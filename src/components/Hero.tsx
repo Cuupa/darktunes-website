@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Play, ArrowRight } from '@phosphor-icons/react'
+import { Play, ArrowDown } from '@phosphor-icons/react'
 import type { Release } from '@/types'
 
 interface HeroProps {
@@ -10,50 +10,49 @@ interface HeroProps {
 
 export function Hero({ featuredRelease }: HeroProps) {
   return (
-    <section id="hero" className="relative min-h-screen flex items-center pt-20">
+    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-32 pb-16">
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(16, 16, 16, 0.4), rgba(16, 16, 16, 0.95)), url(${featuredRelease.coverArt})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(18, 18, 18, 0.3), rgba(18, 18, 18, 0.95)), url(${featuredRelease.coverArt})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
         }}
       />
       
-      <div className="container mx-auto px-4 lg:px-8 z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="container mx-auto px-4 lg:px-16 z-10">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="space-y-8"
           >
-            <Badge className="bg-accent text-accent-foreground uppercase tracking-wider font-bold">
-              New Release
+            <Badge className="bg-secondary/90 text-secondary-foreground uppercase tracking-wider font-bold text-sm px-4 py-2 backdrop-blur-sm">
+              ⚡ New Release
             </Badge>
             
             <div className="space-y-4">
-              <h2 className="text-6xl lg:text-8xl font-bold leading-none tracking-tight">
+              <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight">
                 {featuredRelease.title}
-              </h2>
-              <p className="text-3xl lg:text-4xl text-muted-foreground font-medium">
+              </h1>
+              <p className="text-3xl md:text-4xl lg:text-5xl text-muted-foreground font-medium font-serif">
                 {featuredRelease.artistName}
               </p>
             </div>
 
-            <p className="text-lg text-muted-foreground max-w-lg">
-              Experience the latest evolution in alternative music. 
-              Out now on all streaming platforms.
+            <p className="text-lg md:text-xl text-muted-foreground max-w-xl font-serif leading-relaxed">
+              Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.
             </p>
 
             <div className="flex flex-wrap gap-4">
-              <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider group">
-                <Play className="mr-2 group-hover:scale-110 transition-transform" weight="fill" />
+              <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider group text-base px-8 py-6">
+                <Play className="mr-2 group-hover:scale-110 transition-transform" weight="fill" size={24} />
                 Listen Now
               </Button>
-              <Button size="lg" variant="outline" className="border-2 font-bold uppercase tracking-wider group">
-                View Release
-                <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+              <Button size="lg" variant="outline" className="border-2 font-bold uppercase tracking-wider group text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary">
+                Explore Artist
               </Button>
             </div>
           </motion.div>
@@ -64,23 +63,25 @@ export function Hero({ featuredRelease }: HeroProps) {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="relative"
           >
-            <div className="glow-card relative aspect-square rounded-2xl overflow-hidden shadow-2xl">
+            <div className="glow-card relative aspect-square rounded-lg overflow-hidden shadow-2xl shadow-accent/20">
               <img 
                 src={featuredRelease.coverArt} 
                 alt={`${featuredRelease.title} cover`}
                 className="w-full h-full object-cover"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
             </div>
           </motion.div>
         </div>
       </div>
 
       <motion.div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 text-muted-foreground"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-muted-foreground"
         animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >
-        <p className="text-sm uppercase tracking-wider mb-2">Scroll to explore</p>
+        <p className="text-sm uppercase tracking-widest font-mono">Scroll Down</p>
+        <ArrowDown size={20} weight="bold" />
       </motion.div>
     </section>
   )

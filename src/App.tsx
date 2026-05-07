@@ -6,20 +6,22 @@ import { Artists } from '@/components/Artists'
 import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Footer } from '@/components/Footer'
+import { CRTOverlay } from '@/components/CRTOverlay'
 import { mockReleases, mockArtists, mockNews, mockVideos } from '@/lib/mockData'
 
 function App() {
   const featuredRelease = mockReleases.find(r => r.featured) || mockReleases[0]
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground relative">
+      <CRTOverlay />
       <Header />
       <main>
         <Hero featuredRelease={featuredRelease} />
         <Releases releases={mockReleases} />
         <Artists artists={mockArtists} />
-        <News news={mockNews} />
         <Videos videos={mockVideos} />
+        <News news={mockNews} />
       </main>
       <Footer />
       <Toaster position="bottom-right" theme="dark" />

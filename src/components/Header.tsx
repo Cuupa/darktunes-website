@@ -1,10 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
+import logoImage from '@/assets/images/logo_(1).png'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 100)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const navItems = [
     { label: 'HOME', href: '#hero' },
@@ -15,18 +26,23 @@ export function Header() {
   ]
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-      <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">dT</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight uppercase">darkTunes</h1>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Music Group</p>
-            </div>
-          </div>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border transition-all duration-300">
+      <div className="container mx-auto px-4 lg:px-16">
+        <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? 'h-20' : 'h-28 md:h-32'}`}>
+          <motion.a 
+            href="#hero"
+            className="flex items-center"
+            animate={{
+              scale: scrolled ? 0.75 : 1,
+            }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <img 
+              src={logoImage} 
+              alt="darkTunes Music Group" 
+              className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
+            />
+          </motion.a>
 
           <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => (
@@ -34,12 +50,12 @@ export function Header() {
                 key={item.label}
                 variant="ghost"
                 asChild
-                className="text-sm font-medium tracking-wide hover:text-accent"
+                className="text-sm font-medium tracking-wider hover:text-accent transition-colors"
               >
                 <a href={item.href}>{item.label}</a>
               </Button>
             ))}
-            <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider">
+            <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105">
               Newsletter
             </Button>
           </nav>
@@ -61,7 +77,7 @@ export function Header() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden border-t border-border overflow-hidden"
+            className="lg:hidden border-t border-border overflow-hidden bg-background/98 backdrop-blur-md"
           >
             <nav className="container mx-auto px-4 py-6 flex flex-col gap-2">
               {navItems.map((item) => (
@@ -69,7 +85,7 @@ export function Header() {
                   key={item.label}
                   variant="ghost"
                   asChild
-                  className="justify-start text-base font-medium tracking-wide hover:text-accent"
+                  className="justify-start text-base font-medium tracking-wider hover:text-accent"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <a href={item.href}>{item.label}</a>
