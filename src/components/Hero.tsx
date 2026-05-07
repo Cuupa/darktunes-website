@@ -5,10 +5,14 @@ import { Play, ArrowDown } from '@phosphor-icons/react'
 import type { Release } from '@/types'
 
 interface HeroProps {
-  featuredRelease: Release
+  featuredRelease?: Release
 }
 
 export function Hero({ featuredRelease }: HeroProps) {
+  if (!featuredRelease) {
+    return null
+  }
+  
   return (
     <section id="hero" className="relative min-h-screen flex items-center justify-center pt-32 pb-16">
       <div 

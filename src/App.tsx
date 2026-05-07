@@ -7,10 +7,19 @@ import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Footer } from '@/components/Footer'
 import { CRTOverlay } from '@/components/CRTOverlay'
-import { mockReleases, mockArtists, mockNews, mockVideos } from '@/lib/mockData'
+import { SpotifyPlayer } from '@/components/SpotifyPlayer'
+import { mockArtists, mockNews, mockVideos } from '@/lib/mockData'
+import { useItunesSync } from '@/hooks/useItunesSync'
+import { Button } from '@/components/ui/button'
+import { ArrowsClockwise } from '@phosphor-icons/react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 function App() {
-  const featuredRelease = mockReleases.find(r => r.featured) || mockReleases[0]
+  const { releases, isLoading, isSyncing, syncProgress, syncReleases } = useItunesSync()
+  
+  const featuredRelease = releases && releases.length > 0 
+    ? releases.find(r => r.featured) || releases[0]
+    : undefined
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
@@ -18,7 +27,68 @@ function App() {
       <Header />
       <main>
         <Hero featuredRelease={featuredRelease} />
-        <Releases releases={mockReleases} />
+        
+        <section id="releases" className="relative">
+          <div className="absolute top-8 right-8 z-10">
+            <Button
+              onClick={syncReleases}
+              disabled={isSyncing}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <ArrowsClockwise 
+                size={16} 
+                className={isSyncing ? 'animate-spin' : ''} 
+                weight="bold"
+              />
+              {isSyncing ? `Syncing ${syncProgress}%` : 'Sync iTunes'}
+            </Button>
+          </div>
+          
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="py-24 px-4 lg:px-16 flex justify-center items-center"
+              >
+                <div className="text-center space-y-4">
+                  <ArrowsClockwise size={48} className="animate-spin mx-auto text-primary" weight="bold" />
+                  <p className="text-xl text-muted-foreground">Loading releases from iTunes...</p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="releases"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Releases releases={releases || []} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
+          <div className="container mx-auto max-w-2xl">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mb-8 text-center"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">SPOTIFY</h2>
+              <p className="text-lg text-muted-foreground font-serif">Listen to our playlist</p>
+            </motion.div>
+            <SpotifyPlayer playlistUri="37i9dQZF1DWWqNV5cS50j6" />
+          </div>
+        </section>
+        
         <Artists artists={mockArtists} />
         <Videos videos={mockVideos} />
         <News news={mockNews} />
