@@ -25,12 +25,28 @@ export function Header() {
     { label: 'VIDEOS', href: '#videos' },
   ]
 
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault()
+    const target = document.querySelector(href)
+    if (target) {
+      const headerOffset = 100
+      const elementPosition = target.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
+    }
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border transition-all duration-300">
       <div className="container mx-auto px-4 lg:px-16">
         <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? 'h-20' : 'h-28 md:h-32'}`}>
           <motion.a 
             href="#hero"
+            onClick={(e) => handleSmoothScroll(e, '#hero')}
             className="flex items-center"
             animate={{
               scale: scrolled ? 0.75 : 1,
@@ -52,7 +68,7 @@ export function Header() {
                 asChild
                 className="text-sm font-medium tracking-wider hover:text-accent transition-colors"
               >
-                <a href={item.href}>{item.label}</a>
+                <a href={item.href} onClick={(e) => handleSmoothScroll(e, item.href)}>{item.label}</a>
               </Button>
             ))}
             <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105">
@@ -84,11 +100,13 @@ export function Header() {
                 <Button
                   key={item.label}
                   variant="ghost"
-                  asChild
                   className="justify-start text-base font-medium tracking-wider hover:text-accent"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    handleSmoothScroll(e as any, item.href)
+                    setMobileMenuOpen(false)
+                  }}
                 >
-                  <a href={item.href}>{item.label}</a>
+                  <a href={item.href} onClick={(e) => e.preventDefault()}>{item.label}</a>
                 </Button>
               ))}
               <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider">

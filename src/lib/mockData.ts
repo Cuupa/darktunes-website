@@ -5,21 +5,24 @@ export const mockArtists: Artist[] = [
     id: '1',
     name: 'C Z A R I N A',
     slug: 'czarina',
-    bio: 'Dark electronic pop artist pushing boundaries with haunting vocals and industrial beats. CZARINA crafts atmospheric soundscapes that blend synthetic textures with raw emotion.',
+    bio: 'Dark electronic pop artist pushing boundaries with haunting vocals and industrial beats. CZARINA crafts atmospheric soundscapes that blend synthetic textures with raw emotion, creating music that pulses with intensity.',
     genres: ['Darkpop', 'Electronic', 'Industrial'],
-    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=800&fit=crop',
-    spotifyUrl: 'https://open.spotify.com/artist/example',
+    imageUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/czarina',
     instagramUrl: 'https://instagram.com/czarina',
+    youtubeUrl: 'https://youtube.com/@czarina',
+    websiteUrl: 'https://czarina.music',
     featured: true
   },
   {
     id: '2',
     name: 'BLACKBOOK',
     slug: 'blackbook',
-    bio: 'Merging gothic rock with modern metal sensibilities, BLACKBOOK delivers powerful performances that resonate with darkness and intensity.',
-    genres: ['Gothic Rock', 'Metal'],
-    imageUrl: 'https://images.unsplash.com/photo-1528722828814-77b9b83aafb2?w=800&h=800&fit=crop',
-    spotifyUrl: 'https://open.spotify.com/artist/example',
+    bio: 'Merging gothic rock with modern metal sensibilities, BLACKBOOK delivers powerful performances that resonate with darkness and intensity. Their sound is a perfect marriage of melody and aggression.',
+    genres: ['Gothic Rock', 'Metal', 'Dark Rock'],
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/blackbook',
+    instagramUrl: 'https://instagram.com/blackbook',
     youtubeUrl: 'https://youtube.com/@blackbook',
     featured: true
   },
@@ -27,9 +30,10 @@ export const mockArtists: Artist[] = [
     id: '3',
     name: 'SMASH HIT COMBO',
     slug: 'smash-hit-combo',
-    bio: 'High-energy alternative rock with punk influences. Raw, unfiltered, and unapologetically loud.',
+    bio: 'High-energy alternative rock with punk influences. Raw, unfiltered, and unapologetically loud. SMASH HIT COMBO brings explosive energy to every performance, channeling pure rebellion.',
     genres: ['Alternative', 'Punk', 'Rock'],
-    imageUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=800&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/smashhitcombo',
     instagramUrl: 'https://instagram.com/smashhitcombo',
     featured: false
   },
@@ -37,19 +41,22 @@ export const mockArtists: Artist[] = [
     id: '4',
     name: 'FROZEN PLASMA',
     slug: 'frozen-plasma',
-    bio: 'Pioneers of the synthpop revival, FROZEN PLASMA combines retro electronic aesthetics with contemporary production.',
-    genres: ['Synthpop', 'Electro'],
-    imageUrl: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&h=800&fit=crop',
-    spotifyUrl: 'https://open.spotify.com/artist/example',
+    bio: 'Pioneers of the synthpop revival, FROZEN PLASMA combines retro electronic aesthetics with contemporary production. Their icy melodies and pulsating rhythms define the modern synthwave movement.',
+    genres: ['Synthpop', 'Electro', 'Synth wave'],
+    imageUrl: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/frozenplasma',
+    youtubeUrl: 'https://youtube.com/@frozenplasma',
+    websiteUrl: 'https://frozenplasma.net',
     featured: false
   },
   {
     id: '5',
     name: 'CATTAC',
     slug: 'cattac',
-    bio: 'Aggressive industrial metal with mechanical precision. CATTAC delivers sonic warfare through complex rhythms and distorted vocals.',
-    genres: ['Industrial', 'Metal'],
-    imageUrl: 'https://images.unsplash.com/photo-1524650359799-842906ca1c06?w=800&h=800&fit=crop',
+    bio: 'Aggressive industrial metal with mechanical precision. CATTAC delivers sonic warfare through complex rhythms and distorted vocals, creating a relentless assault of sound that\'s both brutal and hypnotic.',
+    genres: ['Industrial', 'Metal', 'EBM'],
+    imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/cattac',
     youtubeUrl: 'https://youtube.com/@cattac',
     featured: false
   },
@@ -57,10 +64,12 @@ export const mockArtists: Artist[] = [
     id: '6',
     name: 'NEON VOID',
     slug: 'neon-void',
-    bio: 'Cyberpunk-inspired electronic artist creating dystopian soundscapes. The future sounds dark with NEON VOID.',
+    bio: 'Cyberpunk-inspired electronic artist creating dystopian soundscapes. The future sounds dark with NEON VOID. Their music paints vivid pictures of neon-lit streets and digital decay.',
     genres: ['Electronic', 'Industrial', 'Darkwave'],
-    imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop',
-    spotifyUrl: 'https://open.spotify.com/artist/example',
+    imageUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&h=800&fit=crop&q=80',
+    spotifyUrl: 'https://open.spotify.com/artist/neonvoid',
+    instagramUrl: 'https://instagram.com/neonvoid',
+    youtubeUrl: 'https://youtube.com/@neonvoid',
     featured: false
   }
 ]
@@ -72,9 +81,10 @@ export const mockReleases: Release[] = [
     artistId: '1',
     artistName: 'C Z A R I N A',
     releaseDate: '2024-03-15',
-    coverArt: 'https://images.unsplash.com/photo-1611339555312-e607c8352fd7?w=800&h=800&fit=crop',
+    coverArt: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800&h=800&fit=crop&q=80',
     type: 'album',
-    spotifyUrl: 'https://open.spotify.com/album/example',
+    spotifyUrl: 'https://open.spotify.com/album/polymorph',
+    youtubeUrl: 'https://youtube.com/playlist?list=polymorph',
     featured: true
   },
   {
@@ -83,10 +93,10 @@ export const mockReleases: Release[] = [
     artistId: '2',
     artistName: 'BLACKBOOK',
     releaseDate: '2024-04-24',
-    coverArt: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&h=800&fit=crop',
+    coverArt: 'https://images.unsplash.com/photo-1518893883800-45cd0954574b?w=800&h=800&fit=crop&q=80',
     type: 'single',
-    spotifyUrl: 'https://open.spotify.com/track/example',
-    youtubeUrl: 'https://youtube.com/watch?v=example',
+    spotifyUrl: 'https://open.spotify.com/track/monsters',
+    youtubeUrl: 'https://youtube.com/watch?v=monsters',
     featured: true
   },
   {
@@ -95,9 +105,10 @@ export const mockReleases: Release[] = [
     artistId: '3',
     artistName: 'SMASH HIT COMBO',
     releaseDate: '2024-04-17',
-    coverArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop',
+    coverArt: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&h=800&fit=crop&q=80',
     type: 'single',
-    spotifyUrl: 'https://open.spotify.com/track/example',
+    spotifyUrl: 'https://open.spotify.com/track/split',
+    youtubeUrl: 'https://youtube.com/watch?v=split',
     featured: true
   },
   {
@@ -106,9 +117,9 @@ export const mockReleases: Release[] = [
     artistId: '4',
     artistName: 'FROZEN PLASMA',
     releaseDate: '2024-03-27',
-    coverArt: 'https://images.unsplash.com/photo-1558007685-38a2e6f1a845?w=800&h=800&fit=crop',
+    coverArt: 'https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=800&h=800&fit=crop&q=80',
     type: 'ep',
-    spotifyUrl: 'https://open.spotify.com/album/example',
+    spotifyUrl: 'https://open.spotify.com/album/synthetic-dreams',
     featured: false
   },
   {
@@ -117,9 +128,21 @@ export const mockReleases: Release[] = [
     artistId: '5',
     artistName: 'CATTAC',
     releaseDate: '2024-02-14',
-    coverArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop',
+    coverArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop&q=80',
     type: 'album',
-    spotifyUrl: 'https://open.spotify.com/album/example',
+    spotifyUrl: 'https://open.spotify.com/album/machine-heart',
+    youtubeUrl: 'https://youtube.com/playlist?list=machineheart',
+    featured: false
+  },
+  {
+    id: '6',
+    title: 'Digital Decay',
+    artistId: '6',
+    artistName: 'NEON VOID',
+    releaseDate: '2024-05-08',
+    coverArt: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&h=800&fit=crop&q=80',
+    type: 'single',
+    spotifyUrl: 'https://open.spotify.com/track/digital-decay',
     featured: false
   }
 ]
@@ -166,24 +189,48 @@ export const mockVideos: Video[] = [
     id: '1',
     title: 'Monsters (Official Music Video)',
     artistName: 'BLACKBOOK',
-    youtubeId: 'dQw4w9WgXcQ',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=1200&h=675&fit=crop',
+    youtubeId: 'Bx51eegLTY8',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518893883800-45cd0954574b?w=1200&h=675&fit=crop&q=80',
     publishedAt: '2024-04-24'
   },
   {
     id: '2',
     title: 'Polymorph (Visualizer)',
     artistName: 'C Z A R I N A',
-    youtubeId: 'dQw4w9WgXcQ',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1611339555312-e607c8352fd7?w=1200&h=675&fit=crop',
+    youtubeId: '9RBzsjga73s',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=1200&h=675&fit=crop&q=80',
     publishedAt: '2024-03-15'
   },
   {
     id: '3',
     title: 'Split (Official Video)',
     artistName: 'SMASH HIT COMBO',
-    youtubeId: 'dQw4w9WgXcQ',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&h=675&fit=crop',
+    youtubeId: 'kXYiU_JCYtU',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1200&h=675&fit=crop&q=80',
     publishedAt: '2024-04-17'
+  },
+  {
+    id: '4',
+    title: 'Synthetic Dreams (Live Session)',
+    artistName: 'FROZEN PLASMA',
+    youtubeId: 'OPf0YbXqDm0',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=1200&h=675&fit=crop&q=80',
+    publishedAt: '2024-03-27'
+  },
+  {
+    id: '5',
+    title: 'Machine Heart (Official Music Video)',
+    artistName: 'CATTAC',
+    youtubeId: 'WaMB0rR7sTU',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&h=675&fit=crop&q=80',
+    publishedAt: '2024-02-14'
+  },
+  {
+    id: '6',
+    title: 'Digital Decay (Visualizer)',
+    artistName: 'NEON VOID',
+    youtubeId: 'bjPqsDU0j2I',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&h=675&fit=crop&q=80',
+    publishedAt: '2024-05-08'
   }
 ]

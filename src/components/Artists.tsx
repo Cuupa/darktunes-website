@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { InstagramLogo, SpotifyLogo, YoutubeLogo, Globe } from '@phosphor-icons/react'
+import { ArtistModal } from '@/components/ArtistModal'
 import type { Artist } from '@/types'
 
 interface ArtistsProps {
@@ -9,8 +12,17 @@ interface ArtistsProps {
 }
 
 export function Artists({ artists }: ArtistsProps) {
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleArtistClick = (artist: Artist) => {
+    setSelectedArtist(artist)
+    setModalOpen(true)
+  }
+
   return (
-    <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20">
+    <>
+      <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20">
       <div className="container mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -32,7 +44,10 @@ export function Artists({ artists }: ArtistsProps) {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
             >
-              <Card className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full">
+              <Card 
+                className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
+                onClick={() => handleArtistClick(artist)}
+              >
                 <div className="relative aspect-square overflow-hidden">
                   <img 
                     src={artist.imageUrl} 
@@ -55,7 +70,7 @@ export function Artists({ artists }: ArtistsProps) {
                   <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
                     {artist.bio}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     {artist.spotifyUrl && (
                       <a 
                         href={artist.spotifyUrl} 
@@ -104,5 +119,12 @@ export function Artists({ artists }: ArtistsProps) {
         </div>
       </div>
     </section>
+
+    <ArtistModal 
+      artist={selectedArtist} 
+      open={modalOpen} 
+      onOpenChange={setModalOpen} 
+    />
+    </>
   )
 }

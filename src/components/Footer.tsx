@@ -1,6 +1,23 @@
 import { InstagramLogo, YoutubeLogo, SpotifyLogo } from '@phosphor-icons/react'
 
 export function Footer() {
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault()
+      const target = document.querySelector(href)
+      if (target) {
+        const headerOffset = 100
+        const elementPosition = target.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        })
+      }
+    }
+  }
+
   return (
     <footer className="border-t border-border bg-card/50 backdrop-blur-sm">
       <div className="container mx-auto px-4 lg:px-8 py-12">
@@ -23,16 +40,16 @@ export function Footer() {
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wider">Quick Links</h4>
             <nav className="flex flex-col gap-2">
-              <a href="#artists" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#artists" onClick={(e) => handleSmoothScroll(e, '#artists')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Artists
               </a>
-              <a href="#releases" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Releases
               </a>
-              <a href="#news" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 News
               </a>
-              <a href="#videos" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Videos
               </a>
             </nav>
@@ -45,7 +62,7 @@ export function Footer() {
                 href="https://instagram.com/darktunes"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
               >
                 <InstagramLogo size={24} weight="fill" />
               </a>
@@ -53,7 +70,7 @@ export function Footer() {
                 href="https://youtube.com/@darktunes"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
               >
                 <YoutubeLogo size={24} weight="fill" />
               </a>
@@ -61,7 +78,7 @@ export function Footer() {
                 href="https://open.spotify.com/user/darktunes"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
               >
                 <SpotifyLogo size={24} weight="fill" />
               </a>
@@ -74,14 +91,14 @@ export function Footer() {
             © {new Date().getFullYear()} darkTunes Music Group. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+            <a href="mailto:info@darktunes.com" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              Contact
+            </a>
+            <a href="https://darktunes.com/privacy" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
               Privacy Policy
             </a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-              Terms of Service
-            </a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-              Contact
+            <a href="https://darktunes.com/terms" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              Terms
             </a>
           </div>
         </div>
