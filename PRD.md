@@ -1,14 +1,14 @@
 # darkTunes Music Group - Music Label Website
 
-A modern alternative music label website featuring immersive design with CRT effects, animated modals, and dynamic content presentation inspired by contemporary label sites.
+A modern alternative music label website featuring immersive design with CRT effects, animated modals, dynamic content presentation, and a full-featured admin panel for content management.
 
 **Experience Qualities**:
 1. **Immersive** - Deep dark atmosphere with vintage CRT aesthetics that pull users into the alternative music world
 2. **Dynamic** - Smooth scrolling interactions with shrinking logo, overlay modals with build-up animations creating engaging transitions
 3. **Bold** - High-contrast design with powerful typography and striking visuals that command attention
 
-**Complexity Level**: Light Application (multiple features with basic state)
-This is a content showcase site with interactive elements like video modals, smooth scroll effects, and dynamic header behavior. It presents music label content through multiple sections without complex data management.
+**Complexity Level**: Complex Application (advanced functionality with multiple views and data management)
+This application combines a public-facing content showcase with a comprehensive admin panel for content management. It features database integration (Supabase), cloud storage (Cloudflare R2), user authentication, role-based access control, and real-time content management capabilities.
 
 ## Essential Features
 
@@ -39,6 +39,27 @@ This is a content showcase site with interactive elements like video modals, smo
 - **Trigger**: Page load and scroll
 - **Progression**: User scrolls → sections appear → hover interactions reveal more info → clicks navigate to details
 - **Success criteria**: All sections load properly, content is accessible, responsive across devices
+
+### Admin Panel
+- **Functionality**: Full content management system with authentication, role-based access, and CRUD operations
+- **Purpose**: Enables label staff to manage all website content without developer intervention
+- **Trigger**: Admin navigates to /admin route, logs in with credentials
+- **Progression**: User logs in → sees dashboard → selects content type → creates/edits/deletes content → changes reflected on public site
+- **Success criteria**: Secure authentication, intuitive interface, real-time updates, proper permission enforcement
+
+### Database Integration
+- **Functionality**: Supabase backend for storing artists, releases, news, videos, user profiles
+- **Purpose**: Centralized data management with real-time synchronization between admin and public views
+- **Trigger**: Application start, user interactions, admin content updates
+- **Progression**: Data requested → Supabase queries → results cached → UI updates → changes propagate in real-time
+- **Success criteria**: Fast queries, reliable persistence, automatic sync, proper data relationships
+
+### Cloud Storage
+- **Functionality**: Cloudflare R2 for storing and serving images, cover art, and media files
+- **Purpose**: Scalable, cost-effective asset management with CDN delivery
+- **Trigger**: Admin uploads file, public site requests asset
+- **Progression**: File uploaded → stored in R2 → public URL generated → used in content → served via CDN
+- **Success criteria**: Fast uploads, reliable delivery, proper access control, URL generation
 
 ## Edge Case Handling
 

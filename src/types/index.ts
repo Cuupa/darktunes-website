@@ -10,6 +10,11 @@ export interface Artist {
   youtubeUrl?: string
   websiteUrl?: string
   featured: boolean
+  country?: string
+  email?: string
+  vatNumber?: string
+  isEuNonGerman?: boolean
+  notes?: string
 }
 
 export interface Release {
@@ -24,6 +29,7 @@ export interface Release {
   appleMusicUrl?: string
   youtubeUrl?: string
   featured: boolean
+  itunesId?: string
 }
 
 export interface NewsPost {
@@ -43,4 +49,24 @@ export interface Video {
   youtubeId: string
   thumbnailUrl: string
   publishedAt: string
+}
+
+export interface UserProfile {
+  id: string
+  email: string
+  role: 'admin' | 'editor' | 'user'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Asset {
+  id: string
+  filename: string
+  originalFilename: string
+  mimeType: string
+  sizeBytes: number
+  r2Key: string
+  publicUrl: string
+  uploadedBy?: string
+  createdAt: string
 }
