@@ -79,11 +79,11 @@ function validateEnv(): Env | null {
       return null
     }
 
-    // Production / CI: surface the error as loudly as possible.
-    console.error(banner)
-    throw new Error(
-      `darkTunes: missing required environment variables:\n${lines.join('\n')}`,
-    )
+    // Production: also warn and return null to allow graceful degradation.
+    // Server-side enforcement of required vars is handled by src/lib/env.server.ts
+    // which is imported in Route Handlers and Server Components.
+    console.warn(banner)
+    return null
   }
 
   return result.data

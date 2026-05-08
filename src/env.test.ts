@@ -107,28 +107,35 @@ describe('src/env.ts — environment variable validation', () => {
   })
 
   describe('production mode — strict validation', () => {
-    it('throws a formatted error when vars are missing in production', async () => {
+    it('warns and returns null when vars are missing in production', async () => {
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '')
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '')
       vi.stubEnv('NODE_ENV', 'production')
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      await expect(loadEnvModule()).rejects.toThrow(/missing required environment variables/i)
+      const { env, isSupabaseConfigured } = await loadEnvModule()
 
-      errorSpy.mockRestore()
+      expect(env).toBeNull()
+      expect(isSupabaseConfigured).toBe(false)
+      expect(warnSpy).toHaveBeenCalled()
+
+      warnSpy.mockRestore()
     })
 
-    it('throws when URL is invalid in production', async () => {
+    it('warns and returns null when URL is invalid in production', async () => {
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'not-a-url')
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', VALID_KEY)
       vi.stubEnv('NODE_ENV', 'production')
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      await expect(loadEnvModule()).rejects.toThrow()
+      const { env } = await loadEnvModule()
 
-      errorSpy.mockRestore()
+      expect(env).toBeNull()
+      expect(warnSpy).toHaveBeenCalled()
+
+      warnSpy.mockRestore()
     })
 
     it('error message names the missing variable', async () => {
@@ -136,11 +143,14 @@ describe('src/env.ts — environment variable validation', () => {
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '')
       vi.stubEnv('NODE_ENV', 'production')
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      await expect(loadEnvModule()).rejects.toThrow(/NEXT_PUBLIC_SUPABASE_ANON_KEY/)
+      const { env } = await loadEnvModule()
 
-      errorSpy.mockRestore()
+      expect(env).toBeNull()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_ANON_KEY'))
+
+      warnSpy.mockRestore()
     })
   })
 })

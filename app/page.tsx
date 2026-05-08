@@ -15,7 +15,7 @@ import { HomePageContent } from './_components/HomePageContent'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getReleases } from '@/lib/api/releases'
 import { getArtists } from '@/lib/api/artists'
-import { getNews } from '@/lib/api/news'
+import { getNewsPosts } from '@/lib/api/news'
 import { getVideos } from '@/lib/api/videos'
 import type { Release, Artist, NewsPost, Video } from '@/types'
 
@@ -45,7 +45,7 @@ const getCachedArtists = unstable_cache(
 const getCachedNews = unstable_cache(
   async (): Promise<NewsPost[]> => {
     const client = await createServerSupabaseClient()
-    return getNews(client)
+    return getNewsPosts(client)
   },
   ['news'],
   { revalidate: 60, tags: ['news'] },

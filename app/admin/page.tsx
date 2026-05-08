@@ -1,19 +1,15 @@
-'use client'
-
 /**
- * app/admin/page.tsx — Admin dashboard
+ * app/admin/page.tsx — Admin dashboard (Server Component)
  *
- * The middleware guarantees that only authenticated users reach this page.
- * We render the AdminDashboard client component which includes all CMS features.
+ * The middleware.ts at the Edge guarantees only authenticated users reach here.
+ * force-dynamic ensures this page is server-rendered on every request,
+ * never served from a static cache.
  */
 
-import { AdminDashboard } from '@/components/admin/AdminDashboard'
-import { AuthProvider } from '@/contexts/AuthContext'
+export const dynamic = 'force-dynamic'
+
+import { AdminDashboardWrapper } from './_components/AdminDashboardWrapper'
 
 export default function AdminPage() {
-  return (
-    <AuthProvider>
-      <AdminDashboard />
-    </AuthProvider>
-  )
+  return <AdminDashboardWrapper />
 }

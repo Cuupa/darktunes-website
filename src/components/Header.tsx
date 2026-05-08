@@ -56,7 +56,7 @@ export function Header() {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
             <img 
-              src={logoImage} 
+              src={logoImage.src} 
               alt="darkTunes Music Group" 
               className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
             />
