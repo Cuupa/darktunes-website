@@ -104,7 +104,7 @@
 | `src/lib/component-contracts.ts` | Shared prop interfaces (SectionProps, AdminPanelProps, etc.) |
 | `src/types/database.ts` | TypeScript DB types (must stay in sync with migrations) |
 | `src/components/admin/forms/` | Admin CRUD form components |
-| `api/upload.ts` | Vercel serverless function for R2 file uploads |
+| `app/api/upload/route.ts` | Next.js Route Handler for R2 file uploads |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
 ---
@@ -113,10 +113,10 @@
 
 ```bash
 cp .env.example .env.local
-# Fill in VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, CLOUDFLARE_R2_* variables
+# Fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, CLOUDFLARE_R2_* variables
 
 npm ci
 npm run dev
-# -> http://localhost:5173 (public site)
-# -> http://localhost:5173/admin (admin panel)
+# -> http://localhost:3000 (public site)
+# -> http://localhost:3000/admin (admin panel)
 ```
