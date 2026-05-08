@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/env'
 import * as assetsApi from '@/lib/api/assets'
 import type { Asset } from '@/types'
 import type { Database } from '@/types/database'
@@ -10,6 +11,7 @@ export function useAssets() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -27,7 +29,7 @@ export function useAssets() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const createAssetRecord = async (data: AssetInsert): Promise<void> => {
     await assetsApi.createAssetRecord(supabase, data)

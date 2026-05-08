@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
-import { supabase } from '@/lib/supabase'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -131,6 +131,7 @@ function ArtistSkeletonRows() {
 }
 
 export function ArtistsManager() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { artists, isLoading, createArtist, updateArtist, deleteArtist } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
