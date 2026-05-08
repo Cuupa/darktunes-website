@@ -84,3 +84,21 @@ export interface Asset {
   uploadedBy?: string
   createdAt: string
 }
+
+export interface SiteSettings {
+  labelName: string
+  labelTagline: string
+  contactEmail: string
+  privacyPolicyUrl: string
+  termsUrl: string
+  instagramUrl: string
+  youtubeUrl: string
+  spotifyUrl: string
+  spotifyPlaylistUri: string
+  heroBadge: string
+  heroDescription: string
+  seoTitle: string
+  seoDescription: string
+  ogTitle: string
+  ogDescription: string
+}

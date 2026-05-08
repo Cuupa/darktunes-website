@@ -10,13 +10,14 @@ import { Footer } from '@/components/Footer'
 import { CRTOverlay } from '@/components/CRTOverlay'
 import { SpotifyPlayer } from '@/components/SpotifyPlayer'
 import { motion } from 'framer-motion'
-import type { Release, Artist, NewsPost, Video } from '@/types'
+import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
 
 interface HomePageContentProps {
   releases: Release[]
   artists: Artist[]
   news: NewsPost[]
   videos: Video[]
+  siteSettings: SiteSettings
 }
 
 /**
@@ -24,7 +25,7 @@ interface HomePageContentProps {
  * Data is fetched server-side in app/page.tsx (RSC) and passed as props.
  * This component handles all interactive UI — animations, modals, smooth scroll.
  */
-export function HomePageContent({ releases, artists, news, videos }: HomePageContentProps) {
+export function HomePageContent({ releases, artists, news, videos, siteSettings }: HomePageContentProps) {
   const featuredRelease =
     releases.length > 0 ? releases.find((r) => r.featured) ?? releases[0] : undefined
 
@@ -33,7 +34,7 @@ export function HomePageContent({ releases, artists, news, videos }: HomePageCon
       <CRTOverlay />
       <Header />
       <main>
-        <Hero featuredRelease={featuredRelease} />
+        <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} />
 
         <section id="releases" className="relative">
           <motion.div
@@ -57,7 +58,7 @@ export function HomePageContent({ releases, artists, news, videos }: HomePageCon
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">SPOTIFY</h2>
               <p className="text-lg text-muted-foreground font-serif">Listen to our playlist</p>
             </motion.div>
-            <SpotifyPlayer playlistUri="37i9dQZF1DWWqNV5cS50j6" />
+            <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri} />
           </div>
         </section>
 
@@ -65,7 +66,7 @@ export function HomePageContent({ releases, artists, news, videos }: HomePageCon
         <Videos videos={videos} />
         <News news={news} />
       </main>
-      <Footer />
+      <Footer siteSettings={siteSettings} />
     </div>
   )
 }

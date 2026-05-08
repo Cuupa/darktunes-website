@@ -11,6 +11,7 @@ Access the admin panel at `/admin`. Authentication is enforced at the edge by **
 - **News Management**: Create and publish news posts and announcements
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
+- **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
 
 ## Setup
 
@@ -68,6 +69,15 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Browse uploaded assets
 - Copy public URLs for use in content
 - Delete unused assets
+
+### Site Settings
+Manage all global site content from the **Settings** tab — no code changes needed:
+- **Global**: Label name, tagline, contact email, privacy policy URL, terms URL
+- **Social Links**: Instagram, YouTube, Spotify profile URLs (leave blank to hide the icon)
+- **Homepage**: Hero badge text, hero description, Spotify playlist URI
+- **SEO / Meta**: Page title, meta description, Open Graph title and description
+
+Changes are saved to the `site_settings` Supabase table. The Admin CMS immediately calls `POST /api/revalidate-site-settings` to bust the Next.js ISR cache so the public site reflects the update within seconds.
 
 ## Permissions
 

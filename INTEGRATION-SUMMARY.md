@@ -18,7 +18,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 84 tests passing (9 test files)
+- **Vitest** unit test suite (`npm test`) — 93 tests passing (10 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -36,6 +36,7 @@
 - `news.ts` — CRUD for news_posts table
 - `videos.ts` — CRUD for videos table
 - `assets.ts` — `getAssets`, `createAssetRecord`, `deleteAssetRecord`
+- `siteSettings.ts` — `getSiteSettings` (returns typed `SiteSettings`), `upsertSiteSetting`, `upsertSiteSettings` (batch)
 - Each DAL function receives `SupabaseClient<Database>` as first arg; fully unit-tested
 
 ### React Hooks (`src/hooks/`)
@@ -44,6 +45,7 @@
 - `useNews` — loads news posts, exposes create/update/delete
 - `useVideos` — loads videos, exposes create/update/delete
 - `useAssets` — loads assets, exposes createAssetRecord/deleteAssetRecord
+- `useSiteSettings` — loads site settings, exposes `saveSettings()` + cache revalidation
 - All hooks check `isSupabaseConfigured` and short-circuit gracefully in dev
 
 ### Admin Panel (Next.js App Router)
@@ -56,6 +58,7 @@
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
+- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`
 
 ### File Upload (Next.js Route Handler)
 - `app/api/upload/route.ts` — POST Route Handler that:
@@ -120,6 +123,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Sync history logging | ✅ Implemented | sync_logs table + getSyncLogsByArtist DAL |
 | Spotify / Discogs / Songkick sync | 🔲 Pending | ID fields stored in DB; API integration pending API key setup |
 | Supabase pg_cron auto-sync | 🔲 Pending | Schema and API route ready; pg_cron schedule setup needed in Supabase dashboard |
+| Site settings CMS | ✅ Implemented | `site_settings` table + Admin Settings tab + Next.js ISR cache revalidation |
 
 ---
 
@@ -145,11 +149,13 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/types/database.ts` | TypeScript DB types (must stay in sync with migrations) |
 | `src/components/admin/forms/` | Admin CRUD form components |
 | `src/lib/api/syncLogs.ts` | DAL for sync_logs table (getSyncLogsByArtist, insertSyncLog) |
+| `src/lib/api/siteSettings.ts` | DAL for site_settings table (getSiteSettings, upsertSiteSetting, upsertSiteSettings) |
 | `src/lib/rateLimiter.ts` | HttpError + withExponentialBackoff for resilient external API calls |
 | `src/lib/imageUtils.ts` | wsrv.nl image proxy helpers (getOptimizedImageUrl, getSquareThumbnail) |
 | `src/lib/r2Utils.ts` | R2 upload helper (createR2Client, uploadUrlToR2) |
 | `src/lib/sync/syncArtist.ts` | Core artist sync orchestrator (IoC via SyncDeps) |
 | `app/api/sync-artist/route.ts` | Manual sync trigger — POST /api/sync-artist |
+| `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
 ---

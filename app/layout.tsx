@@ -1,16 +1,37 @@
 import type { Metadata } from 'next'
 import { Providers } from './_components/Providers'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getSiteSettings } from '@/lib/api/siteSettings'
+import { unstable_cache } from 'next/cache'
 import './globals.css'
 
-export const metadata: Metadata = {
-  title: 'darkTunes Music Group',
-  description:
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
-  openGraph: {
-    title: 'darkTunes Music Group',
-    description: 'Alternative music label — artists, releases, news, and videos.',
-    type: 'website',
+const getCachedSiteSettings = unstable_cache(
+  async () => {
+    const client = await createServerSupabaseClient()
+    return getSiteSettings(client)
   },
+  ['site-settings'],
+  { revalidate: 60, tags: ['site-settings'] },
+)
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getCachedSiteSettings().catch(() => null)
+  const title = settings?.seoTitle ?? 'darkTunes Music Group'
+  const description =
+    settings?.seoDescription ??
+    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
+  const ogTitle = settings?.ogTitle ?? title
+  const ogDescription = settings?.ogDescription ?? description
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: ogTitle,
+      description: ogDescription,
+      type: 'website',
+    },
+  }
 }
 
 /**
