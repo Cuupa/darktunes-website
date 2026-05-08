@@ -46,13 +46,17 @@ export async function createServerSupabaseClient() {
  * Admin client that uses the service-role key.
  * Only use in trusted server-side contexts (Route Handlers, Server Actions).
  * Never expose this to the browser.
+ *
+ * Uses serverEnv to ensure all required credentials are present and validated
+ * before creating the client. Throws at import if env vars are missing.
  */
 export async function createServiceRoleSupabaseClient() {
+  const { serverEnv } = await import('@/lib/env.server')
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     {
       cookies: {
         getAll() {
