@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
-import { searchItunesArtist, convertItunesReleaseToRelease, type iTunesRelease } from '@/lib/itunesApi'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { searchItunesArtist, convertItunesReleaseToRelease } from '@/lib/itunesApi'
 import { artistsData } from '@/lib/artistsData'
 import type { Release } from '@/types'
 
 export function useItunesSync() {
-  const [releases, setReleases] = useKV<Release[]>('itunes-releases', [])
+  const [releases, setReleases] = useLocalStorage<Release[]>('itunes-releases', [])
   const [isLoading, setIsLoading] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [lastSync, setLastSync] = useKV<string | null>('itunes-last-sync', null)
+  const [lastSync, setLastSync] = useLocalStorage<string | null>('itunes-last-sync', null)
   const [syncProgress, setSyncProgress] = useState(0)
 
   const syncReleases = async () => {

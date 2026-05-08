@@ -1,0 +1,54 @@
+# supabase/config.toml
+# Supabase CLI project configuration for darkTunes Music Group.
+#
+# Setup:
+#   1. Install Supabase CLI: https://supabase.com/docs/guides/cli
+#   2. Log in:  supabase login
+#   3. Link to your cloud project:
+#        supabase link --project-ref <YOUR_PROJECT_REF>
+#      (find YOUR_PROJECT_REF in the Supabase Dashboard → Project Settings → General)
+#   4. Apply migrations:
+#        supabase db push
+#
+# Local development (optional):
+#   supabase start   — spin up a local Supabase stack via Docker
+#   supabase stop    — tear it down
+#   supabase db diff — compare local schema with remote and generate a new migration
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# Site URL is set via VITE_SUPABASE_URL in Vercel environment variables.
+# For local dev, set SITE_URL below.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["https://darktunes.com", "https://darktunes.vercel.app"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
