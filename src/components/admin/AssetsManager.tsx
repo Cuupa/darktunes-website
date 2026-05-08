@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Trash, Copy, UploadSimple } from '@phosphor-icons/react'
 import { useAssets } from '@/hooks/useAssets'
@@ -42,7 +42,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function AssetsManager() {
-  const supabase = createBrowserSupabaseClient()
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { assets, isLoading, createAssetRecord, deleteAssetRecord } = useAssets()
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null)
   const [isMutating, setIsMutating] = useState(false)
