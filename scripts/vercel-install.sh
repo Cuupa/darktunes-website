@@ -63,6 +63,13 @@ require_env "CLOUDFLARE_R2_BUCKET_NAME"       "R2 bucket name"
 require_env "CLOUDFLARE_R2_PUBLIC_URL"        "R2 public CDN base URL (e.g. https://cdn.darktunes.com)"
 echo ""
 
+echo "  — External API keys (optional — artist auto-sync) —"
+require_env "SPOTIFY_CLIENT_ID"     "Spotify app client ID (sync: releases by Spotify Artist ID)"
+require_env "SPOTIFY_CLIENT_SECRET" "Spotify app client secret"
+require_env "DISCOGS_TOKEN"         "Discogs personal access token (sync: releases by Discogs Artist ID)"
+require_env "SONGKICK_API_KEY"      "Songkick API key (sync: tour dates by Songkick Artist ID)"
+echo ""
+
 if [ "$MISSING" -gt 0 ]; then
   echo "  ⚠  ${MISSING} variable(s) not set."
   echo "  → Configure them in Vercel Dashboard → Project → Settings → Environment Variables."

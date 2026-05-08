@@ -38,9 +38,12 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 ## Usage
 
 ### Artists
-- Add new artists with their bio, genres, and social links
+- Add new artists with their bio, genres, social links, and **external API IDs** (Spotify, Discogs, Songkick)
 - Update artist information
 - Mark artists as featured
+- **"Sync Now"** button per artist — triggers `POST /api/sync-artist` to fetch the latest iTunes releases, cache cover art in Cloudflare R2, and upsert releases to Supabase. The button shows a spinner while syncing; success/error is reported via toast notification.
+- Skeleton loading states — the artist table shows animated placeholder rows (avatar + text skeletons) while data is fetching, preventing layout shift.
+- View "Last Synced" date for each artist
 - Delete artists (cascades to their releases)
 
 ### Releases
@@ -80,6 +83,9 @@ To run the admin panel locally with Supabase:
 2. Fill in your Supabase and R2 credentials
 3. Run `npm run dev` — Next.js dev server starts on `http://localhost:3000`
 4. Navigate to `http://localhost:3000/admin`
+
+- **Artist Auto-Sync**: A "Sync Now" button appears next to each artist. Clicking it calls `POST /api/sync-artist`, which fetches releases from the iTunes API, downloads cover art and stores it in Cloudflare R2, and upserts releases to Supabase. All sync operations are logged in the `sync_logs` table for audit purposes.
+- **Skeleton Loading**: The Artists table shows skeleton placeholder rows (avatar circle + text lines) while data is loading, avoiding cumulative layout shift (CLS).
 
 ## Integration Notes
 
