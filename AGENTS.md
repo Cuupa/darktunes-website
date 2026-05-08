@@ -18,8 +18,26 @@ Core Infrastructure: Next.js (App Router), React, Supabase (PostgreSQL), Cloudfl
 UI & Design: Exclusively use Tailwind CSS and ensure the CSS output is minified.
 Motion & UX: Implement fluid page transitions and shared layout animations with Framer Motion, and utilize Lenis for smooth scrolling. Use Phosphor Icons for all vector graphics.
 
+CI Color System (darkTunes Brand)
+The following exact hex values MUST be used. They are mapped to CSS custom properties in src/index.css and must not be replaced with approximations:
+  --primary / --accent / --ring: #493687  (violet – primary CTAs, active nav, focus rings)
+  --secondary:                   #7e1e37  (pink – secondary buttons, hover effects, promo badges)
+  --background:                  #101010  (near-black – global page background, immersive dark mode)
+  --card / --muted / --popover:  #292929  (surface – cards, modals, dropdowns, player bar)
+  --border / --input:            #383838  (subtle borders, input frames, disabled states)
+  --foreground / text:           #ffffff  (primary text – maximum contrast on dark surfaces)
+
+Smooth Scrolling (Lenis)
+The LenisProvider (src/components/animations/LenisProvider.tsx) is the single global smooth-scroll implementation.
+It is mounted once at the root level in src/main.tsx and wraps the entire React tree.
+Do NOT add a second LenisProvider instance anywhere else in the tree.
+Do NOT use CSS scroll-behavior: smooth as a replacement – Lenis overrides this at the JS layer.
+
 Unit Testing & Quality Assurance
 Unit Testing: Write unit tests for all new utilities, API routes, and complex hooks using Vitest.
+Test runner: `npm test` (runs `vitest run`), watch mode: `npm run test:watch`.
+Test setup file: src/test/setup.ts – imports @testing-library/jest-dom matchers.
+Test files live alongside their source files: src/**/*.{test,spec}.{ts,tsx}.
 Test Isolation: Tests must not rely on external network requests. Mock all external APIs (including iTunes, Bandsintown, Odesli, Spotify, and Discogs).
 
 Inversion of Control (IoC) & Component Contracts
