@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use `createBrowserSupabaseClient` from `@/lib/supabase/client` instead.
+ * This client uses localStorage for session storage which is incompatible with
+ * the cookie-based SSR auth used throughout the rest of the app.
+ */
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { env, isSupabaseConfigured } from '@/env'

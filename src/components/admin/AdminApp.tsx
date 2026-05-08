@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { LoginForm } from './LoginForm'
 import { AdminDashboard } from './AdminDashboard'
 import { Card, CardContent } from '@/components/ui/card'
-import { isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured } from '@/env'
 
 function AdminContent() {
   const { loading, isAuthenticated } = useAuthContext()

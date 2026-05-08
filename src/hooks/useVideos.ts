@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/env'
 import * as videosApi from '@/lib/api/videos'
 import type { Video } from '@/types'
 import type { Database } from '@/types/database'
@@ -11,6 +12,7 @@ export function useVideos() {
   const [videos, setVideos] = useState<Video[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -28,7 +30,7 @@ export function useVideos() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const createVideo = async (data: VideoInsert): Promise<void> => {
     await videosApi.createVideo(supabase, data)

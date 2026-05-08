@@ -91,8 +91,8 @@ Migration naming: use UTC timestamp prefix, e.g. 20240601120000_add_artist_bandc
 Vercel Deployment
 Install script: scripts/vercel-install.sh runs npm ci and validates all required environment variables.
 Required env vars are split into two groups:
-  - Client-side (must have VITE_ prefix to be exposed to the browser):
-      VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+  - Client-side (must have NEXT_PUBLIC_ prefix to be exposed to the browser):
+      NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
   - Server-side (never exposed to the browser; used only in Vercel Serverless Functions):
       SUPABASE_SERVICE_ROLE_KEY,
       CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
