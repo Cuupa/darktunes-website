@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'

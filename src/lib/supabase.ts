@@ -5,8 +5,8 @@ import { env, isSupabaseConfigured } from '@/env'
 export { isSupabaseConfigured }
 
 export const supabase = createClient<Database>(
-  env?.VITE_SUPABASE_URL ?? '',
-  env?.VITE_SUPABASE_ANON_KEY ?? '',
+  env?.NEXT_PUBLIC_SUPABASE_URL ?? '',
+  env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
   {
     auth: {
       persistSession: true,

@@ -1,8 +1,11 @@
 /**
  * src/env.ts
  *
- * Central environment-variable validation for darkTunes.
- * All VITE_* variables are validated here via Zod at module-load time.
+ * Client-side environment variable validation for darkTunes.
+ * All NEXT_PUBLIC_* variables are validated here via Zod at module-load time.
+ *
+ * This file is safe to import in both Client Components ("use client") and
+ * Server Components — Next.js inlines NEXT_PUBLIC_* vars at build time.
  *
  * Behavior per environment:
  *   production  → missing required variables throw a formatted Error that is
@@ -11,10 +14,6 @@
  *   development / preview → missing variables produce a console warning and
  *                 the module returns `null` so individual features can degrade
  *                 gracefully instead of blocking the entire dev server.
- *
- * Note: This is a Vite SPA (browser runtime).  `process.exit(1)` is not
- * available in the browser, so a throw is used instead.  The ErrorBoundary in
- * src/main.tsx surfaces the formatted message to the developer.
  */
 
 import { z } from 'zod'
@@ -24,8 +23,7 @@ import { z } from 'zod'
 // ---------------------------------------------------------------------------
 
 /** True when running in development or Vercel preview mode. */
-export const isDev: boolean =
-  import.meta.env.MODE === 'development' || import.meta.env.MODE === 'preview'
+export const isDev: boolean = process.env.NODE_ENV !== 'production'
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -33,9 +31,11 @@ export const isDev: boolean =
 
 const envSchema = z.object({
   /** Supabase project REST/Auth/Realtime base URL (e.g. https://xxxx.supabase.co) */
-  VITE_SUPABASE_URL: z.string().url({ message: 'must be a valid URL (e.g. https://xxxx.supabase.co)' }),
+  NEXT_PUBLIC_SUPABASE_URL: z
+    .string()
+    .url({ message: 'must be a valid URL (e.g. https://xxxx.supabase.co)' }),
   /** Supabase public anonymous key */
-  VITE_SUPABASE_ANON_KEY: z.string().min(1, { message: 'must not be empty' }),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, { message: 'must not be empty' }),
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -46,16 +46,14 @@ export type Env = z.infer<typeof envSchema>
 
 function validateEnv(): Env | null {
   const raw = {
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   }
 
   const result = envSchema.safeParse(raw)
 
   if (!result.success) {
-    const lines = result.error.errors.map(
-      (e) => `  • ${String(e.path[0])}: ${e.message}`,
-    )
+    const lines = result.error.errors.map((e) => `  • ${String(e.path[0])}: ${e.message}`)
 
     const banner = [
       '',

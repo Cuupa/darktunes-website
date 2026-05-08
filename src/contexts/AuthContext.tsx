@@ -1,3 +1,5 @@
+'use client'
+
 import { createContext, useContext, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import type { User, Session } from '@supabase/supabase-js'

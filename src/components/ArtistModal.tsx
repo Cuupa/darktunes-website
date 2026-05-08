@@ -1,3 +1,5 @@
+'use client'
+
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { X, SpotifyLogo, InstagramLogo, YoutubeLogo, Globe } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'

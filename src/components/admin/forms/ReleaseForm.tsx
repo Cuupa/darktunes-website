@@ -1,3 +1,4 @@
+'use client'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import type { AdminPanelProps } from '@/lib/component-contracts'

@@ -1,3 +1,5 @@
+'use client'
+
 import { InstagramLogo, YoutubeLogo, SpotifyLogo } from '@phosphor-icons/react'
 
 export function Footer() {

@@ -1,3 +1,4 @@
+'use client'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { LoginForm } from './LoginForm'

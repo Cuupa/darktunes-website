@@ -1,18 +1,11 @@
 {
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "devCommand": "next dev",
   "installCommand": "bash scripts/vercel-install.sh",
-  "framework": null,
-  "outputDirectory": "dist",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
   "headers": [
     {
-      "source": "/assets/(.*)",
+      "source": "/_next/static/(.*)",
       "headers": [
         {
           "key": "Cache-Control",

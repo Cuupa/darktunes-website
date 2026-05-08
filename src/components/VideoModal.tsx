@@ -1,3 +1,5 @@
+'use client'
+
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
