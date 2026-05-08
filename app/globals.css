@@ -8,22 +8,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
-  }
-
-  html {
-    scroll-behavior: smooth;
   }
 
   body {
@@ -35,7 +21,7 @@
   h1,
   h2,
   h3 {
-    font-family: 'Space Grotesk', 'Outfit', sans-serif;
+    font-family: 'Oxanium', sans-serif;
   }
 }
 
