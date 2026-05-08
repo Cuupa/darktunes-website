@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { UserProfile } from '@/types'
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row']
+
+// Singleton browser client — uses @supabase/ssr cookie-based sessions
+// so the Next.js middleware can read the auth state from cookies.
+const supabase = createBrowserSupabaseClient()
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)

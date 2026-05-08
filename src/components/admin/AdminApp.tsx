@@ -21,8 +21,8 @@ function AdminContent() {
             <div className="bg-muted p-4 rounded-md font-mono text-sm">
               <p>Required environment variables:</p>
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>VITE_SUPABASE_URL</li>
-                <li>VITE_SUPABASE_ANON_KEY</li>
+                <li>NEXT_PUBLIC_SUPABASE_URL</li>
+                <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
               </ul>
             </div>
             <p className="text-sm text-muted-foreground text-center">
