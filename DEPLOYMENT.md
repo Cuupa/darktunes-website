@@ -459,8 +459,11 @@ serve(async (req) => {
 Set these in your Vercel project settings:
 
 ### Supabase
-- `VITE_SUPABASE_URL`: Your Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Your Supabase anon/public key
+- `VITE_SUPABASE_URL`: Your Supabase project URL *(client-side — VITE_ prefix)*
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anon/public key *(client-side — VITE_ prefix)*
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service-role key *(server-side only — never expose to browser)*
+  - Found at: Supabase Dashboard → Project Settings → API → `service_role` key
+  - Used by: `api/upload.ts` to verify Bearer auth tokens before accepting R2 uploads
 
 ### Cloudflare R2 (server-side — Vercel Edge / Serverless Functions only)
 - `CLOUDFLARE_R2_ACCOUNT_ID`: Your Cloudflare account ID

@@ -39,6 +39,15 @@ Test runner: `npm test` (runs `vitest run`), watch mode: `npm run test:watch`.
 Test setup file: src/test/setup.ts – imports @testing-library/jest-dom matchers.
 Test files live alongside their source files: src/**/*.{test,spec}.{ts,tsx}.
 Test Isolation: Tests must not rely on external network requests. Mock all external APIs (including iTunes, Bandsintown, Odesli, Spotify, and Discogs).
+Supabase Mock Pattern: In DAL tests, create a mock builder where all chain methods (select, order, insert, update, delete, upsert, eq, single) return `this` via `vi.fn().mockReturnThis()`. The builder object has `then`, `catch`, `finally` bound to a `Promise.resolve({data, error})`. This makes the entire chain thenable — `await db.from('x').select().order()` resolves correctly.
+
+Data Access Layer (DAL)
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts).
+Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
+DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
+Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
+Hook Pattern: Hooks in `src/hooks/` wrap DAL functions. Each hook checks `isSupabaseConfigured` at load time — if false, immediately sets `isLoading = false` and returns empty data. This prevents Supabase calls when env vars are not set.
+Vercel API Routes: Serverless functions live at `api/` (repo root, not `src/`). The upload route (`api/upload.ts`) uses `SUPABASE_SERVICE_ROLE_KEY` to verify Bearer tokens via `supabase.auth.getUser(token)` before processing uploads.
 
 Inversion of Control (IoC) & Component Contracts
 Props Over State: UI components MUST receive all data and callbacks as props — they must not directly access global state, context, or external stores.
@@ -82,6 +91,7 @@ Required env vars are split into two groups:
   - Client-side (must have VITE_ prefix to be exposed to the browser):
       VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
   - Server-side (never exposed to the browser; used only in Vercel Serverless Functions):
+      SUPABASE_SERVICE_ROLE_KEY,
       CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
       CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME,
       CLOUDFLARE_R2_PUBLIC_URL
