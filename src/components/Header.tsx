@@ -25,7 +25,7 @@ export function Header() {
     { label: 'VIDEOS', href: '#videos' },
   ]
 
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
     e.preventDefault()
     const target = document.querySelector(href)
     if (target) {
@@ -102,7 +102,7 @@ export function Header() {
                   variant="ghost"
                   className="justify-start text-base font-medium tracking-wider hover:text-accent"
                   onClick={(e) => {
-                    handleSmoothScroll(e as any, item.href)
+                    handleSmoothScroll(e, item.href)
                     setMobileMenuOpen(false)
                   }}
                 >
