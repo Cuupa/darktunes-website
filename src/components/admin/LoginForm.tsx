@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +15,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const { signIn, signUp } = useAuthContext()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,8 +28,12 @@ export function LoginForm() {
 
       if (error) {
         toast.error(error.message)
+      } else if (mode === 'signin') {
+        toast.success('Welcome back!')
+        router.refresh()
+        router.push('/admin')
       } else {
-        toast.success(mode === 'signin' ? 'Welcome back!' : 'Account created successfully!')
+        toast.success('Account created successfully!')
       }
     } catch {
       toast.error('An unexpected error occurred')
