@@ -300,10 +300,10 @@ import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.
 
 const s3Client = new S3Client({
   region: 'auto',
-  endpoint: `https://${Deno.env.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+  endpoint: `https://${Deno.env.get('CLOUDFLARE_R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID')!,
-    secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY')!,
+    accessKeyId: Deno.env.get('CLOUDFLARE_R2_ACCESS_KEY_ID')!,
+    secretAccessKey: Deno.env.get('CLOUDFLARE_R2_SECRET_ACCESS_KEY')!,
   },
 })
 
@@ -326,7 +326,7 @@ serve(async (req) => {
   const buffer = await file.arrayBuffer()
 
   const command = new PutObjectCommand({
-    Bucket: Deno.env.get('R2_BUCKET_NAME'),
+    Bucket: Deno.env.get('CLOUDFLARE_R2_BUCKET_NAME'),
     Key: filename,
     Body: new Uint8Array(buffer),
     ContentType: file.type,
@@ -355,15 +355,12 @@ Set these in your Vercel project settings:
 - `VITE_SUPABASE_URL`: Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: Your Supabase anon/public key
 
-### Cloudflare R2 (for Edge Functions)
-- `R2_ACCOUNT_ID`: Your Cloudflare account ID
-- `R2_ACCESS_KEY_ID`: R2 API token access key
-- `R2_SECRET_ACCESS_KEY`: R2 API token secret
-- `R2_BUCKET_NAME`: `darktunes-assets`
-
-### APIs
-- `VITE_SPOTIFY_CLIENT_ID`: Spotify API client ID
-- `VITE_SPOTIFY_CLIENT_SECRET`: Spotify API secret
+### Cloudflare R2 (server-side — Vercel Edge / Serverless Functions only)
+- `CLOUDFLARE_R2_ACCOUNT_ID`: Your Cloudflare account ID
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`: R2 API token access key ID
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: R2 API token secret access key
+- `CLOUDFLARE_R2_BUCKET_NAME`: R2 bucket name (e.g. `darktunes-assets`)
+- `CLOUDFLARE_R2_PUBLIC_URL`: R2 public CDN base URL (e.g. `https://cdn.darktunes.com`)
 
 ---
 

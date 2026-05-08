@@ -1,106 +1,83 @@
-# Admin Integration Summary
+# Integration Summary — darkTunes Music Group
 
-## What's Been Set Up
+## What Is Implemented
 
-This codebase now includes a complete admin infrastructure ready for deployment:
+### Public Website
+- **Hero section** — featured release with dynamic background
+- **Releases section** — fetched from iTunes API via `useItunesSync` hook; manual sync button
+- **Spotify Player** — embedded iframe player for the label playlist
+- **Artists section** — mock data (ready for Supabase integration)
+- **Videos section** — YouTube embed gallery with video modal
+- **News section** — mock data (ready for Supabase integration)
+- **Header** — shrinking logo on scroll, navigation
+- **Footer**
+- **CRT scanline overlay** — full-page vintage aesthetic
 
-### 1. Database Layer (Supabase)
-- Full database schema for artists, releases, news, videos, and assets
-- Row Level Security (RLS) policies for secure data access
-- User authentication and profile management
-- Role-based access control (Admin/Editor/User)
+### Infrastructure
+- **Vite 7 + React 19 + TypeScript** build pipeline
+- **Tailwind CSS v4** with custom darkTunes brand tokens in `src/index.css`
+- **Framer Motion** for page animations and modal transitions
+- **Lenis** smooth scrolling via single `LenisProvider` at root
+- **Vitest** unit test suite (`npm test`)
+- **ESLint** with TypeScript and React-Hooks rules
+- **Vercel** deployment via `vercel.json` + `scripts/vercel-install.sh`
+- **Supabase** client configured in `src/lib/supabase.ts`
+- **Database schema** defined in `supabase/migrations/20240101000000_initial_schema.sql`
+- **TypeScript DB types** in `src/types/database.ts`
 
-### 2. Cloud Storage (Cloudflare R2)
-- Asset management configuration
-- Supabase Edge Function template for secure uploads
-- Public URL generation for media files
+### Admin Panel (scaffolded)
+- Route: `/admin`
+- Authentication via `useAuth` hook (Supabase Auth)
+- Dashboard UI with tabbed interface
+- Manager components for Artists, Releases, News, Videos, Assets
 
-### 3. Admin Panel
-- Authentication system with login/signup
-- Dashboard with tabbed interface
-- Manager components for all content types (placeholders ready for full implementation)
-- User profile and role management
+### Component Contracts
+- `src/lib/component-contracts.ts` — `SectionProps`, `EditableSectionProps<T>`, `AdminPanelProps<T>`, `DialogProps`
 
-### 4. Deployment Setup (Vercel)
-- Vercel configuration file
-- Environment variable setup
-- Automatic deployments from Git
+---
 
-## Next Steps
+## What Still Needs Wiring Up
 
-### To Enable Full Functionality:
+| Feature | Status | Notes |
+|---|---|---|
+| Artists — live DB data | Pending | `mockArtists` used in App.tsx; swap to `useArtists` hook |
+| News — live DB data | Pending | `mockNews` used in App.tsx; swap to `useNews` hook |
+| Videos — live DB data | Pending | `mockVideos` used in App.tsx; swap to `useVideos` hook |
+| Admin CRUD operations | Scaffolded | UI components present; Supabase queries to be wired |
+| R2 file uploads | Pending | Requires Vercel Edge Function + env vars |
+| Supabase RLS policies | Defined in migration | Needs cloud deployment |
 
-1. **Set Up Supabase** (15 minutes)
-   - Create a Supabase project at https://supabase.com
-   - Run the SQL schema from `DEPLOYMENT.md`
-   - Copy your project URL and anon key
+---
 
-2. **Set Up Cloudflare R2** (10 minutes)
-   - Create R2 bucket at Cloudflare
-   - Generate API credentials
-   - Deploy Supabase Edge Function for uploads (optional)
+## File Reference
 
-3. **Deploy to Vercel** (5 minutes)
-   - Connect your repo to Vercel
-   - Add environment variables
-   - Deploy!
+| File | Purpose |
+|---|---|
+| `README.md` | Project overview, quick start, scripts |
+| `DEPLOYMENT.md` | Full deployment guide (Vercel, Supabase, R2) |
+| `ADMIN.md` | Admin panel usage documentation |
+| `AGENTS.md` | Coding conventions and agent workflow rules |
+| `.env.example` | Required environment variables template |
+| `vercel.json` | Vercel build/deploy configuration |
+| `scripts/vercel-install.sh` | Vercel install hook (npm ci + env var check) |
+| `src/lib/supabase.ts` | Supabase client |
+| `src/lib/itunesApi.ts` | iTunes Search API client |
+| `src/hooks/useItunesSync.ts` | iTunes sync hook with local storage caching |
+| `src/hooks/useAuth.ts` | Supabase authentication hook |
+| `src/lib/component-contracts.ts` | Shared prop interfaces (SectionProps, etc.) |
+| `src/types/database.ts` | Generated TypeScript types from DB schema |
+| `supabase/migrations/` | SQL migration files (source of truth) |
 
-4. **Create First Admin** (2 minutes)
-   - Sign up through the app
-   - Run the SQL command to grant admin role
-   - Log in to admin panel
+---
 
-### To Access Admin:
-
-The admin panel can be accessed by importing and rendering the `AdminApp` component:
-
-```typescript
-import { AdminApp } from '@/components/admin/AdminApp'
-
-// In your routing or App component:
-<AdminApp />
-```
-
-Or create a separate route for `/admin` if using a routing library.
-
-## What Works Now (Without Setup)
-
-- Main public website with iTunes API integration
-- Spotify player
-- All frontend features (CRT effect, modals, animations)
-- Mock data for artists, news, and videos
-
-## What Requires Setup
-
-- User authentication
-- Database persistence
-- Content management through admin panel
-- File uploads to R2
-- Real-time data updates
-
-## Files to Review
-
-- `DEPLOYMENT.md` - Complete deployment guide
-- `ADMIN.md` - Admin panel documentation  
-- `.env.example` - Required environment variables
-- `vercel.json` - Vercel deployment configuration
-- `src/lib/supabase.ts` - Supabase client configuration
-- `src/components/admin/` - All admin components
-
-## Quick Start Command
+## Quick Start
 
 ```bash
-# 1. Copy environment template
 cp .env.example .env.local
+# Fill in VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, CLOUDFLARE_R2_* variables
 
-# 2. Edit .env.local with your credentials
-# (Get these from Supabase and Cloudflare dashboards)
-
-# 3. Run development server
+npm ci
 npm run dev
-
-# 4. Visit http://localhost:5173/admin
-# (After implementing routing to AdminApp)
+# → http://localhost:5173 (public site)
+# → http://localhost:5173/admin (admin panel)
 ```
-
-The infrastructure is ready - just add your API keys and deploy! 🚀
