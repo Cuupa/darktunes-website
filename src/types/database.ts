@@ -51,6 +51,10 @@ export interface Database {
           vat_number: string | null
           is_eu_non_german: boolean
           notes: string | null
+          spotify_id: string | null
+          discogs_id: string | null
+          songkick_id: string | null
+          last_synced_at: string | null
           created_at: string
           updated_at: string
         }
@@ -71,6 +75,10 @@ export interface Database {
           vat_number?: string | null
           is_eu_non_german?: boolean
           notes?: string | null
+          spotify_id?: string | null
+          discogs_id?: string | null
+          songkick_id?: string | null
+          last_synced_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -91,6 +99,10 @@ export interface Database {
           vat_number?: string | null
           is_eu_non_german?: boolean
           notes?: string | null
+          spotify_id?: string | null
+          discogs_id?: string | null
+          songkick_id?: string | null
+          last_synced_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -252,9 +264,41 @@ export interface Database {
         }
         Relationships: []
       }
+      sync_logs: {
+        Row: {
+          id: string
+          artist_id: string | null
+          status: 'success' | 'partial' | 'error'
+          message: string | null
+          releases_synced: number
+          errors: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id?: string | null
+          status: 'success' | 'partial' | 'error'
+          message?: string | null
+          releases_synced?: number
+          errors?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string | null
+          status?: 'success' | 'partial' | 'error'
+          message?: string | null
+          releases_synced?: number
+          errors?: string[]
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
-    Enums: Record<string, never>
+    Enums: {
+      sync_status: 'success' | 'partial' | 'error'
+    }
   }
 }

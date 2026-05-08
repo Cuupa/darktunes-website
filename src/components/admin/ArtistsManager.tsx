@@ -1,10 +1,12 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
+import { supabase } from '@/lib/supabase'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -51,6 +53,9 @@ const EMPTY_FORM: ArtistFormData = {
   featured: false,
   isEuNonGerman: false,
   notes: '',
+  spotifyId: '',
+  discogsId: '',
+  songkickId: '',
 }
 
 function artistToFormData(artist: Artist): ArtistFormData {
@@ -70,6 +75,9 @@ function artistToFormData(artist: Artist): ArtistFormData {
     featured: artist.featured,
     isEuNonGerman: artist.isEuNonGerman ?? false,
     notes: artist.notes ?? '',
+    spotifyId: artist.spotifyId ?? '',
+    discogsId: artist.discogsId ?? '',
+    songkickId: artist.songkickId ?? '',
   }
 }
 
@@ -93,7 +101,33 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     featured: data.featured,
     is_eu_non_german: data.isEuNonGerman,
     notes: data.notes || null,
+    spotify_id: data.spotifyId || null,
+    discogs_id: data.discogsId || null,
+    songkick_id: data.songkickId || null,
   }
+}
+
+/** Skeleton placeholder rows shown while artist data loads */
+function ArtistSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell />
+        </TableRow>
+      ))}
+    </>
+  )
 }
 
 export function ArtistsManager() {
@@ -102,6 +136,7 @@ export function ArtistsManager() {
   const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const [syncingId, setSyncingId] = useState<string | null>(null)
 
   const formValue = editingArtist ? artistToFormData(editingArtist) : EMPTY_FORM
 
@@ -147,6 +182,43 @@ export function ArtistsManager() {
     }
   }
 
+  const handleSync = async (artist: Artist) => {
+    setSyncingId(artist.id)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/sync-artist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ artistId: artist.id }),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`Sync failed: ${text}`)
+      }
+
+      const result = (await res.json()) as { releasesUpserted: number; errors: string[] }
+      if (result.errors.length > 0) {
+        toast.warning(
+          `Sync for "${artist.name}" completed with ${result.errors.length} error(s). ${result.releasesUpserted} release(s) synced.`,
+        )
+      } else {
+        toast.success(`Sync complete for "${artist.name}": ${result.releasesUpserted} release(s) updated.`)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -164,19 +236,16 @@ export function ArtistsManager() {
             <TableHead>Genres</TableHead>
             <TableHead>Country</TableHead>
             <TableHead>Featured</TableHead>
+            <TableHead>Last Synced</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                Loading…
-              </TableCell>
-            </TableRow>
+            <ArtistSkeletonRows />
           ) : artists.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                 No artists yet. Click "New Artist" to add one.
               </TableCell>
             </TableRow>
@@ -189,8 +258,25 @@ export function ArtistsManager() {
                 <TableCell>
                   {artist.featured && <Badge variant="secondary">Featured</Badge>}
                 </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {artist.lastSyncedAt
+                    ? new Date(artist.lastSyncedAt).toLocaleDateString()
+                    : '—'}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => void handleSync(artist)}
+                      disabled={syncingId === artist.id}
+                      title="Sync Now"
+                    >
+                      <ArrowsClockwise
+                        size={16}
+                        className={syncingId === artist.id ? 'animate-spin' : ''}
+                      />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(artist)} title="Edit">
                       <PencilSimple size={16} />
                     </Button>
