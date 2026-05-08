@@ -17,7 +17,8 @@ import { getReleases } from '@/lib/api/releases'
 import { getArtists } from '@/lib/api/artists'
 import { getNewsPosts } from '@/lib/api/news'
 import { getVideos } from '@/lib/api/videos'
-import type { Release, Artist, NewsPost, Video } from '@/types'
+import { getSiteSettings } from '@/lib/api/siteSettings'
+import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Cached data-fetching helpers
@@ -60,20 +61,56 @@ const getCachedVideos = unstable_cache(
   { revalidate: 60, tags: ['videos'] },
 )
 
+const getCachedSiteSettings = unstable_cache(
+  async (): Promise<SiteSettings> => {
+    const client = await createServerSupabaseClient()
+    return getSiteSettings(client)
+  },
+  ['site-settings'],
+  { revalidate: 60, tags: ['site-settings'] },
+)
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, artists, news, videos] = await Promise.all([
+  const [releases, artists, news, videos, siteSettings] = await Promise.all([
     getCachedReleases().catch(() => [] as Release[]),
     getCachedArtists().catch(() => [] as Artist[]),
     getCachedNews().catch(() => [] as NewsPost[]),
     getCachedVideos().catch(() => [] as Video[]),
+    getCachedSiteSettings().catch(
+      (): SiteSettings => ({
+        labelName: 'darkTunes Music Group',
+        labelTagline: "We don't follow trends—we create them.",
+        contactEmail: 'info@darktunes.com',
+        privacyPolicyUrl: 'https://darktunes.com/privacy',
+        termsUrl: 'https://darktunes.com/terms',
+        instagramUrl: 'https://instagram.com/darktunes',
+        youtubeUrl: 'https://youtube.com/@darktunes',
+        spotifyUrl: 'https://open.spotify.com/user/darktunes',
+        spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
+        heroBadge: '⚡ New Release',
+        heroDescription:
+          'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
+        seoTitle: 'darkTunes Music Group',
+        seoDescription:
+          'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
+        ogTitle: 'darkTunes Music Group',
+        ogDescription: 'Alternative music label — artists, releases, news, and videos.',
+      }),
+    ),
   ])
 
   return (
-    <HomePageContent releases={releases} artists={artists} news={news} videos={videos} />
+    <HomePageContent
+      releases={releases}
+      artists={artists}
+      news={news}
+      videos={videos}
+      siteSettings={siteSettings}
+    />
   )
 }

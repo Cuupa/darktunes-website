@@ -4,13 +4,14 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
-import type { Release } from '@/types'
+import type { Release, SiteSettings } from '@/types'
 
 interface HeroProps {
   featuredRelease?: Release
+  siteSettings: SiteSettings
 }
 
-export function Hero({ featuredRelease }: HeroProps) {
+export function Hero({ featuredRelease, siteSettings }: HeroProps) {
   if (!featuredRelease) {
     return null
   }
@@ -36,7 +37,7 @@ export function Hero({ featuredRelease }: HeroProps) {
             className="space-y-8"
           >
             <Badge className="bg-secondary/90 text-secondary-foreground uppercase tracking-wider font-bold text-sm px-4 py-2 backdrop-blur-sm">
-              ⚡ New Release
+              {siteSettings.heroBadge}
             </Badge>
             
             <div className="space-y-4">
@@ -49,7 +50,7 @@ export function Hero({ featuredRelease }: HeroProps) {
             </div>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-xl font-serif leading-relaxed">
-              Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.
+              {siteSettings.heroDescription}
             </p>
 
             <div className="flex flex-wrap gap-4">

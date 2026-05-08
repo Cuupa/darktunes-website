@@ -12,6 +12,7 @@ import { useArtists } from '@/hooks/useArtists'
 import { useVideos } from '@/hooks/useVideos'
 import { useNews } from '@/hooks/useNews'
 import { useReleases } from '@/hooks/useReleases'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -20,6 +21,7 @@ function App() {
   const { artists } = useArtists()
   const { videos } = useVideos()
   const { news } = useNews()
+  const { settings: siteSettings } = useSiteSettings()
 
   const featuredRelease =
     releases && releases.length > 0 ? releases.find((r) => r.featured) || releases[0] : undefined
@@ -29,7 +31,7 @@ function App() {
       <CRTOverlay />
       <Header />
       <main>
-        <Hero featuredRelease={featuredRelease} />
+        <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} />
 
         <section id="releases" className="relative">
           <AnimatePresence mode="wait">
@@ -75,7 +77,7 @@ function App() {
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">SPOTIFY</h2>
               <p className="text-lg text-muted-foreground font-serif">Listen to our playlist</p>
             </motion.div>
-            <SpotifyPlayer playlistUri="37i9dQZF1DWWqNV5cS50j6" />
+            <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri} />
           </div>
         </section>
 
@@ -83,7 +85,7 @@ function App() {
         <Videos videos={videos} />
         <News news={news} />
       </main>
-      <Footer />
+      <Footer siteSettings={siteSettings} />
       <Toaster position="bottom-right" theme="dark" />
     </div>
   )

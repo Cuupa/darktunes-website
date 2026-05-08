@@ -4,13 +4,14 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
 import { NewsManager } from './NewsManager'
 import { VideosManager } from './VideosManager'
 import { AssetsManager } from './AssetsManager'
+import { SiteSettingsManager } from './SiteSettingsManager'
 
 export function AdminDashboard() {
   const { user, profile, signOut } = useAuthContext()
@@ -52,7 +53,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" />
               Artists
@@ -72,6 +73,10 @@ export function AdminDashboard() {
             <TabsTrigger value="assets" className="gap-2">
               <ImageIcon size={16} weight="bold" />
               Assets
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Gear size={16} weight="bold" />
+              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -141,6 +146,20 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <AssetsManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Site Settings</CardTitle>
+                <CardDescription>
+                  Manage global site content: social links, hero text, SEO metadata, and more
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SiteSettingsManager />
               </CardContent>
             </Card>
           </TabsContent>

@@ -1,8 +1,13 @@
 'use client'
 
 import { InstagramLogo, YoutubeLogo, SpotifyLogo } from '@phosphor-icons/react'
+import type { SiteSettings } from '@/types'
 
-export function Footer() {
+interface FooterProps {
+  siteSettings: SiteSettings
+}
+
+export function Footer({ siteSettings }: FooterProps) {
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (href.startsWith('#')) {
       e.preventDefault()
@@ -30,12 +35,12 @@ export function Footer() {
                 <span className="text-white font-bold text-lg">dT</span>
               </div>
               <div>
-                <h3 className="text-lg font-bold tracking-tight uppercase">darkTunes</h3>
+                <h3 className="text-lg font-bold tracking-tight uppercase">{siteSettings.labelName}</h3>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">Music Group</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              We don't follow trends—we create them.
+              {siteSettings.labelTagline}
             </p>
           </div>
 
@@ -60,48 +65,58 @@ export function Footer() {
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wider">Follow Us</h4>
             <div className="flex gap-3">
-              <a
-                href="https://instagram.com/darktunes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-              >
-                <InstagramLogo size={24} weight="fill" />
-              </a>
-              <a
-                href="https://youtube.com/@darktunes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-              >
-                <YoutubeLogo size={24} weight="fill" />
-              </a>
-              <a
-                href="https://open.spotify.com/user/darktunes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-              >
-                <SpotifyLogo size={24} weight="fill" />
-              </a>
+              {siteSettings.instagramUrl && (
+                <a
+                  href={siteSettings.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                >
+                  <InstagramLogo size={24} weight="fill" />
+                </a>
+              )}
+              {siteSettings.youtubeUrl && (
+                <a
+                  href={siteSettings.youtubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                >
+                  <YoutubeLogo size={24} weight="fill" />
+                </a>
+              )}
+              {siteSettings.spotifyUrl && (
+                <a
+                  href={siteSettings.spotifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                >
+                  <SpotifyLogo size={24} weight="fill" />
+                </a>
+              )}
             </div>
           </div>
         </div>
 
         <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} darkTunes Music Group. All rights reserved.
+            © {new Date().getFullYear()} {siteSettings.labelName}. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <a href="mailto:info@darktunes.com" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+            <a href={`mailto:${siteSettings.contactEmail}`} className="text-sm text-muted-foreground hover:text-accent transition-colors">
               Contact
             </a>
-            <a href="https://darktunes.com/privacy" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-              Privacy Policy
-            </a>
-            <a href="https://darktunes.com/terms" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-              Terms
-            </a>
+            {siteSettings.privacyPolicyUrl && (
+              <a href={siteSettings.privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                Privacy Policy
+              </a>
+            )}
+            {siteSettings.termsUrl && (
+              <a href={siteSettings.termsUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                Terms
+              </a>
+            )}
           </div>
         </div>
       </div>
