@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, SkipForward, SkipBack, SpeakerHigh } from '@phosphor-icons/react'
