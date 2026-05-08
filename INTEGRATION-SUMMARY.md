@@ -96,7 +96,9 @@
 | `.env.example` | Required environment variables template |
 | `vercel.json` | Vercel build/deploy configuration |
 | `scripts/vercel-install.sh` | Vercel install hook (npm ci + env var check) |
-| `src/lib/supabase.ts` | Supabase client |
+| `src/lib/supabase/client.ts` | Browser Supabase client (`@supabase/ssr`, cookie-based session) |
+| `src/lib/supabase/server.ts` | Server Supabase client (`@supabase/ssr`, reads auth cookies) |
+| `src/lib/supabase.ts` | Legacy Supabase client (deprecated; kept for backward compatibility) |
 | `src/lib/api/` | Data Access Layer (DAL) for all tables |
 | `src/lib/itunesApi.ts` | iTunes Search API client |
 | `src/hooks/use*.ts` | React hooks wrapping DAL + state management |

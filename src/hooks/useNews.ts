@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/env'
 import * as newsApi from '@/lib/api/news'
 import type { NewsPost } from '@/types'
 import type { Database } from '@/types/database'
@@ -11,6 +12,7 @@ export function useNews() {
   const [news, setNews] = useState<NewsPost[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -28,7 +30,7 @@ export function useNews() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const createNewsPost = async (data: NewsInsert): Promise<void> => {
     await newsApi.createNewsPost(supabase, data)

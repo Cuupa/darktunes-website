@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/env'
 import * as artistsApi from '@/lib/api/artists'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
@@ -11,6 +12,7 @@ export function useArtists() {
   const [artists, setArtists] = useState<Artist[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -28,7 +30,7 @@ export function useArtists() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const createArtist = async (data: ArtistInsert): Promise<void> => {
     await artistsApi.createArtist(supabase, data)

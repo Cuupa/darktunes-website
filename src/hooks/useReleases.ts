@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/env'
 import * as releasesApi from '@/lib/api/releases'
 import { searchItunesArtist } from '@/lib/itunesApi'
 import { artistsData } from '@/lib/artistsData'
@@ -33,6 +34,7 @@ export function useReleases() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
   const [error, setError] = useState<Error | null>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -50,7 +52,7 @@ export function useReleases() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const createRelease = async (data: ReleaseInsert): Promise<void> => {
     await releasesApi.createRelease(supabase, data)
