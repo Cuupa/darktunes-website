@@ -1,7 +1,7 @@
 # darkTunes Music Group — Website
 
 Official website for **darkTunes Music Group**, an alternative music label.  
-Built with React 19, Vite 7, Supabase, Cloudflare R2, and Tailwind CSS v4.
+Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tailwind CSS v4.
 
 ---
 
@@ -11,8 +11,9 @@ Built with React 19, Vite 7, Supabase, Cloudflare R2, and Tailwind CSS v4.
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
 - **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets)
-- **Authentication** – Supabase Auth with role-based access (Admin / Editor / User)
-- **Cloud storage** – media uploads via Cloudflare R2
+- **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware
+- **Cloud storage** – media uploads via Cloudflare R2 (server-side Route Handler)
+- **Server-side rendering** – data fetched at the edge with explicit ISR caching
 
 ---
 
@@ -20,13 +21,13 @@ Built with React 19, Vite 7, Supabase, Cloudflare R2, and Tailwind CSS v4.
 
 | Layer | Technology |
 |---|---|
-| UI framework | React 19 + TypeScript |
-| Build tool | Vite 7 |
-| Styling | Tailwind CSS v4 |
+| UI framework | Next.js 15 (App Router) + React 19 + TypeScript |
+| Styling | Tailwind CSS v4 (PostCSS) |
 | Animations | Framer Motion, Lenis |
 | Icons | Phosphor Icons |
 | Database | Supabase (PostgreSQL) |
-| Storage | Cloudflare R2 |
+| Auth | Supabase Auth + `@supabase/ssr` + Next.js Edge Middleware |
+| Storage | Cloudflare R2 (AWS SDK v3) |
 | Deployment | Vercel |
 | Testing | Vitest + Testing Library |
 
@@ -42,11 +43,11 @@ npm ci
 cp .env.example .env.local
 # Edit .env.local — fill in Supabase URL/key and R2 credentials
 
-# 3. Start development server (http://localhost:5173)
+# 3. Start development server (http://localhost:3000)
 npm run dev
 ```
 
-> **Admin panel** is available at `http://localhost:5173/admin` once you have authenticated.
+> **Admin panel** is available at `http://localhost:3000/admin` once you have authenticated.
 
 ---
 
@@ -54,9 +55,9 @@ npm run dev
 
 | Script | Description |
 |---|---|
-| `npm run dev` | Start local development server |
-| `npm run build` | Production build (TypeScript + Vite) |
-| `npm run preview` | Preview the production build locally |
+| `npm run dev` | Start Next.js development server (port 3000) |
+| `npm run build` | Production build (`next build`) |
+| `npm run preview` | Preview the production build locally (`next start`) |
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
@@ -69,14 +70,14 @@ npm run dev
 
 Copy `.env.example` to `.env.local` and fill in your values.
 
-### Client-side (Vite `VITE_` prefix — exposed to the browser)
+### Client-side (`NEXT_PUBLIC_` prefix — exposed to the browser)
 
 | Variable | Description |
 |---|---|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous/public key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous/public key |
 
-### Server-side (Vercel Edge / Serverless Functions only — never in the browser)
+### Server-side (Next.js Route Handlers / Edge Middleware only — never in the browser)
 
 | Variable | Description |
 |---|---|
@@ -109,7 +110,7 @@ npm run db:diff
 
 ## 🚀 Deployment
 
-Deployments run on **Vercel**.  
+Deployments run on **Vercel** with `"framework": "nextjs"` in `vercel.json`.  
 Every push to `main` triggers an automatic production deployment.  
 Branch pushes create preview deployments.
 
@@ -122,24 +123,41 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for step-by-step setup.
 ## 📁 Project Structure
 
 ```
+app/                          # Next.js App Router entry points
+├── layout.tsx                # Root RSC layout (fonts, global CSS, Providers)
+├── page.tsx                  # Home page RSC — server-side data fetch + ISR caching
+├── globals.css               # Global CSS / Tailwind v4 theme
+├── _components/              # App-level client wrappers
+│   ├── HomePageContent.tsx   # "use client" home page shell (receives data as props)
+│   └── Providers.tsx         # Lenis + Toaster + ErrorBoundary (client)
+├── admin/                    # Protected admin routes
+│   ├── layout.tsx            # Admin route layout
+│   ├── page.tsx              # Admin dashboard (force-dynamic, server renders client shell)
+│   ├── login/page.tsx        # Login page (force-dynamic)
+│   └── _components/          # Client wrappers for admin pages
+└── api/
+    └── upload/route.ts       # R2 file upload Route Handler (replaces legacy api/upload.ts)
+middleware.ts                 # Next.js Edge Middleware — Supabase auth check for /admin/*
 src/
-├── components/        # UI components (Header, Hero, Releases, Artists, …)
-│   ├── admin/         # Admin panel + manager components
-│   │   └── forms/     # Admin CRUD form components
-│   ├── animations/    # LenisProvider and motion helpers
-│   └── ui/            # Shadcn/Radix primitives
-├── contexts/          # React context providers
-├── hooks/             # Custom React hooks (useArtists, useReleases, …)
-├── lib/               # Business logic, API clients, utilities
-│   └── api/           # Data Access Layer — one file per table
-├── styles/            # Global CSS / Tailwind configuration
-└── types/             # TypeScript types (incl. database.ts)
-api/
-└── upload.ts          # Vercel serverless function — R2 file uploads
+├── components/               # UI components (Header, Hero, Releases, Artists, …)
+│   ├── admin/                # Admin panel + manager components ("use client")
+│   │   └── forms/            # Admin CRUD form components
+│   ├── animations/           # LenisProvider ("use client")
+│   └── ui/                   # Shadcn/Radix primitives
+├── contexts/                 # React context providers ("use client")
+├── hooks/                    # Custom React hooks (useArtists, useReleases, …)
+├── lib/                      # Business logic, API clients, utilities
+│   ├── api/                  # Data Access Layer — one file per table
+│   ├── env.server.ts         # Server-side Zod env validation (for Route Handlers)
+│   └── supabase/
+│       ├── server.ts         # Supabase server client (@supabase/ssr, reads cookies)
+│       └── client.ts         # Supabase browser client (@supabase/ssr)
+└── types/                    # TypeScript types (incl. database.ts)
+api/                          # Legacy Vercel serverless functions (kept for reference)
 supabase/
-└── migrations/        # SQL migration files (source of truth for schema)
+└── migrations/               # SQL migration files (source of truth for schema)
 scripts/
-└── vercel-install.sh  # Vercel build hook
+└── vercel-install.sh         # Vercel build hook
 ```
 
 ---

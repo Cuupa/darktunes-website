@@ -397,80 +397,40 @@ WHERE id = (
 ]
 ```
 
-### 4. Supabase Edge Function for R2 Upload
-Create a Supabase Edge Function to handle R2 uploads securely:
+### 4. File Uploads via Next.js Route Handler
 
-```typescript
-// supabase/functions/upload-asset/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.0.0'
+File uploads are handled server-side at `app/api/upload/route.ts` (a Next.js Route Handler).
+This eliminates CORS issues that arise from client-side direct uploads. No Supabase Edge Functions are needed for uploads.
 
-const s3Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${Deno.env.get('CLOUDFLARE_R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: Deno.env.get('CLOUDFLARE_R2_ACCESS_KEY_ID')!,
-    secretAccessKey: Deno.env.get('CLOUDFLARE_R2_SECRET_ACCESS_KEY')!,
-  },
-})
-
-serve(async (req) => {
-  // Authentication check
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response('Unauthorized', { status: 401 })
-  }
-
-  // Handle file upload
-  const formData = await req.formData()
-  const file = formData.get('file') as File
-  
-  if (!file) {
-    return new Response('No file provided', { status: 400 })
-  }
-
-  const filename = `${Date.now()}-${file.name}`
-  const buffer = await file.arrayBuffer()
-
-  const command = new PutObjectCommand({
-    Bucket: Deno.env.get('CLOUDFLARE_R2_BUCKET_NAME'),
-    Key: filename,
-    Body: new Uint8Array(buffer),
-    ContentType: file.type,
-  })
-
-  await s3Client.send(command)
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      url: `https://your-r2-domain.com/${filename}`,
-      key: filename,
-    }),
-    { headers: { 'Content-Type': 'application/json' } }
-  )
-})
-```
+The Route Handler:
+1. Verifies the Bearer token via the Supabase service-role key
+2. Parses the multipart `FormData` on the server
+3. Uploads the file to R2 using the AWS SDK v3
+4. Returns the public CDN URL
 
 ---
 
 ## 🔐 Environment Variables
 
-Set these in your Vercel project settings:
+Set these in your Vercel project settings (Dashboard → Project → Settings → Environment Variables):
 
-### Supabase
-- `VITE_SUPABASE_URL`: Your Supabase project URL *(client-side — VITE_ prefix)*
-- `VITE_SUPABASE_ANON_KEY`: Your Supabase anon/public key *(client-side — VITE_ prefix)*
-- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service-role key *(server-side only — never expose to browser)*
+### Supabase (client-side — `NEXT_PUBLIC_` prefix, browser-safe)
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL *(required at build time for Next.js)*
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anon/public key *(required at build time for Next.js)*
+
+### Supabase (server-side — never exposed to browser)
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service-role key *(server-side only)*
   - Found at: Supabase Dashboard → Project Settings → API → `service_role` key
-  - Used by: `api/upload.ts` to verify Bearer auth tokens before accepting R2 uploads
+  - Used by: `app/api/upload/route.ts` (Next.js Route Handler) to verify Bearer auth tokens before accepting R2 uploads
 
-### Cloudflare R2 (server-side — Vercel Edge / Serverless Functions only)
+### Cloudflare R2 (server-side — Next.js Route Handlers only)
 - `CLOUDFLARE_R2_ACCOUNT_ID`: Your Cloudflare account ID
 - `CLOUDFLARE_R2_ACCESS_KEY_ID`: R2 API token access key ID
 - `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: R2 API token secret access key
 - `CLOUDFLARE_R2_BUCKET_NAME`: R2 bucket name (e.g. `darktunes-assets`)
 - `CLOUDFLARE_R2_PUBLIC_URL`: R2 public CDN base URL (e.g. `https://cdn.darktunes.com`)
+
+> ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
 ---
 

@@ -1,16 +1,16 @@
 # darkTunes Admin Panel
 
-Access the admin panel by visiting `/admin` (or creating a separate deployment for it).
+Access the admin panel at `/admin`. Authentication is enforced at the edge by **Next.js Middleware** (`middleware.ts`) — unauthenticated requests are redirected to `/admin/login` before any page content is served.
 
 ## Features
 
-- **User Authentication**: Secure login/signup via Supabase Auth
+- **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
 - **Role-Based Access Control**: Admin and Editor roles with different permissions
 - **Artists Management**: Create, read, update, and delete artist profiles
 - **Releases Management**: Manage music releases with iTunes API integration
 - **News Management**: Create and publish news posts and announcements
 - **Videos Management**: Manage music videos and YouTube content
-- **Assets Management**: Upload and organize media files via Cloudflare R2
+- **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
 
 ## Setup
 
@@ -23,7 +23,7 @@ Follow the instructions in `DEPLOYMENT.md` to:
 
 ### 2. Create First Admin User
 
-After signing up through the app, run this SQL in Supabase:
+After signing up through the app at `/admin/login`, run this SQL in Supabase:
 
 ```sql
 UPDATE public.profiles 
@@ -33,7 +33,7 @@ WHERE email = 'your-email@example.com';
 
 ### 3. Access Admin Panel
 
-Navigate to the admin route in your application. You'll be prompted to log in if not authenticated.
+Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/login` by the Edge Middleware. Log in, and the middleware will redirect you back to `/admin`.
 
 ## Usage
 
@@ -61,7 +61,7 @@ Navigate to the admin route in your application. You'll be prompted to log in if
 - Set thumbnails and metadata
 
 ### Assets
-- Upload images and media files to Cloudflare R2
+- Upload images and media files to Cloudflare R2 (upload goes via the secure Next.js Route Handler `app/api/upload/route.ts` — credentials never exposed to browser)
 - Browse uploaded assets
 - Copy public URLs for use in content
 - Delete unused assets
@@ -77,15 +77,12 @@ Navigate to the admin route in your application. You'll be prompted to log in if
 To run the admin panel locally with Supabase:
 
 1. Copy `.env.example` to `.env.local`
-2. Fill in your Supabase credentials
-3. Run `npm run dev`
-4. Navigate to `/admin`
+2. Fill in your Supabase and R2 credentials
+3. Run `npm run dev` — Next.js dev server starts on `http://localhost:3000`
+4. Navigate to `http://localhost:3000/admin`
 
-##Integration Notes
+## Integration Notes
 
-The admin panel is designed to work alongside the main site. You can:
-- Deploy it as a separate subdomain (`admin.darktunes.com`)
-- Include it as a route in the main application
-- Run it as a standalone admin application
+The admin panel is an integrated part of the Next.js App Router — it lives at the `/admin` route segment. All data is stored in Supabase and shared between the public site and admin panel.
 
-All data is stored in Supabase and shared between the public site and admin panel.
+Admin pages are always dynamically rendered (`force-dynamic`) so auth cookies are always checked server-side on every request.

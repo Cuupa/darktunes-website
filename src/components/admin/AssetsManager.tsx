@@ -1,3 +1,4 @@
+'use client'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Trash, Copy, UploadSimple } from '@phosphor-icons/react'

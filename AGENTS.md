@@ -14,8 +14,8 @@ YAGNI (You Aren't Gonna Need It): Do not generate speculative code for hypotheti
 KISS (Keep It Simple, Stupid): Prefer native HTML/JS solutions over the importation of heavy NPM packages.
 
 Technology Stack & Styling
-Core Infrastructure: Next.js (App Router), React, Supabase (PostgreSQL), Cloudflare R2, Vercel deployment, and Vite build system.
-UI & Design: Exclusively use Tailwind CSS and ensure the CSS output is minified.
+Core Infrastructure: Next.js 15 (App Router), React 19, Supabase (PostgreSQL & Auth), Cloudflare R2, Vercel deployment. The project was migrated from Vite SPA to Next.js 15 App Router in 2025.
+UI & Design: Exclusively use Tailwind CSS v4 (PostCSS) and ensure the CSS output is minified.
 Motion & UX: Implement fluid page transitions and shared layout animations with Framer Motion, and utilize Lenis for smooth scrolling. Use Phosphor Icons for all vector graphics.
 
 CI Color System (darkTunes Brand)
@@ -29,13 +29,13 @@ The following exact hex values MUST be used. They are mapped to CSS custom prope
 
 Smooth Scrolling (Lenis)
 The LenisProvider (src/components/animations/LenisProvider.tsx) is the single global smooth-scroll implementation.
-It is mounted once at the root level in src/main.tsx and wraps the entire React tree.
+It is mounted once at the root level in app/_components/Providers.tsx and wraps the entire React tree.
 Do NOT add a second LenisProvider instance anywhere else in the tree.
 Do NOT use CSS scroll-behavior: smooth as a replacement – Lenis overrides this at the JS layer.
 
 Unit Testing & Quality Assurance
 Unit Testing: Write unit tests for all new utilities, API routes, and complex hooks using Vitest.
-Test runner: `npm test` (runs `vitest run`), watch mode: `npm run test:watch`.
+Test runner: `npm test` (runs `vitest run --config vitest.config.ts`), watch mode: `npm run test:watch`.
 Test setup file: src/test/setup.ts – imports @testing-library/jest-dom matchers.
 Test files live alongside their source files: src/**/*.{test,spec}.{ts,tsx}.
 Test Isolation: Tests must not rely on external network requests. Mock all external APIs (including iTunes, Bandsintown, Odesli, Spotify, and Discogs).
@@ -47,7 +47,10 @@ Every DAL function receives `SupabaseClient<Database>` as its first argument. Ne
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
 Hook Pattern: Hooks in `src/hooks/` wrap DAL functions. Each hook checks `isSupabaseConfigured` at load time — if false, immediately sets `isLoading = false` and returns empty data. This prevents Supabase calls when env vars are not set.
-Vercel API Routes: Serverless functions live at `api/` (repo root, not `src/`). The upload route (`api/upload.ts`) uses `SUPABASE_SERVICE_ROLE_KEY` to verify Bearer tokens via `supabase.auth.getUser(token)` before processing uploads.
+Next.js Route Handlers: API endpoints live at `app/api/*/route.ts`. The upload handler (`app/api/upload/route.ts`) uses `SUPABASE_SERVICE_ROLE_KEY` to verify Bearer tokens via `supabase.auth.getUser(token)` before processing uploads. Never use the legacy `api/` directory for new endpoints.
+Server-side Supabase Clients: Use `src/lib/supabase/server.ts` (createServerSupabaseClient) in Server Components and Route Handlers. Use `src/lib/supabase/client.ts` (createBrowserSupabaseClient) in Client Components.
+Server Env Validation: Import `src/lib/env.server.ts` in Route Handlers to get Zod-validated server-side environment variables. This module throws at startup if any required server var is missing.
+Next.js Caching: In app/page.tsx, data is fetched using `unstable_cache` with explicit `revalidate: 60` and `tags`. This is required because Next.js 15 no longer caches fetch/GET by default.
 
 Inversion of Control (IoC) & Component Contracts
 Props Over State: UI components MUST receive all data and callbacks as props — they must not directly access global state, context, or external stores.

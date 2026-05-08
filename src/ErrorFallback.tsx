@@ -1,10 +1,12 @@
+'use client'
+
 import type { FallbackProps } from 'react-error-boundary'
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { Warning, ArrowsClockwise } from "@phosphor-icons/react";
 
 export const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
-  if (import.meta.env.DEV) throw error;
+  if (process.env.NODE_ENV === 'development') throw error;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
