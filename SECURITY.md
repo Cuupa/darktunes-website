@@ -1,31 +1,31 @@
-Thanks for helping make GitHub safe for everyone.
+# Security Policy — darkTunes Music Group
 
-# Security
+## Supported Versions
 
-GitHub takes the security of our software products and services seriously, including all of the open source code repositories managed through our GitHub organizations, such as [GitHub](https://github.com/GitHub).
+| Version | Supported |
+|---|---|
+| `main` branch | ✅ |
+| Older branches | ❌ |
 
-Even though [open source repositories are outside of the scope of our bug bounty program](https://bounty.github.com/index.html#scope) and therefore not eligible for bounty rewards, we will ensure that your finding gets passed along to the appropriate maintainers for remediation. 
+## Reporting a Vulnerability
 
-## Reporting Security Issues
+**Do not open a public GitHub issue for security vulnerabilities.**
 
-If you believe you have found a security vulnerability in any GitHub-owned repository, please report it to us through coordinated disclosure.
+Please report security issues by emailing the maintainers directly (see repository contacts) or via [GitHub's private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability).
 
-**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
+Include as much detail as possible:
 
-Instead, please send an email to opensource-security[@]github.com.
+- Type of vulnerability (e.g. XSS, SQL injection, broken auth)
+- Affected file(s) and line numbers
+- Steps to reproduce
+- Potential impact
 
-Please include as much of the information listed below as you can to help us better understand and resolve the issue:
+We will respond within 72 hours and coordinate a fix before any public disclosure.
 
-  * The type of issue (e.g., buffer overflow, SQL injection, or cross-site scripting)
-  * Full paths of source file(s) related to the manifestation of the issue
-  * The location of the affected source code (tag/branch/commit or direct URL)
-  * Any special configuration required to reproduce the issue
-  * Step-by-step instructions to reproduce the issue
-  * Proof-of-concept or exploit code (if possible)
-  * Impact of the issue, including how an attacker might exploit the issue
+## Security Practices
 
-This information will help us triage your report more quickly.
-
-## Policy
-
-See [GitHub's Safe Harbor Policy](https://docs.github.com/en/site-policy/security-policies/github-bug-bounty-program-legal-safe-harbor#1-safe-harbor-terms)
+- **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data.
+- **Environment variables** containing secrets (`CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `VITE_` and are therefore never exposed to the browser.
+- **Supabase anon key** is intentionally public (client-side) but is scoped by RLS policies.
+- **File uploads** go through a server-side Vercel Edge Function — the R2 credentials are never accessible from the browser.
+- Dependencies are kept up to date. Run `npm audit` before adding new packages.

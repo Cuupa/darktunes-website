@@ -50,6 +50,15 @@ Dialog Contracts: All modals must extend DialogProps (with open / onClose). No d
 Agent Workflow Requirements
 These rules apply specifically to AI agent runs on this project:
 Update AGENTS.md: AGENTS.md is the living specification of this project and serves as a dedicated, predictable place for context. If new conventions, patterns, or architectural decisions were introduced, add or update the relevant section in this file after every run.
+Review & Update All Docs and Scripts: At the END of EVERY agent session, review each of the following files for accuracy and update any section that is stale or inconsistent with the actual codebase:
+  - README.md (quick start, scripts table, env-var table, project structure)
+  - DEPLOYMENT.md (env-var names must match .env.example and scripts/vercel-install.sh exactly)
+  - INTEGRATION-SUMMARY.md (reflect the current implemented vs. pending state)
+  - ADMIN.md (admin panel features and setup steps)
+  - SECURITY.md (security practices relevant to the actual code)
+  - scripts/vercel-install.sh (env-var list must match .env.example)
+  - .env.example (must list every variable the app actually reads)
+This review is MANDATORY, not optional, even when no documentation changes were part of the original task.
 Update Documentation: If new public APIs, components, or utilities were added, update the relevant docs in the docs/ directory or inline JSDoc comments.
 Minimal Changes Principle: Make the smallest possible change that fully addresses the requirement. Do not refactor unrelated code in the same PR. Do not add new dependencies unless absolutely necessary — check npm audit for any new package.
 
