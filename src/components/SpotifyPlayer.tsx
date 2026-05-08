@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, SkipForward, SkipBack, SpeakerHigh } from '@phosphor-icons/react'
@@ -14,11 +13,11 @@ interface SpotifyPlayerProps {
 export function SpotifyPlayer({ trackUri, playlistUri, artistUri }: SpotifyPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState([70])
-  const [currentTrack, setCurrentTrack] = useState({
+  const currentTrack = {
     name: 'Select a track to play',
     artist: 'darkTunes Music Group',
     albumArt: ''
-  })
+  }
 
   const spotifyUri = trackUri || playlistUri || artistUri
 

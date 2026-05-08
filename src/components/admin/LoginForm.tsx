@@ -28,7 +28,7 @@ export function LoginForm() {
       } else {
         toast.success(mode === 'signin' ? 'Welcome back!' : 'Account created successfully!')
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
