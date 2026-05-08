@@ -4,7 +4,7 @@
  * Central environment-variable validation for darkTunes.
  * All VITE_* variables are validated here via Zod at module-load time.
  *
- * Behaviour per environment:
+ * Behavior per environment:
  *   production  → missing required variables throw a formatted Error that is
  *                 caught by the top-level <ErrorBoundary>.  The message names
  *                 every missing key so the operator knows exactly what to fix.
