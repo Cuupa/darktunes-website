@@ -15,6 +15,20 @@ export interface Artist {
   vatNumber?: string
   isEuNonGerman?: boolean
   notes?: string
+  spotifyId?: string
+  discogsId?: string
+  songkickId?: string
+  lastSyncedAt?: string
+}
+
+export interface SyncLog {
+  id: string
+  artistId: string | null
+  status: 'success' | 'partial' | 'error'
+  message: string | null
+  releasesSynced: number
+  errors: string[]
+  createdAt: string
 }
 
 export interface Release {

@@ -18,7 +18,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 59 tests passing
+- **Vitest** unit test suite (`npm test`) — 84 tests passing (9 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -51,7 +51,7 @@
 - Route: `/admin/login` (dynamic, server-rendered on demand)
 - Authentication via `useAuth` hook (Supabase Auth)
 - Dashboard UI with tabbed interface
-- **ArtistsManager** — table + create/edit dialog + delete confirm
+- **ArtistsManager** — table + create/edit dialog + delete confirm + **"Sync Now"** per-artist button + skeleton loading states + last-synced-at display
 - **ReleasesManager** — table + create/edit dialog + iTunes sync button
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
@@ -70,8 +70,42 @@
 - `NewsForm` — title, auto-slug, excerpt, content, image, publish date
 - `VideoForm` — youtubeId with auto-thumbnail generation
 
-### Component Contracts
-- `src/lib/component-contracts.ts` — `SectionProps`, `EditableSectionProps<T>`, `AdminPanelProps<T>`, `DialogProps`
+### Artist Auto-Sync Pipeline (`src/lib/sync/`)
+- `syncArtist.ts` — Core sync orchestrator with dependency-injected `SyncDeps` interface (db, fetch, uploadToR2). Fetches releases from iTunes API, caches cover art in Cloudflare R2, upserts releases to Supabase, writes a `sync_logs` entry. Never throws — errors are captured in `SyncResult.errors`.
+- All external API calls use `withExponentialBackoff()` from `src/lib/rateLimiter.ts` for resilient retrying on 429/5xx responses.
+
+### Rate Limiter (`src/lib/rateLimiter.ts`)
+- `HttpError` — HTTP error class with a `status` code; used to distinguish retryable (429, 5xx) from non-retryable (4xx) failures.
+- `withExponentialBackoff(fn, maxRetries, baseDelayMs)` — Retries `fn` with exponential back-off delays. Non-`HttpError` errors and non-retryable HTTP errors fail immediately.
+
+### Image Optimisation (`src/lib/imageUtils.ts`)
+All public-facing images MUST be served through wsrv.nl:
+- `getOptimizedImageUrl(url, width)` — Returns a wsrv.nl URL that serves the image at the given width in WebP format.
+- `getSquareThumbnail(url, size)` — Returns a wsrv.nl URL for a square cover-crop thumbnail in WebP.
+Use these functions wherever `<img>` or Next.js `<Image>` displays an artist photo or release cover art.
+
+### R2 Upload Helper (`src/lib/r2Utils.ts`)
+- `createR2Client(accountId, keyId, secret)` — Creates a pre-configured AWS S3 client pointed at Cloudflare R2.
+- `uploadUrlToR2(imageUrl, s3, bucket, r2PublicUrl, keyPrefix, fetchFn)` — Downloads a remote image and uploads it to R2, returning the public CDN URL.
+
+### Sync Service Pattern
+Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps` interface:
+```typescript
+interface SyncDeps {
+  db: SupabaseClient<Database>   // Supabase service-role client
+  fetch: typeof fetch             // Injectable fetch for external APIs
+  uploadToR2: (imageUrl: string, keyPrefix: string) => Promise<string>
+}
+```
+The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and calls `syncArtist()`. Tests mock all deps.
+
+### Sync Logs DAL (`src/lib/api/syncLogs.ts`)
+- `getSyncLogsByArtist(db, artistId, limit)` — Fetches recent sync history for an artist.
+- `insertSyncLog(db, log)` — Records a sync result.
+
+### Manual Sync API (`app/api/sync-artist/route.ts`)
+- POST `/api/sync-artist` with body `{ artistId: string }` and `Authorization: Bearer <token>` header.
+- Verifies the caller is authenticated, runs the sync pipeline, returns `SyncResult`.
 
 ---
 
@@ -79,9 +113,13 @@
 
 | Feature | Status | Notes |
 |---|---|---|
-| Supabase RLS policies | Defined in migration | Needs cloud deployment via `npm run db:push` |
-| R2 bucket CORS | Config needed | Allow `POST` from the Vercel domain |
-| iTunes auto-sync on release | Optional | Manual sync button available in ReleasesManager |
+| iTunes auto-sync on artist create | ✅ Implemented | Manual "Sync Now" per artist in ArtistsManager; POST /api/sync-artist |
+| Image caching in R2 | ✅ Implemented | Cover art from iTunes is downloaded & uploaded to R2 via uploadUrlToR2 |
+| wsrv.nl image proxy | ✅ Implemented | getOptimizedImageUrl / getSquareThumbnail in src/lib/imageUtils.ts |
+| Rate limiter + exponential backoff | ✅ Implemented | withExponentialBackoff in src/lib/rateLimiter.ts |
+| Sync history logging | ✅ Implemented | sync_logs table + getSyncLogsByArtist DAL |
+| Spotify / Discogs / Songkick sync | 🔲 Pending | ID fields stored in DB; API integration pending API key setup |
+| Supabase pg_cron auto-sync | 🔲 Pending | Schema and API route ready; pg_cron schedule setup needed in Supabase dashboard |
 
 ---
 
@@ -106,7 +144,12 @@
 | `src/lib/component-contracts.ts` | Shared prop interfaces (SectionProps, AdminPanelProps, etc.) |
 | `src/types/database.ts` | TypeScript DB types (must stay in sync with migrations) |
 | `src/components/admin/forms/` | Admin CRUD form components |
-| `app/api/upload/route.ts` | Next.js Route Handler for R2 file uploads |
+| `src/lib/api/syncLogs.ts` | DAL for sync_logs table (getSyncLogsByArtist, insertSyncLog) |
+| `src/lib/rateLimiter.ts` | HttpError + withExponentialBackoff for resilient external API calls |
+| `src/lib/imageUtils.ts` | wsrv.nl image proxy helpers (getOptimizedImageUrl, getSquareThumbnail) |
+| `src/lib/r2Utils.ts` | R2 upload helper (createR2Client, uploadUrlToR2) |
+| `src/lib/sync/syncArtist.ts` | Core artist sync orchestrator (IoC via SyncDeps) |
+| `app/api/sync-artist/route.ts` | Manual sync trigger — POST /api/sync-artist |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
 ---

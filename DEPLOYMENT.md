@@ -430,6 +430,13 @@ Set these in your Vercel project settings (Dashboard → Project → Settings �
 - `CLOUDFLARE_R2_BUCKET_NAME`: R2 bucket name (e.g. `darktunes-assets`)
 - `CLOUDFLARE_R2_PUBLIC_URL`: R2 public CDN base URL (e.g. `https://cdn.darktunes.com`)
 
+### External API Keys (optional — Artist Auto-Sync)
+These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync works without any key; the others require keys from the respective developer portals.
+- `SPOTIFY_CLIENT_ID`: Spotify app client ID (https://developer.spotify.com/dashboard → Create App)
+- `SPOTIFY_CLIENT_SECRET`: Spotify app client secret
+- `DISCOGS_TOKEN`: Discogs personal access token (https://www.discogs.com/settings/developers)
+- `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
+
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
 ---
@@ -446,6 +453,8 @@ Set these in your Vercel project settings (Dashboard → Project → Settings �
 - [ ] SSL certificate active
 - [ ] Test admin login
 - [ ] Test file upload
+- [ ] Test artist "Sync Now" button (iTunes releases import)
+- [ ] Check sync_logs table for any errors
 - [ ] Test iTunes sync
 - [ ] Verify all sections load correctly
 

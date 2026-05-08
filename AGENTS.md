@@ -59,6 +59,27 @@ Section Contracts: All page sections must extend SectionProps (or EditableSectio
 Admin Panel Contracts: All admin sub-forms must extend AdminPanelProps<T> from src/lib/component-contracts.ts. No sub-form should import or read AdminSettings directly from storage/context.
 Dialog Contracts: All modals must extend DialogProps (with open / onClose). No dialog should manage its own visibility state internally.
 
+Rate Limiting
+Server-side external API calls MUST use `withExponentialBackoff()` from `src/lib/rateLimiter.ts`.
+Throw `HttpError(status, message)` for HTTP errors to distinguish retryable (429, 5xx) from non-retryable failures.
+Non-HTTP errors (e.g. network errors) are not retried — they fail immediately.
+
+Image Optimisation
+All public-facing images MUST be served via `getOptimizedImageUrl(url, width)` or `getSquareThumbnail(url, size)` from `src/lib/imageUtils.ts`.
+These functions proxy through wsrv.nl and output WebP format, preventing origin load.
+Use `getOptimizedImageUrl` for rectangular/banner images and `getSquareThumbnail` for cover art / profile photos.
+
+Sync Service Pattern
+Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps` interface (db, fetch, uploadToR2).
+The HTTP handler in `app/api/sync-artist/route.ts` only wires deps and calls `syncArtist()`. Tests mock all deps.
+Sync functions MUST NOT throw — capture all errors in `SyncResult.errors` and return gracefully.
+Every sync run writes a `sync_logs` entry with status 'success', 'partial', or 'error'.
+
+R2 Image Caching
+When syncing external content, always download cover/artwork images and upload to Cloudflare R2 via `uploadUrlToR2()` from `src/lib/r2Utils.ts`.
+Store the R2 public URL (not the external URL) in the database. The public website reads only from Supabase + R2.
+If R2 upload fails during sync, fall back to the external URL and log the error — do not abort the sync.
+
 Agent Workflow Requirements
 These rules apply specifically to AI agent runs on this project:
 Update AGENTS.md: AGENTS.md is the living specification of this project and serves as a dedicated, predictable place for context. If new conventions, patterns, or architectural decisions were introduced, add or update the relevant section in this file after every run.
@@ -93,10 +114,13 @@ Install script: scripts/vercel-install.sh runs npm ci and validates all required
 Required env vars are split into two groups:
   - Client-side (must have NEXT_PUBLIC_ prefix to be exposed to the browser):
       NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
-  - Server-side (never exposed to the browser; used only in Vercel Serverless Functions):
+  - Server-side (never exposed to the browser; used only in Vercel Route Handlers / Edge Functions):
       SUPABASE_SERVICE_ROLE_KEY,
       CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
       CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME,
       CLOUDFLARE_R2_PUBLIC_URL
+  - Optional (external API sync — required for Spotify / Discogs / Songkick artist sync):
+      SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
+      DISCOGS_TOKEN, SONGKICK_API_KEY
 Configure all variables in Vercel Dashboard → Project → Settings → Environment Variables.
 See DEPLOYMENT.md for full variable descriptions and setup instructions.

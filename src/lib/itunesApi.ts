@@ -17,26 +17,24 @@ export interface iTunesSearchResponse {
   results: iTunesRelease[]
 }
 
-export async function searchItunesArtist(artistName: string): Promise<iTunesRelease[]> {
-  try {
-    const encodedArtist = encodeURIComponent(artistName)
-    const response = await fetch(
-      `https://itunes.apple.com/search?term=${encodedArtist}&entity=album&limit=200`
-    )
-    
-    if (!response.ok) {
-      throw new Error(`iTunes API error: ${response.status}`)
-    }
-    
-    const data: iTunesSearchResponse = await response.json()
-    
-    return data.results.filter(result => 
-      result.artistName.toLowerCase() === artistName.toLowerCase()
-    )
-  } catch (error) {
-    console.error(`Error fetching iTunes data for ${artistName}:`, error)
-    return []
+export async function searchItunesArtist(
+  artistName: string,
+  fetchFn: typeof fetch = globalThis.fetch,
+): Promise<iTunesRelease[]> {
+  const encodedArtist = encodeURIComponent(artistName)
+  const response = await fetchFn(
+    `https://itunes.apple.com/search?term=${encodedArtist}&entity=album&limit=200`
+  )
+
+  if (!response.ok) {
+    throw new Error(`iTunes API error: ${response.status}`)
   }
+
+  const data: iTunesSearchResponse = await response.json() as iTunesSearchResponse
+
+  return data.results.filter(result =>
+    result.artistName.toLowerCase() === artistName.toLowerCase()
+  )
 }
 
 export async function getAllArtistsReleases(artistNames: string[]): Promise<Map<string, iTunesRelease[]>> {

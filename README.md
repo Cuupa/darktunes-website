@@ -10,7 +10,10 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Spotify Player
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
-- **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets)
+- **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets; Artist Auto-Sync; Skeleton loading)
+- **Artist Auto-Sync** – "Sync Now" per artist triggers iTunes release import, R2 cover art caching, and Supabase upsert
+- **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
+- **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
 - **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware
 - **Cloud storage** – media uploads via Cloudflare R2 (server-side Route Handler)
 - **Server-side rendering** – data fetched at the edge with explicit ISR caching
@@ -88,6 +91,15 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket name (e.g. `darktunes-assets`) |
 | `CLOUDFLARE_R2_PUBLIC_URL` | R2 public CDN base URL (e.g. `https://cdn.darktunes.com`) |
 
+### External API Keys (optional — Artist Auto-Sync)
+
+| Variable | Description |
+|---|---|
+| `SPOTIFY_CLIENT_ID` | Spotify app client ID (sync releases by Spotify Artist ID) |
+| `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
+| `DISCOGS_TOKEN` | Discogs personal access token (sync releases by Discogs Artist ID) |
+| `SONGKICK_API_KEY` | Songkick API key (sync tour dates by Songkick Artist ID) |
+
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 ---
@@ -136,7 +148,8 @@ app/                          # Next.js App Router entry points
 │   ├── login/page.tsx        # Login page (force-dynamic)
 │   └── _components/          # Client wrappers for admin pages
 └── api/
-    └── upload/route.ts       # R2 file upload Route Handler (replaces legacy api/upload.ts)
+    ├── upload/route.ts       # R2 file upload Route Handler
+    └── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
 middleware.ts                 # Next.js Edge Middleware — Supabase auth check for /admin/*
 src/
 ├── components/               # UI components (Header, Hero, Releases, Artists, …)
@@ -147,7 +160,12 @@ src/
 ├── contexts/                 # React context providers ("use client")
 ├── hooks/                    # Custom React hooks (useArtists, useReleases, …)
 ├── lib/                      # Business logic, API clients, utilities
-│   ├── api/                  # Data Access Layer — one file per table
+│   ├── api/                  # Data Access Layer — one file per table (incl. syncLogs.ts)
+│   ├── sync/                 # Artist sync service (syncArtist.ts)
+│   ├── rateLimiter.ts        # HttpError + withExponentialBackoff
+│   ├── imageUtils.ts         # wsrv.nl proxy helpers
+│   ├── r2Utils.ts            # R2 image upload helper
+│   ├── itunesApi.ts          # iTunes Search API client
 │   ├── env.server.ts         # Server-side Zod env validation (for Route Handlers)
 │   └── supabase/
 │       ├── server.ts         # Supabase server client (@supabase/ssr, reads cookies)
