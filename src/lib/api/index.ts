@@ -1,0 +1,5 @@
+export * from './artists'
+export * from './releases'
+export * from './news'
+export * from './videos'
+export * from './assets'

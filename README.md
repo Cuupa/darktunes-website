@@ -80,6 +80,7 @@ Copy `.env.example` to `.env.local` and fill in your values.
 
 | Variable | Description |
 |---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key — used by `/api/upload` to verify auth tokens |
 | `CLOUDFLARE_R2_ACCOUNT_ID` | Cloudflare account ID |
 | `CLOUDFLARE_R2_ACCESS_KEY_ID` | R2 API access key ID |
 | `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | R2 API secret access key |
@@ -123,14 +124,18 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for step-by-step setup.
 ```
 src/
 ├── components/        # UI components (Header, Hero, Releases, Artists, …)
-│   ├── admin/         # Admin panel components
+│   ├── admin/         # Admin panel + manager components
+│   │   └── forms/     # Admin CRUD form components
 │   ├── animations/    # LenisProvider and motion helpers
 │   └── ui/            # Shadcn/Radix primitives
 ├── contexts/          # React context providers
-├── hooks/             # Custom React hooks
+├── hooks/             # Custom React hooks (useArtists, useReleases, …)
 ├── lib/               # Business logic, API clients, utilities
+│   └── api/           # Data Access Layer — one file per table
 ├── styles/            # Global CSS / Tailwind configuration
 └── types/             # TypeScript types (incl. database.ts)
+api/
+└── upload.ts          # Vercel serverless function — R2 file uploads
 supabase/
 └── migrations/        # SQL migration files (source of truth for schema)
 scripts/

@@ -25,7 +25,8 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 ## Security Practices
 
 - **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data.
-- **Environment variables** containing secrets (`CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `VITE_` and are therefore never exposed to the browser.
+- **Environment variables** containing secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `VITE_` and are therefore never exposed to the browser.
 - **Supabase anon key** is intentionally public (client-side) but is scoped by RLS policies.
-- **File uploads** go through a server-side Vercel Edge Function — the R2 credentials are never accessible from the browser.
+- **File uploads** go through the Vercel Serverless Function `api/upload.ts` — R2 credentials are never accessible from the browser. The function validates the caller's `Authorization: Bearer <token>` via `supabase.auth.getUser()` using the service-role key before accepting any upload.
+- **Service-role key** (`SUPABASE_SERVICE_ROLE_KEY`) bypasses RLS — it is used exclusively in `api/upload.ts` for token verification and must never be exposed to the client.
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
