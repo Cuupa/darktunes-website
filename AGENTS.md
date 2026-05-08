@@ -52,3 +52,29 @@ These rules apply specifically to AI agent runs on this project:
 Update AGENTS.md: AGENTS.md is the living specification of this project and serves as a dedicated, predictable place for context. If new conventions, patterns, or architectural decisions were introduced, add or update the relevant section in this file after every run.
 Update Documentation: If new public APIs, components, or utilities were added, update the relevant docs in the docs/ directory or inline JSDoc comments.
 Minimal Changes Principle: Make the smallest possible change that fully addresses the requirement. Do not refactor unrelated code in the same PR. Do not add new dependencies unless absolutely necessary — check npm audit for any new package.
+
+Database Schema Management
+The SQL migration files and the TypeScript database types are the dual source of truth for the database structure. They MUST always be in sync.
+
+MANDATORY RULE — Schema Change Checklist:
+Every PR that adds, removes, or renames a column / table / enum MUST include ALL of the following:
+  1. A new SQL migration file in supabase/migrations/ named YYYYMMDDHHMMSS_short_description.sql.
+  2. Updated src/types/database.ts to reflect the new schema (Row, Insert, Update shapes).
+  3. If applicable: updated application hooks (src/hooks/use*.ts) that query the affected table.
+
+Never edit the initial migration (20240101000000_initial_schema.sql) directly — always add a new migration file.
+Apply migrations to Supabase cloud: npm run db:push (requires Supabase CLI and supabase link).
+Generate a diff between local and remote schema: npm run db:diff.
+Migration naming: use UTC timestamp prefix, e.g. 20240601120000_add_artist_bandcamp_url.sql.
+
+Vercel Deployment
+Install script: scripts/vercel-install.sh runs npm ci and validates all required environment variables.
+Required env vars are split into two groups:
+  - Client-side (must have VITE_ prefix to be exposed to the browser):
+      VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+  - Server-side (never exposed to the browser; used only in Vercel Serverless Functions):
+      CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME,
+      CLOUDFLARE_R2_PUBLIC_URL
+Configure all variables in Vercel Dashboard → Project → Settings → Environment Variables.
+See DEPLOYMENT.md for full variable descriptions and setup instructions.

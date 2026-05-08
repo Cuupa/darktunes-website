@@ -11,7 +11,9 @@
         "optimize": "vite optimize",
         "preview": "vite preview",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "db:push": "supabase db push",
+        "db:diff": "supabase db diff"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",

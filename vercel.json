@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "installCommand": "npm install",
+  "installCommand": "bash scripts/vercel-install.sh",
   "framework": null,
   "outputDirectory": "dist",
   "rewrites": [
