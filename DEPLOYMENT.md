@@ -138,6 +138,40 @@ CREATE TABLE public.assets (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ============================================================
+-- AUTO-CREATE PROFILE ON SIGNUP
+-- This trigger fires for every new row inserted into auth.users
+-- (i.e. every new registration). Without it, public.profiles
+-- will always be empty and admin-promotion SQL will find nothing.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    'user'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+-- Allow the auth system to call this function
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT INSERT ON public.profiles TO supabase_auth_admin;
+
+-- Attach trigger to auth.users
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artists ENABLE ROW LEVEL SECURITY;
@@ -255,13 +289,50 @@ CREATE TRIGGER update_videos_updated_at BEFORE UPDATE ON public.videos
 ```
 
 ### 3. Create First Admin User
-1. Sign up through your app or Supabase dashboard
-2. Run this SQL to make yourself admin:
+
+> **Important:** The `handle_new_user` trigger above must be created **before** any user registers.
+> If you applied the schema after already signing up, follow the **Backfill** step below first.
+
+#### Step A — Register the user
+Sign up normally through your app's login page or directly via the Supabase Dashboard:
+**Authentication → Users → Invite user**.
+
+#### Step B — Verify the profile row was auto-created
+Run this in the Supabase SQL Editor to confirm the trigger fired correctly:
 ```sql
-UPDATE public.profiles 
-SET role = 'admin' 
+SELECT id, email, role
+FROM public.profiles
 WHERE email = 'your-email@example.com';
 ```
+You should see exactly one row with `role = 'user'`.
+
+#### Step C — Backfill (only needed if the trigger was missing when you first signed up)
+If the query above returns 0 rows, the trigger was not yet active during signup.
+Manually create the missing profile row:
+```sql
+INSERT INTO public.profiles (id, email, role)
+SELECT id, email, 'user'
+FROM auth.users
+WHERE email = 'your-email@example.com'
+ON CONFLICT (id) DO NOTHING;
+```
+
+#### Step D — Promote to admin
+Resolve the UUID from `auth.users` and update `profiles` in one statement:
+```sql
+-- Safe: resolves UUID first, then updates by primary key.
+-- Will print "UPDATE 0" with a clear error if the email does not exist.
+UPDATE public.profiles
+SET role = 'admin'
+WHERE id = (
+  SELECT id
+  FROM auth.users
+  WHERE email = 'your-email@example.com'
+  LIMIT 1
+);
+```
+> ⚠️ Replace `your-email@example.com` with your actual email address.
+> If you see `UPDATE 0 rows`, re-run Step B / Step C first.
 
 ---
 
@@ -367,8 +438,9 @@ Set these in your Vercel project settings:
 ## 📝 Post-Deployment Checklist
 
 - [ ] Supabase project created and configured
-- [ ] Database schema applied
-- [ ] First admin user created
+- [ ] Database schema applied (including `handle_new_user` trigger)
+- [ ] First admin user registered **after** schema was applied
+- [ ] Admin role confirmed via `SELECT role FROM public.profiles WHERE email = '...'`
 - [ ] R2 bucket created and configured
 - [ ] Environment variables set in Vercel
 - [ ] Domain configured in Vercel
