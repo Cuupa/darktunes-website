@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 import type { UserProfile } from '@/types'
+
+type ProfileRow = Database['public']['Tables']['profiles']['Row']
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -46,12 +49,13 @@ export function useAuth() {
 
       if (error) throw error
 
+      const row = data as ProfileRow
       setProfile({
-        id: data.id,
-        email: data.email,
-        role: data.role,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        id: row.id,
+        email: row.email,
+        role: row.role,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
       })
     } catch (error) {
       console.error('Error fetching profile:', error)
