@@ -45,104 +45,266 @@
 3. Note your project URL and anon key
 
 ### 2. Database Schema
-Run the following SQL in Supabase SQL Editor:
+
+> ⚠️ **This script is fully idempotent** — it is safe to run on a fresh database
+> **and** on an existing one. All tables, policies, triggers and functions are
+> dropped and recreated cleanly. **Existing data is preserved** (tables are only
+> dropped with `CASCADE` on dependent objects such as policies/triggers, not data).
+
+Run the following SQL in the **Supabase SQL Editor**:
 
 ```sql
+-- ============================================================
+-- IDEMPOTENT SCHEMA SETUP — safe to re-run on existing databases
+-- Tables are created fresh; all policies/triggers are replaced.
+-- Existing row data is NOT deleted.
+-- ============================================================
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table (extends Supabase auth.users)
-CREATE TABLE public.profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'editor', 'user')),
+-- ============================================================
+-- DROP existing triggers, policies and functions so we can
+-- recreate them without conflicts. Tables themselves are kept
+-- (data is preserved). Use DROP TABLE ... CASCADE only if you
+-- intentionally want to wipe all data.
+-- ============================================================
+
+-- Drop triggers (ignore errors if they don't exist yet)
+DROP TRIGGER IF EXISTS on_auth_user_created        ON auth.users;
+DROP TRIGGER IF EXISTS update_profiles_updated_at  ON public.profiles;
+DROP TRIGGER IF EXISTS update_artists_updated_at   ON public.artists;
+DROP TRIGGER IF EXISTS update_releases_updated_at  ON public.releases;
+DROP TRIGGER IF EXISTS update_news_posts_updated_at ON public.news_posts;
+DROP TRIGGER IF EXISTS update_videos_updated_at    ON public.videos;
+
+-- Drop RLS policies — profiles
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile"             ON public.profiles;
+
+-- Drop RLS policies — artists
+DROP POLICY IF EXISTS "Artists are viewable by everyone"  ON public.artists;
+DROP POLICY IF EXISTS "Only admins can insert artists"    ON public.artists;
+DROP POLICY IF EXISTS "Only admins can update artists"    ON public.artists;
+DROP POLICY IF EXISTS "Only admins can delete artists"    ON public.artists;
+
+-- Drop RLS policies — releases
+DROP POLICY IF EXISTS "Releases are viewable by everyone"  ON public.releases;
+DROP POLICY IF EXISTS "Only editors can manage releases"   ON public.releases;
+
+-- Drop RLS policies — news_posts
+DROP POLICY IF EXISTS "News are viewable by everyone"  ON public.news_posts;
+DROP POLICY IF EXISTS "Only editors can manage news"   ON public.news_posts;
+
+-- Drop RLS policies — videos
+DROP POLICY IF EXISTS "Videos are viewable by everyone"  ON public.videos;
+DROP POLICY IF EXISTS "Only editors can manage videos"   ON public.videos;
+
+-- Drop RLS policies — assets
+DROP POLICY IF EXISTS "Assets are viewable by everyone"  ON public.assets;
+DROP POLICY IF EXISTS "Only admins can upload assets"    ON public.assets;
+
+-- ============================================================
+-- TABLES  (CREATE IF NOT EXISTS — data is never deleted)
+-- ============================================================
+
+-- Profiles (extends Supabase auth.users)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id         UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  email      TEXT UNIQUE NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'editor', 'user')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Artists table
-CREATE TABLE public.artists (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  bio TEXT,
-  genres TEXT[] DEFAULT '{}',
-  image_url TEXT,
-  spotify_url TEXT,
-  instagram_url TEXT,
-  youtube_url TEXT,
-  website_url TEXT,
-  featured BOOLEAN DEFAULT false,
-  country TEXT,
-  email TEXT,
-  vat_number TEXT,
+-- Artists
+CREATE TABLE IF NOT EXISTS public.artists (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name            TEXT NOT NULL,
+  slug            TEXT UNIQUE NOT NULL,
+  bio             TEXT,
+  genres          TEXT[] DEFAULT '{}',
+  image_url       TEXT,
+  spotify_url     TEXT,
+  instagram_url   TEXT,
+  youtube_url     TEXT,
+  website_url     TEXT,
+  featured        BOOLEAN DEFAULT false,
+  country         TEXT,
+  email           TEXT,
+  vat_number      TEXT,
   is_eu_non_german BOOLEAN DEFAULT false,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  notes           TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Releases table
-CREATE TABLE public.releases (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  artist_id UUID REFERENCES public.artists(id) ON DELETE CASCADE,
-  artist_name TEXT NOT NULL,
-  release_date DATE NOT NULL,
-  cover_art TEXT,
-  type TEXT NOT NULL CHECK (type IN ('album', 'ep', 'single')),
-  spotify_url TEXT,
+-- Releases
+CREATE TABLE IF NOT EXISTS public.releases (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title           TEXT NOT NULL,
+  artist_id       UUID REFERENCES public.artists(id) ON DELETE CASCADE,
+  artist_name     TEXT NOT NULL,
+  release_date    DATE NOT NULL,
+  cover_art       TEXT,
+  type            TEXT NOT NULL CHECK (type IN ('album', 'ep', 'single')),
+  spotify_url     TEXT,
   apple_music_url TEXT,
-  youtube_url TEXT,
-  featured BOOLEAN DEFAULT false,
-  itunes_id TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  youtube_url     TEXT,
+  featured        BOOLEAN DEFAULT false,
+  itunes_id       TEXT UNIQUE,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- News posts table
-CREATE TABLE public.news_posts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  excerpt TEXT,
-  content TEXT NOT NULL,
-  image_url TEXT,
+-- News posts
+CREATE TABLE IF NOT EXISTS public.news_posts (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title        TEXT NOT NULL,
+  slug         TEXT UNIQUE NOT NULL,
+  excerpt      TEXT,
+  content      TEXT NOT NULL,
+  image_url    TEXT,
   published_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Videos table
-CREATE TABLE public.videos (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  artist_name TEXT NOT NULL,
-  youtube_id TEXT NOT NULL,
+-- Videos
+CREATE TABLE IF NOT EXISTS public.videos (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title         TEXT NOT NULL,
+  artist_name   TEXT NOT NULL,
+  youtube_id    TEXT NOT NULL,
   thumbnail_url TEXT,
-  published_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  published_at  TIMESTAMPTZ DEFAULT NOW(),
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Assets table (for R2 metadata)
-CREATE TABLE public.assets (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  filename TEXT NOT NULL,
+-- Assets (R2 metadata)
+CREATE TABLE IF NOT EXISTS public.assets (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  filename          TEXT NOT NULL,
   original_filename TEXT NOT NULL,
-  mime_type TEXT NOT NULL,
-  size_bytes BIGINT NOT NULL,
-  r2_key TEXT NOT NULL UNIQUE,
-  public_url TEXT NOT NULL,
-  uploaded_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  mime_type         TEXT NOT NULL,
+  size_bytes        BIGINT NOT NULL,
+  r2_key            TEXT NOT NULL UNIQUE,
+  public_url        TEXT NOT NULL,
+  uploaded_by       UUID REFERENCES auth.users(id),
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
+-- ROW LEVEL SECURITY
+-- ============================================================
+ALTER TABLE public.profiles   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artists    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.releases   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.news_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.videos     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assets     ENABLE ROW LEVEL SECURITY;
+
+-- Profiles
+CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can update own profile" ON public.profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+-- Artists
+CREATE POLICY "Artists are viewable by everyone" ON public.artists
+  FOR SELECT USING (true);
+
+CREATE POLICY "Only admins can insert artists" ON public.artists
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Only admins can update artists" ON public.artists
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+CREATE POLICY "Only admins can delete artists" ON public.artists
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- Releases
+CREATE POLICY "Releases are viewable by everyone" ON public.releases
+  FOR SELECT USING (true);
+
+CREATE POLICY "Only editors can manage releases" ON public.releases
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+-- News
+CREATE POLICY "News are viewable by everyone" ON public.news_posts
+  FOR SELECT USING (true);
+
+CREATE POLICY "Only editors can manage news" ON public.news_posts
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+-- Videos
+CREATE POLICY "Videos are viewable by everyone" ON public.videos
+  FOR SELECT USING (true);
+
+CREATE POLICY "Only editors can manage videos" ON public.videos
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+-- Assets
+CREATE POLICY "Assets are viewable by everyone" ON public.assets
+  FOR SELECT USING (true);
+
+CREATE POLICY "Only admins can upload assets" ON public.assets
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+-- ============================================================
+-- FUNCTIONS & TRIGGERS
+-- ============================================================
+
+-- updated_at helper
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_artists_updated_at
+  BEFORE UPDATE ON public.artists
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_releases_updated_at
+  BEFORE UPDATE ON public.releases
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_news_posts_updated_at
+  BEFORE UPDATE ON public.news_posts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_videos_updated_at
+  BEFORE UPDATE ON public.videos
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
 -- AUTO-CREATE PROFILE ON SIGNUP
--- This trigger fires for every new row inserted into auth.users
--- (i.e. every new registration). Without it, public.profiles
--- will always be empty and admin-promotion SQL will find nothing.
+-- Fires on every INSERT into auth.users (every new registration).
+-- Without this trigger public.profiles stays empty and
+-- admin-promotion SQL will always find 0 rows.
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -152,187 +314,61 @@ SET search_path = public
 AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    'user'
-  )
+  VALUES (NEW.id, NEW.email, 'user')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
 
--- Allow the auth system to call this function
-GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
-GRANT INSERT ON public.profiles TO supabase_auth_admin;
+-- Grant permission so the auth subsystem can call this function
+GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
+GRANT INSERT ON public.profiles      TO supabase_auth_admin;
 
--- Attach trigger to auth.users
-CREATE OR REPLACE TRIGGER on_auth_user_created
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Enable Row Level Security
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.artists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.releases ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.news_posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.videos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
-
--- Profiles policies
-CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can update own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
-
--- Artists policies
-CREATE POLICY "Artists are viewable by everyone" ON public.artists
-  FOR SELECT USING (true);
-
-CREATE POLICY "Only admins can insert artists" ON public.artists
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
-
-CREATE POLICY "Only admins can update artists" ON public.artists
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'editor')
-    )
-  );
-
-CREATE POLICY "Only admins can delete artists" ON public.artists
-  FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
-
--- Releases policies (similar pattern)
-CREATE POLICY "Releases are viewable by everyone" ON public.releases
-  FOR SELECT USING (true);
-
-CREATE POLICY "Only editors can manage releases" ON public.releases
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'editor')
-    )
-  );
-
--- News policies
-CREATE POLICY "News are viewable by everyone" ON public.news_posts
-  FOR SELECT USING (true);
-
-CREATE POLICY "Only editors can manage news" ON public.news_posts
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'editor')
-    )
-  );
-
--- Videos policies
-CREATE POLICY "Videos are viewable by everyone" ON public.videos
-  FOR SELECT USING (true);
-
-CREATE POLICY "Only editors can manage videos" ON public.videos
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'editor')
-    )
-  );
-
--- Assets policies
-CREATE POLICY "Assets are viewable by everyone" ON public.assets
-  FOR SELECT USING (true);
-
-CREATE POLICY "Only admins can upload assets" ON public.assets
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'editor')
-    )
-  );
-
--- Triggers for updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_artists_updated_at BEFORE UPDATE ON public.artists
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_releases_updated_at BEFORE UPDATE ON public.releases
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_news_posts_updated_at BEFORE UPDATE ON public.news_posts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_videos_updated_at BEFORE UPDATE ON public.videos
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- ============================================================
+-- BACKFILL: sync any auth users who registered before this
+-- trigger existed (safe to run multiple times — ON CONFLICT)
+-- ============================================================
+INSERT INTO public.profiles (id, email, role)
+SELECT id, email, 'user'
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
 ```
 
 ### 3. Create First Admin User
 
-> **Important:** The `handle_new_user` trigger above must be created **before** any user registers.
-> If you applied the schema after already signing up, follow the **Backfill** step below first.
+> **Note:** The script above contains a backfill at the end that automatically
+> syncs every existing `auth.users` row into `public.profiles`.
+> You can run the entire script on an already-live database without losing data.
 
 #### Step A — Register the user
-Sign up normally through your app's login page or directly via the Supabase Dashboard:
+Sign up through your app's login page or via the Supabase Dashboard:
 **Authentication → Users → Invite user**.
 
-#### Step B — Verify the profile row was auto-created
-Run this in the Supabase SQL Editor to confirm the trigger fired correctly:
+#### Step B — Verify the profile row exists
 ```sql
 SELECT id, email, role
 FROM public.profiles
 WHERE email = 'your-email@example.com';
 ```
-You should see exactly one row with `role = 'user'`.
+You should see exactly one row. If not, re-run the full schema script above —
+the backfill `INSERT … ON CONFLICT DO NOTHING` at the bottom will add it.
 
-#### Step C — Backfill (only needed if the trigger was missing when you first signed up)
-If the query above returns 0 rows, the trigger was not yet active during signup.
-Manually create the missing profile row:
+#### Step C — Promote to admin
 ```sql
-INSERT INTO public.profiles (id, email, role)
-SELECT id, email, 'user'
-FROM auth.users
-WHERE email = 'your-email@example.com'
-ON CONFLICT (id) DO NOTHING;
-```
-
-#### Step D — Promote to admin
-Resolve the UUID from `auth.users` and update `profiles` in one statement:
-```sql
--- Safe: resolves UUID first, then updates by primary key.
--- Will print "UPDATE 0" with a clear error if the email does not exist.
 UPDATE public.profiles
 SET role = 'admin'
 WHERE id = (
-  SELECT id
-  FROM auth.users
+  SELECT id FROM auth.users
   WHERE email = 'your-email@example.com'
   LIMIT 1
 );
 ```
-> ⚠️ Replace `your-email@example.com` with your actual email address.
-> If you see `UPDATE 0 rows`, re-run Step B / Step C first.
+> ⚠️ Replace `your-email@example.com` with the actual address.
+> `UPDATE 0 rows` means the profile row is still missing — re-run Step B first.
 
 ---
 
