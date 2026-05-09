@@ -38,7 +38,7 @@ function formatAmountEur(amount: number | undefined): string {
 export function StatementsTable({ dict, statements }: StatementsTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  const handleDownload = async (statementId: string, filename: string) => {
+  const handleDownload = async (statementId: string) => {
     setLoadingId(statementId)
     toast.info(dict.statements_downloading)
 
@@ -98,7 +98,7 @@ export function StatementsTable({ dict, statements }: StatementsTableProps) {
                         variant="outline"
                         className="border-border hover:bg-primary/10 hover:text-primary"
                         disabled={loadingId === stmt.id}
-                        onClick={() => handleDownload(stmt.id, stmt.filename)}
+                        onClick={() => handleDownload(stmt.id)}
                       >
                         {loadingId === stmt.id ? (
                           <Spinner size={14} className="animate-spin mr-1" />

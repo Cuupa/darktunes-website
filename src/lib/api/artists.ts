@@ -4,7 +4,6 @@ import type { Artist } from '@/types'
 import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
-type ArtistRow = Database['public']['Tables']['artists']['Row']
 export type ArtistInsert = Database['public']['Tables']['artists']['Insert']
 export type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
