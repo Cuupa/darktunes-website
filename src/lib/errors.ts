@@ -53,10 +53,7 @@ function buildErrorResponse(
 // withErrorHandler — Higher-Order Function for Route Handlers
 // ---------------------------------------------------------------------------
 
-type RouteHandler = (
-  req: NextRequest,
-  context?: { params: Record<string, string> },
-) => Promise<NextResponse>
+type RouteHandler = (req: NextRequest) => Promise<NextResponse>
 
 /**
  * Wraps a Next.js Route Handler with centralised error handling.
@@ -67,9 +64,9 @@ type RouteHandler = (
  *   - Unknown errors → returns 500 Internal Server Error (sanitised message)
  */
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     try {
-      return await handler(req, context)
+      return await handler(req)
     } catch (err) {
       if (err instanceof ApiError) {
         return buildErrorResponse(err.message, err.status, err.code)
