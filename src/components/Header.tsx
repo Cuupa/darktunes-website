@@ -31,6 +31,7 @@ export function Header({ dict, locale }: HeaderProps) {
     { label: dict.home, href: '#hero' },
     { label: dict.artists, href: '#artists' },
     { label: dict.releases, href: '#releases' },
+    { label: dict.tour, href: '#concerts' },
     { label: dict.news, href: '#news' },
     { label: dict.videos, href: '#videos' },
   ]

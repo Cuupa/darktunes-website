@@ -6,12 +6,13 @@ import { Releases } from '@/components/Releases'
 import { Artists } from '@/components/Artists'
 import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
+import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { CRTOverlay } from '@/components/CRTOverlay'
 import { SpotifyPlayer } from '@/components/SpotifyPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion } from 'framer-motion'
-import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
+import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface HomePageContentProps {
@@ -19,6 +20,7 @@ interface HomePageContentProps {
   artists: Artist[]
   news: NewsPost[]
   videos: Video[]
+  concerts: Concert[]
   siteSettings: SiteSettings
   dict: Dictionary
   locale: Locale
@@ -33,7 +35,16 @@ interface HomePageContentProps {
  * following the Inversion of Control principle: no child needs to load its
  * own translations.
  */
-export function HomePageContent({ releases, artists, news, videos, siteSettings, dict, locale }: HomePageContentProps) {
+export function HomePageContent({
+  releases,
+  artists,
+  news,
+  videos,
+  concerts,
+  siteSettings,
+  dict,
+  locale,
+}: HomePageContentProps) {
   const featuredRelease =
     releases.length > 0 ? releases.find((r) => r.featured) ?? releases[0] : undefined
 
@@ -82,6 +93,7 @@ export function HomePageContent({ releases, artists, news, videos, siteSettings,
           consentDict={dict.consent}
           locale={locale}
         />
+        <Concerts concerts={concerts} dict={dict.concerts} locale={locale} />
         <News news={news} dict={dict.news} locale={locale} />
 
         <NewsletterSection dict={dict.newsletter} />
