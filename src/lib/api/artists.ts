@@ -1,36 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
+import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
-type ArtistRow = Database['public']['Tables']['artists']['Row']
 export type ArtistInsert = Database['public']['Tables']['artists']['Insert']
 export type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
-function rowToArtist(row: ArtistRow): Artist {
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    bio: row.bio ?? '',
-    genres: row.genres,
-    imageUrl: row.image_url ?? '',
-    spotifyUrl: row.spotify_url ?? undefined,
-    instagramUrl: row.instagram_url ?? undefined,
-    youtubeUrl: row.youtube_url ?? undefined,
-    websiteUrl: row.website_url ?? undefined,
-    featured: row.featured,
-    country: row.country ?? undefined,
-    email: row.email ?? undefined,
-    vatNumber: row.vat_number ?? undefined,
-    isEuNonGerman: row.is_eu_non_german,
-    notes: row.notes ?? undefined,
-    spotifyId: row.spotify_id ?? undefined,
-    discogsId: row.discogs_id ?? undefined,
-    songkickId: row.songkick_id ?? undefined,
-    lastSyncedAt: row.last_synced_at ?? undefined,
-  }
-}
+export { rowToArtist }
 
 export async function getArtists(db: DbClient): Promise<Artist[]> {
   const { data, error } = await db

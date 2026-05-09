@@ -1,8 +1,26 @@
-# darkTunes Admin Panel
+# darkTunes Admin Panel & Artist Portal
+
+## Admin Panel
 
 Access the admin panel at `/admin`. Authentication is enforced at the edge by **Next.js Middleware** (`middleware.ts`) — unauthenticated requests are redirected to `/admin/login` before any page content is served.
 
-## Features
+## Artist Portal
+
+Access the artist portal at `/portal`. Artists sign in with their own Supabase Auth account. The same Edge Middleware enforces auth: unauthenticated requests are redirected to `/portal/login`.
+
+Portal features:
+- **EPK Profile Editor** (`/portal/profile`) — artists edit bio, genres, social links, press quote, and upload a profile photo. The photo upload goes server-side via `/api/portal/upload-photo` (no CORS issues).
+- **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
+- **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. The Server Action generates the URL; the raw R2 object key and credentials never reach the browser.
+
+To link an artist to a portal user, run this SQL once per artist after they have signed up:
+```sql
+UPDATE public.artists
+SET user_id = (SELECT id FROM auth.users WHERE email = 'artist@email.com')
+WHERE slug = 'artist-slug';
+```
+
+## Admin Features
 
 - **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
 - **Role-Based Access Control**: Admin and Editor roles with different permissions

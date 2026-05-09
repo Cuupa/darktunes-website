@@ -49,6 +49,7 @@ const mockArtistRow: ArtistRow = {
   discogs_id: null,
   songkick_id: null,
   last_synced_at: null,
+  user_id: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
