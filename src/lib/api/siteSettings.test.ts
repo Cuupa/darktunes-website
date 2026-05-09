@@ -108,6 +108,27 @@ describe('getSiteSettings', () => {
     expect(result.consentPlaceholderUrl).toBe('')
   })
 
+  it('maps visual effect fields from rows', async () => {
+    const db = makeMockDb([
+      ...mockRows,
+      { key: 'noise_opacity', value: '0.08' },
+      { key: 'crt_scanlines_enabled', value: 'false' },
+      { key: 'vignette_intensity', value: '0.7' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.noiseOpacity).toBe(0.08)
+    expect(result.crtScanlinesEnabled).toBe(false)
+    expect(result.vignetteIntensity).toBe(0.7)
+  })
+
+  it('returns default visual effect values when keys are missing', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.noiseOpacity).toBe(0.04)
+    expect(result.crtScanlinesEnabled).toBe(true)
+    expect(result.vignetteIntensity).toBe(0.5)
+  })
+
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Query failed', code: 'PGRST001' })
     await expect(getSiteSettings(db)).rejects.toThrow('Query failed')

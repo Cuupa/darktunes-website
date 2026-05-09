@@ -125,6 +125,12 @@ export interface SiteSettings {
   datenschutzContent: string
   /** URL of the placeholder image shown in ConsentGate before the user opts in. */
   consentPlaceholderUrl: string
+  /** Visual overlay: animated noise/grain opacity (0–1). Default 0.04. */
+  noiseOpacity: number
+  /** Visual overlay: whether CRT scanline effect is active. */
+  crtScanlinesEnabled: boolean
+  /** Visual overlay: vignette intensity (0–1). Default 0.5. */
+  vignetteIntensity: number
 }
 
 export interface Concert {

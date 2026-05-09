@@ -1,6 +1,6 @@
 'use client'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SiteSettings } from '@/types'
 
@@ -45,6 +47,9 @@ const schema = z.object({
   impressumEmail: z.string().email('Must be a valid email').or(z.literal('')),
   datenschutzContent: z.string().optional().default(''),
   consentPlaceholderUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+  noiseOpacity: z.number().min(0).max(1).default(0.04),
+  crtScanlinesEnabled: z.boolean().default(true),
+  vignetteIntensity: z.number().min(0).max(1).default(0.5),
 })
 
 type FormData = z.infer<typeof schema>
@@ -82,6 +87,7 @@ export function SiteSettingsManager() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -115,12 +121,13 @@ export function SiteSettingsManager() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Tabs defaultValue="global" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="global">Global</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
           <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
+          <TabsTrigger value="visual">Visual Effects</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------------------------------------------ */}
@@ -469,6 +476,109 @@ export function SiteSettingsManager() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        {/* ------------------------------------------------------------------ */}
+        {/* Visual Effects                                                       */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="visual">
+          <Card>
+            <CardHeader>
+              <CardTitle>Visual Effects</CardTitle>
+              <CardDescription>
+                Configure the industrial dark-aesthetic overlays rendered on the public site. All
+                effects are non-interactive and sit beneath UI elements.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Noise / Grain */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Noise / Grain Opacity</Label>
+                  <Controller
+                    name="noiseOpacity"
+                    control={control}
+                    render={({ field }) => (
+                      <span className="text-sm text-muted-foreground tabular-nums w-10 text-right">
+                        {(field.value ?? 0).toFixed(2)}
+                      </span>
+                    )}
+                  />
+                </div>
+                <Controller
+                  name="noiseOpacity"
+                  control={control}
+                  render={({ field }) => (
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={[field.value ?? 0]}
+                      onValueChange={([v]) => field.onChange(v)}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  0 = invisible · 0.04 = subtle (recommended) · 0.15 = heavy grain
+                </p>
+              </div>
+
+              {/* CRT Scanlines */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="crtScanlinesEnabled">CRT Scanlines</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Horizontal line pattern for a subtle industrial CRT look.
+                  </p>
+                </div>
+                <Controller
+                  name="crtScanlinesEnabled"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="crtScanlinesEnabled"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Vignette */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Vignette Intensity</Label>
+                  <Controller
+                    name="vignetteIntensity"
+                    control={control}
+                    render={({ field }) => (
+                      <span className="text-sm text-muted-foreground tabular-nums w-10 text-right">
+                        {(field.value ?? 0).toFixed(2)}
+                      </span>
+                    )}
+                  />
+                </div>
+                <Controller
+                  name="vignetteIntensity"
+                  control={control}
+                  render={({ field }) => (
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={[field.value ?? 0]}
+                      onValueChange={([v]) => field.onChange(v)}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  0 = no vignette · 0.5 = medium depth (recommended) · 1 = heavy
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

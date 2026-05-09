@@ -33,6 +33,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   impressumEmail: 'info@darktunes.com',
   datenschutzContent: '',
   consentPlaceholderUrl: '',
+  noiseOpacity: 0.04,
+  crtScanlinesEnabled: true,
+  vignetteIntensity: 0.5,
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -64,6 +67,9 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     impressum_email: s.impressumEmail,
     datenschutz_content: s.datenschutzContent,
     consent_placeholder_url: s.consentPlaceholderUrl,
+    noise_opacity: String(s.noiseOpacity),
+    crt_scanlines_enabled: String(s.crtScanlinesEnabled),
+    vignette_intensity: String(s.vignetteIntensity),
   }
 }
 
