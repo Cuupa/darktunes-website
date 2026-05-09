@@ -34,6 +34,29 @@ const serverEnvSchema = z.object({
   CLOUDFLARE_R2_PUBLIC_URL: z
     .string()
     .url({ message: 'must be a valid URL (e.g. https://cdn.darktunes.com)' }),
+  // ---------------------------------------------------------------------------
+  // Optional external API keys — leave blank to disable the corresponding sync
+  // ---------------------------------------------------------------------------
+  /** Spotify Web API client ID (https://developer.spotify.com/dashboard) */
+  SPOTIFY_CLIENT_ID: z
+    .string()
+    .optional()
+    .describe('Spotify client ID — leave blank to disable Spotify sync'),
+  /** Spotify Web API client secret */
+  SPOTIFY_CLIENT_SECRET: z
+    .string()
+    .optional()
+    .describe('Spotify client secret — leave blank to disable Spotify sync'),
+  /** Discogs Personal Access Token (https://www.discogs.com/settings/developers) */
+  DISCOGS_TOKEN: z
+    .string()
+    .optional()
+    .describe('Discogs token — leave blank to disable Discogs sync'),
+  /** Songkick API key (https://www.songkick.com/developer) */
+  SONGKICK_API_KEY: z
+    .string()
+    .optional()
+    .describe('Songkick API key — leave blank to disable Songkick sync'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -48,6 +71,10 @@ function validateServerEnv(): ServerEnv {
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME,
     CLOUDFLARE_R2_PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL,
+    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
+    DISCOGS_TOKEN: process.env.DISCOGS_TOKEN,
+    SONGKICK_API_KEY: process.env.SONGKICK_API_KEY,
   })
 
   if (!result.success) {

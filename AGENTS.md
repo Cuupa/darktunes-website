@@ -75,6 +75,15 @@ Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps
 The HTTP handler in `app/api/sync-artist/route.ts` only wires deps and calls `syncArtist()`. Tests mock all deps.
 Sync functions MUST NOT throw — capture all errors in `SyncResult.errors` and return gracefully.
 Every sync run writes a `sync_logs` entry with status 'success', 'partial', or 'error'.
+`sync_logs` also records `api_source` (itunes | spotify | discogs | songkick | odesli | all) and `rate_limited` (boolean) per run.
+The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps extends SyncDeps with optional spotify/discogsToken/songkickApiKey). Called by `POST /api/sync`.
+Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs releases using ISRC → barcode/UPC → normalised title + year precedence.
+
+Centralized Error Handling
+All Next.js Route Handlers MUST be wrapped with `withErrorHandler` from `src/lib/errors.ts`.
+`withErrorHandler` catches `ApiError` (returns its status code), `ZodError` (returns 400 with VALIDATION_ERROR code), and unknown errors (returns 500). All responses follow `{ error, code, status }` shape.
+Throw `new ApiError(status, message, code?)` inside route handlers instead of manually returning `NextResponse.json({ error })`.
+`app/error.tsx` and `app/global-error.tsx` are the Next.js rendering error boundaries.
 
 R2 Image Caching
 When syncing external content, always download cover/artwork images and upload to Cloudflare R2 via `uploadUrlToR2()` from `src/lib/r2Utils.ts`.

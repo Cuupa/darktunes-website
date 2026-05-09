@@ -28,6 +28,8 @@ export interface SyncLog {
   message: string | null
   releasesSynced: number
   errors: string[]
+  apiSource: string
+  rateLimited: boolean
   createdAt: string
 }
 
@@ -44,6 +46,14 @@ export interface Release {
   youtubeUrl?: string
   featured: boolean
   itunesId?: string
+  spotifyId?: string
+  discogsId?: string
+  isrc?: string
+  barcode?: string
+  catalogNumber?: string
+  previewUrl?: string
+  smartUrl?: string
+  popularity?: number
 }
 
 export interface NewsPost {
@@ -115,6 +125,22 @@ export interface SiteSettings {
   datenschutzContent: string
   /** URL of the placeholder image shown in ConsentGate before the user opts in. */
   consentPlaceholderUrl: string
+}
+
+export interface Concert {
+  id: string
+  artistId: string | null
+  artistName: string
+  eventName: string
+  venueName: string | null
+  venueCity: string | null
+  venueCountry: string | null
+  concertDate: string
+  ticketUrl: string | null
+  songkickId: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface NewsletterSubscriber {

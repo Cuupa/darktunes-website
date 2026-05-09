@@ -14,6 +14,8 @@ function rowToSyncLog(row: SyncLogRow): SyncLog {
     message: row.message,
     releasesSynced: row.releases_synced,
     errors: row.errors,
+    apiSource: row.api_source,
+    rateLimited: row.rate_limited,
     createdAt: row.created_at,
   }
 }

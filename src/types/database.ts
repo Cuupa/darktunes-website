@@ -122,6 +122,14 @@ export interface Database {
           youtube_url: string | null
           featured: boolean
           itunes_id: string | null
+          spotify_id: string | null
+          discogs_id: string | null
+          isrc: string | null
+          barcode: string | null
+          catalog_number: string | null
+          preview_url: string | null
+          smart_url: string | null
+          popularity: number | null
           created_at: string
           updated_at: string
         }
@@ -138,6 +146,14 @@ export interface Database {
           youtube_url?: string | null
           featured?: boolean
           itunes_id?: string | null
+          spotify_id?: string | null
+          discogs_id?: string | null
+          isrc?: string | null
+          barcode?: string | null
+          catalog_number?: string | null
+          preview_url?: string | null
+          smart_url?: string | null
+          popularity?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -154,6 +170,62 @@ export interface Database {
           youtube_url?: string | null
           featured?: boolean
           itunes_id?: string | null
+          spotify_id?: string | null
+          discogs_id?: string | null
+          isrc?: string | null
+          barcode?: string | null
+          catalog_number?: string | null
+          preview_url?: string | null
+          smart_url?: string | null
+          popularity?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      concerts: {
+        Row: {
+          id: string
+          artist_id: string | null
+          artist_name: string
+          event_name: string
+          venue_name: string | null
+          venue_city: string | null
+          venue_country: string | null
+          concert_date: string
+          ticket_url: string | null
+          songkick_id: string | null
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id?: string | null
+          artist_name: string
+          event_name: string
+          venue_name?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          concert_date: string
+          ticket_url?: string | null
+          songkick_id?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string | null
+          artist_name?: string
+          event_name?: string
+          venue_name?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          concert_date?: string
+          ticket_url?: string | null
+          songkick_id?: string | null
+          status?: string
           created_at?: string
           updated_at?: string
         }
@@ -290,6 +362,8 @@ export interface Database {
           message: string | null
           releases_synced: number
           errors: string[]
+          api_source: string
+          rate_limited: boolean
           created_at: string
         }
         Insert: {
@@ -299,6 +373,8 @@ export interface Database {
           message?: string | null
           releases_synced?: number
           errors?: string[]
+          api_source?: string
+          rate_limited?: boolean
           created_at?: string
         }
         Update: {
@@ -308,6 +384,8 @@ export interface Database {
           message?: string | null
           releases_synced?: number
           errors?: string[]
+          api_source?: string
+          rate_limited?: boolean
           created_at?: string
         }
         Relationships: []
@@ -341,6 +419,7 @@ export interface Database {
     Functions: Record<string, never>
     Enums: {
       sync_status: 'success' | 'partial' | 'error'
+      sync_api_source: 'itunes' | 'spotify' | 'discogs' | 'songkick' | 'odesli' | 'all'
     }
   }
 }

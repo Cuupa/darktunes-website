@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -12,9 +12,10 @@ import { NewsManager } from './NewsManager'
 import { VideosManager } from './VideosManager'
 import { AssetsManager } from './AssetsManager'
 import { SiteSettingsManager } from './SiteSettingsManager'
+import { SystemHealthWidget } from './SystemHealthWidget'
 
 export function AdminDashboard() {
-  const { user, profile, signOut } = useAuthContext()
+  const { user, profile, signOut, session } = useAuthContext()
   const [activeTab, setActiveTab] = useState('artists')
 
   const handleSignOut = async () => {
@@ -53,7 +54,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" />
               Artists
@@ -77,6 +78,10 @@ export function AdminDashboard() {
             <TabsTrigger value="settings" className="gap-2">
               <Gear size={16} weight="bold" />
               Settings
+            </TabsTrigger>
+            <TabsTrigger value="health" className="gap-2">
+              <Heartbeat size={16} weight="bold" />
+              Health
             </TabsTrigger>
           </TabsList>
 
@@ -160,6 +165,20 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <SiteSettingsManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="health" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Health &amp; API Status</CardTitle>
+                <CardDescription>
+                  Monitor external API synchronisation status and trigger a manual sync
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
               </CardContent>
             </Card>
           </TabsContent>

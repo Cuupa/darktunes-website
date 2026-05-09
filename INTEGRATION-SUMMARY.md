@@ -18,7 +18,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 95 tests passing (10 test files)
+- **Vitest** unit test suite (`npm test`) — 115 tests passing (13 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -74,9 +74,29 @@
 - `NewsForm` — title, auto-slug, excerpt, content, image, publish date
 - `VideoForm` — youtubeId with auto-thumbnail generation
 
-### Artist Auto-Sync Pipeline (`src/lib/sync/`)
-- `syncArtist.ts` — Core sync orchestrator with dependency-injected `SyncDeps` interface (db, fetch, uploadToR2). Fetches releases from iTunes API, caches cover art in Cloudflare R2, upserts releases to Supabase, writes a `sync_logs` entry. Never throws — errors are captured in `SyncResult.errors`.
-- All external API calls use `withExponentialBackoff()` from `src/lib/rateLimiter.ts` for resilient retrying on 429/5xx responses.
+### Multi-API Sync Engine (`src/lib/sync/`)
+- **`syncAll.ts`** — Multi-artist, multi-API orchestrator. Runs iTunes, Spotify, Discogs, Songkick, and Odesli sync for every artist. Accepts `SyncAllDeps` (extends `SyncDeps` with optional `spotify`, `discogsToken`, `songkickApiKey`). Never throws — errors captured per-API in `SyncAllResult`.
+- **`spotifyApi.ts`** — Fetches artist albums via Spotify Web API (client credentials flow). Returns `SpotifyRelease[]` with cover art URLs, popularity scores, and UPC barcodes.
+- **`discogsApi.ts`** — Fetches physical releases from Discogs API (Personal Access Token). Paginated. Returns catalog numbers and barcodes.
+- **`songkickApi.ts`** — Fetches upcoming concerts from Songkick API. Paginated. Returns `SongkickConcert[]` with venue, city, country, date, and ticket URL.
+- **`odesliApi.ts`** — Resolves any music streaming URL through Odesli (song.link) to return a universal smart link plus per-platform URLs.
+- **`deduplication.ts`** — Merges Spotify (digital) and Discogs (physical) release lists using ISRC → barcode/UPC → normalised title + year as matching precedence.
+
+### Centralized Error Handling (`src/lib/errors.ts`)
+- **`ApiError`** — Structured HTTP error class with `status`, `message`, and optional `code`.
+- **`withErrorHandler(handler)`** — Higher-Order Function that wraps any Next.js Route Handler. Catches `ApiError` (returns its status), `ZodError` (returns 400 with `VALIDATION_ERROR` code), and unknown errors (returns 500). All errors returned as `{ error, code, status }` JSON.
+
+### API Routes
+- **`POST /api/sync`** — Triggers full multi-API sync for all artists. Requires `Authorization: Bearer <token>`. Uses `withErrorHandler`.
+- **`GET /api/health`** — Returns database connection status (latency ms), per-API last-sync timestamp and status, and rate-limit warnings. Public endpoint.
+
+### Admin Health Dashboard
+- **`SystemHealthWidget`** (`src/components/admin/SystemHealthWidget.tsx`) — Grid of status cards (DB online/offline, per-API last sync, rate-limit badges) with a "Force Sync All" button. Auto-refreshes every 60 seconds.
+- Added **System Health** tab to `AdminDashboard.tsx`.
+
+### Error Boundaries
+- **`app/error.tsx`** — Next.js error boundary for route segments; shows a retry button.
+- **`app/global-error.tsx`** — Global error boundary for layout-level failures; includes `<html>` and `<body>`.
 
 ### Rate Limiter (`src/lib/rateLimiter.ts`)
 - `HttpError` — HTTP error class with a `status` code; used to distinguish retryable (429, 5xx) from non-retryable (4xx) failures.
@@ -122,7 +142,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | wsrv.nl image proxy | ✅ Implemented | getOptimizedImageUrl / getSquareThumbnail in src/lib/imageUtils.ts |
 | Rate limiter + exponential backoff | ✅ Implemented | withExponentialBackoff in src/lib/rateLimiter.ts |
 | Sync history logging | ✅ Implemented | sync_logs table + getSyncLogsByArtist DAL |
-| Spotify / Discogs / Songkick sync | 🔲 Pending | ID fields stored in DB; API integration pending API key setup |
+| Spotify / Discogs / Songkick sync | ✅ Implemented | `src/lib/sync/{spotifyApi,discogsApi,songkickApi,odesliApi,deduplication,syncAll}.ts`; POST `/api/sync` |
 | Supabase pg_cron auto-sync | 🔲 Pending | Schema and API route ready; pg_cron schedule setup needed in Supabase dashboard |
 | Site settings CMS | ✅ Implemented | `site_settings` table + Admin Settings tab + Next.js ISR cache revalidation |
 | Impressum page (§ 5 TMG) | ✅ Implemented | `/impressum` RSC — all mandatory German legal fields from CMS |
@@ -160,8 +180,20 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/rateLimiter.ts` | HttpError + withExponentialBackoff for resilient external API calls |
 | `src/lib/imageUtils.ts` | wsrv.nl image proxy helpers (getOptimizedImageUrl, getSquareThumbnail) |
 | `src/lib/r2Utils.ts` | R2 upload helper (createR2Client, uploadUrlToR2) |
-| `src/lib/sync/syncArtist.ts` | Core artist sync orchestrator (IoC via SyncDeps) |
-| `app/api/sync-artist/route.ts` | Manual sync trigger — POST /api/sync-artist |
+| `src/lib/sync/syncArtist.ts` | Core iTunes artist sync orchestrator (IoC via SyncDeps) |
+| `src/lib/sync/syncAll.ts` | Multi-API orchestrator (iTunes + Spotify + Discogs + Songkick + Odesli) |
+| `src/lib/sync/spotifyApi.ts` | Spotify Web API integration (albums, popularity, cover art) |
+| `src/lib/sync/discogsApi.ts` | Discogs API integration (physical releases, catalog numbers, barcodes) |
+| `src/lib/sync/songkickApi.ts` | Songkick API integration (concerts, venues, ticket links) |
+| `src/lib/sync/odesliApi.ts` | Odesli API integration (universal smart links via song.link) |
+| `src/lib/sync/deduplication.ts` | ISRC/barcode deduplication utility for merging Spotify + Discogs releases |
+| `src/lib/errors.ts` | `ApiError` class + `withErrorHandler` HOF for centralized error handling |
+| `app/api/sync/route.ts` | Manual all-artists sync trigger — POST /api/sync |
+| `app/api/sync-artist/route.ts` | Manual single-artist sync trigger — POST /api/sync-artist |
+| `app/api/health/route.ts` | System health check — GET /api/health |
+| `app/error.tsx` | Next.js error boundary (route-segment level) |
+| `app/global-error.tsx` | Next.js global error boundary (root layout level) |
+| `src/components/admin/SystemHealthWidget.tsx` | Admin health dashboard widget (DB status + per-API cards + Force Sync) |
 | `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
