@@ -23,7 +23,7 @@ describe('ApiError', () => {
 
 describe('withErrorHandler', () => {
   it('passes through a successful response unchanged', async () => {
-    const handler = withErrorHandler(async (_req) =>
+    const handler = withErrorHandler(async () =>
       NextResponse.json({ ok: true }, { status: 200 }),
     )
     const res = await handler(makeRequest())
