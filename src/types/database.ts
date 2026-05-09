@@ -312,6 +312,30 @@ export interface Database {
         }
         Relationships: []
       }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          email: string
+          name: string | null
+          source: string
+          subscribed_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          name?: string | null
+          source?: string
+          subscribed_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          name?: string | null
+          source?: string
+          subscribed_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

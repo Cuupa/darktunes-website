@@ -12,6 +12,7 @@ Access the admin panel at `/admin`. Authentication is enforced at the edge by **
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
+- **Legal / DSGVO (New)**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
 
 ## Setup
 

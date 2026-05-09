@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Play, Pause, SkipForward, SkipBack, SpeakerHigh } from '@phosphor-icons/react'
 import { Slider } from '@/components/ui/slider'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ConsentGate } from '@/components/ConsentGate'
 
 interface SpotifyPlayerProps {
   trackUri?: string
   playlistUri?: string
   artistUri?: string
+  /** Optional R2 placeholder image URL shown before consent is given. */
+  placeholderUrl?: string
 }
 
-export function SpotifyPlayer({ trackUri, playlistUri, artistUri }: SpotifyPlayerProps) {
+export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl }: SpotifyPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState([70])
   const currentTrack = {
@@ -144,15 +147,17 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri }: SpotifyPlaye
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <iframe
-              src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyUri)}`}
-              width="100%"
-              height="152"
-              frameBorder="0"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-              className="rounded-md"
-            />
+            <ConsentGate label="Spotify laden" placeholderUrl={placeholderUrl}>
+              <iframe
+                src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyUri)}`}
+                width="100%"
+                height="152"
+                frameBorder="0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="rounded-md"
+              />
+            </ConsentGate>
           </motion.div>
         )}
       </motion.div>

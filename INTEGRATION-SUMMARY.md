@@ -18,7 +18,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 93 tests passing (10 test files)
+- **Vitest** unit test suite (`npm test`) — 95 tests passing (10 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -124,6 +124,12 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Spotify / Discogs / Songkick sync | 🔲 Pending | ID fields stored in DB; API integration pending API key setup |
 | Supabase pg_cron auto-sync | 🔲 Pending | Schema and API route ready; pg_cron schedule setup needed in Supabase dashboard |
 | Site settings CMS | ✅ Implemented | `site_settings` table + Admin Settings tab + Next.js ISR cache revalidation |
+| Impressum page (§ 5 TMG) | ✅ Implemented | `/impressum` RSC — all mandatory German legal fields from CMS |
+| Datenschutzerklärung page | ✅ Implemented | `/datenschutz` RSC — Markdown content editable in CMS |
+| GDPR Consent Management | ✅ Implemented | `ConsentBanner` + `ConsentGate` — Spotify/YouTube blocked until opt-in |
+| Newsletter subscription | ✅ Implemented | `/api/newsletter` Route Handler → Supabase + optional MailerLite sync |
+| Generic cache revalidation webhook | ✅ Implemented | `POST /api/revalidate` with `REVALIDATE_SECRET` — for Supabase webhooks |
+| Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
 
 ---
 

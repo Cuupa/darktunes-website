@@ -1,0 +1,138 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Calendar, ArrowLeft, SpotifyLogo, AppleLogo, YoutubeLogo } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import type { Release } from '@/types'
+
+interface ReleaseDetailContentProps {
+  release: Release
+}
+
+/**
+ * Client component for the release detail page.
+ *
+ * The `layoutId` on the cover art image matches the one used in the
+ * Releases grid card, enabling Framer Motion's Shared Layout Animation:
+ * the thumbnail seamlessly morphs into the large header image when the
+ * user navigates from the grid to this detail page.
+ */
+export function ReleaseDetailContent({ release }: ReleaseDetailContentProps) {
+  const formattedDate = new Date(release.releaseDate).toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ------------------------------------------------------------------ */}
+      {/* Hero — shared layout cover art                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="relative">
+        {/* Full-bleed blurred background from the cover art */}
+        <div
+          className="absolute inset-0 h-[70vh] overflow-hidden"
+          style={{ zIndex: 0 }}
+          aria-hidden
+        >
+          <img
+            src={getOptimizedImageUrl(release.coverArt, 1200)}
+            alt=""
+            className="w-full h-full object-cover opacity-20 blur-2xl scale-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-8 pb-16">
+          <Link
+            href="/#releases"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
+          >
+            <ArrowLeft size={16} weight="bold" />
+            Alle Releases
+          </Link>
+
+          <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
+            {/* Shared Layout cover art */}
+            <motion.div
+              layoutId={`release-cover-${release.id}`}
+              className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
+            >
+              <img
+                src={getOptimizedImageUrl(release.coverArt, 600)}
+                alt={`${release.title} cover`}
+                className="w-full aspect-square object-cover"
+              />
+            </motion.div>
+
+            {/* Metadata */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.5 }}
+              className="flex-1 min-w-0 space-y-5 pt-2"
+            >
+              <div className="flex flex-wrap gap-2">
+                <Badge
+                  variant="outline"
+                  className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground"
+                >
+                  {release.type}
+                </Badge>
+                {release.featured && (
+                  <Badge className="bg-secondary/90 text-secondary-foreground font-bold uppercase tracking-wider text-xs">
+                    Featured
+                  </Badge>
+                )}
+              </div>
+
+              <div>
+                <h1 className="text-4xl lg:text-6xl font-bold tracking-tight leading-none mb-2">
+                  {release.title}
+                </h1>
+                <p className="text-xl text-muted-foreground font-medium">{release.artistName}</p>
+              </div>
+
+              <p className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
+                <Calendar size={16} weight="bold" />
+                {formattedDate}
+              </p>
+
+              {/* Streaming links */}
+              <div className="flex flex-wrap gap-3 pt-2">
+                {release.spotifyUrl && (
+                  <Button asChild size="sm" className="bg-[#1DB954] hover:bg-[#1DB954]/90 text-black font-semibold">
+                    <a href={release.spotifyUrl} target="_blank" rel="noopener noreferrer">
+                      <SpotifyLogo size={18} weight="fill" className="mr-2" />
+                      Spotify
+                    </a>
+                  </Button>
+                )}
+                {release.appleMusicUrl && (
+                  <Button asChild size="sm" className="bg-[#FA2D48] hover:bg-[#FA2D48]/90 text-white font-semibold">
+                    <a href={release.appleMusicUrl} target="_blank" rel="noopener noreferrer">
+                      <AppleLogo size={18} weight="fill" className="mr-2" />
+                      Apple Music
+                    </a>
+                  </Button>
+                )}
+                {release.youtubeUrl && (
+                  <Button asChild size="sm" className="bg-[#FF0000] hover:bg-[#FF0000]/90 text-white font-semibold">
+                    <a href={release.youtubeUrl} target="_blank" rel="noopener noreferrer">
+                      <YoutubeLogo size={18} weight="fill" className="mr-2" />
+                      YouTube
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

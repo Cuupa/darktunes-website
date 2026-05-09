@@ -4,14 +4,17 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Video } from '@/types'
+import { ConsentGate } from '@/components/ConsentGate'
 
 interface VideoModalProps {
   video: Video | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Optional R2 placeholder image URL shown before consent is given. */
+  placeholderUrl?: string
 }
 
-export function VideoModal({ video, open, onOpenChange }: VideoModalProps) {
+export function VideoModal({ video, open, onOpenChange, placeholderUrl }: VideoModalProps) {
   if (!video) return null
 
   return (
@@ -33,14 +36,18 @@ export function VideoModal({ video, open, onOpenChange }: VideoModalProps) {
                 <X size={20} weight="bold" />
               </button>
               
-              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                <iframe
-                  className="absolute inset-0 w-full h-full rounded-t-lg"
-                  src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0`}
-                  title={video.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+              <div className="relative w-full" style={{ paddingBottom: '56.25%', minHeight: 180 }}>
+                <div className="absolute inset-0">
+                  <ConsentGate label="YouTube laden" placeholderUrl={placeholderUrl}>
+                    <iframe
+                      className="w-full h-full rounded-t-lg"
+                      src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0`}
+                      title={video.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </ConsentGate>
+                </div>
               </div>
 
               <motion.div
