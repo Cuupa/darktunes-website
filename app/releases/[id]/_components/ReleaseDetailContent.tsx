@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Calendar, ArrowLeft, SpotifyLogo, AppleLogo, YoutubeLogo } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Release } from '@/types'
+import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ReleaseDetailContentProps {
   release: Release
+  dict: Dictionary['releaseDetail']
+  locale: Locale
 }
 
 /**
@@ -20,8 +23,9 @@ interface ReleaseDetailContentProps {
  * the thumbnail seamlessly morphs into the large header image when the
  * user navigates from the grid to this detail page.
  */
-export function ReleaseDetailContent({ release }: ReleaseDetailContentProps) {
-  const formattedDate = new Date(release.releaseDate).toLocaleDateString('de-DE', {
+export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailContentProps) {
+  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const formattedDate = new Date(release.releaseDate).toLocaleDateString(dateLocale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -53,7 +57,7 @@ export function ReleaseDetailContent({ release }: ReleaseDetailContentProps) {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
           >
             <ArrowLeft size={16} weight="bold" />
-            Alle Releases
+            {dict.backToReleases}
           </Link>
 
           <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
@@ -85,7 +89,7 @@ export function ReleaseDetailContent({ release }: ReleaseDetailContentProps) {
                 </Badge>
                 {release.featured && (
                   <Badge className="bg-secondary/90 text-secondary-foreground font-bold uppercase tracking-wider text-xs">
-                    Featured
+                    {dict.featured}
                   </Badge>
                 )}
               </div>

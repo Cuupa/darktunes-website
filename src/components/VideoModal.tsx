@@ -12,9 +12,11 @@ interface VideoModalProps {
   onOpenChange: (open: boolean) => void
   /** Optional R2 placeholder image URL shown before consent is given. */
   placeholderUrl?: string
+  /** Translated label for the YouTube consent gate button. */
+  youtubeLabel?: string
 }
 
-export function VideoModal({ video, open, onOpenChange, placeholderUrl }: VideoModalProps) {
+export function VideoModal({ video, open, onOpenChange, placeholderUrl, youtubeLabel }: VideoModalProps) {
   if (!video) return null
 
   return (
@@ -38,7 +40,7 @@ export function VideoModal({ video, open, onOpenChange, placeholderUrl }: VideoM
               
               <div className="relative w-full" style={{ paddingBottom: '56.25%', minHeight: 180 }}>
                 <div className="absolute inset-0">
-                  <ConsentGate label="YouTube laden" placeholderUrl={placeholderUrl}>
+                  <ConsentGate label={youtubeLabel ?? 'YouTube laden'} placeholderUrl={placeholderUrl}>
                     <iframe
                       className="w-full h-full rounded-t-lg"
                       src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0`}

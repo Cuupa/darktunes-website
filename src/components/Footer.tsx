@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo } from '@phosphor-icons/react'
 import type { SiteSettings } from '@/types'
+import type { Dictionary } from '@/i18n/types'
 
 interface FooterProps {
   siteSettings: SiteSettings
+  dict: Dictionary['footer']
 }
 
-export function Footer({ siteSettings }: FooterProps) {
+export function Footer({ siteSettings, dict }: FooterProps) {
   return (
     <footer className="border-t border-border bg-card/50 backdrop-blur-sm">
       <div className="container mx-auto px-4 lg:px-8 py-12">
@@ -20,7 +22,7 @@ export function Footer({ siteSettings }: FooterProps) {
               </div>
               <div>
                 <h3 className="text-lg font-bold tracking-tight uppercase">{siteSettings.labelName}</h3>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Music Group</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">{dict.musicGroup}</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -29,25 +31,25 @@ export function Footer({ siteSettings }: FooterProps) {
           </div>
 
           <div>
-            <h4 className="font-bold mb-4 uppercase tracking-wider">Quick Links</h4>
+            <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.quickLinks}</h4>
             <nav className="flex flex-col gap-2">
               <a href="#artists" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                Artists
+                {dict.artistsLink}
               </a>
               <a href="#releases" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                Releases
+                {dict.releasesLink}
               </a>
               <a href="#news" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                News
+                {dict.newsLink}
               </a>
               <a href="#videos" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                Videos
+                {dict.videosLink}
               </a>
             </nav>
           </div>
 
           <div>
-            <h4 className="font-bold mb-4 uppercase tracking-wider">Follow Us</h4>
+            <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.followUs}</h4>
             <div className="flex gap-3">
               {siteSettings.instagramUrl && (
                 <a
@@ -85,26 +87,26 @@ export function Footer({ siteSettings }: FooterProps) {
 
         <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} {siteSettings.labelName}. Alle Rechte vorbehalten.
+            © {new Date().getFullYear()} {siteSettings.labelName}. {dict.allRightsReserved}
           </p>
           <div className="flex gap-6">
             <a
               href={`mailto:${siteSettings.contactEmail}`}
               className="text-sm text-muted-foreground hover:text-accent transition-colors"
             >
-              Kontakt
+              {dict.contact}
             </a>
             <Link
               href="/impressum"
               className="text-sm text-muted-foreground hover:text-accent transition-colors"
             >
-              Impressum
+              {dict.legalNotice}
             </Link>
             <Link
               href="/datenschutz"
               className="text-sm text-muted-foreground hover:text-accent transition-colors"
             >
-              Datenschutz
+              {dict.privacyPolicy}
             </Link>
           </div>
         </div>

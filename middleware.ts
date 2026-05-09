@@ -72,6 +72,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(adminUrl)
   }
 
+  // -------------------------------------------------------------------------
+  // Locale detection — set NEXT_LOCALE cookie from Accept-Language if missing
+  // -------------------------------------------------------------------------
+  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value
+  if (!cookieLocale || (cookieLocale !== 'en' && cookieLocale !== 'de')) {
+    const acceptLanguage = request.headers.get('accept-language') ?? ''
+    const primary = acceptLanguage.split(',')[0]?.split(';')[0]?.trim().split('-')[0]?.toLowerCase()
+    const detectedLocale = primary === 'en' ? 'en' : 'de'
+    supabaseResponse.cookies.set('NEXT_LOCALE', detectedLocale, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      sameSite: 'lax',
+    })
+  }
+
   return supabaseResponse
 }
 

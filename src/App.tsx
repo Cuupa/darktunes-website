@@ -15,6 +15,7 @@ import { useReleases } from '@/hooks/useReleases'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
+import enDict from '@/i18n/dictionaries/en.json'
 
 function App() {
   const { releases, isLoading } = useReleases()
@@ -29,9 +30,9 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <CRTOverlay />
-      <Header />
+      <Header dict={enDict.navigation} locale="en" />
       <main>
-        <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} />
+        <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={enDict.hero} />
 
         <section id="releases" className="relative">
           <AnimatePresence mode="wait">
@@ -59,7 +60,7 @@ function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <Releases releases={releases ?? []} />
+                <Releases releases={releases ?? []} dict={enDict.releases} locale="en" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -74,18 +75,18 @@ function App() {
               transition={{ duration: 0.6 }}
               className="mb-8 text-center"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">SPOTIFY</h2>
-              <p className="text-lg text-muted-foreground font-serif">Listen to our playlist</p>
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{enDict.spotify.heading}</h2>
+              <p className="text-lg text-muted-foreground font-serif">{enDict.spotify.subheading}</p>
             </motion.div>
             <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri} />
           </div>
         </section>
 
-        <Artists artists={artists} />
-        <Videos videos={videos} />
-        <News news={news} />
+        <Artists artists={artists} dict={enDict.artists} />
+        <Videos videos={videos} dict={enDict.videos} consentDict={enDict.consent} locale="en" />
+        <News news={news} dict={enDict.news} locale="en" />
       </main>
-      <Footer siteSettings={siteSettings} />
+      <Footer siteSettings={siteSettings} dict={enDict.footer} />
       <Toaster position="bottom-right" theme="dark" />
     </div>
   )

@@ -7,12 +7,14 @@ import { getConsentState, setConsentState, type ConsentState } from '@/component
 interface ConsentGateProps {
   /** The embed to render after consent is given. */
   children: ReactNode
-  /** Label shown on the opt-in button (e.g. "Spotify laden" / "YouTube laden"). */
+  /** Label shown on the opt-in button (e.g. "Load Spotify" / "Spotify laden"). */
   label?: string
   /** Optional placeholder image URL (from R2). Falls back to a styled gradient div. */
   placeholderUrl?: string
   /** Alt text for the placeholder image. */
   placeholderAlt?: string
+  /** Text shown above the opt-in button explaining data transfer. */
+  gateText?: string
 }
 
 /**
@@ -25,9 +27,10 @@ interface ConsentGateProps {
  */
 export function ConsentGate({
   children,
-  label = 'Externe Inhalte laden',
+  label = 'Load external content',
   placeholderUrl,
-  placeholderAlt = 'Externer Inhalt — Klicken zum Laden',
+  placeholderAlt = 'External content — click to load',
+  gateText = 'This content is provided by an external provider. By loading it, you agree to the transfer of data.',
 }: ConsentGateProps) {
   const [consent, setConsent] = useState<ConsentState>(null)
 
@@ -65,8 +68,7 @@ export function ConsentGate({
 
       <div className="relative z-10 text-center px-4 py-6 space-y-3">
         <p className="text-sm text-foreground/80 max-w-xs mx-auto">
-          Dieser Inhalt wird von einem externen Anbieter bereitgestellt. Durch das Laden stimmen
-          Sie der Datenübertragung zu.
+          {gateText}
         </p>
         <Button
           size="sm"

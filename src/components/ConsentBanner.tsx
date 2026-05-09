@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import type { Dictionary } from '@/i18n/types'
 
 const STORAGE_KEY = 'darktunes_consent_external'
 
@@ -29,6 +30,10 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
   window.dispatchEvent(new Event('darktunes_consent_change'))
 }
 
+interface ConsentBannerProps {
+  dict: Dictionary['consent']
+}
+
 /**
  * GDPR-compliant consent banner for external media embeds.
  *
@@ -38,7 +43,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
  *
  * Note: This implements opt-in consent for external services (DSGVO Art. 6).
  */
-export function ConsentBanner() {
+export function ConsentBanner({ dict }: ConsentBannerProps) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -68,21 +73,19 @@ export function ConsentBanner() {
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           className="fixed bottom-0 left-0 right-0 z-50 p-4 lg:p-6"
           role="dialog"
-          aria-label="Cookie-Einwilligung"
+          aria-label={dict.bannerAriaLabel}
           aria-modal="false"
         >
           <div className="container mx-auto max-w-4xl">
             <div className="bg-card border border-border rounded-xl shadow-2xl p-6 flex flex-col md:flex-row gap-4 items-start md:items-center backdrop-blur-sm">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground mb-1">
-                  Externe Inhalte & Datenschutz
+                  {dict.bannerTitle}
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Diese Website möchte Inhalte externer Anbieter (Spotify, YouTube) einbetten.
-                  Durch Klick auf &quot;Akzeptieren&quot; stimmen Sie der Übermittlung von Daten an
-                  diese Drittanbieter zu (DSGVO Art. 6 Abs. 1 lit. a).{' '}
+                  {dict.bannerText}{' '}
                   <Link href="/datenschutz" className="underline hover:text-accent transition-colors">
-                    Datenschutzerklärung
+                    {dict.privacyLink}
                   </Link>
                 </p>
               </div>
@@ -93,14 +96,14 @@ export function ConsentBanner() {
                   onClick={handleReject}
                   className="text-xs border-border hover:border-foreground/50"
                 >
-                  Ablehnen
+                  {dict.reject}
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleAccept}
                   className="text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                 >
-                  Akzeptieren
+                  {dict.accept}
                 </Button>
               </div>
             </div>

@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Calendar } from '@phosphor-icons/react'
 import type { NewsPost } from '@/types'
+import type { Dictionary, Locale } from '@/i18n/types'
 
 interface NewsProps {
   news: NewsPost[]
+  dict: Dictionary['news']
+  locale: Locale
 }
 
-export function News({ news }: NewsProps) {
+export function News({ news, dict, locale }: NewsProps) {
+  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   return (
     <section id="news" className="py-24 px-4 lg:px-16">
       <div className="container mx-auto">
@@ -22,8 +26,8 @@ export function News({ news }: NewsProps) {
           transition={{ duration: 0.6 }}
           className="mb-12"
         >
-          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">NEWS</h2>
-          <p className="text-xl text-muted-foreground font-serif">Stay updated with the latest happenings</p>
+          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
+          <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
         <div className="space-y-8">
@@ -50,7 +54,7 @@ export function News({ news }: NewsProps) {
                   <div className="p-6 lg:p-8 flex flex-col justify-center">
                     <Badge className="self-start mb-4 bg-primary/20 text-primary-foreground border-primary/30 uppercase font-mono text-xs tracking-widest flex items-center gap-2">
                       <Calendar size={12} weight="bold" />
-                      {new Date(post.publishedAt).toLocaleDateString('en-US', {
+                      {new Date(post.publishedAt).toLocaleDateString(dateLocale, {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
@@ -66,7 +70,7 @@ export function News({ news }: NewsProps) {
                       variant="ghost" 
                       className="self-start group/btn hover:text-accent px-0 uppercase tracking-wider font-bold"
                     >
-                      Read Full Story
+                      {dict.readFullStory}
                       <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
                     </Button>
                   </div>

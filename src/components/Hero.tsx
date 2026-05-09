@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
 import type { Release, SiteSettings } from '@/types'
+import type { Dictionary } from '@/i18n/types'
 
 interface HeroProps {
   featuredRelease?: Release
   siteSettings: SiteSettings
+  dict: Dictionary['hero']
 }
 
-export function Hero({ featuredRelease, siteSettings }: HeroProps) {
+export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
   if (!featuredRelease) {
     return null
   }
@@ -56,10 +58,10 @@ export function Hero({ featuredRelease, siteSettings }: HeroProps) {
             <div className="flex flex-wrap gap-4">
               <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider group text-base px-8 py-6">
                 <Play className="mr-2 group-hover:scale-110 transition-transform" weight="fill" size={24} />
-                Listen Now
+                {dict.listenNow}
               </Button>
               <Button size="lg" variant="outline" className="border-2 font-bold uppercase tracking-wider group text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary">
-                Explore Artist
+                {dict.exploreArtist}
               </Button>
             </div>
           </motion.div>
@@ -87,7 +89,7 @@ export function Hero({ featuredRelease, siteSettings }: HeroProps) {
         animate={{ y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >
-        <p className="text-sm uppercase tracking-widest font-mono">Scroll Down</p>
+        <p className="text-sm uppercase tracking-widest font-mono">{dict.scrollDown}</p>
         <ArrowDown size={20} weight="bold" />
       </motion.div>
     </section>
