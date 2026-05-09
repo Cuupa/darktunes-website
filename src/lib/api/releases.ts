@@ -21,6 +21,14 @@ function rowToRelease(row: ReleaseRow): Release {
     youtubeUrl: row.youtube_url ?? undefined,
     featured: row.featured,
     itunesId: row.itunes_id ?? undefined,
+    spotifyId: row.spotify_id ?? undefined,
+    discogsId: row.discogs_id ?? undefined,
+    isrc: row.isrc ?? undefined,
+    barcode: row.barcode ?? undefined,
+    catalogNumber: row.catalog_number ?? undefined,
+    previewUrl: row.preview_url ?? undefined,
+    smartUrl: row.smart_url ?? undefined,
+    popularity: row.popularity ?? undefined,
   }
 }
 
