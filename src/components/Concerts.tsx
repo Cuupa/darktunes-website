@@ -84,7 +84,12 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
 
                       {concert.ticketUrl && (
                         <Button asChild className="uppercase tracking-wider font-bold">
-                          <a href={concert.ticketUrl} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={concert.ticketUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${dict.ticketLink} (${locale === 'de' ? 'öffnet in neuem Tab' : 'opens in new tab'})`}
+                          >
                             <Ticket size={16} className="mr-2" />
                             {dict.ticketLink}
                           </a>
