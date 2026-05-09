@@ -106,55 +106,22 @@
 
 /* ── Visual overlay animation utilities ───────────────────────────────────── */
 /* Used by VisualEffectsOverlay component. opacity/visibility are set inline   */
-/* via CMS-controlled props; these classes only apply the animation.           */
+/* via CMS-controlled props; these classes only apply the blend mode.          */
 
+/* Static grain – no translate animation to avoid visible twitching.
+   mix-blend-mode: overlay blends the noise into the page content subtly,
+   matching the approach used in mixing-mastering-stu. */
 .noise-overlay {
-  animation: noise 0.2s steps(10) infinite;
+  mix-blend-mode: overlay;
 }
 
+/* Scanlines are purely decorative; a slow opacity pulse is far less
+   distracting than a translateY loop that causes layout jank on some GPUs. */
 .scanlines-overlay {
-  animation: scanlines 8s linear infinite;
+  animation: scanlines-pulse 6s ease-in-out infinite;
 }
 
-@keyframes scanlines {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(10px);
-  }
-}
-
-@keyframes noise {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  10% {
-    transform: translate(-5%, -5%);
-  }
-  20% {
-    transform: translate(-10%, 5%);
-  }
-  30% {
-    transform: translate(5%, -10%);
-  }
-  40% {
-    transform: translate(-5%, 15%);
-  }
-  50% {
-    transform: translate(-10%, 5%);
-  }
-  60% {
-    transform: translate(15%, 0);
-  }
-  70% {
-    transform: translate(0, 10%);
-  }
-  80% {
-    transform: translate(-15%, 0);
-  }
-  90% {
-    transform: translate(10%, 5%);
-  }
+@keyframes scanlines-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
 }
