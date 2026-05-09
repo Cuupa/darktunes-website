@@ -22,8 +22,8 @@ const schema = z.object({
   labelName: z.string().min(1, 'Label name is required'),
   labelTagline: z.string().min(1, 'Tagline is required'),
   contactEmail: z.string().email('Must be a valid email'),
-  privacyPolicyUrl: z.string().url('Must be a valid URL'),
-  termsUrl: z.string().url('Must be a valid URL'),
+  privacyPolicyUrl: z.string().min(1, 'Privacy policy URL or path is required'),
+  termsUrl: z.string().min(1, 'Terms URL or path is required'),
   instagramUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   youtubeUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   spotifyUrl: z.string().url('Must be a valid URL').or(z.literal('')),
@@ -34,6 +34,17 @@ const schema = z.object({
   seoDescription: z.string().min(1, 'SEO description is required'),
   ogTitle: z.string().min(1, 'OG title is required'),
   ogDescription: z.string().min(1, 'OG description is required'),
+  impressumCompanyName: z.string().min(1, 'Company name is required'),
+  impressumLegalForm: z.string().optional().default(''),
+  impressumRepresentative: z.string().optional().default(''),
+  impressumAddress: z.string().optional().default(''),
+  impressumVatId: z.string().optional().default(''),
+  impressumRegisterCourt: z.string().optional().default(''),
+  impressumRegisterNumber: z.string().optional().default(''),
+  impressumPhone: z.string().optional().default(''),
+  impressumEmail: z.string().email('Must be a valid email').or(z.literal('')),
+  datenschutzContent: z.string().optional().default(''),
+  consentPlaceholderUrl: z.string().url('Must be a valid URL').or(z.literal('')),
 })
 
 type FormData = z.infer<typeof schema>
@@ -104,11 +115,12 @@ export function SiteSettingsManager() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Tabs defaultValue="global" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="global">Global</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
+          <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------------------------------------------ */}
@@ -307,6 +319,156 @@ export function SiteSettingsManager() {
               </Field>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Legal / DSGVO                                                        */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="legal">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Impressum (§ 5 TMG)</CardTitle>
+                <CardDescription>
+                  Pflichtangaben für das Impressum nach deutschem Recht. Diese Daten erscheinen auf
+                  der Seite /impressum.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Field
+                  id="impressumCompanyName"
+                  label="Firmenname *"
+                  error={errors.impressumCompanyName?.message}
+                >
+                  <Input
+                    id="impressumCompanyName"
+                    {...register('impressumCompanyName')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Field id="impressumLegalForm" label="Rechtsform" error={errors.impressumLegalForm?.message}>
+                    <Input
+                      id="impressumLegalForm"
+                      placeholder="z.B. GmbH, UG, GbR"
+                      {...register('impressumLegalForm')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                  <Field id="impressumRepresentative" label="Vertretungsberechtigte(r)" error={errors.impressumRepresentative?.message}>
+                    <Input
+                      id="impressumRepresentative"
+                      placeholder="Vorname Nachname"
+                      {...register('impressumRepresentative')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                </div>
+
+                <Field id="impressumAddress" label="Anschrift" error={errors.impressumAddress?.message}>
+                  <Textarea
+                    id="impressumAddress"
+                    rows={3}
+                    placeholder="Musterstraße 1&#10;12345 Musterstadt&#10;Deutschland"
+                    {...register('impressumAddress')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Field id="impressumPhone" label="Telefon" error={errors.impressumPhone?.message}>
+                    <Input
+                      id="impressumPhone"
+                      type="tel"
+                      placeholder="+49 30 ..."
+                      {...register('impressumPhone')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                  <Field id="impressumEmail" label="E-Mail" error={errors.impressumEmail?.message}>
+                    <Input
+                      id="impressumEmail"
+                      type="email"
+                      {...register('impressumEmail')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                </div>
+
+                <Field id="impressumVatId" label="USt-IdNr. (§ 27a UStG)" error={errors.impressumVatId?.message}>
+                  <Input
+                    id="impressumVatId"
+                    placeholder="DE123456789"
+                    {...register('impressumVatId')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Field id="impressumRegisterCourt" label="Registergericht" error={errors.impressumRegisterCourt?.message}>
+                    <Input
+                      id="impressumRegisterCourt"
+                      placeholder="Amtsgericht Berlin"
+                      {...register('impressumRegisterCourt')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                  <Field id="impressumRegisterNumber" label="Registernummer" error={errors.impressumRegisterNumber?.message}>
+                    <Input
+                      id="impressumRegisterNumber"
+                      placeholder="HRB 12345"
+                      {...register('impressumRegisterNumber')}
+                      disabled={isSubmitting}
+                    />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Datenschutzerklärung</CardTitle>
+                <CardDescription>
+                  Volltext der Datenschutzerklärung in Markdown. Erscheint auf /datenschutz.
+                  Leer lassen für Standard-Boilerplate.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Field
+                  id="datenschutzContent"
+                  label="Datenschutztext (Markdown)"
+                  error={errors.datenschutzContent?.message}
+                >
+                  <Textarea
+                    id="datenschutzContent"
+                    rows={12}
+                    placeholder="## 1. Datenschutz auf einen Blick&#10;..."
+                    {...register('datenschutzContent')}
+                    disabled={isSubmitting}
+                    className="font-mono text-xs"
+                  />
+                </Field>
+
+                <Field
+                  id="consentPlaceholderUrl"
+                  label="Consent-Platzhalterbild (R2 URL)"
+                  error={errors.consentPlaceholderUrl?.message}
+                >
+                  <Input
+                    id="consentPlaceholderUrl"
+                    placeholder="https://cdn.darktunes.com/consent-placeholder.jpg"
+                    {...register('consentPlaceholderUrl')}
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Bild aus dem R2-Bucket, das angezeigt wird, bevor der Nutzer externen Inhalten
+                    (Spotify, YouTube) zugestimmt hat.
+                  </p>
+                </Field>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

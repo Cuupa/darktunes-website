@@ -9,8 +9,8 @@ const DEFAULTS: SiteSettings = {
   labelName: 'darkTunes Music Group',
   labelTagline: "We don't follow trends—we create them.",
   contactEmail: 'info@darktunes.com',
-  privacyPolicyUrl: 'https://darktunes.com/privacy',
-  termsUrl: 'https://darktunes.com/terms',
+  privacyPolicyUrl: '/datenschutz',
+  termsUrl: '/impressum',
   instagramUrl: 'https://instagram.com/darktunes',
   youtubeUrl: 'https://youtube.com/@darktunes',
   spotifyUrl: 'https://open.spotify.com/user/darktunes',
@@ -23,6 +23,17 @@ const DEFAULTS: SiteSettings = {
     'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
   ogTitle: 'darkTunes Music Group',
   ogDescription: 'Alternative music label — artists, releases, news, and videos.',
+  impressumCompanyName: 'darkTunes Music Group',
+  impressumLegalForm: '',
+  impressumRepresentative: '',
+  impressumAddress: '',
+  impressumVatId: '',
+  impressumRegisterCourt: '',
+  impressumRegisterNumber: '',
+  impressumPhone: '',
+  impressumEmail: 'info@darktunes.com',
+  datenschutzContent: '',
+  consentPlaceholderUrl: '',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -44,6 +55,17 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     seoDescription: map['seo_description'] ?? DEFAULTS.seoDescription,
     ogTitle: map['og_title'] ?? DEFAULTS.ogTitle,
     ogDescription: map['og_description'] ?? DEFAULTS.ogDescription,
+    impressumCompanyName: map['impressum_company_name'] ?? DEFAULTS.impressumCompanyName,
+    impressumLegalForm: map['impressum_legal_form'] ?? DEFAULTS.impressumLegalForm,
+    impressumRepresentative: map['impressum_representative'] ?? DEFAULTS.impressumRepresentative,
+    impressumAddress: map['impressum_address'] ?? DEFAULTS.impressumAddress,
+    impressumVatId: map['impressum_vat_id'] ?? DEFAULTS.impressumVatId,
+    impressumRegisterCourt: map['impressum_register_court'] ?? DEFAULTS.impressumRegisterCourt,
+    impressumRegisterNumber: map['impressum_register_number'] ?? DEFAULTS.impressumRegisterNumber,
+    impressumPhone: map['impressum_phone'] ?? DEFAULTS.impressumPhone,
+    impressumEmail: map['impressum_email'] ?? DEFAULTS.impressumEmail,
+    datenschutzContent: map['datenschutz_content'] ?? DEFAULTS.datenschutzContent,
+    consentPlaceholderUrl: map['consent_placeholder_url'] ?? DEFAULTS.consentPlaceholderUrl,
   }
 }
 

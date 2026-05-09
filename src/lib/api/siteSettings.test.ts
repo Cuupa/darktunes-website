@@ -74,6 +74,40 @@ describe('getSiteSettings', () => {
     expect(result.youtubeUrl).toBe('https://youtube.com/@darktunes')
   })
 
+  it('maps impressum fields from rows', async () => {
+    const db = makeMockDb([
+      ...mockRows,
+      { key: 'impressum_company_name', value: 'Test GmbH' },
+      { key: 'impressum_legal_form', value: 'GmbH' },
+      { key: 'impressum_representative', value: 'Max Mustermann' },
+      { key: 'impressum_address', value: 'Musterstraße 1\n12345 Berlin' },
+      { key: 'impressum_vat_id', value: 'DE123456789' },
+      { key: 'impressum_register_court', value: 'Amtsgericht Berlin' },
+      { key: 'impressum_register_number', value: 'HRB 12345' },
+      { key: 'impressum_phone', value: '+49 30 123456' },
+      { key: 'impressum_email', value: 'legal@test.com' },
+      { key: 'datenschutz_content', value: '## Privacy\nContent here.' },
+      { key: 'consent_placeholder_url', value: 'https://cdn.example.com/placeholder.jpg' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.impressumCompanyName).toBe('Test GmbH')
+    expect(result.impressumLegalForm).toBe('GmbH')
+    expect(result.impressumRepresentative).toBe('Max Mustermann')
+    expect(result.impressumVatId).toBe('DE123456789')
+    expect(result.datenschutzContent).toBe('## Privacy\nContent here.')
+    expect(result.consentPlaceholderUrl).toBe('https://cdn.example.com/placeholder.jpg')
+  })
+
+  it('returns empty string defaults for new legal fields when not in DB', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.impressumCompanyName).toBe('darkTunes Music Group')
+    expect(result.impressumLegalForm).toBe('')
+    expect(result.impressumVatId).toBe('')
+    expect(result.datenschutzContent).toBe('')
+    expect(result.consentPlaceholderUrl).toBe('')
+  })
+
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Query failed', code: 'PGRST001' })
     await expect(getSiteSettings(db)).rejects.toThrow('Query failed')

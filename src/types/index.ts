@@ -101,4 +101,26 @@ export interface SiteSettings {
   seoDescription: string
   ogTitle: string
   ogDescription: string
+  /** Impressum (Legal Notice) fields — required by German law */
+  impressumCompanyName: string
+  impressumLegalForm: string
+  impressumRepresentative: string
+  impressumAddress: string
+  impressumVatId: string
+  impressumRegisterCourt: string
+  impressumRegisterNumber: string
+  impressumPhone: string
+  impressumEmail: string
+  /** Full privacy policy text (Markdown). Displayed on /datenschutz. */
+  datenschutzContent: string
+  /** URL of the placeholder image shown in ConsentGate before the user opts in. */
+  consentPlaceholderUrl: string
+}
+
+export interface NewsletterSubscriber {
+  id: string
+  email: string
+  name: string | null
+  subscribedAt: string
+  source: string
 }

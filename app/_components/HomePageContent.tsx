@@ -9,6 +9,7 @@ import { Videos } from '@/components/Videos'
 import { Footer } from '@/components/Footer'
 import { CRTOverlay } from '@/components/CRTOverlay'
 import { SpotifyPlayer } from '@/components/SpotifyPlayer'
+import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion } from 'framer-motion'
 import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
 
@@ -58,13 +59,18 @@ export function HomePageContent({ releases, artists, news, videos, siteSettings 
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">SPOTIFY</h2>
               <p className="text-lg text-muted-foreground font-serif">Listen to our playlist</p>
             </motion.div>
-            <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri} />
+            <SpotifyPlayer
+              playlistUri={siteSettings.spotifyPlaylistUri}
+              placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
+            />
           </div>
         </section>
 
         <Artists artists={artists} />
-        <Videos videos={videos} />
+        <Videos videos={videos} placeholderUrl={siteSettings.consentPlaceholderUrl || undefined} />
         <News news={news} />
+
+        <NewsletterSection />
       </main>
       <Footer siteSettings={siteSettings} />
     </div>

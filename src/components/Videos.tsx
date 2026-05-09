@@ -11,9 +11,11 @@ import type { Video } from '@/types'
 
 interface VideosProps {
   videos: Video[]
+  /** Optional R2 placeholder image URL for the ConsentGate in VideoModal. */
+  placeholderUrl?: string
 }
 
-export function Videos({ videos }: VideosProps) {
+export function Videos({ videos, placeholderUrl }: VideosProps) {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -90,7 +92,8 @@ export function Videos({ videos }: VideosProps) {
       <VideoModal 
         video={selectedVideo} 
         open={modalOpen} 
-        onOpenChange={setModalOpen} 
+        onOpenChange={setModalOpen}
+        placeholderUrl={placeholderUrl}
       />
     </>
   )

@@ -8,8 +8,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   labelName: 'darkTunes Music Group',
   labelTagline: "We don't follow trends—we create them.",
   contactEmail: 'info@darktunes.com',
-  privacyPolicyUrl: 'https://darktunes.com/privacy',
-  termsUrl: 'https://darktunes.com/terms',
+  privacyPolicyUrl: '/datenschutz',
+  termsUrl: '/impressum',
   instagramUrl: 'https://instagram.com/darktunes',
   youtubeUrl: 'https://youtube.com/@darktunes',
   spotifyUrl: 'https://open.spotify.com/user/darktunes',
@@ -22,6 +22,17 @@ const DEFAULT_SETTINGS: SiteSettings = {
     'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
   ogTitle: 'darkTunes Music Group',
   ogDescription: 'Alternative music label — artists, releases, news, and videos.',
+  impressumCompanyName: 'darkTunes Music Group',
+  impressumLegalForm: '',
+  impressumRepresentative: '',
+  impressumAddress: '',
+  impressumVatId: '',
+  impressumRegisterCourt: '',
+  impressumRegisterNumber: '',
+  impressumPhone: '',
+  impressumEmail: 'info@darktunes.com',
+  datenschutzContent: '',
+  consentPlaceholderUrl: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -42,6 +53,17 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     seo_description: s.seoDescription,
     og_title: s.ogTitle,
     og_description: s.ogDescription,
+    impressum_company_name: s.impressumCompanyName,
+    impressum_legal_form: s.impressumLegalForm,
+    impressum_representative: s.impressumRepresentative,
+    impressum_address: s.impressumAddress,
+    impressum_vat_id: s.impressumVatId,
+    impressum_register_court: s.impressumRegisterCourt,
+    impressum_register_number: s.impressumRegisterNumber,
+    impressum_phone: s.impressumPhone,
+    impressum_email: s.impressumEmail,
+    datenschutz_content: s.datenschutzContent,
+    consent_placeholder_url: s.consentPlaceholderUrl,
   }
 }
 
