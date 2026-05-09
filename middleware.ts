@@ -58,6 +58,9 @@ export async function middleware(request: NextRequest) {
   const isAdminLoginPage = pathname === '/admin/login'
   const isAdminRoute = pathname.startsWith('/admin')
 
+  const isPortalLoginPage = pathname === '/portal/login'
+  const isPortalRoute = pathname.startsWith('/portal')
+
   // Redirect unauthenticated users away from protected admin routes
   if (isAdminRoute && !isAdminLoginPage && !user) {
     const loginUrl = request.nextUrl.clone()
@@ -70,6 +73,20 @@ export async function middleware(request: NextRequest) {
     const adminUrl = request.nextUrl.clone()
     adminUrl.pathname = '/admin'
     return NextResponse.redirect(adminUrl)
+  }
+
+  // Redirect unauthenticated users away from the artist portal
+  if (isPortalRoute && !isPortalLoginPage && !user) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/portal/login'
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Redirect already-authenticated portal users away from the login page
+  if (isPortalLoginPage && user) {
+    const portalUrl = request.nextUrl.clone()
+    portalUrl.pathname = '/portal'
+    return NextResponse.redirect(portalUrl)
   }
 
   // -------------------------------------------------------------------------

@@ -55,6 +55,7 @@ export interface Database {
           discogs_id: string | null
           songkick_id: string | null
           last_synced_at: string | null
+          user_id: string | null
           created_at: string
           updated_at: string
         }
@@ -79,6 +80,7 @@ export interface Database {
           discogs_id?: string | null
           songkick_id?: string | null
           last_synced_at?: string | null
+          user_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -103,8 +105,111 @@ export interface Database {
           discogs_id?: string | null
           songkick_id?: string | null
           last_synced_at?: string | null
+          user_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      artist_profiles: {
+        Row: {
+          id: string
+          artist_id: string
+          bio: string | null
+          photo_url: string | null
+          genres: string[]
+          website_url: string | null
+          instagram_url: string | null
+          youtube_url: string | null
+          bandcamp_url: string | null
+          press_quote: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          bio?: string | null
+          photo_url?: string | null
+          genres?: string[]
+          website_url?: string | null
+          instagram_url?: string | null
+          youtube_url?: string | null
+          bandcamp_url?: string | null
+          press_quote?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          bio?: string | null
+          photo_url?: string | null
+          genres?: string[]
+          website_url?: string | null
+          instagram_url?: string | null
+          youtube_url?: string | null
+          bandcamp_url?: string | null
+          press_quote?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      streaming_stats: {
+        Row: {
+          id: string
+          artist_id: string
+          platform: string
+          period: string
+          streams: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          platform: string
+          period: string
+          streams?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          platform?: string
+          period?: string
+          streams?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      sales_statements: {
+        Row: {
+          id: string
+          artist_id: string
+          filename: string
+          r2_key: string
+          period: string
+          amount_eur: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          filename: string
+          r2_key: string
+          period: string
+          amount_eur?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          filename?: string
+          r2_key?: string
+          period?: string
+          amount_eur?: number | null
+          created_at?: string
         }
         Relationships: []
       }
