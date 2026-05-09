@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getReleaseById } from '@/lib/api/releases'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ReleaseDetailContent } from './_components/ReleaseDetailContent'
 
 interface Props {
@@ -45,7 +46,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ReleaseDetailPage({ params }: Props) {
   const { id } = await params
-  const release = await makeGetRelease(id)().catch(() => null)
+  const [release, locale] = await Promise.all([
+    makeGetRelease(id)().catch(() => null),
+    getLocale(),
+  ])
   if (!release) notFound()
-  return <ReleaseDetailContent release={release} />
+  const dict = await getDictionary(locale)
+  return <ReleaseDetailContent release={release} dict={dict.releaseDetail} locale={locale} />
 }

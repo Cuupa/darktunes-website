@@ -1,14 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImage from '@/assets/images/logo_(1).png'
+import type { Dictionary, Locale } from '@/i18n/types'
 
-export function Header() {
+interface HeaderProps {
+  dict: Dictionary['navigation']
+  locale: Locale
+}
+
+export function Header({ dict, locale }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,11 +28,11 @@ export function Header() {
   }, [])
 
   const navItems = [
-    { label: 'HOME', href: '#hero' },
-    { label: 'ARTISTS', href: '#artists' },
-    { label: 'RELEASES', href: '#releases' },
-    { label: 'NEWS', href: '#news' },
-    { label: 'VIDEOS', href: '#videos' },
+    { label: dict.home, href: '#hero' },
+    { label: dict.artists, href: '#artists' },
+    { label: dict.releases, href: '#releases' },
+    { label: dict.news, href: '#news' },
+    { label: dict.videos, href: '#videos' },
   ]
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
@@ -40,6 +48,12 @@ export function Header() {
         behavior: 'smooth'
       })
     }
+  }
+
+  const handleLocaleSwitch = () => {
+    const next = locale === 'de' ? 'en' : 'de'
+    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+    router.refresh()
   }
 
   return (
@@ -74,7 +88,16 @@ export function Header() {
               </Button>
             ))}
             <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105">
-              Newsletter
+              {dict.newsletter}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLocaleSwitch}
+              className="ml-2 text-xs font-mono text-muted-foreground hover:text-accent border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+              aria-label={`Switch language to ${dict.switchLocale}`}
+            >
+              {dict.switchLocale}
             </Button>
           </nav>
 
@@ -112,7 +135,16 @@ export function Header() {
                 </Button>
               ))}
               <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider">
-                Newsletter
+                {dict.newsletter}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLocaleSwitch}
+                className="mt-2 self-start text-xs font-mono text-muted-foreground hover:text-accent border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+                aria-label={`Switch language to ${dict.switchLocale}`}
+              >
+                {dict.switchLocale}
               </Button>
             </nav>
           </motion.div>

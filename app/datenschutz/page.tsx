@@ -14,6 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
 import { DatenschutzContent } from './_components/DatenschutzContent'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 
 const getCachedSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
@@ -30,36 +31,40 @@ export const metadata: Metadata = {
 }
 
 export default async function DatenschutzPage() {
-  const settings = await getCachedSettings().catch(
-    (): SiteSettings => ({
-      labelName: 'darkTunes Music Group',
-      labelTagline: '',
-      contactEmail: 'info@darktunes.com',
-      privacyPolicyUrl: '/datenschutz',
-      termsUrl: '/impressum',
-      instagramUrl: '',
-      youtubeUrl: '',
-      spotifyUrl: '',
-      spotifyPlaylistUri: '',
-      heroBadge: '',
-      heroDescription: '',
-      seoTitle: '',
-      seoDescription: '',
-      ogTitle: '',
-      ogDescription: '',
-      impressumCompanyName: 'darkTunes Music Group',
-      impressumLegalForm: '',
-      impressumRepresentative: '',
-      impressumAddress: '',
-      impressumVatId: '',
-      impressumRegisterCourt: '',
-      impressumRegisterNumber: '',
-      impressumPhone: '',
-      impressumEmail: 'info@darktunes.com',
-      datenschutzContent: '',
-      consentPlaceholderUrl: '',
-    }),
-  )
+  const [settings, locale] = await Promise.all([
+    getCachedSettings().catch(
+      (): SiteSettings => ({
+        labelName: 'darkTunes Music Group',
+        labelTagline: '',
+        contactEmail: 'info@darktunes.com',
+        privacyPolicyUrl: '/datenschutz',
+        termsUrl: '/impressum',
+        instagramUrl: '',
+        youtubeUrl: '',
+        spotifyUrl: '',
+        spotifyPlaylistUri: '',
+        heroBadge: '',
+        heroDescription: '',
+        seoTitle: '',
+        seoDescription: '',
+        ogTitle: '',
+        ogDescription: '',
+        impressumCompanyName: 'darkTunes Music Group',
+        impressumLegalForm: '',
+        impressumRepresentative: '',
+        impressumAddress: '',
+        impressumVatId: '',
+        impressumRegisterCourt: '',
+        impressumRegisterNumber: '',
+        impressumPhone: '',
+        impressumEmail: 'info@darktunes.com',
+        datenschutzContent: '',
+        consentPlaceholderUrl: '',
+      }),
+    ),
+    getLocale(),
+  ])
+  const dict = await getDictionary(locale)
 
   const defaultContent = `
 ## 1. Datenschutz auf einen Blick
@@ -124,7 +129,7 @@ Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Web
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
         >
-          ← Zurück zur Startseite
+          {dict.pages.backToHome}
         </Link>
 
         <h1 className="text-4xl lg:text-5xl font-bold mb-10 tracking-tight uppercase">

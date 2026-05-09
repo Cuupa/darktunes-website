@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge'
 import { InstagramLogo, SpotifyLogo, YoutubeLogo, Globe } from '@phosphor-icons/react'
 import { ArtistModal } from '@/components/ArtistModal'
 import type { Artist } from '@/types'
+import type { Dictionary } from '@/i18n/types'
 
 interface ArtistsProps {
   artists: Artist[]
+  dict: Dictionary['artists']
 }
 
-export function Artists({ artists }: ArtistsProps) {
+export function Artists({ artists, dict }: ArtistsProps) {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -32,8 +34,8 @@ export function Artists({ artists }: ArtistsProps) {
           transition={{ duration: 0.6 }}
           className="mb-12"
         >
-          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">ARTISTS</h2>
-          <p className="text-xl text-muted-foreground font-serif">The creative force behind our sound</p>
+          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
+          <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">

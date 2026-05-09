@@ -1,0 +1,85 @@
+{
+  "navigation": {
+    "home": "HOME",
+    "artists": "ARTISTS",
+    "releases": "RELEASES",
+    "news": "NEWS",
+    "videos": "VIDEOS",
+    "newsletter": "Newsletter",
+    "switchLocale": "EN"
+  },
+  "hero": {
+    "listenNow": "Jetzt anhören",
+    "exploreArtist": "Künstler entdecken",
+    "scrollDown": "Nach unten"
+  },
+  "artists": {
+    "heading": "ARTISTS",
+    "subheading": "Die kreative Kraft hinter unserem Sound"
+  },
+  "releases": {
+    "heading": "RELEASES",
+    "subheading": "Entdecke die neueste Musik unserer Künstler",
+    "featured": "Featured"
+  },
+  "news": {
+    "heading": "NEWS",
+    "subheading": "Immer auf dem neuesten Stand",
+    "readFullStory": "Zum Artikel"
+  },
+  "videos": {
+    "heading": "VIDEOS",
+    "subheading": "Die neuesten Musikvideos und Visualizer"
+  },
+  "spotify": {
+    "heading": "SPOTIFY",
+    "subheading": "Hör unsere Playlist"
+  },
+  "footer": {
+    "musicGroup": "Music Group",
+    "quickLinks": "Schnellzugriff",
+    "followUs": "Folge uns",
+    "artistsLink": "Künstler",
+    "releasesLink": "Releases",
+    "newsLink": "News",
+    "videosLink": "Videos",
+    "allRightsReserved": "Alle Rechte vorbehalten.",
+    "contact": "Kontakt",
+    "privacyPolicy": "Datenschutz",
+    "legalNotice": "Impressum"
+  },
+  "newsletter": {
+    "heading": "Newsletter",
+    "description": "Bleib auf dem Laufenden – neue Releases, Tourdaten und exklusive Inhalte direkt in deinem Postfach.",
+    "namePlaceholder": "Name (optional)",
+    "emailLabel": "E-Mail-Adresse",
+    "emailPlaceholder": "deine@email.de",
+    "submit": "Anmelden",
+    "submitting": "Anmelden…",
+    "successTitle": "Danke für deine Anmeldung! 🎉",
+    "successMessage": "Du erhältst in Kürze eine Bestätigungsmail.",
+    "consentText": "Mit der Anmeldung stimmst du zu, gelegentlich E-Mails von darkTunes zu erhalten. Du kannst dich jederzeit abmelden.",
+    "privacyLink": "Datenschutzerklärung",
+    "validationEmail": "Bitte eine gültige E-Mail-Adresse eingeben"
+  },
+  "consent": {
+    "bannerAriaLabel": "Cookie-Einwilligung",
+    "bannerTitle": "Externe Inhalte & Datenschutz",
+    "bannerText": "Diese Website möchte Inhalte externer Anbieter (Spotify, YouTube) einbetten. Durch Klick auf \"Akzeptieren\" stimmen Sie der Übermittlung von Daten an diese Drittanbieter zu (DSGVO Art. 6 Abs. 1 lit. a).",
+    "privacyLink": "Datenschutzerklärung",
+    "reject": "Ablehnen",
+    "accept": "Akzeptieren",
+    "gateText": "Dieser Inhalt wird von einem externen Anbieter bereitgestellt. Durch das Laden stimmen Sie der Datenübertragung zu.",
+    "loadExternal": "Externe Inhalte laden",
+    "loadExternalAlt": "Externer Inhalt — Klicken zum Laden",
+    "loadSpotify": "Spotify laden",
+    "loadYouTube": "YouTube laden"
+  },
+  "releaseDetail": {
+    "backToReleases": "Alle Releases",
+    "featured": "Featured"
+  },
+  "pages": {
+    "backToHome": "← Zurück zur Startseite"
+  }
+}

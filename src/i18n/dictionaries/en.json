@@ -1,0 +1,85 @@
+{
+  "navigation": {
+    "home": "HOME",
+    "artists": "ARTISTS",
+    "releases": "RELEASES",
+    "news": "NEWS",
+    "videos": "VIDEOS",
+    "newsletter": "Newsletter",
+    "switchLocale": "DE"
+  },
+  "hero": {
+    "listenNow": "Listen Now",
+    "exploreArtist": "Explore Artist",
+    "scrollDown": "Scroll Down"
+  },
+  "artists": {
+    "heading": "ARTISTS",
+    "subheading": "The creative force behind our sound"
+  },
+  "releases": {
+    "heading": "RELEASES",
+    "subheading": "Discover the latest music from our roster",
+    "featured": "Featured"
+  },
+  "news": {
+    "heading": "NEWS",
+    "subheading": "Stay updated with the latest happenings",
+    "readFullStory": "Read Full Story"
+  },
+  "videos": {
+    "heading": "VIDEOS",
+    "subheading": "Watch the latest music videos and visualizers"
+  },
+  "spotify": {
+    "heading": "SPOTIFY",
+    "subheading": "Listen to our playlist"
+  },
+  "footer": {
+    "musicGroup": "Music Group",
+    "quickLinks": "Quick Links",
+    "followUs": "Follow Us",
+    "artistsLink": "Artists",
+    "releasesLink": "Releases",
+    "newsLink": "News",
+    "videosLink": "Videos",
+    "allRightsReserved": "All rights reserved.",
+    "contact": "Contact",
+    "privacyPolicy": "Privacy Policy",
+    "legalNotice": "Legal Notice"
+  },
+  "newsletter": {
+    "heading": "Newsletter",
+    "description": "Stay in the loop – new releases, tour dates, and exclusive content delivered to your inbox.",
+    "namePlaceholder": "Name (optional)",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "your@email.com",
+    "submit": "Subscribe",
+    "submitting": "Subscribing…",
+    "successTitle": "Thanks for subscribing! 🎉",
+    "successMessage": "You'll receive a confirmation email shortly.",
+    "consentText": "By subscribing, you agree to occasionally receive emails from darkTunes. You can unsubscribe at any time.",
+    "privacyLink": "Privacy Policy",
+    "validationEmail": "Please enter a valid email address"
+  },
+  "consent": {
+    "bannerAriaLabel": "Cookie consent",
+    "bannerTitle": "External Content & Privacy",
+    "bannerText": "This website would like to embed content from external providers (Spotify, YouTube). By clicking \"Accept\", you consent to data being transferred to these third parties (GDPR Art. 6 para. 1 lit. a).",
+    "privacyLink": "Privacy Policy",
+    "reject": "Reject",
+    "accept": "Accept",
+    "gateText": "This content is provided by an external provider. By loading it, you agree to the transfer of data.",
+    "loadExternal": "Load external content",
+    "loadExternalAlt": "External content — click to load",
+    "loadSpotify": "Load Spotify",
+    "loadYouTube": "Load YouTube"
+  },
+  "releaseDetail": {
+    "backToReleases": "All Releases",
+    "featured": "Featured"
+  },
+  "pages": {
+    "backToHome": "← Back to home"
+  }
+}

@@ -8,11 +8,11 @@
  * The caller must pass the Supabase session Bearer token.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = await createServerSupabaseClient()
     const {

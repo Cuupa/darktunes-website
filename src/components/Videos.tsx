@@ -8,14 +8,19 @@ import { Button } from '@/components/ui/button'
 import { Play } from '@phosphor-icons/react'
 import { VideoModal } from '@/components/VideoModal'
 import type { Video } from '@/types'
+import type { Dictionary, Locale } from '@/i18n/types'
 
 interface VideosProps {
   videos: Video[]
   /** Optional R2 placeholder image URL for the ConsentGate in VideoModal. */
   placeholderUrl?: string
+  dict: Dictionary['videos']
+  consentDict: Dictionary['consent']
+  locale: Locale
 }
 
-export function Videos({ videos, placeholderUrl }: VideosProps) {
+export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: VideosProps) {
+  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -35,8 +40,8 @@ export function Videos({ videos, placeholderUrl }: VideosProps) {
             transition={{ duration: 0.6 }}
             className="mb-12"
           >
-            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">VIDEOS</h2>
-            <p className="text-xl text-muted-foreground font-serif">Watch the latest music videos and visualizers</p>
+            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
+            <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -75,7 +80,7 @@ export function Videos({ videos, placeholderUrl }: VideosProps) {
                       {video.title}
                     </h3>
                     <p className="text-sm text-muted-foreground font-mono">
-                      {new Date(video.publishedAt).toLocaleDateString('en-US', {
+                      {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
@@ -94,6 +99,7 @@ export function Videos({ videos, placeholderUrl }: VideosProps) {
         open={modalOpen} 
         onOpenChange={setModalOpen}
         placeholderUrl={placeholderUrl}
+        youtubeLabel={consentDict.loadYouTube}
       />
     </>
   )

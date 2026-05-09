@@ -3,6 +3,7 @@ import { Providers } from './_components/Providers'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { unstable_cache } from 'next/cache'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import './globals.css'
 
 const getCachedSiteSettings = unstable_cache(
@@ -38,9 +39,12 @@ export async function generateMetadata(): Promise<Metadata> {
  * Root Server Component layout — no "use client" here.
  * Providers wraps the tree with client-only concerns (Lenis, Toaster, ErrorBoundary).
  */
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -50,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-background text-foreground antialiased">
-        <Providers>{children}</Providers>
+        <Providers consentDict={dict.consent}>{children}</Providers>
       </body>
     </html>
   )

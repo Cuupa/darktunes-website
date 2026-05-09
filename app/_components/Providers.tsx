@@ -6,9 +6,11 @@ import { ErrorBoundary } from 'react-error-boundary'
 import { LenisProvider } from '@/components/animations/LenisProvider'
 import { ConsentBanner } from '@/components/ConsentBanner'
 import { ErrorFallback } from '@/ErrorFallback'
+import type { Dictionary } from '@/i18n/types'
 
 interface ProvidersProps {
   children: ReactNode
+  consentDict: Dictionary['consent']
 }
 
 /**
@@ -21,12 +23,12 @@ interface ProvidersProps {
  * - Toaster: global toast notifications
  * - ErrorBoundary: catches client-side render errors
  */
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, consentDict }: ProvidersProps) {
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <LenisProvider>
         {children}
-        <ConsentBanner />
+        <ConsentBanner dict={consentDict} />
         <Toaster position="bottom-right" theme="dark" />
       </LenisProvider>
     </ErrorBoundary>

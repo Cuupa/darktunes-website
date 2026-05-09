@@ -18,6 +18,7 @@ import { getArtists } from '@/lib/api/artists'
 import { getNewsPosts } from '@/lib/api/news'
 import { getVideos } from '@/lib/api/videos'
 import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, artists, news, videos, siteSettings] = await Promise.all([
+  const [releases, artists, news, videos, siteSettings, locale] = await Promise.all([
     getCachedReleases().catch(() => [] as Release[]),
     getCachedArtists().catch(() => [] as Artist[]),
     getCachedNews().catch(() => [] as NewsPost[]),
@@ -113,7 +114,10 @@ export default async function HomePage() {
         consentPlaceholderUrl: '',
       }),
     ),
+    getLocale(),
   ])
+
+  const dict = await getDictionary(locale)
 
   return (
     <HomePageContent
@@ -122,6 +126,8 @@ export default async function HomePage() {
       news={news}
       videos={videos}
       siteSettings={siteSettings}
+      dict={dict}
+      locale={locale}
     />
   )
 }

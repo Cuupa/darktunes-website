@@ -14,9 +14,11 @@ interface SpotifyPlayerProps {
   artistUri?: string
   /** Optional R2 placeholder image URL shown before consent is given. */
   placeholderUrl?: string
+  /** Translated label for the Spotify consent gate button. */
+  loadLabel?: string
 }
 
-export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl }: SpotifyPlayerProps) {
+export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl, loadLabel }: SpotifyPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState([70])
   const currentTrack = {
@@ -147,7 +149,7 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <ConsentGate label="Spotify laden" placeholderUrl={placeholderUrl}>
+            <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
               <iframe
                 src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyUri)}`}
                 width="100%"

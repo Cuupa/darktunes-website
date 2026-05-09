@@ -10,13 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Envelope, ArrowRight } from '@phosphor-icons/react'
+import type { Dictionary } from '@/i18n/types'
 
-const schema = z.object({
-  email: z.string().email('Bitte eine gültige E-Mail-Adresse eingeben'),
-  name: z.string().max(120).optional(),
-})
+interface NewsletterSectionProps {
+  dict: Dictionary['newsletter']
+}
 
-type FormData = z.infer<typeof schema>
+type FormData = { email: string; name?: string }
 
 /**
  * NewsletterSection — GDPR-compliant opt-in form.
@@ -25,8 +25,14 @@ type FormData = z.infer<typeof schema>
  * email provider. The user's data is stored in Supabase and optionally synced
  * to MailerLite server-side.
  */
-export function NewsletterSection() {
+export function NewsletterSection({ dict }: NewsletterSectionProps) {
   const [submitted, setSubmitted] = useState(false)
+
+  // Build schema with translated error message
+  const schema = z.object({
+    email: z.string().email(dict.validationEmail),
+    name: z.string().max(120).optional(),
+  })
 
   const {
     register,
@@ -49,7 +55,7 @@ export function NewsletterSection() {
 
       setSubmitted(true)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.')
+      toast.error(err instanceof Error ? err.message : dict.validationEmail)
     }
   }
 
@@ -66,9 +72,9 @@ export function NewsletterSection() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/20 mb-5">
             <Envelope size={28} weight="fill" className="text-primary" />
           </div>
-          <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight uppercase">Newsletter</h2>
+          <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight uppercase">{dict.heading}</h2>
           <p className="text-lg text-muted-foreground font-serif max-w-md mx-auto">
-            Bleib auf dem Laufenden – neue Releases, Tourdaten und exklusive Inhalte direkt in deinem Postfach.
+            {dict.description}
           </p>
         </motion.div>
 
@@ -80,30 +86,30 @@ export function NewsletterSection() {
         >
           {submitted ? (
             <div className="text-center py-8">
-              <p className="text-lg font-semibold text-foreground mb-2">Danke für deine Anmeldung! 🎉</p>
+              <p className="text-lg font-semibold text-foreground mb-2">{dict.successTitle}</p>
               <p className="text-muted-foreground text-sm">
-                Du erhältst in Kürze eine Bestätigungsmail.
+                {dict.successMessage}
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 space-y-1">
-                  <Label htmlFor="nl-name" className="sr-only">Name (optional)</Label>
+                  <Label htmlFor="nl-name" className="sr-only">{dict.namePlaceholder}</Label>
                   <Input
                     id="nl-name"
-                    placeholder="Name (optional)"
+                    placeholder={dict.namePlaceholder}
                     {...register('name')}
                     disabled={isSubmitting}
                     className="bg-card border-border"
                   />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <Label htmlFor="nl-email" className="sr-only">E-Mail-Adresse *</Label>
+                  <Label htmlFor="nl-email" className="sr-only">{dict.emailLabel}</Label>
                   <Input
                     id="nl-email"
                     type="email"
-                    placeholder="deine@email.de"
+                    placeholder={dict.emailPlaceholder}
                     {...register('email')}
                     disabled={isSubmitting}
                     className={`bg-card border-border ${errors.email ? 'border-destructive' : ''}`}
@@ -115,9 +121,9 @@ export function NewsletterSection() {
                   disabled={isSubmitting}
                   className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                 >
-                  {isSubmitting ? 'Anmelden…' : (
+                  {isSubmitting ? dict.submitting : (
                     <>
-                      Anmelden
+                      {dict.submit}
                       <ArrowRight size={16} weight="bold" className="ml-2" />
                     </>
                   )}
@@ -129,10 +135,9 @@ export function NewsletterSection() {
               )}
 
               <p className="text-xs text-muted-foreground text-center">
-                Mit der Anmeldung stimmst du zu, gelegentlich E-Mails von darkTunes zu erhalten.
-                Du kannst dich jederzeit abmelden.{' '}
+                {dict.consentText}{' '}
                 <a href="/datenschutz" className="underline hover:text-accent transition-colors">
-                  Datenschutzerklärung
+                  {dict.privacyLink}
                 </a>
               </p>
             </form>
