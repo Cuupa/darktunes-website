@@ -22,7 +22,8 @@
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
-- **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` routes before page render
+- **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
+- **Internationalisation (i18n)** — `src/i18n/` custom dictionary pattern; `en.json` + `de.json`; `getDictionary.ts` loads server-side; RSCs pass dict as props to Client Components (IoC); Header has DE/EN locale switcher
 - **Database schema** defined in `supabase/migrations/20240101000000_initial_schema.sql`
 - **TypeScript DB types** in `src/types/database.ts`
 
