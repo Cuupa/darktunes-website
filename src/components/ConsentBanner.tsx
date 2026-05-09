@@ -4,31 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { getConsentState, setConsentState } from '@/lib/consentState'
 import type { Dictionary } from '@/i18n/types'
-
-const STORAGE_KEY = 'darktunes_consent_external'
-
-export type ConsentState = 'accepted' | 'rejected' | null
-
-/**
- * Reads the persisted consent state from localStorage.
- * Returns null when no decision has been made yet (or during SSR).
- */
-export function getConsentState(): ConsentState {
-  if (typeof window === 'undefined') return null
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored === 'accepted' || stored === 'rejected') return stored
-  return null
-}
-
-/**
- * Saves the consent decision to localStorage.
- */
-export function setConsentState(state: 'accepted' | 'rejected'): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, state)
-  window.dispatchEvent(new Event('darktunes_consent_change'))
-}
 
 interface ConsentBannerProps {
   dict: Dictionary['consent']

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { getConsentState, setConsentState, type ConsentState } from '@/components/ConsentBanner'
+import { getConsentState, setConsentState, type ConsentState } from '@/lib/consentState'
 
 interface ConsentGateProps {
   /** The embed to render after consent is given. */

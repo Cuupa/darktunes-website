@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { syncArtist, type SyncDeps } from './syncArtist'
+import { syncArtist } from './syncArtist'
 
 type DbClient = SupabaseClient<Database>
 
@@ -147,10 +147,8 @@ describe('syncArtist', () => {
 
     const mockUploadToR2 = vi.fn().mockRejectedValue(new Error('R2 connection refused'))
 
-    let artistCallCount = 0
     const fromFn = vi.fn((table: string) => {
       if (table === 'artists') {
-        artistCallCount++
         return makeArtistBuilder(ARTIST_ROW)
       }
       if (table === 'releases') return makeReleaseBuilder()
