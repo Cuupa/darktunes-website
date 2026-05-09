@@ -445,13 +445,16 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 
 - [ ] Supabase project created and configured
 - [ ] Database schema applied (including `handle_new_user` trigger)
+- [ ] Artist portal migration applied (`20260509124000_artist_portal.sql`)
 - [ ] First admin user registered **after** schema was applied
 - [ ] Admin role confirmed via `SELECT role FROM public.profiles WHERE email = '...'`
+- [ ] Artist users registered and linked: `UPDATE artists SET user_id = (SELECT id FROM auth.users WHERE email = 'artist@...') WHERE slug = 'my-artist'`
 - [ ] R2 bucket created and configured
 - [ ] Environment variables set in Vercel
 - [ ] Domain configured in Vercel
 - [ ] SSL certificate active
 - [ ] Test admin login
+- [ ] Test artist portal login at `/portal`
 - [ ] Test file upload
 - [ ] Test artist "Sync Now" button (iTunes releases import)
 - [ ] Check sync_logs table for any errors

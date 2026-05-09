@@ -8,6 +8,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Spotify Player
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (EPK editor, streaming analytics, royalty statements)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
@@ -15,7 +16,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **Artist Auto-Sync** – "Sync Now" per artist triggers iTunes release import, R2 cover art caching, and Supabase upsert
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
 - **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
-- **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware
+- **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware for `/admin/*` and `/portal/*`
 - **Cloud storage** – media uploads via Cloudflare R2 (server-side Route Handler)
 - **Server-side rendering** – data fetched at the edge with explicit ISR caching
 
@@ -52,6 +53,7 @@ npm run dev
 ```
 
 > **Admin panel** is available at `http://localhost:3000/admin` once you have authenticated.
+> **Artist portal** is available at `http://localhost:3000/portal` (artists sign in with their own Supabase Auth account linked to an artist row).
 
 ---
 
@@ -148,10 +150,20 @@ app/                          # Next.js App Router entry points
 │   ├── page.tsx              # Admin dashboard (force-dynamic, server renders client shell)
 │   ├── login/page.tsx        # Login page (force-dynamic)
 │   └── _components/          # Client wrappers for admin pages
+├── portal/                   # Multi-tenant Artist Portal routes (/portal/*)
+│   ├── layout.tsx            # Portal layout (server, renders sidebar)
+│   ├── page.tsx              # Dashboard overview (force-dynamic)
+│   ├── login/page.tsx        # Artist portal login
+│   ├── profile/page.tsx      # EPK profile editor (Server Component + ProfileForm client)
+│   ├── analytics/page.tsx    # Streaming analytics (Server Component + StreamingChart client)
+│   └── statements/page.tsx   # Royalty statements (Server Component + StatementsTable client)
 └── api/
-    ├── upload/route.ts       # R2 file upload Route Handler
-    └── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
-middleware.ts                 # Next.js Edge Middleware — Supabase auth check for /admin/*
+    ├── upload/route.ts       # R2 file upload Route Handler (admin)
+    ├── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
+    └── portal/
+        ├── upload-photo/route.ts  # Portal: profile photo upload to R2
+        └── profile/route.ts       # Portal: upsert artist EPK profile
+middleware.ts                 # Edge Middleware — auth for /admin/* and /portal/*
 src/
 ├── components/               # UI components (Header, Hero, Releases, Artists, …)
 │   ├── admin/                # Admin panel + manager components ("use client")
@@ -161,7 +173,13 @@ src/
 ├── contexts/                 # React context providers ("use client")
 ├── hooks/                    # Custom React hooks (useArtists, useReleases, …)
 ├── lib/                      # Business logic, API clients, utilities
-│   ├── api/                  # Data Access Layer — one file per table (incl. syncLogs.ts)
+│   ├── api/                  # Data Access Layer — one file per table
+│   │   ├── artistProfiles.ts # EPK profile DAL (artist_profiles table)
+│   │   ├── streamingStats.ts # Streaming stats DAL (streaming_stats table)
+│   │   ├── salesStatements.ts# Royalty statements DAL (sales_statements table)
+│   │   └── artistRowMapper.ts# Shared ArtistRow → Artist domain mapper
+│   ├── portal/               # Portal-specific utilities
+│   │   └── presignedUrl.ts   # Dependency-injected presigned URL generator
 │   ├── sync/                 # Artist sync service (syncArtist.ts)
 │   ├── rateLimiter.ts        # HttpError + withExponentialBackoff
 │   ├── imageUtils.ts         # wsrv.nl proxy helpers
@@ -172,7 +190,6 @@ src/
 │       ├── server.ts         # Supabase server client (@supabase/ssr, reads cookies)
 │       └── client.ts         # Supabase browser client (@supabase/ssr)
 └── types/                    # TypeScript types (incl. database.ts)
-api/                          # Legacy Vercel serverless functions (kept for reference)
 supabase/
 └── migrations/               # SQL migration files (source of truth for schema)
 scripts/

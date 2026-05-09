@@ -18,11 +18,11 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 115 tests passing (13 test files)
+- **Vitest** unit test suite (`npm test`) — 135 tests passing (17 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
-- **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
+- **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` and `/portal/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
 - **Internationalisation (i18n)** — `src/i18n/` custom dictionary pattern; `en.json` + `de.json`; `getDictionary.ts` loads server-side; RSCs pass dict as props to Client Components (IoC); Header has DE/EN locale switcher
 - **Database schema** defined in `supabase/migrations/20240101000000_initial_schema.sql`
 - **TypeScript DB types** in `src/types/database.ts`
@@ -151,6 +151,11 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Newsletter subscription | ✅ Implemented | `/api/newsletter` Route Handler → Supabase + optional MailerLite sync |
 | Generic cache revalidation webhook | ✅ Implemented | `POST /api/revalidate` with `REVALIDATE_SECRET` — for Supabase webhooks |
 | Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
+| Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |
+| Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form (react-hook-form + zod) + photo upload via R2 |
+| Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
+| Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
+| Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 
 ---
 
