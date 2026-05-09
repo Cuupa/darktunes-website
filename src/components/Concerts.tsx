@@ -88,7 +88,7 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
                             href={concert.ticketUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label={`${dict.ticketLink} (${locale === 'de' ? 'öffnet in neuem Tab' : 'opens in new tab'})`}
+                            aria-label={`${dict.ticketLink} (${dict.opensInNewTab})`}
                           >
                             <Ticket size={16} className="mr-2" />
                             {dict.ticketLink}
