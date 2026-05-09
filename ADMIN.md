@@ -30,6 +30,7 @@ WHERE slug = 'artist-slug';
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
+- **Visual Effects**: Configure the three dark-industrial overlay effects (noise/grain opacity, CRT scanlines toggle, vignette intensity) from the **Visual Effects** tab — changes go live immediately via ISR cache revalidation.
 - **Legal / DSGVO (New)**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
 
 ## Setup
@@ -95,6 +96,7 @@ Manage all global site content from the **Settings** tab — no code changes nee
 - **Social Links**: Instagram, YouTube, Spotify profile URLs (leave blank to hide the icon)
 - **Homepage**: Hero badge text, hero description, Spotify playlist URI
 - **SEO / Meta**: Page title, meta description, Open Graph title and description
+- **Visual Effects**: Noise/grain opacity (0–1 slider), CRT scanlines toggle, vignette intensity (0–1 slider)
 
 Changes are saved to the `site_settings` Supabase table. The Admin CMS immediately calls `POST /api/revalidate-site-settings` to bust the Next.js ISR cache so the public site reflects the update within seconds.
 

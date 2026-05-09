@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Providers } from './_components/Providers'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
+import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { unstable_cache } from 'next/cache'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import './globals.css'
@@ -42,6 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale()
   const dict = await getDictionary(locale)
+  const settings = await getCachedSiteSettings().catch(() => null)
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -54,6 +56,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="bg-background text-foreground antialiased">
+        <VisualEffectsOverlay
+          noiseOpacity={settings?.noiseOpacity ?? 0.04}
+          crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
+          vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
+        />
         <Providers consentDict={dict.consent}>{children}</Providers>
       </body>
     </html>

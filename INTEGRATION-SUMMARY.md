@@ -18,7 +18,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 135 tests passing (17 test files)
+- **Vitest** unit test suite (`npm test`) — 137 tests passing (17 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -59,7 +59,7 @@
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
-- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`
+- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`
 
 ### File Upload (Next.js Route Handler)
 - `app/api/upload/route.ts` — POST Route Handler that:
@@ -143,7 +143,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Rate limiter + exponential backoff | ✅ Implemented | withExponentialBackoff in src/lib/rateLimiter.ts |
 | Sync history logging | ✅ Implemented | sync_logs table + getSyncLogsByArtist DAL |
 | Spotify / Discogs / Songkick sync | ✅ Implemented | `src/lib/sync/{spotifyApi,discogsApi,songkickApi,odesliApi,deduplication,syncAll}.ts`; POST `/api/sync` |
-| Supabase pg_cron auto-sync | 🔲 Pending | Schema and API route ready; pg_cron schedule setup needed in Supabase dashboard |
+| Visual Effects overlays (noise, scanlines, vignette) | ✅ Implemented | `VisualEffectsOverlay` in `app/layout.tsx`; settings stored in `site_settings` KV table; controlled from Admin "Visual Effects" tab |
 | Site settings CMS | ✅ Implemented | `site_settings` table + Admin Settings tab + Next.js ISR cache revalidation |
 | Impressum page (§ 5 TMG) | ✅ Implemented | `/impressum` RSC — all mandatory German legal fields from CMS |
 | Datenschutzerklärung page | ✅ Implemented | `/datenschutz` RSC — Markdown content editable in CMS |
