@@ -41,6 +41,19 @@ Test files live alongside their source files: src/**/*.{test,spec}.{ts,tsx}.
 Test Isolation: Tests must not rely on external network requests. Mock all external APIs (including iTunes, Bandsintown, Odesli, Spotify, and Discogs).
 Supabase Mock Pattern: In DAL tests, create a mock builder where all chain methods (select, order, insert, update, delete, upsert, eq, single) return `this` via `vi.fn().mockReturnThis()`. The builder object has `then`, `catch`, `finally` bound to a `Promise.resolve({data, error})`. This makes the entire chain thenable — `await db.from('x').select().order()` resolves correctly.
 
+E2E & Visual Regression Testing (Playwright)
+E2E test runner: `npm run test:e2e` (runs `playwright test` using `playwright.config.ts`).
+Test files live in `tests/e2e/` — one spec file per concern:
+  - `visual.spec.ts`      — full-page & section screenshots for visual regression.
+  - `responsive.spec.ts`  — shrinking header, hamburger menu, grid stacking.
+  - `interactions.spec.ts`— touch-target sizes (≥ 44×44 px on mobile), video/artist modals, swipe-to-close.
+  - `edgecases.spec.ts`   — skeleton ↔ card dimension parity (CLS), long-name truncation, slow-network.
+Three browser projects: `Desktop Chrome` (1920×1080), `Mobile Safari` (iPhone 13), `Mobile Chrome` (Pixel 5).
+CRT/noise/scanline overlays MUST be hidden via CSS injection (`page.addStyleTag`) before any `toHaveScreenshot` call to prevent flaky diffs from animated noise.
+The webServer block in `playwright.config.ts` runs `npm run build && npm run preview` automatically; set `SKIP_BUILD=1` to reuse an existing build artifact.
+Tests that require Supabase data gracefully skip via `test.skip(true, reason)` when the relevant DOM section is absent (i.e. Supabase is unconfigured).
+Never commit `.playwright-snapshots/` baselines — they are regenerated with `playwright test --update-snapshots` on each environment.
+
 Data Access Layer (DAL)
 All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.

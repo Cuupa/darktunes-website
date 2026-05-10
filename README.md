@@ -67,6 +67,7 @@ npm run dev
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run test:e2e` | Run Playwright E2E & visual regression tests |
 | `npm run db:push` | Push local migrations to Supabase cloud |
 | `npm run db:diff` | Diff local schema against remote |
 
