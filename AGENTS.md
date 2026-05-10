@@ -42,7 +42,7 @@ Test Isolation: Tests must not rely on external network requests. Mock all exter
 Supabase Mock Pattern: In DAL tests, create a mock builder where all chain methods (select, order, insert, update, delete, upsert, eq, single) return `this` via `vi.fn().mockReturnThis()`. The builder object has `then`, `catch`, `finally` bound to a `Promise.resolve({data, error})`. This makes the entire chain thenable — `await db.from('x').select().order()` resolves correctly.
 
 Data Access Layer (DAL)
-All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts).
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
@@ -206,3 +206,15 @@ All overlays use pointer-events: none and z-index 9996–9998 so they never bloc
 Settings are stored in the site_settings KV table (keys: noise_opacity, crt_scanlines_enabled, vignette_intensity) and managed via the Admin CMS "Visual Effects" tab (Slider + Switch controls).
 CSS animation keyframes (.noise-overlay, .scanlines-overlay) live in app/globals.css. Opacity/visibility is controlled via inline style props — never hardcoded.
 CRITICAL DESIGN RULE: Do NOT use neon glows, bright highlights, or flashy cyberpunk effects. Keep the aesthetic raw, dark, industrial, and subtle.
+
+Press & Media Ecosystem
+Public EPK page: `app/press/page.tsx` (Server Component) fetches press_photos, artist profile bios (short/medium/long), concerts, and press_quote from Supabase. All photo display URLs pass through `getOptimizedImageUrl()` (wsrv.nl proxy); download links point to the original R2 public CDN URL.
+Promo Pool: `/promo-pool/*` is a dual-gated journalist-only area.
+  - Gate 1 (Edge Middleware): unauthenticated users are redirected to `/promo-pool/login`.
+  - Gate 2 (Layout Server Component): authenticated users without role `journalist` or `admin` see `PromoPoolAccessGate` (shows application status or application form).
+Anti-leak audio: `promo_tracks` stores only the R2 object key — NO public URL. The `getPromoTrackStreamUrl(r2Key)` Server Action in `src/actions/promoTrack.ts` verifies the journalist/admin role and returns a 15-minute presigned GET URL. The URL is only generated on explicit user click, never in initial HTML.
+Admin EPK upload: `getEpkUploadUrl(category, filename, contentType)` in `src/actions/epkUpload.ts` generates a 15-minute presigned PUT URL for direct browser-to-R2 upload, bypassing Vercel's 4.5 MB limit. Categories: `press-photos` | `promo-tracks`.
+Journalist applications: `journalist_applications` table; `POST /api/journalist-applications` lets anyone submit. `PATCH /api/journalist-applications/[id]` (admin-only) approves/rejects and updates `profiles.role` to `journalist` / `user`. Admin UI is in `src/components/admin/JournalistManager.tsx` (Media tab in AdminDashboard).
+DAL: `src/lib/api/pressPhotos.ts`, `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests.
+user_role enum: includes `journalist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all four values.
+DB: Migration `20260510190000_press_and_promo_pool.sql` — adds journalist role value, press_photos, promo_tracks, journalist_applications tables with RLS.

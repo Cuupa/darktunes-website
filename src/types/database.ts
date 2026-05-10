@@ -13,21 +13,21 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'admin' | 'editor' | 'user'
+          role: 'admin' | 'editor' | 'journalist' | 'user'
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
           email: string
-          role?: 'admin' | 'editor' | 'user'
+          role?: 'admin' | 'editor' | 'journalist' | 'user'
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           email?: string
-          role?: 'admin' | 'editor' | 'user'
+          role?: 'admin' | 'editor' | 'journalist' | 'user'
           created_at?: string
           updated_at?: string
         }
@@ -561,6 +561,108 @@ export interface Database {
           is_completed?: boolean
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      press_photos: {
+        Row: {
+          id: string
+          title: string
+          alt_text: string | null
+          r2_key: string
+          public_url: string
+          display_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          alt_text?: string | null
+          r2_key: string
+          public_url: string
+          display_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          alt_text?: string | null
+          r2_key?: string
+          public_url?: string
+          display_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      promo_tracks: {
+        Row: {
+          id: string
+          title: string
+          artist_name: string
+          r2_key: string
+          file_size_bytes: number | null
+          duration_seconds: number | null
+          display_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          artist_name: string
+          r2_key: string
+          file_size_bytes?: number | null
+          duration_seconds?: number | null
+          display_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          artist_name?: string
+          r2_key?: string
+          file_size_bytes?: number | null
+          duration_seconds?: number | null
+          display_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      journalist_applications: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string
+          name: string
+          outlet: string
+          message: string | null
+          status: 'pending' | 'approved' | 'rejected'
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email: string
+          name: string
+          outlet: string
+          message?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          email?: string
+          name?: string
+          outlet?: string
+          message?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
         }
         Relationships: []
       }

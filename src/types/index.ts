@@ -78,7 +78,7 @@ export interface Video {
 export interface UserProfile {
   id: string
   email: string
-  role: 'admin' | 'editor' | 'user'
+  role: 'admin' | 'editor' | 'journalist' | 'user'
   createdAt: string
   updatedAt: string
 }
