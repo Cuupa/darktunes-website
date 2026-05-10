@@ -67,11 +67,15 @@
     "emailPlaceholder": "deine@email.de",
     "submit": "Anmelden",
     "submitting": "Anmelden…",
-    "successTitle": "Danke für deine Anmeldung! 🎉",
-    "successMessage": "Du erhältst in Kürze eine Bestätigungsmail.",
+    "successTitle": "Prüfe dein Postfach! 📬",
+    "successMessage": "Wir haben dir eine Bestätigungsmail geschickt. Bitte klicke auf den Link darin, um deine Anmeldung abzuschließen.",
     "consentText": "Mit der Anmeldung stimmst du zu, gelegentlich E-Mails von darkTunes zu erhalten. Du kannst dich jederzeit abmelden.",
     "privacyLink": "Datenschutzerklärung",
-    "validationEmail": "Bitte eine gültige E-Mail-Adresse eingeben"
+    "validationEmail": "Bitte eine gültige E-Mail-Adresse eingeben",
+    "confirmSuccessTitle": "Anmeldung bestätigt! 🎉",
+    "confirmSuccessMessage": "Du bist jetzt für den darkTunes Newsletter angemeldet. Willkommen in der Community!",
+    "confirmErrorTitle": "Link ungültig oder abgelaufen",
+    "confirmErrorMessage": "Dieser Bestätigungslink ist ungültig oder wurde bereits verwendet. Bitte versuche dich erneut anzumelden."
   },
   "consent": {
     "bannerAriaLabel": "Cookie-Einwilligung",

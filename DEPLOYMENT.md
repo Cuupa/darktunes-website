@@ -440,6 +440,17 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 ### SOS Webhook (optional — Statement of Sales PDF upload from external generator)
 - `SOS_WEBHOOK_SECRET`: A random, high-entropy string shared between this app and the SOS PDF generator service. Used to authenticate server-to-server calls to `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm`. Generate with `openssl rand -hex 32`.
 
+### Newsletter Double Opt-In (optional — confirmation email delivery)
+The following vars are consumed by the **Supabase Edge Function** (`newsletter-confirm`), NOT by the Next.js app. Set them as Edge Function secrets in Supabase Dashboard → Edge Functions → Secrets.
+- `RESEND_API_KEY`: API key from https://resend.com — used to send DOI confirmation emails.
+- `RESEND_FROM_EMAIL`: Verified sender address, e.g. `noreply@darktunes.com`. Must be a domain verified in Resend.
+- `NEXT_PUBLIC_SITE_URL`: The public site URL without trailing slash (e.g. `https://darktunes.com`) — used to build the confirmation link inside the email. Also set this as a Vercel env var (with the `NEXT_PUBLIC_` prefix) so the confirmation page can be rendered.
+
+### Newsletter — MailerLite sync (optional — marketing list)
+After DOI confirmation, verified subscribers are pushed to MailerLite server-to-server via `GET /api/newsletter/verify`. Both vars are optional — omit to store subscribers in Supabase only.
+- `MAILERLITE_API_KEY`: MailerLite API key from https://app.mailerlite.com/integrations/api/
+- `MAILERLITE_GROUP_ID`: MailerLite group/segment ID to add subscribers to.
+
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
 ---
@@ -448,6 +459,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 
 - [ ] Supabase project created and configured
 - [ ] Database schema applied (including `handle_new_user` trigger)
+- [ ] DOI migration applied (`20260510000001_newsletter_double_opt_in.sql`)
 - [ ] Artist portal migration applied (`20260509124000_artist_portal.sql`)
 - [ ] First admin user registered **after** schema was applied
 - [ ] Admin role confirmed via `SELECT role FROM public.profiles WHERE email = '...'`
