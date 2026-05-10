@@ -501,6 +501,8 @@ export interface Database {
           email: string
           name: string | null
           source: string
+          status: 'pending' | 'subscribed'
+          verification_token: string | null
           subscribed_at: string
         }
         Insert: {
@@ -508,6 +510,8 @@ export interface Database {
           email: string
           name?: string | null
           source?: string
+          status?: 'pending' | 'subscribed'
+          verification_token?: string | null
           subscribed_at?: string
         }
         Update: {
@@ -515,6 +519,8 @@ export interface Database {
           email?: string
           name?: string | null
           source?: string
+          status?: 'pending' | 'subscribed'
+          verification_token?: string | null
           subscribed_at?: string
         }
         Relationships: []

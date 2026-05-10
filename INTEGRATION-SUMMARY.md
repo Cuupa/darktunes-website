@@ -157,7 +157,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Impressum page (§ 5 TMG) | ✅ Implemented | `/impressum` RSC — all mandatory German legal fields from CMS |
 | Datenschutzerklärung page | ✅ Implemented | `/datenschutz` RSC — Markdown content editable in CMS |
 | GDPR Consent Management | ✅ Implemented | `ConsentBanner` + `ConsentGate` — Spotify/YouTube blocked until opt-in |
-| Newsletter subscription | ✅ Implemented | `/api/newsletter` Route Handler → Supabase + optional MailerLite sync |
+| Newsletter subscription | ✅ Implemented | Double Opt-In flow: Server Action → Supabase (pending) → Edge Function (Resend email) → `/api/newsletter/verify` (subscribed) → optional MailerLite sync |
 | Generic cache revalidation webhook | ✅ Implemented | `POST /api/revalidate` with `REVALIDATE_SECRET` — for Supabase webhooks |
 | Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
 | Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |

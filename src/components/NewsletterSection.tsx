@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Envelope, ArrowRight } from '@phosphor-icons/react'
 import type { Dictionary } from '@/i18n/types'
+import { subscribeToNewsletter } from '@/actions/newsletter'
 
 interface NewsletterSectionProps {
   dict: Dictionary['newsletter']
@@ -19,11 +20,12 @@ interface NewsletterSectionProps {
 type FormData = { email: string; name?: string }
 
 /**
- * NewsletterSection — GDPR-compliant opt-in form.
+ * NewsletterSection — GDPR-compliant Double Opt-In subscription form.
  *
- * Submits to /api/newsletter (Next.js Route Handler) — never directly to the
- * email provider. The user's data is stored in Supabase and optionally synced
- * to MailerLite server-side.
+ * Submits via the `subscribeToNewsletter` Server Action — never calls an
+ * external API directly from the browser. The Server Action stores the
+ * subscriber as 'pending' in Supabase; a Supabase Edge Function then sends
+ * the confirmation email asynchronously.
  */
 export function NewsletterSection({ dict }: NewsletterSectionProps) {
   const [submitted, setSubmitted] = useState(false)
@@ -41,22 +43,18 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const onSubmit = async (data: FormData) => {
-    try {
-      const res = await fetch('/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+    const formData = new FormData()
+    formData.set('email', data.email)
+    if (data.name) formData.set('name', data.name)
 
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error ?? 'Subscription failed')
-      }
+    const result = await subscribeToNewsletter(formData)
 
-      setSubmitted(true)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.validationEmail)
+    if (!result.success) {
+      toast.error(result.error)
+      return
     }
+
+    setSubmitted(true)
   }
 
   return (

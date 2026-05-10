@@ -42,7 +42,7 @@ Test Isolation: Tests must not rely on external network requests. Mock all exter
 Supabase Mock Pattern: In DAL tests, create a mock builder where all chain methods (select, order, insert, update, delete, upsert, eq, single) return `this` via `vi.fn().mockReturnThis()`. The builder object has `then`, `catch`, `finally` bound to a `Promise.resolve({data, error})`. This makes the entire chain thenable — `await db.from('x').select().order()` resolves correctly.
 
 Data Access Layer (DAL)
-All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts).
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
@@ -166,8 +166,22 @@ Required env vars are split into two groups:
       DISCOGS_TOKEN, SONGKICK_API_KEY
   - Optional (SOS webhook — required for receiving PDF statements from the SOS generator):
       SOS_WEBHOOK_SECRET
+  - Optional (Newsletter DOI — required for sending Double Opt-In confirmation emails):
+      RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL
+  - Optional (MailerLite — adds verified subscribers to the marketing list after DOI confirmation):
+      MAILERLITE_API_KEY, MAILERLITE_GROUP_ID
 Configure all variables in Vercel Dashboard → Project → Settings → Environment Variables.
 See DEPLOYMENT.md for full variable descriptions and setup instructions.
+
+Newsletter Double Opt-In (DOI) Flow
+newsletter_subscribers stores each signup with status='pending' and a UUID verification_token until the user confirms.
+Subscription entry point: `subscribeToNewsletter(formData)` Server Action in `src/actions/newsletter.ts`. The form in `NewsletterSection.tsx` calls this via React 19 Server Action invocation (no fetch, no route handler).
+Email delivery: a Supabase Edge Function (`supabase/functions/newsletter-confirm/index.ts`, Deno runtime) is triggered by a Database Webhook on INSERT to `newsletter_subscribers`. It sends the DOI confirmation email via the Resend API.
+Verification: `GET /api/newsletter/verify?token=<uuid>` looks up the pending row, flips status to 'subscribed', optionally syncs to MailerLite, and redirects to `/newsletter/confirmed`.
+Anti-enumeration: duplicate email submissions return a silent success — the user is never told whether the address is already registered.
+Legacy REST fallback: `POST /api/newsletter` (Route Handler) still accepts subscriptions for server-to-server integrations and testing; it follows the same pending+token pattern.
+DAL: `createPendingSubscriber(db, email, token, name?)` and `verifySubscriberToken(db, token)` in `src/lib/api/newsletter.ts`. Both require a service-role client to bypass RLS.
+Edge Function secrets (set in Supabase Dashboard → Edge Functions → Secrets): RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL.
 
 Responsive Design & Layout Integrity
 MANDATORY: All UI components MUST follow the rules below.

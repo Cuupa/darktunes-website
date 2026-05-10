@@ -70,9 +70,14 @@ require_env "DISCOGS_TOKEN"         "Discogs personal access token (sync: releas
 require_env "SONGKICK_API_KEY"      "Songkick API key (sync: tour dates by Songkick Artist ID)"
 echo ""
 
-echo "  — Newsletter (optional — MailerLite sync) —"
-require_env "MAILERLITE_API_KEY" "MailerLite API key (newsletter subscriber sync)"
-require_env "MAILERLITE_GROUP_ID" "MailerLite group ID for newsletter subscribers"
+echo "  — Newsletter (optional — DOI email delivery via Resend Edge Function) —"
+require_env "RESEND_API_KEY"     "Resend API key (set as Supabase Edge Function secret, not Vercel)"
+require_env "NEXT_PUBLIC_SITE_URL" "Public site URL used to build confirmation links (e.g. https://darktunes.com)"
+echo ""
+
+echo "  — Newsletter (optional — MailerLite sync after DOI confirmation) —"
+require_env "MAILERLITE_API_KEY" "MailerLite API key (newsletter subscriber sync after verification)"
+require_env "MAILERLITE_GROUP_ID" "MailerLite group ID for verified newsletter subscribers"
 echo ""
 
 echo "  — Cache revalidation webhook (optional but recommended) —"
