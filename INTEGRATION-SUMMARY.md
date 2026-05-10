@@ -161,9 +161,12 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Generic cache revalidation webhook | ✅ Implemented | `POST /api/revalidate` with `REVALIDATE_SECRET` — for Supabase webhooks |
 | Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
 | Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |
-| Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form (react-hook-form + zod) + photo upload via R2 |
+| Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form with bio_short/medium/long + photo upload via R2 |
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
+| Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — upcoming concerts via `getConcertsByArtistId()` + TourList client component |
+| Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` |
+| Artist Portal — marketing & smart links | ✅ Implemented | `/portal/marketing` — SmartLinks client component with copy-to-clipboard per release |
 | SOS webhook — PDF upload from external generator | ✅ Implemented | 2-step presigned URL flow: POST /api/webhooks/sos (get PUT URL) + POST /api/webhooks/sos/confirm (create DB record). Requires `SOS_WEBHOOK_SECRET`. |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 

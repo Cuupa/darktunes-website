@@ -29,6 +29,9 @@ export interface ArtistProfile {
   id: string
   artistId: string
   bio: string | undefined
+  bioShort: string | undefined
+  bioMedium: string | undefined
+  bioLong: string | undefined
   photoUrl: string | undefined
   genres: string[]
   websiteUrl: string | undefined
@@ -49,6 +52,9 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     id: row.id,
     artistId: row.artist_id,
     bio: row.bio ?? undefined,
+    bioShort: row.bio_short ?? undefined,
+    bioMedium: row.bio_medium ?? undefined,
+    bioLong: row.bio_long ?? undefined,
     photoUrl: row.photo_url ?? undefined,
     genres: row.genres,
     websiteUrl: row.website_url ?? undefined,

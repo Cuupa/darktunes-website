@@ -9,7 +9,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { MusicNote, ChartBar, FileText, User, SignOut } from '@phosphor-icons/react'
+import { MusicNote, ChartBar, FileText, User, SignOut, MapPin, MegaphoneSimple, MusicNotes } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -26,6 +26,9 @@ const navItems = [
   { href: '/portal', label: 'overview', icon: ChartBar },
   { href: '/portal/profile', label: 'profile', icon: User },
   { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
+  { href: '/portal/releases', label: 'releases', icon: MusicNotes },
+  { href: '/portal/tour', label: 'tour', icon: MapPin },
+  { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple },
   { href: '/portal/statements', label: 'statements', icon: FileText },
 ] as const
 

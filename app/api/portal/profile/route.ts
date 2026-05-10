@@ -18,6 +18,9 @@ import { z } from 'zod'
 const profileBodySchema = z.object({
   artist_id: z.string().uuid(),
   bio: z.string().max(2000).nullable().optional(),
+  bio_short: z.string().max(600).nullable().optional(),
+  bio_medium: z.string().max(1800).nullable().optional(),
+  bio_long: z.string().max(6000).nullable().optional(),
   photo_url: z.string().url().nullable().optional(),
   genres: z.array(z.string()).optional(),
   website_url: z.string().url().nullable().optional(),

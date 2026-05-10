@@ -23,6 +23,18 @@ function rowToConcert(row: ConcertRow): Concert {
   }
 }
 
+export async function getConcertsByArtistId(db: DbClient, artistId: string): Promise<Concert[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const { data, error } = await db
+    .from('concerts')
+    .select('*')
+    .eq('artist_id', artistId)
+    .gte('concert_date', today)
+    .order('concert_date', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToConcert)
+}
+
 export async function getConcerts(db: DbClient): Promise<Concert[]> {
   const today = new Date().toISOString().split('T')[0]
   const { data, error } = await db

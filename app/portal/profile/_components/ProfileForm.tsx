@@ -31,6 +31,9 @@ import type { Dictionary } from '@/i18n/types'
 
 const profileSchema = z.object({
   bio: z.string().max(2000, 'Max 2000 characters').optional(),
+  bio_short: z.string().max(600, 'Max 600 characters').optional(),
+  bio_medium: z.string().max(1800, 'Max 1800 characters').optional(),
+  bio_long: z.string().max(6000, 'Max 6000 characters').optional(),
   genres: z.string().optional(),
   website_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   instagram_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
@@ -64,6 +67,9 @@ export function ProfileForm({ dict, artistId, initialProfile }: ProfileFormProps
     resolver: zodResolver(profileSchema),
     defaultValues: {
       bio: initialProfile?.bio ?? '',
+      bio_short: initialProfile?.bioShort ?? '',
+      bio_medium: initialProfile?.bioMedium ?? '',
+      bio_long: initialProfile?.bioLong ?? '',
       genres: initialProfile?.genres.join(', ') ?? '',
       website_url: initialProfile?.websiteUrl ?? '',
       instagram_url: initialProfile?.instagramUrl ?? '',
@@ -147,6 +153,9 @@ export function ProfileForm({ dict, artistId, initialProfile }: ProfileFormProps
       const payload = {
         artist_id: artistId,
         bio: values.bio ?? null,
+        bio_short: values.bio_short ?? null,
+        bio_medium: values.bio_medium ?? null,
+        bio_long: values.bio_long ?? null,
         photo_url: photoUrl ?? null,
         genres: values.genres
           ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
@@ -231,6 +240,45 @@ export function ProfileForm({ dict, artistId, initialProfile }: ProfileFormProps
               />
               {form.formState.errors.bio && (
                 <p className="text-sm text-destructive">{form.formState.errors.bio.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio_short">{dict.profile_bio_short}</Label>
+              <Textarea
+                id="bio_short"
+                rows={3}
+                className="bg-muted border-border resize-none"
+                {...form.register('bio_short')}
+              />
+              {form.formState.errors.bio_short && (
+                <p className="text-sm text-destructive">{form.formState.errors.bio_short.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio_medium">{dict.profile_bio_medium}</Label>
+              <Textarea
+                id="bio_medium"
+                rows={6}
+                className="bg-muted border-border resize-none"
+                {...form.register('bio_medium')}
+              />
+              {form.formState.errors.bio_medium && (
+                <p className="text-sm text-destructive">{form.formState.errors.bio_medium.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio_long">{dict.profile_bio_long}</Label>
+              <Textarea
+                id="bio_long"
+                rows={10}
+                className="bg-muted border-border resize-none"
+                {...form.register('bio_long')}
+              />
+              {form.formState.errors.bio_long && (
+                <p className="text-sm text-destructive">{form.formState.errors.bio_long.message}</p>
               )}
             </div>
 

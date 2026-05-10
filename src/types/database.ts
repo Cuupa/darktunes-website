@@ -116,6 +116,9 @@ export interface Database {
           id: string
           artist_id: string
           bio: string | null
+          bio_short: string | null
+          bio_medium: string | null
+          bio_long: string | null
           photo_url: string | null
           genres: string[]
           website_url: string | null
@@ -130,6 +133,9 @@ export interface Database {
           id?: string
           artist_id: string
           bio?: string | null
+          bio_short?: string | null
+          bio_medium?: string | null
+          bio_long?: string | null
           photo_url?: string | null
           genres?: string[]
           website_url?: string | null
@@ -144,6 +150,9 @@ export interface Database {
           id?: string
           artist_id?: string
           bio?: string | null
+          bio_short?: string | null
+          bio_medium?: string | null
+          bio_long?: string | null
           photo_url?: string | null
           genres?: string[]
           website_url?: string | null
@@ -522,6 +531,36 @@ export interface Database {
           status?: 'pending' | 'subscribed'
           verification_token?: string | null
           subscribed_at?: string
+        }
+        Relationships: []
+      }
+      release_checklists: {
+        Row: {
+          id: string
+          artist_id: string
+          release_id: string
+          task: string
+          is_completed: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          release_id: string
+          task: string
+          is_completed?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          release_id?: string
+          task?: string
+          is_completed?: boolean
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

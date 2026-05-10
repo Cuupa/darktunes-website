@@ -135,13 +135,16 @@ The Artist Portal lives at `/portal/*` — a secure dashboard for the label's ba
 Auth: `middleware.ts` protects all `/portal/*` routes (except `/portal/login`) using the same Supabase session-cookie pattern as `/admin/*`.
 Multi-tenancy: `artists.user_id UUID REFERENCES auth.users(id)` links each artist row to a Supabase Auth user. One auth user ↔ one artist.
 Portal DAL functions: `getArtistByUserId(db, userId)` in `src/lib/api/artistProfiles.ts` resolves the current user's linked artist. Always call this before accessing artist-scoped data.
-RLS enforcement: `artist_profiles`, `streaming_stats`, and `sales_statements` all have RLS policies that use `EXISTS (SELECT 1 FROM artists WHERE id = artist_id AND user_id = auth.uid())`. Security is at the DB layer; no middleware-only filtering.
+RLS enforcement: `artist_profiles`, `streaming_stats`, `sales_statements`, and `release_checklists` all have RLS policies that use `EXISTS (SELECT 1 FROM artists WHERE id = artist_id AND user_id = auth.uid())`. Security is at the DB layer; no middleware-only filtering.
 Presigned URL pattern: `src/lib/portal/presignedUrl.ts` exposes two injectable functions:
   - `generatePresignedDownloadUrl(r2Key, deps)` — 5-minute GET URL for artist downloads (`PresignedUrlDeps`)
   - `generatePresignedUploadUrl(r2Key, contentType, deps)` — 15-minute PUT URL for the SOS PDF generator to upload directly to R2, bypassing Vercel's 4.5 MB body limit (`PresignedUploadUrlDeps`)
   The Server Action `app/portal/statements/_actions/presignedUrl.ts` wires real deps for artist-facing downloads.
 Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-data`, verifies auth, confirms artist ownership, then uploads to `profile-photos/{artistId}/{uuid}.{ext}` in R2. Max 5 MB, image types only.
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
+Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
+Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
+Portal nav items: Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements.
 
 SOS Webhook (Statement of Sales PDF Upload)
 The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.
