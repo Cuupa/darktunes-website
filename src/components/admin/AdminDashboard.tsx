@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -13,6 +13,7 @@ import { VideosManager } from './VideosManager'
 import { AssetsManager } from './AssetsManager'
 import { SiteSettingsManager } from './SiteSettingsManager'
 import { SystemHealthWidget } from './SystemHealthWidget'
+import { JournalistManager } from './JournalistManager'
 
 export function AdminDashboard() {
   const { user, profile, signOut, session } = useAuthContext()
@@ -54,7 +55,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" />
               Artists
@@ -82,6 +83,10 @@ export function AdminDashboard() {
             <TabsTrigger value="health" className="gap-2">
               <Heartbeat size={16} weight="bold" />
               Health
+            </TabsTrigger>
+            <TabsTrigger value="media" className="gap-2">
+              <Broadcast size={16} weight="bold" />
+              Media
             </TabsTrigger>
           </TabsList>
 
@@ -179,6 +184,20 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="media" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Press &amp; Media</CardTitle>
+                <CardDescription>
+                  Manage journalist applications, press photos (EPK), and private promo tracks
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <JournalistManager />
               </CardContent>
             </Card>
           </TabsContent>

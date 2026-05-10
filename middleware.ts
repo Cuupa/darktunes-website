@@ -89,6 +89,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(portalUrl)
   }
 
+  const isPromoPoolLoginPage = pathname === '/promo-pool/login'
+  const isPromoPoolRoute = pathname.startsWith('/promo-pool')
+
+  // Redirect unauthenticated users away from the promo-pool
+  if (isPromoPoolRoute && !isPromoPoolLoginPage && !user) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/promo-pool/login'
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Redirect already-authenticated promo-pool users away from the login page
+  if (isPromoPoolLoginPage && user) {
+    const promoUrl = request.nextUrl.clone()
+    promoUrl.pathname = '/promo-pool'
+    return NextResponse.redirect(promoUrl)
+  }
+
   // -------------------------------------------------------------------------
   // Locale detection — set NEXT_LOCALE cookie from Accept-Language if missing
   // -------------------------------------------------------------------------
