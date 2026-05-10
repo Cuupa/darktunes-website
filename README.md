@@ -7,7 +7,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 
 ## 🎵 Features
 
-- **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Spotify Player
+- **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
 - **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (EPK editor, streaming analytics, royalty statements)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays

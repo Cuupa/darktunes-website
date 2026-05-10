@@ -45,6 +45,9 @@ export function Footer({ siteSettings, dict }: FooterProps) {
               <a href="#videos" className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.videosLink}
               </a>
+              <a href="#concerts" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                {dict.tourLink}
+              </a>
             </nav>
           </div>
 

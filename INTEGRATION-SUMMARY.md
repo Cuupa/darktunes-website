@@ -9,6 +9,7 @@
 - **Artists section** — server-side data, passed as props to client component
 - **Videos section** — YouTube embed gallery
 - **News section** — server-side data from Supabase
+- **Tour section** — upcoming concert dates from Supabase with ticket links
 - **Header** — shrinking logo on scroll, navigation (`"use client"`)
 - **Footer** (`"use client"` for smooth scroll behaviour)
 - **CRT scanline overlay** — full-page vintage aesthetic
@@ -18,7 +19,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 137 tests passing (17 test files)
+- **Vitest** unit test suite (`npm test`) — 140 tests passing (18 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -36,6 +37,7 @@
 - `releases.ts` — CRUD + `upsertReleaseByItunesId` for iTunes sync
 - `news.ts` — CRUD for news_posts table
 - `videos.ts` — CRUD for videos table
+- `concerts.ts` — read upcoming concerts from concerts table
 - `assets.ts` — `getAssets`, `createAssetRecord`, `deleteAssetRecord`
 - `siteSettings.ts` — `getSiteSettings` (returns typed `SiteSettings`), `upsertSiteSetting`, `upsertSiteSettings` (batch)
 - Each DAL function receives `SupabaseClient<Database>` as first arg; fully unit-tested

@@ -17,9 +17,10 @@ import { getReleases } from '@/lib/api/releases'
 import { getArtists } from '@/lib/api/artists'
 import { getNewsPosts } from '@/lib/api/news'
 import { getVideos } from '@/lib/api/videos'
+import { getConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
-import type { Release, Artist, NewsPost, Video, SiteSettings } from '@/types'
+import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Cached data-fetching helpers
@@ -62,6 +63,15 @@ const getCachedVideos = unstable_cache(
   { revalidate: 60, tags: ['videos'] },
 )
 
+const getCachedConcerts = unstable_cache(
+  async (): Promise<Concert[]> => {
+    const client = await createServerSupabaseClient()
+    return getConcerts(client)
+  },
+  ['concerts'],
+  { revalidate: 60, tags: ['concerts'] },
+)
+
 const getCachedSiteSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
     const client = await createServerSupabaseClient()
@@ -77,11 +87,12 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, artists, news, videos, siteSettings, locale] = await Promise.all([
+  const [releases, artists, news, videos, concerts, siteSettings, locale] = await Promise.all([
     getCachedReleases().catch(() => [] as Release[]),
     getCachedArtists().catch(() => [] as Artist[]),
     getCachedNews().catch(() => [] as NewsPost[]),
     getCachedVideos().catch(() => [] as Video[]),
+    getCachedConcerts().catch(() => [] as Concert[]),
     getCachedSiteSettings().catch(
       (): SiteSettings => ({
         labelName: 'darkTunes Music Group',
@@ -128,6 +139,7 @@ export default async function HomePage() {
       artists={artists}
       news={news}
       videos={videos}
+      concerts={concerts}
       siteSettings={siteSettings}
       dict={dict}
       locale={locale}

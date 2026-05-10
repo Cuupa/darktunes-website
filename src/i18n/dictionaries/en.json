@@ -3,6 +3,7 @@
     "home": "HOME",
     "artists": "ARTISTS",
     "releases": "RELEASES",
+    "tour": "TOUR",
     "news": "NEWS",
     "videos": "VIDEOS",
     "newsletter": "Newsletter",
@@ -31,6 +32,15 @@
     "heading": "VIDEOS",
     "subheading": "Watch the latest music videos and visualizers"
   },
+  "concerts": {
+    "heading": "TOUR",
+    "subheading": "Live dates and upcoming shows",
+    "ticketLink": "Get Tickets",
+    "opensInNewTab": "opens in new tab",
+    "cancelled": "Cancelled",
+    "noShows": "No upcoming tour dates at the moment.",
+    "checkBack": "Check back soon for new dates."
+  },
   "spotify": {
     "heading": "SPOTIFY",
     "subheading": "Listen to our playlist"
@@ -43,6 +53,7 @@
     "releasesLink": "Releases",
     "newsLink": "News",
     "videosLink": "Videos",
+    "tourLink": "Tour",
     "allRightsReserved": "All rights reserved.",
     "contact": "Contact",
     "privacyPolicy": "Privacy Policy",
