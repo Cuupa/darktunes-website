@@ -437,6 +437,9 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 - `DISCOGS_TOKEN`: Discogs personal access token (https://www.discogs.com/settings/developers)
 - `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
 
+### SOS Webhook (optional — Statement of Sales PDF upload from external generator)
+- `SOS_WEBHOOK_SECRET`: A random, high-entropy string shared between this app and the SOS PDF generator service. Used to authenticate server-to-server calls to `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm`. Generate with `openssl rand -hex 32`.
+
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
 ---

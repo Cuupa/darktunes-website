@@ -79,6 +79,10 @@ echo "  — Cache revalidation webhook (optional but recommended) —"
 require_env "REVALIDATE_SECRET" "Shared secret for POST /api/revalidate Supabase webhooks"
 echo ""
 
+echo "  — SOS webhook (optional — required for Statement of Sales PDF upload) —"
+require_env "SOS_WEBHOOK_SECRET" "API key for POST /api/webhooks/sos from the SOS PDF generator"
+echo ""
+
 if [ "$MISSING" -gt 0 ]; then
   echo "  ⚠  ${MISSING} variable(s) not set."
   echo "  → Configure them in Vercel Dashboard → Project → Settings → Environment Variables."

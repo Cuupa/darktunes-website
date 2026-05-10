@@ -19,7 +19,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
-- **Vitest** unit test suite (`npm test`) — 140 tests passing (18 test files)
+- **Vitest** unit test suite (`npm test`) — 147 tests passing (18 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -62,6 +62,13 @@
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`
+
+### SOS Webhook — Statement of Sales PDF Upload
+- `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
+- `POST /api/webhooks/sos/confirm` — Step 2: Validates API key, inserts `sales_statements` row via service-role client. Returns `{ statementId }`.
+- `createSalesStatement(db, data)` DAL function in `src/lib/api/salesStatements.ts`.
+- `generatePresignedUploadUrl(r2Key, contentType, deps)` in `src/lib/portal/presignedUrl.ts` (15-min PUT URL).
+- Bypasses Vercel's 4.5 MB request body limit — PDFs go directly from SOS generator → R2.
 
 ### File Upload (Next.js Route Handler)
 - `app/api/upload/route.ts` — POST Route Handler that:
@@ -157,6 +164,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form (react-hook-form + zod) + photo upload via R2 |
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
+| SOS webhook — PDF upload from external generator | ✅ Implemented | 2-step presigned URL flow: POST /api/webhooks/sos (get PUT URL) + POST /api/webhooks/sos/confirm (create DB record). Requires `SOS_WEBHOOK_SECRET`. |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 
 ---
@@ -202,6 +210,9 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `app/global-error.tsx` | Next.js global error boundary (root layout level) |
 | `src/components/admin/SystemHealthWidget.tsx` | Admin health dashboard widget (DB status + per-API cards + Force Sync) |
 | `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
+| `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
+| `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |
+| `app/api/webhooks/sos/confirm/route.ts` | SOS webhook Step 2 — insert sales_statements DB record |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
 ---
