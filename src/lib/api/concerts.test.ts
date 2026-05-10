@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getConcerts } from './concerts'
+import { getConcerts, getConcertsByArtistId } from './concerts'
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
@@ -11,6 +11,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
   const p = Promise.resolve(result)
   return {
     select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
@@ -75,5 +76,25 @@ describe('getConcerts', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Concert query failed', code: 'PGRST001' })
     await expect(getConcerts(db)).rejects.toThrow('Concert query failed')
+  })
+})
+
+describe('getConcertsByArtistId', () => {
+  it('returns an empty array when no concerts exist for the artist', async () => {
+    const db = makeMockDb([])
+    await expect(getConcertsByArtistId(db, 'artist-1')).resolves.toEqual([])
+  })
+
+  it('returns only concerts for the requested artist', async () => {
+    const artistConcerts: ConcertRow[] = [mockConcerts[0]]
+    const db = makeMockDb(artistConcerts)
+    const result = await getConcertsByArtistId(db, 'artist-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].artistId).toBe('artist-1')
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Artist concert query failed', code: 'PGRST001' })
+    await expect(getConcertsByArtistId(db, 'artist-1')).rejects.toThrow('Artist concert query failed')
   })
 })

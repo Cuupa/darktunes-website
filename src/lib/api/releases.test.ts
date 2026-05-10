@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   getReleases,
+  getReleasesByArtistId,
   createRelease,
   deleteRelease,
   upsertReleaseByItunesId,
@@ -79,6 +80,26 @@ describe('getReleases', () => {
   it('throws on error', async () => {
     const db = makeMockDb(null, { message: 'Connection error', code: 'PGRST001' })
     await expect(getReleases(db)).rejects.toThrow('Connection error')
+  })
+})
+
+describe('getReleasesByArtistId', () => {
+  it('returns an empty array when no releases exist for artist', async () => {
+    const db = makeMockDb([])
+    await expect(getReleasesByArtistId(db, 'art-001')).resolves.toEqual([])
+  })
+
+  it('maps rows to Release domain objects for the given artist', async () => {
+    const db = makeMockDb([mockReleaseRow])
+    const result = await getReleasesByArtistId(db, 'art-001')
+    expect(result).toHaveLength(1)
+    expect(result[0].artistId).toBe('art-001')
+    expect(result[0].title).toBe('Polymorph')
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Artist releases failed', code: 'PGRST001' })
+    await expect(getReleasesByArtistId(db, 'art-001')).rejects.toThrow('Artist releases failed')
   })
 })
 

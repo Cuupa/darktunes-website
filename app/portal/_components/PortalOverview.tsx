@@ -7,7 +7,7 @@
  */
 
 import Link from 'next/link'
-import { User, ChartBar, FileText } from '@phosphor-icons/react'
+import { User, ChartBar, FileText, MusicNotes, MapPin } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Dictionary } from '@/i18n/types'
 
@@ -16,6 +16,8 @@ interface PortalOverviewProps {
   artistName: string | null
   totalStreams: number
   statementCount: number
+  releaseCount: number
+  upcomingShowCount: number
 }
 
 export function PortalOverview({
@@ -23,6 +25,8 @@ export function PortalOverview({
   artistName,
   totalStreams,
   statementCount,
+  releaseCount,
+  upcomingShowCount,
 }: PortalOverviewProps) {
   return (
     <div className="space-y-8">
@@ -78,6 +82,36 @@ export function PortalOverview({
             <CardContent>
               <p className="text-2xl font-bold">{statementCount}</p>
               <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/portal/releases">
+          <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {dict.overview_totalReleases}
+              </CardTitle>
+              <MusicNotes size={18} className="text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{releaseCount}</p>
+              <p className="text-xs text-muted-foreground mt-1">{dict.releases_heading}</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/portal/tour">
+          <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {dict.overview_upcomingShows}
+              </CardTitle>
+              <MapPin size={18} className="text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{upcomingShowCount}</p>
+              <p className="text-xs text-muted-foreground mt-1">{dict.tour_heading}</p>
             </CardContent>
           </Card>
         </Link>

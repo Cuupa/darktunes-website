@@ -32,6 +32,16 @@ function rowToRelease(row: ReleaseRow): Release {
   }
 }
 
+export async function getReleasesByArtistId(db: DbClient, artistId: string): Promise<Release[]> {
+  const { data, error } = await db
+    .from('releases')
+    .select('*')
+    .eq('artist_id', artistId)
+    .order('release_date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToRelease)
+}
+
 export async function getReleases(db: DbClient): Promise<Release[]> {
   const { data, error } = await db
     .from('releases')

@@ -12,6 +12,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
+import { getReleasesByArtistId } from '@/lib/api/releases'
+import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { PortalOverview } from './_components/PortalOverview'
 
 export default async function PortalPage() {
@@ -27,12 +29,14 @@ export default async function PortalPage() {
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
 
-  const [stats, statements] = artist
+  const [stats, statements, releases, concerts] = artist
     ? await Promise.all([
         getStreamingStatsByArtistId(supabase, artist.id).catch(() => []),
         getSalesStatementsByArtistId(supabase, artist.id).catch(() => []),
+        getReleasesByArtistId(supabase, artist.id).catch(() => []),
+        getConcertsByArtistId(supabase, artist.id).catch(() => []),
       ])
-    : [[], []]
+    : [[], [], [], []]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
@@ -43,6 +47,8 @@ export default async function PortalPage() {
       artistName={artist?.name ?? null}
       totalStreams={totalStreams}
       statementCount={statements.length}
+      releaseCount={releases.length}
+      upcomingShowCount={concerts.length}
     />
   )
 }
