@@ -51,6 +51,56 @@ function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
 // Queries
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Insert type
+// ---------------------------------------------------------------------------
+
+export interface CreateSalesStatementData {
+  artistId: string
+  filename: string
+  r2Key: string
+  period: string
+  amountEur?: number | null
+}
+
+// ---------------------------------------------------------------------------
+// Mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * Inserts a new sales statement row.
+ *
+ * IMPORTANT: The caller MUST pass a service-role Supabase client so that the
+ * INSERT bypasses RLS. Artist-scoped sessions do not have INSERT permission on
+ * `sales_statements` — only admins and the service-role key do.
+ *
+ * Throws if `r2_key` already exists (unique constraint violation).
+ */
+export async function createSalesStatement(
+  db: DbClient,
+  data: CreateSalesStatementData,
+): Promise<SalesStatement> {
+  const { data: row, error } = await db
+    .from('sales_statements')
+    .insert({
+      artist_id: data.artistId,
+      filename: data.filename,
+      r2_key: data.r2Key,
+      period: data.period,
+      amount_eur: data.amountEur ?? null,
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  if (!row) throw new Error('No data returned from createSalesStatement')
+  return rowToSalesStatement(row as SalesStatementRow)
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
 /**
  * Fetches all sales statements for a given artist, newest first.
  * RLS at the DB layer guarantees the artist only sees their own rows.

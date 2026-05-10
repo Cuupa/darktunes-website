@@ -136,9 +136,20 @@ Auth: `middleware.ts` protects all `/portal/*` routes (except `/portal/login`) u
 Multi-tenancy: `artists.user_id UUID REFERENCES auth.users(id)` links each artist row to a Supabase Auth user. One auth user ↔ one artist.
 Portal DAL functions: `getArtistByUserId(db, userId)` in `src/lib/api/artistProfiles.ts` resolves the current user's linked artist. Always call this before accessing artist-scoped data.
 RLS enforcement: `artist_profiles`, `streaming_stats`, and `sales_statements` all have RLS policies that use `EXISTS (SELECT 1 FROM artists WHERE id = artist_id AND user_id = auth.uid())`. Security is at the DB layer; no middleware-only filtering.
-Presigned URL pattern: `src/lib/portal/presignedUrl.ts` exposes `generatePresignedDownloadUrl(r2Key, deps)` with a `PresignedUrlDeps` injection interface. The 5-minute TTL (300 s) is enforced here. The Server Action `app/portal/statements/_actions/presignedUrl.ts` wires real deps (S3Client + getSignedUrl from `@aws-sdk/s3-request-presigner`).
+Presigned URL pattern: `src/lib/portal/presignedUrl.ts` exposes two injectable functions:
+  - `generatePresignedDownloadUrl(r2Key, deps)` — 5-minute GET URL for artist downloads (`PresignedUrlDeps`)
+  - `generatePresignedUploadUrl(r2Key, contentType, deps)` — 15-minute PUT URL for the SOS PDF generator to upload directly to R2, bypassing Vercel's 4.5 MB body limit (`PresignedUploadUrlDeps`)
+  The Server Action `app/portal/statements/_actions/presignedUrl.ts` wires real deps for artist-facing downloads.
 Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-data`, verifies auth, confirms artist ownership, then uploads to `profile-photos/{artistId}/{uuid}.{ext}` in R2. Max 5 MB, image types only.
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
+
+SOS Webhook (Statement of Sales PDF Upload)
+The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.
+Step 1 — POST /api/webhooks/sos: Validates API key, validates metadata (artistId, filename, period, amountEur?), verifies artist exists via service-role client, generates an R2 key (`statements/{artistId}/{uuid}_{filename}`), returns a 15-minute presigned R2 PUT URL.
+Step 2 — POST /api/webhooks/sos/confirm: Validates API key, validates payload (r2Key, artistId, filename, period, amountEur?), inserts a `sales_statements` DB row via service-role client (bypasses RLS), returns `{ statementId }`.
+Authentication: Both endpoints check `Authorization: Bearer <SOS_WEBHOOK_SECRET>` against the `SOS_WEBHOOK_SECRET` environment variable. Return 503 if the variable is unset; 401 on mismatch.
+DAL: `createSalesStatement(db, data)` in `src/lib/api/salesStatements.ts` inserts the record. MUST be called with a service-role client to bypass RLS.
+Duplicate handling: If the r2Key already exists (unique constraint), the confirm endpoint returns 409 — the SOS generator should treat this as a no-op.
 
 Vercel Deployment
 Install script: scripts/vercel-install.sh runs npm ci and validates all required environment variables.
@@ -153,6 +164,8 @@ Required env vars are split into two groups:
   - Optional (external API sync — required for Spotify / Discogs / Songkick artist sync):
       SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
       DISCOGS_TOKEN, SONGKICK_API_KEY
+  - Optional (SOS webhook — required for receiving PDF statements from the SOS generator):
+      SOS_WEBHOOK_SECRET
 Configure all variables in Vercel Dashboard → Project → Settings → Environment Variables.
 See DEPLOYMENT.md for full variable descriptions and setup instructions.
 
