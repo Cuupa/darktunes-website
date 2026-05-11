@@ -1,19 +1,13 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Calendar } from '@phosphor-icons/react'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
-import { ContentPagination } from '@/components/ContentPagination'
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ReleasesCarousel } from '@/components/ReleasesCarousel'
+import { Releases3DCarousel } from '@/components/Releases3DCarousel'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
-
-const ITEMS_PER_PAGE = 6
 
 interface ReleasesProps extends SectionProps {
   releases: Release[]
@@ -22,37 +16,29 @@ interface ReleasesProps extends SectionProps {
 }
 
 export function Releases({ releases, dict, locale }: ReleasesProps) {
-  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
 
-  // Genre filter
-  const allGenres: string[] = []
+  // Category / type filter
+  const allTypes: string[] = []
   releases.forEach((r) => {
-    if (r.type && !allGenres.includes(r.type)) allGenres.push(r.type)
+    if (r.type && !allTypes.includes(r.type)) allTypes.push(r.type)
   })
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
+  const [selectedType, setSelectedType] = useState<string | null>(null)
 
-  const filtered = selectedGenre
-    ? releases.filter((r) => r.type === selectedGenre)
-    : releases
+  // Search
+  const [searchQuery, setSearchQuery] = useState('')
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
-  const paginated = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  )
+  const filtered = releases
+    .filter((r) => !selectedType || r.type === selectedType)
+    .filter((r) => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      return r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q)
+    })
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  const handleGenreChange = (genre: string | null) => {
-    setSelectedGenre(genre)
-    setCurrentPage(1)
+  const handleTypeChange = (type: string | null) => {
+    setSelectedType(type)
   }
 
   return (
@@ -69,104 +55,79 @@ export function Releases({ releases, dict, locale }: ReleasesProps) {
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        {/* Genre / type filter tabs */}
-        {allGenres.length > 1 && (
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : 0.1 }}
-            className="flex flex-wrap gap-2 mb-8"
-          >
-            <button
-              onClick={() => handleGenreChange(null)}
-              className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all ${
-                selectedGenre === null
-                  ? 'bg-accent text-accent-foreground border-accent'
-                  : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
-              }`}
-            >
-              All
-            </button>
-            {allGenres.map((genre) => (
+        {/* Search + category filter row */}
+        <motion.div
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : 0.1 }}
+          className="flex flex-col sm:flex-row gap-4 mb-8"
+        >
+          {/* Search input */}
+          <div className="relative flex-1 max-w-sm">
+            <MagnifyingGlass
+              size={16}
+              weight="bold"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={dict.searchPlaceholder}
+              aria-label={dict.searchPlaceholder}
+              className="w-full pl-9 pr-4 py-2 text-sm font-mono bg-card border border-border rounded-full focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/40 transition-colors placeholder:text-muted-foreground/60"
+            />
+          </div>
+
+          {/* Type filter tabs */}
+          {allTypes.length > 1 && (
+            <div className="flex flex-wrap gap-2">
               <button
-                key={genre}
-                onClick={() => handleGenreChange(genre)}
+                onClick={() => handleTypeChange(null)}
                 className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all ${
-                  selectedGenre === genre
+                  selectedType === null
                     ? 'bg-accent text-accent-foreground border-accent'
                     : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
                 }`}
               >
-                {genre}
+                All
               </button>
-            ))}
-          </motion.div>
-        )}
-
-        {/* Mobile: 3D Carousel */}
-        <div className="block md:hidden">
-          <ReleasesCarousel releases={filtered} dict={dict} locale={locale} />
-        </div>
-
-        {/* Desktop: grid with pagination */}
-        <div className="hidden md:block">
-          <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
-            {paginated.map((release, index) => (
-              <motion.li
-                key={release.id}
-                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
-              >
-                <Link href={`/releases/${release.id}`} aria-label={`${release.title} – ${release.artistName}`}>
-                  <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
-                    <div className="relative aspect-square overflow-hidden">
-                      <motion.img
-                        layoutId={`release-cover-${release.id}`}
-                        src={getOptimizedImageUrl(release.coverArt, 600)}
-                        alt={`${release.title} cover`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      {release.featured && (
-                        <Badge className="absolute top-4 right-4 bg-secondary/90 text-secondary-foreground backdrop-blur-sm font-bold uppercase tracking-wider">
-                          {dict.featured}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="p-6 space-y-3">
-                      <Badge variant="outline" className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground">
-                        {release.type}
-                      </Badge>
-                      <h3 className="text-2xl font-bold line-clamp-1 group-hover:text-accent transition-colors">{release.title}</h3>
-                      <p className="text-muted-foreground font-medium">{release.artistName}</p>
-                      <p className="text-sm text-muted-foreground font-mono flex items-center gap-2">
-                        <Calendar size={16} weight="bold" aria-hidden="true" />
-                        {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                  </Card>
-                </Link>
-              </motion.li>
-            ))}
-          </ul>
-
-          {totalPages > 1 && (
-            <div className="mt-12">
-              <ContentPagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
+              {allTypes.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => handleTypeChange(type)}
+                  className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all ${
+                    selectedType === type
+                      ? 'bg-accent text-accent-foreground border-accent'
+                      : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
           )}
-        </div>
+        </motion.div>
+
+        {filtered.length === 0 ? (
+          <p className="text-muted-foreground font-mono text-sm py-12 text-center">
+            {dict.noResults}
+          </p>
+        ) : (
+          <>
+            {/* Mobile: swipe gallery (one card at a time) */}
+            <div className="block md:hidden">
+              <ReleasesCarousel releases={filtered} dict={dict} locale={locale} />
+            </div>
+
+            {/* Desktop: real 3D coverflow carousel */}
+            <div className="hidden md:block">
+              <Releases3DCarousel releases={filtered} dict={dict} locale={locale} />
+            </div>
+          </>
+        )}
       </div>
     </section>
   )

@@ -22,7 +22,9 @@
   "releases": {
     "heading": "RELEASES",
     "subheading": "Entdecke die neueste Musik unserer Künstler",
-    "featured": "Featured"
+    "featured": "Featured",
+    "searchPlaceholder": "Releases suchen…",
+    "noResults": "Keine Releases gefunden."
   },
   "news": {
     "heading": "NEWS",

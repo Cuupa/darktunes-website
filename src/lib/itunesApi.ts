@@ -62,6 +62,7 @@ export async function searchItunesArtist(
     .map((result) => ({
       ...result,
       artworkUrl100: upgradeArtworkUrl(result.artworkUrl100),
+      artworkUrl600: result.artworkUrl600 ? upgradeArtworkUrl(result.artworkUrl600) : result.artworkUrl600,
     }))
 }
 
