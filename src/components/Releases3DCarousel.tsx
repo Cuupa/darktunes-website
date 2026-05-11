@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -26,21 +26,30 @@ interface CardSlotStyle {
   zIndex: number
 }
 
-const CARD_WIDTH = 280 // px
-const PERSPECTIVE = 1200 // px
+const PERSPECTIVE = 1400 // px
+
+/**
+ * Returns a fluid card width in pixels: 36 vw, clamped between 280 px and 500 px.
+ * Falls back to 380 on the server (component is 'use client', so this only runs
+ * during the very first render before the useEffect fires).
+ */
+function computeCardWidth(): number {
+  if (typeof window === 'undefined') return 380
+  return Math.min(500, Math.max(280, Math.round(window.innerWidth * 0.36)))
+}
 
 /**
  * Compute display style for a card at `offset` positions from the centre.
  * Offset 0 = centre card, ±1 = adjacent, ±2 = far sides.
  */
-function slotStyle(offset: number, reduced: boolean): CardSlotStyle | null {
+function slotStyle(offset: number, reduced: boolean, cardWidth: number): CardSlotStyle | null {
   const abs = Math.abs(offset)
   if (abs > 2) return null
 
   if (reduced) {
     // No rotation / depth for users who prefer reduced motion
     return {
-      translateX: offset * (CARD_WIDTH * 0.65),
+      translateX: offset * (cardWidth * 0.65),
       translateZ: 0,
       rotateY: 0,
       scale: abs === 0 ? 1 : 0.85,
@@ -49,10 +58,10 @@ function slotStyle(offset: number, reduced: boolean): CardSlotStyle | null {
     }
   }
 
-  const translateX = offset * (CARD_WIDTH * 0.62)
+  const translateX = offset * (cardWidth * 0.62)
   const rotateY = -offset * 38
-  const translateZ = abs === 0 ? 80 : -abs * 40
-  const scale = 1 - abs * 0.17
+  const translateZ = abs === 0 ? 100 : -abs * 50
+  const scale = 1 - abs * 0.15
   const opacity = 1 - abs * 0.28
   const zIndex = 10 - abs * 2
 
@@ -65,6 +74,17 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
   const router = useRouter()
   const total = releases.length
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  // Fluid card width: 36 vw, clamped [280, 500] px. Updates on resize.
+  const [cardWidth, setCardWidth] = useState(computeCardWidth)
+  useEffect(() => {
+    const update = () => setCardWidth(computeCardWidth())
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  // Stage height = square card + metadata area
+  const stageHeight = cardWidth + 140
 
   const handlePrev = useCallback(() => {
     setCurrentIndex((prev) => (prev - 1 + total) % total)
@@ -96,8 +116,8 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
         className="relative mx-auto overflow-visible"
         style={{
           perspective: PERSPECTIVE,
-          height: 440,
-          maxWidth: 900,
+          height: stageHeight,
+          maxWidth: '100%',
         }}
       >
         {releases.map((release, releaseIdx) => {
@@ -106,7 +126,7 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
           if (offset > total / 2) offset -= total
           if (offset < -total / 2) offset += total
 
-          const style = slotStyle(offset, prefersReducedMotion)
+          const style = slotStyle(offset, prefersReducedMotion, cardWidth)
           if (!style) return null
 
           const isCenter = offset === 0
@@ -116,11 +136,11 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
               key={release.id}
               className="absolute top-0"
               style={{
-                width: CARD_WIDTH,
+                width: cardWidth,
                 left: '50%',
-                marginLeft: -(CARD_WIDTH / 2),
+                marginLeft: -(cardWidth / 2),
                 transformStyle: 'preserve-3d',
-                cursor: isCenter ? 'pointer' : 'pointer',
+                cursor: 'pointer',
               }}
               animate={{
                 x: style.translateX,
@@ -152,7 +172,7 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
                     : 'border-border hover:border-accent/30'
                 }`}
               >
-                <div className="relative overflow-hidden" style={{ aspectRatio: '1/1' }}>
+                <div className="relative aspect-square overflow-hidden">
                   <img
                     src={getOptimizedImageUrl(release.coverArt, 600)}
                     alt={`${release.title} – cover art`}
