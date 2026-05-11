@@ -84,6 +84,13 @@ describe('getArtists', () => {
     expect(result[0].slug).toBe('c-z-a-r-i-n-a')
   })
 
+  it('falls back to an ascii slug for names with special characters', async () => {
+    const db = makeMockDb([{ ...mockArtistRow, name: 'Mötley Crüe ß', slug: '   ' }])
+    const result = await getArtists(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].slug).toBe('motley-crue-ss')
+  })
+
   it('throws on error', async () => {
     const db = makeMockDb(null, { message: 'DB error', code: 'PGRST001' })
     await expect(getArtists(db)).rejects.toThrow('DB error')

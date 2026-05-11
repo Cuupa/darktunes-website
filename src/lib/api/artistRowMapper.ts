@@ -13,6 +13,9 @@ type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 export function rowToArtist(row: ArtistRow): Artist {
   const fallbackSlug = row.name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
@@ -20,7 +23,7 @@ export function rowToArtist(row: ArtistRow): Artist {
   return {
     id: row.id,
     name: row.name,
-    slug: row.slug || fallbackSlug,
+    slug: (row.slug ?? '').trim() || fallbackSlug,
     bio: row.bio ?? '',
     genres: row.genres,
     imageUrl: row.image_url ?? '',
