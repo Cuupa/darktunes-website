@@ -75,12 +75,19 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
   const total = releases.length
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  // Fluid card width: 36 vw, clamped [280, 500] px. Updates on resize.
+  // Fluid card width: 36 vw, clamped [280, 500] px. Updates on resize (debounced).
   const [cardWidth, setCardWidth] = useState(computeCardWidth)
   useEffect(() => {
-    const update = () => setCardWidth(computeCardWidth())
+    let timer: ReturnType<typeof setTimeout>
+    const update = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => setCardWidth(computeCardWidth()), 150)
+    }
     window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', update)
+    }
   }, [])
 
   // Stage height = square card + metadata area
@@ -134,13 +141,12 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
           return (
             <motion.div
               key={release.id}
-              className="absolute top-0"
+              className="absolute top-0 cursor-pointer"
               style={{
                 width: cardWidth,
                 left: '50%',
                 marginLeft: -(cardWidth / 2),
                 transformStyle: 'preserve-3d',
-                cursor: 'pointer',
               }}
               animate={{
                 x: style.translateX,
