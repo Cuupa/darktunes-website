@@ -118,3 +118,19 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     { status: overallStatus === 'unhealthy' ? 503 : 200 },
   )
 }
+
+export async function HEAD(): Promise<NextResponse> {
+  const res = await GET()
+  return new NextResponse(null, { status: res.status })
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
+}
