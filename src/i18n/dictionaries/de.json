@@ -7,7 +7,8 @@
     "news": "NEWS",
     "videos": "VIDEOS",
     "newsletter": "Newsletter",
-    "switchLocale": "DE"
+    "switchLocale": "DE",
+    "contact": "KONTAKT"
   },
   "hero": {
     "listenNow": "Jetzt anhören",
@@ -57,7 +58,10 @@
     "allRightsReserved": "Alle Rechte vorbehalten.",
     "contact": "Kontakt",
     "privacyPolicy": "Datenschutz",
-    "legalNotice": "Impressum"
+    "legalNotice": "Impressum",
+    "contactLink": "Kontakt",
+    "submitMusicLink": "Musik einreichen",
+    "shopLink": "Darkmerch Shop"
   },
   "newsletter": {
     "heading": "Newsletter",
@@ -218,5 +222,41 @@
       "applyError": "Antrag konnte nicht gesendet werden. Bitte erneut versuchen.",
       "applyEmailPlaceholder": "deine@email.de"
     }
+  },
+  "contact": {
+    "heading": "KONTAKT",
+    "subheading": "Nimm Kontakt mit der darkTunes Music Group auf",
+    "submitMusicHeading": "Musik einreichen",
+    "submitMusicDescription": "Du bist Künstler oder Band und möchtest deine Musik vorstellen? Reiche deine Demos und Releases direkt über SubmitHub ein.",
+    "submitMusicButton": "Über SubmitHub einreichen",
+    "nameLabel": "Name",
+    "namePlaceholder": "Dein Name",
+    "emailLabel": "E-Mail",
+    "emailPlaceholder": "deine@email.de",
+    "topicLabel": "Thema",
+    "topicLabel_label": "Label",
+    "topicLabel_shop": "Shop / Darkmerch",
+    "topicLabel_booking": "Artist Booking",
+    "topicLabel_other": "Sonstiges",
+    "messageLabel": "Nachricht",
+    "messagePlaceholder": "Wie können wir dir helfen? (mind. 20 Zeichen)",
+    "gdprConsent": "Ich stimme der Verarbeitung meiner personenbezogenen Daten zur Bearbeitung dieser Anfrage zu (DSGVO Art. 6 Abs. 1 lit. b).",
+    "submit": "Nachricht senden",
+    "submitting": "Senden…",
+    "successTitle": "Nachricht gesendet!",
+    "successMessage": "Vielen Dank für deine Nachricht. Wir melden uns in Kürze.",
+    "errorTitle": "Senden fehlgeschlagen",
+    "errorMessage": "Deine Nachricht konnte nicht gesendet werden. Bitte versuche es erneut oder schreibe uns direkt.",
+    "validationName": "Bitte gib deinen Namen ein.",
+    "validationEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
+    "validationMessage": "Die Nachricht muss mindestens 20 Zeichen lang sein.",
+    "validationConsent": "Du musst der Datenverarbeitung zustimmen, um das Formular abzusenden."
+  },
+  "newsPage": {
+    "heading": "NEWS",
+    "subheading": "Bleib auf dem Laufenden mit den neuesten Nachrichten von darkTunes Music Group",
+    "readMore": "Weiterlesen",
+    "backToNews": "← Zurück zu den News",
+    "noNews": "Noch keine News-Beiträge vorhanden."
   }
 }

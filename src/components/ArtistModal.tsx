@@ -1,7 +1,18 @@
 'use client'
 
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
-import { X, SpotifyLogo, InstagramLogo, YoutubeLogo, Globe } from '@phosphor-icons/react'
+import {
+  X,
+  SpotifyLogo,
+  InstagramLogo,
+  YoutubeLogo,
+  Globe,
+  FacebookLogo,
+  TwitterLogo,
+  TiktokLogo,
+  MusicNote,
+  ShoppingBag,
+} from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import type { Artist } from '@/types'
@@ -70,11 +81,29 @@ export function ArtistModal({ artist, open, onOpenChange }: ArtistModalProps) {
                 {artist.bio}
               </motion.p>
 
+              {artist.shopUrl && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35, duration: 0.5 }}
+                >
+                  <a
+                    href={artist.shopUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all hover:scale-105 font-bold uppercase tracking-wider"
+                  >
+                    <ShoppingBag size={22} weight="fill" />
+                    Darkmerch
+                  </a>
+                </motion.div>
+              )}
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.5 }}
-                className="flex gap-3 pt-4"
+                className="flex flex-wrap gap-3 pt-2"
               >
                 {artist.spotifyUrl && (
                   <a 
@@ -93,6 +122,7 @@ export function ArtistModal({ artist, open, onOpenChange }: ArtistModalProps) {
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="Instagram"
                   >
                     <InstagramLogo size={24} weight="fill" />
                   </a>
@@ -103,8 +133,53 @@ export function ArtistModal({ artist, open, onOpenChange }: ArtistModalProps) {
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="YouTube"
                   >
                     <YoutubeLogo size={24} weight="fill" />
+                  </a>
+                )}
+                {artist.facebookUrl && (
+                  <a
+                    href={artist.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="Facebook"
+                  >
+                    <FacebookLogo size={24} weight="fill" />
+                  </a>
+                )}
+                {artist.twitterUrl && (
+                  <a
+                    href={artist.twitterUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="X / Twitter"
+                  >
+                    <TwitterLogo size={24} weight="fill" />
+                  </a>
+                )}
+                {artist.tiktokUrl && (
+                  <a
+                    href={artist.tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="TikTok"
+                  >
+                    <TiktokLogo size={24} weight="fill" />
+                  </a>
+                )}
+                {artist.bandcampUrl && (
+                  <a
+                    href={artist.bandcampUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="Bandcamp"
+                  >
+                    <MusicNote size={24} weight="fill" />
                   </a>
                 )}
                 {artist.websiteUrl && (
@@ -113,6 +188,7 @@ export function ArtistModal({ artist, open, onOpenChange }: ArtistModalProps) {
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-105"
+                    title="Website"
                   >
                     <Globe size={24} weight="fill" />
                   </a>

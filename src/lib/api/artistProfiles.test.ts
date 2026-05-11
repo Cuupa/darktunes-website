@@ -74,6 +74,11 @@ const mockArtistRow: ArtistRow = {
   bandsintown_id: null,
   last_synced_at: null,
   user_id: 'auth-user-uuid',
+  facebook_url: null,
+  twitter_url: null,
+  tiktok_url: null,
+  bandcamp_url: null,
+  shop_url: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

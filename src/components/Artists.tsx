@@ -4,7 +4,17 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { InstagramLogo, SpotifyLogo, YoutubeLogo, Globe } from '@phosphor-icons/react'
+import {
+  InstagramLogo,
+  SpotifyLogo,
+  YoutubeLogo,
+  Globe,
+  FacebookLogo,
+  TwitterLogo,
+  TiktokLogo,
+  MusicNote,
+  ShoppingBag,
+} from '@phosphor-icons/react'
 import { ArtistModal } from '@/components/ArtistModal'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
@@ -73,7 +83,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                   <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
                     {artist.bio}
                   </p>
-                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                     {artist.spotifyUrl && (
                       <a 
                         href={artist.spotifyUrl} 
@@ -102,6 +112,58 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
                         <YoutubeLogo size={20} weight="fill" />
+                      </a>
+                    )}
+                    {artist.facebookUrl && (
+                      <a
+                        href={artist.facebookUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                      >
+                        <FacebookLogo size={20} weight="fill" />
+                      </a>
+                    )}
+                    {artist.twitterUrl && (
+                      <a
+                        href={artist.twitterUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                      >
+                        <TwitterLogo size={20} weight="fill" />
+                      </a>
+                    )}
+                    {artist.tiktokUrl && (
+                      <a
+                        href={artist.tiktokUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                      >
+                        <TiktokLogo size={20} weight="fill" />
+                      </a>
+                    )}
+                    {artist.bandcampUrl && (
+                      <a
+                        href={artist.bandcampUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        title="Bandcamp"
+                      >
+                        <MusicNote size={20} weight="fill" />
+                      </a>
+                    )}
+                    {artist.shopUrl && (
+                      <a
+                        href={artist.shopUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
+                        title="Darkmerch"
+                      >
+                        <ShoppingBag size={20} weight="fill" />
                       </a>
                     )}
                     {artist.websiteUrl && (

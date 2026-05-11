@@ -57,6 +57,11 @@ const EMPTY_FORM: ArtistFormData = {
   discogsId: '',
   songkickId: '',
   bandsintownId: '',
+  facebookUrl: '',
+  twitterUrl: '',
+  tiktokUrl: '',
+  bandcampUrl: '',
+  shopUrl: '',
 }
 
 function artistToFormData(artist: Artist): ArtistFormData {
@@ -80,6 +85,11 @@ function artistToFormData(artist: Artist): ArtistFormData {
     discogsId: artist.discogsId ?? '',
     songkickId: artist.songkickId ?? '',
     bandsintownId: artist.bandsintownId ?? '',
+    facebookUrl: artist.facebookUrl ?? '',
+    twitterUrl: artist.twitterUrl ?? '',
+    tiktokUrl: artist.tiktokUrl ?? '',
+    bandcampUrl: artist.bandcampUrl ?? '',
+    shopUrl: artist.shopUrl ?? '',
   }
 }
 
@@ -107,6 +117,11 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     discogs_id: data.discogsId || null,
     songkick_id: data.songkickId || null,
     bandsintown_id: data.bandsintownId || null,
+    facebook_url: data.facebookUrl || null,
+    twitter_url: data.twitterUrl || null,
+    tiktok_url: data.tiktokUrl || null,
+    bandcamp_url: data.bandcampUrl || null,
+    shop_url: data.shopUrl || null,
   }
 }
 

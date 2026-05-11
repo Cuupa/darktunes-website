@@ -135,6 +135,8 @@ export default async function HomePage() {
         noiseOpacity: 0.04,
         crtScanlinesEnabled: true,
         vignetteIntensity: 0.5,
+        shopifyStoreUrl: '',
+        youtubeChannelId: '',
       }),
     ),
     getLocale(),

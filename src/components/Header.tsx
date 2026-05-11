@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -34,6 +35,7 @@ export function Header({ dict, locale }: HeaderProps) {
     { label: dict.tour, href: '#concerts' },
     { label: dict.news, href: '#news' },
     { label: dict.videos, href: '#videos' },
+    { label: dict.contact, href: '/contact', isLink: true },
   ]
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
@@ -81,7 +83,11 @@ export function Header({ dict, locale }: HeaderProps) {
                 asChild
                 className="text-sm font-medium tracking-wider transition-colors"
               >
-                <a href={item.href} onClick={(e) => handleSmoothScroll(e, item.href)}>{item.label}</a>
+                {item.isLink ? (
+                  <Link href={item.href}>{item.label}</Link>
+                ) : (
+                  <a href={item.href} onClick={(e) => handleSmoothScroll(e, item.href)}>{item.label}</a>
+                )}
               </Button>
             ))}
             <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105">
@@ -119,17 +125,29 @@ export function Header({ dict, locale }: HeaderProps) {
           >
             <nav className="container mx-auto px-4 py-6 flex flex-col gap-2">
               {navItems.map((item) => (
-                <Button
-                  key={item.label}
-                  variant="ghost"
-                  className="justify-start text-base font-medium tracking-wider"
-                  onClick={(e) => {
-                    handleSmoothScroll(e, item.href)
-                    setMobileMenuOpen(false)
-                  }}
-                >
-                  <a href={item.href} onClick={(e) => e.preventDefault()}>{item.label}</a>
-                </Button>
+                item.isLink ? (
+                  <Button
+                    key={item.label}
+                    variant="ghost"
+                    className="justify-start text-base font-medium tracking-wider"
+                    asChild
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Link href={item.href}>{item.label}</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    key={item.label}
+                    variant="ghost"
+                    className="justify-start text-base font-medium tracking-wider"
+                    onClick={(e) => {
+                      handleSmoothScroll(e, item.href)
+                      setMobileMenuOpen(false)
+                    }}
+                  >
+                    <a href={item.href} onClick={(e) => e.preventDefault()}>{item.label}</a>
+                  </Button>
+                )
               ))}
               <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider">
                 {dict.newsletter}

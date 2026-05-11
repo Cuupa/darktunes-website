@@ -28,6 +28,15 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
   return (data ?? []).map(rowToNewsPost)
 }
 
+export async function getNewsPostBySlug(db: DbClient, slug: string): Promise<NewsPost | null> {
+  const { data, error } = await db.from('news_posts').select('*').eq('slug', slug).single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+  return data ? rowToNewsPost(data) : null
+}
+
 export async function getNewsPostById(db: DbClient, id: string): Promise<NewsPost | null> {
   const { data, error } = await db.from('news_posts').select('*').eq('id', id).single()
   if (error) {

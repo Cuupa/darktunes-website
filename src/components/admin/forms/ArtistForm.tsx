@@ -18,6 +18,11 @@ export interface ArtistFormData {
   instagramUrl: string
   youtubeUrl: string
   websiteUrl: string
+  facebookUrl: string
+  twitterUrl: string
+  tiktokUrl: string
+  bandcampUrl: string
+  shopUrl: string
   country: string
   email: string
   vatNumber: string
@@ -119,6 +124,33 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
           <Label htmlFor="websiteUrl">Website URL</Label>
           <Input id="websiteUrl" {...register('websiteUrl')} disabled={isLoading} />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="facebookUrl">Facebook URL</Label>
+          <Input id="facebookUrl" {...register('facebookUrl')} disabled={isLoading} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="twitterUrl">X / Twitter URL</Label>
+          <Input id="twitterUrl" {...register('twitterUrl')} disabled={isLoading} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="tiktokUrl">TikTok URL</Label>
+          <Input id="tiktokUrl" {...register('tiktokUrl')} disabled={isLoading} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="bandcampUrl">Bandcamp URL</Label>
+          <Input id="bandcampUrl" {...register('bandcampUrl')} disabled={isLoading} />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="shopUrl">Shop URL (Darkmerch)</Label>
+        <Input id="shopUrl" {...register('shopUrl')} placeholder="https://darkmerch.com/..." disabled={isLoading} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

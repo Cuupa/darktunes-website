@@ -9,6 +9,11 @@ export interface Artist {
   instagramUrl?: string
   youtubeUrl?: string
   websiteUrl?: string
+  facebookUrl?: string
+  twitterUrl?: string
+  tiktokUrl?: string
+  bandcampUrl?: string
+  shopUrl?: string
   featured: boolean
   country?: string
   email?: string
@@ -132,6 +137,10 @@ export interface SiteSettings {
   crtScanlinesEnabled: boolean
   /** Visual overlay: vignette intensity (0–1). Default 0.5. */
   vignetteIntensity: number
+  /** Shopify / Darkmerch store URL. Empty string when not configured. */
+  shopifyStoreUrl: string
+  /** YouTube channel ID for video sync. */
+  youtubeChannelId: string
 }
 
 export interface Concert {

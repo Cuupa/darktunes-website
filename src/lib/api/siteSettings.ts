@@ -37,6 +37,8 @@ const DEFAULTS: SiteSettings = {
   noiseOpacity: 0.04,
   crtScanlinesEnabled: true,
   vignetteIntensity: 0.5,
+  shopifyStoreUrl: '',
+  youtubeChannelId: '',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -75,6 +77,8 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
         ? map['crt_scanlines_enabled'] === 'true'
         : DEFAULTS.crtScanlinesEnabled,
     vignetteIntensity: parseFloat(map['vignette_intensity'] ?? '') || DEFAULTS.vignetteIntensity,
+    shopifyStoreUrl: map['shopify_store_url'] ?? DEFAULTS.shopifyStoreUrl,
+    youtubeChannelId: map['youtube_channel_id'] ?? DEFAULTS.youtubeChannelId,
   }
 }
 
