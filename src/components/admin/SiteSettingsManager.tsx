@@ -4,7 +4,6 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SiteSettings } from '@/types'
+import type { AdminPanelProps } from '@/lib/component-contracts'
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -80,9 +80,7 @@ function Field({ id, label, error, children }: FieldProps) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function SiteSettingsManager() {
-  const { settings, isLoading, saveSettings } = useSiteSettings()
-
+export function SiteSettingsManager({ value: settings, onChange: saveSettings, isLoading }: AdminPanelProps<SiteSettings>) {
   const {
     register,
     handleSubmit,

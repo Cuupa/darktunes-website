@@ -32,6 +32,21 @@ The LenisProvider (src/components/animations/LenisProvider.tsx) is the single gl
 It is mounted once at the root level in app/_components/Providers.tsx and wraps the entire React tree.
 Do NOT add a second LenisProvider instance anywhere else in the tree.
 Do NOT use CSS scroll-behavior: smooth as a replacement – Lenis overrides this at the JS layer.
+LenisProvider uses ReactLenis from lenis/react (root mode) so any component can call useLenis() to get the Lenis instance for programmatic scrolling.
+useLenis is re-exported from src/components/animations/LenisProvider.tsx. Import from there (not directly from lenis/react) for consistency.
+For anchor-based scrolling in Header/Footer, use: const lenis = useLenis(); lenis?.scrollTo(href, { offset: -140 })
+
+WCAG 2.1 AA/AAA Accessibility
+All public-facing pages MUST comply with WCAG 2.1 AA at minimum; strive for AAA where feasible.
+Skip Navigation: app/layout.tsx includes a sr-only skip link (<a href="#main-content">) as the first focusable element. The <main> element in HomePageContent.tsx carries id="main-content".
+Semantic HTML: Content grids (Artists, News, Videos, Releases) use <ul>/<li> with list-none to allow grid styling while preserving list semantics for screen readers.
+Reduced Motion (WCAG 2.3.3 – AAA): Import useReducedMotion from framer-motion in every animated component. When prefersReducedMotion is true, set duration: 0 and skip initial offset transforms.
+ARIA on dialogs: All Dialog components must set aria-labelledby pointing to the modal title's id. Close buttons must have a descriptive aria-label (e.g. "Close ${artist.name}"). Icons inside interactive elements must carry aria-hidden="true".
+Icon-only links: Any link that renders only an icon MUST have a descriptive aria-label (e.g. aria-label="`${artist.name} on Spotify`").
+Touch Targets (WCAG 2.5.5 – AAA): Icon-only interactive elements must include min-w-[44px] min-h-[44px] on the anchor/button element.
+Navigation ARIA: Desktop <nav> must have aria-label="Main navigation". Mobile toggle button must have aria-expanded and aria-controls="mobile-menu". Mobile <nav> must have id="mobile-menu" and aria-label="Mobile navigation".
+Alt text: Images must have descriptive alt text, e.g. "${artist.name} – artist photo", "${release.title} by ${artistName} – cover art", "${video.title} – video thumbnail".
+Decorative elements (e.g. animated scroll-down indicator) must carry aria-hidden="true".
 
 Unit Testing & Quality Assurance
 Unit Testing: Write unit tests for all new utilities, API routes, and complex hooks using Vitest.

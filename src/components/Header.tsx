@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImage from '@/assets/images/logo_(1).png'
+import { useLenis } from '@/components/animations/LenisProvider'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface HeaderProps {
@@ -18,6 +19,7 @@ export function Header({ dict, locale }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
+  const lenis = useLenis()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -40,16 +42,16 @@ export function Header({ dict, locale }: HeaderProps) {
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
     e.preventDefault()
-    const target = document.querySelector(href)
-    if (target) {
-      const headerOffset = 140
-      const elementPosition = target.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.scrollY - headerOffset
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
+    if (lenis) {
+      lenis.scrollTo(href, { offset: -140 })
+    } else {
+      const target = document.querySelector(href)
+      if (target) {
+        const headerOffset = 140
+        const elementPosition = target.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.scrollY - headerOffset
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+      }
     }
   }
 
@@ -75,7 +77,7 @@ export function Header({ dict, locale }: HeaderProps) {
             />
           </motion.a>
 
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
             {navItems.map((item) => (
               <Button
                 key={item.label}
@@ -97,7 +99,7 @@ export function Header({ dict, locale }: HeaderProps) {
               variant="ghost"
               size="sm"
               onClick={handleLocaleSwitch}
-              className="ml-2 text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+              className="ml-2 min-w-[44px] min-h-[44px] text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1"
               aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
             >
               {dict.switchLocale}
@@ -107,8 +109,11 @@ export function Header({ dict, locale }: HeaderProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="lg:hidden min-w-[44px] min-h-[44px]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? <X size={24} /> : <List size={24} />}
           </Button>
@@ -123,7 +128,7 @@ export function Header({ dict, locale }: HeaderProps) {
             exit={{ opacity: 0, height: 0 }}
             className="lg:hidden border-t border-border overflow-hidden bg-background/98 backdrop-blur-md"
           >
-            <nav className="container mx-auto px-4 py-6 flex flex-col gap-2">
+            <nav id="mobile-menu" aria-label="Mobile navigation" className="container mx-auto px-4 py-6 flex flex-col gap-2">
               {navItems.map((item) => (
                 item.isLink ? (
                   <Button
@@ -156,7 +161,7 @@ export function Header({ dict, locale }: HeaderProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLocaleSwitch}
-                className="mt-2 self-start text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+                className="mt-2 self-start min-w-[44px] min-h-[44px] text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1"
                 aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
               >
                 {dict.switchLocale}

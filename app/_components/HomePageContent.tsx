@@ -52,7 +52,7 @@ export function HomePageContent({
     <div className="min-h-screen bg-background text-foreground relative">
       <CRTOverlay />
       <Header dict={dict.navigation} locale={locale} />
-      <main>
+      <main id="main-content">
         <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
 
         <motion.div

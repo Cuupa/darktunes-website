@@ -1,52 +1,26 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
-import Lenis from 'lenis'
+import { useEffect, type ReactNode } from 'react'
+import { ReactLenis, useLenis } from 'lenis/react'
+
+// Re-export useLenis so any component can import the hook from a single location
+export { useLenis }
 
 interface LenisProviderProps {
   children: ReactNode
 }
 
 /**
- * Global smooth-scrolling provider using Lenis.
- *
- * Wraps the entire application so every scroll consumer benefits from the
- * kinematic interpolation without any per-component setup. The Lenis
- * instance is synchronised with requestAnimationFrame so it integrates
- * cleanly with Framer Motion layout animations.
- *
- * When a Radix UI modal/dialog is open, the library adds `data-scroll-locked`
- * to `<body>`. We observe this attribute and pause Lenis so the modal's own
- * scrollable area can receive wheel events normally.
- *
- * Usage: wrap your root layout once — do NOT nest multiple LenisProviders.
+ * Pauses Lenis whenever a Radix UI dialog/sheet/popover locks body scroll.
+ * Radix sets `data-scroll-locked="1"` on `<body>` via react-remove-scroll.
+ * Without this observer Lenis intercepts wheel events and the modal's own
+ * scrollable area cannot be scrolled.
  */
-export function LenisProvider({ children }: LenisProviderProps) {
-  const lenisRef = useRef<Lenis | null>(null)
+function ScrollLockObserver() {
+  const lenis = useLenis()
 
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      touchMultiplier: 2,
-      infinite: false,
-    })
-
-    lenisRef.current = lenis
-
-    let rafId: number
-
-    function raf(time: number) {
-      lenis.raf(time)
-      rafId = requestAnimationFrame(raf)
-    }
-
-    rafId = requestAnimationFrame(raf)
-
-    // Pause Lenis while any Radix UI dialog/sheet/popover is open.
-    // Radix sets data-scroll-locked="1" on <body> via react-remove-scroll
-    // when it locks page scrolling. Without this, Lenis intercepts wheel
-    // events and the modal's own scroll area cannot be scrolled.
+    if (!lenis) return
     const observer = new MutationObserver(() => {
       if (document.body.dataset.scrollLocked === '1') {
         lenis.stop()
@@ -54,19 +28,38 @@ export function LenisProvider({ children }: LenisProviderProps) {
         lenis.start()
       }
     })
-
     observer.observe(document.body, {
       attributes: true,
       attributeFilter: ['data-scroll-locked'],
     })
+    return () => observer.disconnect()
+  }, [lenis])
 
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(rafId)
-      lenis.destroy()
-      lenisRef.current = null
-    }
-  }, [])
+  return null
+}
 
-  return <>{children}</>
+/**
+ * Global smooth-scrolling provider using Lenis.
+ *
+ * Wraps the entire application so every scroll consumer benefits from the
+ * kinematic interpolation without any per-component setup. Uses ReactLenis
+ * with `root` mode so the `useLenis()` hook is available anywhere in the tree.
+ *
+ * Usage: wrap your root layout once — do NOT nest multiple LenisProviders.
+ */
+export function LenisProvider({ children }: LenisProviderProps) {
+  return (
+    <ReactLenis
+      root
+      options={{
+        duration: 1.2,
+        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        touchMultiplier: 2,
+        infinite: false,
+      }}
+    >
+      <ScrollLockObserver />
+      {children}
+    </ReactLenis>
+  )
 }

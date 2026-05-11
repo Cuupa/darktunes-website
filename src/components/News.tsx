@@ -1,6 +1,7 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
+import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,8 +9,9 @@ import { ArrowRight, Calendar } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { NewsPost } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface NewsProps {
+interface NewsProps extends SectionProps {
   news: NewsPost[]
   dict: Dictionary['news']
   locale: Locale
@@ -17,28 +19,29 @@ interface NewsProps {
 
 export function News({ news, dict, locale }: NewsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const prefersReducedMotion = useReducedMotion()
   return (
     <section id="news" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="mb-12"
         >
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        <div className="space-y-8">
+        <ul className="space-y-8 list-none">
           {news.map((post, index) => (
-            <motion.div
+            <motion.li
               key={post.id}
-              initial={{ opacity: 0, x: -30 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
             >
               <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300">
                 <div className="grid lg:grid-cols-[320px_1fr] gap-0">
@@ -73,16 +76,19 @@ export function News({ news, dict, locale }: NewsProps) {
                     <Button 
                       variant="ghost" 
                       className="self-start group/btn hover:text-accent px-0 uppercase tracking-wider font-bold"
+                      asChild
                     >
-                      {dict.readFullStory}
-                      <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
+                      <Link href={`/news/${post.slug}`}>
+                        {dict.readFullStory}
+                        <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
+                      </Link>
                     </Button>
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   )

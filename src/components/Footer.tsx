@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag } from '@phosphor-icons/react'
+import { useLenis } from '@/components/animations/LenisProvider'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 
@@ -11,14 +12,20 @@ interface FooterProps {
 }
 
 export function Footer({ siteSettings, dict }: FooterProps) {
+  const lenis = useLenis()
+
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault()
-    const target = document.querySelector(href)
-    if (target) {
-      const headerOffset = 140
-      const elementPosition = target.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.scrollY - headerOffset
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+    if (lenis) {
+      lenis.scrollTo(href, { offset: -140 })
+    } else {
+      const target = document.querySelector(href)
+      if (target) {
+        const headerOffset = 140
+        const elementPosition = target.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.scrollY - headerOffset
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+      }
     }
   }
 
@@ -43,44 +50,62 @@ export function Footer({ siteSettings, dict }: FooterProps) {
 
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.quickLinks}</h4>
-            <nav className="flex flex-col gap-2">
-              <a href="#artists" onClick={(e) => handleSmoothScroll(e, '#artists')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.artistsLink}
-              </a>
-              <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.releasesLink}
-              </a>
-              <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.newsLink}
-              </a>
-              <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.videosLink}
-              </a>
-              <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.tourLink}
-              </a>
-              <Link href="/contact" className="text-sm text-muted-foreground hover:text-accent transition-colors">
-                {dict.contactLink}
-              </Link>
-              <a
-                href="https://www.submithub.com/playlister/darktunes-music-group"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-accent transition-colors"
-              >
-                {dict.submitMusicLink}
-              </a>
-              {siteSettings.shopifyStoreUrl && (
-                <a
-                  href={siteSettings.shopifyStoreUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-accent transition-colors flex items-center gap-1"
-                >
-                  <ShoppingBag size={14} />
-                  {dict.shopLink}
-                </a>
-              )}
+            <nav aria-label="Footer navigation">
+              <ul className="flex flex-col gap-2 list-none">
+                <li>
+                  <a href="#artists" onClick={(e) => handleSmoothScroll(e, '#artists')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.artistsLink}
+                  </a>
+                </li>
+                <li>
+                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.releasesLink}
+                  </a>
+                </li>
+                <li>
+                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.newsLink}
+                  </a>
+                </li>
+                <li>
+                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.videosLink}
+                  </a>
+                </li>
+                <li>
+                  <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.tourLink}
+                  </a>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                    {dict.contactLink}
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href="https://www.submithub.com/playlister/darktunes-music-group"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    {dict.submitMusicLink}
+                  </a>
+                </li>
+                {siteSettings.shopifyStoreUrl && (
+                  <li>
+                    <a
+                      href={siteSettings.shopifyStoreUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-muted-foreground hover:text-accent transition-colors flex items-center gap-1"
+                    >
+                      <ShoppingBag size={14} />
+                      {dict.shopLink}
+                    </a>
+                  </li>
+                )}
+              </ul>
             </nav>
           </div>
 
@@ -92,9 +117,10 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   href={siteSettings.instagramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="darkTunes on Instagram"
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
-                  <InstagramLogo size={24} weight="fill" />
+                  <InstagramLogo size={24} weight="fill" aria-hidden="true" />
                 </a>
               )}
               {siteSettings.youtubeUrl && (
@@ -102,9 +128,10 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   href={siteSettings.youtubeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="darkTunes on YouTube"
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
-                  <YoutubeLogo size={24} weight="fill" />
+                  <YoutubeLogo size={24} weight="fill" aria-hidden="true" />
                 </a>
               )}
               {siteSettings.spotifyUrl && (
@@ -112,9 +139,10 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   href={siteSettings.spotifyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="darkTunes on Spotify"
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
-                  <SpotifyLogo size={24} weight="fill" />
+                  <SpotifyLogo size={24} weight="fill" aria-hidden="true" />
                 </a>
               )}
             </div>

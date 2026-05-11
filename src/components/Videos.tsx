@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Play } from '@phosphor-icons/react'
 import { VideoModal } from '@/components/VideoModal'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Video } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface VideosProps {
+interface VideosProps extends SectionProps {
   videos: Video[]
   /** Optional R2 placeholder image URL for the ConsentGate in VideoModal. */
   placeholderUrl?: string
@@ -23,6 +25,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
 
   const handleVideoClick = (video: Video) => {
     setSelectedVideo(video)
@@ -34,24 +37,24 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
       <section id="videos" className="py-24 px-4 lg:px-16 scroll-mt-36">
         <div className="container mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
             className="mb-12"
           >
             <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
             {videos.map((video, index) => (
-              <motion.div
+              <motion.li
                 key={video.id}
-                initial={{ opacity: 0, y: 30 }}
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
               >
                 <Card className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer">
                   <div 
@@ -59,16 +62,17 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                     onClick={() => handleVideoClick(video)}
                   >
                     <img
-                      src={video.thumbnailUrl}
-                      alt={video.title}
+                      src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
+                      alt={`${video.title} – video thumbnail`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
                       <Button
                         size="lg"
+                        aria-label={`Play ${video.title}`}
                         className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0 hover:scale-110 transition-transform"
                       >
-                        <Play size={28} weight="fill" />
+                        <Play size={28} weight="fill" aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
@@ -88,16 +92,16 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                     </p>
                   </div>
                 </Card>
-              </motion.div>
+              </motion.li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
       <VideoModal 
         video={selectedVideo} 
         open={modalOpen} 
-        onOpenChange={setModalOpen}
+        onClose={() => setModalOpen(false)}
         placeholderUrl={placeholderUrl}
         youtubeLabel={consentDict.loadYouTube}
       />
