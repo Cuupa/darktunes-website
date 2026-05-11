@@ -90,8 +90,8 @@ export function Header({ dict, locale }: HeaderProps) {
                 )}
               </Button>
             ))}
-            <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105">
-              {dict.newsletter}
+            <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105" asChild>
+              <Link href="/newsletter">{dict.newsletter}</Link>
             </Button>
             <Button
               variant="ghost"
@@ -149,8 +149,8 @@ export function Header({ dict, locale }: HeaderProps) {
                   </Button>
                 )
               ))}
-              <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider">
-                {dict.newsletter}
+              <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider" asChild>
+                <Link href="/newsletter">{dict.newsletter}</Link>
               </Button>
               <Button
                 variant="ghost"

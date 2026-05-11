@@ -3,6 +3,7 @@
 import { Card } from '@/components/ui/card'
 import { motion } from 'framer-motion'
 import { ConsentGate } from '@/components/ConsentGate'
+import { MusicNote } from '@phosphor-icons/react'
 
 interface SpotifyPlayerProps {
   trackUri?: string
@@ -23,7 +24,7 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        {spotifyUri && (
+        {spotifyUri ? (
           <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
             <iframe
               src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyUri)}`}
@@ -35,6 +36,11 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl
               className="rounded-md"
             />
           </ConsentGate>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 py-8 text-muted-foreground">
+            <MusicNote size={40} weight="thin" />
+            <p className="text-sm font-mono uppercase tracking-widest">Playlist coming soon</p>
+          </div>
         )}
       </motion.div>
     </Card>

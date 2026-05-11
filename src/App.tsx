@@ -78,7 +78,7 @@ function App() {
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{enDict.spotify.heading}</h2>
               <p className="text-lg text-muted-foreground font-serif">{enDict.spotify.subheading}</p>
             </motion.div>
-            <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri} />
+            <SpotifyPlayer playlistUri={siteSettings.spotifyPlaylistUri || '37i9dQZF1DWWqNV5cS50j6'} />
           </div>
         </section>
 

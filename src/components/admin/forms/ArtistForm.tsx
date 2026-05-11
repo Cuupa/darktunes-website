@@ -1,12 +1,15 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { ArrowsClockwise } from '@phosphor-icons/react'
 
 export interface ArtistFormData {
   name: string
@@ -46,9 +49,11 @@ function toSlug(name: string): string {
 type Props = AdminPanelProps<ArtistFormData>
 
 export function ArtistForm({ value, onChange, isLoading }: Props) {
+  const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset } = useForm<ArtistFormData>({
     defaultValues: value,
   })
+  const [isFetchingImage, setIsFetchingImage] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -69,6 +74,40 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
   const featured = watch('featured')
   const isEuNonGerman = watch('isEuNonGerman')
+  const spotifyId = watch('spotifyId')
+  const discogsId = watch('discogsId')
+
+  const handleFetchImage = async () => {
+    if (!spotifyId && !discogsId) {
+      toast.error('Enter a Spotify ID or Discogs ID first')
+      return
+    }
+    setIsFetchingImage(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/admin/fetch-artist-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ spotifyId: spotifyId || undefined, discogsId: discogsId || undefined }),
+      })
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+      const { imageUrl } = (await res.json()) as { imageUrl: string }
+      setValue('imageUrl', imageUrl)
+      toast.success('Image fetched successfully')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to fetch image')
+    } finally {
+      setIsFetchingImage(false)
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
@@ -96,7 +135,20 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="imageUrl">Image URL</Label>
-          <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} />
+          <div className="flex gap-2">
+            <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void handleFetchImage()}
+              disabled={isLoading || isFetchingImage || (!spotifyId && !discogsId)}
+              title="Auto-fetch from Spotify or Discogs"
+            >
+              <ArrowsClockwise size={14} className={isFetchingImage ? 'animate-spin' : ''} />
+            </Button>
+          </div>
         </div>
         <div className="space-y-1">
           <Label htmlFor="country">Country</Label>
