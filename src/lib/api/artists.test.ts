@@ -77,6 +77,13 @@ describe('getArtists', () => {
     expect(result[0].genres).toEqual(['Darkpop', 'Industrial'])
   })
 
+  it('falls back to a slug generated from name when row slug is empty', async () => {
+    const db = makeMockDb([{ ...mockArtistRow, slug: '' }])
+    const result = await getArtists(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].slug).toBe('c-z-a-r-i-n-a')
+  })
+
   it('throws on error', async () => {
     const db = makeMockDb(null, { message: 'DB error', code: 'PGRST001' })
     await expect(getArtists(db)).rejects.toThrow('DB error')

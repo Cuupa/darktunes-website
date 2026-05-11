@@ -172,6 +172,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
   const bioText = artist.bio ?? ''
   const bioClamped = !bioExpanded && bioText.length > BIO_LIMIT
   const bioDisplay = bioClamped ? bioText.slice(0, BIO_LIMIT) + '…' : bioText
+  const profileSlug = artist.slug?.trim()
 
   const socialLinks = [
     { url: artist.spotifyUrl, icon: SpotifyLogo, label: `${artist.name} on Spotify` },
@@ -492,20 +493,22 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
             </motion.div>
 
             {/* Full Profile link */}
-            <motion.div
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: prefersReducedMotion ? 0 : 0.5, duration: prefersReducedMotion ? 0 : 0.4 }}
-            >
-              <Link
-                href={`/artists/${artist.slug}`}
-                onClick={handleClose}
-                className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline font-medium"
+            {profileSlug && (
+              <motion.div
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: prefersReducedMotion ? 0 : 0.5, duration: prefersReducedMotion ? 0 : 0.4 }}
               >
-                Full Profile
-                <ArrowRight size={14} weight="bold" aria-hidden="true" />
-              </Link>
-            </motion.div>
+                <Link
+                  href={`/artists/${profileSlug}`}
+                  onClick={handleClose}
+                  className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline font-medium"
+                >
+                  Full Profile
+                  <ArrowRight size={14} weight="bold" aria-hidden="true" />
+                </Link>
+              </motion.div>
+            )}
           </div>
         </motion.div>
       </DialogContent>

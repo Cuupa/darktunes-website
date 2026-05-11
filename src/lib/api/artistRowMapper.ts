@@ -12,10 +12,15 @@ import type { Artist } from '@/types'
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 export function rowToArtist(row: ArtistRow): Artist {
+  const fallbackSlug = row.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+
   return {
     id: row.id,
     name: row.name,
-    slug: row.slug,
+    slug: row.slug || fallbackSlug,
     bio: row.bio ?? '',
     genres: row.genres,
     imageUrl: row.image_url ?? '',
