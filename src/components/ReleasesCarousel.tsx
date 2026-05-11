@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -17,6 +17,7 @@ interface ReleasesCarouselProps {
 }
 
 const CARD_PERSPECTIVE = 1200
+const DRAG_THRESHOLD = 5
 
 export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -25,13 +26,13 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
   const [direction, setDirection] = useState<1 | -1>(1)
   const total = releases.length
 
+  // Track drag state to prevent link clicks from firing after a real drag gesture
+  const isDragging = useRef(false)
+
   const goTo = useCallback(
     (index: number, dir: 1 | -1) => {
       setDirection(dir)
-      setCurrentIndex((prev) => {
-        const next = (prev + dir + total) % total
-        return index !== undefined ? ((index + total) % total) : next
-      })
+      setCurrentIndex(((index % total) + total) % total)
     },
     [total],
   )
@@ -46,10 +47,25 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
     setCurrentIndex((prev) => (prev + 1) % total)
   }
 
-  // Drag support
+  const handleDragStart = () => {
+    isDragging.current = false
+  }
+
   const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
-    if (info.offset.x < -50) handleNext()
-    else if (info.offset.x > 50) handlePrev()
+    if (Math.abs(info.offset.x) > DRAG_THRESHOLD) {
+      isDragging.current = true
+      if (info.offset.x < -50) handleNext()
+      else if (info.offset.x > 50) handlePrev()
+    }
+    // Reset after the click event has had a chance to fire
+    setTimeout(() => { isDragging.current = false }, 50)
+  }
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (isDragging.current) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
   }
 
   if (total === 0) return null
@@ -96,11 +112,17 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             className="cursor-grab active:cursor-grabbing"
             style={{ transformStyle: 'preserve-3d' }}
           >
-            <Link href={`/releases/${release.id}`} aria-label={`${release.title} – ${release.artistName}`} draggable={false}>
+            <Link
+              href={`/releases/${release.id}`}
+              aria-label={`${release.title} – ${release.artistName}`}
+              draggable={false}
+              onClick={handleLinkClick}
+            >
               <Card className="glow-card bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
                 <div className="relative aspect-square overflow-hidden">
                   <motion.img
