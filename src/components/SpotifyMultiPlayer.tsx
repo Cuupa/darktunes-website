@@ -42,9 +42,8 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                   title={`Spotify playlist: ${playlist.label}`}
                   width="100%"
                   height="152"
-                  frameBorder="0"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  className="rounded-md"
+                  className="rounded-md border-0"
                 />
               </div>
             ))}
@@ -58,7 +57,6 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                   size="sm"
                   variant={i === activeIndex ? 'default' : 'outline'}
                   onClick={() => setActiveIndex(i)}
-                  aria-label={i === activeIndex ? `${playlist.label} (active)` : playlist.label}
                   aria-pressed={i === activeIndex}
                   className="text-xs"
                   type="button"

@@ -313,7 +313,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     <div key={field.id} className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-start">
                       <div className="space-y-1">
                         <Input
-                          placeholder="Label (z.B. Darkwave Mix)"
+                          placeholder="Label (e.g. Darkwave Mix)"
                           {...register(`spotifyPlaylists.${index}.label` as const)}
                           disabled={isSubmitting}
                         />
@@ -325,7 +325,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                       </div>
                       <div className="space-y-1">
                         <Input
-                          placeholder="URI oder URL"
+                          placeholder="URI or URL"
                           {...register(`spotifyPlaylists.${index}.uri` as const)}
                           disabled={isSubmitting}
                         />
