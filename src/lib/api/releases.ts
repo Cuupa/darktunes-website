@@ -92,9 +92,22 @@ export async function upsertReleaseByItunesId(
   db: DbClient,
   releaseData: ReleaseInsert,
 ): Promise<Release> {
+  let featured = releaseData.featured ?? false
+
+  if (releaseData.itunes_id) {
+    const { data: existing, error: existingErr } = await db
+      .from('releases')
+      .select('id, featured')
+      .eq('itunes_id', releaseData.itunes_id)
+      .maybeSingle()
+
+    if (existingErr) throw new Error(existingErr.message)
+    featured = existing?.featured ?? featured
+  }
+
   const { data, error } = await db
     .from('releases')
-    .upsert(releaseData, { onConflict: 'itunes_id' })
+    .upsert({ ...releaseData, featured }, { onConflict: 'itunes_id' })
     .select()
     .single()
   if (error) throw new Error(error.message)

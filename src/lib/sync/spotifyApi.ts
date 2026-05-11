@@ -52,6 +52,15 @@ export interface SpotifyRelease {
   isrc: string | null
 }
 
+export interface SpotifyArtistProfile {
+  spotifyId: string
+  name: string
+  imageUrl: string | null
+  genres: string[]
+  spotifyUrl: string
+  popularity: number | null
+}
+
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
@@ -132,6 +141,43 @@ export async function fetchSpotifyArtistReleases(
     barcode: album.external_ids?.upc ?? null,
     isrc: null, // ISRC is per-track, not per-album; populated separately
   }))
+}
+
+export async function fetchSpotifyArtistProfile(
+  spotifyArtistId: string,
+  clientId: string,
+  clientSecret: string,
+  fetchFn: typeof fetch,
+): Promise<SpotifyArtistProfile> {
+  const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
+
+  const response = await fetchFn(`https://api.spotify.com/v1/artists/${spotifyArtistId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (!response.ok) {
+    throw new HttpError(response.status, `Spotify artist fetch failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as {
+    id: string
+    name: string
+    images: SpotifyImage[]
+    genres: string[]
+    external_urls: { spotify: string }
+    popularity?: number
+  }
+
+  const largestImage = [...(data.images ?? [])].sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]
+
+  return {
+    spotifyId: data.id,
+    name: data.name,
+    imageUrl: largestImage?.url ?? null,
+    genres: data.genres ?? [],
+    spotifyUrl: data.external_urls.spotify,
+    popularity: data.popularity ?? null,
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -38,6 +38,8 @@ function makeReleaseBuilder(
   return {
     upsert: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -68,6 +70,7 @@ const ARTIST_ID = 'artist-uuid-1'
 const ARTIST_ROW: ArtistRow = { id: ARTIST_ID, name: 'Test Artist' }
 
 const ITUNES_RELEASE = {
+  wrapperType: 'collection',
   collectionId: 123,
   collectionName: 'Test Album',
   artistId: 999,
@@ -84,6 +87,11 @@ const ITUNES_RELEASE = {
 const ITUNES_RESPONSE = {
   resultCount: 1,
   results: [ITUNES_RELEASE],
+}
+
+const ITUNES_ARTIST_SEARCH_RESPONSE = {
+  resultCount: 1,
+  results: [{ artistId: ITUNES_RELEASE.artistId, artistName: ITUNES_RELEASE.artistName }],
 }
 
 // ---------------------------------------------------------------------------
@@ -109,10 +117,10 @@ describe('syncArtist', () => {
   })
 
   it('upserts releases and returns success result', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
-      json: async () => ITUNES_RESPONSE,
-    } as Response)
+      json: async () => (url.includes('/search') ? ITUNES_ARTIST_SEARCH_RESPONSE : ITUNES_RESPONSE),
+    } as Response))
 
     const mockUploadToR2 = vi.fn().mockResolvedValue('https://cdn.darktunes.com/cover-art/123.jpg')
 
@@ -140,10 +148,10 @@ describe('syncArtist', () => {
   })
 
   it('gracefully handles R2 upload failure and falls back to original URL', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
-      json: async () => ITUNES_RESPONSE,
-    } as Response)
+      json: async () => (url.includes('/search') ? ITUNES_ARTIST_SEARCH_RESPONSE : ITUNES_RESPONSE),
+    } as Response))
 
     const mockUploadToR2 = vi.fn().mockRejectedValue(new Error('R2 connection refused'))
 
@@ -188,10 +196,10 @@ describe('syncArtist', () => {
   })
 
   it('writes sync_logs entry with status=success when no errors', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
-      json: async () => ITUNES_RESPONSE,
-    } as Response)
+      json: async () => (url.includes('/search') ? ITUNES_ARTIST_SEARCH_RESPONSE : ITUNES_RESPONSE),
+    } as Response))
     const mockUploadToR2 = vi.fn().mockResolvedValue('https://cdn.darktunes.com/art.jpg')
 
     const syncLogInsert = vi.fn().mockReturnThis()

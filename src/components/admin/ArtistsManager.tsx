@@ -178,11 +178,13 @@ export function ArtistsManager() {
       if (editingArtist) {
         await updateArtist(editingArtist.id, formDataToInsert(data))
         toast.success(`Updated "${data.name}"`)
+        setDialogOpen(false)
       } else {
-        await createArtist(formDataToInsert(data))
-        toast.success(`Created "${data.name}"`)
+        const newArtist = await createArtist(formDataToInsert(data))
+        setDialogOpen(false)
+        toast.success(`Created "${data.name}" — syncing releases…`)
+        void handleSync(newArtist)
       }
-      setDialogOpen(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {

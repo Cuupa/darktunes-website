@@ -25,6 +25,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -192,5 +193,31 @@ describe('upsertReleaseByItunesId', () => {
         itunes_id: '999',
       }),
     ).rejects.toThrow('Upsert error')
+  })
+
+  it('preserves featured when the release already exists', async () => {
+    const existingBuilder = makeBuilder({ id: 'rel-001', featured: true })
+    const upsertBuilder = makeBuilder({ ...mockReleaseRow, featured: true })
+    const db = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(existingBuilder)
+        .mockReturnValueOnce(upsertBuilder),
+    } as unknown as DbClient
+
+    const result = await upsertReleaseByItunesId(db, {
+      title: 'Polymorph',
+      artist_name: 'C Z A R I N A',
+      release_date: '2024-03-15',
+      type: 'album',
+      itunes_id: '123456789',
+      featured: false,
+    })
+
+    expect(result.featured).toBe(true)
+    expect(upsertBuilder.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ featured: true }),
+      { onConflict: 'itunes_id' },
+    )
   })
 })

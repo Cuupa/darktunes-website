@@ -167,6 +167,20 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                 .catch(() => null)
             }
 
+            let preservedFeatured = false
+            if (release.spotifyId) {
+              const { data: existingRelease, error: existingReleaseErr } = await db
+                .from('releases')
+                .select('id, featured')
+                .eq('spotify_id', release.spotifyId)
+                .maybeSingle()
+
+              if (existingReleaseErr) {
+                throw new Error(existingReleaseErr.message)
+              }
+              preservedFeatured = existingRelease?.featured ?? false
+            }
+
             await db
               .from('releases')
               .upsert(
@@ -185,7 +199,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                   catalog_number: release.catalogNumber,
                   popularity: release.popularity,
                   smart_url: smartUrl,
-                  featured: false,
+                  featured: preservedFeatured,
                 },
                 { onConflict: 'spotify_id' },
               )
