@@ -15,6 +15,10 @@ interface LenisProviderProps {
  * instance is synchronised with requestAnimationFrame so it integrates
  * cleanly with Framer Motion layout animations.
  *
+ * When a Radix UI modal/dialog is open, the library adds `data-scroll-locked`
+ * to `<body>`. We observe this attribute and pause Lenis so the modal's own
+ * scrollable area can receive wheel events normally.
+ *
  * Usage: wrap your root layout once — do NOT nest multiple LenisProviders.
  */
 export function LenisProvider({ children }: LenisProviderProps) {
@@ -39,7 +43,25 @@ export function LenisProvider({ children }: LenisProviderProps) {
 
     rafId = requestAnimationFrame(raf)
 
+    // Pause Lenis while any Radix UI dialog/sheet/popover is open.
+    // Radix sets data-scroll-locked="1" on <body> via react-remove-scroll
+    // when it locks page scrolling. Without this, Lenis intercepts wheel
+    // events and the modal's own scroll area cannot be scrolled.
+    const observer = new MutationObserver(() => {
+      if (document.body.dataset.scrollLocked === '1') {
+        lenis.stop()
+      } else {
+        lenis.start()
+      }
+    })
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-scroll-locked'],
+    })
+
     return () => {
+      observer.disconnect()
       cancelAnimationFrame(rafId)
       lenis.destroy()
       lenisRef.current = null

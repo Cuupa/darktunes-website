@@ -31,7 +31,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
 
   return (
     <>
-      <section id="videos" className="py-24 px-4 lg:px-16">
+      <section id="videos" className="py-24 px-4 lg:px-16 scroll-mt-36">
         <div className="container mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
