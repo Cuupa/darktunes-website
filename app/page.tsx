@@ -11,8 +11,8 @@
  */
 
 import { unstable_cache } from 'next/cache'
+import { createClient } from '@supabase/supabase-js'
 import { HomePageContent } from './_components/HomePageContent'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getReleases } from '@/lib/api/releases'
 import { getArtists } from '@/lib/api/artists'
 import { getNewsPosts } from '@/lib/api/news'
@@ -21,6 +21,21 @@ import { getConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
+import type { Database } from '@/types/database'
+
+// ---------------------------------------------------------------------------
+// Public Supabase client — no cookies() dependency
+// Safe to use inside unstable_cache callbacks where Next.js Dynamic APIs
+// (cookies, headers) are unavailable. All data fetched here is publicly
+// readable (RLS: FOR SELECT USING (TRUE)).
+// ---------------------------------------------------------------------------
+
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Cached data-fetching helpers
@@ -29,8 +44,7 @@ import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/
 
 const getCachedReleases = unstable_cache(
   async (): Promise<Release[]> => {
-    const client = await createServerSupabaseClient()
-    return getReleases(client)
+    return getReleases(createPublicSupabaseClient())
   },
   ['releases'],
   { revalidate: 60, tags: ['releases'] },
@@ -38,8 +52,7 @@ const getCachedReleases = unstable_cache(
 
 const getCachedArtists = unstable_cache(
   async (): Promise<Artist[]> => {
-    const client = await createServerSupabaseClient()
-    return getArtists(client)
+    return getArtists(createPublicSupabaseClient())
   },
   ['artists'],
   { revalidate: 60, tags: ['artists'] },
@@ -47,8 +60,7 @@ const getCachedArtists = unstable_cache(
 
 const getCachedNews = unstable_cache(
   async (): Promise<NewsPost[]> => {
-    const client = await createServerSupabaseClient()
-    return getNewsPosts(client)
+    return getNewsPosts(createPublicSupabaseClient())
   },
   ['news'],
   { revalidate: 60, tags: ['news'] },
@@ -56,8 +68,7 @@ const getCachedNews = unstable_cache(
 
 const getCachedVideos = unstable_cache(
   async (): Promise<Video[]> => {
-    const client = await createServerSupabaseClient()
-    return getVideos(client)
+    return getVideos(createPublicSupabaseClient())
   },
   ['videos'],
   { revalidate: 60, tags: ['videos'] },
@@ -65,8 +76,7 @@ const getCachedVideos = unstable_cache(
 
 const getCachedConcerts = unstable_cache(
   async (): Promise<Concert[]> => {
-    const client = await createServerSupabaseClient()
-    return getConcerts(client)
+    return getConcerts(createPublicSupabaseClient())
   },
   ['concerts'],
   { revalidate: 60, tags: ['concerts'] },
@@ -74,8 +84,7 @@ const getCachedConcerts = unstable_cache(
 
 const getCachedSiteSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
-    const client = await createServerSupabaseClient()
-    return getSiteSettings(client)
+    return getSiteSettings(createPublicSupabaseClient())
   },
   ['site-settings'],
   { revalidate: 60, tags: ['site-settings'] },
