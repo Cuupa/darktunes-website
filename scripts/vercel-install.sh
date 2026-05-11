@@ -88,6 +88,15 @@ echo "  — SOS webhook (optional — required for Statement of Sales PDF upload
 require_env "SOS_WEBHOOK_SECRET" "API key for POST /api/webhooks/sos from the SOS PDF generator"
 echo ""
 
+echo "  — Contact form (optional — email delivery via Resend) —"
+require_env "CONTACT_EMAIL" "Email recipient for POST /api/contact form submissions"
+echo ""
+
+echo "  — YouTube video sync (optional — YouTube Data API v3) —"
+require_env "YOUTUBE_API_KEY"   "Google API key with YouTube Data API v3 (used by POST /api/sync-youtube)"
+require_env "YOUTUBE_CHANNEL_ID" "YouTube channel ID (starts with UC)"
+echo ""
+
 if [ "$MISSING" -gt 0 ]; then
   echo "  ⚠  ${MISSING} variable(s) not set."
   echo "  → Configure them in Vercel Dashboard → Project → Settings → Environment Variables."

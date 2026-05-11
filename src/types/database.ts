@@ -57,6 +57,11 @@ export interface Database {
           bandsintown_id: string | null
           last_synced_at: string | null
           user_id: string | null
+          facebook_url: string | null
+          twitter_url: string | null
+          tiktok_url: string | null
+          bandcamp_url: string | null
+          shop_url: string | null
           created_at: string
           updated_at: string
         }
@@ -83,6 +88,11 @@ export interface Database {
           bandsintown_id?: string | null
           last_synced_at?: string | null
           user_id?: string | null
+          facebook_url?: string | null
+          twitter_url?: string | null
+          tiktok_url?: string | null
+          bandcamp_url?: string | null
+          shop_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -109,6 +119,11 @@ export interface Database {
           bandsintown_id?: string | null
           last_synced_at?: string | null
           user_id?: string | null
+          facebook_url?: string | null
+          twitter_url?: string | null
+          tiktok_url?: string | null
+          bandcamp_url?: string | null
+          shop_url?: string | null
           created_at?: string
           updated_at?: string
         }

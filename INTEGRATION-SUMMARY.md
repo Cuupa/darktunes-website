@@ -170,6 +170,13 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — marketing & smart links | ✅ Implemented | `/portal/marketing` — SmartLinks client component with copy-to-clipboard per release |
 | SOS webhook — PDF upload from external generator | ✅ Implemented | 2-step presigned URL flow: POST /api/webhooks/sos (get PUT URL) + POST /api/webhooks/sos/confirm (create DB record). Requires `SOS_WEBHOOK_SECRET`. |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
+| Artist social/shop links | ✅ Implemented | `facebook_url`, `twitter_url`, `tiktok_url`, `bandcamp_url`, `shop_url` columns in `artists` table; icon buttons in public artist cards + modal + admin form |
+| News full page + detail page | ✅ Implemented | `/news` RSC with pagination via `ContentPagination`; `/news/[slug]` RSC detail page with `getNewsPostBySlug` DAL |
+| Contact page + API route | ✅ Implemented | `/contact` RSC with SubmitHub link; `POST /api/contact` (Zod, honeypot, Resend delivery); `CONTACT_EMAIL` env var |
+| SubmitHub link | ✅ Implemented | Footer → "Submit Your Music" link + Contact page SubmitHub section |
+| Shopify/Darkmerch shop link | ✅ Implemented | `shopifyStoreUrl` in `SiteSettings` (`site_settings` KV key `shopify_store_url`); conditional display in Footer |
+| YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID` |
+| ContentPagination component | ✅ Implemented | `src/components/ContentPagination.tsx` — reusable shadcn-based paginator with ellipsis support |
 
 ---
 
@@ -218,6 +225,13 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
 | `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |
 | `app/api/webhooks/sos/confirm/route.ts` | SOS webhook Step 2 — insert sales_statements DB record |
+| `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (requires YOUTUBE_API_KEY + YOUTUBE_CHANNEL_ID) |
+| `src/lib/api/youtubeApi.ts` | YouTube Data API v3 utility — `fetchYouTubeChannelVideos(channelId, apiKey, maxResults)` |
+| `app/news/page.tsx` | Public news list RSC — paginated via ContentPagination |
+| `app/news/[slug]/page.tsx` | Public news detail RSC — `getNewsPostBySlug` DAL |
+| `app/contact/page.tsx` | Contact page RSC with SubmitHub integration section |
+| `app/api/contact/route.ts` | Contact form handler — POST (Zod, honeypot, Resend delivery, `CONTACT_EMAIL`) |
+| `src/components/ContentPagination.tsx` | Reusable shadcn-based page navigator with ellipsis support |
 | `supabase/migrations/` | SQL migration files (source of truth for schema) |
 
 ---

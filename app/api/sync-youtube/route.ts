@@ -1,0 +1,79 @@
+/**
+ * app/api/sync-youtube/route.ts — YouTube video sync
+ *
+ * POST /api/sync-youtube
+ * Auth: Bearer <supabase-access-token>
+ *
+ * Fetches the latest videos from the configured YouTube channel and upserts
+ * them into the `videos` table.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { revalidateTag } from 'next/cache'
+import type { Database } from '@/types/database'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
+
+async function verifyToken(token: string): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) throw new ApiError(500, 'Supabase service key not configured')
+
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const { data, error } = await admin.auth.getUser(token)
+  if (error || !data.user) throw new ApiError(401, 'Unauthorized')
+}
+
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 1. Authenticate
+  const authHeader = request.headers.get('authorization') ?? ''
+  if (!authHeader.startsWith('Bearer ')) {
+    throw new ApiError(401, 'Missing or invalid Authorization header')
+  }
+  await verifyToken(authHeader.slice(7))
+
+  // 2. Read required config
+  const youtubeApiKey = process.env.YOUTUBE_API_KEY
+  const youtubeChannelId = process.env.YOUTUBE_CHANNEL_ID
+
+  if (!youtubeApiKey) throw new ApiError(500, 'YOUTUBE_API_KEY is not configured', 'MISSING_CONFIG')
+  if (!youtubeChannelId)
+    throw new ApiError(500, 'YOUTUBE_CHANNEL_ID is not configured', 'MISSING_CONFIG')
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceKey) {
+    throw new ApiError(500, 'Supabase is not configured', 'MISSING_SUPABASE_CONFIG')
+  }
+
+  // 3. Fetch from YouTube
+  const videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
+
+  if (videos.length === 0) {
+    return NextResponse.json({ synced: 0, message: 'No videos returned from YouTube' })
+  }
+
+  // 4. Upsert into Supabase
+  const db = createClient<Database>(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  })
+
+  const rows = videos.map((v) => ({
+    youtube_id: v.youtubeId,
+    title: v.title,
+    artist_name: v.channelTitle,
+    thumbnail_url: v.thumbnailUrl,
+    published_at: v.publishedAt,
+  }))
+
+  const { error } = await db
+    .from('videos')
+    .upsert(rows, { onConflict: 'youtube_id', ignoreDuplicates: false })
+
+  if (error) throw new ApiError(500, `DB upsert failed: ${error.message}`)
+
+  revalidateTag('videos')
+
+  return NextResponse.json({ synced: videos.length })
+})

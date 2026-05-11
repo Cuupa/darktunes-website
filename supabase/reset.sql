@@ -148,6 +148,11 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS songkick_id    TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandsintown_id TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS user_id        UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS facebook_url   TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS twitter_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);

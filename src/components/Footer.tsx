@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { InstagramLogo, YoutubeLogo, SpotifyLogo } from '@phosphor-icons/react'
+import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag } from '@phosphor-icons/react'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 
@@ -59,6 +59,28 @@ export function Footer({ siteSettings, dict }: FooterProps) {
               <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.tourLink}
               </a>
+              <Link href="/contact" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                {dict.contactLink}
+              </Link>
+              <a
+                href="https://www.submithub.com/playlister/darktunes-music-group"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-accent transition-colors"
+              >
+                {dict.submitMusicLink}
+              </a>
+              {siteSettings.shopifyStoreUrl && (
+                <a
+                  href={siteSettings.shopifyStoreUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-accent transition-colors flex items-center gap-1"
+                >
+                  <ShoppingBag size={14} />
+                  {dict.shopLink}
+                </a>
+              )}
             </nav>
           </div>
 
@@ -104,12 +126,12 @@ export function Footer({ siteSettings, dict }: FooterProps) {
             © {new Date().getFullYear()} {siteSettings.labelName}. {dict.allRightsReserved}
           </p>
           <div className="flex gap-6">
-            <a
-              href={`mailto:${siteSettings.contactEmail}`}
+            <Link
+              href="/contact"
               className="text-sm text-muted-foreground hover:text-accent transition-colors"
             >
               {dict.contact}
-            </a>
+            </Link>
             <Link
               href="/impressum"
               className="text-sm text-muted-foreground hover:text-accent transition-colors"

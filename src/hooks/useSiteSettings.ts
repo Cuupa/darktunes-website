@@ -36,6 +36,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   noiseOpacity: 0.04,
   crtScanlinesEnabled: true,
   vignetteIntensity: 0.5,
+  shopifyStoreUrl: '',
+  youtubeChannelId: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -70,6 +72,8 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     noise_opacity: String(s.noiseOpacity),
     crt_scanlines_enabled: String(s.crtScanlinesEnabled),
     vignette_intensity: String(s.vignetteIntensity),
+    shopify_store_url: s.shopifyStoreUrl,
+    youtube_channel_id: s.youtubeChannelId,
   }
 }
 
