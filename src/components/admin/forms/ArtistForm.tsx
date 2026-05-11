@@ -143,7 +143,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
         </p>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label htmlFor="spotifyId">Spotify Artist ID</Label>
+            <Label htmlFor="spotifyId">Spotify Artist ID (optional)</Label>
             <Input
               id="spotifyId"
               {...register('spotifyId')}
@@ -152,7 +152,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="discogsId">Discogs Artist ID</Label>
+            <Label htmlFor="discogsId">Discogs Artist ID (optional)</Label>
             <Input
               id="discogsId"
               {...register('discogsId')}
@@ -161,7 +161,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="songkickId">Songkick Artist ID</Label>
+            <Label htmlFor="songkickId">Songkick Artist ID (optional)</Label>
             <Input
               id="songkickId"
               {...register('songkickId')}
@@ -170,7 +170,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="bandsintownId">Bandsintown Artist ID</Label>
+            <Label htmlFor="bandsintownId">Bandsintown Artist ID (optional)</Label>
             <Input
               id="bandsintownId"
               {...register('bandsintownId')}
@@ -179,6 +179,9 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
             />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          These IDs are used for automatic release sync. All fields are optional.
+        </p>
       </div>
 
       <div className="flex items-center gap-6">
