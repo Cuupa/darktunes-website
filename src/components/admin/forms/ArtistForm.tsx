@@ -151,9 +151,11 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       }
 
       const current = getValues()
-      if (!current.name.trim()) setValue('name', profile.name)
-      if (!current.imageUrl.trim() && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
-      if (!current.genres.trim() && profile.genres.length > 0) setValue('genres', profile.genres.join(', '))
+      if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
+      if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
+      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) {
+        setValue('genres', profile.genres.join(', '))
+      }
       setValue('spotifyId', profile.spotifyId)
       setValue('spotifyUrl', profile.spotifyUrl)
 

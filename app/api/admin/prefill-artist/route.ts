@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { withExponentialBackoff } from '@/lib/rateLimiter'
+import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchSpotifyArtistProfile } from '@/lib/sync/spotifyApi'
 
 type ProfileRole = 'admin' | 'editor' | 'user' | 'journalist'
@@ -37,9 +37,21 @@ async function verifyTokenAndRole(token: string): Promise<void> {
 
 function extractSpotifyArtistId(input: string): string | null {
   const trimmed = input.trim()
-  const urlMatch = trimmed.match(/(?:https?:\/\/)?open\.spotify\.com\/artist\/([A-Za-z0-9]+)(?:\?.*)?$/i)
-  if (urlMatch?.[1]) return urlMatch[1]
+  if (!trimmed) return null
   if (/^[A-Za-z0-9]+$/.test(trimmed)) return trimmed
+
+  try {
+    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+    if (parsed.hostname.toLowerCase() !== 'open.spotify.com') return null
+
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    if (parts[0] === 'artist' && parts[1] && /^[A-Za-z0-9]+$/.test(parts[1])) {
+      return parts[1]
+    }
+  } catch {
+    return null
+  }
+
   return null
 }
 
@@ -97,9 +109,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(response)
   } catch (err) {
+    if (err instanceof HttpError) {
+      const status = err.status >= 500 ? 502 : err.status
+      return NextResponse.json({ error: err.message }, { status })
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to prefill artist' },
-      { status: 502 },
+      { status: 500 },
     )
   }
 }

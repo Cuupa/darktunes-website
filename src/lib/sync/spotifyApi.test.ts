@@ -35,7 +35,8 @@ const ALBUM_RESPONSE = {
 
 function makeFetch(tokenResponse: unknown, albumResponse: unknown) {
   return vi.fn().mockImplementation(async (url: string) => {
-    const body = url.includes('accounts.spotify.com') ? tokenResponse : albumResponse
+    const hostname = new URL(url).hostname
+    const body = hostname === 'accounts.spotify.com' ? tokenResponse : albumResponse
     return {
       ok: true,
       json: async () => body,
@@ -107,7 +108,7 @@ describe('fetchSpotifyArtistReleases', () => {
 describe('fetchSpotifyArtistProfile', () => {
   it('returns mapped profile and uses largest image', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('accounts.spotify.com')) {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
         return { ok: true, json: async () => TOKEN_RESPONSE } as Response
       }
       return {
@@ -140,7 +141,7 @@ describe('fetchSpotifyArtistProfile', () => {
 
   it('throws HttpError when profile endpoint is not ok', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('accounts.spotify.com')) {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
         return { ok: true, json: async () => TOKEN_RESPONSE } as Response
       }
       return { ok: false, status: 500 } as Response
