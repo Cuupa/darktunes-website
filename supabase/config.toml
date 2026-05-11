@@ -41,9 +41,9 @@ file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-# Site URL is set via VITE_SUPABASE_URL in Vercel environment variables.
+# Site URL is set via NEXT_PUBLIC_SUPABASE_URL in Vercel environment variables.
 # For local dev, set SITE_URL below.
-site_url = "http://localhost:5173"
+site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://darktunes.com", "https://darktunes.vercel.app"]
 jwt_expiry = 3600
 enable_signup = true
