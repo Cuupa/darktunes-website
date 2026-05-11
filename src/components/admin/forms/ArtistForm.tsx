@@ -180,7 +180,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Diese IDs werden für den automatischen Release-Sync verwendet. Alle Felder sind optional.
+          These IDs are used for automatic release sync. All fields are optional.
         </p>
       </div>
 
