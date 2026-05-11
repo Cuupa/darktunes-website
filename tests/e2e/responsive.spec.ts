@@ -93,9 +93,6 @@ test.describe('Navigation Visibility', () => {
 
     // The hamburger button uses List (Phosphor icon) and is only shown below lg.
     // It has the class `lg:hidden` (or is wrapped in an element with that class).
-    const hamburger = page.locator('header button[aria-label], header button').filter({
-      has: page.locator('svg'),
-    }).first()
     // On desktop the hamburger container should not be visible.
     const hamburgerParent = page.locator('header .lg\\:hidden, header button.lg\\:hidden')
     const hamburgerParentCount = await hamburgerParent.count()
@@ -147,7 +144,6 @@ test.describe('Navigation Visibility', () => {
 
     await hamburgerButton.click()
     // The mobile menu should appear — it contains anchor links.
-    const mobileMenu = page.locator('header [role="navigation"] a, header .mobile-menu a').first()
     // Simply verify that some nav link is now visible.
     const navLink = page.locator('header a[href="#artists"], header a[href="#hero"]').first()
     const navLinkCount = await navLink.count()
