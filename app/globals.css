@@ -26,7 +26,7 @@
 }
 
 :root {
-  --background: #101010;
+  --background: oklch(0.02 0 0);
   --foreground: #ffffff;
   --card: #292929;
   --card-foreground: #ffffff;
@@ -128,14 +128,15 @@
   background-size: 300px 300px;
   background-repeat: repeat;
   mix-blend-mode: soft-light;
-  opacity: 0.35;
+  opacity: 0.12;
   pointer-events: none;
 }
 
 /* Static grain – no translate animation to avoid visible twitching.
-   mix-blend-mode: overlay blends the noise into the page content subtly. */
+   mix-blend-mode: soft-light on a near-black background produces a microscopic
+   film-grain texture without lightening / grey-washing the pitch-black surface. */
 .noise-overlay {
-  mix-blend-mode: overlay;
+  mix-blend-mode: soft-light;
   will-change: opacity;
 }
 

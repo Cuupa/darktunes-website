@@ -63,7 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to main content
         </a>
         <VisualEffectsOverlay
-          noiseOpacity={settings?.noiseOpacity ?? 0.04}
+          noiseOpacity={settings?.noiseOpacity ?? 0.03}
           crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
           vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
         />
