@@ -153,6 +153,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS twitter_url    TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);

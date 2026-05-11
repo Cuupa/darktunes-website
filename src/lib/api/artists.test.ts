@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getArtists, createArtist, updateArtist, deleteArtist, getArtistById } from './artists'
+import { getArtists, createArtist, updateArtist, deleteArtist, getArtistById, getArtistBySlug } from './artists'
 
 type DbClient = SupabaseClient<Database>
 type ArtistRow = Database['public']['Tables']['artists']['Row']
@@ -56,6 +56,7 @@ const mockArtistRow: ArtistRow = {
   tiktok_url: null,
   bandcamp_url: null,
   shop_url: null,
+  founded_year: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -100,6 +101,27 @@ describe('getArtistById', () => {
     expect(result).not.toBeNull()
     expect(result?.name).toBe('C Z A R I N A')
     expect(result?.featured).toBe(true)
+  })
+})
+
+describe('getArtistBySlug', () => {
+  it('returns null when artist not found (PGRST116)', async () => {
+    const db = makeMockDb(null, { message: 'Not found', code: 'PGRST116' })
+    const result = await getArtistBySlug(db, 'nonexistent-slug')
+    expect(result).toBeNull()
+  })
+
+  it('throws for non-PGRST116 errors', async () => {
+    const db = makeMockDb(null, { message: 'Permission denied', code: 'PGRST301' })
+    await expect(getArtistBySlug(db, 'czarina')).rejects.toThrow('Permission denied')
+  })
+
+  it('returns mapped Artist for found row', async () => {
+    const db = makeMockDb(mockArtistRow)
+    const result = await getArtistBySlug(db, mockArtistRow.slug)
+    expect(result).not.toBeNull()
+    expect(result?.slug).toBe('czarina')
+    expect(result?.name).toBe('C Z A R I N A')
   })
 })
 

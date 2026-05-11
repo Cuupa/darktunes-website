@@ -62,6 +62,7 @@ export interface Database {
           tiktok_url: string | null
           bandcamp_url: string | null
           shop_url: string | null
+          founded_year: number | null
           created_at: string
           updated_at: string
         }
@@ -93,6 +94,7 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
+          founded_year?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -124,6 +126,7 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
+          founded_year?: number | null
           created_at?: string
           updated_at?: string
         }

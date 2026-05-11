@@ -25,6 +25,7 @@ export interface Artist {
   songkickId?: string
   bandsintownId?: string
   lastSyncedAt?: string
+  foundedYear?: number
 }
 
 export interface SyncLog {
