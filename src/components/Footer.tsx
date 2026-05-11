@@ -11,6 +11,17 @@ interface FooterProps {
 }
 
 export function Footer({ siteSettings, dict }: FooterProps) {
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault()
+    const target = document.querySelector(href)
+    if (target) {
+      const headerOffset = 140
+      const elementPosition = target.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.scrollY - headerOffset
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+    }
+  }
+
   return (
     <footer className="border-t border-border bg-card/50 backdrop-blur-sm">
       <div className="container mx-auto px-4 lg:px-8 py-12">
@@ -33,19 +44,19 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.quickLinks}</h4>
             <nav className="flex flex-col gap-2">
-              <a href="#artists" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#artists" onClick={(e) => handleSmoothScroll(e, '#artists')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.artistsLink}
               </a>
-              <a href="#releases" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.releasesLink}
               </a>
-              <a href="#news" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.newsLink}
               </a>
-              <a href="#videos" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.videosLink}
               </a>
-              <a href="#concerts" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 {dict.tourLink}
               </a>
             </nav>

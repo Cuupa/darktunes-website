@@ -40,9 +40,9 @@ export function Header({ dict, locale }: HeaderProps) {
     e.preventDefault()
     const target = document.querySelector(href)
     if (target) {
-      const headerOffset = 100
+      const headerOffset = 140
       const elementPosition = target.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+      const offsetPosition = elementPosition + window.scrollY - headerOffset
 
       window.scrollTo({
         top: offsetPosition,
@@ -64,16 +64,12 @@ export function Header({ dict, locale }: HeaderProps) {
           <motion.a 
             href="#hero"
             onClick={(e) => handleSmoothScroll(e, '#hero')}
-            className="flex items-center"
-            animate={{
-              scale: scrolled ? 0.75 : 1,
-            }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="flex items-center flex-shrink-0"
           >
             <img 
               src={logoImage.src} 
               alt="darkTunes Music Group" 
-              className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
+              className={`w-auto transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
             />
           </motion.a>
 
@@ -83,7 +79,7 @@ export function Header({ dict, locale }: HeaderProps) {
                 key={item.label}
                 variant="ghost"
                 asChild
-                className="text-sm font-medium tracking-wider hover:text-accent transition-colors"
+                className="text-sm font-medium tracking-wider transition-colors"
               >
                 <a href={item.href} onClick={(e) => handleSmoothScroll(e, item.href)}>{item.label}</a>
               </Button>
@@ -95,8 +91,8 @@ export function Header({ dict, locale }: HeaderProps) {
               variant="ghost"
               size="sm"
               onClick={handleLocaleSwitch}
-              className="ml-2 text-xs font-mono text-muted-foreground hover:text-accent border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
-              aria-label={`Switch language to ${dict.switchLocale}`}
+              className="ml-2 text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+              aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
             >
               {dict.switchLocale}
             </Button>
@@ -126,7 +122,7 @@ export function Header({ dict, locale }: HeaderProps) {
                 <Button
                   key={item.label}
                   variant="ghost"
-                  className="justify-start text-base font-medium tracking-wider hover:text-accent"
+                  className="justify-start text-base font-medium tracking-wider"
                   onClick={(e) => {
                     handleSmoothScroll(e, item.href)
                     setMobileMenuOpen(false)
@@ -142,8 +138,8 @@ export function Header({ dict, locale }: HeaderProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLocaleSwitch}
-                className="mt-2 self-start text-xs font-mono text-muted-foreground hover:text-accent border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
-                aria-label={`Switch language to ${dict.switchLocale}`}
+                className="mt-2 self-start text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1 h-auto"
+                aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
               >
                 {dict.switchLocale}
               </Button>

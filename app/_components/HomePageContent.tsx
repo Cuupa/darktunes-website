@@ -55,15 +55,13 @@ export function HomePageContent({
       <main>
         <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
 
-        <section id="releases" className="relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <Releases releases={releases} dict={dict.releases} locale={locale} />
-          </motion.div>
-        </section>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Releases releases={releases} dict={dict.releases} locale={locale} />
+        </motion.div>
 
         <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
           <div className="container mx-auto max-w-2xl">
