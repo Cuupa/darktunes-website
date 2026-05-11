@@ -17,7 +17,7 @@ interface NewsProps {
 export function News({ news, dict, locale }: NewsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   return (
-    <section id="news" className="py-24 px-4 lg:px-16">
+    <section id="news" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

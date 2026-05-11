@@ -25,7 +25,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
 
   return (
     <>
-      <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20">
+      <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
