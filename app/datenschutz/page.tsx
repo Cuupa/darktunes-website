@@ -43,6 +43,7 @@ export default async function DatenschutzPage() {
         youtubeUrl: '',
         spotifyUrl: '',
         spotifyPlaylistUri: '',
+        spotifyPlaylists: [],
         heroBadge: '',
         heroDescription: '',
         seoTitle: '',

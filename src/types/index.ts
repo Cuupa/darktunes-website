@@ -102,6 +102,11 @@ export interface Asset {
   createdAt: string
 }
 
+export interface SpotifyPlaylistEntry {
+  label: string
+  uri: string
+}
+
 export interface SiteSettings {
   labelName: string
   labelTagline: string
@@ -112,6 +117,8 @@ export interface SiteSettings {
   youtubeUrl: string
   spotifyUrl: string
   spotifyPlaylistUri: string
+  /** Multiple playlists for the multi-player. Falls back to spotifyPlaylistUri when empty. */
+  spotifyPlaylists: SpotifyPlaylistEntry[]
   heroBadge: string
   heroDescription: string
   seoTitle: string

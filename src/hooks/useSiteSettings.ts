@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   youtubeUrl: 'https://youtube.com/@darktunes',
   spotifyUrl: 'https://open.spotify.com/user/darktunes',
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
+  spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
@@ -52,6 +53,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     youtube_url: s.youtubeUrl,
     spotify_url: s.spotifyUrl,
     spotify_playlist_uri: s.spotifyPlaylistUri,
+    spotify_playlists: JSON.stringify(s.spotifyPlaylists ?? []),
     hero_badge: s.heroBadge,
     hero_description: s.heroDescription,
     seo_title: s.seoTitle,

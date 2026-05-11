@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { SiteSettings } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 
@@ -15,6 +15,7 @@ const DEFAULTS: SiteSettings = {
   youtubeUrl: 'https://youtube.com/@darktunes',
   spotifyUrl: 'https://open.spotify.com/user/darktunes',
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
+  spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
@@ -44,6 +45,21 @@ const DEFAULTS: SiteSettings = {
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
 function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  let spotifyPlaylists: SpotifyPlaylistEntry[] = []
+
+  try {
+    const parsed = JSON.parse(map['spotify_playlists'] ?? '[]') as unknown
+    if (Array.isArray(parsed)) {
+      spotifyPlaylists = parsed.filter((entry): entry is SpotifyPlaylistEntry => {
+        if (!entry || typeof entry !== 'object') return false
+        const candidate = entry as { label?: unknown; uri?: unknown }
+        return typeof candidate.label === 'string' && typeof candidate.uri === 'string'
+      })
+    }
+  } catch {
+    spotifyPlaylists = []
+  }
+
   return {
     labelName: map['label_name'] ?? DEFAULTS.labelName,
     labelTagline: map['label_tagline'] ?? DEFAULTS.labelTagline,
@@ -54,6 +70,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     youtubeUrl: map['youtube_url'] ?? DEFAULTS.youtubeUrl,
     spotifyUrl: map['spotify_url'] ?? DEFAULTS.spotifyUrl,
     spotifyPlaylistUri: map['spotify_playlist_uri'] ?? DEFAULTS.spotifyPlaylistUri,
+    spotifyPlaylists,
     heroBadge: map['hero_badge'] ?? DEFAULTS.heroBadge,
     heroDescription: map['hero_description'] ?? DEFAULTS.heroDescription,
     seoTitle: map['seo_title'] ?? DEFAULTS.seoTitle,

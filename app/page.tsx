@@ -113,6 +113,7 @@ export default async function HomePage() {
         youtubeUrl: 'https://youtube.com/@darktunes',
         spotifyUrl: 'https://open.spotify.com/user/darktunes',
         spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
+        spotifyPlaylists: [],
         heroBadge: '⚡ New Release',
         heroDescription:
           'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
