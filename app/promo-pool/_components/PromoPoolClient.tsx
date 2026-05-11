@@ -97,7 +97,6 @@ function TrackCard({ track, dict }: { track: PromoTrack; dict: Dictionary['promo
         )}
 
         {streamUrl && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
           <audio
             controls
             autoPlay
