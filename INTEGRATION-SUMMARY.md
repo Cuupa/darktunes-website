@@ -62,7 +62,7 @@
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
-- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
+- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 
 ### SOS Webhook — Statement of Sales PDF Upload
 - `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
