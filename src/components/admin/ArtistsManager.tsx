@@ -135,7 +135,7 @@ function ArtistSkeletonRows() {
 
 export function ArtistsManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { artists, isLoading, createArtist, updateArtist, deleteArtist } = useArtists()
+  const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
@@ -216,6 +216,7 @@ export function ArtistsManager() {
       } else {
         toast.success(`Sync complete for "${artist.name}": ${result.releasesUpserted} release(s) updated.`)
       }
+      await reload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sync failed')
     } finally {

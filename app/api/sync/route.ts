@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { syncAll } from '@/lib/sync/syncAll'
@@ -104,5 +105,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     bandsintownAppId: BANDSINTOWN_APP_ID,
   })
 
+  revalidateTag('releases')
+  revalidateTag('artists')
+  revalidateTag('concerts')
   return NextResponse.json(result)
 })

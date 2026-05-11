@@ -77,7 +77,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
 }
 
 export function ReleasesManager() {
-  const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncFromItunes } = useReleases()
+  const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRelease, setEditingRelease] = useState<Release | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Release | null>(null)
@@ -129,8 +129,8 @@ export function ReleasesManager() {
 
   const handleSync = async () => {
     try {
-      await syncFromItunes()
-      toast.success('iTunes sync completed')
+      await syncAllReleases()
+      toast.success('Sync completed')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sync failed')
     }
@@ -140,9 +140,9 @@ export function ReleasesManager() {
     <div className="space-y-4">
       <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card">
         <div className="flex-1">
-          <p className="text-sm font-medium">iTunes Sync</p>
+          <p className="text-sm font-medium">Sync All APIs</p>
           <p className="text-xs text-muted-foreground">
-            Fetch all releases from Apple iTunes for known artists
+            Aggregate releases from iTunes · Spotify · Discogs for all artists
           </p>
         </div>
         <Button
@@ -157,7 +157,7 @@ export function ReleasesManager() {
             className={isSyncing ? 'animate-spin' : ''}
             weight="bold"
           />
-          {isSyncing ? `Syncing ${syncProgress}%` : 'Sync from iTunes'}
+          {isSyncing ? `Syncing ${syncProgress}%` : 'Sync All APIs (iTunes · Spotify · Discogs)'}
         </Button>
       </div>
 
