@@ -1,6 +1,6 @@
 'use client'
 import { useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -30,6 +30,15 @@ const schema = z.object({
   youtubeUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   spotifyUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   spotifyPlaylistUri: z.string().min(1, 'Spotify playlist URI is required'),
+  spotifyPlaylists: z.array(
+    z.object({
+      label: z.string().min(1, 'Label required'),
+      uri: z.string().min(1, 'URI required'),
+    }),
+  ).default([]).refine(
+    (entries) => new Set(entries.map((entry) => entry.uri.trim())).size === entries.length,
+    { message: 'Playlist URIs must be unique' },
+  ),
   heroBadge: z.string().min(1, 'Hero badge text is required'),
   heroDescription: z.string().min(1, 'Hero description is required'),
   seoTitle: z.string().min(1, 'SEO title is required'),
@@ -90,6 +99,10 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: settings,
+  })
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'spotifyPlaylists',
   })
 
   // Sync form state when settings load from Supabase
@@ -276,6 +289,72 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   The playlist ID from the Spotify share link (not the full URL).
                 </p>
               </Field>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label>Spotify Playlists (Tabs)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ label: '', uri: '' })}
+                    disabled={isSubmitting}
+                  >
+                    + Add playlist
+                  </Button>
+                </div>
+
+                {fields.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No additional playlists configured. The website will fall back to the “Spotify
+                    Playlist URI” field above.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-start">
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="Label (e.g. Darkwave Mix)"
+                          {...register(`spotifyPlaylists.${index}.label` as const)}
+                          disabled={isSubmitting}
+                        />
+                        {errors.spotifyPlaylists?.[index]?.label?.message && (
+                          <p className="text-xs text-destructive">
+                            {errors.spotifyPlaylists[index]?.label?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="URI or URL"
+                          {...register(`spotifyPlaylists.${index}.uri` as const)}
+                          disabled={isSubmitting}
+                        />
+                        {errors.spotifyPlaylists?.[index]?.uri?.message && (
+                          <p className="text-xs text-destructive">
+                            {errors.spotifyPlaylists[index]?.uri?.message}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(index)}
+                        disabled={isSubmitting}
+                        className="justify-self-start md:justify-self-end"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {typeof errors.spotifyPlaylists?.message === 'string' && (
+                  <p className="text-xs text-destructive">{errors.spotifyPlaylists.message}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

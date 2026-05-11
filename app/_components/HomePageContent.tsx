@@ -9,7 +9,7 @@ import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { CRTOverlay } from '@/components/CRTOverlay'
-import { SpotifyPlayer } from '@/components/SpotifyPlayer'
+import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion } from 'framer-motion'
 import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
@@ -47,6 +47,10 @@ export function HomePageContent({
 }: HomePageContentProps) {
   const featuredRelease =
     releases.length > 0 ? releases.find((r) => r.featured) ?? releases[0] : undefined
+  const playlists =
+    siteSettings.spotifyPlaylists?.length
+      ? siteSettings.spotifyPlaylists
+      : [{ label: 'Label Playlist', uri: siteSettings.spotifyPlaylistUri }]
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
@@ -75,8 +79,8 @@ export function HomePageContent({
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{dict.spotify.heading}</h2>
               <p className="text-lg text-muted-foreground font-serif">{dict.spotify.subheading}</p>
             </motion.div>
-            <SpotifyPlayer
-              playlistUri={siteSettings.spotifyPlaylistUri || '37i9dQZF1DWWqNV5cS50j6'}
+            <SpotifyMultiPlayer
+              playlists={playlists}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
               loadLabel={dict.consent.loadSpotify}
             />

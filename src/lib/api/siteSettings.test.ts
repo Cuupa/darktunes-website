@@ -37,6 +37,13 @@ const mockRows = [
   { key: 'youtube_url', value: 'https://youtube.com/@test' },
   { key: 'spotify_url', value: 'https://open.spotify.com/user/test' },
   { key: 'spotify_playlist_uri', value: 'abc123' },
+  {
+    key: 'spotify_playlists',
+    value: JSON.stringify([
+      { label: 'Darkwave Mix', uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6' },
+      { label: 'EBM Essentials', uri: 'https://open.spotify.com/playlist/abc123' },
+    ]),
+  },
   { key: 'hero_badge', value: '🎵 New' },
   { key: 'hero_description', value: 'A test description.' },
   { key: 'seo_title', value: 'Test SEO Title' },
@@ -54,6 +61,10 @@ describe('getSiteSettings', () => {
     expect(result.contactEmail).toBe('test@example.com')
     expect(result.instagramUrl).toBe('https://instagram.com/test')
     expect(result.spotifyPlaylistUri).toBe('abc123')
+    expect(result.spotifyPlaylists).toEqual([
+      { label: 'Darkwave Mix', uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6' },
+      { label: 'EBM Essentials', uri: 'https://open.spotify.com/playlist/abc123' },
+    ])
     expect(result.heroBadge).toBe('🎵 New')
     expect(result.seoTitle).toBe('Test SEO Title')
   })
@@ -63,6 +74,7 @@ describe('getSiteSettings', () => {
     const result = await getSiteSettings(db)
     expect(result.labelName).toBe('darkTunes Music Group')
     expect(result.spotifyPlaylistUri).toBe('37i9dQZF1DWWqNV5cS50j6')
+    expect(result.spotifyPlaylists).toEqual([])
     expect(result.instagramUrl).toBe('https://instagram.com/darktunes')
   })
 
@@ -72,6 +84,13 @@ describe('getSiteSettings', () => {
     expect(result.labelName).toBe('Partial Label')
     expect(result.contactEmail).toBe('info@darktunes.com')
     expect(result.youtubeUrl).toBe('https://youtube.com/@darktunes')
+    expect(result.spotifyPlaylists).toEqual([])
+  })
+
+  it('falls back to an empty spotify playlists array when JSON is invalid', async () => {
+    const db = makeMockDb([{ key: 'spotify_playlists', value: '{not-json' }])
+    const result = await getSiteSettings(db)
+    expect(result.spotifyPlaylists).toEqual([])
   })
 
   it('maps impressum fields from rows', async () => {

@@ -40,6 +40,7 @@ export default async function ImpressumPage() {
         youtubeUrl: '',
         spotifyUrl: '',
         spotifyPlaylistUri: '',
+        spotifyPlaylists: [],
         heroBadge: '',
         heroDescription: '',
         seoTitle: '',

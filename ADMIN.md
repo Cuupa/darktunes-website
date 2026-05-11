@@ -94,7 +94,7 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 Manage all global site content from the **Settings** tab — no code changes needed:
 - **Global**: Label name, tagline, contact email, privacy policy URL, terms URL
 - **Social Links**: Instagram, YouTube, Spotify profile URLs (leave blank to hide the icon)
-- **Homepage**: Hero badge text, hero description, Spotify playlist URI
+- **Homepage**: Hero badge text, hero description, Spotify playlist URI, and multi-playlist entries (label + URI) for instant tab-based player swaps on the homepage
 - **SEO / Meta**: Page title, meta description, Open Graph title and description
 - **Visual Effects**: Noise/grain opacity (0–1 slider), CRT scanlines toggle, vignette intensity (0–1 slider)
 
