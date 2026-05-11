@@ -41,9 +41,13 @@ export function VisualEffectsOverlay({
 }: VisualEffectsOverlayProps) {
   return (
     <>
-      {/* ── Vignette ───────────────────────────────────────────────────────── */}
+      {/* ── Vignette (anti-banding) ────────────────────────────────────────── */}
+      {/* isolation: isolate (via .vignette-dithered) confines the ::after    */}
+      {/* noise's soft-light blend to the gradient only, preventing it from   */}
+      {/* interacting with page content. The noise breaks up gradient banding. */}
       <div
         aria-hidden="true"
+        className="vignette-dithered"
         style={{
           ...OVERLAY_BASE,
           zIndex: 'var(--z-global-fx)',
@@ -68,6 +72,8 @@ export function VisualEffectsOverlay({
       )}
 
       {/* ── Animated Noise / Grain ─────────────────────────────────────────── */}
+      {/* 600 × 600 SVG canvas with baseFrequency 0.65 and 4 octaves produces  */}
+      {/* finer, more varied film-grain without obvious tiling seams.           */}
       <div
         aria-hidden="true"
         className="noise-overlay"
@@ -75,9 +81,9 @@ export function VisualEffectsOverlay({
           ...OVERLAY_BASE,
           zIndex: 'calc(var(--z-global-fx) + 2)',
           opacity: noiseOpacity,
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           backgroundRepeat: 'repeat',
-          backgroundSize: '200px 200px',
+          backgroundSize: '300px 300px',
         }}
       />
     </>
