@@ -32,10 +32,11 @@ export function useArtists() {
     }
   }, [supabase])
 
-  const createArtist = async (data: ArtistInsert): Promise<void> => {
-    await artistsApi.createArtist(supabase, data)
+  const createArtist = async (data: ArtistInsert): Promise<Artist> => {
+    const createdArtist = await artistsApi.createArtist(supabase, data)
     await load()
     void revalidateContentCache(['artists'])
+    return createdArtist
   }
 
   const updateArtist = async (id: string, data: ArtistUpdate): Promise<void> => {

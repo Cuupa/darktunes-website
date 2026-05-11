@@ -51,10 +51,11 @@ type Props = AdminPanelProps<ArtistFormData>
 
 export function ArtistForm({ value, onChange, isLoading }: Props) {
   const supabase = createBrowserSupabaseClient()
-  const { register, handleSubmit, watch, setValue, reset } = useForm<ArtistFormData>({
+  const { register, handleSubmit, watch, setValue, reset, getValues } = useForm<ArtistFormData>({
     defaultValues: value,
   })
   const [isFetchingImage, setIsFetchingImage] = useState(false)
+  const [isPrefillingSpotify, setIsPrefillingSpotify] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -76,6 +77,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   const featured = watch('featured')
   const isEuNonGerman = watch('isEuNonGerman')
   const spotifyId = watch('spotifyId')
+  const spotifyUrl = watch('spotifyUrl')
   const discogsId = watch('discogsId')
 
   const handleFetchImage = async () => {
@@ -107,6 +109,61 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       toast.error(err instanceof Error ? err.message : 'Failed to fetch image')
     } finally {
       setIsFetchingImage(false)
+    }
+  }
+
+  const handlePrefillFromSpotify = async () => {
+    const spotifyUrlInput = spotifyUrl.trim()
+    const spotifyIdInput = spotifyId.trim()
+    if (!spotifyUrlInput && !spotifyIdInput) {
+      toast.error('Enter a Spotify URL or Spotify ID first')
+      return
+    }
+
+    setIsPrefillingSpotify(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const source = spotifyUrlInput || `https://open.spotify.com/artist/${spotifyIdInput}`
+      const res = await fetch('/api/admin/prefill-artist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ spotifyUrl: source }),
+      })
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+
+      const profile = (await res.json()) as {
+        spotifyId: string
+        name: string
+        imageUrl: string | null
+        genres: string[]
+        spotifyUrl: string
+      }
+
+      const current = getValues()
+      if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
+      if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
+      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) {
+        setValue('genres', profile.genres.join(', '))
+      }
+      setValue('spotifyId', profile.spotifyId)
+      setValue('spotifyUrl', profile.spotifyUrl)
+
+      toast.success('Artist data prefilled from Spotify')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to prefill from Spotify')
+    } finally {
+      setIsPrefillingSpotify(false)
     }
   }
 
@@ -164,7 +221,20 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="spotifyUrl">Spotify URL</Label>
-          <Input id="spotifyUrl" {...register('spotifyUrl')} disabled={isLoading} />
+          <div className="flex gap-2">
+            <Input id="spotifyUrl" {...register('spotifyUrl')} disabled={isLoading} className="flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void handlePrefillFromSpotify()}
+              disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
+            >
+              {isPrefillingSpotify && <ArrowsClockwise size={14} className="animate-spin" />}
+              Prefill from Spotify
+            </Button>
+          </div>
         </div>
         <div className="space-y-1">
           <Label htmlFor="instagramUrl">Instagram URL</Label>

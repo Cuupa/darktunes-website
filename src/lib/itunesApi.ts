@@ -10,11 +10,21 @@ export interface iTunesRelease {
   trackCount: number
   primaryGenreName: string
   collectionViewUrl: string
+  wrapperType?: string
 }
 
 export interface iTunesSearchResponse {
   resultCount: number
+  results: Array<{ artistId: number; artistName: string }>
+}
+
+export interface iTunesLookupResponse {
+  resultCount: number
   results: iTunesRelease[]
+}
+
+function upgradeArtworkUrl(url: string): string {
+  return url.replace(/\d+x\d+bb(\.\w+)$/, '3000x3000bb$1')
 }
 
 export async function searchItunesArtist(
@@ -22,19 +32,37 @@ export async function searchItunesArtist(
   fetchFn: typeof fetch = globalThis.fetch,
 ): Promise<iTunesRelease[]> {
   const encodedArtist = encodeURIComponent(artistName)
-  const response = await fetchFn(
-    `https://itunes.apple.com/search?term=${encodedArtist}&entity=album&limit=200`
+  const searchResponse = await fetchFn(
+    `https://itunes.apple.com/search?term=${encodedArtist}&entity=musicArtist&attribute=artistTerm&limit=5`,
   )
 
-  if (!response.ok) {
-    throw new Error(`iTunes API error: ${response.status}`)
+  if (!searchResponse.ok) {
+    throw new Error(`iTunes API error: ${searchResponse.status}`)
   }
 
-  const data: iTunesSearchResponse = await response.json() as iTunesSearchResponse
-
-  return data.results.filter(result =>
-    result.artistName.toLowerCase() === artistName.toLowerCase()
+  const searchData = (await searchResponse.json()) as iTunesSearchResponse
+  const artistMatch = searchData.results.find(
+    (result) => result.artistName.toLowerCase() === artistName.toLowerCase(),
   )
+
+  if (!artistMatch?.artistId) return []
+
+  const lookupResponse = await fetchFn(
+    `https://itunes.apple.com/lookup?id=${artistMatch.artistId}&entity=album&limit=200`,
+  )
+
+  if (!lookupResponse.ok) {
+    throw new Error(`iTunes API error: ${lookupResponse.status}`)
+  }
+
+  const lookupData = (await lookupResponse.json()) as iTunesLookupResponse
+
+  return lookupData.results
+    .filter((result) => result.wrapperType === 'collection')
+    .map((result) => ({
+      ...result,
+      artworkUrl100: upgradeArtworkUrl(result.artworkUrl100),
+    }))
 }
 
 export async function getAllArtistsReleases(artistNames: string[]): Promise<Map<string, iTunesRelease[]>> {
@@ -79,7 +107,7 @@ export function convertItunesReleaseToRelease(itunesRelease: iTunesRelease): {
     artistId: String(itunesRelease.artistId),
     artistName: itunesRelease.artistName,
     releaseDate: itunesRelease.releaseDate.split('T')[0],
-    coverArt: itunesRelease.artworkUrl600 || itunesRelease.artworkUrl100.replace('100x100', '600x600'),
+    coverArt: upgradeArtworkUrl(itunesRelease.artworkUrl100),
     type,
     appleMusicUrl: itunesRelease.collectionViewUrl,
     featured: false

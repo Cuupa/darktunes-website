@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fetchSpotifyArtistReleases } from './spotifyApi'
+import { fetchSpotifyArtistProfile, fetchSpotifyArtistReleases } from './spotifyApi'
 
 const TOKEN_RESPONSE = {
   access_token: 'test-token',
@@ -35,7 +35,8 @@ const ALBUM_RESPONSE = {
 
 function makeFetch(tokenResponse: unknown, albumResponse: unknown) {
   return vi.fn().mockImplementation(async (url: string) => {
-    const body = url.includes('accounts.spotify.com') ? tokenResponse : albumResponse
+    const hostname = new URL(url).hostname
+    const body = hostname === 'accounts.spotify.com' ? tokenResponse : albumResponse
     return {
       ok: true,
       json: async () => body,
@@ -101,5 +102,53 @@ describe('fetchSpotifyArtistReleases', () => {
     await expect(
       fetchSpotifyArtistReleases('a', 'id', 'secret', mockFetch),
     ).rejects.toThrow('429')
+  })
+})
+
+describe('fetchSpotifyArtistProfile', () => {
+  it('returns mapped profile and uses largest image', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
+        return { ok: true, json: async () => TOKEN_RESPONSE } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'artist123',
+          name: 'Dark Artist',
+          images: [
+            { url: 'https://i.scdn.co/image/320.jpg', width: 320, height: 320 },
+            { url: 'https://i.scdn.co/image/640.jpg', width: 640, height: 640 },
+          ],
+          genres: ['industrial', 'ebm'],
+          external_urls: { spotify: 'https://open.spotify.com/artist/artist123' },
+          popularity: 77,
+        }),
+      } as Response
+    })
+
+    const profile = await fetchSpotifyArtistProfile('artist123', 'profile-id', 'secret', mockFetch)
+
+    expect(profile).toEqual({
+      spotifyId: 'artist123',
+      name: 'Dark Artist',
+      imageUrl: 'https://i.scdn.co/image/640.jpg',
+      genres: ['industrial', 'ebm'],
+      spotifyUrl: 'https://open.spotify.com/artist/artist123',
+      popularity: 77,
+    })
+  })
+
+  it('throws HttpError when profile endpoint is not ok', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
+        return { ok: true, json: async () => TOKEN_RESPONSE } as Response
+      }
+      return { ok: false, status: 500 } as Response
+    })
+
+    await expect(
+      fetchSpotifyArtistProfile('artist123', 'profile-id-2', 'secret', mockFetch),
+    ).rejects.toThrow('500')
   })
 })
