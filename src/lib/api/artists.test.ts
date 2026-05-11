@@ -84,7 +84,7 @@ describe('getArtists', () => {
     expect(result[0].slug).toBe('c-z-a-r-i-n-a')
   })
 
-  it('falls back to an ascii slug for names with special characters', async () => {
+  it('falls back to a normalized slug for names with unicode characters', async () => {
     const db = makeMockDb([{ ...mockArtistRow, name: 'Mötley Crüe ß', slug: '   ' }])
     const result = await getArtists(db)
     expect(result).toHaveLength(1)

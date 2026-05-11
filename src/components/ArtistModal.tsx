@@ -172,7 +172,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
   const bioText = artist.bio ?? ''
   const bioClamped = !bioExpanded && bioText.length > BIO_LIMIT
   const bioDisplay = bioClamped ? bioText.slice(0, BIO_LIMIT) + '…' : bioText
-  const profileSlug = artist.slug?.trim()
+  const profileSlug = artist.slug
 
   const socialLinks = [
     { url: artist.spotifyUrl, icon: SpotifyLogo, label: `${artist.name} on Spotify` },
