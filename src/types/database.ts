@@ -54,6 +54,7 @@ export interface Database {
           spotify_id: string | null
           discogs_id: string | null
           songkick_id: string | null
+          bandsintown_id: string | null
           last_synced_at: string | null
           user_id: string | null
           created_at: string
@@ -79,6 +80,7 @@ export interface Database {
           spotify_id?: string | null
           discogs_id?: string | null
           songkick_id?: string | null
+          bandsintown_id?: string | null
           last_synced_at?: string | null
           user_id?: string | null
           created_at?: string
@@ -104,6 +106,7 @@ export interface Database {
           spotify_id?: string | null
           discogs_id?: string | null
           songkick_id?: string | null
+          bandsintown_id?: string | null
           last_synced_at?: string | null
           user_id?: string | null
           created_at?: string
@@ -309,6 +312,7 @@ export interface Database {
           concert_date: string
           ticket_url: string | null
           songkick_id: string | null
+          bandsintown_id: string | null
           status: string
           created_at: string
           updated_at: string
@@ -324,6 +328,7 @@ export interface Database {
           concert_date: string
           ticket_url?: string | null
           songkick_id?: string | null
+          bandsintown_id?: string | null
           status?: string
           created_at?: string
           updated_at?: string
@@ -339,6 +344,7 @@ export interface Database {
           concert_date?: string
           ticket_url?: string | null
           songkick_id?: string | null
+          bandsintown_id?: string | null
           status?: string
           created_at?: string
           updated_at?: string

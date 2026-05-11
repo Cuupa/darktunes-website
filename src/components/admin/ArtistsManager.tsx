@@ -56,6 +56,7 @@ const EMPTY_FORM: ArtistFormData = {
   spotifyId: '',
   discogsId: '',
   songkickId: '',
+  bandsintownId: '',
 }
 
 function artistToFormData(artist: Artist): ArtistFormData {
@@ -78,6 +79,7 @@ function artistToFormData(artist: Artist): ArtistFormData {
     spotifyId: artist.spotifyId ?? '',
     discogsId: artist.discogsId ?? '',
     songkickId: artist.songkickId ?? '',
+    bandsintownId: artist.bandsintownId ?? '',
   }
 }
 
@@ -104,6 +106,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     spotify_id: data.spotifyId || null,
     discogs_id: data.discogsId || null,
     songkick_id: data.songkickId || null,
+    bandsintown_id: data.bandsintownId || null,
   }
 }
 

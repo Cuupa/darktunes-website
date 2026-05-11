@@ -27,6 +27,7 @@ export interface ArtistFormData {
   spotifyId: string
   discogsId: string
   songkickId: string
+  bandsintownId: string
 }
 
 function toSlug(name: string): string {
@@ -140,7 +141,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Auto-Sync IDs
         </p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label htmlFor="spotifyId">Spotify Artist ID</Label>
             <Input
@@ -165,6 +166,15 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
               id="songkickId"
               {...register('songkickId')}
               placeholder="e.g. 789012"
+              disabled={isLoading}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="bandsintownId">Bandsintown Artist ID</Label>
+            <Input
+              id="bandsintownId"
+              {...register('bandsintownId')}
+              placeholder="e.g. Artist Name or id:12345"
               disabled={isLoading}
             />
           </div>

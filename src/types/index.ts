@@ -18,6 +18,7 @@ export interface Artist {
   spotifyId?: string
   discogsId?: string
   songkickId?: string
+  bandsintownId?: string
   lastSyncedAt?: string
 }
 
@@ -144,6 +145,7 @@ export interface Concert {
   concertDate: string
   ticketUrl: string | null
   songkickId: string | null
+  bandsintownId: string | null
   status: string
   createdAt: string
   updatedAt: string

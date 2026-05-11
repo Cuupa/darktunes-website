@@ -8,7 +8,8 @@
  *   2. Spotify — albums + popularity + cover art
  *   3. Discogs — physical releases (catalog numbers, barcodes)
  *   4. Songkick — upcoming concerts
- *   5. Odesli — smart links for newly synced releases
+ *   5. Bandsintown — upcoming concerts (second source)
+ *   6. Odesli — smart links for newly synced releases
  *
  * All dependencies are injected via `SyncAllDeps` for full testability.
  * The function never throws — all errors are collected in `SyncAllResult`.
@@ -24,6 +25,7 @@ import { withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchSpotifyArtistReleases } from './spotifyApi'
 import { fetchDiscogsArtistReleases } from './discogsApi'
 import { fetchSongkickArtistCalendar } from './songkickApi'
+import { fetchBandsintownArtistEvents } from './bandsintownApi'
 import { resolveOdesliSmartLink } from './odesliApi'
 import { deduplicateReleases } from './deduplication'
 import { syncArtist } from './syncArtist'
@@ -40,6 +42,8 @@ export interface SyncAllDeps extends SyncDeps {
   discogsToken?: string
   /** Songkick API key — undefined means Songkick sync is skipped */
   songkickApiKey?: string
+  /** Bandsintown app_id — undefined means Bandsintown sync is skipped */
+  bandsintownAppId?: string
 }
 
 export interface ApiSyncResult {
@@ -65,7 +69,7 @@ export interface SyncAllResult {
  * Returns a consolidated result — never throws.
  */
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
-  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey } = deps
+  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownAppId } = deps
   const results: ApiSyncResult[] = []
 
   // 1. Fetch all artists
@@ -264,6 +268,66 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
     await writeSyncLog(db, 'songkick', songkickResult)
     results.push(songkickResult)
+  }
+
+  // 5. Bandsintown sync — upcoming concerts (second source)
+  if (bandsintownAppId) {
+    const bandsintownResult: ApiSyncResult = {
+      api: 'bandsintown',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      errors: [],
+    }
+
+    for (const artist of artists) {
+      if (!artist.bandsintown_id) continue
+      bandsintownResult.artistsProcessed++
+
+      try {
+        const concerts = await withExponentialBackoff(() =>
+          fetchBandsintownArtistEvents(artist.bandsintown_id!, bandsintownAppId, fetchFn),
+        )
+
+        for (const concert of concerts) {
+          try {
+            await db
+              .from('concerts')
+              .upsert(
+                {
+                  artist_id: artist.id,
+                  artist_name: artist.name,
+                  event_name: concert.eventName,
+                  venue_name: concert.venueName,
+                  venue_city: concert.venueCity,
+                  venue_country: concert.venueCountry,
+                  concert_date: concert.concertDate,
+                  ticket_url: concert.ticketUrl,
+                  bandsintown_id: concert.bandsintownId,
+                  status: concert.status,
+                },
+                { onConflict: 'bandsintown_id' },
+              )
+              .select()
+              .single()
+
+            bandsintownResult.concertsUpserted++
+          } catch (e) {
+            bandsintownResult.errors.push(
+              `Failed to upsert concert "${concert.eventName}": ${String(e)}`,
+            )
+          }
+        }
+      } catch (e) {
+        const msg = String(e)
+        if (msg.includes('429')) bandsintownResult.rateLimited = true
+        bandsintownResult.errors.push(`Bandsintown sync for ${artist.name}: ${msg}`)
+      }
+    }
+
+    await writeSyncLog(db, 'bandsintown', bandsintownResult)
+    results.push(bandsintownResult)
   }
 
   return {
