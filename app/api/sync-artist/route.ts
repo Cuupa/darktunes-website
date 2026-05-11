@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { syncArtist } from '@/lib/sync/syncArtist'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
@@ -112,6 +113,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       fetch: globalThis.fetch,
       uploadToR2: uploadFn,
     })
+    revalidateTag('releases')
+    revalidateTag('artists')
     return NextResponse.json(result)
   } catch (err) {
     return NextResponse.json(

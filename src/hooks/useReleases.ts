@@ -2,31 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as releasesApi from '@/lib/api/releases'
-import { searchItunesArtist } from '@/lib/itunesApi'
-import { artistsData } from '@/lib/artistsData'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
-import type { iTunesRelease } from '@/lib/itunesApi'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
-
-function itunesReleaseToInsert(ir: iTunesRelease): ReleaseInsert {
-  const trackCount = ir.trackCount
-  const type: 'album' | 'ep' | 'single' =
-    trackCount === 1 ? 'single' : trackCount <= 6 ? 'ep' : 'album'
-
-  return {
-    title: ir.collectionName,
-    artist_name: ir.artistName,
-    release_date: ir.releaseDate.split('T')[0],
-    cover_art: ir.artworkUrl600 ?? ir.artworkUrl100.replace('100x100', '600x600'),
-    type,
-    apple_music_url: ir.collectionViewUrl,
-    itunes_id: String(ir.collectionId),
-    featured: false,
-  }
-}
 
 export function useReleases() {
   const [releases, setReleases] = useState<Release[]>([])
@@ -57,42 +37,66 @@ export function useReleases() {
   const createRelease = async (data: ReleaseInsert): Promise<void> => {
     await releasesApi.createRelease(supabase, data)
     await load()
+    void revalidateContentCache(['releases'])
   }
 
   const updateRelease = async (id: string, data: ReleaseUpdate): Promise<void> => {
     await releasesApi.updateRelease(supabase, id, data)
     await load()
+    void revalidateContentCache(['releases'])
   }
 
   const deleteRelease = async (id: string): Promise<void> => {
     await releasesApi.deleteRelease(supabase, id)
     await load()
+    void revalidateContentCache(['releases'])
   }
 
-  const syncFromItunes = async (): Promise<void> => {
+  const syncAllReleases = async (): Promise<void> => {
     if (!isSupabaseConfigured) return
     setIsSyncing(true)
     setSyncProgress(0)
-    const artistNames = artistsData.map((a) => a.name)
-    for (let i = 0; i < artistNames.length; i++) {
-      try {
-        const itunesReleases = await searchItunesArtist(artistNames[i])
-        for (const ir of itunesReleases) {
-          try {
-            await releasesApi.upsertReleaseByItunesId(supabase, itunesReleaseToInsert(ir))
-          } catch {
-            // Skip individual upsert failures to not block the sync
-          }
-        }
-      } catch {
-        // Skip individual artist fetch failures
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`Sync failed: ${text}`)
       }
-      setSyncProgress(Math.round(((i + 1) / artistNames.length) * 100))
-      await new Promise<void>((resolve) => setTimeout(resolve, 200))
+    } finally {
+      setIsSyncing(false)
+      setSyncProgress(0)
+      await load()
     }
-    setIsSyncing(false)
-    setSyncProgress(0)
-    await load()
+  }
+
+  // Fire-and-forget ISR cache revalidation after mutations
+  const revalidateContentCache = async (tags: string[]): Promise<void> => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      void fetch('/api/revalidate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ tags }),
+      })
+    } catch {
+      // Ignore revalidation errors — they are non-critical
+    }
   }
 
   useEffect(() => {
@@ -108,7 +112,7 @@ export function useReleases() {
     createRelease,
     updateRelease,
     deleteRelease,
-    syncFromItunes,
+    syncAllReleases,
     reload: load,
   }
 }
