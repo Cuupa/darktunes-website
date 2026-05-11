@@ -1,19 +1,23 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Release, SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface HeroProps {
+interface HeroProps extends SectionProps {
   featuredRelease?: Release
   siteSettings: SiteSettings
   dict: Dictionary['hero']
 }
 
 export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
+  const prefersReducedMotion = useReducedMotion()
+
   if (!featuredRelease) {
     return null
   }
@@ -41,7 +45,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(18, 18, 18, 0.3), rgba(18, 18, 18, 0.95)), url(${featuredRelease.coverArt})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(18, 18, 18, 0.3), rgba(18, 18, 18, 0.95)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundAttachment: 'fixed',
@@ -51,9 +55,9 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
       <div className="container mx-auto px-4 lg:px-16 z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.2 }}
             className="space-y-8"
           >
             <Badge className="bg-secondary/90 text-secondary-foreground uppercase tracking-wider font-bold text-sm px-4 py-2 backdrop-blur-sm">
@@ -85,15 +89,15 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.4 }}
             className="relative"
           >
             <div className="glow-card relative aspect-square rounded-lg overflow-hidden shadow-2xl shadow-accent/20">
               <img 
-                src={featuredRelease.coverArt} 
-                alt={`${featuredRelease.title} cover`}
+                src={getOptimizedImageUrl(featuredRelease.coverArt, 800)}
+                alt={`${featuredRelease.title} by ${featuredRelease.artistName} – cover art`}
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
@@ -103,8 +107,9 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
       </div>
 
       <motion.div
+        aria-hidden="true"
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-muted-foreground"
-        animate={{ y: [0, 10, 0] }}
+        animate={prefersReducedMotion ? {} : { y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >
         <p className="text-sm uppercase tracking-widest font-mono">{dict.scrollDown}</p>

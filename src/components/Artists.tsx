@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,8 +19,9 @@ import { ArtistModal } from '@/components/ArtistModal'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface ArtistsProps {
+interface ArtistsProps extends SectionProps {
   artists: Artist[]
   dict: Dictionary['artists']
 }
@@ -28,6 +29,7 @@ interface ArtistsProps {
 export function Artists({ artists, dict }: ArtistsProps) {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
 
   const handleArtistClick = (artist: Artist) => {
     setSelectedArtist(artist)
@@ -39,24 +41,24 @@ export function Artists({ artists, dict }: ArtistsProps) {
       <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="mb-12"
         >
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
           {artists.map((artist, index) => (
-            <motion.div 
+            <motion.li
               key={artist.id}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
             >
               <Card 
                 className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
@@ -66,7 +68,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                   {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
                     <img
                       src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
-                      alt={artist.name}
+                      alt={`${artist.name} – artist photo`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
@@ -105,9 +107,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.spotifyUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on Spotify`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <SpotifyLogo size={20} weight="fill" />
+                        <SpotifyLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.instagramUrl && (
@@ -115,9 +118,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.instagramUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on Instagram`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <InstagramLogo size={20} weight="fill" />
+                        <InstagramLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.youtubeUrl && (
@@ -125,9 +129,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.youtubeUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on YouTube`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <YoutubeLogo size={20} weight="fill" />
+                        <YoutubeLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.facebookUrl && (
@@ -135,9 +140,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.facebookUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on Facebook`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <FacebookLogo size={20} weight="fill" />
+                        <FacebookLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.twitterUrl && (
@@ -145,9 +151,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.twitterUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on X (Twitter)`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <TwitterLogo size={20} weight="fill" />
+                        <TwitterLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.tiktokUrl && (
@@ -155,9 +162,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.tiktokUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} on TikTok`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <TiktokLogo size={20} weight="fill" />
+                        <TiktokLogo size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.bandcampUrl && (
@@ -165,10 +173,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.bandcampUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                        title="Bandcamp"
+                        aria-label={`${artist.name} on Bandcamp`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <MusicNote size={20} weight="fill" />
+                        <MusicNote size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.shopUrl && (
@@ -176,10 +184,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.shopUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
-                        title="Darkmerch"
+                        aria-label={`${artist.name} merch shop`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
                       >
-                        <ShoppingBag size={20} weight="fill" />
+                        <ShoppingBag size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                     {artist.websiteUrl && (
@@ -187,24 +195,25 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         href={artist.websiteUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="p-2.5 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        aria-label={`${artist.name} official website`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                       >
-                        <Globe size={20} weight="fill" />
+                        <Globe size={20} weight="fill" aria-hidden="true" />
                       </a>
                     )}
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
 
     <ArtistModal 
       artist={selectedArtist} 
       open={modalOpen} 
-      onOpenChange={setModalOpen} 
+      onClose={() => setModalOpen(false)}
     />
     </>
   )

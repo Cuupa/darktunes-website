@@ -56,6 +56,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="bg-background text-foreground antialiased">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:bg-background focus:text-foreground focus:px-4 focus:py-2 focus:rounded-md focus:border focus:border-accent focus:outline-none"
+        >
+          Skip to main content
+        </a>
         <VisualEffectsOverlay
           noiseOpacity={settings?.noiseOpacity ?? 0.04}
           crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}

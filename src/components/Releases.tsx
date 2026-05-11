@@ -1,15 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface ReleasesProps {
+interface ReleasesProps extends SectionProps {
   releases: Release[]
   dict: Dictionary['releases']
   locale: Locale
@@ -17,28 +18,29 @@ interface ReleasesProps {
 
 export function Releases({ releases, dict, locale }: ReleasesProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const prefersReducedMotion = useReducedMotion()
   return (
     <section id="releases" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="mb-12"
         >
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
           {releases.map((release, index) => (
-            <motion.div
+            <motion.li
               key={release.id}
-              initial={{ opacity: 0, y: 30 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
             >
               <Link href={`/releases/${release.id}`} aria-label={`${release.title} – ${release.artistName}`}>
                 <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
@@ -74,9 +76,9 @@ export function Releases({ releases, dict, locale }: ReleasesProps) {
                   </div>
                 </Card>
               </Link>
-            </motion.div>
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   )

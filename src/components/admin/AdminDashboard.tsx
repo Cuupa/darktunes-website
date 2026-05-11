@@ -14,10 +14,12 @@ import { AssetsManager } from './AssetsManager'
 import { SiteSettingsManager } from './SiteSettingsManager'
 import { SystemHealthWidget } from './SystemHealthWidget'
 import { JournalistManager } from './JournalistManager'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 export function AdminDashboard() {
   const { user, profile, signOut, session } = useAuthContext()
   const [activeTab, setActiveTab] = useState('artists')
+  const { settings: siteSettings, isLoading: siteSettingsLoading, saveSettings } = useSiteSettings()
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -169,7 +171,7 @@ export function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SiteSettingsManager />
+                <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Calendar, MapPin, Ticket } from '@phosphor-icons/react'
 import type { Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import type { SectionProps } from '@/lib/component-contracts'
 
-interface ConcertsProps {
+interface ConcertsProps extends SectionProps {
   concerts: Concert[]
   dict: Dictionary['concerts']
   locale: Locale

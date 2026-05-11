@@ -3,22 +3,23 @@
 ## What Is Implemented
 
 ### Public Website
-- **Hero section** — featured release with dynamic background
-- **Releases section** — server-side fetched from Supabase via RSC + ISR (60s revalidate)
+- **Hero section** — featured release with dynamic background; buttons functional (Listen Now → Spotify/player, Explore Artist → #artists)
+- **Releases section** — server-side fetched from Supabase via RSC + ISR (60s revalidate); semantic `<ul>/<li>` grid; `useReducedMotion` support
 - **Spotify Player** — embedded iframe player for the label playlist
-- **Artists section** — server-side data, passed as props to client component
-- **Videos section** — YouTube embed gallery
-- **News section** — server-side data from Supabase
+- **Artists section** — server-side data, passed as props to client component; semantic `<ul>/<li>` grid; full ARIA on icon links; 44×44px touch targets; `useReducedMotion` support
+- **Videos section** — YouTube embed gallery; semantic `<ul>/<li>` grid; image proxy via wsrv.nl; `useReducedMotion` support
+- **News section** — server-side data from Supabase; semantic `<ul>/<li>` list; "Read Full Story" links to `/news/${slug}`; `useReducedMotion` support
 - **Tour section** — upcoming concert dates from Supabase with ticket links
-- **Header** — shrinking logo on scroll, navigation (`"use client"`)
-- **Footer** (`"use client"` for smooth scroll behaviour)
+- **Header** — shrinking logo on scroll, navigation, Lenis smooth scroll, full ARIA (nav label, mobile toggle aria-expanded/controls, mobile nav id), 44px touch targets (`"use client"`)
+- **Footer** — Lenis smooth scroll, footer nav wrapped in `<nav aria-label="Footer navigation">`, aria-labels on social icons (`"use client"`)
 - **CRT scanline overlay** — full-page vintage aesthetic
+- **WCAG 2.1 AA/AAA compliance** — skip navigation link in `app/layout.tsx`, `id="main-content"` on `<main>`, `useReducedMotion` in all animated sections, descriptive alt text, icon aria-labels, 44×44px touch targets, semantic lists
 
 ### Infrastructure (Next.js 15 App Router)
 - **Next.js 15 (App Router)** + React 19 + TypeScript — migrated from Vite SPA
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
-- **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`)
+- **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
 - **Vitest** unit test suite (`npm test`) — 147 tests passing (18 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
@@ -61,7 +62,7 @@
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
-- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`
+- **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 
 ### SOS Webhook — Statement of Sales PDF Upload
 - `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
