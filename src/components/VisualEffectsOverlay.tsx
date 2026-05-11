@@ -30,6 +30,8 @@ const OVERLAY_BASE: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
   pointerEvents: 'none',
+  transform: 'translateZ(0)',
+  contain: 'strict',
 }
 
 export function VisualEffectsOverlay({
@@ -44,8 +46,9 @@ export function VisualEffectsOverlay({
         aria-hidden="true"
         style={{
           ...OVERLAY_BASE,
-          zIndex: 9996,
-          background: `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${vignetteIntensity}) 100%)`,
+          zIndex: 'var(--z-global-fx)',
+          background: `radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,${vignetteIntensity * 0.65}) 100%)`,
+          boxShadow: `inset 0 0 160px rgba(0,0,0,${vignetteIntensity})`,
         }}
       />
 
@@ -56,7 +59,7 @@ export function VisualEffectsOverlay({
           className="scanlines-overlay"
           style={{
             ...OVERLAY_BASE,
-            zIndex: 9997,
+            zIndex: 'calc(var(--z-global-fx) + 1)',
             background:
               'repeating-linear-gradient(0deg, rgba(0,0,0,0.12), rgba(0,0,0,0.12) 1px, transparent 1px, transparent 2px)',
             backgroundSize: '100% 2px',
@@ -70,7 +73,7 @@ export function VisualEffectsOverlay({
         className="noise-overlay"
         style={{
           ...OVERLAY_BASE,
-          zIndex: 9998,
+          zIndex: 'calc(var(--z-global-fx) + 2)',
           opacity: noiseOpacity,
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           backgroundRepeat: 'repeat',
