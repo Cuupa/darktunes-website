@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 
 interface ArtistModalProps {
@@ -41,14 +42,29 @@ export function ArtistModal({ artist, open, onOpenChange }: ArtistModalProps) {
           
           <div className="grid md:grid-cols-2 gap-0">
             <div className="relative aspect-square md:aspect-auto overflow-hidden">
-              <motion.img
-                initial={{ scale: 1.1, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
-                src={artist.imageUrl}
-                alt={artist.name}
-                className="w-full h-full object-cover"
-              />
+              {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
+                <motion.img
+                  initial={{ scale: 1.1, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
+                  alt={artist.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                    const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
+                    if (placeholder) placeholder.style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <div
+                className="w-full h-full min-h-[320px] bg-gradient-to-br from-card to-background flex items-center justify-center"
+                style={{ display: getSquareThumbnail(artist.imageUrl ?? '', 800) ? 'none' : 'flex' }}
+              >
+                <span className="text-8xl font-bold text-muted-foreground/40 select-none uppercase">
+                  {artist.name.slice(0, 2)}
+                </span>
+              </div>
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
             </div>
 

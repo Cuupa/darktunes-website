@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Calendar } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { NewsPost } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -44,9 +45,12 @@ export function News({ news, dict, locale }: NewsProps) {
                   {post.imageUrl && (
                     <div className="relative aspect-[16/9] lg:aspect-auto overflow-hidden">
                       <img 
-                        src={post.imageUrl} 
+                        src={getOptimizedImageUrl(post.imageUrl, 800)} 
                         alt={post.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        onError={(e) => {
+                          e.currentTarget.closest('.relative')?.remove()
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/20" />
                     </div>

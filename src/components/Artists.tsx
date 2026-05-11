@@ -16,6 +16,7 @@ import {
   ShoppingBag,
 } from '@phosphor-icons/react'
 import { ArtistModal } from '@/components/ArtistModal'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 
@@ -62,11 +63,26 @@ export function Artists({ artists, dict }: ArtistsProps) {
                 onClick={() => handleArtistClick(artist)}
               >
                 <div className="relative aspect-square overflow-hidden">
-                  <img 
-                    src={artist.imageUrl} 
-                    alt={artist.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
+                  {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
+                    <img
+                      src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
+                      alt={artist.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                        const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
+                        if (placeholder) placeholder.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className="w-full h-full bg-gradient-to-br from-card to-background flex items-center justify-center"
+                    style={{ display: getSquareThumbnail(artist.imageUrl ?? '', 800) ? 'none' : 'flex' }}
+                  >
+                    <span className="text-6xl font-bold text-muted-foreground/40 select-none uppercase">
+                      {artist.name.slice(0, 2)}
+                    </span>
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 right-6">
                     <h3 className="text-3xl font-bold mb-3 group-hover:text-accent transition-colors">{artist.name}</h3>

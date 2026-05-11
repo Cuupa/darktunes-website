@@ -76,7 +76,7 @@ export function HomePageContent({
               <p className="text-lg text-muted-foreground font-serif">{dict.spotify.subheading}</p>
             </motion.div>
             <SpotifyPlayer
-              playlistUri={siteSettings.spotifyPlaylistUri}
+              playlistUri={siteSettings.spotifyPlaylistUri || '37i9dQZF1DWWqNV5cS50j6'}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
               loadLabel={dict.consent.loadSpotify}
             />
