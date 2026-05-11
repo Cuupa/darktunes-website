@@ -436,6 +436,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 - `SPOTIFY_CLIENT_SECRET`: Spotify app client secret
 - `DISCOGS_TOKEN`: Discogs personal access token (https://www.discogs.com/settings/developers)
 - `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
+- `BANDSINTOWN_APP_ID`: Bandsintown app_id (https://www.bandsintown.com/api/app_id → Request access)
 
 ### SOS Webhook (optional — Statement of Sales PDF upload from external generator)
 - `SOS_WEBHOOK_SECRET`: A random, high-entropy string shared between this app and the SOS PDF generator service. Used to authenticate server-to-server calls to `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm`. Generate with `openssl rand -hex 32`.

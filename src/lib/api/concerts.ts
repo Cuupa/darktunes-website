@@ -17,6 +17,7 @@ function rowToConcert(row: ConcertRow): Concert {
     concertDate: row.concert_date,
     ticketUrl: row.ticket_url,
     songkickId: row.songkick_id,
+    bandsintownId: row.bandsintown_id,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

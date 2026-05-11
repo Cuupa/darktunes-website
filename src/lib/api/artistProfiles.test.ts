@@ -71,6 +71,7 @@ const mockArtistRow: ArtistRow = {
   spotify_id: null,
   discogs_id: null,
   songkick_id: null,
+  bandsintown_id: null,
   last_synced_at: null,
   user_id: 'auth-user-uuid',
   created_at: '2024-01-01T00:00:00Z',

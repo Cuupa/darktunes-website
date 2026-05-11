@@ -84,10 +84,11 @@
 - `VideoForm` — youtubeId with auto-thumbnail generation
 
 ### Multi-API Sync Engine (`src/lib/sync/`)
-- **`syncAll.ts`** — Multi-artist, multi-API orchestrator. Runs iTunes, Spotify, Discogs, Songkick, and Odesli sync for every artist. Accepts `SyncAllDeps` (extends `SyncDeps` with optional `spotify`, `discogsToken`, `songkickApiKey`). Never throws — errors captured per-API in `SyncAllResult`.
+- **`syncAll.ts`** — Multi-artist, multi-API orchestrator. Runs iTunes, Spotify, Discogs, Songkick, Bandsintown, and Odesli sync for every artist. Accepts `SyncAllDeps` (extends `SyncDeps` with optional `spotify`, `discogsToken`, `songkickApiKey`, `bandsintownAppId`). Never throws — errors captured per-API in `SyncAllResult`.
 - **`spotifyApi.ts`** — Fetches artist albums via Spotify Web API (client credentials flow). Returns `SpotifyRelease[]` with cover art URLs, popularity scores, and UPC barcodes.
 - **`discogsApi.ts`** — Fetches physical releases from Discogs API (Personal Access Token). Paginated. Returns catalog numbers and barcodes.
 - **`songkickApi.ts`** — Fetches upcoming concerts from Songkick API. Paginated. Returns `SongkickConcert[]` with venue, city, country, date, and ticket URL.
+- **`bandsintownApi.ts`** — Fetches upcoming concerts from Bandsintown API v3. Returns `BandsintownConcert[]` with venue, city, country, date, and ticket URL.
 - **`odesliApi.ts`** — Resolves any music streaming URL through Odesli (song.link) to return a universal smart link plus per-platform URLs.
 - **`deduplication.ts`** — Merges Spotify (digital) and Discogs (physical) release lists using ISRC → barcode/UPC → normalised title + year as matching precedence.
 
@@ -151,7 +152,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | wsrv.nl image proxy | ✅ Implemented | getOptimizedImageUrl / getSquareThumbnail in src/lib/imageUtils.ts |
 | Rate limiter + exponential backoff | ✅ Implemented | withExponentialBackoff in src/lib/rateLimiter.ts |
 | Sync history logging | ✅ Implemented | sync_logs table + getSyncLogsByArtist DAL |
-| Spotify / Discogs / Songkick sync | ✅ Implemented | `src/lib/sync/{spotifyApi,discogsApi,songkickApi,odesliApi,deduplication,syncAll}.ts`; POST `/api/sync` |
+| Spotify / Discogs / Songkick / Bandsintown sync | ✅ Implemented | `src/lib/sync/{spotifyApi,discogsApi,songkickApi,bandsintownApi,odesliApi,deduplication,syncAll}.ts`; POST `/api/sync` |
 | Visual Effects overlays (noise, scanlines, vignette) | ✅ Implemented | `VisualEffectsOverlay` in `app/layout.tsx`; settings stored in `site_settings` KV table; controlled from Admin "Visual Effects" tab |
 | Site settings CMS | ✅ Implemented | `site_settings` table + Admin Settings tab + Next.js ISR cache revalidation |
 | Impressum page (§ 5 TMG) | ✅ Implemented | `/impressum` RSC — all mandatory German legal fields from CMS |
@@ -203,6 +204,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/sync/spotifyApi.ts` | Spotify Web API integration (albums, popularity, cover art) |
 | `src/lib/sync/discogsApi.ts` | Discogs API integration (physical releases, catalog numbers, barcodes) |
 | `src/lib/sync/songkickApi.ts` | Songkick API integration (concerts, venues, ticket links) |
+| `src/lib/sync/bandsintownApi.ts` | Bandsintown API v3 integration (concerts, venues, ticket links) |
 | `src/lib/sync/odesliApi.ts` | Odesli API integration (universal smart links via song.link) |
 | `src/lib/sync/deduplication.ts` | ISRC/barcode deduplication utility for merging Spotify + Discogs releases |
 | `src/lib/errors.ts` | `ApiError` class + `withErrorHandler` HOF for centralized error handling |

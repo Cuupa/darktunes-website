@@ -103,6 +103,7 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
 | `DISCOGS_TOKEN` | Discogs personal access token (sync releases by Discogs Artist ID) |
 | `SONGKICK_API_KEY` | Songkick API key (sync tour dates by Songkick Artist ID) |
+| `BANDSINTOWN_APP_ID` | Bandsintown app_id / API key (sync tour dates by Bandsintown artist name) |
 
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 

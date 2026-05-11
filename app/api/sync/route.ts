@@ -59,6 +59,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     SPOTIFY_CLIENT_SECRET,
     DISCOGS_TOKEN,
     SONGKICK_API_KEY,
+    BANDSINTOWN_APP_ID,
   } = process.env
 
   if (
@@ -100,6 +101,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         : undefined,
     discogsToken: DISCOGS_TOKEN,
     songkickApiKey: SONGKICK_API_KEY,
+    bandsintownAppId: BANDSINTOWN_APP_ID,
   })
 
   return NextResponse.json(result)

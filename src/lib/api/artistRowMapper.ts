@@ -32,6 +32,7 @@ export function rowToArtist(row: ArtistRow): Artist {
     spotifyId: row.spotify_id ?? undefined,
     discogsId: row.discogs_id ?? undefined,
     songkickId: row.songkick_id ?? undefined,
+    bandsintownId: row.bandsintown_id ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
   }
 }
