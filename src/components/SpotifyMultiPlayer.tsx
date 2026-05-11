@@ -58,6 +58,8 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                   size="sm"
                   variant={i === activeIndex ? 'default' : 'outline'}
                   onClick={() => setActiveIndex(i)}
+                  aria-label={i === activeIndex ? `${playlist.label} (active)` : playlist.label}
+                  aria-pressed={i === activeIndex}
                   className="text-xs"
                   type="button"
                 >
@@ -73,9 +75,13 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
 }
 
 function getSpotifyEmbedPath(uri: string): string {
-  if (uri.includes('spotify.com')) {
+  try {
     const url = new URL(uri)
-    return url.pathname
+    if (url.hostname === 'open.spotify.com' || url.hostname.endsWith('.spotify.com')) {
+      return url.pathname
+    }
+  } catch {
+    // Continue with URI parsing fallback below.
   }
 
   const parts = uri.split(':')

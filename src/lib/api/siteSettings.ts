@@ -51,7 +51,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     const parsed = JSON.parse(map['spotify_playlists'] ?? '[]') as unknown
     if (Array.isArray(parsed)) {
       spotifyPlaylists = parsed.filter((entry): entry is SpotifyPlaylistEntry => {
-        if (!entry || typeof entry !== 'object') return false
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
         const candidate = entry as { label?: unknown; uri?: unknown }
         return typeof candidate.label === 'string' && typeof candidate.uri === 'string'
       })

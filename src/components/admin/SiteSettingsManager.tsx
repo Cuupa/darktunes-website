@@ -297,14 +297,14 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     onClick={() => append({ label: '', uri: '' })}
                     disabled={isSubmitting}
                   >
-                    + Playlist hinzufügen
+                    + Add playlist
                   </Button>
                 </div>
 
                 {fields.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Keine zusätzlichen Playlists konfiguriert. Die Website nutzt dann die URI oben als
-                    Fallback.
+                    No additional playlists configured. The website will use the Spotify Playlist URI
+                    above as a fallback.
                   </p>
                 )}
 
@@ -343,7 +343,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                         disabled={isSubmitting}
                         className="justify-self-start md:justify-self-end"
                       >
-                        Entfernen
+                        Remove
                       </Button>
                     </div>
                   ))}
