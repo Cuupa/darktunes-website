@@ -32,7 +32,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
           <div className="relative h-[152px] rounded-md overflow-hidden">
             {playlists.map((playlist, i) => (
               <div
-                key={`${playlist.uri}-${i}`}
+                key={playlist.uri}
                 className={`absolute inset-0 transition-opacity duration-300 ${
                   i === activeIndex
                     ? 'opacity-100 pointer-events-auto'
@@ -55,7 +55,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
             <div className="flex flex-wrap gap-2 mt-4 justify-center">
               {playlists.map((playlist, i) => (
                 <Button
-                  key={`${playlist.uri}-${i}-tab`}
+                  key={playlist.uri}
                   size="sm"
                   variant={i === activeIndex ? 'default' : 'outline'}
                   onClick={() => setActiveIndex(i)}

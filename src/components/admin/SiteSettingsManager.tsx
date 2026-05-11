@@ -35,7 +35,10 @@ const schema = z.object({
       label: z.string().min(1, 'Label required'),
       uri: z.string().min(1, 'URI required'),
     }),
-  ).default([]),
+  ).default([]).refine(
+    (entries) => new Set(entries.map((entry) => entry.uri.trim())).size === entries.length,
+    { message: 'Playlist URIs must be unique' },
+  ),
   heroBadge: z.string().min(1, 'Hero badge text is required'),
   heroDescription: z.string().min(1, 'Hero description is required'),
   seoTitle: z.string().min(1, 'SEO title is required'),
@@ -348,6 +351,9 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     </div>
                   ))}
                 </div>
+                {typeof errors.spotifyPlaylists?.message === 'string' && (
+                  <p className="text-xs text-destructive">{errors.spotifyPlaylists.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
