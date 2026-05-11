@@ -166,3 +166,10 @@
     transform: translate(10%, 5%);
   }
 }
+
+/* Tactical chromatic aberration – TacticalButton hover state.
+   Simulates a damaged CRT / tactical-optics glitch: red channel shifts left,
+   blue channel shifts right. No glow, no scale – purely optical distortion. */
+.tactical-chromatic:hover:not(:disabled) {
+  text-shadow: -1px 0 #ff0033, 1px 0 #0055ff;
+}
