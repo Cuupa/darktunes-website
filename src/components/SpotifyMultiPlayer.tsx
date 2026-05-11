@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { ConsentGate } from '@/components/ConsentGate'
 import type { SpotifyPlaylistEntry } from '@/types'
 
+const DEFAULT_SPOTIFY_PLAYLIST_ID = '37i9dQZF1DWWqNV5cS50j6'
+
 interface SpotifyMultiPlayerProps {
   playlists: SpotifyPlaylistEntry[]
   placeholderUrl?: string
@@ -87,5 +89,5 @@ function getSpotifyEmbedPath(uri: string): string {
     return `/${parts[1]}/${parts[2]}`
   }
 
-  return '/playlist/37i9dQZF1DXcF6B6QPhFDv'
+  return `/playlist/${DEFAULT_SPOTIFY_PLAYLIST_ID}`
 }

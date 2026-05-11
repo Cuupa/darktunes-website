@@ -50,6 +50,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
   try {
     const parsed = JSON.parse(map['spotify_playlists'] ?? '[]') as unknown
     if (Array.isArray(parsed)) {
+      // Keep this runtime guard aligned with the admin Zod schema in SiteSettingsManager.
       spotifyPlaylists = parsed.filter((entry): entry is SpotifyPlaylistEntry => {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
         const candidate = entry as { label?: unknown; uri?: unknown }

@@ -303,8 +303,8 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
 
                 {fields.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    No additional playlists configured. The website will use the Spotify Playlist URI
-                    above as a fallback.
+                    No additional playlists configured. The website will fall back to the “Spotify
+                    Playlist URI” field above.
                   </p>
                 )}
 
