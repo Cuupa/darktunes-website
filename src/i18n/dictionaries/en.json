@@ -98,6 +98,19 @@
     "backToReleases": "All Releases",
     "featured": "Featured"
   },
+  "artistDetail": {
+    "backToArtists": "← Back to Artists",
+    "fullBio": "Biography",
+    "discography": "Discography",
+    "tourDates": "Tour Dates",
+    "noShows": "No upcoming shows",
+    "shopMerch": "Shop Merch",
+    "listenEverywhere": "Listen Everywhere",
+    "since": "Since",
+    "latestVideo": "Latest Video",
+    "getTickets": "Tickets",
+    "fullProfile": "Full Profile →"
+  },
   "pages": {
     "backToHome": "← Back to home"
   },

@@ -27,6 +27,7 @@ export interface ArtistFormData {
   bandcampUrl: string
   shopUrl: string
   country: string
+  foundedYear: string
   email: string
   vatNumber: string
   featured: boolean
@@ -153,6 +154,10 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
         <div className="space-y-1">
           <Label htmlFor="country">Country</Label>
           <Input id="country" {...register('country')} disabled={isLoading} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="foundedYear">Founded Year</Label>
+          <Input id="foundedYear" type="number" {...register('foundedYear')} placeholder="e.g. 2012" disabled={isLoading} />
         </div>
       </div>
 

@@ -98,6 +98,19 @@
     "backToReleases": "Alle Releases",
     "featured": "Featured"
   },
+  "artistDetail": {
+    "backToArtists": "← Zurück zu Künstlern",
+    "fullBio": "Biografie",
+    "discography": "Diskografie",
+    "tourDates": "Tour-Daten",
+    "noShows": "Keine kommenden Shows",
+    "shopMerch": "Merch kaufen",
+    "listenEverywhere": "Überall anhören",
+    "since": "Seit",
+    "latestVideo": "Neuestes Video",
+    "getTickets": "Tickets",
+    "fullProfile": "Vollständiges Profil →"
+  },
   "pages": {
     "backToHome": "← Zurück zur Startseite"
   },

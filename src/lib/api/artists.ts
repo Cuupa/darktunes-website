@@ -27,6 +27,15 @@ export async function getArtistById(db: DbClient, id: string): Promise<Artist | 
   return data ? rowToArtist(data) : null
 }
 
+export async function getArtistBySlug(db: DbClient, slug: string): Promise<Artist | null> {
+  const { data, error } = await db.from('artists').select('*').eq('slug', slug).single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+  return data ? rowToArtist(data) : null
+}
+
 export async function createArtist(db: DbClient, artistData: ArtistInsert): Promise<Artist> {
   const { data, error } = await db.from('artists').insert(artistData).select().single()
   if (error) throw new Error(error.message)
