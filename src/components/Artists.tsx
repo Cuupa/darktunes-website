@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo, useDeferredValue } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -64,13 +64,28 @@ export function Artists({ artists, dict }: ArtistsProps) {
     }
   }
 
-  const normalisedQuery = searchQuery.trim().toLowerCase()
-  const filteredArtists = normalisedQuery
-    ? artists.filter((artist) =>
-      artist.name.toLowerCase().includes(normalisedQuery) ||
-      artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
+  // Defer search filtering so the input updates instantly while the heavier
+  // filter+render work runs as a low-priority React update.
+  const deferredSearch = useDeferredValue(searchQuery)
+
+  /** True while the user has typed something (even before deferred catches up). */
+  const isSearching = searchQuery !== ''
+
+  /** True while deferred search hasn't yet caught up with the current input. */
+  const isFilterPending = deferredSearch !== searchQuery
+
+  const stableVisibleArtists = stableVisibleArtistsRef.current.artists
+
+  const normalisedQuery = useMemo(() => deferredSearch.trim().toLowerCase(), [deferredSearch])
+
+  const filteredArtists = useMemo(() => {
+    if (!normalisedQuery) return stableVisibleArtists
+    return artists.filter(
+      (artist) =>
+        artist.name.toLowerCase().includes(normalisedQuery) ||
+        artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
     )
-    : stableVisibleArtistsRef.current.artists
+  }, [normalisedQuery, artists, stableVisibleArtists])
 
   const handleArtistClick = (artist: Artist) => {
     setSelectedArtist(artist)
@@ -111,7 +126,9 @@ export function Artists({ artists, dict }: ArtistsProps) {
         {filteredArtists.length === 0 ? (
           <p className="text-muted-foreground font-serif">{dict.noResults}</p>
         ) : (
-          <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3">
+          <ul
+            className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
+          >
             {filteredArtists.map((artist, index) => (
               <motion.li
                 key={artist.id}
@@ -119,7 +136,11 @@ export function Artists({ artists, dict }: ArtistsProps) {
                 initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.6,
+                  // Skip the stagger delay while searching so results appear instantly
+                  delay: prefersReducedMotion || isSearching ? 0 : index * 0.1,
+                }}
               >
                 <Card
                   className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
