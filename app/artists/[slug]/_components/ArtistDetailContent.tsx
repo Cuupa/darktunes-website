@@ -314,7 +314,7 @@ export function ArtistDetailContent({
           >
             <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.latestVideo}</h2>
             <div className="max-w-3xl">
-              <ConsentGate label={consentDict.loadYouTube}>
+              <ConsentGate label={consentDict.loadYouTube} gateText={consentDict.gateText}>
                 <div className="aspect-video rounded-xl overflow-hidden">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}

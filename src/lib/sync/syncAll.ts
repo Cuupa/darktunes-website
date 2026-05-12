@@ -224,6 +224,84 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     results.push(spotifyResult)
   }
 
+  // 3.5. Standalone Discogs sync — runs independently of Spotify
+  // Syncs releases for artists that have a discogs_id but may not have been
+  // covered by the Spotify block (or when Spotify is not configured).
+  if (discogsToken) {
+    const discogsResult: ApiSyncResult = {
+      api: 'discogs',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      errors: [],
+    }
+
+    for (const artist of artists) {
+      if (!artist.discogs_id) continue
+      discogsResult.artistsProcessed++
+
+      try {
+        const discogsReleases = await withExponentialBackoff(() =>
+          fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, fetchFn),
+        )
+
+        for (const release of discogsReleases) {
+          try {
+            // Skip if this release already exists with a Spotify ID
+            // (it will have been handled more completely by the Spotify block)
+            const { data: existing } = await db
+              .from('releases')
+              .select('id, spotify_id')
+              .eq('discogs_id', release.discogsId)
+              .maybeSingle()
+
+            if (existing?.spotify_id) continue // Already handled by Spotify sync
+
+            let coverArt: string | null = release.coverUrl
+            if (release.coverUrl && !release.coverUrl.startsWith('https://cdn.')) {
+              try {
+                coverArt = await uploadToR2(release.coverUrl, 'cover-art')
+              } catch {
+                // Graceful fallback to external URL
+              }
+            }
+
+            await db
+              .from('releases')
+              .upsert(
+                {
+                  title: release.title,
+                  artist_id: artist.id,
+                  artist_name: artist.name,
+                  release_date: release.releaseDate ?? new Date().toISOString().slice(0, 10),
+                  cover_art: coverArt,
+                  type: release.format === 'vinyl' || release.format === 'cd' ? 'album' : 'single',
+                  discogs_id: release.discogsId,
+                  barcode: release.barcode,
+                  catalog_number: release.catalogNumber,
+                },
+                { onConflict: 'discogs_id' },
+              )
+
+            discogsResult.releasesUpserted++
+          } catch (e) {
+            discogsResult.errors.push(
+              `Failed to upsert Discogs release "${release.title}" for ${artist.name}: ${String(e)}`,
+            )
+          }
+        }
+      } catch (e) {
+        const msg = String(e)
+        if (msg.includes('429')) discogsResult.rateLimited = true
+        discogsResult.errors.push(`Discogs sync for ${artist.name}: ${msg}`)
+      }
+    }
+
+    await writeSyncLog(db, 'discogs', discogsResult)
+    results.push(discogsResult)
+  }
+
   // 4. Songkick sync
   if (songkickApiKey) {
     const songkickResult: ApiSyncResult = {

@@ -53,7 +53,20 @@ export async function fetchYouTubeChannelVideos(
 
   const res = await fetch(url.toString())
   if (!res.ok) {
-    throw new Error(`YouTube API error: ${res.status} ${res.statusText}`)
+    let detail = `${res.status} ${res.statusText}`
+    try {
+      const errBody = await res.json() as { error?: { message?: string; status?: string } }
+      if (errBody?.error?.message) detail = errBody.error.message
+    } catch {
+      // Ignore parse errors
+    }
+    if (res.status === 403) {
+      throw new Error(`YouTube API quota exceeded or key invalid: ${detail}`)
+    }
+    if (res.status === 400) {
+      throw new Error(`YouTube API bad request (check channel ID): ${detail}`)
+    }
+    throw new Error(`YouTube API error: ${detail}`)
   }
 
   const data: YouTubeSearchResult = await res.json() as YouTubeSearchResult

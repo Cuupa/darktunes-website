@@ -3,6 +3,7 @@ import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchSpotifyArtistProfile } from '@/lib/sync/spotifyApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 
 interface PrefillResponse {
   spotifyId: string
@@ -10,26 +11,6 @@ interface PrefillResponse {
   imageUrl: string | null
   genres: string[]
   spotifyUrl: string
-}
-
-function extractSpotifyArtistId(input: string): string | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-  if (/^[A-Za-z0-9]+$/.test(trimmed)) return trimmed
-
-  try {
-    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
-    if (parsed.hostname.toLowerCase() !== 'open.spotify.com') return null
-
-    const parts = parsed.pathname.split('/').filter(Boolean)
-    if (parts[0] === 'artist' && parts[1] && /^[A-Za-z0-9]+$/.test(parts[1])) {
-      return parts[1]
-    }
-  } catch {
-    return null
-  }
-
-  return null
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
