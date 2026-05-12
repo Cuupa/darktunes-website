@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState, useRef } from 'react'
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import type { EmblaCarouselType } from 'embla-carousel'
 import Link from 'next/link'
@@ -125,16 +125,51 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   /**
+   * Stable initial window helper — extracts the setup logic so both the
+   * initialiser and the reset effect can share the same computation.
+   */
+  const buildInitialWindow = useCallback(
+    (count: number) => {
+      const s = new Set<number>()
+      for (let i = 0; i < Math.min(VIRTUAL_BUFFER + 1, count); i++) s.add(i)
+      return s as ReadonlySet<number>
+    },
+    [],
+  )
+
+  /**
    * Virtual window: a Set of indices whose slide *content* is currently
    * rendered in the DOM.  We grow the window as the user navigates but never
    * shrink it, so previously seen covers stay cached in the browser and
    * re-appear instantly when the user swipes back.
    */
-  const [renderedIndices, setRenderedIndices] = useState<ReadonlySet<number>>(() => {
-    const initial = new Set<number>()
-    for (let i = 0; i < Math.min(VIRTUAL_BUFFER + 1, total); i++) initial.add(i)
-    return initial
-  })
+  const [renderedIndices, setRenderedIndices] = useState<ReadonlySet<number>>(() =>
+    buildInitialWindow(total),
+  )
+
+  /**
+   * Compute a stable identity key for the releases array so we can detect
+   * when the parent passes a completely different filtered set.  Using a
+   * derived string here is O(n) on the first render but avoids creating a
+   * closure over a full array in the effect dependency.
+   */
+  const releasesKey = useMemo(
+    () => releases.map((r) => r.id).join(','),
+    [releases],
+  )
+
+  /**
+   * When the releases array changes (e.g. a new search filter is applied),
+   * reset virtual-window state and scroll back to slide 0.  This prevents
+   * stale indices from a previous catalogue from polluting the Set and
+   * ensures the active-release metadata panel is always in sync.
+   */
+  useEffect(() => {
+    setSelectedIndex(0)
+    setRenderedIndices(buildInitialWindow(total))
+    emblaApi?.scrollTo(0, true /* jump, no animation */)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [releasesKey])
 
   /** Expand the rendered window around `centre` by VIRTUAL_BUFFER either side. */
   const expandWindow = useCallback(
