@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
+import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
@@ -25,6 +26,14 @@ function createArtistNamePattern(artistName: string): RegExp | null {
   const trimmedArtistName = artistName.trim()
   if (!trimmedArtistName) return null
   return new RegExp(`(^|\\W)${escapeRegExp(trimmedArtistName)}(\\W|$)`, 'i')
+}
+
+function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
+  const expected = `Bearer ${cronSecret}`
+  const authBuffer = Buffer.from(authHeader)
+  const expectedBuffer = Buffer.from(expected)
+  if (authBuffer.length !== expectedBuffer.length) return false
+  return timingSafeEqual(authBuffer, expectedBuffer)
 }
 
 async function verifyToken(token: string): Promise<void> {
@@ -43,7 +52,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const authHeader = request.headers.get('authorization') ?? ''
   const cronSecret = process.env.CRON_SECRET
   if (isCron) {
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
       throw new ApiError(401, 'Invalid cron secret')
     }
   } else {
