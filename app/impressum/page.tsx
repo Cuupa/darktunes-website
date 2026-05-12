@@ -64,6 +64,7 @@ export default async function ImpressumPage() {
         shopifyStoreUrl: '',
         youtubeChannelId: '',
         carouselAutoplayMs: 0,
+        featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
       }),
     ),
     getLocale(),

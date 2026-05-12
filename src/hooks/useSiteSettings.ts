@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   shopifyStoreUrl: '',
   youtubeChannelId: '',
   carouselAutoplayMs: 0,
+  featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -78,6 +79,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     shopify_store_url: s.shopifyStoreUrl,
     youtube_channel_id: s.youtubeChannelId,
     carousel_autoplay_ms: String(s.carouselAutoplayMs ?? 0),
+    feature_toggles: JSON.stringify(s.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }),
   }
 }
 

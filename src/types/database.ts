@@ -13,21 +13,21 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'admin' | 'editor' | 'journalist' | 'user'
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
           email: string
-          role?: 'admin' | 'editor' | 'journalist' | 'user'
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           email?: string
-          role?: 'admin' | 'editor' | 'journalist' | 'user'
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
           created_at?: string
           updated_at?: string
         }

@@ -75,7 +75,7 @@ Every DAL function receives `SupabaseClient<Database>` as its first argument. Ne
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
 Shared mappers: `src/lib/api/artistRowMapper.ts` exports `rowToArtist()` — used by both `artists.ts` and `artistProfiles.ts` to avoid duplication.
-Site Settings DAL: `siteSettings.ts` uses `rowsToSettings()` (flat key-value rows → typed `SiteSettings` domain object) with hardcoded defaults as fallback. Use `upsertSiteSettings(db, record)` for batch saves from the Admin CMS.
+Site Settings DAL: `siteSettings.ts` uses `rowsToSettings()` (flat key-value rows → typed `SiteSettings` domain object) with hardcoded defaults as fallback. Use `upsertSiteSettings(db, record)` for batch saves from the Admin CMS. The `feature_toggles` key stores a JSON object (`FeatureToggles`) for global feature flags.
 Hook Pattern: Hooks in `src/hooks/` wrap DAL functions. Each hook checks `isSupabaseConfigured` at load time — if false, immediately sets `isLoading = false` and returns empty data. This prevents Supabase calls when env vars are not set.
 Next.js Route Handlers: API endpoints live at `app/api/*/route.ts`. The upload handler (`app/api/upload/route.ts`) uses `SUPABASE_SERVICE_ROLE_KEY` to verify Bearer tokens via `supabase.auth.getUser(token)` before processing uploads. Never use the legacy `api/` directory for new endpoints.
 Server-side Supabase Clients: Use `src/lib/supabase/server.ts` (createServerSupabaseClient) in Server Components and Route Handlers. Use `src/lib/supabase/client.ts` (createBrowserSupabaseClient) in Client Components.
@@ -276,11 +276,13 @@ Anti-leak audio: `promo_tracks` stores only the R2 object key — NO public URL.
 Admin EPK upload: `getEpkUploadUrl(category, filename, contentType)` in `src/actions/epkUpload.ts` generates a 15-minute presigned PUT URL for direct browser-to-R2 upload, bypassing Vercel's 4.5 MB limit. Categories: `press-photos` | `promo-tracks`.
 Journalist applications: `journalist_applications` table; `POST /api/journalist-applications` lets anyone submit. `PATCH /api/journalist-applications/[id]` (admin-only) approves/rejects and updates `profiles.role` to `journalist` / `user`. Admin UI is in `src/components/admin/JournalistManager.tsx` (Media tab in AdminDashboard).
 DAL: `src/lib/api/pressPhotos.ts`, `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests.
-user_role enum: includes `journalist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all four values.
+user_role enum: includes `journalist`, `artist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all five values.
 DB: Migration `20260510190000_press_and_promo_pool.sql` — adds journalist role value, press_photos, promo_tracks, journalist_applications tables with RLS.
 
 Admin User Management
 The **Users** tab in the AdminDashboard (`src/components/admin/AdminDashboard.tsx`) is only visible when `profile.role === 'admin'`. It renders `<UsersManager />`.
+The **Features** tab is also admin-only — it renders `<FeatureTogglesManager />` to toggle `promoPool`, `sosStatements`, and `editorTools` globally.
+Editor restriction: Editors (`role === 'editor'`) see only artists, releases, news, and videos tabs in the admin dashboard. Admin-only tabs (assets, settings, health, media, users, features) are hidden for editors. If `editorTools` feature toggle is disabled, editors are blocked from admin entirely with an "Editor Tools Disabled" gate.
 Types: `UserRole` and `UserWithProfile` are in `src/types/users.ts`.
 DAL: `src/lib/api/users.ts` exports `listUsersWithProfiles`, `updateUserRole`, `banUser`, `deleteUser`, `linkArtistToUser`, `unlinkArtistFromUser`. All functions accept a service-role `SupabaseClient`. Supabase Auth Admin API methods (`listUsers`, `updateUserById`, `deleteUser`) are called via the `adminClient.auth.admin` namespace.
 Hook: `src/hooks/useUsers.ts` fetches from `GET /api/admin/users` and exposes `updateRole`, `toggleBan`, `deleteUser`, `linkArtist`, `unlinkArtist` with optimistic updates and toast notifications.
@@ -290,3 +292,22 @@ API Routes (all admin-only, use service-role client):
   - `DELETE /api/admin/users/[id]` — deletes user from Auth; profiles cascade. Rejects self-deletion.
   - `PATCH /api/admin/users/[id]/link-artist` — links or unlinks (`artistId: null`) an artist to a user. Validates no double-linking.
 Security: Every route verifies `profiles.role = 'admin'` server-side via `createServerSupabaseClient()` before using the service-role client. The service-role key never reaches the browser.
+
+Feature Toggles
+Global feature flags stored in `site_settings` table under key `feature_toggles` as JSON. Type: `FeatureToggles` in `src/types/index.ts`.
+Flags: `promoPool` (journalist area), `sosStatements` (artist royalty PDFs), `editorTools` (editor CMS access). All default to `true`.
+Admin UI: `src/components/admin/FeatureTogglesManager.tsx` (admin-only "Features" tab in AdminDashboard). Toggle switches persist via `upsertSiteSettings()`.
+Enforcement: `promo-pool/layout.tsx` checks `featureToggles.promoPool`; `portal/statements/page.tsx` checks `featureToggles.sosStatements`; `AdminDashboard` checks `featureToggles.editorTools` for editors.
+
+Artist Portal Access Gate
+Portal layout (`app/portal/layout.tsx`) enforces role-based access BEFORE rendering the portal UI:
+  - Roles `artist` or `admin` → portal accessible (user must also have a linked artist record).
+  - Role `user` (unassigned/new) → `PortalAccessGate` component shown — explains how to request access.
+  - Other roles (`editor`, `journalist`) → `PortalAccessGate` shown with role explanation.
+`PortalAccessGate` lives at `app/portal/_components/PortalAccessGate.tsx`.
+New users default to `user` role = zero portal/admin access until an Admin explicitly assigns a role and links their artist profile.
+
+Artist Preview
+`PortalSidebar` accepts `artistSlug: string | null` and `sosStatementsEnabled: boolean` props from the layout Server Component.
+When `artistSlug` is set, a "Preview Public Profile" link is shown under the artist name (opens `/artists/{slug}` in a new tab).
+The same preview link/button appears at the top of `ProfileForm` (passed via `artistSlug` prop from `portal/profile/page.tsx`).

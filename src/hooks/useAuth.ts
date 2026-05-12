@@ -92,6 +92,7 @@ export function useAuth() {
 
   const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor' || profile?.role === 'admin'
+  const isArtist = profile?.role === 'artist' || profile?.role === 'admin'
 
   return {
     user,
@@ -103,6 +104,7 @@ export function useAuth() {
     signOut,
     isAdmin,
     isEditor,
+    isArtist,
     isAuthenticated: !!user,
   }
 }

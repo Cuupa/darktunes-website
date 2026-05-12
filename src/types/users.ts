@@ -5,7 +5,7 @@
  * These supplement the database types in src/types/database.ts.
  */
 
-export type UserRole = 'admin' | 'editor' | 'journalist' | 'user'
+export type UserRole = 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
 
 export interface UserWithProfile {
   id: string

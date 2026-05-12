@@ -148,6 +148,32 @@ describe('getSiteSettings', () => {
     expect(result.vignetteIntensity).toBe(0.5)
   })
 
+  it('returns default feature toggles when key is missing', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.featureToggles).toEqual({ promoPool: true, sosStatements: true, editorTools: true })
+  })
+
+  it('parses feature toggles from DB row', async () => {
+    const db = makeMockDb([
+      ...mockRows,
+      {
+        key: 'feature_toggles',
+        value: JSON.stringify({ promoPool: false, sosStatements: true, editorTools: false }),
+      },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.featureToggles.promoPool).toBe(false)
+    expect(result.featureToggles.sosStatements).toBe(true)
+    expect(result.featureToggles.editorTools).toBe(false)
+  })
+
+  it('falls back to default feature toggles when JSON is invalid', async () => {
+    const db = makeMockDb([{ key: 'feature_toggles', value: 'not-valid-json' }])
+    const result = await getSiteSettings(db)
+    expect(result.featureToggles).toEqual({ promoPool: true, sosStatements: true, editorTools: true })
+  })
+
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Query failed', code: 'PGRST001' })
     await expect(getSiteSettings(db)).rejects.toThrow('Query failed')

@@ -3,6 +3,9 @@
  *
  * Fetches the artist's statements server-side and passes them to the
  * StatementsTable client leaf component. Follows IoC principle.
+ *
+ * If the 'sosStatements' feature toggle is disabled, an unavailable message
+ * is shown instead of the statements table.
  */
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +15,7 @@ import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
+import { getSiteSettings } from '@/lib/api/siteSettings'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatementsTable } from './_components/StatementsTable'
 
@@ -36,6 +40,21 @@ async function StatementsContent() {
   } = await supabase.auth.getUser()
 
   if (!user) return null
+
+  // Feature toggle check — if SOS statements is disabled, show unavailable message
+  const siteSettings = await getSiteSettings(supabase).catch(() => null)
+  const sosEnabled = siteSettings?.featureToggles?.sosStatements ?? true
+
+  if (!sosEnabled) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">{dict.portal.statements_heading}</h1>
+        <p className="text-muted-foreground">
+          The Statement of Sales feature is currently unavailable. Please contact the label for more information.
+        </p>
+      </div>
+    )
+  }
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
   const statements = artist

@@ -15,6 +15,7 @@ interface AuthContextType {
   signOut: () => Promise<{ error: Error | null }>
   isAdmin: boolean
   isEditor: boolean
+  isArtist: boolean
   isAuthenticated: boolean
 }
 

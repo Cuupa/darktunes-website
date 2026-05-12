@@ -99,6 +99,7 @@ function UserSkeletonRows() {
 function RoleBadge({ role }: { role: UserRole }) {
   const colours: Record<UserRole, string> = {
     admin: 'bg-violet-700 text-violet-100',
+    artist: 'bg-emerald-700 text-emerald-100',
     editor: 'bg-blue-700 text-blue-100',
     journalist: 'bg-amber-700 text-amber-100',
     user: '',
@@ -283,6 +284,7 @@ export function UsersManager() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">admin</SelectItem>
+                            <SelectItem value="artist">artist</SelectItem>
                             <SelectItem value="editor">editor</SelectItem>
                             <SelectItem value="journalist">journalist</SelectItem>
                             <SelectItem value="user">user</SelectItem>

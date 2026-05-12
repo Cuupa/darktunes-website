@@ -5,11 +5,13 @@
  *
  * Navigation sidebar for the Artist Portal. Receives all data as props (IoC).
  * Handles sign-out on the client side.
+ * Shows/hides Statements nav item based on the sosStatementsEnabled feature toggle.
+ * Provides a "Preview Profile" link to the public artist page.
  */
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { MusicNote, ChartBar, FileText, User, SignOut, MapPin, MegaphoneSimple, MusicNotes } from '@phosphor-icons/react'
+import { MusicNote, ChartBar, FileText, User, SignOut, MapPin, MegaphoneSimple, MusicNotes, Eye } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -20,19 +22,24 @@ interface PortalSidebarProps {
   dict: Dictionary['portal']
   artistName: string | null
   userId: string | null
+  /** Slug of the linked artist — used for the public preview link */
+  artistSlug: string | null
+  /** Whether the Statement of Sales feature is globally enabled */
+  sosStatementsEnabled: boolean
 }
 
-const navItems = [
+const baseNavItems = [
   { href: '/portal', label: 'overview', icon: ChartBar },
   { href: '/portal/profile', label: 'profile', icon: User },
   { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
   { href: '/portal/releases', label: 'releases', icon: MusicNotes },
   { href: '/portal/tour', label: 'tour', icon: MapPin },
   { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple },
-  { href: '/portal/statements', label: 'statements', icon: FileText },
 ] as const
 
-export function PortalSidebar({ dict, artistName }: PortalSidebarProps) {
+const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText } as const
+
+export function PortalSidebar({ dict, artistName, artistSlug, sosStatementsEnabled }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -44,28 +51,44 @@ export function PortalSidebar({ dict, artistName }: PortalSidebarProps) {
     router.refresh()
   }
 
+  const navItems = sosStatementsEnabled
+    ? [...baseNavItems, statementsNavItem]
+    : baseNavItems
+
   return (
     <aside className="w-64 min-h-screen bg-card border-r border-border flex flex-col shrink-0">
       {/* Logo */}
       <div className="p-6 flex items-center gap-3">
-        <MusicNote size={28} weight="bold" className="text-primary" />
+        <MusicNote size={28} weight="bold" className="text-primary" aria-hidden="true" />
         <span className="font-bold text-lg tracking-wide">darkTunes</span>
       </div>
 
       <Separator className="bg-border" />
 
-      {/* Artist name */}
+      {/* Artist name + preview link */}
       {artistName && (
         <div className="px-6 py-4">
           <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">
             {dict.title}
           </p>
-          <p className="font-semibold truncate">{artistName}</p>
+          <p className="font-semibold truncate mb-2">{artistName}</p>
+          {artistSlug && (
+            <Link
+              href={`/artists/${artistSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+              aria-label={`Preview public profile for ${artistName}`}
+            >
+              <Eye size={13} aria-hidden="true" />
+              Preview Public Profile
+            </Link>
+          )}
         </div>
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Artist portal navigation">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === '/portal' ? pathname === '/portal' : pathname.startsWith(href)
@@ -80,7 +103,7 @@ export function PortalSidebar({ dict, artistName }: PortalSidebarProps) {
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               ].join(' ')}
             >
-              <Icon size={18} weight={isActive ? 'bold' : 'regular'} />
+              <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
               {dict[label as keyof typeof dict]}
             </Link>
           )
@@ -96,7 +119,7 @@ export function PortalSidebar({ dict, artistName }: PortalSidebarProps) {
           className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
           onClick={handleSignOut}
         >
-          <SignOut size={18} />
+          <SignOut size={18} aria-hidden="true" />
           {dict.signOut}
         </Button>
       </div>

@@ -139,6 +139,7 @@ export default async function HomePage() {
         shopifyStoreUrl: '',
         youtubeChannelId: '',
         carouselAutoplayMs: 0,
+        featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
       }),
     ),
     getLocale(),
