@@ -41,6 +41,7 @@ const EMPTY_FORM: NewsFormData = {
   content: '',
   imageUrl: '',
   publishedAt: new Date().toISOString().split('T')[0],
+  isPressOnly: false,
 }
 
 function newsPostToFormData(post: NewsPost): NewsFormData {
@@ -51,6 +52,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     content: post.content,
     imageUrl: post.imageUrl ?? '',
     publishedAt: post.publishedAt.split('T')[0],
+    isPressOnly: post.isPressOnly,
   }
 }
 
@@ -62,6 +64,7 @@ function formDataToInsert(data: NewsFormData): NewsInsert {
     content: data.content,
     image_url: data.imageUrl || null,
     published_at: data.publishedAt || new Date().toISOString(),
+    is_press_only: data.isPressOnly,
   }
 }
 
@@ -132,19 +135,20 @@ export function NewsManager() {
             <TableHead>Title</TableHead>
             <TableHead>Slug</TableHead>
             <TableHead>Published</TableHead>
+            <TableHead>Audience</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : news.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                 No posts yet. Click "New Post" to add one.
               </TableCell>
             </TableRow>
@@ -156,6 +160,7 @@ export function NewsManager() {
                   {post.slug}
                 </TableCell>
                 <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
+                <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button size="icon" variant="ghost" onClick={() => openEdit(post)} title="Edit">

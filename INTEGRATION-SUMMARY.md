@@ -26,7 +26,7 @@
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
 - **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` and `/portal/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
 - **Internationalisation (i18n)** — `src/i18n/` custom dictionary pattern; `en.json` + `de.json`; `getDictionary.ts` loads server-side; RSCs pass dict as props to Client Components (IoC); Header has DE/EN locale switcher
-- **Database schema** defined in `supabase/reset.sql` (single idempotent script; no migration files)
+- **Database schema** defined in `supabase/reset.sql` (single idempotent script) and mirrored by targeted migration patch `supabase/migrations/20260512000002_add_journalist_and_feature_flags.sql`
 - **TypeScript DB types** in `src/types/database.ts`
 
 ### Environment Validation
@@ -64,6 +64,9 @@
 - **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 - **UsersManager** *(admin-only tab)* — full user management: lists all registered users (via Supabase Auth Admin API), allows role changes (admin/editor/journalist/user), ban/unban with confirmation dialog, user deletion, and artist ↔ user linking/unlinking. Tab is only rendered when `profile.role === 'admin'`. API routes: `GET/PATCH/DELETE /api/admin/users`, `PATCH /api/admin/users/[id]/link-artist`.
+- **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
+- **MessagesManager** *(admin-only tab)* — sends artist inbox messages (`label_messages`) and shows read status.
+- **AccreditationsManager** *(admin-only tab)* — reviews and updates journalist accreditation requests (`accreditation_requests`).
 
 ### SOS Webhook — Statement of Sales PDF Upload
 - `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
@@ -167,9 +170,14 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form with bio_short/medium/long + photo upload via R2 |
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
-| Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — upcoming concerts via `getConcertsByArtistId()` + TourList client component |
+| Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — artists can list/create/delete own concerts (RLS-protected) |
 | Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` |
-| Artist Portal — marketing & smart links | ✅ Implemented | `/portal/marketing` — SmartLinks client component with copy-to-clipboard per release |
+| Artist Portal — marketing assets | ✅ Implemented | `/portal/marketing` — asset list + presigned download links |
+| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — list + mark-as-read from `label_messages` |
+| Artist Portal — module feature flags | ✅ Implemented | `portal_feature_flags` (`artist.*`) controls nav + page availability |
+| Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |
+| Journalist Dashboard — feature modules | ✅ Implemented | Promo Pool, Press Kit, Press Releases, Accreditation, Download History with `journalist.*` flags |
+| Journalist download logging | ✅ Implemented | `journalist_downloads` tracks all secure journalist downloads |
 | SOS webhook — PDF upload from external generator | ✅ Implemented | 2-step presigned URL flow: POST /api/webhooks/sos (get PUT URL) + POST /api/webhooks/sos/confirm (create DB record). Requires `SOS_WEBHOOK_SECRET`. |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 | Artist social/shop links | ✅ Implemented | `facebook_url`, `twitter_url`, `tiktok_url`, `bandcamp_url`, `shop_url` columns in `artists` table; icon buttons in public artist cards + modal + admin form |

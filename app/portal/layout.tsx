@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalAccessGate } from './_components/PortalAccessGate'
 
@@ -54,12 +54,18 @@ export default async function PortalLayout({ children }: { children: ReactNode }
     return <PortalAccessGate role={role} />
   }
 
-  const [artist, siteSettings] = await Promise.all([
-    getArtistByUserId(supabase, user.id).catch(() => null),
-    getSiteSettings(supabase).catch(() => null),
+  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const [featureFlags, unreadMessagesResult] = await Promise.all([
+    getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
+    artist
+      ? supabase
+          .from('label_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('artist_id', artist.id)
+          .eq('read', false)
+      : Promise.resolve({ count: 0, error: null }),
   ])
-
-  const sosStatementsEnabled = siteSettings?.featureToggles?.sosStatements ?? true
+  const unreadMessages = unreadMessagesResult.count ?? 0
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -68,7 +74,8 @@ export default async function PortalLayout({ children }: { children: ReactNode }
         artistName={artist?.name ?? null}
         userId={user?.id ?? null}
         artistSlug={artist?.slug ?? null}
-        sosStatementsEnabled={sosStatementsEnabled}
+        featureFlags={featureFlags}
+        unreadMessages={unreadMessages}
       />
       <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">{children}</main>
     </div>

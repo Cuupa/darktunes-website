@@ -7,30 +7,48 @@
  */
 
 import Link from 'next/link'
-import { User, ChartBar, FileText, MusicNotes, MapPin } from '@phosphor-icons/react'
+import Image from 'next/image'
+import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCircleText } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Dictionary } from '@/i18n/types'
 
 interface PortalOverviewProps {
   dict: Dictionary['portal']
   artistName: string | null
+  profileImageUrl: string | null
   totalStreams: number
-  statementCount: number
   releaseCount: number
   upcomingShowCount: number
+  openChecklistCount: number
+  featureFlags: Record<string, boolean>
 }
 
 export function PortalOverview({
   dict,
   artistName,
+  profileImageUrl,
   totalStreams,
-  statementCount,
   releaseCount,
   upcomingShowCount,
+  openChecklistCount,
+  featureFlags,
 }: PortalOverviewProps) {
+  const isEnabled = (id: string) => featureFlags[id] ?? true
+
   return (
     <div className="space-y-8">
-      <div>
+      <div className="flex items-center gap-4">
+        {profileImageUrl && (
+          <div className="relative h-16 w-16 overflow-hidden rounded-full border border-border">
+            <Image
+              src={getSquareThumbnail(profileImageUrl, 64)}
+              alt={`${artistName ?? 'Artist'} – artist photo`}
+              fill
+              className="object-cover"
+            />
+          </div>
+        )}
         <h1 className="text-3xl font-bold text-foreground">
           {dict.welcomeBack}
           {artistName ? `, ${artistName}` : ''}
@@ -71,6 +89,7 @@ export function PortalOverview({
           </Card>
         </Link>
 
+        {isEnabled('artist.statements') && (
         <Link href="/portal/statements">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -80,12 +99,14 @@ export function PortalOverview({
               <FileText size={18} className="text-primary" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{statementCount}</p>
+              <p className="text-2xl font-bold">↗</p>
               <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
             </CardContent>
           </Card>
         </Link>
+        )}
 
+        {isEnabled('artist.releases') && (
         <Link href="/portal/releases">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -96,11 +117,13 @@ export function PortalOverview({
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{releaseCount}</p>
-              <p className="text-xs text-muted-foreground mt-1">{dict.releases_heading}</p>
+              <p className="text-xs text-muted-foreground mt-1">{openChecklistCount} open checklist items</p>
             </CardContent>
           </Card>
         </Link>
+        )}
 
+        {isEnabled('artist.tour') && (
         <Link href="/portal/tour">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -115,6 +138,37 @@ export function PortalOverview({
             </CardContent>
           </Card>
         </Link>
+        )}
+
+        {isEnabled('artist.marketing') && (
+          <Link href="/portal/marketing">
+            <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{dict.marketing}</CardTitle>
+                <MegaphoneSimple size={18} className="text-primary" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">↗</p>
+                <p className="text-xs text-muted-foreground mt-1">{dict.marketing_heading}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {isEnabled('artist.messages') && (
+          <Link href="/portal/messages">
+            <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{dict.messages}</CardTitle>
+                <ChatCircleText size={18} className="text-primary" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">↗</p>
+                <p className="text-xs text-muted-foreground mt-1">{dict.messages_heading}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
     </div>
   )

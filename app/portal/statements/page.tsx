@@ -15,7 +15,7 @@ import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatementsTable } from './_components/StatementsTable'
 
@@ -41,11 +41,8 @@ async function StatementsContent() {
 
   if (!user) return null
 
-  // Feature toggle check — if SOS statements is disabled, show unavailable message
-  const siteSettings = await getSiteSettings(supabase).catch(() => null)
-  const sosEnabled = siteSettings?.featureToggles?.sosStatements ?? true
-
-  if (!sosEnabled) {
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.statements'] === false) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{dict.portal.statements_heading}</h1>
