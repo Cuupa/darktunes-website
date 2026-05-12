@@ -20,7 +20,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
 DO $$ BEGIN
-  CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist');
+  CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

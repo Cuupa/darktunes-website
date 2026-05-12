@@ -20,7 +20,7 @@ import { updateUserRole, banUser, deleteUser } from '@/lib/api/users'
 // ---------------------------------------------------------------------------
 
 const patchSchema = z.object({
-  role: z.enum(['admin', 'editor', 'journalist', 'user']).optional(),
+  role: z.enum(['admin', 'artist', 'editor', 'journalist', 'user']).optional(),
   ban: z.boolean().optional(),
 })
 
