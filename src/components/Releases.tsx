@@ -12,9 +12,10 @@ interface ReleasesProps extends SectionProps {
   releases: Release[]
   dict: Dictionary['releases']
   locale: Locale
+  autoplayMs?: number
 }
 
-export function Releases({ releases, dict, locale }: ReleasesProps) {
+export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) {
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -115,7 +116,7 @@ export function Releases({ releases, dict, locale }: ReleasesProps) {
             {dict.noResults}
           </p>
         ) : (
-          <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} />
+          <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} autoplayMs={autoplayMs} />
         )}
       </div>
     </section>

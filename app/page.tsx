@@ -138,6 +138,7 @@ export default async function HomePage() {
         vignetteIntensity: 0.5,
         shopifyStoreUrl: '',
         youtubeChannelId: '',
+        carouselAutoplayMs: 0,
       }),
     ),
     getLocale(),

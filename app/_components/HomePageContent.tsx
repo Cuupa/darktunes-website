@@ -64,7 +64,7 @@ export function HomePageContent({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4 }}
         >
-          <Releases releases={releases} dict={dict.releases} locale={locale} />
+          <Releases releases={releases} dict={dict.releases} locale={locale} autoplayMs={siteSettings.carouselAutoplayMs ?? 0} />
         </motion.div>
 
         <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
