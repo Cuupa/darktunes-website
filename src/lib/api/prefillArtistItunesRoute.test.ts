@@ -98,7 +98,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid Apple Music artist URL or ID' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'Invalid Apple Music artist URL or ID' })
   })
 
   it('returns 403 when user is not admin or editor', async () => {
@@ -119,7 +119,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toEqual({ error: 'Forbidden' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'Forbidden' })
   })
 
   it('returns 401 when token is invalid', async () => {
@@ -140,7 +140,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(401)
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'Unauthorized' })
   })
 
   it('returns 400 when iTunes lookup has no artist result', async () => {
@@ -172,7 +172,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'Artist not found on Apple Music' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'Artist not found on Apple Music' })
   })
 
   it('returns 502 when iTunes lookup API fails', async () => {
@@ -201,6 +201,6 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(502)
-    await expect(response.json()).resolves.toEqual({ error: 'iTunes API error: 503' })
+    await expect(response.json()).resolves.toMatchObject({ error: 'iTunes API error: 503' })
   })
 })

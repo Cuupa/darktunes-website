@@ -77,7 +77,7 @@ Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to c
 Shared mappers: `src/lib/api/artistRowMapper.ts` exports `rowToArtist()` — used by both `artists.ts` and `artistProfiles.ts` to avoid duplication.
 Site Settings DAL: `siteSettings.ts` uses `rowsToSettings()` (flat key-value rows → typed `SiteSettings` domain object) with hardcoded defaults as fallback. Use `upsertSiteSettings(db, record)` for batch saves from the Admin CMS. The `feature_toggles` key stores a JSON object (`FeatureToggles`) for global feature flags.
 Hook Pattern: Hooks in `src/hooks/` wrap DAL functions. Each hook checks `isSupabaseConfigured` at load time — if false, immediately sets `isLoading = false` and returns empty data. This prevents Supabase calls when env vars are not set.
-Next.js Route Handlers: API endpoints live at `app/api/*/route.ts`. The upload handler (`app/api/upload/route.ts`) uses `SUPABASE_SERVICE_ROLE_KEY` to verify Bearer tokens via `supabase.auth.getUser(token)` before processing uploads. Never use the legacy `api/` directory for new endpoints.
+Next.js Route Handlers: API endpoints live at `app/api/*/route.ts`. The upload handler (`app/api/upload/route.ts`) requires admin or editor role. Never use the legacy `api/` directory for new endpoints.
 Server-side Supabase Clients: Use `src/lib/supabase/server.ts` (createServerSupabaseClient) in Server Components and Route Handlers. Use `src/lib/supabase/client.ts` (createBrowserSupabaseClient) in Client Components.
 Server Env Validation: Import `src/lib/env.server.ts` in Route Handlers to get Zod-validated server-side environment variables. This module throws at startup if any required server var is missing.
 Next.js Caching: In app/page.tsx, data is fetched using `unstable_cache` with explicit `revalidate: 60` and `tags`. This is required because Next.js 15 no longer caches fetch/GET by default.
@@ -105,7 +105,23 @@ Section Contracts: All page sections must extend SectionProps (or EditableSectio
 Admin Panel Contracts: All admin sub-forms must extend AdminPanelProps<T> from src/lib/component-contracts.ts. No sub-form should import or read AdminSettings directly from storage/context.
 Dialog Contracts: All modals must extend DialogProps (with open / onClose). No dialog should manage its own visibility state internally.
 
-Rate Limiting
+Admin Route Auth Pattern
+All admin API routes MUST use the shared auth helpers from `src/lib/adminAuth.ts`:
+  - `extractBearerToken(authHeader)` — extracts the JWT from `Authorization: Bearer <token>`, throws ApiError(401) if missing.
+  - `verifyAdminOrEditor(token)` — verifies the token with the Supabase service-role client and asserts `admin` or `editor` role. Throws ApiError(401) for invalid tokens, ApiError(403) for insufficient role.
+Do NOT duplicate `verifyTokenAndRole` inline in individual route files — use the shared helper.
+Every admin route MUST be wrapped with `withErrorHandler` from `src/lib/errors.ts` for uniform error responses.
+
+Domain Layer (src/domain/)
+Repository Interfaces: `src/domain/repositories/` contains TypeScript interfaces (IArtistRepository, IReleaseRepository, INewsRepository, IAssetRepository) that define what the application needs from persistent storage without depending on Supabase. Concrete implementations live in `src/lib/api/`. This enforces the Dependency Inversion Principle.
+Event Bus: `src/domain/events/eventBus.ts` provides a typed pub/sub Event Bus for decoupled domain event communication. Import the singleton `eventBus` for application-wide use or `createEventBus()` for isolated test buses. DomainEvent union includes: artist.synced, release.synced, asset.uploaded, asset.deleted, user.role.changed, sync.completed. Use `eventBus.on(type, handler)` to subscribe and `eventBus.emit(event)` to publish. Async handler errors are caught and logged — they never propagate to the emitter.
+
+Web Workers (src/workers/)
+CPU-intensive image operations (resize, format conversion) MUST use `src/workers/imageProcessor.worker.ts` via `createImageProcessorWorker()` from `src/workers/index.ts` so the main thread stays responsive.
+Worker instances are lazily created per component/operation and MUST be terminated (`processor.terminate()`) when done. Create in component mount effect, terminate in cleanup.
+ImageBitmap objects are transferred (not copied) to the worker via the Transferable API — do not reuse a bitmap after calling `resize()` or `toBlob()`.
+
+
 Server-side external API calls MUST use `withExponentialBackoff()` from `src/lib/rateLimiter.ts`.
 Throw `HttpError(status, message)` for HTTP errors to distinguish retryable (429, 5xx) from non-retryable failures.
 Non-HTTP errors (e.g. network errors) are not retried — they fail immediately.
