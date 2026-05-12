@@ -9,7 +9,6 @@ import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
-import { CRTOverlay } from '@/components/CRTOverlay'
 import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion } from 'framer-motion'
@@ -73,7 +72,6 @@ export function HomePageContent({
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <CRTOverlay />
       <Header dict={dict.navigation} locale={locale} />
       <main id="main-content">
         <div className="relative">

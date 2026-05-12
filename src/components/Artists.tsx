@@ -29,6 +29,19 @@ interface ArtistsProps extends SectionProps {
 
 const MAX_VISIBLE = 6
 
+// Variants for the card list — Framer Motion batches all stagger timers
+// inside a single IntersectionObserver + AnimationFrame scheduler, reducing
+// overhead vs. per-item `whileInView` with individual observers.
+const listVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.6 } },
+}
+
 function shuffleArtists<T>(items: T[]): T[] {
   const shuffled = [...items]
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -126,32 +139,38 @@ export function Artists({ artists, dict }: ArtistsProps) {
         {filteredArtists.length === 0 ? (
           <p className="text-muted-foreground font-serif">{dict.noResults}</p>
         ) : (
-          <ul
+          // data-lenis-prevent: tell Lenis to hand off scroll events inside
+          // this horizontal swipe container back to the native browser handler,
+          // preventing "scroll-fighting" between Lenis (vertical) and the
+          // snap carousel (horizontal) on touch devices.
+          <motion.ul
             className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
+            data-lenis-prevent
+            variants={prefersReducedMotion ? undefined : listVariants}
+            initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
+            whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}
+            viewport={{ once: true }}
           >
-            {filteredArtists.map((artist, index) => (
+            {filteredArtists.map((artist) => {
+              const thumbUrl = getSquareThumbnail(artist.imageUrl ?? '', 800)
+              return (
               <motion.li
                 key={artist.id}
                 className="flex-none w-[78vw] snap-start sm:w-auto"
-                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{
-                  duration: prefersReducedMotion ? 0 : 0.6,
-                  // Skip the stagger delay while searching so results appear instantly
-                  delay: prefersReducedMotion || isSearching ? 0 : index * 0.1,
-                }}
+                variants={prefersReducedMotion ? undefined : itemVariants}
               >
                 <Card
                   className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
                   onClick={() => handleArtistClick(artist)}
                 >
                   <div className="relative aspect-square overflow-hidden">
-                    {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
+                    {thumbUrl ? (
                       <img
-                        src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
+                        src={thumbUrl}
                         alt={`${artist.name} – artist photo`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        style={{ transformOrigin: 'center' }}
+                        sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"
                         loading="lazy"
                         decoding="async"
                         onError={(e) => {
@@ -163,7 +182,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                     ) : null}
                     <div
                       className="w-full h-full bg-gradient-to-br from-card to-background flex items-center justify-center"
-                      style={{ display: getSquareThumbnail(artist.imageUrl ?? '', 800) ? 'none' : 'flex' }}
+                      style={{ display: thumbUrl ? 'none' : 'flex' }}
                     >
                       <span className="text-6xl font-bold text-muted-foreground/40 select-none uppercase">
                         {artist.name.slice(0, 2)}
@@ -289,8 +308,9 @@ export function Artists({ artists, dict }: ArtistsProps) {
                   </div>
                 </Card>
               </motion.li>
-            ))}
-          </ul>
+              )
+            })}
+          </motion.ul>
         )}
       </div>
     </section>

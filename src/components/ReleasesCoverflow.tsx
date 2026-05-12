@@ -32,7 +32,12 @@ const VIRTUAL_BUFFER = 3
  * event — it NEVER touches React state, so there are zero component
  * re-renders on scroll.  All visual work is done by the GPU compositor via
  * `transform` and `opacity` (hardware-accelerated properties only).
+ *
+ * Performance: slides further than TWEEN_CUTOFF units from the active slide
+ * are skipped immediately — only the 7 centre slides receive DOM mutations.
  */
+const TWEEN_CUTOFF = VIRTUAL_BUFFER + 0.5
+
 function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): void {
   const engine = api.internalEngine()
   const scrollProgress = api.scrollProgress()
@@ -56,8 +61,19 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       })
     }
 
+    // Convert the normalised scroll diff → "slide units"
+    // (1 unit = one snap interval — gives clean integer values at rest)
+    const distInSlides = diffToTarget * Math.max(1, snapCount - 1)
+    const abs = Math.abs(distInSlides)
+
     const inner = slideNodes[snapIndex]?.firstElementChild as HTMLElement | null
     if (!inner) return
+
+    // Early-exit: slides beyond the tween cutoff are invisible — skip DOM work
+    if (abs > TWEEN_CUTOFF) {
+      inner.style.opacity = '0'
+      return
+    }
 
     if (prefersReducedMotion) {
       // Reduced motion: no rotation or depth, just a slight opacity fade
@@ -65,11 +81,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
       return
     }
-
-    // Convert the normalised scroll diff → "slide units"
-    // (1 unit = one snap interval — gives clean integer values at rest)
-    const distInSlides = diffToTarget * Math.max(1, snapCount - 1)
-    const abs = Math.abs(distInSlides)
 
     // 3D coverflow interpolation — GPU-only properties (transform + opacity)
     const rotateY = -distInSlides * 44                    // deg: fan inward
@@ -113,6 +124,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
+
+  // Pre-compute all date strings once — avoids repeated toLocaleDateString() on every swipe
+  const formattedDates = useMemo(
+    () =>
+      releases.map((r) =>
+        new Date(r.releaseDate).toLocaleDateString(dateLocale, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+      ),
+    [releases, dateLocale],
+  )
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: total > 2,
@@ -284,12 +308,17 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                   preserve Embla layout calculation.  The `aspect-square` class
                   keeps dimensions identical to the real slide so the scroll
                   physics remain accurate.
+
+                  willChange is applied only to rendered slides (within the
+                  virtual window) to avoid promoting every slide to a GPU
+                  compositor layer — which exhausts VRAM on large catalogues.
                 */}
                 <div
-                  style={{
-                    transformStyle: 'preserve-3d',
-                    willChange: 'transform, opacity',
-                  }}
+                  style={
+                    renderedIndices.has(index)
+                      ? { transformStyle: 'preserve-3d', willChange: 'transform, opacity' }
+                      : { transformStyle: 'preserve-3d' }
+                  }
                 >
                   {renderedIndices.has(index) ? (
                     <Link
@@ -309,6 +338,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                           src={getOptimizedImageUrl(release.coverArt, 600)}
                           alt={`${release.title} by ${release.artistName} – cover art`}
                           className="w-full h-full object-cover"
+                          sizes="(max-width: 640px) 70vw, 320px"
                           draggable={false}
                           loading="lazy"
                           decoding="async"
@@ -356,11 +386,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           </p>
           <p className="text-xs text-muted-foreground font-mono flex items-center justify-center gap-1.5">
             <Calendar size={12} weight="bold" aria-hidden="true" />
-            {new Date(activeRelease.releaseDate).toLocaleDateString(dateLocale, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
+            {formattedDates[selectedIndex]}
           </p>
         </div>
       )}

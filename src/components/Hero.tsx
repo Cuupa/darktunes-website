@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { useRef } from 'react'
+import { motion, useReducedMotion, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
@@ -17,6 +18,10 @@ interface HeroProps extends SectionProps {
 
 export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
   const prefersReducedMotion = useReducedMotion()
+  const sectionRef = useRef<HTMLElement>(null)
+  // Stop the bounce animation as soon as the hero scrolls out of view so the
+  // Framer Motion rAF loop doesn't keep running while the user reads below.
+  const isInView = useInView(sectionRef, { margin: '0px 0px -20% 0px' })
 
   if (!featuredRelease) {
     return null
@@ -40,17 +45,31 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
     }
   }
 
+  const coverUrl = getOptimizedImageUrl(featuredRelease.coverArt, 1200)
+
   return (
-    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(var(--background-rgb), 0.65), rgba(var(--background-rgb), 0.97)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'scroll',
-        }}
-      />
+    <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
+      {/* Hero background — using <img> instead of CSS background-image so the
+          browser can apply fetchPriority="high" and start loading the LCP
+          image as early as possible, before CSSOM construction completes. */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <img
+          src={coverUrl}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+          sizes="100vw"
+          fetchPriority="high"
+          loading="eager"
+          decoding="sync"
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to bottom, rgba(var(--background-rgb), 0.65), rgba(var(--background-rgb), 0.97))`,
+          }}
+        />
+      </div>
       
       <div className="container mx-auto px-4 lg:px-16 z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -99,6 +118,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
                 src={getOptimizedImageUrl(featuredRelease.coverArt, 800)}
                 alt={`${featuredRelease.title} by ${featuredRelease.artistName} – cover art`}
                 className="w-full h-full object-cover"
+                sizes="50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
             </div>
@@ -106,11 +126,17 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
         </div>
       </div>
 
+      {/* Scroll-down indicator — bounce animation stops when hero leaves the
+          viewport to prevent a permanent rAF loop while the page is scrolled. */}
       <motion.div
         aria-hidden="true"
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-muted-foreground"
-        animate={prefersReducedMotion ? {} : { y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        animate={(!prefersReducedMotion && isInView) ? { y: [0, 10, 0] } : { y: 0 }}
+        transition={
+          (!prefersReducedMotion && isInView)
+            ? { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0 }
+        }
       >
         <p className="text-sm uppercase tracking-widest font-mono">{dict.scrollDown}</p>
         <ArrowDown size={20} weight="bold" />

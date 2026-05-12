@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Roboto+Slab:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Roboto+Slab:wght@100..900&family=JetBrains+Mono:wght@100..800&display=fallback"
           rel="stylesheet"
         />
         {/* PWA meta — prevents white flash and styles the status bar */}
