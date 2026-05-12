@@ -39,7 +39,7 @@ export function EPKPreview({
         <h3 className="text-xl font-bold">{artistName}</h3>
         {photoUrl && (
           <div className="relative h-40 w-40">
-            <Image src={photoUrl} alt={`${artistName} – artist photo`} fill className="rounded-md object-cover" />
+            <Image src={photoUrl} alt={`${artistName} – artist photo`} fill loading="lazy" className="rounded-md object-cover" />
           </div>
         )}
         {genres && <p><strong>{dict.profile_genres}:</strong> {genres}</p>}
@@ -50,7 +50,11 @@ export function EPKPreview({
         {links.length > 0 && (
           <ul className="list-disc pl-5">
             {links.map((link) => (
-              <li key={link} className="break-all">{link}</li>
+              <li key={link} className="break-all">
+                <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
+                  {link}
+                </a>
+              </li>
             ))}
           </ul>
         )}

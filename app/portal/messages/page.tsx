@@ -49,6 +49,8 @@ async function MessagesContent() {
   replyResults.forEach((result, index) => {
     if (result.status === 'fulfilled') {
       repliesByMessageId[messages[index].id] = result.value
+    } else {
+      console.error('[PortalMessagesPage] Failed to load replies for message', messages[index]?.id, result.reason)
     }
   })
 

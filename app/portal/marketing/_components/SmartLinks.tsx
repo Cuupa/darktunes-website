@@ -154,7 +154,9 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
               <Label htmlFor="asset-label">{dict.marketing_asset_label}</Label>
               <Input id="asset-label" value={label} onChange={(e) => setLabel(e.target.value)} />
             </div>
+            <Label htmlFor="artist-asset-file" className="sr-only">{dict.marketing_upload_asset}</Label>
             <input
+              id="artist-asset-file"
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,application/pdf,application/zip"
@@ -164,7 +166,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
               }}
             />
             <p className="text-xs text-muted-foreground">JPEG, PNG, WebP, PDF, ZIP · max 20 MB</p>
-            <Button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+            <Button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} aria-label={dict.marketing_upload_asset}>
               <UploadSimple size={16} className="mr-2" />
               {uploading ? dict.marketing_asset_uploading : dict.marketing_upload_asset}
             </Button>
@@ -188,7 +190,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                   </div>
                   <div className="flex items-center gap-2">
                     <Button size="sm" variant="outline" asChild>
-                      <a href={asset.publicUrl} target="_blank" rel="noopener noreferrer">{dict.statements_download}</a>
+                      <a href={asset.publicUrl} target="_blank" rel="noopener noreferrer">{dict.marketing_asset_download}</a>
                     </Button>
                     <Button
                       size="sm"

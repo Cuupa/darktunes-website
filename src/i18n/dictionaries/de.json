@@ -240,7 +240,8 @@
     "marketing_asset_delete_error": "Asset konnte nicht gelöscht werden.",
     "marketing_my_assets_empty": "Noch keine Assets hochgeladen.",
     "profile_download_epk": "EPK als PDF herunterladen",
-    "profile_epk_preview_heading": "EPK Vorschau"
+    "profile_epk_preview_heading": "EPK Vorschau",
+    "marketing_asset_download": "Herunterladen"
   },
   "press": {
     "title": "Presse & Medien",

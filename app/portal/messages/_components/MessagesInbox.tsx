@@ -11,6 +11,7 @@ import type { ArtistReply, LabelMessage } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import { markPortalMessageRead } from '../_actions/messages'
 import { sendPortalReply } from '../_actions/reply'
+import { REPLY_MAX_LENGTH, REPLY_MIN_LENGTH } from '../_constants'
 
 interface MessagesInboxProps {
   dict: Dictionary['portal']
@@ -39,11 +40,11 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
 
   const handleSendReply = async (messageId: string) => {
     const body = (replyDraftByMessageId[messageId] ?? '').trim()
-    if (body.length < 1) {
+    if (body.length < REPLY_MIN_LENGTH) {
       toast.error(dict.messages_reply_error)
       return
     }
-    if (body.length > 2000) {
+    if (body.length > REPLY_MAX_LENGTH) {
       toast.error(dict.messages_reply_error)
       return
     }
@@ -103,7 +104,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
                     value={replyDraftByMessageId[message.id] ?? ''}
                     onChange={(e) => setReplyDraftByMessageId((prev) => ({ ...prev, [message.id]: e.target.value }))}
                     placeholder={dict.messages_reply_placeholder}
-                    maxLength={2000}
+                    maxLength={REPLY_MAX_LENGTH}
                   />
                   <Button
                     type="button"

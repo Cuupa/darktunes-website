@@ -153,7 +153,7 @@ export function PortalOverview({
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{assetCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">assets available</p>
+                <p className="text-xs text-muted-foreground mt-1">label assets available</p>
               </CardContent>
             </Card>
           </Link>

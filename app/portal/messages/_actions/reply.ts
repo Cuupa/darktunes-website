@@ -3,10 +3,11 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { sendArtistReply } from '@/lib/api/artistReplies'
+import { REPLY_MAX_LENGTH, REPLY_MIN_LENGTH } from '../_constants'
 
 export async function sendPortalReply(messageId: string, body: string) {
   const trimmedBody = body.trim()
-  if (trimmedBody.length < 1 || trimmedBody.length > 2000) {
+  if (trimmedBody.length < REPLY_MIN_LENGTH || trimmedBody.length > REPLY_MAX_LENGTH) {
     throw new Error('Reply must be between 1 and 2000 characters')
   }
 
@@ -26,7 +27,7 @@ export async function sendPortalReply(messageId: string, body: string) {
     .eq('artist_id', artist.id)
     .maybeSingle()
 
-  if (!message) throw new Error('Message not found')
+  if (!message) throw new Error('Unauthorized')
 
   return sendArtistReply(supabase, messageId, artist.id, trimmedBody)
 }

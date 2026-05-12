@@ -6,6 +6,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 
+const MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024
+
 async function uploadCoverToR2(
   file: File,
   artistId: string,
@@ -50,8 +52,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  const maxBytes = 5 * 1024 * 1024
-  if (file.size > maxBytes) throw new ApiError(413, 'File too large (max 5 MB)')
+  if (file.size > MAX_RELEASE_COVER_SIZE_BYTES) throw new ApiError(413, 'File too large (max 5 MB)')
 
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
   if (!allowedTypes.includes(file.type)) {

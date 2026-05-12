@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
@@ -14,6 +15,8 @@ const allowedTypes = [
   'application/pdf',
   'application/zip',
 ]
+const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024
+const deleteSchema = z.object({ id: z.string() })
 
 function extFromMimeType(mimeType: string): string {
   if (mimeType === 'image/jpeg') return 'jpg'
@@ -76,8 +79,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  const maxBytes = 20 * 1024 * 1024
-  if (file.size > maxBytes) throw new ApiError(413, 'File too large (max 20 MB)')
+  if (file.size > MAX_ASSET_SIZE_BYTES) throw new ApiError(413, 'File too large (max 20 MB)')
 
   if (!allowedTypes.includes(file.type)) {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP, PDF, ZIP')
@@ -115,16 +117,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateArtist(req)
 
-  const body: unknown = await req.json()
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    typeof (body as Record<string, unknown>).id !== 'string'
-  ) {
-    throw new ApiError(400, 'Invalid payload: id is required')
-  }
-
-  const assetId = (body as { id: string }).id
+  const body = deleteSchema.parse(await req.json())
+  const assetId = body.id
   const { data: asset } = await supabase
     .from('artist_assets')
     .select('id, artist_id')

@@ -164,8 +164,9 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>{dict.releases_submit_cover}</Label>
+              <Label htmlFor="release-cover-file">{dict.releases_submit_cover}</Label>
               <input
+                id="release-cover-file"
                 ref={fileInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
