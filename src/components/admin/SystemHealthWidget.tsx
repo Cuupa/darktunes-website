@@ -10,7 +10,7 @@
  *   - Per-API last sync timestamp and status (auto-discovered from sync_logs)
  *   - Rate-limit warning badges
  *   - Error details for partial/error syncs
- *   - "Force Sync All" button with loading state
+ *   - "Force Sync All" and "Sync YouTube" actions with loading states
  *
  * Props (IoC): receives the Bearer token from the parent (AuthContext) so
  * this component itself never reads auth state directly.
@@ -34,7 +34,6 @@ import {
   Ticket,
   YoutubeLogo,
   Link,
-  Waveform,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useEffect } from 'react'
@@ -89,7 +88,7 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
 }
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
-  return API_META[api] ?? { label: api.charAt(0).toUpperCase() + api.slice(1), icon: <Waveform size={16} weight="bold" /> }
+  return API_META[api] ?? { label: api.charAt(0).toUpperCase() + api.slice(1), icon: <MusicNote size={16} weight="bold" /> }
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +99,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncingYoutube, setSyncingYoutube] = useState(false)
   const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
 
   const fetchHealth = useCallback(async () => {
@@ -164,6 +164,39 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
     }
   }
 
+  const handleSyncYoutube = async () => {
+    setSyncingYoutube(true)
+    try {
+      const res = await fetch('/api/sync-youtube', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data: unknown = await res.json()
+
+      if (!res.ok) {
+        const errorData = data as { error?: string }
+        throw new Error(errorData.error ?? `YouTube sync failed with status ${res.status}`)
+      }
+
+      const result = data as { synced?: number; count?: number; message?: string }
+      const syncedCount = result.synced ?? result.count
+      if (typeof syncedCount === 'number') {
+        toast.success(`YouTube sync completed (${syncedCount} video${syncedCount === 1 ? '' : 's'} synced).`)
+      } else {
+        toast.success(result.message ?? 'YouTube sync completed successfully.')
+      }
+      await fetchHealth()
+    } catch (err) {
+      toast.error(`YouTube sync failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSyncingYoutube(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -206,24 +239,44 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
             Updated {formatRelativeTime(health.checkedAt)}
           </span>
         </div>
-        <Button
-          onClick={() => { void handleForceSync() }}
-          disabled={syncing || !dbOnline}
-          size="sm"
-          variant="outline"
-        >
-          {syncing ? (
-            <>
-              <Spinner size={14} className="mr-2 animate-spin" />
-              Syncing…
-            </>
-          ) : (
-            <>
-              <ArrowsClockwise size={14} className="mr-2" />
-              Force Sync All
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => { void handleSyncYoutube() }}
+            disabled={syncingYoutube || !dbOnline}
+            size="sm"
+            variant="outline"
+          >
+            {syncingYoutube ? (
+              <>
+                <Spinner size={14} className="mr-2 animate-spin" />
+                Syncing…
+              </>
+            ) : (
+              <>
+                <YoutubeLogo size={14} className="mr-2" />
+                Sync YouTube
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={() => { void handleForceSync() }}
+            disabled={syncing || !dbOnline}
+            size="sm"
+            variant="outline"
+          >
+            {syncing ? (
+              <>
+                <Spinner size={14} className="mr-2 animate-spin" />
+                Syncing…
+              </>
+            ) : (
+              <>
+                <ArrowsClockwise size={14} className="mr-2" />
+                Force Sync All
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Database card */}
@@ -290,6 +343,16 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                     {formatRelativeTime(status.lastSyncAt)}
                   </span>
                 </div>
+                {api === 'discogs' && !status.lastSyncStatus && (
+                  <p className="text-xs text-muted-foreground">
+                    Runs as part of Spotify sync when artist has a Discogs ID set.
+                  </p>
+                )}
+                {api === 'odesli' && !status.lastSyncStatus && (
+                  <p className="text-xs text-muted-foreground">
+                    Runs automatically after each successful Spotify release sync.
+                  </p>
+                )}
 
                 {/* Status badge */}
                 {status.lastSyncStatus && (

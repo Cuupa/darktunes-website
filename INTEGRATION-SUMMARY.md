@@ -3,10 +3,10 @@
 ## What Is Implemented
 
 ### Public Website
-- **Hero section** — featured release with dynamic background; buttons functional (Listen Now → Spotify/player, Explore Artist → #artists)
+- **Hero section** — featured release with dynamic background; supports rotating multiple featured releases (6s auto-advance + clickable dot indicators); buttons functional (Listen Now → Spotify/player, Explore Artist → #artists)
 - **Releases section** — server-side fetched from Supabase via RSC + ISR (60s revalidate); semantic `<ul>/<li>` grid; `useReducedMotion` support
 - **Spotify Player** — embedded iframe player for the label playlist
-- **Artists section** — server-side data, passed as props to client component; semantic `<ul>/<li>` grid; full ARIA on icon links; 44×44px touch targets; `useReducedMotion` support
+- **Artists section** — server-side data, passed as props to client component; shows max 6 cards per visit with stable per-visit shuffle; featured artists are guaranteed in those 6; quick search (name/genre) shows all matches; semantic `<ul>/<li>` grid; full ARIA on icon links; 44×44px touch targets; `useReducedMotion` support
 - **Videos section** — YouTube embed gallery; semantic `<ul>/<li>` grid; image proxy via wsrv.nl; `useReducedMotion` support
 - **News section** — server-side data from Supabase; semantic `<ul>/<li>` list; "Read Full Story" links to `/news/${slug}`; `useReducedMotion` support
 - **Tour section** — upcoming concert dates from Supabase with ticket links

@@ -92,6 +92,10 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
               uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
             }`,
           )
+          // R2 "Unauthorized" typically means the CLOUDFLARE_R2_ACCESS_KEY_ID /
+          // CLOUDFLARE_R2_SECRET_ACCESS_KEY env vars are missing or the key lacks
+          // Object:Write permission on the bucket. The external iTunes URL is used
+          // as a graceful fallback — no data is lost, but cover art won't be CDN-cached.
           // Graceful fallback: use the original external URL
           coverArt = artworkUrl
         }

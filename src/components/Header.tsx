@@ -150,7 +150,7 @@ export function Header({ dict, locale }: HeaderProps) {
                       setMobileMenuOpen(false)
                     }}
                   >
-                    <a href={item.href} onClick={(e) => e.preventDefault()}>{item.label}</a>
+                    {item.label}
                   </Button>
                 )
               ))}

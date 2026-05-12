@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ import {
   TiktokLogo,
   MusicNote,
   ShoppingBag,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { ArtistModal } from '@/components/ArtistModal'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -26,10 +27,50 @@ interface ArtistsProps extends SectionProps {
   dict: Dictionary['artists']
 }
 
+const MAX_VISIBLE = 6
+
+function shuffleArtists<T>(items: T[]): T[] {
+  const shuffled = [...items]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const randomIndex = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]]
+  }
+  return shuffled
+}
+
+function getVisibleArtists(artists: Artist[]): Artist[] {
+  const featuredArtists = artists.filter((artist) => artist.featured).slice(0, MAX_VISIBLE)
+  const nonFeaturedArtists = artists.filter((artist) => !artist.featured)
+  const remainingSlots = Math.max(0, MAX_VISIBLE - featuredArtists.length)
+  const randomNonFeatured = shuffleArtists(nonFeaturedArtists).slice(0, remainingSlots)
+  return shuffleArtists([...featuredArtists, ...randomNonFeatured])
+}
+
 export function Artists({ artists, dict }: ArtistsProps) {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const prefersReducedMotion = useReducedMotion()
+  const stableVisibleArtistsRef = useRef<{ idsKey: string; artists: Artist[] }>({
+    idsKey: '',
+    artists: [],
+  })
+
+  const idsKey = artists.map((artist) => artist.id).join('|')
+  if (stableVisibleArtistsRef.current.idsKey !== idsKey) {
+    stableVisibleArtistsRef.current = {
+      idsKey,
+      artists: getVisibleArtists(artists),
+    }
+  }
+
+  const normalisedQuery = searchQuery.trim().toLowerCase()
+  const filteredArtists = normalisedQuery
+    ? artists.filter((artist) =>
+      artist.name.toLowerCase().includes(normalisedQuery) ||
+      artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
+    )
+    : stableVisibleArtistsRef.current.artists
 
   const handleArtistClick = (artist: Artist) => {
     setSelectedArtist(artist)
@@ -51,163 +92,183 @@ export function Artists({ artists, dict }: ArtistsProps) {
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3">
-          {artists.map((artist, index) => (
-            <motion.li
-              key={artist.id}
-              className="flex-none w-[78vw] snap-start sm:w-auto"
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
-            >
-              <Card 
-                className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
-                onClick={() => handleArtistClick(artist)}
+        <div className="relative mb-6">
+          <MagnifyingGlass
+            size={18}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={dict.searchPlaceholder}
+            className="h-11 w-full rounded-md border border-border bg-muted pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={dict.searchPlaceholder}
+          />
+        </div>
+
+        {filteredArtists.length === 0 ? (
+          <p className="text-muted-foreground font-serif">{dict.noResults}</p>
+        ) : (
+          <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3">
+            {filteredArtists.map((artist, index) => (
+              <motion.li
+                key={artist.id}
+                className="flex-none w-[78vw] snap-start sm:w-auto"
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
               >
-                <div className="relative aspect-square overflow-hidden">
-                  {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
-                    <img
-                      src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
-                      alt={`${artist.name} – artist photo`}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
-                        if (placeholder) placeholder.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className="w-full h-full bg-gradient-to-br from-card to-background flex items-center justify-center"
-                    style={{ display: getSquareThumbnail(artist.imageUrl ?? '', 800) ? 'none' : 'flex' }}
-                  >
-                    <span className="text-6xl font-bold text-muted-foreground/40 select-none uppercase">
-                      {artist.name.slice(0, 2)}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-                  <div className="absolute bottom-6 left-6 right-6">
-                    <h3 className="text-3xl font-bold mb-3 group-hover:text-accent transition-colors">{artist.name}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {artist.genres.map((genre) => (
-                        <Badge key={genre} className="bg-primary/20 text-primary-foreground border-primary/30 backdrop-blur-sm uppercase font-mono text-xs tracking-wider">
-                          {genre}
-                        </Badge>
-                      ))}
+                <Card
+                  className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
+                  onClick={() => handleArtistClick(artist)}
+                >
+                  <div className="relative aspect-square overflow-hidden">
+                    {getSquareThumbnail(artist.imageUrl ?? '', 800) ? (
+                      <img
+                        src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
+                        alt={`${artist.name} – artist photo`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                          const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
+                          if (placeholder) placeholder.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-full h-full bg-gradient-to-br from-card to-background flex items-center justify-center"
+                      style={{ display: getSquareThumbnail(artist.imageUrl ?? '', 800) ? 'none' : 'flex' }}
+                    >
+                      <span className="text-6xl font-bold text-muted-foreground/40 select-none uppercase">
+                        {artist.name.slice(0, 2)}
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <h3 className="text-3xl font-bold mb-3 group-hover:text-accent transition-colors">{artist.name}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {artist.genres.map((genre) => (
+                          <Badge key={genre} className="bg-primary/20 text-primary-foreground border-primary/30 backdrop-blur-sm uppercase font-mono text-xs tracking-wider">
+                            {genre}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="p-6 space-y-4">
-                  <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
-                    {artist.bio}
-                  </p>
-                  <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-                    {artist.spotifyUrl && (
-                      <a 
-                        href={artist.spotifyUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on Spotify`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <SpotifyLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.instagramUrl && (
-                      <a 
-                        href={artist.instagramUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on Instagram`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <InstagramLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.youtubeUrl && (
-                      <a 
-                        href={artist.youtubeUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on YouTube`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <YoutubeLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.facebookUrl && (
-                      <a
-                        href={artist.facebookUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on Facebook`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <FacebookLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.twitterUrl && (
-                      <a
-                        href={artist.twitterUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on X (Twitter)`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <TwitterLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.tiktokUrl && (
-                      <a
-                        href={artist.tiktokUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on TikTok`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <TiktokLogo size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.bandcampUrl && (
-                      <a
-                        href={artist.bandcampUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} on Bandcamp`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <MusicNote size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.shopUrl && (
-                      <a
-                        href={artist.shopUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} merch shop`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
-                      >
-                        <ShoppingBag size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
-                    {artist.websiteUrl && (
-                      <a 
-                        href={artist.websiteUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        aria-label={`${artist.name} official website`}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                      >
-                        <Globe size={20} weight="fill" aria-hidden="true" />
-                      </a>
-                    )}
+                  <div className="p-6 space-y-4">
+                    <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
+                      {artist.bio}
+                    </p>
+                    <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                      {artist.spotifyUrl && (
+                        <a
+                          href={artist.spotifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on Spotify`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <SpotifyLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.instagramUrl && (
+                        <a
+                          href={artist.instagramUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on Instagram`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <InstagramLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.youtubeUrl && (
+                        <a
+                          href={artist.youtubeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on YouTube`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <YoutubeLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.facebookUrl && (
+                        <a
+                          href={artist.facebookUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on Facebook`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <FacebookLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.twitterUrl && (
+                        <a
+                          href={artist.twitterUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on X (Twitter)`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <TwitterLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.tiktokUrl && (
+                        <a
+                          href={artist.tiktokUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on TikTok`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <TiktokLogo size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.bandcampUrl && (
+                        <a
+                          href={artist.bandcampUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} on Bandcamp`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <MusicNote size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.shopUrl && (
+                        <a
+                          href={artist.shopUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} merch shop`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
+                        >
+                          <ShoppingBag size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                      {artist.websiteUrl && (
+                        <a
+                          href={artist.websiteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${artist.name} official website`}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <Globe size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </motion.li>
-          ))}
-        </ul>
+                </Card>
+              </motion.li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
 

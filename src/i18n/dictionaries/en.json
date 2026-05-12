@@ -17,7 +17,9 @@
   },
   "artists": {
     "heading": "ARTISTS",
-    "subheading": "The creative force behind our sound"
+    "subheading": "The creative force behind our sound",
+    "searchPlaceholder": "Search artist or genre…",
+    "noResults": "No artists found."
   },
   "releases": {
     "heading": "RELEASES",

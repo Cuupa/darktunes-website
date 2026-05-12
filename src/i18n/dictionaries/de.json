@@ -17,7 +17,9 @@
   },
   "artists": {
     "heading": "ARTISTS",
-    "subheading": "Die kreative Kraft hinter unserem Sound"
+    "subheading": "Die kreative Kraft hinter unserem Sound",
+    "searchPlaceholder": "Künstler oder Genre suchen…",
+    "noResults": "Keine Künstler gefunden."
   },
   "releases": {
     "heading": "RELEASES",
