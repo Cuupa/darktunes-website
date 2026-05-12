@@ -128,16 +128,14 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
         setTracks([])
       })
       .finally(() => setTracksLoading(false))
-  }, [artist?.id, open])
-
-  // Fetch concerts from Supabase (client-side)
+  }, [artist, open])
   useEffect(() => {
     if (!artist || !open || !isSupabaseConfigured) return
     const db = createBrowserSupabaseClient()
     getConcertsByArtistId(db, artist.id)
       .then((data) => setConcerts(data.slice(0, 5)))
       .catch(() => setConcerts([]))
-  }, [artist?.id, open])
+  }, [artist, open])
 
   // Handle play/pause for a track
   const handleTogglePlay = (track: ItunesTrack) => {

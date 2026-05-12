@@ -81,9 +81,6 @@ export function Artists({ artists, dict }: ArtistsProps) {
   // filter+render work runs as a low-priority React update.
   const deferredSearch = useDeferredValue(searchQuery)
 
-  /** True while the user has typed something (even before deferred catches up). */
-  const isSearching = searchQuery !== ''
-
   /** True while deferred search hasn't yet caught up with the current input. */
   const isFilterPending = deferredSearch !== searchQuery
 
