@@ -131,6 +131,8 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         src={getSquareThumbnail(artist.imageUrl ?? '', 800)}
                         alt={`${artist.name} – artist photo`}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                           const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null

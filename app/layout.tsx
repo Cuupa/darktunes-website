@@ -68,6 +68,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Roboto+Slab:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap"
           rel="stylesheet"
         />
+        {/* PWA meta — prevents white flash and styles the status bar */}
+        <meta name="theme-color" content="#101010" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="darkTunes" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="bg-background text-foreground antialiased">
         <a
