@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OfflineRetryButton } from './_components/OfflineRetryButton'
 
 export const metadata: Metadata = {
   title: 'Offline – darkTunes Music Group',
@@ -76,12 +77,7 @@ export default function OfflinePage() {
           music will be waiting for you.
         </p>
 
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-white font-mono text-sm uppercase tracking-widest hover:bg-accent/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          Try Again
-        </button>
+        <OfflineRetryButton />
       </div>
     </main>
   )
