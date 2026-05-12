@@ -151,3 +151,13 @@
   0%, 100% { opacity: 1;    }
   50%       { opacity: 0.85; }
 }
+
+/* Hides the native scrollbar on horizontally-scrollable swipe containers
+   (Artists / Videos mobile carousels) while keeping scroll functionality. */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

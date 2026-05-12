@@ -51,10 +51,11 @@ export function Artists({ artists, dict }: ArtistsProps) {
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
 
-        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
+        <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3">
           {artists.map((artist, index) => (
             <motion.li
               key={artist.id}
+              className="flex-none w-[78vw] snap-start sm:w-auto"
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}

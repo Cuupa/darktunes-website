@@ -47,10 +47,11 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
-          <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 list-none">
+          <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3">
             {videos.map((video, index) => (
               <motion.li
                 key={video.id}
+                className="flex-none w-[82vw] snap-start md:w-auto"
                 initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}

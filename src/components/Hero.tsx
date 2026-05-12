@@ -41,14 +41,14 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
   }
 
   return (
-    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-32 pb-16">
+    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20 pb-16 lg:pt-32">
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(18, 18, 18, 0.3), rgba(18, 18, 18, 0.95)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(16, 16, 16, 0.65), rgba(16, 16, 16, 0.97)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
+          backgroundAttachment: 'scroll',
         }}
       />
       
@@ -65,10 +65,10 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
             </Badge>
             
             <div className="space-y-4">
-              <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight">
+              <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight">
                 {featuredRelease.title}
               </h1>
-              <p className="text-3xl md:text-4xl lg:text-5xl text-muted-foreground font-medium font-serif">
+              <p className="text-xl sm:text-3xl md:text-4xl lg:text-5xl text-muted-foreground font-medium font-serif">
                 {featuredRelease.artistName}
               </p>
             </div>
@@ -92,7 +92,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.4 }}
-            className="relative"
+            className="relative hidden lg:block"
           >
             <div className="glow-card relative aspect-square rounded-lg overflow-hidden shadow-2xl shadow-accent/20">
               <img 
