@@ -1,11 +1,12 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { useReleases } from '@/hooks/useReleases'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -31,6 +32,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
@@ -39,6 +47,11 @@ import type { Database } from '@/types/database'
 import type { SyncAllResult } from '@/lib/sync/syncAll'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
+
+const PAGE_SIZE = 20
+
+type SortField = 'title' | 'artistName' | 'releaseDate' | 'type'
+type SortDir = 'asc' | 'desc'
 
 const EMPTY_FORM: ReleaseFormData = {
   title: '',
@@ -97,7 +110,44 @@ export function ReleasesManager() {
   const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
   const [isCleaningUp, setIsCleaningUp] = useState(false)
 
+  // Search / sort / pagination
+  const [search, setSearch] = useState('')
+  const [sortField, setSortField] = useState<SortField>('releaseDate')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [page, setPage] = useState(0)
+
   const formValue = editingRelease ? releaseToFormData(editingRelease) : EMPTY_FORM
+
+  // Derived: filtered + sorted + paginated list
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return releases.filter((r) =>
+      r.title.toLowerCase().includes(q) ||
+      r.artistName.toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q),
+    )
+  }, [releases, search])
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'title') cmp = a.title.localeCompare(b.title)
+      else if (sortField === 'artistName') cmp = a.artistName.localeCompare(b.artistName)
+      else if (sortField === 'releaseDate') cmp = a.releaseDate.localeCompare(b.releaseDate)
+      else if (sortField === 'type') cmp = a.type.localeCompare(b.type)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortField, sortDir])
+
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortDir === 'asc'
+      ? <ArrowUp size={12} className="inline ml-1" aria-hidden="true" />
+      : <ArrowDown size={12} className="inline ml-1" aria-hidden="true" />
+  }
 
   const openNew = () => {
     setEditingRelease(null)
@@ -283,8 +333,35 @@ export function ReleasesManager() {
 
       <Separator />
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{releases.length} release(s)</p>
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 min-w-0">
+          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Search releases…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            className="pl-8"
+          />
+        </div>
+        <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => {
+          const [f, d] = v.split(':') as [SortField, SortDir]
+          setSortField(f); setSortDir(d); setPage(0)
+        }}>
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Sort by…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="releaseDate:desc">Date (newest first)</SelectItem>
+            <SelectItem value="releaseDate:asc">Date (oldest first)</SelectItem>
+            <SelectItem value="title:asc">Title A → Z</SelectItem>
+            <SelectItem value="title:desc">Title Z → A</SelectItem>
+            <SelectItem value="artistName:asc">Artist A → Z</SelectItem>
+            <SelectItem value="artistName:desc">Artist Z → A</SelectItem>
+            <SelectItem value="type:asc">Type</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {releases.length}</p>
         <Button size="sm" onClick={openNew} className="gap-2">
           <Plus size={16} weight="bold" />
           New Release
@@ -294,10 +371,26 @@ export function ReleasesManager() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Artist</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Type</TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('title'); setSortDir(sortField === 'title' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
+                Title <SortIcon field="title" />
+              </button>
+            </TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('artistName'); setSortDir(sortField === 'artistName' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
+                Artist <SortIcon field="artistName" />
+              </button>
+            </TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('releaseDate'); setSortDir(sortField === 'releaseDate' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
+                Date <SortIcon field="releaseDate" />
+              </button>
+            </TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('type'); setSortDir(sortField === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
+                Type <SortIcon field="type" />
+              </button>
+            </TableHead>
             <TableHead>Visibility</TableHead>
             <TableHead>Featured</TableHead>
             <TableHead>Promo</TableHead>
@@ -311,14 +404,14 @@ export function ReleasesManager() {
                 Loading…
               </TableCell>
             </TableRow>
-          ) : releases.length === 0 ? (
+          ) : paginated.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                No releases yet. Click "New Release" or sync from iTunes.
+                {search ? `No releases match "${search}".` : 'No releases yet. Click "New Release" or sync from iTunes.'}
               </TableCell>
             </TableRow>
           ) : (
-            releases.map((release) => (
+            paginated.map((release) => (
               <TableRow key={release.id}>
                 <TableCell className="font-medium">{release.title}</TableCell>
                 <TableCell>{release.artistName}</TableCell>
@@ -379,6 +472,23 @@ export function ReleasesManager() {
           )}
         </TableBody>
       </Table>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Page {page + 1} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+              Previous
+            </Button>
+            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
