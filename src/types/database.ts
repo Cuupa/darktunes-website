@@ -42,6 +42,7 @@ export interface Database {
           genres: string[]
           image_url: string | null
           spotify_url: string | null
+          apple_music_url: string | null
           instagram_url: string | null
           youtube_url: string | null
           website_url: string | null
@@ -75,6 +76,7 @@ export interface Database {
           genres?: string[]
           image_url?: string | null
           spotify_url?: string | null
+          apple_music_url?: string | null
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null
@@ -108,6 +110,7 @@ export interface Database {
           genres?: string[]
           image_url?: string | null
           spotify_url?: string | null
+          apple_music_url?: string | null
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null

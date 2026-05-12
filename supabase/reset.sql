@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS public.artists (
   genres           TEXT[]      NOT NULL DEFAULT '{}',
   image_url        TEXT,
   spotify_url      TEXT,
+  apple_music_url  TEXT,
   instagram_url    TEXT,
   youtube_url      TEXT,
   website_url      TEXT,
@@ -167,6 +168,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS twitter_url    TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 

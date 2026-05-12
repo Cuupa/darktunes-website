@@ -134,8 +134,9 @@ Video Admin UX:
   "Fetch Info" button calls `/api/admin/fetch-youtube-info` to auto-fill title, channel name, and thumbnail.
   VideosManager has a "Sync YouTube Channel" button that calls `POST /api/sync-youtube` and shows synced count in toast.
 
-Artist Quick-Import:
-  When creating a NEW artist (value.name is empty), ArtistForm shows a prominent "Quick Import from Spotify" panel at the very top: paste Spotify URL → click "Import" → all fields auto-filled (name, image, genres, spotifyId, spotifyUrl).
+Artist Import (Spotify + Apple Music):
+  ArtistForm has a single Spotify URL field (no duplicated quick-import field) with an "Import" button that pre-fills name, image, genres, spotifyId, and spotifyUrl via `POST /api/admin/prefill-artist`.
+  ArtistForm also has an Apple Music URL field with an "Import" button that pre-fills name, image, genres, and appleMusicUrl via `POST /api/admin/prefill-artist-itunes`.
 
 Cascade Deletes:
   `releases.artist_id` uses `ON DELETE CASCADE`. When an artist is deleted, all their releases are automatically deleted by the DB.

@@ -28,6 +28,7 @@ export function rowToArtist(row: ArtistRow): Artist {
     genres: row.genres,
     imageUrl: row.image_url ?? '',
     spotifyUrl: row.spotify_url ?? undefined,
+    appleMusicUrl: row.apple_music_url ?? undefined,
     instagramUrl: row.instagram_url ?? undefined,
     youtubeUrl: row.youtube_url ?? undefined,
     websiteUrl: row.website_url ?? undefined,
