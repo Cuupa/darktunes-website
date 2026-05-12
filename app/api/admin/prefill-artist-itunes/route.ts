@@ -56,7 +56,7 @@ function extractItunesArtistId(input: string): string | null {
   try {
     const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
     const hostname = parsed.hostname.toLowerCase()
-    if (hostname !== 'music.apple.com' && hostname !== 'www.music.apple.com') return null
+    if (hostname !== 'music.apple.com' && !hostname.endsWith('.music.apple.com')) return null
 
     const parts = parsed.pathname.split('/').filter(Boolean)
     for (let i = parts.length - 1; i >= 0; i -= 1) {
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Artist not found on Apple Music' }, { status: 400 })
     }
     if (artist.wrapperType !== 'artist') {
-      return NextResponse.json({ error: 'Apple Music lookup did not return an artist entity' }, { status: 400 })
+      return NextResponse.json({ error: 'The provided Apple Music link is not an artist profile' }, { status: 400 })
     }
     if (!artist.artistName || !artist.artistId) {
       return NextResponse.json({ error: 'Apple Music artist data is incomplete' }, { status: 400 })
