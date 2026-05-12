@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchSpotifyArtistProfile } from '@/lib/sync/spotifyApi'
-
-type ProfileRole = 'admin' | 'editor' | 'user' | 'journalist'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 
 interface PrefillResponse {
   spotifyId: string
@@ -11,28 +10,6 @@ interface PrefillResponse {
   imageUrl: string | null
   genres: string[]
   spotifyUrl: string
-}
-
-async function verifyTokenAndRole(token: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new Error('Supabase service key not configured')
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
-  const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new Error('Unauthorized')
-
-  const { data: profile, error: profileErr } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', data.user.id)
-    .maybeSingle()
-
-  if (profileErr) throw new Error(profileErr.message)
-  const role = profile?.role as ProfileRole | undefined
-  if (!role || (role !== 'admin' && role !== 'editor')) {
-    throw new Error('Forbidden')
-  }
 }
 
 function extractSpotifyArtistId(input: string): string | null {
@@ -55,19 +32,10 @@ function extractSpotifyArtistId(input: string): string | null {
   return null
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get('authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing or invalid Authorization header' }, { status: 401 })
-  }
-
-  try {
-    await verifyTokenAndRole(authHeader.slice(7))
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unauthorized'
-    const status = message === 'Forbidden' ? 403 : 401
-    return NextResponse.json({ error: message }, { status })
-  }
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 1. Authenticate — admin or editor role required
+  const token = extractBearerToken(request.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
 
   let spotifyUrl: string | undefined
   try {
@@ -76,22 +44,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       spotifyUrl = String((body as { spotifyUrl: unknown }).spotifyUrl)
     }
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON body')
   }
 
   if (!spotifyUrl) {
-    return NextResponse.json({ error: 'Missing required field: spotifyUrl' }, { status: 400 })
+    throw new ApiError(400, 'Missing required field: spotifyUrl')
   }
 
   const spotifyArtistId = extractSpotifyArtistId(spotifyUrl)
   if (!spotifyArtistId) {
-    return NextResponse.json({ error: 'Invalid Spotify artist URL or ID' }, { status: 400 })
+    throw new ApiError(400, 'Invalid Spotify artist URL or ID')
   }
 
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    return NextResponse.json({ error: 'Spotify is not configured' }, { status: 503 })
+    throw new ApiError(503, 'Spotify is not configured')
   }
 
   try {
@@ -109,13 +77,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(response)
   } catch (err) {
+    if (err instanceof ApiError) throw err
     if (err instanceof HttpError) {
-      const status = err.status >= 500 ? 502 : err.status
-      return NextResponse.json({ error: err.message }, { status })
+      throw new ApiError(err.status >= 500 ? 502 : err.status, err.message)
     }
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to prefill artist' },
-      { status: 500 },
-    )
+    throw err
   }
-}
+})

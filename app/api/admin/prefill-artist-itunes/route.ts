@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
-
-type ProfileRole = 'admin' | 'editor' | 'user' | 'journalist' | 'artist'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 
 interface ItunesLookupResult {
   wrapperType?: string
@@ -24,28 +23,6 @@ interface PrefillItunesResponse {
   imageUrl: string | null
   appleMusicUrl: string
   itunesArtistId: string
-}
-
-async function verifyTokenAndRole(token: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new Error('Supabase service key not configured')
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
-  const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new Error('Unauthorized')
-
-  const { data: profile, error: profileErr } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', data.user.id)
-    .maybeSingle()
-
-  if (profileErr) throw new Error(profileErr.message)
-  const role = profile?.role as ProfileRole | undefined
-  if (!role || (role !== 'admin' && role !== 'editor')) {
-    throw new Error('Forbidden')
-  }
 }
 
 function extractItunesArtistId(input: string): string | null {
@@ -74,19 +51,10 @@ function getArtistImageUrl(artworkUrl100: string | undefined): string | null {
   return artworkUrl100.replace(/\d+x\d+bb(\.\w+)$/, '600x600bb$1')
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get('authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing or invalid Authorization header' }, { status: 401 })
-  }
-
-  try {
-    await verifyTokenAndRole(authHeader.slice(7))
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unauthorized'
-    const status = message === 'Forbidden' ? 403 : 401
-    return NextResponse.json({ error: message }, { status })
-  }
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 1. Authenticate — admin or editor role required
+  const token = extractBearerToken(request.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
 
   let appleMusicUrl: string | undefined
   try {
@@ -95,16 +63,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       appleMusicUrl = String((body as { appleMusicUrl: unknown }).appleMusicUrl)
     }
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON body')
   }
 
   if (!appleMusicUrl) {
-    return NextResponse.json({ error: 'Missing required field: appleMusicUrl' }, { status: 400 })
+    throw new ApiError(400, 'Missing required field: appleMusicUrl')
   }
 
   const artistId = extractItunesArtistId(appleMusicUrl)
   if (!artistId) {
-    return NextResponse.json({ error: 'Invalid Apple Music artist URL or ID' }, { status: 400 })
+    throw new ApiError(400, 'Invalid Apple Music artist URL or ID')
   }
 
   try {
@@ -120,13 +88,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const artist = lookup.results[0]
     if (!artist) {
-      return NextResponse.json({ error: 'Artist not found on Apple Music' }, { status: 400 })
+      throw new ApiError(400, 'Artist not found on Apple Music')
     }
     if (artist.wrapperType !== 'artist') {
-      return NextResponse.json({ error: 'The provided Apple Music link is not an artist profile' }, { status: 400 })
+      throw new ApiError(400, 'The provided Apple Music link is not an artist profile')
     }
     if (!artist.artistName || !artist.artistId) {
-      return NextResponse.json({ error: 'Apple Music artist data is incomplete' }, { status: 400 })
+      throw new ApiError(400, 'Apple Music artist data is incomplete')
     }
 
     const response: PrefillItunesResponse = {
@@ -139,12 +107,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(response)
   } catch (err) {
+    if (err instanceof ApiError) throw err
     if (err instanceof HttpError) {
-      return NextResponse.json({ error: err.message }, { status: 502 })
+      throw new ApiError(502, err.message)
     }
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to prefill artist from Apple Music' },
-      { status: 502 },
-    )
+    throw err
   }
-}
+})

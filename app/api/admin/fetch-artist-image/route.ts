@@ -3,29 +3,16 @@
  *
  * POST /api/admin/fetch-artist-image
  * Body: { spotifyId?: string; discogsId?: string }
- * Auth: Bearer <supabase-access-token>
+ * Auth: Bearer <supabase-access-token> (admin or editor role required)
  *
  * Attempts to fetch the artist's profile image from Spotify (preferred) or
  * Discogs (fallback). Returns the first available high-resolution image URL.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { HttpError } from '@/lib/rateLimiter'
-
-// ---------------------------------------------------------------------------
-// Auth helper (same pattern as sync-artist route)
-// ---------------------------------------------------------------------------
-
-async function verifyToken(token: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new Error('Supabase service key not configured')
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
-  const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new Error('Unauthorized')
-}
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 
 // ---------------------------------------------------------------------------
 // Spotify helpers
@@ -89,18 +76,10 @@ async function fetchDiscogsArtistImage(discogsId: string): Promise<string | null
 // Route Handler
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  // 1. Authenticate
-  const authHeader = request.headers.get('authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing or invalid Authorization header' }, { status: 401 })
-  }
-
-  try {
-    await verifyToken(authHeader.slice(7))
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 1. Authenticate — admin or editor role required
+  const token = extractBearerToken(request.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
 
   // 2. Parse body
   let spotifyId: string | undefined
@@ -113,11 +92,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (typeof b.discogsId === 'string') discogsId = b.discogsId
     }
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON body')
   }
 
   if (!spotifyId && !discogsId) {
-    return NextResponse.json({ error: 'Provide at least spotifyId or discogsId' }, { status: 400 })
+    throw new ApiError(400, 'Provide at least spotifyId or discogsId')
   }
 
   // 3. Try Spotify first, then Discogs
@@ -140,8 +119,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (!imageUrl) {
-    return NextResponse.json({ error: 'No image found for this artist' }, { status: 404 })
+    throw new ApiError(404, 'No image found for this artist')
   }
 
   return NextResponse.json({ imageUrl })
-}
+})
