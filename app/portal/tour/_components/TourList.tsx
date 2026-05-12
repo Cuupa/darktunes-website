@@ -1,8 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,18 +14,17 @@ import {
 } from '@/components/ui/select'
 import type { Dictionary } from '@/i18n/types'
 import type { Concert } from '@/types'
+import { createTourDate, deleteTourDate } from '../_actions/tour'
 
 interface TourListProps {
   dict: Dictionary['portal']
   concerts: Concert[]
   artistId: string | null
-  artistName: string
 }
 
 type Status = 'announced' | 'confirmed' | 'cancelled'
 
-export function TourList({ dict, concerts, artistId, artistName }: TourListProps) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+export function TourList({ dict, concerts, artistId }: TourListProps) {
   const [items, setItems] = useState(concerts)
   const [status, setStatus] = useState<Status>('announced')
   const [form, setForm] = useState({
@@ -42,24 +40,19 @@ export function TourList({ dict, concerts, artistId, artistName }: TourListProps
     e.preventDefault()
     if (!artistId || !form.eventName || !form.concertDate) return
 
-    const { data, error } = await supabase
-      .from('concerts')
-      .insert({
-        artist_id: artistId,
-        artist_name: artistName,
-        event_name: form.eventName,
-        concert_date: form.concertDate,
-        venue_name: form.venueName || null,
-        venue_city: form.venueCity || null,
-        venue_country: form.venueCountry || null,
-        ticket_url: form.ticketUrl || null,
+    let data: Awaited<ReturnType<typeof createTourDate>>
+    try {
+      data = await createTourDate({
+        eventName: form.eventName,
+        concertDate: form.concertDate,
+        venueName: form.venueName,
+        venueCity: form.venueCity,
+        venueCountry: form.venueCountry,
+        ticketUrl: form.ticketUrl,
         status,
       })
-      .select()
-      .single()
-
-    if (error) {
-      toast.error(error.message)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create tour date')
       return
     }
 
@@ -87,9 +80,11 @@ export function TourList({ dict, concerts, artistId, artistName }: TourListProps
   }
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from('concerts').delete().eq('id', id)
-    if (error) {
-      toast.error(error.message)
+    if (!window.confirm('Delete this tour date?')) return
+    try {
+      await deleteTourDate(id)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete tour date')
       return
     }
     setItems((prev) => prev.filter((item) => item.id !== id))

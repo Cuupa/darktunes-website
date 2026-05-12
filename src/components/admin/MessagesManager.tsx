@@ -71,10 +71,10 @@ export function MessagesManager() {
     setIsSending(true)
     try {
       await sendMessage(supabase, artistId, subject.trim(), body.trim())
+      await load()
       setSubject('')
       setBody('')
       toast.success('Message sent')
-      await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send message')
     } finally {

@@ -1,12 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { markMessageRead } from '@/lib/api/labelMessages'
 import { Button } from '@/components/ui/button'
 import type { LabelMessage } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+import { markPortalMessageRead } from '../_actions/messages'
 
 interface MessagesInboxProps {
   dict: Dictionary['portal']
@@ -14,14 +13,13 @@ interface MessagesInboxProps {
 }
 
 export function MessagesInbox({ dict, initialMessages }: MessagesInboxProps) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [messages, setMessages] = useState(initialMessages)
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const handleRead = async (id: string) => {
     setLoadingId(id)
     try {
-      await markMessageRead(supabase, id)
+      await markPortalMessageRead(id)
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read: true } : m)))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to mark message as read')

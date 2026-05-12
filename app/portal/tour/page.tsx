@@ -42,7 +42,7 @@ async function TourContent() {
   const concerts = artist
     ? await getConcertsByArtistId(supabase, artist.id).catch(() => [])
     : []
-  return <TourList dict={dict.portal} concerts={concerts} artistId={artist?.id ?? null} artistName={artist?.name ?? ''} />
+  return <TourList dict={dict.portal} concerts={concerts} artistId={artist?.id ?? null} />
 }
 
 export default function TourPage() {

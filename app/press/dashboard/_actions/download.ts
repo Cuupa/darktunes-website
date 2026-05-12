@@ -25,7 +25,15 @@ export async function getJournalistDownloadUrl(
     if (!profile || !['journalist', 'admin'].includes(profile.role)) return { url: null }
 
     let url = assetKey
-    if (!assetKey.startsWith('http://') && !assetKey.startsWith('https://')) {
+    let isExternal = false
+    try {
+      const parsed = new URL(assetKey)
+      isExternal = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+      isExternal = false
+    }
+
+    if (!isExternal) {
       const { serverEnv } = await import('@/lib/env.server')
       const s3 = createR2Client(
         serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,

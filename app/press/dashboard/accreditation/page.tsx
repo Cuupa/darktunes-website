@@ -22,5 +22,5 @@ export default async function AccreditationPage() {
     .eq('journalist_id', user.id)
     .order('created_at', { ascending: false })
 
-  return <AccreditationClient initialRequests={data ?? []} journalistId={user.id} />
+  return <AccreditationClient initialRequests={data ?? []} />
 }

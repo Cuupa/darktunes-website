@@ -15,10 +15,13 @@ export function PromoDownloads({ releases }: PromoDownloadsProps) {
   const download = async (release: Release) => {
     const key = release.coverArt || release.previewUrl || release.id
     setLoadingId(release.id)
-    const result = await getJournalistDownloadUrl(key, release.id)
-    setLoadingId(null)
-    if (result.url) {
-      window.open(result.url, '_blank', 'noopener,noreferrer')
+    try {
+      const result = await getJournalistDownloadUrl(key, release.id)
+      if (result.url) {
+        window.open(result.url, '_blank', 'noopener,noreferrer')
+      }
+    } finally {
+      setLoadingId(null)
     }
   }
 

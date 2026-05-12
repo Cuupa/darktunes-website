@@ -1,24 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { createRequest } from '@/lib/api/accreditations'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database'
+import { createAccreditationRequest } from '../_actions/accreditation'
 
 type AccreditationRow = Database['public']['Tables']['accreditation_requests']['Row']
 
 interface AccreditationClientProps {
   initialRequests: AccreditationRow[]
-  journalistId: string
 }
 
-export function AccreditationClient({ initialRequests, journalistId }: AccreditationClientProps) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+export function AccreditationClient({ initialRequests }: AccreditationClientProps) {
   const [requests, setRequests] = useState(initialRequests)
   const [form, setForm] = useState({
     eventName: '',
@@ -30,10 +27,9 @@ export function AccreditationClient({ initialRequests, journalistId }: Accredita
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const created = await createRequest(supabase, {
-        journalist_id: journalistId,
-        event_name: form.eventName,
-        event_date: form.eventDate,
+      const created = await createAccreditationRequest({
+        eventName: form.eventName,
+        eventDate: form.eventDate,
         publication: form.publication,
         reason: form.reason,
       })

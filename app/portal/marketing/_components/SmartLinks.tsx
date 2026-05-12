@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { DownloadSimple, Spinner } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,10 +19,16 @@ export function SmartLinks({ dict, assets }: SmartLinksProps) {
 
   const download = async (assetId: string) => {
     setLoadingId(assetId)
-    const result = await getMarketingAssetDownloadUrl(assetId)
-    setLoadingId(null)
-    if (!result.url) return
-    window.open(result.url, '_blank', 'noopener,noreferrer')
+    try {
+      const result = await getMarketingAssetDownloadUrl(assetId)
+      if (!result.url) {
+        toast.error('Failed to generate download link')
+        return
+      }
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+    } finally {
+      setLoadingId(null)
+    }
   }
 
   return (
@@ -36,7 +43,7 @@ export function SmartLinks({ dict, assets }: SmartLinksProps) {
                 <p className="text-xs text-muted-foreground">{asset.mimeType}</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => void download(asset.id)} disabled={loadingId === asset.id}>
-                {loadingId === asset.id ? <Spinner size={14} className="mr-1 animate-spin" /> : <DownloadSimple size={14} className="mr-1" />}
+                {loadingId === asset.id ? <Spinner size={14} className="mr-1 animate-spin" aria-label="Loading" /> : <DownloadSimple size={14} className="mr-1" />}
                 Download
               </Button>
             </CardContent>

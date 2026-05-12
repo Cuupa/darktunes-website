@@ -14,9 +14,12 @@ export function PressKitList({ photos }: PressKitListProps) {
 
   const download = async (photo: PressPhoto) => {
     setLoadingId(photo.id)
-    const result = await getJournalistDownloadUrl(photo.r2Key, null)
-    setLoadingId(null)
-    if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer')
+    try {
+      const result = await getJournalistDownloadUrl(photo.r2Key, null)
+      if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer')
+    } finally {
+      setLoadingId(null)
+    }
   }
 
   return (
