@@ -36,6 +36,18 @@ BEGIN
   END IF;
 END $$;
 
+-- Ensure 'artist' exists (added for the multi-role portal ecosystem)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumtypid = 'public.user_role'::regtype
+      AND enumlabel = 'artist'
+  ) THEN
+    ALTER TYPE public.user_role ADD VALUE 'artist';
+  END IF;
+END $$;
+
 DO $$ BEGIN
   CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
 EXCEPTION WHEN duplicate_object THEN NULL;

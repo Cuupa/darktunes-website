@@ -52,6 +52,7 @@ async function ProfileContent() {
     <ProfileForm
       dict={dict.portal}
       artistId={artist?.id ?? null}
+      artistSlug={artist?.slug ?? null}
       initialProfile={profile}
     />
   )

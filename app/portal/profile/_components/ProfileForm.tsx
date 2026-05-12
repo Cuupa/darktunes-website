@@ -14,13 +14,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Camera, FloppyDisk } from '@phosphor-icons/react'
+import { Camera, FloppyDisk, Eye } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Dictionary } from '@/i18n/types'
@@ -51,6 +52,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>
 interface ProfileFormProps {
   dict: Dictionary['portal']
   artistId: string | null
+  artistSlug: string | null
   initialProfile: ArtistProfile | null
 }
 
@@ -58,7 +60,7 @@ interface ProfileFormProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, artistId, initialProfile }: ProfileFormProps) {
+export function ProfileForm({ dict, artistId, artistSlug, initialProfile }: ProfileFormProps) {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -189,7 +191,21 @@ export function ProfileForm({ dict, artistId, initialProfile }: ProfileFormProps
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
+        {artistSlug && (
+          <Link
+            href={`/artists/${artistSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+            aria-label="Preview your public artist profile in a new tab"
+          >
+            <Eye size={15} aria-hidden="true" />
+            Preview Public Profile
+          </Link>
+        )}
+      </div>
 
       {/* Photo upload */}
       <Card className="bg-card border-border">

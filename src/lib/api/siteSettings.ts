@@ -1,8 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles } from '@/types'
 
 type DbClient = SupabaseClient<Database>
+
+/** Default feature toggle values — all features enabled by default. */
+const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
+  promoPool: true,
+  sosStatements: true,
+  editorTools: true,
+}
 
 /** Default values used when a key is missing from the database. */
 const DEFAULTS: SiteSettings = {
@@ -41,6 +48,7 @@ const DEFAULTS: SiteSettings = {
   shopifyStoreUrl: '',
   youtubeChannelId: '',
   carouselAutoplayMs: 0,
+  featureToggles: DEFAULT_FEATURE_TOGGLES,
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -60,6 +68,21 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     }
   } catch {
     spotifyPlaylists = []
+  }
+
+  let featureToggles: FeatureToggles = { ...DEFAULT_FEATURE_TOGGLES }
+  try {
+    const parsed = JSON.parse(map['feature_toggles'] ?? '{}') as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const candidate = parsed as Record<string, unknown>
+      featureToggles = {
+        promoPool: typeof candidate['promoPool'] === 'boolean' ? candidate['promoPool'] : DEFAULT_FEATURE_TOGGLES.promoPool,
+        sosStatements: typeof candidate['sosStatements'] === 'boolean' ? candidate['sosStatements'] : DEFAULT_FEATURE_TOGGLES.sosStatements,
+        editorTools: typeof candidate['editorTools'] === 'boolean' ? candidate['editorTools'] : DEFAULT_FEATURE_TOGGLES.editorTools,
+      }
+    }
+  } catch {
+    featureToggles = { ...DEFAULT_FEATURE_TOGGLES }
   }
 
   return {
@@ -99,6 +122,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     shopifyStoreUrl: map['shopify_store_url'] ?? DEFAULTS.shopifyStoreUrl,
     youtubeChannelId: map['youtube_channel_id'] ?? DEFAULTS.youtubeChannelId,
     carouselAutoplayMs: parseInt(map['carousel_autoplay_ms'] ?? '0', 10) || 0,
+    featureToggles,
   }
 }
 

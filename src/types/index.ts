@@ -88,7 +88,7 @@ export interface Video {
 export interface UserProfile {
   id: string
   email: string
-  role: 'admin' | 'editor' | 'journalist' | 'user'
+  role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
   createdAt: string
   updatedAt: string
 }
@@ -108,6 +108,15 @@ export interface Asset {
 export interface SpotifyPlaylistEntry {
   label: string
   uri: string
+}
+
+export interface FeatureToggles {
+  /** Enable/disable the journalist Promo Pool area. Default: true */
+  promoPool: boolean
+  /** Enable/disable the Statement-of-Sales (royalty PDFs) feature for artists. Default: true */
+  sosStatements: boolean
+  /** Enable/disable editor access to the admin CMS. Default: true */
+  editorTools: boolean
 }
 
 export interface SiteSettings {
@@ -154,6 +163,8 @@ export interface SiteSettings {
   youtubeChannelId: string
   /** Auto-advance interval for the releases carousel in ms. 0 = disabled. Default 0. */
   carouselAutoplayMs: number
+  /** Feature flags: enable/disable portal modules globally. */
+  featureToggles: FeatureToggles
 }
 
 export interface Concert {
