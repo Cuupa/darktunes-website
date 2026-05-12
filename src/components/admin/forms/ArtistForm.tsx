@@ -232,6 +232,39 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
+      {/* Prominent Spotify import — shown at top when creating a new artist */}
+      {!value.name && (
+        <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+          <p className="text-sm font-semibold">Quick Import from Spotify</p>
+          <p className="text-xs text-muted-foreground">
+            Paste a Spotify artist URL (e.g. https://open.spotify.com/artist/…) and click
+            &ldquo;Import&rdquo; to auto-fill name, image, genres, and IDs.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              id="spotifyUrl"
+              {...register('spotifyUrl')}
+              placeholder="https://open.spotify.com/artist/…"
+              disabled={isLoading}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void handlePrefillFromSpotify()}
+              disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
+            >
+              {isPrefillingSpotify ? (
+                <ArrowsClockwise size={14} className="animate-spin mr-1.5" />
+              ) : null}
+              Import
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="name">Name *</Label>

@@ -47,9 +47,30 @@ export function useVideos() {
     await load()
   }
 
+  const syncYouTube = async (): Promise<{ synced: number }> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Not authenticated')
+
+    const res = await fetch('/api/sync-youtube', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`YouTube sync failed: ${text}`)
+    }
+    const result = (await res.json()) as { synced: number; message?: string }
+    await load()
+    return { synced: result.synced ?? 0 }
+  }
+
   useEffect(() => {
     void load()
   }, [load])
 
-  return { videos, isLoading, error, createVideo, updateVideo, deleteVideo, reload: load }
+  return { videos, isLoading, error, createVideo, updateVideo, deleteVideo, syncYouTube, reload: load }
 }

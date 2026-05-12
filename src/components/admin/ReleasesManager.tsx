@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning } from '@phosphor-icons/react'
 import { useReleases } from '@/hooks/useReleases'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   AlertDialog,
@@ -35,6 +36,7 @@ import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
+import type { SyncAllResult } from '@/lib/sync/syncAll'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 
@@ -89,6 +91,8 @@ export function ReleasesManager() {
   const [deleteTarget, setDeleteTarget] = useState<Release | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [resolvingSmartLinkId, setResolvingSmartLinkId] = useState<string | null>(null)
+  const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
+  const [isCleaningUp, setIsCleaningUp] = useState(false)
 
   const formValue = editingRelease ? releaseToFormData(editingRelease) : EMPTY_FORM
 
@@ -136,10 +140,59 @@ export function ReleasesManager() {
 
   const handleSync = async () => {
     try {
-      await syncAllReleases()
-      toast.success('Sync completed')
+      const result = await syncAllReleases()
+      if (!result) {
+        toast.info('Sync skipped — Supabase not configured')
+        return
+      }
+      const totalSynced = result.results.reduce(
+        (sum, r) => sum + r.releasesUpserted + r.concertsUpserted,
+        0,
+      )
+      if (result.totalErrors === 0) {
+        toast.success(`Sync completed: ${totalSynced} item(s) updated across all APIs`)
+      } else {
+        setSyncResult(result)
+        toast.warning(
+          `Sync completed with ${result.totalErrors} error(s). ${totalSynced} item(s) synced. Click "View Errors" to see details.`,
+          { duration: 8000 },
+        )
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sync failed')
+    }
+  }
+
+  const handleCleanupOrphaned = async () => {
+    setIsCleaningUp(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/admin/cleanup-orphaned-releases', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+
+      const { deleted } = (await res.json()) as { deleted: number }
+      if (deleted > 0) {
+        toast.success(`Deleted ${deleted} orphaned release(s)`)
+      } else {
+        toast.info('No orphaned releases found')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Cleanup failed')
+    } finally {
+      setIsCleaningUp(false)
     }
   }
 
@@ -185,20 +238,44 @@ export function ReleasesManager() {
             Aggregate releases from iTunes · Spotify · Discogs for all artists
           </p>
         </div>
-        <Button
-          onClick={handleSync}
-          disabled={isSyncing || isLoading}
-          variant="outline"
-          size="sm"
-          className="gap-2"
-        >
-          <ArrowsClockwise
-            size={16}
-            className={isSyncing ? 'animate-spin' : ''}
-            weight="bold"
-          />
-          {isSyncing ? `Syncing ${syncProgress}%` : 'Sync All APIs (iTunes · Spotify · Discogs)'}
-        </Button>
+        <div className="flex gap-2">
+          {syncResult && syncResult.totalErrors > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-yellow-500 border-yellow-500/30"
+              onClick={() => setSyncResult(syncResult)}
+            >
+              <Warning size={16} weight="bold" />
+              {syncResult.totalErrors} Error(s)
+            </Button>
+          )}
+          <Button
+            onClick={handleCleanupOrphaned}
+            disabled={isCleaningUp || isLoading}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Delete releases with no linked artist"
+          >
+            <Trash size={16} weight="bold" />
+            {isCleaningUp ? 'Cleaning…' : 'Clean Orphaned'}
+          </Button>
+          <Button
+            onClick={handleSync}
+            disabled={isSyncing || isLoading}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <ArrowsClockwise
+              size={16}
+              className={isSyncing ? 'animate-spin' : ''}
+              weight="bold"
+            />
+            {isSyncing ? `Syncing ${syncProgress}%` : 'Sync All APIs (iTunes · Spotify · Discogs)'}
+          </Button>
+        </div>
       </div>
 
       <Separator />
@@ -326,6 +403,34 @@ export function ReleasesManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sync error details dialog */}
+      <Dialog open={!!syncResult && syncResult.totalErrors > 0} onOpenChange={(open) => !open && setSyncResult(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sync Errors ({syncResult?.totalErrors ?? 0})</DialogTitle>
+            <DialogDescription>
+              The following errors occurred during the last sync run. Successful items were still saved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            {syncResult?.results.filter((r) => r.errors.length > 0).map((r) => (
+              <div key={r.api} className="space-y-2">
+                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {r.api} — {r.releasesUpserted} synced, {r.errors.length} error(s)
+                </p>
+                <ul className="space-y-1">
+                  {r.errors.map((err, i) => (
+                    <li key={i} className="text-xs text-destructive bg-destructive/10 rounded px-3 py-1.5 font-mono break-all">
+                      {err}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
