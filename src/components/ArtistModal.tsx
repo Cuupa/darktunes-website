@@ -38,6 +38,7 @@ interface ItunesTrack {
   collectionName: string
   artworkUrl60: string
   previewUrl: string | undefined
+  releaseDate: string | undefined
 }
 
 interface ItunesSearchResult {
@@ -49,6 +50,7 @@ interface ItunesSearchResult {
     collectionName: string
     artworkUrl60: string
     previewUrl?: string
+    releaseDate?: string
   }>
 }
 
@@ -104,14 +106,22 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
       .then((data: ItunesSearchResult) => {
         const filtered = data.results
           .filter((r) => r.kind === 'song' && r.previewUrl)
-          .slice(0, 5)
           .map((r) => ({
             trackId: r.trackId,
             trackName: r.trackName,
             collectionName: r.collectionName,
             artworkUrl60: r.artworkUrl60,
             previewUrl: r.previewUrl,
+            releaseDate: r.releaseDate,
           }))
+          // Sort newest first
+          .sort((a, b) => {
+            if (!a.releaseDate && !b.releaseDate) return 0
+            if (!a.releaseDate) return 1
+            if (!b.releaseDate) return -1
+            return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+          })
+          .slice(0, 5)
         setTracks(filtered)
       })
       .catch(() => {
@@ -291,7 +301,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                     onClick={() => setBioExpanded((v) => !v)}
                     className="mt-1 text-xs text-accent hover:underline"
                   >
-                    {bioExpanded ? 'Read less' : 'Read more'}
+                    {bioExpanded ? 'Weniger anzeigen' : 'Weiterlesen'}
                   </button>
                 )}
               </motion.div>
@@ -314,7 +324,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                     className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all hover:scale-105 font-semibold text-sm"
                   >
                     <SpotifyLogo size={18} weight="fill" aria-hidden="true" />
-                    Listen Everywhere
+                    Überall anhören
                   </a>
                 )}
                 {artist.shopUrl && (
@@ -326,7 +336,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                     className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all hover:scale-105 font-semibold text-sm"
                   >
                     <ShoppingBag size={18} weight="fill" aria-hidden="true" />
-                    Shop Merch
+                    Merch kaufen
                   </a>
                 )}
               </motion.div>
@@ -401,9 +411,12 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                 transition={{ delay: prefersReducedMotion ? 0 : 0.35, duration: prefersReducedMotion ? 0 : 0.4 }}
               >
                 <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                  Latest Video
+                  Neuestes Video
                 </h3>
-                <ConsentGate label="Load YouTube">
+                <ConsentGate
+                  label="YouTube laden"
+                  gateText="Dieser Inhalt wird von einem externen Anbieter bereitgestellt. Durch das Laden stimmen Sie der Datenübertragung zu."
+                >
                   <div className="aspect-video rounded-xl overflow-hidden">
                     <iframe
                       src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -425,7 +438,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                 transition={{ delay: prefersReducedMotion ? 0 : 0.4, duration: prefersReducedMotion ? 0 : 0.4 }}
               >
                 <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                  Tour Dates
+                  Tour-Daten
                 </h3>
                 <ul className="space-y-2 list-none">
                   {concerts.map((concert) => (
@@ -501,10 +514,10 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                 <Link
                   href={`/artists/${artist.slug}`}
                   onClick={handleClose}
-                  className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline font-medium"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 min-h-[44px] rounded-lg border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all font-semibold text-sm"
                 >
-                  Full Profile
-                  <ArrowRight size={14} weight="bold" aria-hidden="true" />
+                  Vollständiges Profil ansehen
+                  <ArrowRight size={16} weight="bold" aria-hidden="true" />
                 </Link>
               </motion.div>
             )}

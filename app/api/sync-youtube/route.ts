@@ -77,7 +77,17 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   // 3. Fetch from YouTube
-  const videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
+  let videos
+  try {
+    videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    // Surface quota / key issues as 502 with a helpful message
+    if (msg.includes('quota') || msg.includes('403')) {
+      throw new ApiError(502, `YouTube API error: ${msg}`, 'YOUTUBE_QUOTA_OR_KEY')
+    }
+    throw new ApiError(502, `YouTube API error: ${msg}`, 'YOUTUBE_FETCH_ERROR')
+  }
 
   if (videos.length === 0) {
     return NextResponse.json({ synced: 0, message: 'No videos returned from YouTube' })

@@ -458,7 +458,7 @@ export function ArtistsManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingArtist ? 'Edit Artist' : 'New Artist'}</DialogTitle>
           </DialogHeader>

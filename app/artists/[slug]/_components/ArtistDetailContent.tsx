@@ -238,8 +238,8 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.fullBio}</h2>
-            <p className="text-muted-foreground leading-relaxed font-serif text-base max-w-3xl whitespace-pre-line">
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
+            <p className="text-foreground/80 leading-relaxed font-serif text-base max-w-3xl whitespace-pre-line">
               {artist.bio}
             </p>
           </motion.section>
@@ -253,7 +253,7 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.latestVideo}</h2>
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.latestVideo}</h2>
             <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 list-none">
               {videos.map((video, index) => (
                 <motion.li
@@ -312,9 +312,9 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.latestVideo}</h2>
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.latestVideo}</h2>
             <div className="max-w-3xl">
-              <ConsentGate label={consentDict.loadYouTube}>
+              <ConsentGate label={consentDict.loadYouTube} gateText={consentDict.gateText}>
                 <div className="aspect-video rounded-xl overflow-hidden">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -337,7 +337,7 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.discography}</h2>
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.discography}</h2>
             <ul className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 list-none">
               {releases.map((release, index) => (
                 <motion.li
@@ -388,9 +388,9 @@ export function ArtistDetailContent({
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.tourDates}</h2>
+          <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.tourDates}</h2>
           {concerts.length === 0 ? (
-            <p className="text-muted-foreground font-serif">{dict.noShows}</p>
+            <p className="text-foreground/70 font-serif">{dict.noShows}</p>
           ) : (
             <ul className="space-y-3 list-none max-w-2xl">
               {concerts.map((concert) => (

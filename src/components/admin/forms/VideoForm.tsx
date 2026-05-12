@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowsClockwise } from '@phosphor-icons/react'
+import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
 
 export interface VideoFormData {
   title: string
@@ -20,33 +21,8 @@ export interface VideoFormData {
 type Props = AdminPanelProps<VideoFormData>
 
 /** Extracts a YouTube video ID from a URL or returns null if unrecognised. */
-function extractYouTubeId(input: string): string | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed
-  try {
-    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
-    if (
-      (parsed.hostname === 'www.youtube.com' || parsed.hostname === 'youtube.com') &&
-      parsed.pathname === '/watch'
-    ) {
-      const v = parsed.searchParams.get('v')
-      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v
-    }
-    if (parsed.hostname === 'youtu.be') {
-      const id = parsed.pathname.slice(1).split('/')[0]
-      if (id && /^[A-Za-z0-9_-]{11}$/.test(id)) return id
-    }
-    const parts = parsed.pathname.split('/').filter(Boolean)
-    if (['embed', 'v', 'shorts'].includes(parts[0]) && parts[1]) {
-      const id = parts[1].split('?')[0]
-      if (/^[A-Za-z0-9_-]{11}$/.test(id)) return id
-    }
-  } catch {
-    return null
-  }
-  return null
-}
+// Uses the centralized parser from platformUrlParser.ts
+const localExtractYouTubeId = extractYouTubeVideoId
 
 export function VideoForm({ value, onChange, isLoading }: Props) {
   const supabase = createBrowserSupabaseClient()
@@ -69,7 +45,7 @@ export function VideoForm({ value, onChange, isLoading }: Props) {
     if (raw === lastParsed.current) return
     // Only attempt extraction if the value looks like a URL (contains '/')
     if (raw.includes('/')) {
-      const extracted = extractYouTubeId(raw)
+      const extracted = localExtractYouTubeId(raw)
       if (extracted && extracted !== raw) {
         lastParsed.current = extracted
         setValue('youtubeId', extracted)
