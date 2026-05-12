@@ -353,3 +353,20 @@ Feature-flag-gated modules: promo pool, press kit, press releases, accreditation
 
 Schema note
 `supabase/reset.sql` remains the canonical idempotent schema script. This project now also contains migration patch `supabase/migrations/20260512000002_add_journalist_and_feature_flags.sql` for incremental rollout.
+
+PWA (Progressive Web App)
+The site is a fully installable PWA powered by @serwist/next (v9) + serwist.
+Service Worker: `app/sw.ts` — compiled by serwist's Next.js plugin into `public/sw.js` (gitignored). Uses `CacheFirst` for static assets and wsrv.nl images (30-day TTL), `StaleWhileRevalidate` for R2 assets, `NetworkFirst` for HTML pages, and serves `app/offline/page.tsx` as a document fallback when offline.
+next.config.ts is wrapped with `withSerwistInit` from `@serwist/next`. The `exclude` list prevents the service worker from intercepting `/api/*`, `/admin/*`, `/portal/*`, `/press/*`, `/promo-pool/*` routes.
+Manifest: `app/manifest.ts` (Next.js 15 `MetadataRoute.Manifest`) — served at `/manifest.webmanifest`. `display: 'standalone'`, `background_color / theme_color: '#101010'`. Requires icon files in `public/icons/` (see `public/icons/README.md`).
+Apple PWA meta tags (theme-color, apple-mobile-web-app-capable, apple-touch-icon) are injected in `app/layout.tsx`.
+Custom install prompt: `src/components/PWAInstallPrompt.tsx` — listens for `beforeinstallprompt` (Android/Chrome) and shows an on-brand banner after 3 seconds. iOS users see a manual "Share → Add to Home Screen" hint. Dismissal is persisted in localStorage (`pwa-install-dismissed`). Mounted once in `app/_components/Providers.tsx`.
+NEVER add a second `PWAInstallPrompt` instance. NEVER intercept admin/portal/press routes in the service worker.
+
+Gallery Performance (ReleasesCoverflow Virtual Windowing)
+`ReleasesCoverflow` supports catalogues of any size without degrading performance.
+All slide *containers* are rendered so Embla measures the full carousel width correctly (they are lightweight empty `<div>` elements with `aspect-square`).
+Only slides within `VIRTUAL_BUFFER = 3` positions of the active index have their actual image/link content rendered. Off-window slides render a placeholder `<div>`.
+The rendered window (`renderedIndices: Set<number>`) grows monotonically as the user navigates — once an index enters the window it is never evicted, acting as a natural browser image cache. Maximum DOM-heavy nodes at any time: 7.
+Images use `loading="lazy" decoding="async"` and pass through `getOptimizedImageUrl(url, 600)` (wsrv.nl → WebP).
+Artist images in `Artists.tsx` also use `loading="lazy" decoding="async"` + `getSquareThumbnail`.

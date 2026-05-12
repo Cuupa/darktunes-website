@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from 'react-error-boundary'
 import { LenisProvider } from '@/components/animations/LenisProvider'
 import { ConsentBanner } from '@/components/ConsentBanner'
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { ErrorFallback } from '@/ErrorFallback'
 import type { Dictionary } from '@/i18n/types'
 
@@ -20,6 +21,7 @@ interface ProvidersProps {
  * Includes:
  * - LenisProvider: global smooth scrolling (single instance rule)
  * - ConsentBanner: GDPR opt-in for external embeds (Spotify, YouTube)
+ * - PWAInstallPrompt: deferred beforeinstallprompt banner (Android/Chrome)
  * - Toaster: global toast notifications
  * - ErrorBoundary: catches client-side render errors
  */
@@ -29,6 +31,7 @@ export function Providers({ children, consentDict }: ProvidersProps) {
       <LenisProvider>
         {children}
         <ConsentBanner dict={consentDict} />
+        <PWAInstallPrompt />
         <Toaster position="bottom-right" theme="dark" />
       </LenisProvider>
     </ErrorBoundary>

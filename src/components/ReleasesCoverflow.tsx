@@ -19,6 +19,14 @@ export interface ReleasesCoverflowProps {
 }
 
 /**
+ * How many slides either side of the active slide to keep rendered in the DOM.
+ *
+ * With VIRTUAL_BUFFER = 3, a maximum of 7 slide contents exist in the DOM at
+ * any time, regardless of how many releases are in the full catalogue.
+ */
+const VIRTUAL_BUFFER = 3
+
+/**
  * Directly mutates CSS transforms on each slide's inner element to produce
  * the 3D coverflow effect.  This function is called from Embla's `scroll`
  * event — it NEVER touches React state, so there are zero component
@@ -75,7 +83,8 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
 }
 
 /**
- * ReleasesCoverflow — a hardware-accelerated 3D Embla coverflow gallery.
+ * ReleasesCoverflow — a hardware-accelerated 3D Embla coverflow gallery with
+ * **virtual slide windowing** for large catalogues.
  *
  * Performance design:
  * - Embla is the scroll engine (~5 KB, physics-based, zero injected CSS).
@@ -83,6 +92,16 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  *   `on('scroll')` callback — never via React state, never causing re-renders.
  * - Only `selectedIndex` (for the metadata panel and dot nav) lives in state;
  *   it is updated lazily via `on('select')`.
+ *
+ * Virtual windowing:
+ * - All slide *containers* are rendered so Embla can compute the full carousel
+ *   width correctly (they are lightweight empty <div> elements).
+ * - Only slides within VIRTUAL_BUFFER positions of the active index have their
+ *   actual image / link content rendered. Off-window slides are empty divs.
+ * - When the selected index changes, `renderedIndices` expands the window in
+ *   the appropriate direction.  Once an index enters the window it is never
+ *   evicted (set semantics), capping peak DOM size at ~7 rich nodes while
+ *   still serving as a natural LRU image cache via the browser's own cache.
  *
  * 3D CSS architecture (avoids the preserve-3d / overflow-hidden flattening trap):
  * - `perspective` lives on an outer wrapper div — NOT on the overflow-hidden
@@ -105,15 +124,48 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   // dot indicators.  Scroll progress itself never enters React state.
   const [selectedIndex, setSelectedIndex] = useState(0)
 
+  /**
+   * Virtual window: a Set of indices whose slide *content* is currently
+   * rendered in the DOM.  We grow the window as the user navigates but never
+   * shrink it, so previously seen covers stay cached in the browser and
+   * re-appear instantly when the user swipes back.
+   */
+  const [renderedIndices, setRenderedIndices] = useState<ReadonlySet<number>>(() => {
+    const initial = new Set<number>()
+    for (let i = 0; i < Math.min(VIRTUAL_BUFFER + 1, total); i++) initial.add(i)
+    return initial
+  })
+
+  /** Expand the rendered window around `centre` by VIRTUAL_BUFFER either side. */
+  const expandWindow = useCallback(
+    (centre: number) => {
+      setRenderedIndices((prev) => {
+        let changed = false
+        const next = new Set(prev)
+        for (let offset = -VIRTUAL_BUFFER; offset <= VIRTUAL_BUFFER; offset++) {
+          const idx = ((centre + offset) % total + total) % total
+          if (!next.has(idx)) {
+            next.add(idx)
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    },
+    [total],
+  )
+
   const onTween = useCallback(() => {
     if (emblaApi) tweenSlides(emblaApi, prefersReducedMotion)
   }, [emblaApi, prefersReducedMotion])
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return
-    setSelectedIndex(emblaApi.selectedScrollSnap())
+    const index = emblaApi.selectedScrollSnap()
+    setSelectedIndex(index)
+    expandWindow(index)
     tweenSlides(emblaApi, prefersReducedMotion)
-  }, [emblaApi, prefersReducedMotion])
+  }, [emblaApi, prefersReducedMotion, expandWindow])
 
   useEffect(() => {
     if (!emblaApi) return
@@ -179,7 +231,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         <div ref={emblaRef} className="overflow-hidden">
           {/* Embla container: Embla translates this element for scrolling */}
           <div className="flex">
-            {releases.map((release) => (
+            {releases.map((release, index) => (
               <div
                 key={release.id}
                 // Fluid viewport-relative widths — no hardcoded pixel values.
@@ -191,6 +243,12 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                   (rotateY, scale, translate3d) via direct DOM mutation inside
                   tweenSlides().  It is never re-rendered on scroll — the GPU
                   compositor handles every frame at 60 fps.
+
+                  Virtual windowing: when this slide is outside the rendered
+                  window we render an empty aspect-square placeholder to
+                  preserve Embla layout calculation.  The `aspect-square` class
+                  keeps dimensions identical to the real slide so the scroll
+                  physics remain accurate.
                 */}
                 <div
                   style={{
@@ -198,37 +256,47 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                     willChange: 'transform, opacity',
                   }}
                 >
-                  <Link
-                    href={`/releases/${release.id}`}
-                    aria-label={`${release.title} by ${release.artistName} – cover art`}
-                    draggable={false}
-                    tabIndex={release.id === activeRelease?.id ? 0 : -1}
-                  >
-                    <div
-                      className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
-                        release.id === activeRelease?.id
-                          ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
-                          : 'border-border hover:border-accent/30'
-                      }`}
+                  {renderedIndices.has(index) ? (
+                    <Link
+                      href={`/releases/${release.id}`}
+                      aria-label={`${release.title} by ${release.artistName} – cover art`}
+                      draggable={false}
+                      tabIndex={release.id === activeRelease?.id ? 0 : -1}
                     >
-                      <img
-                        src={getOptimizedImageUrl(release.coverArt, 600)}
-                        alt={`${release.title} by ${release.artistName} – cover art`}
-                        className="w-full h-full object-cover"
-                        draggable={false}
-                        loading="lazy"
-                      />
-                      {/* Cinematic gradient overlay on centre card */}
-                      {release.id === activeRelease?.id && (
-                        <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
-                      )}
-                      {release.featured && (
-                        <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                          {dict.featured}
-                        </Badge>
-                      )}
-                    </div>
-                  </Link>
+                      <div
+                        className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
+                          release.id === activeRelease?.id
+                            ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
+                            : 'border-border hover:border-accent/30'
+                        }`}
+                      >
+                        <img
+                          src={getOptimizedImageUrl(release.coverArt, 600)}
+                          alt={`${release.title} by ${release.artistName} – cover art`}
+                          className="w-full h-full object-cover"
+                          draggable={false}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        {/* Cinematic gradient overlay on centre card */}
+                        {release.id === activeRelease?.id && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+                        )}
+                        {release.featured && (
+                          <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                            {dict.featured}
+                          </Badge>
+                        )}
+                      </div>
+                    </Link>
+                  ) : (
+                    /* Lightweight placeholder — maintains slide dimensions so
+                       Embla measures the full carousel width correctly. */
+                    <div
+                      className="aspect-square rounded-lg bg-muted/20 border border-border/20"
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
               </div>
             ))}
