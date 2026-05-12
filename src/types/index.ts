@@ -6,6 +6,7 @@ export interface Artist {
   genres: string[]
   imageUrl: string
   spotifyUrl?: string
+  appleMusicUrl?: string
   instagramUrl?: string
   youtubeUrl?: string
   websiteUrl?: string

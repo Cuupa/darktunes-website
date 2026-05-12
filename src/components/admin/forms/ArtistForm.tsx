@@ -18,6 +18,7 @@ export interface ArtistFormData {
   genres: string
   imageUrl: string
   spotifyUrl: string
+  appleMusicUrl: string
   instagramUrl: string
   youtubeUrl: string
   websiteUrl: string
@@ -57,6 +58,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   })
   const [isFetchingImage, setIsFetchingImage] = useState(false)
   const [isPrefillingSpotify, setIsPrefillingSpotify] = useState(false)
+  const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   const isVisible = watch('isVisible')
   const spotifyId = watch('spotifyId')
   const spotifyUrl = watch('spotifyUrl')
+  const appleMusicUrl = watch('appleMusicUrl')
   const discogsId = watch('discogsId')
 
   const handleFetchImage = async () => {
@@ -230,41 +233,58 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
     }
   }
 
+  const handlePrefillFromItunes = async () => {
+    const appleMusicUrlInput = appleMusicUrl.trim()
+    if (!appleMusicUrlInput) {
+      toast.error('Enter an Apple Music artist URL first')
+      return
+    }
+
+    setIsPrefillingItunes(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/admin/prefill-artist-itunes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ appleMusicUrl: appleMusicUrlInput }),
+      })
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+
+      const profile = (await res.json()) as {
+        name: string
+        genres: string[]
+        imageUrl: string | null
+        appleMusicUrl: string
+      }
+
+      const current = getValues()
+      if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
+      if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
+      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) {
+        setValue('genres', profile.genres.join(', '))
+      }
+      setValue('appleMusicUrl', profile.appleMusicUrl)
+      toast.success('Artist data prefilled from Apple Music')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to prefill from Apple Music')
+    } finally {
+      setIsPrefillingItunes(false)
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
-      {/* Prominent Spotify import — shown at top when creating a new artist */}
-      {!value.name && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-          <p className="text-sm font-semibold">Quick Import from Spotify</p>
-          <p className="text-xs text-muted-foreground">
-            Paste a Spotify artist URL (e.g. https://open.spotify.com/artist/…) and click
-            &ldquo;Import&rdquo; to auto-fill name, image, genres, and IDs.
-          </p>
-          <div className="flex gap-2">
-            <Input
-              id="spotifyUrl"
-              {...register('spotifyUrl')}
-              placeholder="https://open.spotify.com/artist/…"
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              className="shrink-0"
-              onClick={() => void handlePrefillFromSpotify()}
-              disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
-            >
-              {isPrefillingSpotify ? (
-                <ArrowsClockwise size={14} className="animate-spin mr-1.5" />
-              ) : null}
-              Import
-            </Button>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="name">Name *</Label>
@@ -327,14 +347,38 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
               onClick={() => void handlePrefillFromSpotify()}
               disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
             >
-              {isPrefillingSpotify && <ArrowsClockwise size={14} className="animate-spin" />}
-              Prefill from Spotify
+              {isPrefillingSpotify && <ArrowsClockwise size={14} className="animate-spin mr-1.5" />}
+              Import
             </Button>
           </div>
         </div>
         <div className="space-y-1">
           <Label htmlFor="instagramUrl">Instagram URL</Label>
           <Input id="instagramUrl" {...register('instagramUrl')} disabled={isLoading} />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="appleMusicUrl">Apple Music URL</Label>
+        <div className="flex gap-2">
+          <Input
+            id="appleMusicUrl"
+            {...register('appleMusicUrl')}
+            disabled={isLoading}
+            className="flex-1"
+            placeholder="https://music.apple.com/..."
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => void handlePrefillFromItunes()}
+            disabled={isLoading || isPrefillingItunes || !appleMusicUrl.trim()}
+          >
+            {isPrefillingItunes && <ArrowsClockwise size={14} className="animate-spin mr-1.5" />}
+            Import
+          </Button>
         </div>
       </div>
 
