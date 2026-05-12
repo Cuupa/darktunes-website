@@ -8,7 +8,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
-- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (EPK editor, streaming analytics, royalty statements)
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission, tour manager, marketing assets, messages with replies, account settings)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
@@ -159,13 +159,18 @@ app/                          # Next.js App Router entry points
 │   ├── login/page.tsx        # Artist portal login
 │   ├── profile/page.tsx      # EPK profile editor (Server Component + ProfileForm client)
 │   ├── analytics/page.tsx    # Streaming analytics (Server Component + StreamingChart client)
-│   └── statements/page.tsx   # Royalty statements (Server Component + StatementsTable client)
+│   ├── statements/page.tsx   # Royalty statements (Server Component + StatementsTable client)
+│   ├── releases/new/page.tsx # Artist release submission form
+│   └── settings/page.tsx     # Account settings (password + locale switch)
 └── api/
     ├── upload/route.ts       # R2 file upload Route Handler (admin)
     ├── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
     └── portal/
-        ├── upload-photo/route.ts  # Portal: profile photo upload to R2
-        └── profile/route.ts       # Portal: upsert artist EPK profile
+        ├── upload-photo/route.ts         # Portal: profile photo upload to R2
+        ├── upload-release-cover/route.ts # Portal: release cover upload to R2
+        ├── upload-asset/route.ts         # Portal: artist-owned asset upload/delete
+        ├── submit-release/route.ts       # Portal: create release submission (is_visible=false)
+        └── profile/route.ts              # Portal: upsert artist EPK profile
 middleware.ts                 # Edge Middleware — auth for /admin/* and /portal/*
 src/
 ├── components/               # UI components (Header, Hero, Releases, Artists, …)

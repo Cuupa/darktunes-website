@@ -171,9 +171,11 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
 | Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — artists can list/create/delete own concerts (RLS-protected) |
-| Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` |
-| Artist Portal — marketing assets | ✅ Implemented | `/portal/marketing` — asset list + presigned download links |
-| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — list + mark-as-read from `label_messages` |
+| Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` + empty-state CTA |
+| Artist Portal — release submission | ✅ Implemented | `/portal/releases/new` + `POST /api/portal/submit-release` (`is_visible=false` pending admin approval) + optional cover upload via `POST /api/portal/upload-release-cover` |
+| Artist Portal — marketing assets | ✅ Implemented | `/portal/marketing` — assigned asset downloads + artist-owned uploads/deletes via `artist_assets` and `POST/DELETE /api/portal/upload-asset` |
+| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — Suspense + mark-as-read + artist replies via `artist_replies` (`sendPortalReply`) |
+| Artist Portal — account settings | ✅ Implemented | `/portal/settings` — password update (`supabase.auth.updateUser`) + locale switch (NEXT_LOCALE cookie) |
 | Artist Portal — module feature flags | ✅ Implemented | `portal_feature_flags` (`artist.*`) controls nav + page availability |
 | Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |
 | Journalist Dashboard — feature modules | ✅ Implemented | Promo Pool, Press Kit, Press Releases, Accreditation, Download History with `journalist.*` flags |

@@ -70,7 +70,7 @@ Tests that require Supabase data gracefully skip via `test.skip(true, reason)` w
 Never commit `.playwright-snapshots/` baselines — they are regenerated with `playwright test --update-snapshots` on each environment.
 
 Data Access Layer (DAL)
-All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
@@ -227,16 +227,19 @@ The Artist Portal lives at `/portal/*` — a secure dashboard for the label's ba
 Auth: `middleware.ts` protects all `/portal/*` routes (except `/portal/login`) using the same Supabase session-cookie pattern as `/admin/*`.
 Multi-tenancy: `artists.user_id UUID REFERENCES auth.users(id)` links each artist row to a Supabase Auth user. One auth user ↔ one artist.
 Portal DAL functions: `getArtistByUserId(db, userId)` in `src/lib/api/artistProfiles.ts` resolves the current user's linked artist. Always call this before accessing artist-scoped data.
-RLS enforcement: `artist_profiles`, `streaming_stats`, `sales_statements`, and `release_checklists` all have RLS policies that use `EXISTS (SELECT 1 FROM artists WHERE id = artist_id AND user_id = auth.uid())`. Security is at the DB layer; no middleware-only filtering.
+RLS enforcement: `artist_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, and `artist_assets` all have artist-scoped RLS policies using `auth.uid()` + artist linkage. Security is at the DB layer; no middleware-only filtering.
 Presigned URL pattern: `src/lib/portal/presignedUrl.ts` exposes two injectable functions:
   - `generatePresignedDownloadUrl(r2Key, deps)` — 5-minute GET URL for artist downloads (`PresignedUrlDeps`)
   - `generatePresignedUploadUrl(r2Key, contentType, deps)` — 15-minute PUT URL for the SOS PDF generator to upload directly to R2, bypassing Vercel's 4.5 MB body limit (`PresignedUploadUrlDeps`)
   The Server Action `app/portal/statements/_actions/presignedUrl.ts` wires real deps for artist-facing downloads.
 Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-data`, verifies auth, confirms artist ownership, then uploads to `profile-photos/{artistId}/{uuid}.{ext}` in R2. Max 5 MB, image types only.
+Release submission: `POST /api/portal/submit-release` creates a new release with `is_visible = FALSE` (pending admin approval). Optional cover uploads use `POST /api/portal/upload-release-cover` (max 5 MB images) into `release-covers/{artistId}/`.
+Artist-owned marketing uploads: `POST /api/portal/upload-asset` stores files in `artist-assets/{artistId}/` and inserts into `artist_assets`; `DELETE /api/portal/upload-asset` deletes own rows. Allowed MIME types: JPEG, PNG, WebP, PDF, ZIP (max 20 MB).
+Label replies: `artist_replies` stores artist-side responses to inbox messages. The portal uses `sendPortalReply` Server Action + `src/lib/api/artistReplies.ts`.
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
-Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements, Messages (`/portal/messages`).
+Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements, Messages (`/portal/messages`). Settings (`/portal/settings`) is always visible (not flag-gated).
 
 SOS Webhook (Statement of Sales PDF Upload)
 The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.

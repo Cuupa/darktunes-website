@@ -13,7 +13,7 @@ export function PortalEmptyState({ icon: Icon, heading, description, action }: P
   return (
     <div className="rounded-md border border-dashed border-border p-12 text-center">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center">
-        <Icon size={48} className="text-muted-foreground/40" aria-hidden="true" />
+        <Icon size={48} className="text-muted-foreground/40" aria-hidden />
       </div>
       <h2 className="text-lg font-semibold">{heading}</h2>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>

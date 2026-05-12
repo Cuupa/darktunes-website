@@ -118,7 +118,7 @@ WHERE id = (
 
 ### 4. File Uploads via Next.js Route Handler
 
-File uploads are handled server-side at `app/api/upload/route.ts` (a Next.js Route Handler).
+File uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin uploads, plus portal routes like `app/api/portal/upload-photo/route.ts`, `app/api/portal/upload-release-cover/route.ts`, and `app/api/portal/upload-asset/route.ts`).
 This eliminates CORS issues that arise from client-side direct uploads. No Supabase Edge Functions are needed for uploads.
 
 The Route Handler:
