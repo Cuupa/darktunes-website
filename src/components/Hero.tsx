@@ -58,6 +58,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
           alt=""
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover object-center"
+          sizes="100vw"
           fetchPriority="high"
           loading="eager"
           decoding="sync"
@@ -117,6 +118,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
                 src={getOptimizedImageUrl(featuredRelease.coverArt, 800)}
                 alt={`${featuredRelease.title} by ${featuredRelease.artistName} – cover art`}
                 className="w-full h-full object-cover"
+                sizes="50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
             </div>

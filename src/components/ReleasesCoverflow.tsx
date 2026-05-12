@@ -303,6 +303,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                           src={getOptimizedImageUrl(release.coverArt, 600)}
                           alt={`${release.title} by ${release.artistName} – cover art`}
                           className="w-full h-full object-cover"
+                          sizes="(max-width: 640px) 70vw, 320px"
                           draggable={false}
                           loading="lazy"
                           decoding="async"

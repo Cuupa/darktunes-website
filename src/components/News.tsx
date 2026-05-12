@@ -50,7 +50,8 @@ export function News({ news, dict, locale }: NewsProps) {
                       <img 
                         src={getOptimizedImageUrl(post.imageUrl, 800)} 
                         alt={post.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        sizes="(max-width: 1024px) 100vw, 320px"
                         onError={(e) => {
                           e.currentTarget.closest('.relative')?.remove()
                         }}

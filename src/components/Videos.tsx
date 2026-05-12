@@ -84,6 +84,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                       src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                       alt={`${video.title} – video thumbnail`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
                       loading="lazy"
                       decoding="async"
                     />
