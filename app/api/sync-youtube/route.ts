@@ -21,11 +21,10 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function matchesArtistNameInTitle(videoTitle: string, artistName: string): boolean {
+function createArtistNamePattern(artistName: string): RegExp | null {
   const trimmedArtistName = artistName.trim()
-  if (!trimmedArtistName) return false
-  const pattern = new RegExp(`(^|\\W)${escapeRegExp(trimmedArtistName)}(\\W|$)`, 'i')
-  return pattern.test(videoTitle)
+  if (!trimmedArtistName) return null
+  return new RegExp(`(^|\\W)${escapeRegExp(trimmedArtistName)}(\\W|$)`, 'i')
 }
 
 async function verifyToken(token: string): Promise<void> {
@@ -86,9 +85,15 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     .eq('is_visible', true)
   if (artistsError) throw new ApiError(500, `Artist lookup failed: ${artistsError.message}`)
 
+  const artistMatchers = (artists ?? [])
+    .map((artist) => ({
+      id: artist.id,
+      pattern: createArtistNamePattern(artist.name),
+    }))
+    .filter((artist): artist is { id: string; pattern: RegExp } => Boolean(artist.pattern))
+
   const rows = videos.map((v) => ({
-    artist_id:
-      artists?.find((artist) => matchesArtistNameInTitle(v.title, artist.name))?.id ?? null,
+    artist_id: artistMatchers.find((artist) => artist.pattern.test(v.title))?.id ?? null,
     youtube_id: v.youtubeId,
     title: v.title,
     artist_name: v.channelTitle,
