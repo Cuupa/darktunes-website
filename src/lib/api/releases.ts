@@ -81,6 +81,7 @@ export async function getPublicReleases(db: DbClient): Promise<Release[]> {
     .from('releases')
     .select('*')
     .eq('is_visible', true)
+    .eq('is_promo', false)
     .order('release_date', { ascending: false })
 
   if (hiddenIds.length > 0) {

@@ -15,6 +15,7 @@ export interface Artist {
   tiktokUrl?: string
   bandcampUrl?: string
   shopUrl?: string
+  /** When true, this artist is guaranteed to appear in the homepage Artists section regardless of shuffle. */
   featured: boolean
   country?: string
   email?: string
@@ -64,6 +65,7 @@ export interface Release {
   smartUrl?: string
   popularity?: number
   isVisible: boolean
+  /** When true, this release is only visible in the journalist Promo Pool and never shown on the public homepage. */
   isPromo: boolean
 }
 

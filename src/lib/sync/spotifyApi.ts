@@ -115,8 +115,9 @@ export async function fetchSpotifyArtistReleases(
   fetchFn: typeof fetch,
 ): Promise<SpotifyRelease[]> {
   const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
+  const artistId = extractSpotifyId(spotifyArtistId)
 
-  const url = new URL(`https://api.spotify.com/v1/artists/${spotifyArtistId}/albums`)
+  const url = new URL(`https://api.spotify.com/v1/artists/${artistId}/albums`)
   url.searchParams.set('limit', '50')
   url.searchParams.set('include_groups', 'album,single,compilation')
 
@@ -150,8 +151,9 @@ export async function fetchSpotifyArtistProfile(
   fetchFn: typeof fetch,
 ): Promise<SpotifyArtistProfile> {
   const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
+  const artistId = extractSpotifyId(spotifyArtistId)
 
-  const response = await fetchFn(`https://api.spotify.com/v1/artists/${spotifyArtistId}`, {
+  const response = await fetchFn(`https://api.spotify.com/v1/artists/${artistId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
 
@@ -198,4 +200,25 @@ function normaliseDate(date: string): string {
   if (/^\d{4}$/.test(date)) return `${date}-01-01`
   if (/^\d{4}-\d{2}$/.test(date)) return `${date}-01`
   return date
+}
+
+/**
+ * Normalises a Spotify artist identifier to a bare Spotify artist ID.
+ */
+function extractSpotifyId(value: string): string {
+  const trimmed = value.trim()
+  try {
+    const url = new URL(trimmed)
+    if (url.hostname.includes('spotify.com')) {
+      const segments = url.pathname.split('/').filter(Boolean)
+      return segments[segments.length - 1] ?? trimmed
+    }
+  } catch {
+    // Not a URL; continue with Spotify URI parsing.
+  }
+
+  const parts = trimmed.split(':')
+  if (parts.length === 3 && parts[0] === 'spotify') return parts[2]
+
+  return trimmed
 }

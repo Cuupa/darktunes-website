@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card'
 import { motion } from 'framer-motion'
 import { ConsentGate } from '@/components/ConsentGate'
 import { MusicNote } from '@phosphor-icons/react'
+import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 
 interface SpotifyPlayerProps {
   trackUri?: string
@@ -45,20 +46,4 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl
       </motion.div>
     </Card>
   )
-}
-
-function getSpotifyEmbedPath(uri: string): string {
-  if (uri.includes('spotify.com')) {
-    const url = new URL(uri)
-    return url.pathname
-  }
-
-  const parts = uri.split(':')
-  if (parts.length === 3) {
-    const type = parts[1]
-    const id = parts[2]
-    return `/${type}/${id}`
-  }
-
-  return '/playlist/37i9dQZF1DXcF6B6QPhFDv'
 }

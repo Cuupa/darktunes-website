@@ -27,6 +27,7 @@ export async function getPublicArtists(db: DbClient): Promise<Artist[]> {
     .from('artists')
     .select('*')
     .eq('is_visible', true)
+    .order('featured', { ascending: false })
     .order('name', { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToArtist)

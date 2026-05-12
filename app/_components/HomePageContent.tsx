@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { Header } from '@/components/Header'
 import { Hero } from '@/components/Hero'
 import { Releases } from '@/components/Releases'
@@ -45,8 +46,26 @@ export function HomePageContent({
   dict,
   locale,
 }: HomePageContentProps) {
-  const featuredRelease =
-    releases.length > 0 ? releases.find((r) => r.featured) ?? releases[0] : undefined
+  const featuredReleases = useMemo(() => {
+    const featured = releases.filter((release) => release.featured)
+    if (featured.length > 0) return featured
+    return releases.length > 0 ? [releases[0]] : []
+  }, [releases])
+  const [heroIndex, setHeroIndex] = useState(0)
+
+  useEffect(() => {
+    setHeroIndex(0)
+  }, [featuredReleases])
+
+  useEffect(() => {
+    if (featuredReleases.length <= 1) return
+    const intervalId = setInterval(() => {
+      setHeroIndex((previousIndex) => (previousIndex + 1) % featuredReleases.length)
+    }, 6000)
+    return () => clearInterval(intervalId)
+  }, [featuredReleases])
+
+  const featuredRelease = featuredReleases[heroIndex] ?? featuredReleases[0]
   const playlists =
     siteSettings.spotifyPlaylists?.length
       ? siteSettings.spotifyPlaylists
@@ -57,7 +76,22 @@ export function HomePageContent({
       <CRTOverlay />
       <Header dict={dict.navigation} locale={locale} />
       <main id="main-content">
-        <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
+        <div className="relative">
+          <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
+          {featuredReleases.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+              {featuredReleases.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setHeroIndex(i)}
+                  aria-label={`Show release ${i + 1}`}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === heroIndex ? 'bg-accent scale-125' : 'bg-muted-foreground/50 hover:bg-muted-foreground'}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         <motion.div
           initial={{ opacity: 0 }}

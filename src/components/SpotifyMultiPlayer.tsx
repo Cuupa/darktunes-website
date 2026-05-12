@@ -6,8 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConsentGate } from '@/components/ConsentGate'
 import type { SpotifyPlaylistEntry } from '@/types'
-
-const DEFAULT_SPOTIFY_PLAYLIST_ID = '37i9dQZF1DWWqNV5cS50j6'
+import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 
 interface SpotifyMultiPlayerProps {
   playlists: SpotifyPlaylistEntry[]
@@ -72,22 +71,4 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
       </motion.div>
     </Card>
   )
-}
-
-function getSpotifyEmbedPath(uri: string): string {
-  try {
-    const url = new URL(uri)
-    if (url.hostname === 'open.spotify.com' || url.hostname.endsWith('.spotify.com')) {
-      return url.pathname
-    }
-  } catch {
-    // Continue with URI parsing fallback below.
-  }
-
-  const parts = uri.split(':')
-  if (parts.length === 3) {
-    return `/${parts[1]}/${parts[2]}`
-  }
-
-  return `/playlist/${DEFAULT_SPOTIFY_PLAYLIST_ID}`
 }

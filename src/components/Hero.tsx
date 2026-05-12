@@ -41,7 +41,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
   }
 
   return (
-    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20 pb-16 lg:pt-32">
+    <section id="hero" className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
       <div 
         className="absolute inset-0 z-0"
         style={{
