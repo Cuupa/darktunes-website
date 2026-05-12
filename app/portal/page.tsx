@@ -29,7 +29,7 @@ export default async function PortalPage() {
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
 
-  const [stats, releases, concerts, openChecklistCountResult, featureFlags, profileResult] = artist
+  const [stats, releases, concerts, openChecklistCountResult, featureFlags, profileResult, unreadMessagesResult, statementCountResult, assetCountResult] = artist
     ? await Promise.all([
         getStreamingStatsByArtistId(supabase, artist.id).catch(() => []),
         getReleasesByArtistId(supabase, artist.id).catch(() => []),
@@ -45,8 +45,18 @@ export default async function PortalPage() {
           .select('photo_url')
           .eq('artist_id', artist.id)
           .maybeSingle(),
+        supabase
+          .from('label_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('artist_id', artist.id)
+          .eq('read', false),
+        supabase
+          .from('sales_statements')
+          .select('id', { count: 'exact', head: true })
+          .eq('artist_id', artist.id),
+        supabase.from('assets').select('id', { count: 'exact', head: true }),
       ])
-    : [[], [], [], { count: 0, error: null }, {}, { data: null, error: null }]
+    : [[], [], [], { count: 0, error: null }, {}, { data: null, error: null }, { count: 0, error: null }, { count: 0, error: null }, { count: 0, error: null }]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
@@ -60,6 +70,9 @@ export default async function PortalPage() {
       releaseCount={releases.length}
       upcomingShowCount={concerts.length}
       openChecklistCount={openChecklistCountResult.count ?? 0}
+      unreadMessageCount={unreadMessagesResult.count ?? 0}
+      statementCount={statementCountResult.count ?? 0}
+      assetCount={assetCountResult.count ?? 0}
       featureFlags={featureFlags}
     />
   )

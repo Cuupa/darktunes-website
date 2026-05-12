@@ -10,11 +10,14 @@ Access the artist portal at `/portal`. Artists sign in with their own Supabase A
 
 Portal features:
 - **EPK Profile Editor** (`/portal/profile`) — artists edit bio, genres, social links, press quote, and upload a profile photo. The photo upload goes server-side via `/api/portal/upload-photo` (no CORS issues).
+- **EPK PDF Export** (`/portal/profile`) — artists can generate a print-ready EPK using the "Download EPK as PDF" action (browser print-to-PDF flow).
 - **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
 - **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. The Server Action generates the URL; the raw R2 object key and credentials never reach the browser.
 - **Tour Manager** (`/portal/tour`) — artists can create/delete their own concert entries (announced/confirmed/cancelled).
-- **Marketing Assets** (`/portal/marketing`) — artists can download assigned assets via short-lived presigned URLs.
-- **Label Inbox** (`/portal/messages`) — artists can read label messages and mark them as read.
+- **Release Submission** (`/portal/releases/new`) — artists can submit new releases for admin review (`is_visible=false` until approved), including optional cover upload via `/api/portal/upload-release-cover`.
+- **Marketing Assets** (`/portal/marketing`) — artists can download assigned assets via short-lived presigned URLs and upload/delete their own assets via `/api/portal/upload-asset`.
+- **Label Inbox** (`/portal/messages`) — artists can read label messages, mark them as read, and send replies (stored in `artist_replies`).
+- **Account Settings** (`/portal/settings`) — artists can update their password and switch locale (EN/DE).
 - **Feature-flag gating** — portal modules are controlled by `portal_feature_flags` (artist.* keys) and hidden/blocked when disabled.
 
 To link an artist to a portal user, use the **Users** tab in the Admin Dashboard:

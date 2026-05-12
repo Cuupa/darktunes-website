@@ -9,14 +9,16 @@
  */
 
 import { useState } from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { CaretDown, CaretUp, CheckCircle, Circle } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, CheckCircle, Circle, MusicNotes } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import type { Dictionary } from '@/i18n/types'
 import type { Release } from '@/types'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
@@ -187,14 +189,20 @@ export function ReleaseChecklistPanel({
 }: ReleaseChecklistPanelProps) {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{dict.releases_heading}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold">{dict.releases_heading}</h1>
+        <Button asChild>
+          <Link href="/portal/releases/new">{dict.releases_submit_new}</Link>
+        </Button>
+      </div>
 
       {releases.length === 0 ? (
-        <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">{dict.releases_noReleases}</p>
-          </CardContent>
-        </Card>
+        <PortalEmptyState
+          icon={MusicNotes}
+          heading={dict.releases_noReleases}
+          description={dict.releases_noData}
+          action={{ label: dict.releases_submit_new, href: '/portal/releases/new' }}
+        />
       ) : (
         <div className="space-y-3">
           {releases.map((release) => (

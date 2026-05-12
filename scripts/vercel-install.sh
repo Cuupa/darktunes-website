@@ -78,10 +78,12 @@ require_env "SPOTIFY_CLIENT_ID"     "Spotify app client ID (sync: releases by Sp
 require_env "SPOTIFY_CLIENT_SECRET" "Spotify app client secret"
 require_env "DISCOGS_TOKEN"         "Discogs personal access token (sync: releases by Discogs Artist ID)"
 require_env "SONGKICK_API_KEY"      "Songkick API key (sync: tour dates by Songkick Artist ID)"
+require_env "BANDSINTOWN_APP_ID"    "Bandsintown app_id (sync: tour dates by Bandsintown artist name/id)"
 echo ""
 
 echo "  — Newsletter (optional — DOI email delivery via Resend Edge Function) —"
 require_env "RESEND_API_KEY"     "Resend API key (set as Supabase Edge Function secret, not Vercel)"
+require_env "RESEND_FROM_EMAIL"  "Verified sender email for DOI confirmation emails"
 require_env "NEXT_PUBLIC_SITE_URL" "Public site URL used to build confirmation links (e.g. https://darktunes.com)"
 echo ""
 

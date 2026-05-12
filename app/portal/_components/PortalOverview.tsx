@@ -1,13 +1,11 @@
 'use client'
 
-/**
- * app/portal/_components/PortalOverview.tsx — Client Component (leaf)
- *
- * Renders the dashboard overview cards. Receives all data as props (IoC).
- */
-
 import Link from 'next/link'
-import Image from 'next/image'
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@/components/ui/avatar'
 import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCircleText } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -21,6 +19,9 @@ interface PortalOverviewProps {
   releaseCount: number
   upcomingShowCount: number
   openChecklistCount: number
+  unreadMessageCount: number
+  statementCount: number
+  assetCount: number
   featureFlags: Record<string, boolean>
 }
 
@@ -32,24 +33,27 @@ export function PortalOverview({
   releaseCount,
   upcomingShowCount,
   openChecklistCount,
+  unreadMessageCount,
+  statementCount,
+  assetCount,
   featureFlags,
 }: PortalOverviewProps) {
   const isEnabled = (id: string) => featureFlags[id] ?? true
+  const initials = artistName
+    ? artistName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+    : '?'
 
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
-        {profileImageUrl && (
-          <div className="relative h-16 w-16 overflow-hidden rounded-full border border-border">
-            <Image
-              src={getSquareThumbnail(profileImageUrl, 64)}
-              alt={`${artistName ?? 'Artist'} – artist photo`}
-              fill
-              className="object-cover"
-            />
-          </div>
-        )}
-        <h1 className="text-3xl font-bold text-foreground">
+        <Avatar className="h-16 w-16 border border-border">
+          <AvatarImage
+            src={profileImageUrl ? getSquareThumbnail(profileImageUrl, 64) : undefined}
+            alt={`${artistName ?? 'Artist'} – artist photo`}
+          />
+          <AvatarFallback className="bg-primary/20 text-xl font-bold text-primary">{initials}</AvatarFallback>
+        </Avatar>
+        <h1 className="bg-gradient-to-r from-foreground to-primary/70 bg-clip-text text-3xl font-bold text-transparent">
           {dict.welcomeBack}
           {artistName ? `, ${artistName}` : ''}
         </h1>
@@ -99,7 +103,7 @@ export function PortalOverview({
               <FileText size={18} className="text-primary" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">↗</p>
+              <p className="text-2xl font-bold">{statementCount}</p>
               <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
             </CardContent>
           </Card>
@@ -148,8 +152,8 @@ export function PortalOverview({
                 <MegaphoneSimple size={18} className="text-primary" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">↗</p>
-                <p className="text-xs text-muted-foreground mt-1">{dict.marketing_heading}</p>
+                <p className="text-2xl font-bold">{assetCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">label assets available</p>
               </CardContent>
             </Card>
           </Link>
@@ -163,8 +167,8 @@ export function PortalOverview({
                 <ChatCircleText size={18} className="text-primary" />
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">↗</p>
-                <p className="text-xs text-muted-foreground mt-1">{dict.messages_heading}</p>
+                <p className="text-2xl font-bold">{unreadMessageCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">unread messages</p>
               </CardContent>
             </Card>
           </Link>
