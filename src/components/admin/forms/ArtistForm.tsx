@@ -65,6 +65,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
   const name = watch('name')
   const slugValue = watch('slug')
+  const shopUrl = watch('shopUrl')
 
   // Track whether the slug was auto-generated so we stop overwriting manual edits
   const lastAutoSlug = useRef(toSlug(name))
@@ -75,6 +76,16 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       lastAutoSlug.current = auto
     }
   }, [name, slugValue, setValue])
+
+  // Track whether the shopUrl was auto-generated so we stop overwriting manual edits
+  const lastAutoShopUrl = useRef(slugValue ? `https://darkmerch.com/${slugValue}` : '')
+  useEffect(() => {
+    const auto = slugValue ? `https://darkmerch.com/${slugValue}` : ''
+    if (!shopUrl || shopUrl === lastAutoShopUrl.current) {
+      setValue('shopUrl', auto)
+      lastAutoShopUrl.current = auto
+    }
+  }, [slugValue, shopUrl, setValue])
 
   const featured = watch('featured')
   const isEuNonGerman = watch('isEuNonGerman')
@@ -329,7 +340,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
       <div className="space-y-1">
         <Label htmlFor="shopUrl">Shop URL (Darkmerch)</Label>
-        <Input id="shopUrl" {...register('shopUrl')} placeholder="https://darkmerch.com/..." disabled={isLoading} />
+        <Input id="shopUrl" {...register('shopUrl')} placeholder="Auto-filled from slug" disabled={isLoading} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
