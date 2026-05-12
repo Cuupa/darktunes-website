@@ -248,3 +248,15 @@ Journalist applications: `journalist_applications` table; `POST /api/journalist-
 DAL: `src/lib/api/pressPhotos.ts`, `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests.
 user_role enum: includes `journalist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all four values.
 DB: Migration `20260510190000_press_and_promo_pool.sql` — adds journalist role value, press_photos, promo_tracks, journalist_applications tables with RLS.
+
+Admin User Management
+The **Users** tab in the AdminDashboard (`src/components/admin/AdminDashboard.tsx`) is only visible when `profile.role === 'admin'`. It renders `<UsersManager />`.
+Types: `UserRole` and `UserWithProfile` are in `src/types/users.ts`.
+DAL: `src/lib/api/users.ts` exports `listUsersWithProfiles`, `updateUserRole`, `banUser`, `deleteUser`, `linkArtistToUser`, `unlinkArtistFromUser`. All functions accept a service-role `SupabaseClient`. Supabase Auth Admin API methods (`listUsers`, `updateUserById`, `deleteUser`) are called via the `adminClient.auth.admin` namespace.
+Hook: `src/hooks/useUsers.ts` fetches from `GET /api/admin/users` and exposes `updateRole`, `toggleBan`, `deleteUser`, `linkArtist`, `unlinkArtist` with optimistic updates and toast notifications.
+API Routes (all admin-only, use service-role client):
+  - `GET /api/admin/users` — lists all users merged with profile roles and linked artist names.
+  - `PATCH /api/admin/users/[id]` — updates `role` and/or `ban` status; rejects self-modification.
+  - `DELETE /api/admin/users/[id]` — deletes user from Auth; profiles cascade. Rejects self-deletion.
+  - `PATCH /api/admin/users/[id]/link-artist` — links or unlinks (`artistId: null`) an artist to a user. Validates no double-linking.
+Security: Every route verifies `profiles.role = 'admin'` server-side via `createServerSupabaseClient()` before using the service-role client. The service-role key never reaches the browser.
