@@ -13,11 +13,11 @@
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import { HomePageContent } from './_components/HomePageContent'
-import { getReleases } from '@/lib/api/releases'
-import { getArtists } from '@/lib/api/artists'
+import { getPublicReleases } from '@/lib/api/releases'
+import { getPublicArtists } from '@/lib/api/artists'
 import { getNewsPosts } from '@/lib/api/news'
 import { getVideos } from '@/lib/api/videos'
-import { getConcerts } from '@/lib/api/concerts'
+import { getPublicConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
@@ -44,7 +44,7 @@ function createPublicSupabaseClient() {
 
 const getCachedReleases = unstable_cache(
   async (): Promise<Release[]> => {
-    return getReleases(createPublicSupabaseClient())
+    return getPublicReleases(createPublicSupabaseClient())
   },
   ['releases'],
   { revalidate: 60, tags: ['releases'] },
@@ -52,7 +52,7 @@ const getCachedReleases = unstable_cache(
 
 const getCachedArtists = unstable_cache(
   async (): Promise<Artist[]> => {
-    return getArtists(createPublicSupabaseClient())
+    return getPublicArtists(createPublicSupabaseClient())
   },
   ['artists'],
   { revalidate: 60, tags: ['artists'] },
@@ -76,7 +76,7 @@ const getCachedVideos = unstable_cache(
 
 const getCachedConcerts = unstable_cache(
   async (): Promise<Concert[]> => {
-    return getConcerts(createPublicSupabaseClient())
+    return getPublicConcerts(createPublicSupabaseClient())
   },
   ['concerts'],
   { revalidate: 60, tags: ['concerts'] },

@@ -48,5 +48,6 @@ export function rowToArtist(row: ArtistRow): Artist {
     bandsintownId: row.bandsintown_id ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
     foundedYear: row.founded_year ?? undefined,
+    isVisible: row.is_visible,
   }
 }

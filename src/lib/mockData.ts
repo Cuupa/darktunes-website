@@ -12,7 +12,8 @@ export const mockArtists: Artist[] = [
     instagramUrl: 'https://instagram.com/czarina',
     youtubeUrl: 'https://youtube.com/@czarina',
     websiteUrl: 'https://czarina.music',
-    featured: true
+    featured: true,
+    isVisible: true,
   },
   {
     id: '2',
@@ -24,7 +25,8 @@ export const mockArtists: Artist[] = [
     spotifyUrl: 'https://open.spotify.com/artist/blackbook',
     instagramUrl: 'https://instagram.com/blackbook',
     youtubeUrl: 'https://youtube.com/@blackbook',
-    featured: true
+    featured: true,
+    isVisible: true,
   },
   {
     id: '3',
@@ -35,7 +37,8 @@ export const mockArtists: Artist[] = [
     imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&h=800&fit=crop&q=80',
     spotifyUrl: 'https://open.spotify.com/artist/smashhitcombo',
     instagramUrl: 'https://instagram.com/smashhitcombo',
-    featured: false
+    featured: false,
+    isVisible: true,
   },
   {
     id: '4',
@@ -47,7 +50,8 @@ export const mockArtists: Artist[] = [
     spotifyUrl: 'https://open.spotify.com/artist/frozenplasma',
     youtubeUrl: 'https://youtube.com/@frozenplasma',
     websiteUrl: 'https://frozenplasma.net',
-    featured: false
+    featured: false,
+    isVisible: true,
   },
   {
     id: '5',
@@ -58,7 +62,8 @@ export const mockArtists: Artist[] = [
     imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=800&fit=crop&q=80',
     spotifyUrl: 'https://open.spotify.com/artist/cattac',
     youtubeUrl: 'https://youtube.com/@cattac',
-    featured: false
+    featured: false,
+    isVisible: true,
   },
   {
     id: '6',
@@ -70,7 +75,8 @@ export const mockArtists: Artist[] = [
     spotifyUrl: 'https://open.spotify.com/artist/neonvoid',
     instagramUrl: 'https://instagram.com/neonvoid',
     youtubeUrl: 'https://youtube.com/@neonvoid',
-    featured: false
+    featured: false,
+    isVisible: true,
   }
 ]
 
@@ -85,7 +91,8 @@ export const mockReleases: Release[] = [
     type: 'album',
     spotifyUrl: 'https://open.spotify.com/album/polymorph',
     youtubeUrl: 'https://youtube.com/playlist?list=polymorph',
-    featured: true
+    featured: true,
+    isVisible: true,
   },
   {
     id: '2',
@@ -97,7 +104,8 @@ export const mockReleases: Release[] = [
     type: 'single',
     spotifyUrl: 'https://open.spotify.com/track/monsters',
     youtubeUrl: 'https://youtube.com/watch?v=monsters',
-    featured: true
+    featured: true,
+    isVisible: true,
   },
   {
     id: '3',
@@ -109,7 +117,8 @@ export const mockReleases: Release[] = [
     type: 'single',
     spotifyUrl: 'https://open.spotify.com/track/split',
     youtubeUrl: 'https://youtube.com/watch?v=split',
-    featured: true
+    featured: true,
+    isVisible: true,
   },
   {
     id: '4',
@@ -120,7 +129,8 @@ export const mockReleases: Release[] = [
     coverArt: 'https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=800&h=800&fit=crop&q=80',
     type: 'ep',
     spotifyUrl: 'https://open.spotify.com/album/synthetic-dreams',
-    featured: false
+    featured: false,
+    isVisible: true,
   },
   {
     id: '5',
@@ -132,7 +142,8 @@ export const mockReleases: Release[] = [
     type: 'album',
     spotifyUrl: 'https://open.spotify.com/album/machine-heart',
     youtubeUrl: 'https://youtube.com/playlist?list=machineheart',
-    featured: false
+    featured: false,
+    isVisible: true,
   },
   {
     id: '6',
@@ -143,7 +154,8 @@ export const mockReleases: Release[] = [
     coverArt: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&h=800&fit=crop&q=80',
     type: 'single',
     spotifyUrl: 'https://open.spotify.com/track/digital-decay',
-    featured: false
+    featured: false,
+    isVisible: true,
   }
 ]
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getArtists, createArtist, updateArtist, deleteArtist, getArtistById, getArtistBySlug } from './artists'
+import { getArtists, getPublicArtists, createArtist, updateArtist, deleteArtist, getArtistById, getArtistBySlug } from './artists'
 
 type DbClient = SupabaseClient<Database>
 type ArtistRow = Database['public']['Tables']['artists']['Row']
@@ -57,6 +57,7 @@ const mockArtistRow: ArtistRow = {
   bandcamp_url: null,
   shop_url: null,
   founded_year: null,
+  is_visible: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -75,6 +76,7 @@ describe('getArtists', () => {
     expect(result[0].name).toBe('C Z A R I N A')
     expect(result[0].id).toBe('abc-123')
     expect(result[0].genres).toEqual(['Darkpop', 'Industrial'])
+    expect(result[0].isVisible).toBe(true)
   })
 
   it('falls back to a slug generated from name when row slug is empty', async () => {
@@ -94,6 +96,33 @@ describe('getArtists', () => {
   it('throws on error', async () => {
     const db = makeMockDb(null, { message: 'DB error', code: 'PGRST001' })
     await expect(getArtists(db)).rejects.toThrow('DB error')
+  })
+
+  it('maps is_visible=false to isVisible=false', async () => {
+    const db = makeMockDb([{ ...mockArtistRow, is_visible: false }])
+    const result = await getArtists(db)
+    expect(result[0].isVisible).toBe(false)
+  })
+})
+
+describe('getPublicArtists', () => {
+  it('returns only visible artists (applies is_visible filter)', async () => {
+    const builder = makeBuilder([mockArtistRow])
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    const result = await getPublicArtists(db)
+    expect(result).toHaveLength(1)
+    expect(builder.eq).toHaveBeenCalledWith('is_visible', true)
+  })
+
+  it('returns an empty array when no visible artists exist', async () => {
+    const db = makeMockDb([])
+    const result = await getPublicArtists(db)
+    expect(result).toEqual([])
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Connection error', code: 'PGRST001' })
+    await expect(getPublicArtists(db)).rejects.toThrow('Connection error')
   })
 })
 
@@ -115,6 +144,7 @@ describe('getArtistById', () => {
     expect(result).not.toBeNull()
     expect(result?.name).toBe('C Z A R I N A')
     expect(result?.featured).toBe(true)
+    expect(result?.isVisible).toBe(true)
   })
 })
 
@@ -177,6 +207,13 @@ describe('updateArtist', () => {
     const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
     await expect(updateArtist(db, 'some-id', { name: 'X' })).rejects.toThrow('Update failed')
   })
+
+  it('can toggle visibility off', async () => {
+    const hidden = { ...mockArtistRow, is_visible: false }
+    const db = makeMockDb(hidden)
+    const result = await updateArtist(db, mockArtistRow.id, { is_visible: false })
+    expect(result.isVisible).toBe(false)
+  })
 })
 
 describe('deleteArtist', () => {
@@ -188,5 +225,14 @@ describe('deleteArtist', () => {
   it('throws when deletion fails', async () => {
     const db = makeMockDb(null, { message: 'Delete denied', code: 'PGRST301' })
     await expect(deleteArtist(db, 'abc-123')).rejects.toThrow('Delete denied')
+  })
+
+  it('calls delete on the artists table (cascades to releases/concerts in DB)', async () => {
+    const builder = makeBuilder(null, null)
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    await deleteArtist(db, 'abc-123')
+    expect(db.from).toHaveBeenCalledWith('artists')
+    expect(builder.delete).toHaveBeenCalled()
+    expect(builder.eq).toHaveBeenCalledWith('id', 'abc-123')
   })
 })

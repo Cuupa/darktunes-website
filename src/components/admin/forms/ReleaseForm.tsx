@@ -24,6 +24,7 @@ export interface ReleaseFormData {
   appleMusicUrl: string
   youtubeUrl: string
   featured: boolean
+  isVisible: boolean
 }
 
 type Props = AdminPanelProps<ReleaseFormData>
@@ -38,6 +39,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   }, [value, reset])
 
   const featured = watch('featured')
+  const isVisible = watch('isVisible')
   const type = watch('type')
 
   return (
@@ -98,14 +100,25 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
         <Input id="youtubeUrl" {...register('youtubeUrl')} disabled={isLoading} />
       </div>
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="featured"
-          checked={featured}
-          onCheckedChange={(val) => setValue('featured', val)}
-          disabled={isLoading}
-        />
-        <Label htmlFor="featured">Featured</Label>
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="isVisible"
+            checked={isVisible}
+            onCheckedChange={(val) => setValue('isVisible', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="isVisible">Visible (public)</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="featured"
+            checked={featured}
+            onCheckedChange={(val) => setValue('featured', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="featured">Featured</Label>
+        </div>
       </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">

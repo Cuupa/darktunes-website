@@ -32,6 +32,7 @@ export interface ArtistFormData {
   vatNumber: string
   featured: boolean
   isEuNonGerman: boolean
+  isVisible: boolean
   notes: string
   spotifyId: string
   discogsId: string
@@ -76,6 +77,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
   const featured = watch('featured')
   const isEuNonGerman = watch('isEuNonGerman')
+  const isVisible = watch('isVisible')
   const spotifyId = watch('spotifyId')
   const spotifyUrl = watch('spotifyUrl')
   const discogsId = watch('discogsId')
@@ -344,6 +346,15 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       </div>
 
       <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="isVisible"
+            checked={isVisible}
+            onCheckedChange={(val) => setValue('isVisible', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="isVisible">Visible (public)</Label>
+        </div>
         <div className="flex items-center gap-2">
           <Switch
             id="featured"

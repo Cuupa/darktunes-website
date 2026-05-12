@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
@@ -46,6 +47,7 @@ const EMPTY_FORM: ReleaseFormData = {
   appleMusicUrl: '',
   youtubeUrl: '',
   featured: false,
+  isVisible: true,
 }
 
 function releaseToFormData(release: Release): ReleaseFormData {
@@ -59,6 +61,7 @@ function releaseToFormData(release: Release): ReleaseFormData {
     appleMusicUrl: release.appleMusicUrl ?? '',
     youtubeUrl: release.youtubeUrl ?? '',
     featured: release.featured,
+    isVisible: release.isVisible,
   }
 }
 
@@ -73,6 +76,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     apple_music_url: data.appleMusicUrl || null,
     youtube_url: data.youtubeUrl || null,
     featured: data.featured,
+    is_visible: data.isVisible,
   }
 }
 
@@ -178,6 +182,7 @@ export function ReleasesManager() {
             <TableHead>Artist</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Type</TableHead>
+            <TableHead>Visibility</TableHead>
             <TableHead>Featured</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -185,13 +190,13 @@ export function ReleasesManager() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : releases.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 No releases yet. Click "New Release" or sync from iTunes.
               </TableCell>
             </TableRow>
@@ -203,6 +208,19 @@ export function ReleasesManager() {
                 <TableCell>{release.releaseDate}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{release.type}</Badge>
+                </TableCell>
+                <TableCell>
+                  {release.isVisible ? (
+                    <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30">
+                      <Eye size={12} aria-hidden="true" />
+                      Visible
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 text-muted-foreground border-border">
+                      <EyeSlash size={12} aria-hidden="true" />
+                      Hidden
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   {release.featured && <Badge variant="secondary">Featured</Badge>}
