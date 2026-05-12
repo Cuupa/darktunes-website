@@ -45,7 +45,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(16, 16, 16, 0.65), rgba(16, 16, 16, 0.97)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(var(--background-rgb), 0.65), rgba(var(--background-rgb), 0.97)), url(${getOptimizedImageUrl(featuredRelease.coverArt, 1200)})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundAttachment: 'scroll',
