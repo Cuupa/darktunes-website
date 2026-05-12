@@ -355,8 +355,8 @@ export function ArtistsManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artist</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action
-              cannot be undone.
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will also
+              permanently delete <strong>all their releases</strong>. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

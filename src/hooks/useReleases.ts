@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from '@/env'
 import * as releasesApi from '@/lib/api/releases'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
+import type { SyncAllResult } from '@/lib/sync/syncAll'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
@@ -52,8 +53,8 @@ export function useReleases() {
     void revalidateContentCache(['releases'])
   }
 
-  const syncAllReleases = async (): Promise<void> => {
-    if (!isSupabaseConfigured) return
+  const syncAllReleases = async (): Promise<SyncAllResult | null> => {
+    if (!isSupabaseConfigured) return null
     setIsSyncing(true)
     setSyncProgress(0)
     try {
@@ -72,6 +73,8 @@ export function useReleases() {
         const text = await res.text()
         throw new Error(`Sync failed: ${text}`)
       }
+      const result = (await res.json()) as SyncAllResult
+      return result
     } finally {
       setIsSyncing(false)
       setSyncProgress(0)

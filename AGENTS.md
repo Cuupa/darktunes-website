@@ -123,6 +123,23 @@ Every sync run writes a `sync_logs` entry with status 'success', 'partial', or '
 `sync_logs` also records `api_source` (itunes | spotify | discogs | songkick | bandsintown | odesli | all) and `rate_limited` (boolean) per run.
 The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps extends SyncDeps with optional spotify/discogsToken/songkickApiKey/bandsintownAppId). Called by `POST /api/sync`.
 Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs releases using ISRC → barcode/UPC → normalised title + year precedence.
+`syncAllReleases()` in `useReleases.ts` returns the full `SyncAllResult` (typed import from `src/lib/sync/syncAll.ts`). `ReleasesManager` parses the result: on success shows a toast with total items synced; on errors shows a warning toast and a "View Errors" button that opens a dialog with per-API error details.
+
+Admin Utility Routes (admin/editor auth required):
+  `POST /api/admin/cleanup-orphaned-releases` — deletes all releases where `artist_id IS NULL` (uses service-role client). Returns `{ deleted: number }`. Triggered by the "Clean Orphaned" button in ReleasesManager.
+  `POST /api/admin/fetch-youtube-info` — resolves a YouTube URL or video ID to `{ videoId, title, channelTitle, thumbnailUrl }` via YouTube oEmbed (no API key needed). Called by the "Fetch Info" button in VideoForm.
+
+Video Admin UX:
+  VideoForm accepts full YouTube URLs (watch?v=, youtu.be/, /shorts/, /embed/) and auto-extracts the 11-char video ID on input.
+  "Fetch Info" button calls `/api/admin/fetch-youtube-info` to auto-fill title, channel name, and thumbnail.
+  VideosManager has a "Sync YouTube Channel" button that calls `POST /api/sync-youtube` and shows synced count in toast.
+
+Artist Quick-Import:
+  When creating a NEW artist (value.name is empty), ArtistForm shows a prominent "Quick Import from Spotify" panel at the very top: paste Spotify URL → click "Import" → all fields auto-filled (name, image, genres, spotifyId, spotifyUrl).
+
+Cascade Deletes:
+  `releases.artist_id` uses `ON DELETE CASCADE`. When an artist is deleted, all their releases are automatically deleted by the DB.
+  The delete confirmation dialog in ArtistsManager explicitly states this to the user.
 
 Discogs Artist Enrichment (manual):
   `src/lib/sync/discogsApi.ts` exports two functions:

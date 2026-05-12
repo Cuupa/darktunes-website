@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise } from '@phosphor-icons/react'
 import { useVideos } from '@/hooks/useVideos'
 import { VideoForm, type VideoFormData } from './forms/VideoForm'
 import { Button } from '@/components/ui/button'
@@ -63,11 +63,12 @@ function formDataToInsert(data: VideoFormData): VideoInsert {
 }
 
 export function VideosManager() {
-  const { videos, isLoading, createVideo, updateVideo, deleteVideo } = useVideos()
+  const { videos, isLoading, createVideo, updateVideo, deleteVideo, syncYouTube } = useVideos()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingVideo, setEditingVideo] = useState<Video | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Video | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const formValue = editingVideo ? videoToFormData(editingVideo) : EMPTY_FORM
 
@@ -113,14 +114,38 @@ export function VideosManager() {
     }
   }
 
+  const handleSyncYouTube = async () => {
+    setIsSyncing(true)
+    try {
+      const { synced } = await syncYouTube()
+      toast.success(`YouTube sync complete: ${synced} video(s) updated`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'YouTube sync failed')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{videos.length} video(s)</p>
-        <Button size="sm" onClick={openNew} className="gap-2">
-          <Plus size={16} weight="bold" />
-          New Video
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleSyncYouTube()}
+            disabled={isSyncing || isLoading}
+            className="gap-2"
+          >
+            <ArrowsClockwise size={16} className={isSyncing ? 'animate-spin' : ''} weight="bold" />
+            {isSyncing ? 'Syncing…' : 'Sync YouTube Channel'}
+          </Button>
+          <Button size="sm" onClick={openNew} className="gap-2">
+            <Plus size={16} weight="bold" />
+            New Video
+          </Button>
+        </div>
       </div>
 
       <Table>
@@ -143,7 +168,8 @@ export function VideosManager() {
           ) : videos.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                No videos yet. Click "New Video" to add one.
+                No videos yet. Click &ldquo;Sync YouTube Channel&rdquo; to import the latest videos, or
+                &ldquo;New Video&rdquo; to add one manually.
               </TableCell>
             </TableRow>
           ) : (
