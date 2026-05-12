@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -14,6 +14,7 @@ import { AssetsManager } from './AssetsManager'
 import { SiteSettingsManager } from './SiteSettingsManager'
 import { SystemHealthWidget } from './SystemHealthWidget'
 import { JournalistManager } from './JournalistManager'
+import { UsersManager } from './UsersManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 export function AdminDashboard() {
@@ -57,7 +58,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
+          <TabsList className={`grid w-full lg:w-auto lg:inline-grid ${profile?.role === 'admin' ? 'grid-cols-9' : 'grid-cols-8'}`}>
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" />
               Artists
@@ -90,6 +91,12 @@ export function AdminDashboard() {
               <Broadcast size={16} weight="bold" />
               Media
             </TabsTrigger>
+            {profile?.role === 'admin' && (
+              <TabsTrigger value="users" className="gap-2">
+                <Users size={16} weight="bold" />
+                Users
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="artists" className="space-y-4">
@@ -203,6 +210,22 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {profile?.role === 'admin' && (
+            <TabsContent value="users" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Management</CardTitle>
+                  <CardDescription>
+                    Manage registered users: assign roles, ban/unban accounts, link artists, or delete users
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UsersManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>

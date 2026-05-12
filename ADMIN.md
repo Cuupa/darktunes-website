@@ -13,7 +13,12 @@ Portal features:
 - **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
 - **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. The Server Action generates the URL; the raw R2 object key and credentials never reach the browser.
 
-To link an artist to a portal user, run this SQL once per artist after they have signed up:
+To link an artist to a portal user, use the **Users** tab in the Admin Dashboard:
+1. Open `/admin` and go to the **Users** tab (admin-only).
+2. Find the user row and click the **Link Band** icon (🔗).
+3. Select the artist from the dropdown and confirm.
+
+Alternatively, you can still run SQL directly:
 ```sql
 UPDATE public.artists
 SET user_id = (SELECT id FROM auth.users WHERE email = 'artist@email.com')
@@ -24,6 +29,7 @@ WHERE slug = 'artist-slug';
 
 - **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
 - **Role-Based Access Control**: Admin and Editor roles with different permissions
+- **User Management** *(admin-only)*: View all registered users, change their roles (admin / editor / journalist / user), ban/unban accounts, delete users, and link/unlink artists — no raw SQL required. Accessible via the **Users** tab (only visible to admins).
 - **Artists Management**: Create, read, update, and delete artist profiles. The artist form now includes five additional URL fields: **Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, and a **Shop URL** (Darkmerch or Shopify link). These appear as clickable icons in the public artist cards and in artist modals.
 - **Releases Management**: Manage music releases with iTunes API integration
 - **News Management**: Create and publish news posts and announcements
