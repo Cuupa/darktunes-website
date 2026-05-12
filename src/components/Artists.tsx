@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo, useDeferredValue } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -77,13 +77,28 @@ export function Artists({ artists, dict }: ArtistsProps) {
     }
   }
 
-  const normalisedQuery = searchQuery.trim().toLowerCase()
-  const filteredArtists = normalisedQuery
-    ? artists.filter((artist) =>
-      artist.name.toLowerCase().includes(normalisedQuery) ||
-      artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
+  // Defer search filtering so the input updates instantly while the heavier
+  // filter+render work runs as a low-priority React update.
+  const deferredSearch = useDeferredValue(searchQuery)
+
+  /** True while the user has typed something (even before deferred catches up). */
+  const isSearching = searchQuery !== ''
+
+  /** True while deferred search hasn't yet caught up with the current input. */
+  const isFilterPending = deferredSearch !== searchQuery
+
+  const stableVisibleArtists = stableVisibleArtistsRef.current.artists
+
+  const normalisedQuery = useMemo(() => deferredSearch.trim().toLowerCase(), [deferredSearch])
+
+  const filteredArtists = useMemo(() => {
+    if (!normalisedQuery) return stableVisibleArtists
+    return artists.filter(
+      (artist) =>
+        artist.name.toLowerCase().includes(normalisedQuery) ||
+        artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
     )
-    : stableVisibleArtistsRef.current.artists
+  }, [normalisedQuery, artists, stableVisibleArtists])
 
   const handleArtistClick = (artist: Artist) => {
     setSelectedArtist(artist)
@@ -129,7 +144,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
           // preventing "scroll-fighting" between Lenis (vertical) and the
           // snap carousel (horizontal) on touch devices.
           <motion.ul
-            className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3"
+            className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
             data-lenis-prevent
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}

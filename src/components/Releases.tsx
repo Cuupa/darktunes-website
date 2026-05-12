@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useDeferredValue } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ReleasesCoverflow } from '@/components/ReleasesCoverflow'
@@ -19,26 +19,37 @@ export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) 
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
 
-  // Category / type filter
-  const allTypes: string[] = []
-  releases.forEach((r) => {
-    if (r.type && !allTypes.includes(r.type)) allTypes.push(r.type)
-  })
   const [selectedType, setSelectedType] = useState<string | null>(null)
-
-  // Search
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Defer expensive filtering so the search input stays responsive on every
+  // keystroke.  The deferred values lag one React render behind the real state,
+  // keeping input latency near zero while the filter computation runs as an
+  // interruptible low-priority update.
+  const deferredSearch = useDeferredValue(searchQuery)
+  const deferredType = useDeferredValue(selectedType)
+
+  /** True while React is still processing the deferred filter update. */
+  const isFilterPending = deferredSearch !== searchQuery || deferredType !== selectedType
+
+  const allTypes = useMemo(() => {
+    const types: string[] = []
+    releases.forEach((r) => {
+      if (r.type && !types.includes(r.type)) types.push(r.type)
+    })
+    return types
+  }, [releases])
 
   const filtered = useMemo(
     () =>
       releases
-        .filter((r) => !selectedType || r.type === selectedType)
+        .filter((r) => !deferredType || r.type === deferredType)
         .filter((r) => {
-          if (!searchQuery.trim()) return true
-          const q = searchQuery.toLowerCase()
+          if (!deferredSearch.trim()) return true
+          const q = deferredSearch.toLowerCase()
           return r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q)
         }),
-    [releases, selectedType, searchQuery],
+    [releases, deferredSearch, deferredType],
   )
 
   const handleTypeChange = (type: string | null) => {
@@ -115,13 +126,16 @@ export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) 
           )}
         </motion.div>
 
-        {filtered.length === 0 ? (
-          <p className="text-muted-foreground font-mono text-sm py-12 text-center">
-            {dict.noResults}
-          </p>
-        ) : (
-          <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} autoplayMs={autoplayMs} />
-        )}
+        {/* Subtle opacity fade while the deferred filter is still pending */}
+        <div className={`transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}>
+          {filtered.length === 0 ? (
+            <p className="text-muted-foreground font-mono text-sm py-12 text-center">
+              {dict.noResults}
+            </p>
+          ) : (
+            <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} autoplayMs={autoplayMs} />
+          )}
+        </div>
       </div>
     </section>
   )
