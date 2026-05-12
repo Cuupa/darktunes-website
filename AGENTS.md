@@ -81,7 +81,22 @@ Next.js Route Handlers: API endpoints live at `app/api/*/route.ts`. The upload h
 Server-side Supabase Clients: Use `src/lib/supabase/server.ts` (createServerSupabaseClient) in Server Components and Route Handlers. Use `src/lib/supabase/client.ts` (createBrowserSupabaseClient) in Client Components.
 Server Env Validation: Import `src/lib/env.server.ts` in Route Handlers to get Zod-validated server-side environment variables. This module throws at startup if any required server var is missing.
 Next.js Caching: In app/page.tsx, data is fetched using `unstable_cache` with explicit `revalidate: 60` and `tags`. This is required because Next.js 15 no longer caches fetch/GET by default.
+CRITICAL — unstable_cache and Dynamic APIs: In Next.js 15, dynamic APIs such as `cookies()`, `headers()`, and `params` CANNOT be called inside `unstable_cache` callbacks. Any call to `createServerSupabaseClient()` (which calls `cookies()`) inside an `unstable_cache` callback will throw at runtime, causing `.catch(() => null)` guards to silently return null and trigger `notFound()` → 404. ALWAYS use a cookie-free client inside `unstable_cache`: `createClient<Database>(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)`. For public read operations (artists, releases, site settings) the anon key + RLS is sufficient; no session cookie is needed.
 Public vs Admin DAL: The public homepage (app/page.tsx) uses `getPublicArtists()`, `getPublicReleases()`, and `getPublicConcerts()` which filter by `is_visible = TRUE` and cascade that filter via artist linkage. Admin hooks use the unrestricted `getArtists()` / `getReleases()` / `getConcerts()` to see all records including hidden ones.
+
+Detail Page Data API Waterfall
+app/releases/[id]/page.tsx — Data API Waterfall:
+  1. URL segment `id` → UUID of the release
+  2. `getReleaseById(client, id)` → SELECT * FROM releases WHERE id = ? (RLS: anon sees visible releases with visible artists)
+  3. `getDictionary(locale)` → resolved from NEXT_LOCALE cookie / Accept-Language header
+  Steps 2+3 run in parallel via Promise.all. Cookie-free public client used inside unstable_cache (revalidate: 60, tag: 'releases').
+
+app/artists/[slug]/page.tsx — Data API Waterfall:
+  1. URL segment `slug` → artist slug
+  2. `getArtistBySlug(client, slug)` → SELECT * FROM artists WHERE slug = ? (RLS: anon sees visible artists)
+  3. `getReleasesByArtistId` + `getConcertsByArtistId` + `getVideosByArtistId` → three parallel queries using the resolved artist.id
+  4. `getDictionary(locale)` → locale resolution
+  Steps 2+3+4 run concurrently after step 1 resolves. Cookie-free public client used inside unstable_cache (revalidate: 60, tags: artists/releases/concerts/videos).
 
 Inversion of Control (IoC) & Component Contracts
 Props Over State: UI components MUST receive all data and callbacks as props — they must not directly access global state, context, or external stores.
@@ -108,6 +123,21 @@ Every sync run writes a `sync_logs` entry with status 'success', 'partial', or '
 `sync_logs` also records `api_source` (itunes | spotify | discogs | songkick | bandsintown | odesli | all) and `rate_limited` (boolean) per run.
 The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps extends SyncDeps with optional spotify/discogsToken/songkickApiKey/bandsintownAppId). Called by `POST /api/sync`.
 Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs releases using ISRC → barcode/UPC → normalised title + year precedence.
+
+Discogs Artist Enrichment (manual):
+  `src/lib/sync/discogsApi.ts` exports two functions:
+    - `fetchDiscogsArtistReleases(id, token, fetch)` — paginated release list (used by syncAll).
+    - `fetchDiscogsArtistProfile(id, token, fetch)` — fetches artist bio, primary image, and URLs from `GET /artists/{id}`. Token is optional (higher rate limit when provided).
+  `cleanDiscogsMarkup(text)` strips Discogs wiki markup ([a=Name], [l=Label], [url=…][/url], etc.) and is exported for standalone use and testing.
+  Admin route `POST /api/admin/enrich-artist-discogs` (body: `{ discogsId }`) verifies admin/editor role, calls `fetchDiscogsArtistProfile`, and returns `{ name, bio, imageUrl, urls }`. It does NOT write to the DB — the admin UI applies the data via the normal artist update flow.
+  The "Enrich from Discogs" button in `ArtistForm` only fills empty fields (bio, imageUrl) — it never overwrites data the admin has already entered.
+
+Odesli (song.link) Smart Links:
+  `src/lib/sync/odesliApi.ts` exports `resolveOdesliSmartLink(musicUrl, fetch)` which resolves any streaming URL to a universal smart link page.
+  During the full `syncAll` run, Odesli is called for every newly synced release to populate `releases.smart_url`.
+  Admin route `POST /api/admin/resolve-release-smart-link` (body: `{ releaseId }`) lets editors manually resolve the Odesli link for a single release and persists it to `releases.smart_url`.
+  The "Resolve Smart Link" (link icon) button in ReleasesManager triggers this route. The button is disabled when the release has no Spotify or Apple Music URL.
+  On the public release detail page (`app/releases/[id]`), a "Listen Everywhere" button links to `release.smartUrl` when populated (shown first, above platform-specific links).
 
 Centralized Error Handling
 All Next.js Route Handlers MUST be wrapped with `withErrorHandler` from `src/lib/errors.ts`.

@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple } from '@phosphor-icons/react'
 import { useReleases } from '@/hooks/useReleases'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
 import { Button } from '@/components/ui/button'
 import {
@@ -81,11 +82,13 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
 }
 
 export function ReleasesManager() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRelease, setEditingRelease] = useState<Release | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Release | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const [resolvingSmartLinkId, setResolvingSmartLinkId] = useState<string | null>(null)
 
   const formValue = editingRelease ? releaseToFormData(editingRelease) : EMPTY_FORM
 
@@ -137,6 +140,39 @@ export function ReleasesManager() {
       toast.success('Sync completed')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sync failed')
+    }
+  }
+
+  const handleResolveSmartLink = async (release: Release) => {
+    setResolvingSmartLinkId(release.id)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/admin/resolve-release-smart-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ releaseId: release.id }),
+      })
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+
+      const { smartUrl } = (await res.json()) as { smartUrl: string }
+      toast.success(
+        `Smart link resolved for "${release.title}": ${smartUrl.slice(0, 50)}…`,
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resolve smart link')
+    } finally {
+      setResolvingSmartLinkId(null)
     }
   }
 
@@ -227,6 +263,19 @@ export function ReleasesManager() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => void handleResolveSmartLink(release)}
+                      disabled={resolvingSmartLinkId === release.id || (!release.spotifyUrl && !release.appleMusicUrl)}
+                      title={release.smartUrl ? 'Re-resolve Odesli smart link' : 'Resolve Odesli smart link'}
+                    >
+                      <LinkSimple
+                        size={16}
+                        className={resolvingSmartLinkId === release.id ? 'animate-pulse' : ''}
+                        weight={release.smartUrl ? 'fill' : 'regular'}
+                      />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(release)} title="Edit">
                       <PencilSimple size={16} />
                     </Button>

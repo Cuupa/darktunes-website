@@ -98,7 +98,8 @@
   },
   "releaseDetail": {
     "backToReleases": "All Releases",
-    "featured": "Featured"
+    "featured": "Featured",
+    "listenEverywhere": "Listen Everywhere"
   },
   "artistDetail": {
     "backToArtists": "← Back to Artists",

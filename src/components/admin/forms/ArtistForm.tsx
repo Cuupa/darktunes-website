@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ArrowsClockwise } from '@phosphor-icons/react'
+import { ArrowsClockwise, VinylRecord } from '@phosphor-icons/react'
 
 export interface ArtistFormData {
   name: string
@@ -57,6 +57,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   })
   const [isFetchingImage, setIsFetchingImage] = useState(false)
   const [isPrefillingSpotify, setIsPrefillingSpotify] = useState(false)
+  const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -166,6 +167,55 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       toast.error(err instanceof Error ? err.message : 'Failed to prefill from Spotify')
     } finally {
       setIsPrefillingSpotify(false)
+    }
+  }
+
+  const handleEnrichFromDiscogs = async () => {
+    const discogsIdInput = discogsId.trim()
+    if (!discogsIdInput) {
+      toast.error('Enter a Discogs Artist ID first')
+      return
+    }
+
+    setIsEnrichingDiscogs(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const res = await fetch('/api/admin/enrich-artist-discogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ discogsId: discogsIdInput }),
+      })
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+
+      const profile = (await res.json()) as {
+        name: string
+        bio: string | null
+        imageUrl: string | null
+        urls: string[]
+      }
+
+      const current = getValues()
+
+      // Only fill empty fields — never overwrite data the admin has entered
+      if (!(current.bio?.trim() ?? '') && profile.bio) setValue('bio', profile.bio)
+      if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
+
+      toast.success(`Discogs enrichment applied for "${profile.name}"`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to enrich from Discogs')
+    } finally {
+      setIsEnrichingDiscogs(false)
     }
   }
 
@@ -314,12 +364,31 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
           </div>
           <div className="space-y-1">
             <Label htmlFor="discogsId">Discogs Artist ID (optional)</Label>
-            <Input
-              id="discogsId"
-              {...register('discogsId')}
-              placeholder="e.g. 123456"
-              disabled={isLoading}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="discogsId"
+                {...register('discogsId')}
+                placeholder="e.g. 123456"
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => void handleEnrichFromDiscogs()}
+                disabled={isLoading || isEnrichingDiscogs || !discogsId.trim()}
+                title="Enrich bio & image from Discogs"
+              >
+                {isEnrichingDiscogs ? (
+                  <ArrowsClockwise size={14} className="animate-spin" />
+                ) : (
+                  <VinylRecord size={14} />
+                )}
+                <span className="ml-1.5">Enrich from Discogs</span>
+              </Button>
+            </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="songkickId">Songkick Artist ID (optional)</Label>

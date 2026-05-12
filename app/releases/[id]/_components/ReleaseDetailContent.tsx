@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, ArrowLeft, SpotifyLogo, AppleLogo, YoutubeLogo } from '@phosphor-icons/react'
+import { Calendar, ArrowLeft, SpotifyLogo, AppleLogo, YoutubeLogo, LinkSimple } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -22,6 +22,11 @@ interface ReleaseDetailContentProps {
  * Releases grid card, enabling Framer Motion's Shared Layout Animation:
  * the thumbnail seamlessly morphs into the large header image when the
  * user navigates from the grid to this detail page.
+ *
+ * Odesli smart link: if `release.smartUrl` is populated (resolved by the
+ * syncAll pipeline via the Odesli API), a "Listen Everywhere" button is
+ * shown that deep-links to song.link — a universal streaming hub that
+ * redirects the visitor to their preferred platform.
  */
 export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailContentProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
@@ -108,6 +113,15 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
 
               {/* Streaming links */}
               <div className="flex flex-wrap gap-3 pt-2">
+                {/* Odesli smart link — shown first as the universal hub */}
+                {release.smartUrl && (
+                  <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                    <a href={release.smartUrl} target="_blank" rel="noopener noreferrer">
+                      <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
+                      {dict.listenEverywhere}
+                    </a>
+                  </Button>
+                )}
                 {release.spotifyUrl && (
                   <Button asChild size="sm" className="bg-[#1DB954] hover:bg-[#1DB954]/90 text-black font-semibold">
                     <a href={release.spotifyUrl} target="_blank" rel="noopener noreferrer">

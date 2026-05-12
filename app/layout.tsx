@@ -1,16 +1,30 @@
 import type { Metadata } from 'next'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 import { Providers } from './_components/Providers'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { unstable_cache } from 'next/cache'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import './globals.css'
 
+/**
+ * Cookie-free Supabase client — safe to use inside unstable_cache.
+ *
+ * In Next.js 15, dynamic APIs like cookies() cannot be called inside
+ * unstable_cache callbacks.  Site settings are publicly readable (RLS: TRUE),
+ * so the anon key without a session cookie is sufficient.
+ */
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+  )
+}
+
 const getCachedSiteSettings = unstable_cache(
   async () => {
-    const client = await createServerSupabaseClient()
-    return getSiteSettings(client)
+    return getSiteSettings(createPublicSupabaseClient())
   },
   ['site-settings'],
   { revalidate: 60, tags: ['site-settings'] },
