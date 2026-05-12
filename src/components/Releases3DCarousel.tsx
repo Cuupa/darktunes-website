@@ -26,16 +26,17 @@ interface CardSlotStyle {
   zIndex: number
 }
 
-const PERSPECTIVE = 1400 // px
+const PERSPECTIVE = 1600 // px – deeper perspective for a more dramatic coverflow
 
 /**
- * Returns a fluid card width in pixels: 36 vw, clamped between 280 px and 500 px.
- * Falls back to 380 on the server (component is 'use client', so this only runs
+ * Returns a fluid card width in pixels: 40 vw, clamped between 280 px and 720 px.
+ * At 40 vw the centre card occupies ≈ 40 % of the viewport on all screen sizes.
+ * Falls back to 420 on the server (component is 'use client', so this only runs
  * during the very first render before the useEffect fires).
  */
 function computeCardWidth(): number {
-  if (typeof window === 'undefined') return 380
-  return Math.min(500, Math.max(280, Math.round(window.innerWidth * 0.36)))
+  if (typeof window === 'undefined') return 420
+  return Math.min(720, Math.max(280, Math.round(window.innerWidth * 0.40)))
 }
 
 /**
@@ -49,20 +50,21 @@ function slotStyle(offset: number, reduced: boolean, cardWidth: number): CardSlo
   if (reduced) {
     // No rotation / depth for users who prefer reduced motion
     return {
-      translateX: offset * (cardWidth * 0.65),
+      translateX: offset * (cardWidth * 0.68),
       translateZ: 0,
       rotateY: 0,
-      scale: abs === 0 ? 1 : 0.85,
-      opacity: abs === 0 ? 1 : 0.6,
+      scale: abs === 0 ? 1 : 0.72,
+      opacity: abs === 0 ? 1 : 0.5,
       zIndex: 10 - abs,
     }
   }
 
-  const translateX = offset * (cardWidth * 0.62)
-  const rotateY = -offset * 38
-  const translateZ = abs === 0 ? 100 : -abs * 50
-  const scale = 1 - abs * 0.15
-  const opacity = 1 - abs * 0.28
+  // Pronounced coverflow: side cards are noticeably smaller and rotated
+  const translateX = offset * (cardWidth * 0.68)
+  const rotateY = -offset * 44
+  const translateZ = abs === 0 ? 140 : -abs * 100
+  const scale = abs === 0 ? 1 : 1 - abs * 0.28   // 1.0 → 0.72 → 0.44
+  const opacity = abs === 0 ? 1 : 1 - abs * 0.32  // 1.0 → 0.68 → 0.36
   const zIndex = 10 - abs * 2
 
   return { translateX, translateZ, rotateY, scale, opacity, zIndex }
