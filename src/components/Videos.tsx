@@ -21,6 +21,17 @@ interface VideosProps extends SectionProps {
   locale: Locale
 }
 
+// Batched stagger animation — single IntersectionObserver + shared scheduler
+const listVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
+}
+
 export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: VideosProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
@@ -47,15 +58,22 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
-          <ul className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3">
-            {videos.map((video, index) => (
+          {/* data-lenis-prevent: hand off horizontal touch-scroll to the native
+              browser handler so Lenis (vertical) and snap carousel (horizontal)
+              don't fight on mobile. */}
+          <motion.ul
+            className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
+            data-lenis-prevent
+            variants={prefersReducedMotion ? undefined : listVariants}
+            initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
+            whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}
+            viewport={{ once: true }}
+          >
+            {videos.map((video) => (
               <motion.li
                 key={video.id}
                 className="flex-none w-[82vw] snap-start md:w-auto"
-                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
+                variants={prefersReducedMotion ? undefined : itemVariants}
               >
                 <Card className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer">
                   <div 
@@ -66,6 +84,8 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                       src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                       alt={`${video.title} – video thumbnail`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
                     />
                     <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
                       <Button
@@ -95,7 +115,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                 </Card>
               </motion.li>
             ))}
-          </ul>
+          </motion.ul>
         </div>
       </section>
 

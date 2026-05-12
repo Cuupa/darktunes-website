@@ -52,9 +52,9 @@ export function LenisProvider({ children }: LenisProviderProps) {
     <ReactLenis
       root
       options={{
-        duration: 1.2,
+        duration: 0.9,
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-        touchMultiplier: 2,
+        touchMultiplier: 1.5,
         infinite: false,
       }}
     >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ReleasesCoverflow } from '@/components/ReleasesCoverflow'
@@ -29,13 +29,17 @@ export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) 
   // Search
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filtered = releases
-    .filter((r) => !selectedType || r.type === selectedType)
-    .filter((r) => {
-      if (!searchQuery.trim()) return true
-      const q = searchQuery.toLowerCase()
-      return r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q)
-    })
+  const filtered = useMemo(
+    () =>
+      releases
+        .filter((r) => !selectedType || r.type === selectedType)
+        .filter((r) => {
+          if (!searchQuery.trim()) return true
+          const q = searchQuery.toLowerCase()
+          return r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q)
+        }),
+    [releases, selectedType, searchQuery],
+  )
 
   const handleTypeChange = (type: string | null) => {
     setSelectedType(type)
