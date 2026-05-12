@@ -48,7 +48,7 @@ export function AdminDashboard() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 max-w-md px-4">
-          <ToggleRight size={48} className="text-muted-foreground mx-auto" aria-hidden="true" />
+          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label="Feature disabled" />
           <h1 className="text-2xl font-bold">Editor Tools Disabled</h1>
           <p className="text-muted-foreground">
             The Editor Tools feature has been disabled by an administrator. Please contact your admin if you believe this is an error.
@@ -100,7 +100,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full lg:w-auto lg:inline-grid grid-cols-${Math.min(visibleTabCount, 5)} lg:grid-cols-${visibleTabCount}`}>
+          <TabsList className="grid w-full lg:w-auto lg:inline-grid" style={{ gridTemplateColumns: `repeat(${visibleTabCount}, minmax(0, 1fr))` }}>
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" aria-hidden="true" />
               Artists

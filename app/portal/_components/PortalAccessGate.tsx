@@ -1,24 +1,41 @@
 /**
- * app/portal/_components/PortalAccessGate.tsx — Server Component
+ * app/portal/_components/PortalAccessGate.tsx — Client Component
  *
  * Shown to authenticated users who do not have the 'artist' or 'admin' role.
  * Displays a clear explanation and instructions for requesting access.
+ * The "Sign Out" button signs the user out before redirecting to the login page.
  */
 
+'use client'
+
 import Link from 'next/link'
-import { Lock, EnvelopeSimple } from '@phosphor-icons/react/dist/ssr'
+import { useRouter } from 'next/navigation'
+import { Lock, EnvelopeSimple, SignOut } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 interface PortalAccessGateProps {
   role: string
 }
 
 export function PortalAccessGate({ role }: PortalAccessGateProps) {
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    const supabase = createBrowserSupabaseClient()
+    await supabase.auth.signOut()
+    toast.success('Signed out')
+    router.push('/portal/login')
+    router.refresh()
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-6">
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <Lock size={32} className="text-muted-foreground" aria-hidden="true" />
+            <Lock size={32} className="text-muted-foreground" role="img" aria-label="Access restricted" />
           </div>
         </div>
 
@@ -44,24 +61,26 @@ export function PortalAccessGate({ role }: PortalAccessGateProps) {
             <li>Contact the label administrator</li>
             <li>Ask them to assign you the <strong>Artist</strong> role in User Management</li>
             <li>Ask them to link your account to your artist profile</li>
-            <li>Sign out and sign back in once they've made the changes</li>
+            <li>Sign out and sign back in once they&apos;ve made the changes</li>
           </ol>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/contact"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors min-w-[44px] min-h-[44px]"
           >
             <EnvelopeSimple size={16} aria-hidden="true" />
             Contact the Label
           </Link>
-          <Link
-            href="/portal/login"
-            className="inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+          <Button
+            variant="outline"
+            onClick={handleSignOut}
+            className="min-w-[44px] min-h-[44px]"
           >
-            Sign Out &amp; Return
-          </Link>
+            <SignOut size={16} className="mr-2" aria-hidden="true" />
+            Sign Out
+          </Button>
         </div>
       </div>
     </div>
