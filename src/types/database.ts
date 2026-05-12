@@ -63,6 +63,7 @@ export interface Database {
           bandcamp_url: string | null
           shop_url: string | null
           founded_year: number | null
+          is_visible: boolean
           created_at: string
           updated_at: string
         }
@@ -95,6 +96,7 @@ export interface Database {
           bandcamp_url?: string | null
           shop_url?: string | null
           founded_year?: number | null
+          is_visible?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -127,6 +129,7 @@ export interface Database {
           bandcamp_url?: string | null
           shop_url?: string | null
           founded_year?: number | null
+          is_visible?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -265,6 +268,7 @@ export interface Database {
           preview_url: string | null
           smart_url: string | null
           popularity: number | null
+          is_visible: boolean
           created_at: string
           updated_at: string
         }
@@ -289,6 +293,7 @@ export interface Database {
           preview_url?: string | null
           smart_url?: string | null
           popularity?: number | null
+          is_visible?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -313,6 +318,7 @@ export interface Database {
           preview_url?: string | null
           smart_url?: string | null
           popularity?: number | null
+          is_visible?: boolean
           created_at?: string
           updated_at?: string
         }

@@ -18,6 +18,20 @@ export async function getArtists(db: DbClient): Promise<Artist[]> {
   return (data ?? []).map(rowToArtist)
 }
 
+/**
+ * Public-facing query: returns only visible artists.
+ * Used by the public homepage (Server Component). The admin uses getArtists instead.
+ */
+export async function getPublicArtists(db: DbClient): Promise<Artist[]> {
+  const { data, error } = await db
+    .from('artists')
+    .select('*')
+    .eq('is_visible', true)
+    .order('name', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToArtist)
+}
+
 export async function getArtistById(db: DbClient, id: string): Promise<Artist | null> {
   const { data, error } = await db.from('artists').select('*').eq('id', id).single()
   if (error) {

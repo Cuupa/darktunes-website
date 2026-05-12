@@ -29,6 +29,7 @@ function rowToRelease(row: ReleaseRow): Release {
     previewUrl: row.preview_url ?? undefined,
     smartUrl: row.smart_url ?? undefined,
     popularity: row.popularity ?? undefined,
+    isVisible: row.is_visible,
   }
 }
 
@@ -47,6 +48,36 @@ export async function getReleases(db: DbClient): Promise<Release[]> {
     .from('releases')
     .select('*')
     .order('release_date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToRelease)
+}
+
+/**
+ * Public-facing query: returns only visible releases whose artist is also visible.
+ * Used by the public homepage (Server Component). The admin uses getReleases instead.
+ */
+export async function getPublicReleases(db: DbClient): Promise<Release[]> {
+  // Fetch IDs of hidden artists so we can exclude their releases
+  const { data: hiddenArtistRows, error: hiddenErr } = await db
+    .from('artists')
+    .select('id')
+    .eq('is_visible', false)
+  if (hiddenErr) throw new Error(hiddenErr.message)
+
+  const hiddenIds = (hiddenArtistRows ?? []).map((a) => a.id)
+
+  let builder = db
+    .from('releases')
+    .select('*')
+    .eq('is_visible', true)
+    .order('release_date', { ascending: false })
+
+  if (hiddenIds.length > 0) {
+    // Keep releases with no artist OR whose artist is not hidden
+    builder = builder.or(`artist_id.is.null,artist_id.not.in.(${hiddenIds.join(',')})`)
+  }
+
+  const { data, error } = await builder
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToRelease)
 }

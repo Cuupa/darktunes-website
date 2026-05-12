@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
 
@@ -53,6 +54,7 @@ const EMPTY_FORM: ArtistFormData = {
   vatNumber: '',
   featured: false,
   isEuNonGerman: false,
+  isVisible: true,
   notes: '',
   spotifyId: '',
   discogsId: '',
@@ -82,6 +84,7 @@ function artistToFormData(artist: Artist): ArtistFormData {
     vatNumber: artist.vatNumber ?? '',
     featured: artist.featured,
     isEuNonGerman: artist.isEuNonGerman ?? false,
+    isVisible: artist.isVisible,
     notes: artist.notes ?? '',
     spotifyId: artist.spotifyId ?? '',
     discogsId: artist.discogsId ?? '',
@@ -115,6 +118,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     vat_number: data.vatNumber || null,
     featured: data.featured,
     is_eu_non_german: data.isEuNonGerman,
+    is_visible: data.isVisible,
     notes: data.notes || null,
     spotify_id: data.spotifyId || null,
     discogs_id: data.discogsId || null,
@@ -142,6 +146,7 @@ function ArtistSkeletonRows() {
           </TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
           <TableCell />
@@ -260,6 +265,7 @@ export function ArtistsManager() {
             <TableHead>Name</TableHead>
             <TableHead>Genres</TableHead>
             <TableHead>Country</TableHead>
+            <TableHead>Visibility</TableHead>
             <TableHead>Featured</TableHead>
             <TableHead>Last Synced</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -270,7 +276,7 @@ export function ArtistsManager() {
             <ArtistSkeletonRows />
           ) : artists.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 No artists yet. Click "New Artist" to add one.
               </TableCell>
             </TableRow>
@@ -280,6 +286,19 @@ export function ArtistsManager() {
                 <TableCell className="font-medium">{artist.name}</TableCell>
                 <TableCell>{artist.genres.slice(0, 2).join(', ')}</TableCell>
                 <TableCell>{artist.country ?? '—'}</TableCell>
+                <TableCell>
+                  {artist.isVisible ? (
+                    <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30">
+                      <Eye size={12} aria-hidden="true" />
+                      Visible
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 text-muted-foreground border-border">
+                      <EyeSlash size={12} aria-hidden="true" />
+                      Hidden
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   {artist.featured && <Badge variant="secondary">Featured</Badge>}
                 </TableCell>

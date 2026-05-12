@@ -26,6 +26,7 @@ export interface Artist {
   bandsintownId?: string
   lastSyncedAt?: string
   foundedYear?: number
+  isVisible: boolean
 }
 
 export interface SyncLog {
@@ -61,6 +62,7 @@ export interface Release {
   previewUrl?: string
   smartUrl?: string
   popularity?: number
+  isVisible: boolean
 }
 
 export interface NewsPost {

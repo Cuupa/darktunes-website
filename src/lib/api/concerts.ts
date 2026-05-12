@@ -55,3 +55,42 @@ export async function getConcerts(db: DbClient): Promise<Concert[]> {
       return new Date(a.concertDate).getTime() - new Date(b.concertDate).getTime()
     })
 }
+
+/**
+ * Public-facing query: returns only concerts for visible artists.
+ * Used by the public homepage (Server Component). The admin uses getConcerts instead.
+ */
+export async function getPublicConcerts(db: DbClient): Promise<Concert[]> {
+  const today = new Date().toISOString().split('T')[0]
+
+  // Fetch IDs of hidden artists to exclude their concerts
+  const { data: hiddenArtistRows, error: hiddenErr } = await db
+    .from('artists')
+    .select('id')
+    .eq('is_visible', false)
+  if (hiddenErr) throw new Error(hiddenErr.message)
+
+  const hiddenIds = (hiddenArtistRows ?? []).map((a) => a.id)
+
+  let builder = db
+    .from('concerts')
+    .select('*')
+    .gte('concert_date', today)
+    .order('concert_date', { ascending: true })
+
+  if (hiddenIds.length > 0) {
+    builder = builder.or(`artist_id.is.null,artist_id.not.in.(${hiddenIds.join(',')})`)
+  }
+
+  const { data, error } = await builder
+  if (error) throw new Error(error.message)
+
+  return (data ?? [])
+    .map(rowToConcert)
+    .sort((a, b) => {
+      const aPriority = a.status === 'ok' ? 0 : 1
+      const bPriority = b.status === 'ok' ? 0 : 1
+      if (aPriority !== bPriority) return aPriority - bPriority
+      return new Date(a.concertDate).getTime() - new Date(b.concertDate).getTime()
+    })
+}

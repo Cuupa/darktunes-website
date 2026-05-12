@@ -137,6 +137,8 @@ CREATE TABLE IF NOT EXISTS public.artists (
   last_synced_at   TIMESTAMPTZ,
   -- Multi-tenant Artist Portal (Bug 2 fix — was missing from initial schema)
   user_id          UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  -- Visibility toggle: FALSE hides the artist (and all their releases/concerts) from public
+  is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -154,9 +156,11 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
+CREATE INDEX IF NOT EXISTS idx_artists_visible  ON public.artists (is_visible);
 CREATE UNIQUE INDEX IF NOT EXISTS artists_user_id_key
   ON public.artists (user_id) WHERE user_id IS NOT NULL;
 
@@ -171,7 +175,7 @@ CREATE TRIGGER trg_artists_updated_at
 CREATE TABLE IF NOT EXISTS public.releases (
   id              UUID                PRIMARY KEY DEFAULT uuid_generate_v4(),
   title           TEXT                NOT NULL,
-  artist_id       UUID                REFERENCES public.artists (id) ON DELETE SET NULL,
+  artist_id       UUID                REFERENCES public.artists (id) ON DELETE CASCADE,
   artist_name     TEXT                NOT NULL,
   release_date    DATE                NOT NULL,
   cover_art       TEXT,
@@ -190,6 +194,8 @@ CREATE TABLE IF NOT EXISTS public.releases (
   preview_url     TEXT,
   smart_url       TEXT,
   popularity      INTEGER,
+  -- Visibility toggle: FALSE hides the release from public
+  is_visible      BOOLEAN             NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
@@ -202,11 +208,17 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS catalog_number TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS preview_url    TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
+-- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
+ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
+ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
+  FOREIGN KEY (artist_id) REFERENCES public.artists (id) ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_releases_artist_id    ON public.releases (artist_id);
 CREATE INDEX IF NOT EXISTS idx_releases_release_date ON public.releases (release_date DESC);
 CREATE INDEX IF NOT EXISTS idx_releases_featured     ON public.releases (featured);
 CREATE INDEX IF NOT EXISTS idx_releases_itunes_id    ON public.releases (itunes_id);
+CREATE INDEX IF NOT EXISTS idx_releases_visible      ON public.releases (is_visible);
 CREATE UNIQUE INDEX IF NOT EXISTS releases_spotify_id_key
   ON public.releases (spotify_id) WHERE spotify_id IS NOT NULL;
 
@@ -590,14 +602,19 @@ CREATE POLICY "profiles: admin read all" ON public.profiles
 -- ---------------------------------------------------------------------------
 -- RLS: artists
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "artists: public read"       ON public.artists;
-DROP POLICY IF EXISTS "artists: editor+ insert"    ON public.artists;
-DROP POLICY IF EXISTS "artists: editor+ update"    ON public.artists;
-DROP POLICY IF EXISTS "artists: admin delete"      ON public.artists;
-DROP POLICY IF EXISTS "artists: own artist update" ON public.artists;
+DROP POLICY IF EXISTS "artists: public read"         ON public.artists;
+DROP POLICY IF EXISTS "artists: public read visible" ON public.artists;
+DROP POLICY IF EXISTS "artists: editor+ insert"      ON public.artists;
+DROP POLICY IF EXISTS "artists: editor+ update"      ON public.artists;
+DROP POLICY IF EXISTS "artists: admin delete"        ON public.artists;
+DROP POLICY IF EXISTS "artists: own artist update"   ON public.artists;
 
-CREATE POLICY "artists: public read" ON public.artists
-  FOR SELECT USING (TRUE);
+-- Anonymous users only see visible artists; admins/editors see all
+CREATE POLICY "artists: public read visible" ON public.artists
+  FOR SELECT USING (
+    is_visible = TRUE
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 
 CREATE POLICY "artists: editor+ insert" ON public.artists
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
@@ -615,13 +632,28 @@ CREATE POLICY "artists: own artist update" ON public.artists
 -- ---------------------------------------------------------------------------
 -- RLS: releases
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "releases: public read"    ON public.releases;
-DROP POLICY IF EXISTS "releases: editor+ insert" ON public.releases;
-DROP POLICY IF EXISTS "releases: editor+ update" ON public.releases;
-DROP POLICY IF EXISTS "releases: admin delete"   ON public.releases;
+DROP POLICY IF EXISTS "releases: public read"         ON public.releases;
+DROP POLICY IF EXISTS "releases: public read visible" ON public.releases;
+DROP POLICY IF EXISTS "releases: editor+ insert"      ON public.releases;
+DROP POLICY IF EXISTS "releases: editor+ update"      ON public.releases;
+DROP POLICY IF EXISTS "releases: admin delete"        ON public.releases;
 
-CREATE POLICY "releases: public read" ON public.releases
-  FOR SELECT USING (TRUE);
+-- Anonymous users only see visible releases whose artist is also visible;
+-- admins/editors see all releases regardless of visibility.
+CREATE POLICY "releases: public read visible" ON public.releases
+  FOR SELECT USING (
+    (
+      is_visible = TRUE
+      AND (
+        artist_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM public.artists a
+          WHERE a.id = artist_id AND a.is_visible = TRUE
+        )
+      )
+    )
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 
 CREATE POLICY "releases: editor+ insert" ON public.releases
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
@@ -717,9 +749,18 @@ DROP POLICY IF EXISTS "Allow authenticated reads on concerts" ON public.concerts
 DROP POLICY IF EXISTS "Allow admin inserts on concerts"       ON public.concerts;
 DROP POLICY IF EXISTS "Allow admin updates on concerts"       ON public.concerts;
 DROP POLICY IF EXISTS "Allow admin deletes on concerts"       ON public.concerts;
+DROP POLICY IF EXISTS "concerts: public read visible"         ON public.concerts;
 
-CREATE POLICY "Allow authenticated reads on concerts" ON public.concerts
-  FOR SELECT USING (TRUE);
+-- Anonymous users only see concerts for visible artists; admins/editors see all
+CREATE POLICY "concerts: public read visible" ON public.concerts
+  FOR SELECT USING (
+    artist_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id AND a.is_visible = TRUE
+    )
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 
 CREATE POLICY "Allow admin inserts on concerts" ON public.concerts
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
