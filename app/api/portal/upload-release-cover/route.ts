@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { randomUUID } from 'crypto'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { createR2Client } from '@/lib/r2Utils'
+
+async function uploadCoverToR2(
+  file: File,
+  artistId: string,
+  s3: S3Client,
+  bucket: string,
+  r2PublicUrl: string,
+): Promise<string> {
+  const contentType = file.type || 'image/jpeg'
+  const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg'
+  const key = `release-covers/${artistId}/${randomUUID()}.${ext}`
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      ContentLength: buffer.length,
+    }),
+  )
+
+  return `${r2PublicUrl.replace(/\/$/, '')}/${key}`
+}
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const token = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) throw new ApiError(401, 'Missing authorization token')
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
+
+  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+
+  const artist = await getArtistByUserId(supabase, user.id)
+  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+
+  const formData = await req.formData()
+  const file = formData.get('file')
+  if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
+
+  const maxBytes = 5 * 1024 * 1024
+  if (file.size > maxBytes) throw new ApiError(413, 'File too large (max 5 MB)')
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP')
+  }
+
+  const { serverEnv } = await import('@/lib/env.server')
+  const s3 = createR2Client(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+
+  const url = await uploadCoverToR2(
+    file,
+    artist.id,
+    s3,
+    serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+    serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
+  )
+
+  return NextResponse.json({ url })
+})

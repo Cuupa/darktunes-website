@@ -20,7 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DownloadSimple, Spinner } from '@phosphor-icons/react'
+import { DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
+import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { getStatementPresignedUrl } from '../_actions/presignedUrl'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
@@ -64,11 +65,11 @@ export function StatementsTable({ dict, statements }: StatementsTableProps) {
       <h1 className="text-3xl font-bold">{dict.statements_heading}</h1>
 
       {statements.length === 0 ? (
-        <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">{dict.statements_noData}</p>
-          </CardContent>
-        </Card>
+        <PortalEmptyState
+          icon={FileText}
+          heading={dict.statements_noData}
+          description={dict.statements_heading}
+        />
       ) : (
         <Card className="bg-card border-border">
           <CardHeader>

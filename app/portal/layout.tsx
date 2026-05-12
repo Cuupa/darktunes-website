@@ -68,7 +68,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   const unreadMessages = unreadMessagesResult.count ?? 0
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
       <PortalSidebar
         dict={dict.portal}
         artistName={artist?.name ?? null}
@@ -77,7 +77,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
         featureFlags={featureFlags}
         unreadMessages={unreadMessages}
       />
-      <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">{children}</main>
+      <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t border-primary/10">{children}</main>
     </div>
   )
 }

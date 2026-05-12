@@ -97,6 +97,14 @@ export interface LabelMessage {
   sentAt: string
 }
 
+export interface ArtistReply {
+  id: string
+  messageId: string
+  artistId: string
+  body: string
+  sentAt: string
+}
+
 export interface JournalistDownload {
   id: string
   journalistId: string
@@ -145,6 +153,19 @@ export interface Asset {
   r2Key: string
   publicUrl: string
   uploadedBy?: string
+  createdAt: string
+}
+
+export interface ArtistAsset {
+  id: string
+  artistId: string
+  filename: string
+  originalFilename: string
+  mimeType: string
+  sizeBytes: number
+  r2Key: string
+  publicUrl: string
+  label?: string
   createdAt: string
 }
 

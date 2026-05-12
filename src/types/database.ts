@@ -759,6 +759,69 @@ export interface Database {
         }
         Relationships: []
       }
+      artist_replies: {
+        Row: {
+          id: string
+          message_id: string
+          artist_id: string
+          body: string
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          artist_id: string
+          body: string
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          artist_id?: string
+          body?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
+      artist_assets: {
+        Row: {
+          id: string
+          artist_id: string
+          filename: string
+          original_filename: string
+          mime_type: string
+          size_bytes: number
+          r2_key: string
+          public_url: string
+          label: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          filename: string
+          original_filename: string
+          mime_type: string
+          size_bytes: number
+          r2_key: string
+          public_url: string
+          label?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          filename?: string
+          original_filename?: string
+          mime_type?: string
+          size_bytes?: number
+          r2_key?: string
+          public_url?: string
+          label?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       journalist_downloads: {
         Row: {
           id: string

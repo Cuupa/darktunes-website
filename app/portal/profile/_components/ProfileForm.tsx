@@ -25,6 +25,7 @@ import { Camera, FloppyDisk, Eye } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Dictionary } from '@/i18n/types'
+import { EPKPreview } from './EPKPreview'
 
 // ---------------------------------------------------------------------------
 // Zod schema
@@ -52,6 +53,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>
 interface ProfileFormProps {
   dict: Dictionary['portal']
   artistId: string | null
+  artistName: string | null
   artistSlug: string | null
   initialProfile: ArtistProfile | null
 }
@@ -60,7 +62,7 @@ interface ProfileFormProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, artistId, artistSlug, initialProfile }: ProfileFormProps) {
+export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormProps) {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -193,18 +195,23 @@ export function ProfileForm({ dict, artistId, artistSlug, initialProfile }: Prof
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
-        {artistSlug && (
-          <Link
-            href={`/artists/${artistSlug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-            aria-label="Preview your public artist profile in a new tab"
-          >
-            <Eye size={15} aria-hidden="true" />
-            Preview Public Profile
-          </Link>
-        )}
+        <div className="no-print flex items-center gap-2">
+          <Button type="button" variant="outline" onClick={() => window.print()}>
+            {dict.profile_download_epk}
+          </Button>
+          {artistSlug && (
+            <Link
+              href={`/artists/${artistSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              aria-label="Preview your public artist profile in a new tab"
+            >
+              <Eye size={15} aria-hidden="true" />
+              Preview Public Profile
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Photo upload */}
@@ -361,6 +368,21 @@ export function ProfileForm({ dict, artistId, artistSlug, initialProfile }: Prof
           </form>
         </CardContent>
       </Card>
+
+      <EPKPreview
+        dict={dict}
+        artistName={artistName ?? 'Artist'}
+        photoUrl={photoUrl}
+        bioShort={form.watch('bio_short')}
+        bioMedium={form.watch('bio_medium')}
+        bioLong={form.watch('bio_long')}
+        pressQuote={form.watch('press_quote')}
+        genres={form.watch('genres')}
+        websiteUrl={form.watch('website_url')}
+        instagramUrl={form.watch('instagram_url')}
+        youtubeUrl={form.watch('youtube_url')}
+        bandcampUrl={form.watch('bandcamp_url')}
+      />
     </div>
   )
 }

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { MapPin } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import {
   Select,
   SelectContent,
@@ -26,6 +28,7 @@ type Status = 'announced' | 'confirmed' | 'cancelled'
 
 export function TourList({ dict, concerts, artistId }: TourListProps) {
   const [items, setItems] = useState(concerts)
+  const eventInputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<Status>('announced')
   const [form, setForm] = useState({
     eventName: '',
@@ -97,7 +100,7 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
       <form onSubmit={submit} className="rounded-lg border border-border p-4 grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="tour-event">Event</Label>
-          <Input id="tour-event" value={form.eventName} onChange={(e) => setForm((v) => ({ ...v, eventName: e.target.value }))} required />
+          <Input id="tour-event" ref={eventInputRef} value={form.eventName} onChange={(e) => setForm((v) => ({ ...v, eventName: e.target.value }))} required />
         </div>
         <div className="space-y-1">
           <Label htmlFor="tour-date">Date</Label>
@@ -136,7 +139,14 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
             </Button>
           </div>
         ))}
-        {items.length === 0 && <p className="text-sm text-muted-foreground">{dict.tour_noData}</p>}
+        {items.length === 0 && (
+          <PortalEmptyState
+            icon={MapPin}
+            heading={dict.tour_noData}
+            description="No tour dates yet."
+            action={{ label: '+ Add Date', onClick: () => eventInputRef.current?.focus() }}
+          />
+        )}
       </div>
     </div>
   )
