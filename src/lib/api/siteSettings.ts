@@ -40,6 +40,7 @@ const DEFAULTS: SiteSettings = {
   vignetteIntensity: 0.5,
   shopifyStoreUrl: '',
   youtubeChannelId: '',
+  carouselAutoplayMs: 0,
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -97,6 +98,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     vignetteIntensity: parseFloat(map['vignette_intensity'] ?? '') || DEFAULTS.vignetteIntensity,
     shopifyStoreUrl: map['shopify_store_url'] ?? DEFAULTS.shopifyStoreUrl,
     youtubeChannelId: map['youtube_channel_id'] ?? DEFAULTS.youtubeChannelId,
+    carouselAutoplayMs: parseInt(map['carousel_autoplay_ms'] ?? '0', 10) || 0,
   }
 }
 

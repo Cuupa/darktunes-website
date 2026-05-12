@@ -59,6 +59,7 @@ const schema = z.object({
   noiseOpacity: z.number().min(0).max(1).default(0.04),
   crtScanlinesEnabled: z.boolean().default(true),
   vignetteIntensity: z.number().min(0).max(1).default(0.5),
+  carouselAutoplayMs: z.number().int().min(0).default(0),
 })
 
 type FormData = z.infer<typeof schema>
@@ -355,6 +356,21 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   <p className="text-xs text-destructive">{errors.spotifyPlaylists.message}</p>
                 )}
               </div>
+
+              <Field id="carouselAutoplayMs" label="Carousel Auto-Advance (ms)">
+                <Input
+                  id="carouselAutoplayMs"
+                  type="number"
+                  min={0}
+                  step={500}
+                  {...register('carouselAutoplayMs', { valueAsNumber: true })}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Milliseconds between automatic slide advances. 0 = disabled (recommended default).
+                  E.g. 5000 = 5 seconds.
+                </p>
+              </Field>
             </CardContent>
           </Card>
         </TabsContent>

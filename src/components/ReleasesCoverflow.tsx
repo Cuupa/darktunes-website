@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import type { EmblaCarouselType } from 'embla-carousel'
 import Link from 'next/link'
@@ -15,6 +15,7 @@ export interface ReleasesCoverflowProps {
   releases: Release[]
   dict: Dictionary['releases']
   locale: Locale
+  autoplayMs?: number
 }
 
 /**
@@ -89,7 +90,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  * - `overflow-hidden` is on the Embla viewport (clips card edges only).
  * - `transform-style: preserve-3d` is on each slide's inner content wrapper.
  */
-export function ReleasesCoverflow({ releases, dict, locale }: ReleasesCoverflowProps) {
+export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
@@ -131,6 +132,16 @@ export function ReleasesCoverflow({ releases, dict, locale }: ReleasesCoverflowP
   const handlePrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi])
   const handleNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi])
 
+  const isPaused = useRef(false)
+
+  useEffect(() => {
+    if (!emblaApi || (autoplayMs ?? 0) <= 0 || prefersReducedMotion || total <= 1) return
+    const id = setInterval(() => {
+      if (!isPaused.current) emblaApi.scrollNext()
+    }, autoplayMs)
+    return () => clearInterval(id)
+  }, [emblaApi, autoplayMs, prefersReducedMotion, total])
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowLeft') handlePrev()
@@ -150,6 +161,10 @@ export function ReleasesCoverflow({ releases, dict, locale }: ReleasesCoverflowP
       aria-label="Releases coverflow"
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onMouseEnter={() => { isPaused.current = true }}
+      onMouseLeave={() => { isPaused.current = false }}
+      onFocus={() => { isPaused.current = true }}
+      onBlur={() => { isPaused.current = false }}
     >
       {/* ── 3D Stage ───────────────────────────────────────────────────────── */}
       {/*

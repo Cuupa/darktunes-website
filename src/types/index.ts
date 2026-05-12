@@ -152,6 +152,8 @@ export interface SiteSettings {
   shopifyStoreUrl: string
   /** YouTube channel ID for video sync. */
   youtubeChannelId: string
+  /** Auto-advance interval for the releases carousel in ms. 0 = disabled. Default 0. */
+  carouselAutoplayMs: number
 }
 
 export interface Concert {

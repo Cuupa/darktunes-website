@@ -63,6 +63,7 @@ export default async function ImpressumPage() {
         vignetteIntensity: 0.5,
         shopifyStoreUrl: '',
         youtubeChannelId: '',
+        carouselAutoplayMs: 0,
       }),
     ),
     getLocale(),

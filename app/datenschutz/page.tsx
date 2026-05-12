@@ -66,6 +66,7 @@ export default async function DatenschutzPage() {
         vignetteIntensity: 0.5,
         shopifyStoreUrl: '',
         youtubeChannelId: '',
+        carouselAutoplayMs: 0,
       }),
     ),
     getLocale(),

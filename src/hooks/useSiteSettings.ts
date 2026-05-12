@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   vignetteIntensity: 0.5,
   shopifyStoreUrl: '',
   youtubeChannelId: '',
+  carouselAutoplayMs: 0,
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -76,6 +77,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     vignette_intensity: String(s.vignetteIntensity),
     shopify_store_url: s.shopifyStoreUrl,
     youtube_channel_id: s.youtubeChannelId,
+    carousel_autoplay_ms: String(s.carouselAutoplayMs ?? 0),
   }
 }
 
