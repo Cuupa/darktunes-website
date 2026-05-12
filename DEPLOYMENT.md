@@ -166,6 +166,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 ### YouTube Video Sync (optional — sync channel videos)
 - `YOUTUBE_API_KEY`: Google Cloud API key with YouTube Data API v3 enabled. See https://console.developers.google.com → Enable YouTube Data API v3.
 - `YOUTUBE_CHANNEL_ID`: Your YouTube channel ID (starts with `UC`). Used by `POST /api/sync-youtube` to fetch and upsert the latest videos.
+- `CRON_SECRET`: Optional Bearer token for Vercel cron calls to `POST /api/sync-youtube`. If set, cron requests must send `Authorization: Bearer <CRON_SECRET>`.
 
 ### Newsletter Double Opt-In (optional — confirmation email delivery)
 The following vars are consumed by the **Supabase Edge Function** (`newsletter-confirm`), NOT by the Next.js app. Set them as Edge Function secrets in Supabase Dashboard → Edge Functions → Secrets.

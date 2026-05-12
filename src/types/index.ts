@@ -79,6 +79,7 @@ export interface Video {
   id: string
   title: string
   artistName: string
+  artistId?: string
   youtubeId: string
   thumbnailUrl: string
   publishedAt: string

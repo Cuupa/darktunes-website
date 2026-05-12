@@ -14,6 +14,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **Smooth scrolling** – powered by Lenis
 - **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets; Artist Auto-Sync; Skeleton loading)
 - **Artist Auto-Sync** – "Sync Now" per artist triggers iTunes release import, R2 cover art caching, and Supabase upsert
+- **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; Vercel cron can trigger daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
 - **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
 - **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware for `/admin/*` and `/portal/*`
@@ -106,6 +107,7 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `BANDSINTOWN_APP_ID` | Bandsintown app_id / API key (sync tour dates by Bandsintown artist name) |
 | `YOUTUBE_API_KEY` | Google API key with YouTube Data API v3 (sync videos via `POST /api/sync-youtube`) |
 | `YOUTUBE_CHANNEL_ID` | YouTube channel ID (starts with `UC`) |
+| `CRON_SECRET` | Optional secret for Vercel cron requests to `POST /api/sync-youtube` (Bearer token) |
 | `CONTACT_EMAIL` | Email address for contact form submissions (defaults to `info@darktunes.com`) |
 
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.

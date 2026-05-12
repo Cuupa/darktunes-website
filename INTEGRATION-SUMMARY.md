@@ -177,7 +177,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Contact page + API route | ✅ Implemented | `/contact` RSC with SubmitHub link; `POST /api/contact` (Zod, honeypot, Resend delivery); `CONTACT_EMAIL` env var |
 | SubmitHub link | ✅ Implemented | Footer → "Submit Your Music" link + Contact page SubmitHub section |
 | Shopify/Darkmerch shop link | ✅ Implemented | `shopifyStoreUrl` in `SiteSettings` (`site_settings` KV key `shopify_store_url`); conditional display in Footer |
-| YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID` |
+| YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID`, supports daily Vercel cron and maps videos to artists via `videos.artist_id` title matching |
 | ContentPagination component | ✅ Implemented | `src/components/ContentPagination.tsx` — reusable shadcn-based paginator with ellipsis support |
 
 ---
@@ -227,7 +227,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
 | `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |
 | `app/api/webhooks/sos/confirm/route.ts` | SOS webhook Step 2 — insert sales_statements DB record |
-| `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (requires YOUTUBE_API_KEY + YOUTUBE_CHANNEL_ID) |
+| `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (admin bearer token or Vercel cron; optional `CRON_SECRET` check), upserts `artist_id` by case-insensitive title match against visible artists |
 | `src/lib/api/youtubeApi.ts` | YouTube Data API v3 utility — `fetchYouTubeChannelVideos(channelId, apiKey, maxResults)` |
 | `app/news/page.tsx` | Public news list RSC — paginated via ContentPagination |
 | `app/news/[slug]/page.tsx` | Public news detail RSC — `getNewsPostBySlug` DAL |

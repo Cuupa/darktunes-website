@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getVideos, createVideo, updateVideo, deleteVideo } from './videos'
+import { getVideos, createVideo, updateVideo, deleteVideo, getVideosByArtistId } from './videos'
 
 type DbClient = SupabaseClient<Database>
 type VideoRow = Database['public']['Tables']['videos']['Row']
@@ -32,6 +32,7 @@ const mockVideoRow: VideoRow = {
   id: 'vid-001',
   title: 'Monsters (Official Music Video)',
   artist_name: 'BLACKBOOK',
+  artist_id: 'artist-001',
   youtube_id: 'Bx51eegLTY8',
   thumbnail_url: 'https://img.youtube.com/vi/Bx51eegLTY8/maxresdefault.jpg',
   published_at: '2024-04-24T00:00:00Z',
@@ -53,11 +54,26 @@ describe('getVideos', () => {
     expect(result[0].title).toBe('Monsters (Official Music Video)')
     expect(result[0].youtubeId).toBe('Bx51eegLTY8')
     expect(result[0].artistName).toBe('BLACKBOOK')
+    expect(result[0].artistId).toBe('artist-001')
   })
 
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Query error', code: 'PGRST001' })
     await expect(getVideos(db)).rejects.toThrow('Query error')
+  })
+})
+
+describe('getVideosByArtistId', () => {
+  it('returns videos filtered by artist id', async () => {
+    const db = makeMockDb([mockVideoRow])
+    const result = await getVideosByArtistId(db, 'artist-001')
+    expect(result).toHaveLength(1)
+    expect(result[0].artistId).toBe('artist-001')
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Artist query failed', code: 'PGRST001' })
+    await expect(getVideosByArtistId(db, 'artist-001')).rejects.toThrow('Artist query failed')
   })
 })
 

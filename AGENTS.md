@@ -159,6 +159,7 @@ Apply migrations to Supabase cloud: npm run db:push (requires Supabase CLI and s
 Generate a diff between local and remote schema: npm run db:diff.
 Migration naming: use UTC timestamp prefix, e.g. 20240601120000_add_artist_bandcamp_url.sql.
 Visibility & Cascading Deletes: `artists.is_visible` and `releases.is_visible` (both BOOLEAN DEFAULT TRUE) control public visibility. `releases.artist_id` uses `ON DELETE CASCADE` so deleting an artist removes all their releases automatically. RLS policies enforce visibility at the DB level for the public role; the DAL public functions (`getPublicArtists`, `getPublicReleases`, `getPublicConcerts`) enforce it additionally at the application layer.
+Video ownership: `videos.artist_id UUID REFERENCES artists(id) ON DELETE SET NULL` links synced label-channel videos to artists. Artist profile pages fetch videos via `getVideosByArtistId()`; when no match exists, `artist_id` remains NULL and the homepage still shows latest videos globally.
 
 Artist Portal (Multi-Tenant)
 The Artist Portal lives at `/portal/*` — a secure dashboard for the label's bands.
@@ -197,6 +198,8 @@ Required env vars are split into two groups:
   - Optional (external API sync — required for Spotify / Discogs / Songkick artist sync):
       SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
       DISCOGS_TOKEN, SONGKICK_API_KEY
+  - Optional (YouTube sync):
+      YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID, CRON_SECRET
   - Optional (SOS webhook — required for receiving PDF statements from the SOS generator):
       SOS_WEBHOOK_SECRET
   - Optional (Newsletter DOI — required for sending Double Opt-In confirmation emails):
