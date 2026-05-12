@@ -65,17 +65,17 @@ export interface BandsintownConcert {
  * Fetches upcoming events for the given Bandsintown artist identifier.
  *
  * @param artistId  - The artist name or "id:{numeric_id}" as stored in artists.bandsintown_id
- * @param appId     - Bandsintown app_id (API key)
+ * @param apiKey    - Bandsintown API key (sent as app_id query param)
  * @param fetchFn   - Injectable fetch (real in prod, mockable in tests)
  */
 export async function fetchBandsintownArtistEvents(
   artistId: string,
-  appId: string,
+  apiKey: string,
   fetchFn: typeof fetch,
 ): Promise<BandsintownConcert[]> {
   const encoded = encodeURIComponent(artistId)
   const url = new URL(`https://rest.bandsintown.com/artists/${encoded}/events`)
-  url.searchParams.set('app_id', appId)
+  url.searchParams.set('app_id', apiKey)
   url.searchParams.set('date', 'upcoming')
 
   const response = await fetchFn(url.toString())

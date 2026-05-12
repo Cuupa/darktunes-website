@@ -89,7 +89,7 @@
 - `VideoForm` — youtubeId with auto-thumbnail generation
 
 ### Multi-API Sync Engine (`src/lib/sync/`)
-- **`syncAll.ts`** — Multi-artist, multi-API orchestrator. Runs iTunes, Spotify, Discogs, Songkick, Bandsintown, and Odesli sync for every artist. Accepts `SyncAllDeps` (extends `SyncDeps` with optional `spotify`, `discogsToken`, `songkickApiKey`, `bandsintownAppId`). Never throws — errors captured per-API in `SyncAllResult`.
+- **`syncAll.ts`** — Multi-artist, multi-API orchestrator. Runs iTunes, Spotify, Discogs, Songkick, Bandsintown, and Odesli sync for every artist. Accepts `SyncAllDeps` (extends `SyncDeps` with optional `spotify`, `discogsToken`, `songkickApiKey`, `bandsintownApiKey`). Never throws — errors captured per-API in `SyncAllResult`.
 - **`spotifyApi.ts`** — Fetches artist albums via Spotify Web API (client credentials flow). Returns `SpotifyRelease[]` with cover art URLs, popularity scores, and UPC barcodes.
 - **`discogsApi.ts`** — Fetches physical releases from Discogs API (Personal Access Token). Paginated. Returns catalog numbers and barcodes.
 - **`songkickApi.ts`** — Fetches upcoming concerts from Songkick API. Paginated. Returns `SongkickConcert[]` with venue, city, country, date, and ticket URL.

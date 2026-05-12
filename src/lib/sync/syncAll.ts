@@ -42,8 +42,8 @@ export interface SyncAllDeps extends SyncDeps {
   discogsToken?: string
   /** Songkick API key — undefined means Songkick sync is skipped */
   songkickApiKey?: string
-  /** Bandsintown app_id — undefined means Bandsintown sync is skipped */
-  bandsintownAppId?: string
+  /** Bandsintown API key — undefined means Bandsintown sync is skipped */
+  bandsintownApiKey?: string
 }
 
 export interface ApiSyncResult {
@@ -69,7 +69,7 @@ export interface SyncAllResult {
  * Returns a consolidated result — never throws.
  */
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
-  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownAppId } = deps
+  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey } = deps
   const results: ApiSyncResult[] = []
 
   // 1. Fetch all artists
@@ -368,7 +368,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   }
 
   // 5. Bandsintown sync — upcoming concerts (second source)
-  if (bandsintownAppId) {
+  if (bandsintownApiKey) {
     const bandsintownResult: ApiSyncResult = {
       api: 'bandsintown',
       artistsProcessed: 0,
@@ -384,7 +384,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
       try {
         const concerts = await withExponentialBackoff(() =>
-          fetchBandsintownArtistEvents(artist.bandsintown_id!, bandsintownAppId, fetchFn),
+          fetchBandsintownArtistEvents(artist.bandsintown_id!, bandsintownApiKey, fetchFn),
         )
 
         for (const concert of concerts) {

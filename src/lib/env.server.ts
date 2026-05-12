@@ -57,6 +57,11 @@ const serverEnvSchema = z.object({
     .string()
     .optional()
     .describe('Songkick API key — leave blank to disable Songkick sync'),
+  /** Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access) */
+  BANDSINTOWN_API_KEY: z
+    .string()
+    .optional()
+    .describe('Bandsintown API key — leave blank to disable Bandsintown sync'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -75,6 +80,7 @@ function validateServerEnv(): ServerEnv {
     SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
     DISCOGS_TOKEN: process.env.DISCOGS_TOKEN,
     SONGKICK_API_KEY: process.env.SONGKICK_API_KEY,
+    BANDSINTOWN_API_KEY: process.env.BANDSINTOWN_API_KEY,
   })
 
   if (!result.success) {
