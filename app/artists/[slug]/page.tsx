@@ -3,12 +3,31 @@
  *
  * Fetches artist by slug + their releases and concerts server-side.
  * Uses unstable_cache for ISR with 60-second revalidation.
+ *
+ * ── Data API Waterfall ──────────────────────────────────────────────────────
+ * 1. `params.slug`              → URL slug of the artist
+ * 2. `getArtistBySlug`          → SELECT * FROM artists WHERE slug = ?
+ *                                 (RLS: only visible artists returned to anon)
+ * 3. `getReleasesByArtistId`    → SELECT * FROM releases WHERE artist_id = ?
+ *                                 ordered by release_date DESC
+ *    `getConcertsByArtistId`    → SELECT * FROM concerts WHERE artist_id = ?
+ *                                 filtered to future dates, ordered by date ASC
+ *    `getVideosByArtistId`      → SELECT * FROM videos WHERE artist_id = ?
+ *                                 ordered by published_at DESC
+ * 4. Dictionary                 → resolved from NEXT_LOCALE cookie / Accept-Language
+ *
+ * Steps 3 + 4 run in parallel via Promise.all after step 2 resolves.
+ * The Supabase queries use a cookie-free public client (anon key) so they can
+ * be safely cached by unstable_cache without hitting Next.js 15's
+ * "cookies() not available inside unstable_cache" restriction.
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 import { getArtistBySlug } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
@@ -20,10 +39,24 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
+/**
+ * Cookie-free Supabase client — safe to use inside unstable_cache.
+ *
+ * In Next.js 15, dynamic APIs like cookies() cannot be called inside
+ * unstable_cache callbacks.  For public read operations the anon key with
+ * RLS is sufficient; no session cookie is required.
+ */
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+  )
+}
+
 function makeGetArtistData(slug: string) {
   return unstable_cache(
     async () => {
-      const client = await createServerSupabaseClient()
+      const client = createPublicSupabaseClient()
       const artist = await getArtistBySlug(client, slug)
       if (!artist) return null
       const [releases, concerts, videos] = await Promise.all([

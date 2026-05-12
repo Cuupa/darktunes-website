@@ -3,8 +3,10 @@
  *
  * Discogs API integration.
  *
- * Fetches physical releases (Vinyl/CD) for a given Discogs artist ID,
- * including catalog numbers and barcodes for deduplication.
+ * - `fetchDiscogsArtistProfile`: fetches bio, images and URLs for an artist.
+ * - `fetchDiscogsArtistReleases`: fetches physical releases (Vinyl/CD) for
+ *   a given Discogs artist ID, including catalog numbers and barcodes for
+ *   deduplication.
  *
  * Authentication: Personal Access Token (header-based).
  * Docs: https://www.discogs.com/developers/
@@ -15,6 +17,18 @@ import { HttpError } from '@/lib/rateLimiter'
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** Enrichment data returned from GET /artists/{id} */
+export interface DiscogsArtistProfile {
+  discogsId: string
+  name: string
+  /** Plain-text biography (Discogs markup stripped) */
+  bio: string | null
+  /** URL of the primary (or first available) artist image */
+  imageUrl: string | null
+  /** External URLs listed on the Discogs artist page */
+  urls: string[]
+}
 
 export interface DiscogsArtistRelease {
   id: number
@@ -55,6 +69,54 @@ export interface DiscogsRelease {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/**
+ * Fetches artist profile data from the Discogs API.
+ *
+ * Returns bio, primary image URL, and any external URLs listed on the artist
+ * page.  No API token is required for basic reads but providing one increases
+ * the rate limit.
+ *
+ * @param discogsArtistId - Numeric Discogs artist ID (e.g. "123456")
+ * @param token           - Optional Discogs personal access token
+ * @param fetchFn         - Injectable fetch (real in prod, mocked in tests)
+ */
+export async function fetchDiscogsArtistProfile(
+  discogsArtistId: string,
+  token: string | undefined,
+  fetchFn: typeof fetch,
+): Promise<DiscogsArtistProfile> {
+  const headers: Record<string, string> = {
+    'User-Agent': 'darkTunes/1.0 +https://darktunes.com',
+  }
+  if (token) headers['Authorization'] = `Discogs token=${token}`
+
+  const response = await fetchFn(`https://api.discogs.com/artists/${discogsArtistId}`, { headers })
+
+  if (!response.ok) {
+    throw new HttpError(response.status, `Discogs artist profile fetch failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as {
+    id: number
+    name: string
+    profile?: string
+    images?: Array<{ uri: string; type: string; width: number; height: number }>
+    urls?: string[]
+  }
+
+  // Prefer the primary image; fall back to the first available image
+  const primaryImage =
+    data.images?.find((img) => img.type === 'primary') ?? data.images?.[0] ?? null
+
+  return {
+    discogsId: String(data.id),
+    name: data.name,
+    bio: data.profile ? cleanDiscogsMarkup(data.profile) : null,
+    imageUrl: primaryImage?.uri ?? null,
+    urls: data.urls ?? [],
+  }
+}
 
 /**
  * Fetches all releases for a given Discogs artist ID.
@@ -125,4 +187,26 @@ function deriveFormat(format: string): DiscogsRelease['format'] {
   if (f.includes('cd') || f.includes('cdr')) return 'cd'
   if (f.includes('digital') || f.includes('file')) return 'digital'
   return 'other'
+}
+
+/**
+ * Strips Discogs wiki markup from a profile text, leaving readable plain text.
+ *
+ * Handled tags:
+ *   [a=Name]       → "Name"  (artist link)
+ *   [l=Name]       → "Name"  (label link)
+ *   [r=Title]      → "Title" (release link)
+ *   [m=Title]      → "Title" (master link)
+ *   [url=…]text[/url] → "text"
+ *   bare [a123]    → removed (numeric-only artist reference)
+ */
+export function cleanDiscogsMarkup(text: string): string {
+  return text
+    .replace(/\[a\d*=([^\]]*)\]/g, '$1')
+    .replace(/\[l\d*=([^\]]*)\]/g, '$1')
+    .replace(/\[r\d*=([^\]]*)\]/g, '$1')
+    .replace(/\[m\d*=([^\]]*)\]/g, '$1')
+    .replace(/\[url=[^\]]*\]([^[]*)\[\/url\]/gi, '$1')
+    .replace(/\[a\d+\]/g, '')
+    .trim()
 }
