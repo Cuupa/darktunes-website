@@ -3,8 +3,7 @@
 import { useState, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
-import { ReleasesCarousel } from '@/components/ReleasesCarousel'
-import { Releases3DCarousel } from '@/components/Releases3DCarousel'
+import { ReleasesCoverflow } from '@/components/ReleasesCoverflow'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -116,17 +115,7 @@ export function Releases({ releases, dict, locale }: ReleasesProps) {
             {dict.noResults}
           </p>
         ) : (
-          <>
-            {/* Mobile: swipe gallery (one card at a time) */}
-            <div className="block md:hidden">
-              <ReleasesCarousel releases={filtered} dict={dict} locale={locale} />
-            </div>
-
-            {/* Desktop: real 3D coverflow carousel */}
-            <div className="hidden md:block">
-              <Releases3DCarousel releases={filtered} dict={dict} locale={locale} />
-            </div>
-          </>
+          <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} />
         )}
       </div>
     </section>
