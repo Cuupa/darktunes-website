@@ -109,7 +109,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const lookup = await withExponentialBackoff(async () => {
-      const response = await globalThis.fetch(`https://itunes.apple.com/lookup?id=${artistId}`)
+      const response = await globalThis.fetch(
+        `https://itunes.apple.com/lookup?id=${encodeURIComponent(artistId)}`,
+      )
       if (!response.ok) {
         throw new HttpError(response.status, `iTunes API error: ${response.status}`)
       }
@@ -117,8 +119,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     })
 
     const artist = lookup.results[0]
-    if (!artist || artist.wrapperType !== 'artist' || !artist.artistName || !artist.artistId) {
+    if (!artist) {
       return NextResponse.json({ error: 'Artist not found on Apple Music' }, { status: 400 })
+    }
+    if (artist.wrapperType !== 'artist') {
+      return NextResponse.json({ error: 'Apple Music lookup did not return an artist entity' }, { status: 400 })
+    }
+    if (!artist.artistName || !artist.artistId) {
+      return NextResponse.json({ error: 'Apple Music artist data is incomplete' }, { status: 400 })
     }
 
     const response: PrefillItunesResponse = {

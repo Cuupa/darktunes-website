@@ -50,6 +50,12 @@ function toSlug(name: string): string {
 }
 
 type Props = AdminPanelProps<ArtistFormData>
+type PrefillItunesResponse = {
+  name: string
+  genres: string[]
+  imageUrl: string | null
+  appleMusicUrl: string
+}
 
 export function ArtistForm({ value, onChange, isLoading }: Props) {
   const supabase = createBrowserSupabaseClient()
@@ -261,12 +267,7 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
 
-      const profile = (await res.json()) as {
-        name: string
-        genres: string[]
-        imageUrl: string | null
-        appleMusicUrl: string
-      }
+      const profile: PrefillItunesResponse = await res.json()
 
       const current = getValues()
       if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
