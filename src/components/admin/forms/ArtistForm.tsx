@@ -10,6 +10,29 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise, VinylRecord } from '@phosphor-icons/react'
+import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
+
+/** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
+function classifyDiscogsUrl(url: string): keyof ArtistFormData | null {
+  try {
+    const { hostname, pathname } = new URL(url)
+    const h = hostname.toLowerCase().replace(/^www\./, '')
+    if (h === 'open.spotify.com' || h === 'spotify.com') {
+      if (pathname.includes('/artist/') || pathname.includes('/intl-')) return 'spotifyUrl'
+    }
+    if (h === 'music.apple.com' || h === 'itunes.apple.com') return 'appleMusicUrl'
+    if (h === 'instagram.com') return 'instagramUrl'
+    if (h === 'youtube.com' || h === 'youtu.be') return 'youtubeUrl'
+    if (h === 'facebook.com') return 'facebookUrl'
+    if (h === 'twitter.com' || h === 'x.com') return 'twitterUrl'
+    if (h === 'tiktok.com') return 'tiktokUrl'
+    if (h.includes('bandcamp.com')) return 'bandcampUrl'
+    if (h === 'discogs.com') return null // Skip – it's the source itself
+  } catch {
+    // ignore invalid URLs
+  }
+  return null
+}
 
 export interface ArtistFormData {
   name: string
@@ -231,7 +254,29 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       if (!(current.bio?.trim() ?? '') && profile.bio) setValue('bio', profile.bio)
       if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
 
-      toast.success(`Discogs enrichment applied for "${profile.name}"`)
+      // Parse and fill platform URLs from Discogs external links
+      let urlsApplied = 0
+      for (const urlStr of profile.urls) {
+        const field = classifyDiscogsUrl(urlStr)
+        if (!field) continue
+        const existingVal = current[field]
+        if (!(typeof existingVal === 'string' ? existingVal.trim() : '')) {
+          // Special case: if Spotify URL, also try to extract spotifyId
+          if (field === 'spotifyUrl') {
+            const spotifyId = extractSpotifyArtistId(urlStr)
+            if (spotifyId && !(current.spotifyId?.trim() ?? '')) {
+              setValue('spotifyId', spotifyId)
+            }
+          }
+          setValue(field, urlStr)
+          urlsApplied++
+        }
+      }
+
+      const msg = urlsApplied > 0
+        ? `Discogs enrichment applied for "${profile.name}" (${urlsApplied} platform link${urlsApplied > 1 ? 's' : ''} added)`
+        : `Discogs enrichment applied for "${profile.name}"`
+      toast.success(msg)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to enrich from Discogs')
     } finally {

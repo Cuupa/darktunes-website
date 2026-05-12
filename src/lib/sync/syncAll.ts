@@ -159,12 +159,16 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
             // Resolve Odesli smart link for Spotify releases
             let smartUrl: string | null = null
+            let appleMusicUrl: string | null = null
             if (release.spotifyUrl) {
-              smartUrl = await withExponentialBackoff(() =>
+              const odesli = await withExponentialBackoff(() =>
                 resolveOdesliSmartLink(release.spotifyUrl!, fetchFn),
-              )
-                .then((r) => r.smartUrl)
-                .catch(() => null)
+              ).catch(() => null)
+              if (odesli) {
+                smartUrl = odesli.smartUrl
+                // Save Apple Music URL if Odesli returns it
+                appleMusicUrl = odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
+              }
             }
 
             let preservedFeatured = false
@@ -193,6 +197,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                   type: release.type,
                   spotify_url: release.spotifyUrl,
                   spotify_id: release.spotifyId,
+                  apple_music_url: appleMusicUrl,
                   discogs_id: release.discogsId,
                   isrc: release.isrc,
                   barcode: release.barcode,

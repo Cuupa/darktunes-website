@@ -19,6 +19,7 @@ import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchDiscogsArtistProfile } from '@/lib/sync/discogsApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractDiscogsArtistId } from '@/lib/parsers/platformUrlParser'
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -44,8 +45,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Missing required field: discogsId')
   }
 
-  if (!/^\d+$/.test(discogsId)) {
-    throw new ApiError(400, 'discogsId must be a numeric string')
+  // Accept both numeric IDs and full Discogs artist URLs
+  const numericId = extractDiscogsArtistId(discogsId)
+  if (!numericId) {
+    throw new ApiError(400, 'Invalid Discogs artist ID or URL. Provide a numeric ID or full Discogs artist URL.')
   }
 
   // 3. Fetch from Discogs
@@ -55,7 +58,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   try {
     const profile = await withExponentialBackoff(() =>
-      fetchDiscogsArtistProfile(discogsId!, discogsToken, globalThis.fetch),
+      fetchDiscogsArtistProfile(numericId, discogsToken, globalThis.fetch),
     )
 
     return NextResponse.json({
