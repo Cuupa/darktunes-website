@@ -11,6 +11,7 @@ import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TourList } from './_components/TourList'
 
@@ -34,10 +35,14 @@ async function TourContent() {
   } = await supabase.auth.getUser()
   if (!user) return null
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.tour'] === false) {
+    return <p className="text-muted-foreground">Tour module is currently disabled.</p>
+  }
   const concerts = artist
     ? await getConcertsByArtistId(supabase, artist.id).catch(() => [])
     : []
-  return <TourList dict={dict.portal} concerts={concerts} />
+  return <TourList dict={dict.portal} concerts={concerts} artistId={artist?.id ?? null} />
 }
 
 export default function TourPage() {

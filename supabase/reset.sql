@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS public.releases (
   popularity      INTEGER,
   -- Visibility toggle: FALSE hides the release from public
   is_visible      BOOLEAN             NOT NULL DEFAULT TRUE,
+  is_promo        BOOLEAN             NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
@@ -221,6 +222,7 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS preview_url    TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT NULL DEFAULT FALSE;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
@@ -249,10 +251,12 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   excerpt      TEXT,
   content      TEXT        NOT NULL,
   image_url    TEXT,
+  is_press_only BOOLEAN    NOT NULL DEFAULT FALSE,
   published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);
@@ -563,6 +567,84 @@ CREATE INDEX IF NOT EXISTS idx_journalist_applications_status
 CREATE INDEX IF NOT EXISTS idx_journalist_applications_created_at
   ON public.journalist_applications (created_at DESC);
 
+-- ---------------------------------------------------------------------------
+-- TABLE: portal_feature_flags
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_feature_flags (
+  id          TEXT        PRIMARY KEY,
+  label       TEXT        NOT NULL,
+  enabled     BOOLEAN     NOT NULL DEFAULT TRUE,
+  target_role TEXT        NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_feature_flags_target_role
+  ON public.portal_feature_flags (target_role);
+
+DROP TRIGGER IF EXISTS trg_portal_feature_flags_updated_at ON public.portal_feature_flags;
+CREATE TRIGGER trg_portal_feature_flags_updated_at
+  BEFORE UPDATE ON public.portal_feature_flags
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: label_messages
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.label_messages (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  subject   TEXT        NOT NULL,
+  body      TEXT        NOT NULL,
+  read      BOOLEAN     NOT NULL DEFAULT FALSE,
+  sent_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_label_messages_artist_id_sent_at
+  ON public.label_messages (artist_id, sent_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: journalist_downloads
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.journalist_downloads (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  journalist_id UUID        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  release_id    UUID        REFERENCES public.releases (id) ON DELETE SET NULL,
+  asset_key     TEXT        NOT NULL,
+  downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_journalist_downloads_journalist_id
+  ON public.journalist_downloads (journalist_id);
+CREATE INDEX IF NOT EXISTS idx_journalist_downloads_downloaded_at
+  ON public.journalist_downloads (downloaded_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: accreditation_requests
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.accreditation_requests (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  journalist_id UUID        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  event_name    TEXT        NOT NULL,
+  event_date    DATE        NOT NULL,
+  publication   TEXT        NOT NULL,
+  reason        TEXT        NOT NULL,
+  status        TEXT        NOT NULL DEFAULT 'pending',
+  admin_note    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT accreditation_requests_status_check
+    CHECK (status IN ('pending', 'approved', 'rejected'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_accreditation_requests_journalist_id
+  ON public.accreditation_requests (journalist_id);
+CREATE INDEX IF NOT EXISTS idx_accreditation_requests_status
+  ON public.accreditation_requests (status);
+
+DROP TRIGGER IF EXISTS trg_accreditation_requests_updated_at ON public.accreditation_requests;
+CREATE TRIGGER trg_accreditation_requests_updated_at
+  BEFORE UPDATE ON public.accreditation_requests
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 -- =============================================================================
 -- ROW LEVEL SECURITY
 -- =============================================================================
@@ -584,6 +666,10 @@ ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.press_photos          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promo_tracks          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.portal_feature_flags  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
@@ -768,6 +854,9 @@ DROP POLICY IF EXISTS "Allow admin inserts on concerts"       ON public.concerts
 DROP POLICY IF EXISTS "Allow admin updates on concerts"       ON public.concerts;
 DROP POLICY IF EXISTS "Allow admin deletes on concerts"       ON public.concerts;
 DROP POLICY IF EXISTS "concerts: public read visible"         ON public.concerts;
+DROP POLICY IF EXISTS "concerts: artist own insert"           ON public.concerts;
+DROP POLICY IF EXISTS "concerts: artist own update"           ON public.concerts;
+DROP POLICY IF EXISTS "concerts: artist own delete"           ON public.concerts;
 
 -- Anonymous users only see concerts for visible artists; admins/editors see all
 CREATE POLICY "concerts: public read visible" ON public.concerts
@@ -781,13 +870,28 @@ CREATE POLICY "concerts: public read visible" ON public.concerts
   );
 
 CREATE POLICY "Allow admin inserts on concerts" ON public.concerts
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 CREATE POLICY "Allow admin updates on concerts" ON public.concerts
-  FOR UPDATE USING (auth.role() = 'authenticated');
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
 CREATE POLICY "Allow admin deletes on concerts" ON public.concerts
-  FOR DELETE USING (auth.role() = 'authenticated');
+  FOR DELETE USING (public.get_my_role() IN ('admin', 'editor'));
+
+CREATE POLICY "concerts: artist own insert" ON public.concerts
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+CREATE POLICY "concerts: artist own update" ON public.concerts
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
+
+CREATE POLICY "concerts: artist own delete" ON public.concerts
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
 
 -- ---------------------------------------------------------------------------
 -- RLS: newsletter_subscribers
@@ -935,6 +1039,70 @@ CREATE POLICY "journalist_applications: admin all" ON public.journalist_applicat
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
+-- ---------------------------------------------------------------------------
+-- RLS: portal_feature_flags
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "portal_feature_flags: authenticated read" ON public.portal_feature_flags;
+DROP POLICY IF EXISTS "portal_feature_flags: admin write" ON public.portal_feature_flags;
+
+CREATE POLICY "portal_feature_flags: authenticated read" ON public.portal_feature_flags
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "portal_feature_flags: admin write" ON public.portal_feature_flags
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: label_messages
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "label_messages: artist own read" ON public.label_messages;
+DROP POLICY IF EXISTS "label_messages: admin all" ON public.label_messages;
+
+CREATE POLICY "label_messages: artist own read" ON public.label_messages
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+CREATE POLICY "label_messages: admin all" ON public.label_messages
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: journalist_downloads
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "journalist_downloads: own read" ON public.journalist_downloads;
+DROP POLICY IF EXISTS "journalist_downloads: own insert" ON public.journalist_downloads;
+DROP POLICY IF EXISTS "journalist_downloads: admin read" ON public.journalist_downloads;
+
+CREATE POLICY "journalist_downloads: own read" ON public.journalist_downloads
+  FOR SELECT USING (journalist_id = auth.uid());
+
+CREATE POLICY "journalist_downloads: own insert" ON public.journalist_downloads
+  FOR INSERT WITH CHECK (journalist_id = auth.uid());
+
+CREATE POLICY "journalist_downloads: admin read" ON public.journalist_downloads
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: accreditation_requests
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "accreditation_requests: own read" ON public.accreditation_requests;
+DROP POLICY IF EXISTS "accreditation_requests: own insert" ON public.accreditation_requests;
+DROP POLICY IF EXISTS "accreditation_requests: admin all" ON public.accreditation_requests;
+
+CREATE POLICY "accreditation_requests: own read" ON public.accreditation_requests
+  FOR SELECT USING (journalist_id = auth.uid());
+
+CREATE POLICY "accreditation_requests: own insert" ON public.accreditation_requests
+  FOR INSERT WITH CHECK (journalist_id = auth.uid());
+
+CREATE POLICY "accreditation_requests: admin all" ON public.accreditation_requests
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
 -- =============================================================================
 -- SEED DATA
 -- =============================================================================
@@ -961,3 +1129,17 @@ INSERT INTO public.site_settings (key, value) VALUES
   ('crt_scanlines_enabled', 'true'),
   ('vignette_intensity',    '0.5')
 ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
+  ('artist.analytics', 'Artist Analytics', TRUE, 'artist'),
+  ('artist.statements', 'Artist Statements', TRUE, 'artist'),
+  ('artist.releases', 'Artist Releases', TRUE, 'artist'),
+  ('artist.tour', 'Artist Tour', TRUE, 'artist'),
+  ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
+  ('artist.messages', 'Artist Messages', TRUE, 'artist'),
+  ('journalist.promo_pool', 'Journalist Promo Pool', TRUE, 'journalist'),
+  ('journalist.press_kit', 'Journalist Press Kit', TRUE, 'journalist'),
+  ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist'),
+  ('journalist.press_releases', 'Journalist Press Releases', TRUE, 'journalist'),
+  ('journalist.download_history', 'Journalist Download History', TRUE, 'journalist')
+ON CONFLICT (id) DO NOTHING;

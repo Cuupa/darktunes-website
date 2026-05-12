@@ -35,6 +35,7 @@ const mockNewsRow: NewsRow = {
   excerpt: 'A haunting new single.',
   content: 'Full content here...',
   image_url: 'https://example.com/news.jpg',
+  is_press_only: false,
   published_at: '2024-04-24T00:00:00Z',
   created_at: '2024-04-24T00:00:00Z',
   updated_at: '2024-04-24T00:00:00Z',

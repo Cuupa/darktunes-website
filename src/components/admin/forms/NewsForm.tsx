@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 
 export interface NewsFormData {
   title: string
@@ -14,6 +15,7 @@ export interface NewsFormData {
   content: string
   imageUrl: string
   publishedAt: string
+  isPressOnly: boolean
 }
 
 function toSlug(text: string): string {
@@ -48,6 +50,8 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
     }
   }, [title, slugValue, setValue])
 
+  const isPressOnly = watch('isPressOnly')
+
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
       <div className="space-y-1">
@@ -79,6 +83,16 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           <Label htmlFor="publishedAt">Published At</Label>
           <Input id="publishedAt" type="date" {...register('publishedAt')} disabled={isLoading} />
         </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="isPressOnly"
+          checked={isPressOnly}
+          onCheckedChange={(val) => setValue('isPressOnly', val)}
+          disabled={isLoading}
+        />
+        <Label htmlFor="isPressOnly">Press-only</Label>
       </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">

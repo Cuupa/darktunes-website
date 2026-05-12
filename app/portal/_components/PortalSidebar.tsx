@@ -11,7 +11,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { MusicNote, ChartBar, FileText, User, SignOut, MapPin, MegaphoneSimple, MusicNotes, Eye } from '@phosphor-icons/react'
+import { MusicNote, ChartBar, FileText, User, SignOut, MapPin, MegaphoneSimple, MusicNotes, Eye, ChatCircleText } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -24,22 +24,23 @@ interface PortalSidebarProps {
   userId: string | null
   /** Slug of the linked artist — used for the public preview link */
   artistSlug: string | null
-  /** Whether the Statement of Sales feature is globally enabled */
-  sosStatementsEnabled: boolean
+  featureFlags: Record<string, boolean>
+  unreadMessages: number
 }
 
 const baseNavItems = [
   { href: '/portal', label: 'overview', icon: ChartBar },
   { href: '/portal/profile', label: 'profile', icon: User },
-  { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
-  { href: '/portal/releases', label: 'releases', icon: MusicNotes },
-  { href: '/portal/tour', label: 'tour', icon: MapPin },
-  { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple },
+  { href: '/portal/analytics', label: 'analytics', icon: ChartBar, flag: 'artist.analytics' },
+  { href: '/portal/releases', label: 'releases', icon: MusicNotes, flag: 'artist.releases' },
+  { href: '/portal/tour', label: 'tour', icon: MapPin, flag: 'artist.tour' },
+  { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
+  { href: '/portal/messages', label: 'messages', icon: ChatCircleText, flag: 'artist.messages' },
 ] as const
 
-const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText } as const
+const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
 
-export function PortalSidebar({ dict, artistName, artistSlug, sosStatementsEnabled }: PortalSidebarProps) {
+export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unreadMessages }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -51,9 +52,10 @@ export function PortalSidebar({ dict, artistName, artistSlug, sosStatementsEnabl
     router.refresh()
   }
 
-  const navItems = sosStatementsEnabled
-    ? [...baseNavItems, statementsNavItem]
-    : baseNavItems
+  const navItems = [...baseNavItems, statementsNavItem].filter((item) => {
+    if (!('flag' in item)) return true
+    return featureFlags[item.flag] ?? true
+  })
 
   return (
     <aside className="w-64 min-h-screen bg-card border-r border-border flex flex-col shrink-0">
@@ -105,6 +107,11 @@ export function PortalSidebar({ dict, artistName, artistSlug, sosStatementsEnabl
             >
               <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
               {dict[label as keyof typeof dict]}
+              {href === '/portal/messages' && unreadMessages > 0 && (
+                <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+                  {unreadMessages}
+                </span>
+              )}
             </Link>
           )
         })}

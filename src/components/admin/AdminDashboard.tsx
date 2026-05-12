@@ -16,6 +16,9 @@ import { SystemHealthWidget } from './SystemHealthWidget'
 import { JournalistManager } from './JournalistManager'
 import { UsersManager } from './UsersManager'
 import { FeatureTogglesManager } from './FeatureTogglesManager'
+import { FeatureFlagsManager } from './FeatureFlagsManager'
+import { MessagesManager } from './MessagesManager'
+import { AccreditationsManager } from './AccreditationsManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 export function AdminDashboard() {
@@ -27,7 +30,7 @@ export function AdminDashboard() {
   const isEditor = profile?.role === 'editor'
 
   // Tabs visible only to admin (not editor)
-  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features']
+  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations']
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -70,7 +73,7 @@ export function AdminDashboard() {
   }
 
   // Count visible tabs for grid layout
-  const visibleTabCount = ['artists', 'releases', 'news', 'videos', 'assets', 'settings', 'health', 'media', 'users', 'features']
+  const visibleTabCount = ['artists', 'releases', 'news', 'videos', 'assets', 'settings', 'health', 'media', 'features', 'feature-flags', 'messages', 'accreditations', 'users']
     .filter(canSeeTab).length
 
   return (
@@ -151,6 +154,24 @@ export function AdminDashboard() {
               <TabsTrigger value="users" className="gap-2">
                 <Users size={16} weight="bold" aria-hidden="true" />
                 Users
+              </TabsTrigger>
+            )}
+            {canSeeTab('feature-flags') && (
+              <TabsTrigger value="feature-flags" className="gap-2">
+                <ToggleRight size={16} weight="bold" aria-hidden="true" />
+                Feature Flags
+              </TabsTrigger>
+            )}
+            {canSeeTab('messages') && (
+              <TabsTrigger value="messages" className="gap-2">
+                <Broadcast size={16} weight="bold" aria-hidden="true" />
+                Messages
+              </TabsTrigger>
+            )}
+            {canSeeTab('accreditations') && (
+              <TabsTrigger value="accreditations" className="gap-2">
+                <Newspaper size={16} weight="bold" aria-hidden="true" />
+                Accreditations
               </TabsTrigger>
             )}
           </TabsList>
@@ -306,6 +327,54 @@ export function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <UsersManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('feature-flags') && (
+            <TabsContent value="feature-flags" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Portal &amp; Journalist Feature Flags</CardTitle>
+                  <CardDescription>
+                    Enable or disable sections for artist and journalist dashboards.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FeatureFlagsManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('messages') && (
+            <TabsContent value="messages" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Artist Messages</CardTitle>
+                  <CardDescription>
+                    Send inbox messages to artists and track read status.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MessagesManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('accreditations') && (
+            <TabsContent value="accreditations" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Accreditations</CardTitle>
+                  <CardDescription>
+                    Review journalist accreditation requests and approve or reject them.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AccreditationsManager />
                 </CardContent>
               </Card>
             </TabsContent>

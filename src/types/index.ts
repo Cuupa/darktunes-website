@@ -63,6 +63,7 @@ export interface Release {
   smartUrl?: string
   popularity?: number
   isVisible: boolean
+  isPromo: boolean
 }
 
 export interface NewsPost {
@@ -73,6 +74,45 @@ export interface NewsPost {
   publishedAt: string
   imageUrl?: string
   slug: string
+  isPressOnly: boolean
+}
+
+export interface PortalFeatureFlag {
+  id: string
+  label: string
+  enabled: boolean
+  targetRole: 'artist' | 'journalist'
+  updatedAt: string
+}
+
+export interface LabelMessage {
+  id: string
+  artistId: string
+  subject: string
+  body: string
+  read: boolean
+  sentAt: string
+}
+
+export interface JournalistDownload {
+  id: string
+  journalistId: string
+  releaseId: string | null
+  assetKey: string
+  downloadedAt: string
+}
+
+export interface AccreditationRequest {
+  id: string
+  journalistId: string
+  eventName: string
+  eventDate: string
+  publication: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  adminNote?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Video {

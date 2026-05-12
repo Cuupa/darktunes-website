@@ -30,6 +30,7 @@ function rowToRelease(row: ReleaseRow): Release {
     smartUrl: row.smart_url ?? undefined,
     popularity: row.popularity ?? undefined,
     isVisible: row.is_visible,
+    isPromo: row.is_promo,
   }
 }
 
@@ -47,6 +48,16 @@ export async function getReleases(db: DbClient): Promise<Release[]> {
   const { data, error } = await db
     .from('releases')
     .select('*')
+    .order('release_date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToRelease)
+}
+
+export async function getPromoReleases(db: DbClient): Promise<Release[]> {
+  const { data, error } = await db
+    .from('releases')
+    .select('*')
+    .eq('is_promo', true)
     .order('release_date', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToRelease)

@@ -269,6 +269,7 @@ export interface Database {
           smart_url: string | null
           popularity: number | null
           is_visible: boolean
+          is_promo: boolean
           created_at: string
           updated_at: string
         }
@@ -294,6 +295,7 @@ export interface Database {
           smart_url?: string | null
           popularity?: number | null
           is_visible?: boolean
+          is_promo?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -319,6 +321,7 @@ export interface Database {
           smart_url?: string | null
           popularity?: number | null
           is_visible?: boolean
+          is_promo?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -383,6 +386,7 @@ export interface Database {
           excerpt: string | null
           content: string
           image_url: string | null
+          is_press_only: boolean
           published_at: string
           created_at: string
           updated_at: string
@@ -394,6 +398,7 @@ export interface Database {
           excerpt?: string | null
           content: string
           image_url?: string | null
+          is_press_only?: boolean
           published_at?: string
           created_at?: string
           updated_at?: string
@@ -405,6 +410,7 @@ export interface Database {
           excerpt?: string | null
           content?: string
           image_url?: string | null
+          is_press_only?: boolean
           published_at?: string
           created_at?: string
           updated_at?: string
@@ -696,6 +702,120 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           created_at?: string
+        }
+        Relationships: []
+      }
+      portal_feature_flags: {
+        Row: {
+          id: string
+          label: string
+          enabled: boolean
+          target_role: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          label: string
+          enabled?: boolean
+          target_role: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          label?: string
+          enabled?: boolean
+          target_role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      label_messages: {
+        Row: {
+          id: string
+          artist_id: string
+          subject: string
+          body: string
+          read: boolean
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          subject: string
+          body: string
+          read?: boolean
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          subject?: string
+          body?: string
+          read?: boolean
+          sent_at?: string
+        }
+        Relationships: []
+      }
+      journalist_downloads: {
+        Row: {
+          id: string
+          journalist_id: string
+          release_id: string | null
+          asset_key: string
+          downloaded_at: string
+        }
+        Insert: {
+          id?: string
+          journalist_id: string
+          release_id?: string | null
+          asset_key: string
+          downloaded_at?: string
+        }
+        Update: {
+          id?: string
+          journalist_id?: string
+          release_id?: string | null
+          asset_key?: string
+          downloaded_at?: string
+        }
+        Relationships: []
+      }
+      accreditation_requests: {
+        Row: {
+          id: string
+          journalist_id: string
+          event_name: string
+          event_date: string
+          publication: string
+          reason: string
+          status: 'pending' | 'approved' | 'rejected'
+          admin_note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          journalist_id: string
+          event_name: string
+          event_date: string
+          publication: string
+          reason: string
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          journalist_id?: string
+          event_name?: string
+          event_date?: string
+          publication?: string
+          reason?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_note?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

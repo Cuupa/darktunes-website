@@ -16,6 +16,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     content: row.content,
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
+    isPressOnly: row.is_press_only,
   }
 }
 
@@ -23,6 +24,16 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const { data, error } = await db
     .from('news_posts')
     .select('*')
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToNewsPost)
+}
+
+export async function getPressOnlyNewsPosts(db: DbClient): Promise<NewsPost[]> {
+  const { data, error } = await db
+    .from('news_posts')
+    .select('*')
+    .eq('is_press_only', true)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToNewsPost)

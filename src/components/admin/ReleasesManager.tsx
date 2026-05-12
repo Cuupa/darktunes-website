@@ -49,6 +49,7 @@ const EMPTY_FORM: ReleaseFormData = {
   youtubeUrl: '',
   featured: false,
   isVisible: true,
+  isPromo: false,
 }
 
 function releaseToFormData(release: Release): ReleaseFormData {
@@ -63,6 +64,7 @@ function releaseToFormData(release: Release): ReleaseFormData {
     youtubeUrl: release.youtubeUrl ?? '',
     featured: release.featured,
     isVisible: release.isVisible,
+    isPromo: release.isPromo,
   }
 }
 
@@ -78,6 +80,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     youtube_url: data.youtubeUrl || null,
     featured: data.featured,
     is_visible: data.isVisible,
+    is_promo: data.isPromo,
   }
 }
 
@@ -220,19 +223,20 @@ export function ReleasesManager() {
             <TableHead>Type</TableHead>
             <TableHead>Visibility</TableHead>
             <TableHead>Featured</TableHead>
+            <TableHead>Promo</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : releases.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                 No releases yet. Click "New Release" or sync from iTunes.
               </TableCell>
             </TableRow>
@@ -260,6 +264,9 @@ export function ReleasesManager() {
                 </TableCell>
                 <TableCell>
                   {release.featured && <Badge variant="secondary">Featured</Badge>}
+                </TableCell>
+                <TableCell>
+                  {release.isPromo && <Badge variant="secondary">Promo</Badge>}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">

@@ -12,6 +12,10 @@ Portal features:
 - **EPK Profile Editor** (`/portal/profile`) — artists edit bio, genres, social links, press quote, and upload a profile photo. The photo upload goes server-side via `/api/portal/upload-photo` (no CORS issues).
 - **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
 - **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. The Server Action generates the URL; the raw R2 object key and credentials never reach the browser.
+- **Tour Manager** (`/portal/tour`) — artists can create/delete their own concert entries (announced/confirmed/cancelled).
+- **Marketing Assets** (`/portal/marketing`) — artists can download assigned assets via short-lived presigned URLs.
+- **Label Inbox** (`/portal/messages`) — artists can read label messages and mark them as read.
+- **Feature-flag gating** — portal modules are controlled by `portal_feature_flags` (artist.* keys) and hidden/blocked when disabled.
 
 To link an artist to a portal user, use the **Users** tab in the Admin Dashboard:
 1. Open `/admin` and go to the **Users** tab (admin-only).
@@ -33,6 +37,9 @@ WHERE slug = 'artist-slug';
 - **Artists Management**: Create, read, update, and delete artist profiles. The artist form now includes five additional URL fields: **Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, and a **Shop URL** (Darkmerch or Shopify link). These appear as clickable icons in the public artist cards and in artist modals.
 - **Releases Management**: Manage music releases with iTunes API integration
 - **News Management**: Create and publish news posts and announcements
+- **Feature Flags (admin-only)**: New **Feature Flags** tab to toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`)
+- **Messages (admin-only)**: New **Messages** tab to send label messages to artists (`label_messages`)
+- **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
@@ -84,6 +91,13 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Add featured images
 - Schedule or publish immediately
 - Edit or delete existing posts
+- Toggle **Press-only** visibility (`is_press_only`) for journalist dashboard content
+
+### Journalist Dashboard
+- Login at `/press/login`
+- Protected dashboard at `/press/dashboard/*` for roles `journalist` and `admin`
+- Feature-flagged modules: Promo Pool, Press Kit, Press Releases, Accreditation, Download History
+- Downloads are tracked in `journalist_downloads`
 
 ### Videos
 - Add music videos by YouTube ID

@@ -13,6 +13,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getOrCreateReleaseChecklist } from '@/lib/api/releaseChecklists'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseChecklistPanel } from './_components/ReleaseChecklist'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
@@ -36,6 +37,11 @@ async function ReleasesContent() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
+
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.releases'] === false) {
+    return <p className="text-muted-foreground">Releases module is currently disabled.</p>
+  }
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
   const releases = artist

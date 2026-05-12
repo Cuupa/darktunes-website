@@ -60,6 +60,8 @@ export async function middleware(request: NextRequest) {
 
   const isPortalLoginPage = pathname === '/portal/login'
   const isPortalRoute = pathname.startsWith('/portal')
+  const isPressLoginPage = pathname === '/press/login'
+  const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
 
   // Redirect unauthenticated users away from protected admin routes
   if (isAdminRoute && !isAdminLoginPage && !user) {
@@ -82,11 +84,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  if (isPortalRoute && !isPortalLoginPage && user) {
+    const { data: linkedArtist } = await supabase
+      .from('artists')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (!linkedArtist) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/portal/login'
+      loginUrl.searchParams.set('error', 'no_artist')
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   // Redirect already-authenticated portal users away from the login page
   if (isPortalLoginPage && user) {
-    const portalUrl = request.nextUrl.clone()
-    portalUrl.pathname = '/portal'
-    return NextResponse.redirect(portalUrl)
+    const { data: linkedArtist } = await supabase
+      .from('artists')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (linkedArtist) {
+      const portalUrl = request.nextUrl.clone()
+      portalUrl.pathname = '/portal'
+      return NextResponse.redirect(portalUrl)
+    }
   }
 
   const isPromoPoolLoginPage = pathname === '/promo-pool/login'
@@ -104,6 +131,33 @@ export async function middleware(request: NextRequest) {
     const promoUrl = request.nextUrl.clone()
     promoUrl.pathname = '/promo-pool'
     return NextResponse.redirect(promoUrl)
+  }
+
+  if (isPressDashboardRoute && !user) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/press/login'
+    return NextResponse.redirect(loginUrl)
+  }
+
+  if (isPressLoginPage && user) {
+    const pressUrl = request.nextUrl.clone()
+    pressUrl.pathname = '/press/dashboard'
+    return NextResponse.redirect(pressUrl)
+  }
+
+  if (isPressDashboardRoute && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile || !['journalist', 'admin'].includes(profile.role)) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/press/login'
+      loginUrl.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(loginUrl)
+    }
   }
 
   // -------------------------------------------------------------------------

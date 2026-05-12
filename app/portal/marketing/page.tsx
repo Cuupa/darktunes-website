@@ -10,7 +10,8 @@ import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { getReleasesByArtistId } from '@/lib/api/releases'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { getAssets } from '@/lib/api/assets'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SmartLinks } from './_components/SmartLinks'
 
@@ -37,11 +38,13 @@ async function MarketingContent() {
   if (!user) return null
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
-  const releases = artist
-    ? await getReleasesByArtistId(supabase, artist.id).catch(() => [])
-    : []
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.marketing'] === false) {
+    return <p className="text-muted-foreground">Marketing module is currently disabled.</p>
+  }
+  const assets = artist ? await getAssets(supabase).catch(() => []) : []
 
-  return <SmartLinks dict={dict.portal} releases={releases} />
+  return <SmartLinks dict={dict.portal} assets={assets} />
 }
 
 export default function MarketingPage() {

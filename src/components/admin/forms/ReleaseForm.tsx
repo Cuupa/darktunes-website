@@ -25,6 +25,7 @@ export interface ReleaseFormData {
   youtubeUrl: string
   featured: boolean
   isVisible: boolean
+  isPromo: boolean
 }
 
 type Props = AdminPanelProps<ReleaseFormData>
@@ -40,6 +41,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
 
   const featured = watch('featured')
   const isVisible = watch('isVisible')
+  const isPromo = watch('isPromo')
   const type = watch('type')
 
   return (
@@ -118,6 +120,15 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
             disabled={isLoading}
           />
           <Label htmlFor="featured">Featured</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="isPromo"
+            checked={isPromo}
+            onCheckedChange={(val) => setValue('isPromo', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="isPromo">Promo Release</Label>
         </div>
       </div>
 

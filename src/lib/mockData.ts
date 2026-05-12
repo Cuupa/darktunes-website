@@ -93,6 +93,7 @@ export const mockReleases: Release[] = [
     youtubeUrl: 'https://youtube.com/playlist?list=polymorph',
     featured: true,
     isVisible: true,
+    isPromo: false,
   },
   {
     id: '2',
@@ -106,6 +107,7 @@ export const mockReleases: Release[] = [
     youtubeUrl: 'https://youtube.com/watch?v=monsters',
     featured: true,
     isVisible: true,
+    isPromo: false,
   },
   {
     id: '3',
@@ -119,6 +121,7 @@ export const mockReleases: Release[] = [
     youtubeUrl: 'https://youtube.com/watch?v=split',
     featured: true,
     isVisible: true,
+    isPromo: false,
   },
   {
     id: '4',
@@ -131,6 +134,7 @@ export const mockReleases: Release[] = [
     spotifyUrl: 'https://open.spotify.com/album/synthetic-dreams',
     featured: false,
     isVisible: true,
+    isPromo: false,
   },
   {
     id: '5',
@@ -144,6 +148,7 @@ export const mockReleases: Release[] = [
     youtubeUrl: 'https://youtube.com/playlist?list=machineheart',
     featured: false,
     isVisible: true,
+    isPromo: false,
   },
   {
     id: '6',
@@ -156,6 +161,7 @@ export const mockReleases: Release[] = [
     spotifyUrl: 'https://open.spotify.com/track/digital-decay',
     featured: false,
     isVisible: true,
+    isPromo: false,
   }
 ]
 
@@ -167,7 +173,8 @@ export const mockNews: NewsPost[] = [
     content: 'Full article content would go here...',
     publishedAt: '2024-04-24',
     imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=1200&h=600&fit=crop',
-    slug: 'blackbook-monsters'
+    slug: 'blackbook-monsters',
+    isPressOnly: false,
   },
   {
     id: '2',
@@ -176,7 +183,8 @@ export const mockNews: NewsPost[] = [
     content: 'Full article content would go here...',
     publishedAt: '2024-05-01',
     imageUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=1200&h=600&fit=crop',
-    slug: 'throatcut-signing'
+    slug: 'throatcut-signing',
+    isPressOnly: false,
   },
   {
     id: '3',
@@ -184,7 +192,8 @@ export const mockNews: NewsPost[] = [
     excerpt: 'The highly anticipated album "Polymorph" showcases CZARINA\'s evolution as a darkpop visionary, pushing sonic boundaries further than ever.',
     content: 'Full article content would go here...',
     publishedAt: '2024-03-15',
-    slug: 'czarina-polymorph'
+    slug: 'czarina-polymorph',
+    isPressOnly: false,
   },
   {
     id: '4',
@@ -192,7 +201,8 @@ export const mockNews: NewsPost[] = [
     excerpt: 'Get ready for the darkTunes showcase tour hitting major European cities this fall. Featuring CATTAC, NEON VOID, and surprise guests.',
     content: 'Full article content would go here...',
     publishedAt: '2024-05-03',
-    slug: 'european-tour-2024'
+    slug: 'european-tour-2024',
+    isPressOnly: false,
   }
 ]
 

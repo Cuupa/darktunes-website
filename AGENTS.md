@@ -202,7 +202,7 @@ Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-dat
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
-Portal nav items: Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements.
+Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements, Messages (`/portal/messages`).
 
 SOS Webhook (Statement of Sales PDF Upload)
 The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.
@@ -294,10 +294,10 @@ API Routes (all admin-only, use service-role client):
 Security: Every route verifies `profiles.role = 'admin'` server-side via `createServerSupabaseClient()` before using the service-role client. The service-role key never reaches the browser.
 
 Feature Toggles
-Global feature flags stored in `site_settings` table under key `feature_toggles` as JSON. Type: `FeatureToggles` in `src/types/index.ts`.
-Flags: `promoPool` (journalist area), `sosStatements` (artist royalty PDFs), `editorTools` (editor CMS access). All default to `true`.
-Admin UI: `src/components/admin/FeatureTogglesManager.tsx` (admin-only "Features" tab in AdminDashboard). Toggle switches persist via `upsertSiteSettings()`.
-Enforcement: `promo-pool/layout.tsx` checks `featureToggles.promoPool`; `portal/statements/page.tsx` checks `featureToggles.sosStatements`; `AdminDashboard` checks `featureToggles.editorTools` for editors.
+There are now two feature-flag systems:
+1) Global JSON toggles in `site_settings` key `feature_toggles` (`promoPool`, `sosStatements`, `editorTools`) managed by `FeatureTogglesManager`.
+2) Role-targeted portal/journalist module flags in `portal_feature_flags` (e.g. `artist.tour`, `journalist.press_kit`) managed by `FeatureFlagsManager` and `PATCH /api/admin/feature-flags/[id]`.
+Enforcement: Portal and press dashboard nav/routes read `portal_feature_flags`; legacy promo-pool/editor gates still read `site_settings.feature_toggles`.
 
 Artist Portal Access Gate
 Portal layout (`app/portal/layout.tsx`) enforces role-based access BEFORE rendering the portal UI:
@@ -308,6 +308,14 @@ Portal layout (`app/portal/layout.tsx`) enforces role-based access BEFORE render
 New users default to `user` role = zero portal/admin access until an Admin explicitly assigns a role and links their artist profile.
 
 Artist Preview
-`PortalSidebar` accepts `artistSlug: string | null` and `sosStatementsEnabled: boolean` props from the layout Server Component.
+`PortalSidebar` accepts `artistSlug: string | null`, `featureFlags: Record<string, boolean>`, and `unreadMessages: number` props from the layout Server Component.
 When `artistSlug` is set, a "Preview Public Profile" link is shown under the artist name (opens `/artists/{slug}` in a new tab).
 The same preview link/button appears at the top of `ProfileForm` (passed via `artistSlug` prop from `portal/profile/page.tsx`).
+
+Journalist Dashboard
+Protected routes live at `/press/dashboard/*` with dedicated `/press/login`.
+Middleware enforces auth and role (`journalist` or `admin`) before access.
+Feature-flag-gated modules: promo pool, press kit, press releases, accreditation, download history.
+
+Schema note
+`supabase/reset.sql` remains the canonical idempotent schema script. This project now also contains migration patch `supabase/migrations/20260512000002_add_journalist_and_feature_flags.sql` for incremental rollout.

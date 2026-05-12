@@ -1,109 +1,143 @@
 'use client'
 
-/**
- * app/portal/tour/_components/TourList.tsx — Client Component (leaf)
- *
- * Renders a list of upcoming concerts for the artist portal.
- * Receives all data as props (IoC).
- */
-
-import Link from 'next/link'
-import { MapPin, Ticket, WarningCircle } from '@phosphor-icons/react'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { Dictionary } from '@/i18n/types'
 import type { Concert } from '@/types'
+import { createTourDate, deleteTourDate } from '../_actions/tour'
 
 interface TourListProps {
   dict: Dictionary['portal']
   concerts: Concert[]
+  artistId: string | null
 }
 
-function formatDate(dateStr: string): { day: string; month: string; year: string } {
-  const d = new Date(dateStr)
-  return {
-    day: d.toLocaleDateString('en-GB', { day: '2-digit' }),
-    month: d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
-    year: d.toLocaleDateString('en-GB', { year: 'numeric' }),
+type Status = 'announced' | 'confirmed' | 'cancelled'
+
+export function TourList({ dict, concerts, artistId }: TourListProps) {
+  const [items, setItems] = useState(concerts)
+  const [status, setStatus] = useState<Status>('announced')
+  const [form, setForm] = useState({
+    eventName: '',
+    concertDate: '',
+    venueName: '',
+    venueCity: '',
+    venueCountry: '',
+    ticketUrl: '',
+  })
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!artistId || !form.eventName || !form.concertDate) return
+
+    let data: Awaited<ReturnType<typeof createTourDate>>
+    try {
+      data = await createTourDate({
+        eventName: form.eventName,
+        concertDate: form.concertDate,
+        venueName: form.venueName,
+        venueCity: form.venueCity,
+        venueCountry: form.venueCountry,
+        ticketUrl: form.ticketUrl,
+        status,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create tour date')
+      return
+    }
+
+    setItems((prev) => [
+      {
+        id: data.id,
+        artistId: data.artist_id,
+        artistName: data.artist_name,
+        eventName: data.event_name,
+        venueName: data.venue_name,
+        venueCity: data.venue_city,
+        venueCountry: data.venue_country,
+        concertDate: data.concert_date,
+        ticketUrl: data.ticket_url,
+        songkickId: data.songkick_id,
+        bandsintownId: data.bandsintown_id,
+        status: data.status,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      },
+      ...prev,
+    ])
+    setForm({ eventName: '', concertDate: '', venueName: '', venueCity: '', venueCountry: '', ticketUrl: '' })
+    toast.success('Tour date created')
   }
-}
 
-export function TourList({ dict, concerts }: TourListProps) {
+  const remove = async (id: string) => {
+    if (!window.confirm('Delete this tour date?')) return
+    try {
+      await deleteTourDate(id)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete tour date')
+      return
+    }
+    setItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
 
-      {concerts.length === 0 ? (
-        <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">{dict.tour_noData}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {concerts.map((concert) => {
-            const { day, month, year } = formatDate(concert.concertDate)
-            const isCancelled = concert.status === 'cancelled'
-            return (
-              <Card
-                key={concert.id}
-                className={[
-                  'bg-card border-border transition-colors',
-                  isCancelled ? 'opacity-60' : 'hover:border-primary/40',
-                ].join(' ')}
-              >
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-4">
-                    {/* Date badge */}
-                    <div className="shrink-0 w-14 text-center">
-                      <p className="text-2xl font-bold leading-none">{day}</p>
-                      <p className="text-xs text-primary font-semibold tracking-widest mt-0.5">
-                        {month}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{year}</p>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="w-px h-12 bg-border shrink-0" />
-
-                    {/* Event info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold truncate">{concert.eventName}</p>
-                        {isCancelled && (
-                          <Badge variant="destructive" className="shrink-0 text-xs">
-                            <WarningCircle size={12} className="mr-1" />
-                            {dict.tour_cancelled}
-                          </Badge>
-                        )}
-                      </div>
-                      {(concert.venueName || concert.venueCity) && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <MapPin size={12} />
-                          {[concert.venueName, concert.venueCity, concert.venueCountry]
-                            .filter(Boolean)
-                            .join(', ')}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Ticket link */}
-                    {concert.ticketUrl && !isCancelled && (
-                      <Button asChild size="sm" variant="outline" className="shrink-0 border-border">
-                        <Link href={concert.ticketUrl} target="_blank" rel="noopener noreferrer">
-                          <Ticket size={14} className="mr-1.5" />
-                          {dict.tour_getTickets}
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+      <form onSubmit={submit} className="rounded-lg border border-border p-4 grid gap-3 md:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="tour-event">Event</Label>
+          <Input id="tour-event" value={form.eventName} onChange={(e) => setForm((v) => ({ ...v, eventName: e.target.value }))} required />
         </div>
-      )}
+        <div className="space-y-1">
+          <Label htmlFor="tour-date">Date</Label>
+          <Input id="tour-date" type="date" value={form.concertDate} onChange={(e) => setForm((v) => ({ ...v, concertDate: e.target.value }))} required />
+        </div>
+        <Input placeholder="Venue" value={form.venueName} onChange={(e) => setForm((v) => ({ ...v, venueName: e.target.value }))} />
+        <Input placeholder="City" value={form.venueCity} onChange={(e) => setForm((v) => ({ ...v, venueCity: e.target.value }))} />
+        <Input placeholder="Country" value={form.venueCountry} onChange={(e) => setForm((v) => ({ ...v, venueCountry: e.target.value }))} />
+        <Input placeholder="Ticket URL" value={form.ticketUrl} onChange={(e) => setForm((v) => ({ ...v, ticketUrl: e.target.value }))} />
+        <div className="md:col-span-2 flex items-center gap-2">
+          <Select value={status} onValueChange={(value) => setStatus(value as Status)}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="announced">announced</SelectItem>
+              <SelectItem value="confirmed">confirmed</SelectItem>
+              <SelectItem value="cancelled">cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="submit">Add date</Button>
+        </div>
+      </form>
+
+      <div className="space-y-3">
+        {items.map((concert) => (
+          <div key={concert.id} className="rounded-lg border border-border p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium">{concert.eventName}</p>
+              <p className="text-sm text-muted-foreground">
+                {concert.concertDate} · {[concert.venueName, concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')} · {concert.status}
+              </p>
+            </div>
+            <Button size="sm" variant="destructive" onClick={() => void remove(concert.id)}>
+              Delete
+            </Button>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-sm text-muted-foreground">{dict.tour_noData}</p>}
+      </div>
     </div>
   )
 }
