@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   ArrowLeft,
   SpotifyLogo,
@@ -18,17 +20,21 @@ import {
   MapPin,
   Calendar,
   Ticket,
+  Play,
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
+import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
-import type { Artist, Release, Concert } from '@/types'
+import type { Artist, Release, Concert, Video } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ArtistDetailContentProps {
   artist: Artist
   releases: Release[]
   concerts: Concert[]
+  videos: Video[]
   dict: Dictionary['artistDetail']
+  consentDict: Dictionary['consent']
   locale: Locale
 }
 
@@ -43,12 +49,21 @@ export function ArtistDetailContent({
   artist,
   releases,
   concerts,
+  videos,
   dict,
+  consentDict,
   locale,
 }: ArtistDetailContentProps) {
   const prefersReducedMotion = useReducedMotion()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const youtubeId = artist.youtubeUrl ? extractYouTubeId(artist.youtubeUrl) : null
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
+  const openVideoModal = (video: Video) => {
+    setSelectedVideo(video)
+    setIsVideoModalOpen(true)
+  }
 
   const socialLinks = [
     { url: artist.spotifyUrl, icon: SpotifyLogo, label: `${artist.name} on Spotify` },
@@ -230,8 +245,66 @@ export function ArtistDetailContent({
           </motion.section>
         )}
 
-        {/* YouTube embed */}
-        {youtubeId && (
+        {/* Videos */}
+        {videos.length > 0 && (
+          <motion.section
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+          >
+            <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.latestVideo}</h2>
+            <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 list-none">
+              {videos.map((video, index) => (
+                <motion.li
+                  key={video.id}
+                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{
+                    duration: prefersReducedMotion ? 0 : 0.5,
+                    delay: prefersReducedMotion ? 0 : index * 0.05,
+                  }}
+                >
+                  <Card className="group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300">
+                    <div
+                      className="relative aspect-video overflow-hidden cursor-pointer"
+                      onClick={() => openVideoModal(video)}
+                    >
+                      <img
+                        src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
+                        alt={`${video.title} – video thumbnail`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
+                        <Button
+                          size="lg"
+                          aria-label={`Play ${video.title}`}
+                          className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0"
+                        >
+                          <Play size={26} weight="fill" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">
+                        {video.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground font-mono mt-2">
+                        {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </Card>
+                </motion.li>
+              ))}
+            </ul>
+          </motion.section>
+        )}
+        {videos.length === 0 && youtubeId && (
           <motion.section
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -240,7 +313,7 @@ export function ArtistDetailContent({
           >
             <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.latestVideo}</h2>
             <div className="max-w-3xl">
-              <ConsentGate label="Load YouTube">
+              <ConsentGate label={consentDict.loadYouTube}>
                 <div className="aspect-video rounded-xl overflow-hidden">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -359,6 +432,12 @@ export function ArtistDetailContent({
           )}
         </motion.section>
       </div>
+      <VideoModal
+        video={selectedVideo}
+        open={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        youtubeLabel={consentDict.loadYouTube}
+      />
     </div>
   )
 }

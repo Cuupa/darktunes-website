@@ -416,6 +416,7 @@ export interface Database {
           id: string
           title: string
           artist_name: string
+          artist_id: string | null
           youtube_id: string
           thumbnail_url: string | null
           published_at: string
@@ -426,6 +427,7 @@ export interface Database {
           id?: string
           title: string
           artist_name: string
+          artist_id?: string | null
           youtube_id: string
           thumbnail_url?: string | null
           published_at?: string
@@ -436,6 +438,7 @@ export interface Database {
           id?: string
           title?: string
           artist_name?: string
+          artist_id?: string | null
           youtube_id?: string
           thumbnail_url?: string | null
           published_at?: string

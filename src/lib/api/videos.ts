@@ -12,6 +12,7 @@ function rowToVideo(row: VideoRow): Video {
     id: row.id,
     title: row.title,
     artistName: row.artist_name,
+    artistId: row.artist_id ?? undefined,
     youtubeId: row.youtube_id,
     thumbnailUrl: row.thumbnail_url ?? '',
     publishedAt: row.published_at,
@@ -34,6 +35,16 @@ export async function getVideoById(db: DbClient, id: string): Promise<Video | nu
     throw new Error(error.message)
   }
   return data ? rowToVideo(data) : null
+}
+
+export async function getVideosByArtistId(db: DbClient, artistId: string): Promise<Video[]> {
+  const { data, error } = await db
+    .from('videos')
+    .select('*')
+    .eq('artist_id', artistId)
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToVideo)
 }
 
 export async function createVideo(db: DbClient, videoData: VideoInsert): Promise<Video> {

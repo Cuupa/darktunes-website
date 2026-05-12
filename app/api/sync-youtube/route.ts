@@ -2,7 +2,9 @@
  * app/api/sync-youtube/route.ts — YouTube video sync
  *
  * POST /api/sync-youtube
- * Auth: Bearer <supabase-access-token>
+ * Auth:
+ *   - Bearer <supabase-access-token>
+ *   - OR Vercel cron request (x-vercel-cron: 1), optionally guarded by CRON_SECRET
  *
  * Fetches the latest videos from the configured YouTube channel and upserts
  * them into the `videos` table.
@@ -27,11 +29,19 @@ async function verifyToken(token: string): Promise<void> {
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate
+  const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Missing or invalid Authorization header')
+  const cronSecret = process.env.CRON_SECRET
+  if (isCron) {
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      throw new ApiError(401, 'Invalid cron secret')
+    }
+  } else {
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new ApiError(401, 'Missing or invalid Authorization header')
+    }
+    await verifyToken(authHeader.slice(7))
   }
-  await verifyToken(authHeader.slice(7))
 
   // 2. Read required config
   const youtubeApiKey = process.env.YOUTUBE_API_KEY
@@ -59,7 +69,16 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     auth: { persistSession: false },
   })
 
+  const { data: artists, error: artistsError } = await db
+    .from('artists')
+    .select('id, name')
+    .eq('is_visible', true)
+  if (artistsError) throw new ApiError(500, `Artist lookup failed: ${artistsError.message}`)
+
   const rows = videos.map((v) => ({
+    artist_id:
+      artists?.find((artist) => v.title.toUpperCase().includes(artist.name.toUpperCase()))?.id ??
+      null,
     youtube_id: v.youtubeId,
     title: v.title,
     artist_name: v.channelTitle,

@@ -12,6 +12,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistBySlug } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
+import { getVideosByArtistId } from '@/lib/api/videos'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 
@@ -25,14 +26,15 @@ function makeGetArtistData(slug: string) {
       const client = await createServerSupabaseClient()
       const artist = await getArtistBySlug(client, slug)
       if (!artist) return null
-      const [releases, concerts] = await Promise.all([
+      const [releases, concerts, videos] = await Promise.all([
         getReleasesByArtistId(client, artist.id),
         getConcertsByArtistId(client, artist.id),
+        getVideosByArtistId(client, artist.id),
       ])
-      return { artist, releases, concerts }
+      return { artist, releases, concerts, videos }
     },
     [`artist-detail-${slug}`],
-    { revalidate: 60, tags: ['artists', 'releases', 'concerts'] },
+    { revalidate: 60, tags: ['artists', 'releases', 'concerts', 'videos'] },
   )
 }
 
@@ -61,13 +63,15 @@ export default async function ArtistDetailPage({ params }: Props) {
   ])
   if (!data) notFound()
   const dict = await getDictionary(locale)
-  const { artist, releases, concerts } = data
+  const { artist, releases, concerts, videos } = data
   return (
     <ArtistDetailContent
       artist={artist}
       releases={releases}
       concerts={concerts}
+      videos={videos}
       dict={dict.artistDetail}
+      consentDict={dict.consent}
       locale={locale}
     />
   )

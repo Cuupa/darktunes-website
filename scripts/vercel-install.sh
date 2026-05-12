@@ -95,6 +95,7 @@ echo ""
 echo "  — YouTube video sync (optional — YouTube Data API v3) —"
 require_env "YOUTUBE_API_KEY"   "Google API key with YouTube Data API v3 (used by POST /api/sync-youtube)"
 require_env "YOUTUBE_CHANNEL_ID" "YouTube channel ID (starts with UC)"
+require_env "CRON_SECRET" "Optional bearer token for Vercel cron calls to POST /api/sync-youtube"
 echo ""
 
 if [ "$MISSING" -gt 0 ]; then
@@ -110,4 +111,3 @@ echo "╔═══════════════════════�
 echo "║    Install complete. Proceeding to build…            ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
-

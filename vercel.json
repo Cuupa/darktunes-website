@@ -13,5 +13,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync-youtube",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

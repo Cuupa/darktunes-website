@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS public.videos (
   id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   title         TEXT        NOT NULL,
   artist_name   TEXT        NOT NULL,
+  artist_id     UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
   youtube_id    TEXT        NOT NULL UNIQUE,
   thumbnail_url TEXT,
   published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -264,7 +265,11 @@ CREATE TABLE IF NOT EXISTS public.videos (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.videos
+  ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists (id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_videos_youtube_id   ON public.videos (youtube_id);
+CREATE INDEX IF NOT EXISTS idx_videos_artist_id    ON public.videos (artist_id);
 CREATE INDEX IF NOT EXISTS idx_videos_published_at ON public.videos (published_at DESC);
 
 DROP TRIGGER IF EXISTS trg_videos_updated_at ON public.videos;
