@@ -30,8 +30,8 @@ function createArtistNamePattern(artistName: string): RegExp | null {
 
 function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
   const expected = `Bearer ${cronSecret}`
-  const authBuffer = Buffer.from(authHeader)
-  const expectedBuffer = Buffer.from(expected)
+  const authBuffer = Buffer.from(authHeader, 'utf-8')
+  const expectedBuffer = Buffer.from(expected, 'utf-8')
   if (authBuffer.length !== expectedBuffer.length) return false
   return timingSafeEqual(authBuffer, expectedBuffer)
 }

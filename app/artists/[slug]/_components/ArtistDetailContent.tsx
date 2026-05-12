@@ -267,9 +267,11 @@ export function ArtistDetailContent({
                   }}
                 >
                   <Card className="group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300">
-                    <div
+                    <button
+                      type="button"
                       className="relative aspect-video overflow-hidden cursor-pointer"
                       onClick={() => openVideoModal(video)}
+                      aria-label={`Play ${video.title}`}
                     >
                       <img
                         src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
@@ -284,7 +286,7 @@ export function ArtistDetailContent({
                           <Play size={26} weight="fill" aria-hidden="true" />
                         </div>
                       </div>
-                    </div>
+                    </button>
                     <div className="p-4">
                       <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">
                         {video.title}
