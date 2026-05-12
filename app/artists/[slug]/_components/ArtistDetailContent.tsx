@@ -277,13 +277,12 @@ export function ArtistDetailContent({
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
-                        <Button
-                          size="lg"
-                          aria-label={`Play ${video.title}`}
-                          className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0"
+                        <div
+                          aria-hidden="true"
+                          className="bg-accent text-accent-foreground rounded-full w-16 h-16 p-0 flex items-center justify-center"
                         >
                           <Play size={26} weight="fill" aria-hidden="true" />
-                        </Button>
+                        </div>
                       </div>
                     </div>
                     <div className="p-4">

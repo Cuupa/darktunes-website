@@ -265,9 +265,6 @@ CREATE TABLE IF NOT EXISTS public.videos (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.videos
-  ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists (id) ON DELETE SET NULL;
-
 CREATE INDEX IF NOT EXISTS idx_videos_youtube_id   ON public.videos (youtube_id);
 CREATE INDEX IF NOT EXISTS idx_videos_artist_id    ON public.videos (artist_id);
 CREATE INDEX IF NOT EXISTS idx_videos_published_at ON public.videos (published_at DESC);

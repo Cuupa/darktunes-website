@@ -17,6 +17,17 @@ import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function matchesArtistNameInTitle(videoTitle: string, artistName: string): boolean {
+  const trimmedArtistName = artistName.trim()
+  if (!trimmedArtistName) return false
+  const pattern = new RegExp(`(^|\\W)${escapeRegExp(trimmedArtistName)}(\\W|$)`, 'i')
+  return pattern.test(videoTitle)
+}
+
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -77,8 +88,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   const rows = videos.map((v) => ({
     artist_id:
-      artists?.find((artist) => v.title.toUpperCase().includes(artist.name.toUpperCase()))?.id ??
-      null,
+      artists?.find((artist) => matchesArtistNameInTitle(v.title, artist.name))?.id ?? null,
     youtube_id: v.youtubeId,
     title: v.title,
     artist_name: v.channelTitle,

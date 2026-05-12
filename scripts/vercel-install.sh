@@ -46,6 +46,16 @@ require_env() {
   fi
 }
 
+optional_env() {
+  local var_name="$1"
+  local description="$2"
+  if [ -z "${!var_name:-}" ]; then
+    echo "  ℹ  OPTIONAL: ${var_name} not set  (${description})"
+  else
+    echo "  ✔  ${var_name}"
+  fi
+}
+
 echo "▶  Checking environment variables..."
 echo ""
 echo "  — Supabase (client-side, prefixed NEXT_PUBLIC_) —"
@@ -95,7 +105,7 @@ echo ""
 echo "  — YouTube video sync (optional — YouTube Data API v3) —"
 require_env "YOUTUBE_API_KEY"   "Google API key with YouTube Data API v3 (used by POST /api/sync-youtube)"
 require_env "YOUTUBE_CHANNEL_ID" "YouTube channel ID (starts with UC)"
-require_env "CRON_SECRET" "Optional bearer token for Vercel cron calls to POST /api/sync-youtube"
+optional_env "CRON_SECRET" "Optional bearer token for Vercel cron calls to POST /api/sync-youtube"
 echo ""
 
 if [ "$MISSING" -gt 0 ]; then
