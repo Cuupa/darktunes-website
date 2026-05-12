@@ -56,6 +56,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Invalid Spotify artist URL or ID')
   }
 
+  // Dynamic import defers validation — note: we only need SPOTIFY vars here but
+  // keep direct process.env access to avoid requiring R2 vars (serverEnv validates all).
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   if (!clientId || !clientSecret) {

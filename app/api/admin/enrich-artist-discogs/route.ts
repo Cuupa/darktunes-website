@@ -49,6 +49,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   // 3. Fetch from Discogs
+  // Direct process.env access: serverEnv validates all vars including R2,
+  // but this route only needs the optional DISCOGS_TOKEN.
   const discogsToken = process.env.DISCOGS_TOKEN
 
   try {

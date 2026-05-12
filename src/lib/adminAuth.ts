@@ -12,6 +12,12 @@
  * Centralising this avoids the duplicated `verifyTokenAndRole` helpers
  * that previously lived in every individual route file.
  *
+ * NOTE: This module reads NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+ * via process.env directly (instead of serverEnv) to avoid coupling the auth
+ * check to R2 environment variables, which are validated by serverEnv but
+ * irrelevant to authentication. The null-guard below provides the equivalent
+ * runtime protection for the two vars actually used here.
+ *
  * Usage (inside a withErrorHandler wrapper):
  *   const token = extractBearerToken(req.headers.get('authorization'))
  *   const userId = await verifyAdminOrEditor(token)

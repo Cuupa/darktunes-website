@@ -49,13 +49,14 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   // 3. Load the release to get its Spotify URL
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !serviceKey) {
-    throw new ApiError(503, 'Supabase not configured')
-  }
+  // Dynamic import defers env validation to request time — consistent with upload route pattern.
+  const { serverEnv } = await import('@/lib/env.server')
 
-  const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const db = createClient<Database>(
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } },
+  )
 
   const { data: releaseRow, error: releaseErr } = await db
     .from('releases')
