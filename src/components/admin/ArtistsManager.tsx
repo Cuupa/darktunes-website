@@ -1,11 +1,12 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -31,12 +32,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
 
 type ArtistInsert = Database['public']['Tables']['artists']['Insert']
+
+const PAGE_SIZE = 20
+
+type SortField = 'name' | 'country' | 'lastSyncedAt'
+type SortDir = 'asc' | 'desc'
 
 const EMPTY_FORM: ArtistFormData = {
   name: '',
@@ -168,7 +181,53 @@ export function ArtistsManager() {
   const [isMutating, setIsMutating] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
 
+  // Search / sort / pagination
+  const [search, setSearch] = useState('')
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [page, setPage] = useState(0)
+
   const formValue = editingArtist ? artistToFormData(editingArtist) : EMPTY_FORM
+
+  // Derived: filtered + sorted + paginated list
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return artists.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.country ?? '').toLowerCase().includes(q) ||
+      a.genres.some((g) => g.toLowerCase().includes(q)),
+    )
+  }, [artists, search])
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'name') cmp = a.name.localeCompare(b.name)
+      else if (sortField === 'country') cmp = (a.country ?? '').localeCompare(b.country ?? '')
+      else if (sortField === 'lastSyncedAt') cmp = (a.lastSyncedAt ?? '').localeCompare(b.lastSyncedAt ?? '')
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortField, sortDir])
+
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+    setPage(0)
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortDir === 'asc'
+      ? <ArrowUp size={12} className="inline ml-1" aria-hidden="true" />
+      : <ArrowDown size={12} className="inline ml-1" aria-hidden="true" />
+  }
 
   const openNew = () => {
     setEditingArtist(null)
@@ -254,8 +313,33 @@ export function ArtistsManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{artists.length} artist(s)</p>
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 min-w-0">
+          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Search artists…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            className="pl-8"
+          />
+        </div>
+        <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => {
+          const [f, d] = v.split(':') as [SortField, SortDir]
+          setSortField(f); setSortDir(d); setPage(0)
+        }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Sort by…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name:asc">Name A → Z</SelectItem>
+            <SelectItem value="name:desc">Name Z → A</SelectItem>
+            <SelectItem value="country:asc">Country A → Z</SelectItem>
+            <SelectItem value="lastSyncedAt:desc">Last synced (newest)</SelectItem>
+            <SelectItem value="lastSyncedAt:asc">Last synced (oldest)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {artists.length}</p>
         <Button size="sm" onClick={openNew} className="gap-2">
           <Plus size={16} weight="bold" />
           New Artist
@@ -265,26 +349,38 @@ export function ArtistsManager() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('name')}>
+                Name <SortIcon field="name" />
+              </button>
+            </TableHead>
             <TableHead>Genres</TableHead>
-            <TableHead>Country</TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('country')}>
+                Country <SortIcon field="country" />
+              </button>
+            </TableHead>
             <TableHead>Visibility</TableHead>
             <TableHead>Featured</TableHead>
-            <TableHead>Last Synced</TableHead>
+            <TableHead>
+              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('lastSyncedAt')}>
+                Last Synced <SortIcon field="lastSyncedAt" />
+              </button>
+            </TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <ArtistSkeletonRows />
-          ) : artists.length === 0 ? (
+          ) : paginated.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                No artists yet. Click "New Artist" to add one.
+                {search ? `No artists match "${search}".` : 'No artists yet. Click "New Artist" to add one.'}
               </TableCell>
             </TableRow>
           ) : (
-            artists.map((artist) => (
+            paginated.map((artist) => (
               <TableRow key={artist.id}>
                 <TableCell className="font-medium">{artist.name}</TableCell>
                 <TableCell>{artist.genres.slice(0, 2).join(', ')}</TableCell>
@@ -343,6 +439,23 @@ export function ArtistsManager() {
           )}
         </TableBody>
       </Table>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Page {page + 1} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+              Previous
+            </Button>
+            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

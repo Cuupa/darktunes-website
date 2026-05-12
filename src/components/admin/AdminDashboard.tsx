@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users, ToggleRight } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users, ToggleRight, ClipboardText } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -19,6 +19,7 @@ import { FeatureTogglesManager } from './FeatureTogglesManager'
 import { FeatureFlagsManager } from './FeatureFlagsManager'
 import { MessagesManager } from './MessagesManager'
 import { AccreditationsManager } from './AccreditationsManager'
+import { LogsManager } from './LogsManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 export function AdminDashboard() {
@@ -30,7 +31,7 @@ export function AdminDashboard() {
   const isEditor = profile?.role === 'editor'
 
   // Tabs visible only to admin (not editor)
-  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations']
+  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs']
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -72,10 +73,6 @@ export function AdminDashboard() {
     return false
   }
 
-  // Count visible tabs for grid layout
-  const visibleTabCount = ['artists', 'releases', 'news', 'videos', 'assets', 'settings', 'health', 'media', 'features', 'feature-flags', 'messages', 'accreditations', 'users']
-    .filter(canSeeTab).length
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card sticky top-0 z-40">
@@ -103,7 +100,7 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full lg:w-auto lg:inline-grid" style={{ gridTemplateColumns: `repeat(${visibleTabCount}, minmax(0, 1fr))` }}>
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" aria-hidden="true" />
               Artists
@@ -172,6 +169,12 @@ export function AdminDashboard() {
               <TabsTrigger value="accreditations" className="gap-2">
                 <Newspaper size={16} weight="bold" aria-hidden="true" />
                 Accreditations
+              </TabsTrigger>
+            )}
+            {canSeeTab('logs') && (
+              <TabsTrigger value="logs" className="gap-2">
+                <ClipboardText size={16} weight="bold" aria-hidden="true" />
+                Logs
               </TabsTrigger>
             )}
           </TabsList>
@@ -375,6 +378,22 @@ export function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <AccreditationsManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('logs') && (
+            <TabsContent value="logs" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Logs</CardTitle>
+                  <CardDescription>
+                    Audit log of all sync runs and error log for failed or partial syncs.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LogsManager />
                 </CardContent>
               </Card>
             </TabsContent>

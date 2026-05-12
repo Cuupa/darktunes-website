@@ -7,8 +7,9 @@
  *
  * Displays:
  *   - Database connection status (Online / Offline)
- *   - Per-API last sync timestamp and status
+ *   - Per-API last sync timestamp and status (auto-discovered from sync_logs)
  *   - Rate-limit warning badges
+ *   - Error details for partial/error syncs
  *   - "Force Sync All" button with loading state
  *
  * Props (IoC): receives the Bearer token from the parent (AuthContext) so
@@ -31,6 +32,9 @@ import {
   Microphone,
   Record as RecordIcon,
   Ticket,
+  YoutubeLogo,
+  Link,
+  Waveform,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useEffect } from 'react'
@@ -44,6 +48,7 @@ interface ApiHealthStatus {
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'partial' | 'error' | null
   rateLimited: boolean
+  lastErrors: string[]
 }
 
 interface HealthData {
@@ -78,6 +83,13 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
   spotify: { label: 'Spotify', icon: <Microphone size={16} weight="bold" /> },
   discogs: { label: 'Discogs', icon: <RecordIcon size={16} weight="bold" /> },
   songkick: { label: 'Songkick', icon: <Ticket size={16} weight="bold" /> },
+  bandsintown: { label: 'Bandsintown', icon: <Ticket size={16} weight="bold" /> },
+  youtube: { label: 'YouTube', icon: <YoutubeLogo size={16} weight="bold" /> },
+  odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" /> },
+}
+
+function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
+  return API_META[api] ?? { label: api.charAt(0).toUpperCase() + api.slice(1), icon: <Waveform size={16} weight="bold" /> }
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +100,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -167,6 +180,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   if (!health) return null
 
   const dbOnline = health.database.status === 'online'
+  const apiEntries = Object.entries(health.apis) as [string, ApiHealthStatus][]
 
   return (
     <div className="space-y-6">
@@ -240,9 +254,12 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       </Card>
 
       {/* Per-API cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {(Object.entries(health.apis) as [string, ApiHealthStatus][]).map(([api, status]) => {
-          const meta = API_META[api] ?? { label: api, icon: <MusicNote size={16} /> }
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {apiEntries.map(([api, status]) => {
+          const meta = getApiMeta(api)
+          const hasErrors = status.lastErrors.length > 0 && (status.lastSyncStatus === 'partial' || status.lastSyncStatus === 'error')
+          const isExpanded = expandedErrors === api
+
           return (
             <Card
               key={api}
@@ -251,7 +268,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                   ? 'border-yellow-500/30'
                   : status.lastSyncStatus === 'error'
                     ? 'border-red-500/30'
-                    : 'border-border'
+                    : status.lastSyncStatus === 'partial'
+                      ? 'border-yellow-500/30'
+                      : 'border-border'
               }
             >
               <CardHeader className="pb-2">
@@ -293,6 +312,28 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                     <Warning size={10} className="mr-1" />
                     Rate limited
                   </Badge>
+                )}
+
+                {/* Error details toggle */}
+                {hasErrors && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedErrors(isExpanded ? null : api)}
+                      className="text-xs text-red-400 underline underline-offset-2 hover:text-red-300"
+                    >
+                      {isExpanded ? 'Hide errors' : `Show ${status.lastErrors.length} error(s)`}
+                    </button>
+                    {isExpanded && (
+                      <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                        {status.lastErrors.map((err, i) => (
+                          <li key={i} className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 font-mono break-all">
+                            {err}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

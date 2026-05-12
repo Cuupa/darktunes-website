@@ -7,29 +7,38 @@
  *
  * Returns:
  *   - Database connection status
- *   - API key configuration status for each external API
- *   - Last successful sync timestamp per API (from sync_logs)
+ *   - Per-API last sync timestamp and status (auto-discovered from sync_logs)
  *   - Rate-limit warnings (if the most recent sync log shows rate_limited=true)
+ *   - Last errors for partial/error syncs
  */
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
-const API_SOURCES = ['itunes', 'spotify', 'discogs', 'songkick'] as const
-type ApiSource = (typeof API_SOURCES)[number]
+/** Known API sources with their configuration check. Auto-discovery adds any others found in sync_logs. */
+const KNOWN_APIS: Record<string, boolean> = {
+  itunes: true, // no key required
+  spotify: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
+  discogs: !!process.env.DISCOGS_TOKEN,
+  songkick: !!process.env.SONGKICK_API_KEY,
+  bandsintown: !!process.env.BANDSINTOWN_APP_ID,
+  odesli: true, // no key required
+  youtube: !!process.env.YOUTUBE_API_KEY,
+}
 
 export interface ApiHealthStatus {
   configured: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'partial' | 'error' | null
   rateLimited: boolean
+  lastErrors: string[]
 }
 
 export interface HealthResponse {
   status: 'healthy' | 'degraded' | 'unhealthy'
   database: { status: 'online' | 'offline'; latencyMs: number | null }
-  apis: Record<ApiSource, ApiHealthStatus>
+  apis: Record<string, ApiHealthStatus>
   checkedAt: string
 }
 
@@ -60,44 +69,61 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Per-API key configuration + last sync status
+  // 2. Per-API status — auto-discover all api_source values from sync_logs
   // ---------------------------------------------------------------------------
   const apiStatuses: Record<string, ApiHealthStatus> = {}
-  const configured: Record<ApiSource, boolean> = {
-    itunes: true, // iTunes requires no API key
-    spotify: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
-    discogs: !!process.env.DISCOGS_TOKEN,
-    songkick: !!process.env.SONGKICK_API_KEY,
-  }
 
   if (supabaseUrl && supabaseKey && dbStatus === 'online') {
     const db = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: { persistSession: false },
     })
 
-    for (const api of API_SOURCES) {
-      const { data } = await db
-        .from('sync_logs')
-        .select('created_at, status, rate_limited')
-        .eq('api_source', api)
-        .order('created_at', { ascending: false })
-        .limit(1)
+    // Fetch most recent sync log per api_source in a single query
+    const { data: logs } = await db
+      .from('sync_logs')
+      .select('api_source, created_at, status, rate_limited, errors')
+      .order('created_at', { ascending: false })
 
-      const latest = data?.[0] ?? null
+    // Group by api_source — keep only the latest entry per source
+    const latestPerApi = new Map<string, {
+      created_at: string
+      status: string
+      rate_limited: boolean
+      errors: unknown
+    }>()
+    for (const row of logs ?? []) {
+      if (!latestPerApi.has(row.api_source)) {
+        latestPerApi.set(row.api_source, row)
+      }
+    }
+
+    // Merge: all known APIs + any discovered from sync_logs
+    const allApis = new Set([...Object.keys(KNOWN_APIS), ...latestPerApi.keys()])
+
+    for (const api of allApis) {
+      const latest = latestPerApi.get(api) ?? null
+      const rawErrors = latest?.errors
+      const lastErrors: string[] = Array.isArray(rawErrors)
+        ? (rawErrors as unknown[]).map((e) => (typeof e === 'string' ? e : JSON.stringify(e)))
+        : []
+
       apiStatuses[api] = {
-        configured: configured[api],
+        configured: KNOWN_APIS[api] ?? false,
         lastSyncAt: latest?.created_at ?? null,
         lastSyncStatus: (latest?.status as ApiHealthStatus['lastSyncStatus']) ?? null,
         rateLimited: latest?.rate_limited ?? false,
+        lastErrors,
       }
     }
   } else {
-    for (const api of API_SOURCES) {
+    // DB offline — report known APIs only
+    for (const api of Object.keys(KNOWN_APIS)) {
       apiStatuses[api] = {
-        configured: configured[api],
+        configured: KNOWN_APIS[api],
         lastSyncAt: null,
         lastSyncStatus: null,
         rateLimited: false,
+        lastErrors: [],
       }
     }
   }
@@ -106,13 +132,17 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   // 3. Overall status
   // ---------------------------------------------------------------------------
   const overallStatus: HealthResponse['status'] =
-    dbStatus === 'offline' ? 'unhealthy' : Object.values(apiStatuses).some((s) => s.rateLimited) ? 'degraded' : 'healthy'
+    dbStatus === 'offline'
+      ? 'unhealthy'
+      : Object.values(apiStatuses).some((s) => s.rateLimited)
+        ? 'degraded'
+        : 'healthy'
 
   return NextResponse.json(
     {
       status: overallStatus,
       database: { status: dbStatus, latencyMs },
-      apis: apiStatuses as Record<ApiSource, ApiHealthStatus>,
+      apis: apiStatuses,
       checkedAt,
     },
     { status: overallStatus === 'unhealthy' ? 503 : 200 },
