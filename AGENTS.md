@@ -146,18 +146,15 @@ Update Documentation: If new public APIs, components, or utilities were added, u
 Minimal Changes Principle: Make the smallest possible change that fully addresses the requirement. Do not refactor unrelated code in the same PR. Do not add new dependencies unless absolutely necessary — check npm audit for any new package.
 
 Database Schema Management
-The SQL migration files and the TypeScript database types are the dual source of truth for the database structure. They MUST always be in sync.
+`supabase/reset.sql` and `src/types/database.ts` are the dual source of truth for the database structure. They MUST always be in sync. There are no incremental migration files — only the single idempotent reset script.
 
 MANDATORY RULE — Schema Change Checklist:
 Every PR that adds, removes, or renames a column / table / enum MUST include ALL of the following:
-  1. A new SQL migration file in supabase/migrations/ named YYYYMMDDHHMMSS_short_description.sql.
-  2. Updated src/types/database.ts to reflect the new schema (Row, Insert, Update shapes).
+  1. Updated `supabase/reset.sql` — add the column/table to the CREATE TABLE definition AND add an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` guard so existing databases are updated safely.
+  2. Updated `src/types/database.ts` to reflect the new schema (Row, Insert, Update shapes).
   3. If applicable: updated application hooks (src/hooks/use*.ts) that query the affected table.
 
-Never edit the initial migration (20240101000000_initial_schema.sql) directly — always add a new migration file.
-Apply migrations to Supabase cloud: npm run db:push (requires Supabase CLI and supabase link).
-Generate a diff between local and remote schema: npm run db:diff.
-Migration naming: use UTC timestamp prefix, e.g. 20240601120000_add_artist_bandcamp_url.sql.
+Apply the schema to Supabase cloud: paste `supabase/reset.sql` into the Supabase SQL Editor and run it (fully idempotent — safe on fresh and existing databases).
 Visibility & Cascading Deletes: `artists.is_visible` and `releases.is_visible` (both BOOLEAN DEFAULT TRUE) control public visibility. `releases.artist_id` uses `ON DELETE CASCADE` so deleting an artist removes all their releases automatically. RLS policies enforce visibility at the DB level for the public role; the DAL public functions (`getPublicArtists`, `getPublicReleases`, `getPublicConcerts`) enforce it additionally at the application layer.
 Video ownership: `videos.artist_id UUID REFERENCES artists(id) ON DELETE SET NULL` links synced label-channel videos to artists. Artist profile pages fetch videos via `getVideosByArtistId()`; when no match exists, `artist_id` remains NULL and the homepage still shows latest videos globally.
 

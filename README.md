@@ -69,8 +69,6 @@ npm run dev
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:e2e` | Run Playwright E2E & visual regression tests |
-| `npm run db:push` | Push local migrations to Supabase cloud |
-| `npm run db:diff` | Diff local schema against remote |
 
 ---
 
@@ -116,17 +114,15 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 ## 🗄 Database
 
-Migrations live in `supabase/migrations/`.  
-Types are auto-derived in `src/types/database.ts`.  
+The schema lives in **`supabase/reset.sql`** — a single fully idempotent script.
+Types are defined in `src/types/database.ts`.
 **Always keep both in sync** — see the schema change checklist in [AGENTS.md](./AGENTS.md).
 
-```bash
-# Push local migrations to Supabase cloud
-npm run db:push
+To apply the schema (fresh or existing database):
+1. Open the **Supabase SQL Editor** in the dashboard.
+2. Paste the contents of `supabase/reset.sql` and click **Run**.
 
-# Diff local schema vs. remote
-npm run db:diff
-```
+The script is safe to re-run at any time — it never deletes existing data.
 
 ---
 
@@ -198,7 +194,7 @@ src/
 │       └── client.ts         # Supabase browser client (@supabase/ssr)
 └── types/                    # TypeScript types (incl. database.ts)
 supabase/
-└── migrations/               # SQL migration files (source of truth for schema)
+└── reset.sql                 # Single idempotent SQL script — full schema source of truth
 scripts/
 └── vercel-install.sh         # Vercel build hook
 ```

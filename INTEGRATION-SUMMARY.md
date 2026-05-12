@@ -26,7 +26,7 @@
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
 - **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` and `/portal/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
 - **Internationalisation (i18n)** — `src/i18n/` custom dictionary pattern; `en.json` + `de.json`; `getDictionary.ts` loads server-side; RSCs pass dict as props to Client Components (IoC); Header has DE/EN locale switcher
-- **Database schema** defined in `supabase/migrations/20240101000000_initial_schema.sql`
+- **Database schema** defined in `supabase/reset.sql` (single idempotent script; no migration files)
 - **TypeScript DB types** in `src/types/database.ts`
 
 ### Environment Validation
@@ -234,7 +234,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `app/contact/page.tsx` | Contact page RSC with SubmitHub integration section |
 | `app/api/contact/route.ts` | Contact form handler — POST (Zod, honeypot, Resend delivery, `CONTACT_EMAIL`) |
 | `src/components/ContentPagination.tsx` | Reusable shadcn-based page navigator with ellipsis support |
-| `supabase/migrations/` | SQL migration files (source of truth for schema) |
+| `supabase/reset.sql` | Single idempotent SQL script — full schema source of truth |
 
 ---
 
