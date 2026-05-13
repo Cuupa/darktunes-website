@@ -239,6 +239,16 @@ export interface SiteSettings {
   carouselAutoplayMs: number
   /** Feature flags: enable/disable portal modules globally. */
   featureToggles: FeatureToggles
+  /** R2 URL of the custom label logo shown in the header and footer. Falls back to static asset when empty. */
+  logoUrl?: string
+  /** R2 URL of the custom favicon. Used in <head> meta. Falls back to /icons/icon-192.png when empty. */
+  faviconUrl?: string
+  /** Custom headline for the About page. Falls back to i18n default when empty. */
+  aboutHeadline?: string
+  /** Custom subheading for the About page. Falls back to i18n default when empty. */
+  aboutSubheading?: string
+  /** Main About page body text (Markdown). Rendered via MarkdownContent on /about. */
+  aboutBody?: string
 }
 
 export interface Concert {

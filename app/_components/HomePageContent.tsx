@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Header } from '@/components/Header'
 import { Hero } from '@/components/Hero'
 import { Releases } from '@/components/Releases'
-import { Artists } from '@/components/Artists'
 import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
@@ -72,7 +71,7 @@ export function HomePageContent({
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <Header dict={dict.navigation} locale={locale} />
+      <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} />
       <main id="main-content">
         <div className="relative">
           <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
@@ -100,7 +99,7 @@ export function HomePageContent({
         </motion.div>
 
         <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
-          <div className="container mx-auto max-w-5xl">
+          <div className="container mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -119,7 +118,6 @@ export function HomePageContent({
           </div>
         </section>
 
-        <Artists artists={artists} dict={dict.artists} />
         <Videos
           videos={videos}
           placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}

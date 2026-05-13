@@ -13,6 +13,9 @@ Avoid Anti-Patterns: Absolutely avoid anti-patterns like prop-drilling over more
 YAGNI (You Aren't Gonna Need It): Do not generate speculative code for hypothetical features. Keep the codebase lean.
 KISS (Keep It Simple, Stupid): Prefer native HTML/JS solutions over the importation of heavy NPM packages.
 
+Artist Navigation — Architecture Rule
+ALL components that display an artist card, tile, or list item MUST navigate to `/artists/[slug]` using Next.js `<Link href={`/artists/${artist.slug}`}>`. Opening a modal instead of navigating to the artist detail page is FORBIDDEN for artist roster components. The dedicated artist page at `app/artists/[slug]/page.tsx` is the single point of truth for artist detail. This rule applies across the homepage, the artists grid page, the footer, and any future section.
+
 Technology Stack & Styling
 Core Infrastructure: Next.js 15 (App Router), React 19, Supabase (PostgreSQL & Auth), Cloudflare R2, Vercel deployment. The project was migrated from Vite SPA to Next.js 15 App Router in 2025.
 UI & Design: Exclusively use Tailwind CSS v4 (PostCSS) and ensure the CSS output is minified.
@@ -210,7 +213,8 @@ Update Documentation: If new public APIs, components, or utilities were added, u
 Minimal Changes Principle: Make the smallest possible change that fully addresses the requirement. Do not refactor unrelated code in the same PR. Do not add new dependencies unless absolutely necessary — check npm audit for any new package.
 
 Database Schema Management
-`supabase/reset.sql` and `src/types/database.ts` are the dual source of truth for the database structure. They MUST always be in sync. There are no incremental migration files — only the single idempotent reset script.
+⛔ MIGRATION SCRIPTS ARE STRICTLY AND ABSOLUTELY FORBIDDEN. Never create files in `supabase/migrations/` or any incremental SQL patch files. Every agent or developer who creates a migration script violates this rule and must immediately delete it and move the change into `supabase/reset.sql`.
+`supabase/reset.sql` and `src/types/database.ts` are the ONE AND ONLY source of truth for the database structure. They MUST always be in sync. There is only ONE schema script — the idempotent reset script.
 
 MANDATORY RULE — Schema Change Checklist:
 Every PR that adds, removes, or renames a column / table / enum MUST include ALL of the following:
@@ -314,7 +318,7 @@ Admin EPK upload: `getEpkUploadUrl(category, filename, contentType)` in `src/act
 Journalist applications: `journalist_applications` table; `POST /api/journalist-applications` lets anyone submit. `PATCH /api/journalist-applications/[id]` (admin-only) approves/rejects and updates `profiles.role` to `journalist` / `user`. Admin UI is in `src/components/admin/JournalistManager.tsx` (Media tab in AdminDashboard).
 DAL: `src/lib/api/pressPhotos.ts`, `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests.
 user_role enum: includes `journalist`, `artist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all five values.
-DB: Migration `20260510190000_press_and_promo_pool.sql` — adds journalist role value, press_photos, promo_tracks, journalist_applications tables with RLS.
+DB: All tables for journalist role, press_photos, promo_tracks, and journalist_applications are defined in `supabase/reset.sql` (the only schema source of truth).
 
 Admin User Management
 The **Users** tab in the AdminDashboard (`src/components/admin/AdminDashboard.tsx`) is only visible when `profile.role === 'admin'`. It renders `<UsersManager />`.
@@ -355,7 +359,7 @@ Middleware enforces auth and role (`journalist` or `admin`) before access.
 Feature-flag-gated modules: promo pool, press kit, press releases, accreditation, download history.
 
 Schema note
-`supabase/reset.sql` remains the canonical idempotent schema script. This project now also contains migration patch `supabase/migrations/20260512000002_add_journalist_and_feature_flags.sql` for incremental rollout.
+`supabase/reset.sql` is the sole, canonical, idempotent schema script. ⛔ There are NO migration files — `supabase/migrations/` MUST NOT exist. If any file exists there, delete it and fold the change into `reset.sql`.
 
 PWA (Progressive Web App)
 The site is a fully installable PWA powered by @serwist/next (v9) + serwist.

@@ -13,9 +13,10 @@ import type { Dictionary, Locale } from '@/i18n/types'
 interface HeaderProps {
   dict: Dictionary['navigation']
   locale: Locale
+  logoUrl?: string
 }
 
-export function Header({ dict, locale }: HeaderProps) {
+export function Header({ dict, locale, logoUrl }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
@@ -72,7 +73,7 @@ export function Header({ dict, locale }: HeaderProps) {
             className="flex items-center flex-shrink-0"
           >
             <img 
-              src={logoImage.src} 
+              src={logoUrl || logoImage.src} 
               alt="darkTunes Music Group" 
               className={`w-auto transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
             />

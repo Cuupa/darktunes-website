@@ -28,7 +28,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
         transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
       >
         <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
-          <div className="relative h-[152px] rounded-md overflow-hidden">
+          <div className="relative h-[352px] rounded-md overflow-hidden">
             {playlists.map((playlist, i) => (
               <div
                 key={playlist.uri}
@@ -42,7 +42,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                   src={`https://open.spotify.com/embed${getSpotifyEmbedPath(playlist.uri)}`}
                   title={`Spotify playlist: ${playlist.label}`}
                   width="100%"
-                  height="152"
+                  height="352"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                   className="rounded-md border-0"
                 />

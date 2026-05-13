@@ -38,6 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
     'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
   const ogTitle = settings?.ogTitle ?? title
   const ogDescription = settings?.ogDescription ?? description
+  const faviconUrl = settings?.faviconUrl || '/icons/icon-192.png'
 
   return {
     title,
@@ -46,6 +47,10 @@ export async function generateMetadata(): Promise<Metadata> {
       title: ogTitle,
       description: ogDescription,
       type: 'website',
+    },
+    icons: {
+      icon: faviconUrl,
+      apple: faviconUrl,
     },
   }
 }
