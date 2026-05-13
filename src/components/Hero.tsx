@@ -46,6 +46,9 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
   }
 
   const coverUrl = getOptimizedImageUrl(featuredRelease.coverArt, 1200)
+  const bgUrl = featuredRelease.heroBgUrl
+    ? getOptimizedImageUrl(featuredRelease.heroBgUrl, 1200)
+    : coverUrl
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
@@ -54,7 +57,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
           image as early as possible, before CSSOM construction completes. */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <img
-          src={coverUrl}
+          src={bgUrl}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover object-center"
@@ -93,7 +96,7 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
             </div>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-xl font-serif leading-relaxed">
-              {siteSettings.heroDescription}
+              {featuredRelease.promoText || siteSettings.heroDescription}
             </p>
 
             <div className="flex flex-wrap gap-4">

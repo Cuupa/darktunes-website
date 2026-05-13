@@ -17,6 +17,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
     isPressOnly: row.is_press_only,
+    status: (row.status === 'draft' ? 'draft' : 'published') as 'draft' | 'published',
   }
 }
 
@@ -24,6 +25,17 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const { data, error } = await db
     .from('news_posts')
     .select('*')
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToNewsPost)
+}
+
+/** Public-facing: only returns posts with status='published'. */
+export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
+  const { data, error } = await db
+    .from('news_posts')
+    .select('*')
+    .eq('status', 'published')
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToNewsPost)

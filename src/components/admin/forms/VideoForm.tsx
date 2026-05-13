@@ -7,8 +7,10 @@ import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
+import { ImageUploadButton } from './ImageUploadButton'
 
 export interface VideoFormData {
   title: string
@@ -16,6 +18,8 @@ export interface VideoFormData {
   youtubeId: string
   thumbnailUrl: string
   publishedAt: string
+  isVisible: boolean
+  isShort: boolean
 }
 
 type Props = AdminPanelProps<VideoFormData>
@@ -37,6 +41,8 @@ export function VideoForm({ value, onChange, isLoading }: Props) {
 
   const youtubeIdField = watch('youtubeId')
   const thumbnailUrl = watch('thumbnailUrl')
+  const isVisible = watch('isVisible')
+  const isShort = watch('isShort')
 
   // Auto-extract YouTube ID when the user pastes a full URL
   const lastParsed = useRef('')
@@ -161,8 +167,35 @@ export function VideoForm({ value, onChange, isLoading }: Props) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="thumbnailUrl">Thumbnail URL (auto-filled)</Label>
-        <Input id="thumbnailUrl" {...register('thumbnailUrl')} disabled={isLoading} />
+        <Label htmlFor="thumbnailUrl">Thumbnail URL</Label>
+        <div className="flex gap-2">
+          <Input id="thumbnailUrl" {...register('thumbnailUrl')} disabled={isLoading} className="flex-1" />
+          <ImageUploadButton
+            label="Upload"
+            onUploaded={(url) => setValue('thumbnailUrl', url)}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="isVisible"
+            checked={isVisible}
+            onCheckedChange={(val) => setValue('isVisible', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="isVisible">Visible</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="isShort"
+            checked={isShort}
+            onCheckedChange={(val) => setValue('isShort', val)}
+            disabled={isLoading}
+          />
+          <Label htmlFor="isShort">YouTube Short</Label>
+        </div>
       </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">

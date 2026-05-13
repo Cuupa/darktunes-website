@@ -7,6 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ImageUploadButton } from './ImageUploadButton'
 
 export interface NewsFormData {
   title: string
@@ -16,6 +24,7 @@ export interface NewsFormData {
   imageUrl: string
   publishedAt: string
   isPressOnly: boolean
+  status: 'draft' | 'published'
 }
 
 function toSlug(text: string): string {
@@ -39,6 +48,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
 
   const title = watch('title')
   const slugValue = watch('slug')
+  const status = watch('status')
 
   // Track whether the slug was auto-generated so we stop overwriting manual edits
   const lastAutoSlug = useRef(toSlug(title))
@@ -76,12 +86,35 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="imageUrl">Image URL</Label>
-          <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
           <Label htmlFor="publishedAt">Published At</Label>
           <Input id="publishedAt" type="date" {...register('publishedAt')} disabled={isLoading} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={status}
+            onValueChange={(val) => setValue('status', val as 'draft' | 'published')}
+            disabled={isLoading}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="imageUrl">Image URL</Label>
+        <div className="flex gap-2">
+          <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+          <ImageUploadButton
+            label="Upload"
+            onUploaded={(url) => setValue('imageUrl', url)}
+          />
         </div>
       </div>
 

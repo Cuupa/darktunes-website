@@ -62,6 +62,8 @@ const mockReleaseRow: ReleaseRow = {
   popularity: null,
   is_visible: true,
   is_promo: false,
+  promo_text: null,
+  hero_bg_url: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -6,14 +6,14 @@ import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getNewsPosts } from '@/lib/api/news'
+import { getPublicNewsPosts } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { NewsList } from './_components/NewsList'
 
 const getCachedPosts = unstable_cache(
   async () => {
     const client = await createServerSupabaseClient()
-    return getNewsPosts(client)
+    return getPublicNewsPosts(client)
   },
   ['news-posts'],
   { revalidate: 60, tags: ['news'] },

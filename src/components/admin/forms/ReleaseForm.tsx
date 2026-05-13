@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ImageUploadButton } from './ImageUploadButton'
 
 export interface ReleaseFormData {
   title: string
@@ -26,6 +28,8 @@ export interface ReleaseFormData {
   featured: boolean
   isVisible: boolean
   isPromo: boolean
+  promoText: string
+  heroBgUrl: string
 }
 
 type Props = AdminPanelProps<ReleaseFormData>
@@ -83,7 +87,29 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
 
       <div className="space-y-1">
         <Label htmlFor="coverArt">Cover Art URL</Label>
-        <Input id="coverArt" {...register('coverArt')} disabled={isLoading} />
+        <div className="flex gap-2">
+          <Input id="coverArt" {...register('coverArt')} disabled={isLoading} className="flex-1" />
+          <ImageUploadButton
+            label="Upload"
+            onUploaded={(url) => setValue('coverArt', url)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="heroBgUrl">Hero Background Image (optional, overrides cover in Hero)</Label>
+        <div className="flex gap-2">
+          <Input id="heroBgUrl" {...register('heroBgUrl')} disabled={isLoading} placeholder="Leave empty to use cover art" className="flex-1" />
+          <ImageUploadButton
+            label="Upload"
+            onUploaded={(url) => setValue('heroBgUrl', url)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="promoText">Promo Text (optional, shown in Hero section)</Label>
+        <Textarea id="promoText" {...register('promoText')} rows={2} disabled={isLoading} placeholder="Short teaser text for the hero section…" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

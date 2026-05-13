@@ -22,7 +22,7 @@ export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel 
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      <DialogContent aria-labelledby="video-modal-title" className="max-w-6xl w-[95vw] p-0 bg-background/95 backdrop-blur-xl border-accent/30 overflow-hidden">
+      <DialogContent aria-labelledby="video-modal-title" className="max-w-6xl w-[95vw] p-0 bg-background/95 backdrop-blur-xl border-accent/30 overflow-hidden max-h-[92vh] flex flex-col">
         <AnimatePresence>
           {open && (
             <motion.div

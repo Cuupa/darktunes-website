@@ -35,6 +35,8 @@ const mockVideoRow: VideoRow = {
   artist_id: 'artist-001',
   youtube_id: 'Bx51eegLTY8',
   thumbnail_url: 'https://img.youtube.com/vi/Bx51eegLTY8/maxresdefault.jpg',
+  is_visible: true,
+  is_short: false,
   published_at: '2024-04-24T00:00:00Z',
   created_at: '2024-04-24T00:00:00Z',
   updated_at: '2024-04-24T00:00:00Z',

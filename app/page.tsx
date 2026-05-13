@@ -15,8 +15,8 @@ import { createClient } from '@supabase/supabase-js'
 import { HomePageContent } from './_components/HomePageContent'
 import { getPublicReleases } from '@/lib/api/releases'
 import { getPublicArtists } from '@/lib/api/artists'
-import { getNewsPosts } from '@/lib/api/news'
-import { getVideos } from '@/lib/api/videos'
+import { getPublicNewsPosts } from '@/lib/api/news'
+import { getPublicVideos } from '@/lib/api/videos'
 import { getPublicConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
@@ -60,7 +60,7 @@ const getCachedArtists = unstable_cache(
 
 const getCachedNews = unstable_cache(
   async (): Promise<NewsPost[]> => {
-    return getNewsPosts(createPublicSupabaseClient())
+    return getPublicNewsPosts(createPublicSupabaseClient())
   },
   ['news'],
   { revalidate: 60, tags: ['news'] },
@@ -68,7 +68,7 @@ const getCachedNews = unstable_cache(
 
 const getCachedVideos = unstable_cache(
   async (): Promise<Video[]> => {
-    return getVideos(createPublicSupabaseClient())
+    return getPublicVideos(createPublicSupabaseClient())
   },
   ['videos'],
   { revalidate: 60, tags: ['videos'] },

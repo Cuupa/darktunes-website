@@ -59,6 +59,7 @@ const mockArtistRow: ArtistRow = {
   genres: [],
   image_url: null,
   spotify_url: null,
+  apple_music_url: null,
   instagram_url: null,
   youtube_url: null,
   website_url: null,
@@ -81,6 +82,7 @@ const mockArtistRow: ArtistRow = {
   shop_url: null,
   founded_year: null,
   is_visible: true,
+  logo_url: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

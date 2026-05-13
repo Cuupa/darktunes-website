@@ -31,7 +31,8 @@
   "news": {
     "heading": "NEWS",
     "subheading": "Immer auf dem neuesten Stand",
-    "readFullStory": "Zum Artikel"
+    "readFullStory": "Zum Artikel",
+    "viewAll": "Alle News"
   },
   "videos": {
     "heading": "VIDEOS",

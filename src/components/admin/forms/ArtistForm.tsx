@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise, VinylRecord } from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
+import { ImageUploadButton } from './ImageUploadButton'
 
 /** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
 function classifyDiscogsUrl(url: string): keyof ArtistFormData | null {
@@ -40,6 +41,8 @@ export interface ArtistFormData {
   bio: string
   genres: string
   imageUrl: string
+  /** Optional logo/wordmark URL for the artists grid hover effect. */
+  logoUrl: string
   spotifyUrl: string
   appleMusicUrl: string
   instagramUrl: string
@@ -357,6 +360,10 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
           <Label htmlFor="imageUrl">Image URL</Label>
           <div className="flex gap-2">
             <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+            <ImageUploadButton
+              label="Upload"
+              onUploaded={(url) => setValue('imageUrl', url)}
+            />
             <Button
               type="button"
               variant="outline"
@@ -368,6 +375,16 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
             >
               <ArrowsClockwise size={14} className={isFetchingImage ? 'animate-spin' : ''} />
             </Button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="logoUrl">Logo / Wordmark URL (hover effect)</Label>
+          <div className="flex gap-2">
+            <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} className="flex-1" />
+            <ImageUploadButton
+              label="Upload"
+              onUploaded={(url) => setValue('logoUrl', url)}
+            />
           </div>
         </div>
         <div className="space-y-1">

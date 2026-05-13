@@ -65,6 +65,7 @@ export interface Database {
           shop_url: string | null
           founded_year: number | null
           is_visible: boolean
+          logo_url: string | null
           created_at: string
           updated_at: string
         }
@@ -99,6 +100,7 @@ export interface Database {
           shop_url?: string | null
           founded_year?: number | null
           is_visible?: boolean
+          logo_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -133,6 +135,7 @@ export interface Database {
           shop_url?: string | null
           founded_year?: number | null
           is_visible?: boolean
+          logo_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -273,6 +276,8 @@ export interface Database {
           popularity: number | null
           is_visible: boolean
           is_promo: boolean
+          promo_text: string | null
+          hero_bg_url: string | null
           created_at: string
           updated_at: string
         }
@@ -299,6 +304,8 @@ export interface Database {
           popularity?: number | null
           is_visible?: boolean
           is_promo?: boolean
+          promo_text?: string | null
+          hero_bg_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -325,6 +332,8 @@ export interface Database {
           popularity?: number | null
           is_visible?: boolean
           is_promo?: boolean
+          promo_text?: string | null
+          hero_bg_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -390,6 +399,7 @@ export interface Database {
           content: string
           image_url: string | null
           is_press_only: boolean
+          status: string
           published_at: string
           created_at: string
           updated_at: string
@@ -402,6 +412,7 @@ export interface Database {
           content: string
           image_url?: string | null
           is_press_only?: boolean
+          status?: string
           published_at?: string
           created_at?: string
           updated_at?: string
@@ -414,6 +425,7 @@ export interface Database {
           content?: string
           image_url?: string | null
           is_press_only?: boolean
+          status?: string
           published_at?: string
           created_at?: string
           updated_at?: string
@@ -428,6 +440,8 @@ export interface Database {
           artist_id: string | null
           youtube_id: string
           thumbnail_url: string | null
+          is_visible: boolean
+          is_short: boolean
           published_at: string
           created_at: string
           updated_at: string
@@ -439,6 +453,8 @@ export interface Database {
           artist_id?: string | null
           youtube_id: string
           thumbnail_url?: string | null
+          is_visible?: boolean
+          is_short?: boolean
           published_at?: string
           created_at?: string
           updated_at?: string
@@ -450,6 +466,8 @@ export interface Database {
           artist_id?: string | null
           youtube_id?: string
           thumbnail_url?: string | null
+          is_visible?: boolean
+          is_short?: boolean
           published_at?: string
           created_at?: string
           updated_at?: string

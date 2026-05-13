@@ -65,6 +65,8 @@ const EMPTY_FORM: ReleaseFormData = {
   featured: false,
   isVisible: true,
   isPromo: false,
+  promoText: '',
+  heroBgUrl: '',
 }
 
 function releaseToFormData(release: Release): ReleaseFormData {
@@ -80,6 +82,8 @@ function releaseToFormData(release: Release): ReleaseFormData {
     featured: release.featured,
     isVisible: release.isVisible,
     isPromo: release.isPromo,
+    promoText: release.promoText ?? '',
+    heroBgUrl: release.heroBgUrl ?? '',
   }
 }
 
@@ -96,6 +100,8 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     featured: data.featured,
     is_visible: data.isVisible,
     is_promo: data.isPromo,
+    promo_text: data.promoText || null,
+    hero_bg_url: data.heroBgUrl || null,
   }
 }
 
@@ -282,6 +288,15 @@ export function ReleasesManager() {
     }
   }
 
+  const handleToggleVisibility = async (release: Release) => {
+    try {
+      await updateRelease(release.id, { is_visible: !release.isVisible })
+      toast.success(`"${release.title}" is now ${!release.isVisible ? 'visible' : 'hidden'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Update failed')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card">
@@ -420,17 +435,24 @@ export function ReleasesManager() {
                   <Badge variant="outline">{release.type}</Badge>
                 </TableCell>
                 <TableCell>
-                  {release.isVisible ? (
-                    <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30">
-                      <Eye size={12} aria-hidden="true" />
-                      Visible
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="gap-1 text-muted-foreground border-border">
-                      <EyeSlash size={12} aria-hidden="true" />
-                      Hidden
-                    </Badge>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleVisibility(release)}
+                    title={release.isVisible ? 'Click to hide' : 'Click to show'}
+                    className="focus:outline-none"
+                  >
+                    {release.isVisible ? (
+                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
+                        <Eye size={12} aria-hidden="true" />
+                        Visible
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
+                        <EyeSlash size={12} aria-hidden="true" />
+                        Hidden
+                      </Badge>
+                    )}
+                  </button>
                 </TableCell>
                 <TableCell>
                   {release.featured && <Badge variant="secondary">Featured</Badge>}

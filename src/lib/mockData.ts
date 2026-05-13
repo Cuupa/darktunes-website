@@ -175,6 +175,7 @@ export const mockNews: NewsPost[] = [
     imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=1200&h=600&fit=crop',
     slug: 'blackbook-monsters',
     isPressOnly: false,
+    status: 'published',
   },
   {
     id: '2',
@@ -185,6 +186,7 @@ export const mockNews: NewsPost[] = [
     imageUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=1200&h=600&fit=crop',
     slug: 'throatcut-signing',
     isPressOnly: false,
+    status: 'published',
   },
   {
     id: '3',
@@ -194,6 +196,7 @@ export const mockNews: NewsPost[] = [
     publishedAt: '2024-03-15',
     slug: 'czarina-polymorph',
     isPressOnly: false,
+    status: 'published',
   },
   {
     id: '4',
@@ -203,6 +206,7 @@ export const mockNews: NewsPost[] = [
     publishedAt: '2024-05-03',
     slug: 'european-tour-2024',
     isPressOnly: false,
+    status: 'published',
   }
 ]
 
@@ -213,7 +217,9 @@ export const mockVideos: Video[] = [
     artistName: 'BLACKBOOK',
     youtubeId: 'Bx51eegLTY8',
     thumbnailUrl: 'https://images.unsplash.com/photo-1518893883800-45cd0954574b?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-04-24'
+    publishedAt: '2024-04-24',
+    isVisible: true,
+    isShort: false,
   },
   {
     id: '2',
@@ -221,7 +227,9 @@ export const mockVideos: Video[] = [
     artistName: 'C Z A R I N A',
     youtubeId: '9RBzsjga73s',
     thumbnailUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-03-15'
+    publishedAt: '2024-03-15',
+    isVisible: true,
+    isShort: false,
   },
   {
     id: '3',
@@ -229,7 +237,9 @@ export const mockVideos: Video[] = [
     artistName: 'SMASH HIT COMBO',
     youtubeId: 'kXYiU_JCYtU',
     thumbnailUrl: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-04-17'
+    publishedAt: '2024-04-17',
+    isVisible: true,
+    isShort: false,
   },
   {
     id: '4',
@@ -237,7 +247,9 @@ export const mockVideos: Video[] = [
     artistName: 'FROZEN PLASMA',
     youtubeId: 'OPf0YbXqDm0',
     thumbnailUrl: 'https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-03-27'
+    publishedAt: '2024-03-27',
+    isVisible: true,
+    isShort: false,
   },
   {
     id: '5',
@@ -245,7 +257,9 @@ export const mockVideos: Video[] = [
     artistName: 'CATTAC',
     youtubeId: 'WaMB0rR7sTU',
     thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-02-14'
+    publishedAt: '2024-02-14',
+    isVisible: true,
+    isShort: false,
   },
   {
     id: '6',
@@ -253,6 +267,8 @@ export const mockVideos: Video[] = [
     artistName: 'NEON VOID',
     youtubeId: 'bjPqsDU0j2I',
     thumbnailUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&h=675&fit=crop&q=80',
-    publishedAt: '2024-05-08'
+    publishedAt: '2024-05-08',
+    isVisible: true,
+    isShort: false,
   }
 ]

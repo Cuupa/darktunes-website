@@ -50,5 +50,6 @@ export function rowToArtist(row: ArtistRow): Artist {
     lastSyncedAt: row.last_synced_at ?? undefined,
     foundedYear: row.founded_year ?? undefined,
     isVisible: row.is_visible,
+    logoUrl: row.logo_url ?? undefined,
   }
 }
