@@ -57,6 +57,7 @@ const EMPTY_FORM: ArtistFormData = {
   bio: '',
   genres: '',
   imageUrl: '',
+  logoUrl: '',
   spotifyUrl: '',
   appleMusicUrl: '',
   instagramUrl: '',
@@ -88,6 +89,7 @@ function artistToFormData(artist: Artist): ArtistFormData {
     bio: artist.bio ?? '',
     genres: artist.genres.join(', '),
     imageUrl: artist.imageUrl ?? '',
+    logoUrl: artist.logoUrl ?? '',
     spotifyUrl: artist.spotifyUrl ?? '',
     appleMusicUrl: artist.appleMusicUrl ?? '',
     instagramUrl: artist.instagramUrl ?? '',
@@ -123,6 +125,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
       .map((g) => g.trim())
       .filter(Boolean),
     image_url: data.imageUrl || null,
+    logo_url: data.logoUrl || null,
     spotify_url: data.spotifyUrl || null,
     apple_music_url: data.appleMusicUrl || null,
     instagram_url: data.instagramUrl || null,
@@ -311,6 +314,15 @@ export function ArtistsManager() {
     }
   }
 
+  const handleToggleVisibility = async (artist: Artist) => {
+    try {
+      await updateArtist(artist.id, { is_visible: !artist.isVisible })
+      toast.success(`"${artist.name}" is now ${!artist.isVisible ? 'visible' : 'hidden'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Update failed')
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -386,17 +398,24 @@ export function ArtistsManager() {
                 <TableCell>{artist.genres.slice(0, 2).join(', ')}</TableCell>
                 <TableCell>{artist.country ?? '—'}</TableCell>
                 <TableCell>
-                  {artist.isVisible ? (
-                    <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30">
-                      <Eye size={12} aria-hidden="true" />
-                      Visible
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="gap-1 text-muted-foreground border-border">
-                      <EyeSlash size={12} aria-hidden="true" />
-                      Hidden
-                    </Badge>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleVisibility(artist)}
+                    title={artist.isVisible ? 'Click to hide' : 'Click to show'}
+                    className="focus:outline-none"
+                  >
+                    {artist.isVisible ? (
+                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
+                        <Eye size={12} aria-hidden="true" />
+                        Visible
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
+                        <EyeSlash size={12} aria-hidden="true" />
+                        Hidden
+                      </Badge>
+                    )}
+                  </button>
                 </TableCell>
                 <TableCell>
                   {artist.featured && <Badge variant="secondary">Featured</Badge>}

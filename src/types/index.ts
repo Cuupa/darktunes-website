@@ -5,6 +5,8 @@ export interface Artist {
   bio: string
   genres: string[]
   imageUrl: string
+  /** Optional logo/wordmark image URL shown on hover in the artists grid. */
+  logoUrl?: string
   spotifyUrl?: string
   appleMusicUrl?: string
   instagramUrl?: string
@@ -67,6 +69,10 @@ export interface Release {
   isVisible: boolean
   /** When true, this release is only visible in the journalist Promo Pool and never shown on the public homepage. */
   isPromo: boolean
+  /** Optional promo/teaser text shown in the Hero section when this release is featured. */
+  promoText?: string
+  /** Optional hero background image URL, different from the release cover art. */
+  heroBgUrl?: string
 }
 
 export interface NewsPost {
@@ -78,6 +84,8 @@ export interface NewsPost {
   imageUrl?: string
   slug: string
   isPressOnly: boolean
+  /** Draft posts are only visible in the admin/editor CMS; published posts appear on the public site. */
+  status: 'draft' | 'published'
 }
 
 export interface PortalFeatureFlag {
@@ -134,6 +142,8 @@ export interface Video {
   youtubeId: string
   thumbnailUrl: string
   publishedAt: string
+  isVisible: boolean
+  isShort: boolean
 }
 
 export interface UserProfile {

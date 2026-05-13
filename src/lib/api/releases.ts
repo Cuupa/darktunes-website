@@ -31,6 +31,8 @@ function rowToRelease(row: ReleaseRow): Release {
     popularity: row.popularity ?? undefined,
     isVisible: row.is_visible,
     isPromo: row.is_promo,
+    promoText: row.promo_text ?? undefined,
+    heroBgUrl: row.hero_bg_url ?? undefined,
   }
 }
 

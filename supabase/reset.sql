@@ -190,6 +190,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
@@ -230,6 +231,9 @@ CREATE TABLE IF NOT EXISTS public.releases (
   -- Visibility toggle: FALSE hides the release from public
   is_visible      BOOLEAN             NOT NULL DEFAULT TRUE,
   is_promo        BOOLEAN             NOT NULL DEFAULT FALSE,
+  -- Optional hero customisation per release
+  promo_text      TEXT,
+  hero_bg_url     TEXT,
   created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
@@ -244,6 +248,9 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT NULL DEFAULT FALSE;
+-- Optional per-release hero customisation
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS promo_text     TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_bg_url    TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
@@ -273,14 +280,17 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   content      TEXT        NOT NULL,
   image_url    TEXT,
   is_press_only BOOLEAN    NOT NULL DEFAULT FALSE,
+  status       TEXT        NOT NULL DEFAULT 'published',
   published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_posts_status       ON public.news_posts (status);
 
 DROP TRIGGER IF EXISTS trg_news_posts_updated_at ON public.news_posts;
 CREATE TRIGGER trg_news_posts_updated_at
@@ -297,6 +307,8 @@ CREATE TABLE IF NOT EXISTS public.videos (
   artist_id     UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
   youtube_id    TEXT        NOT NULL UNIQUE,
   thumbnail_url TEXT,
+  is_visible    BOOLEAN     NOT NULL DEFAULT TRUE,
+  is_short      BOOLEAN     NOT NULL DEFAULT FALSE,
   published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -305,6 +317,8 @@ CREATE TABLE IF NOT EXISTS public.videos (
 -- Idempotent column additions for videos (artist linkage was added after initial deploy)
 ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS artist_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS artist_id   UUID REFERENCES public.artists (id) ON DELETE SET NULL;
+ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS is_visible  BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS is_short    BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_videos_youtube_id   ON public.videos (youtube_id);
 CREATE INDEX IF NOT EXISTS idx_videos_artist_id    ON public.videos (artist_id);

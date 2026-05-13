@@ -75,11 +75,11 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                 className="flex-none w-[82vw] snap-start md:w-auto"
                 variants={prefersReducedMotion ? undefined : itemVariants}
               >
-                <Card className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer">
-                  <div 
-                    className="relative aspect-video overflow-hidden"
-                    onClick={() => handleVideoClick(video)}
-                  >
+                <Card 
+                  className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer"
+                  onClick={() => handleVideoClick(video)}
+                >
+                  <div className="relative aspect-video overflow-hidden">
                     <img
                       src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                       alt={`${video.title} – video thumbnail`}
@@ -93,6 +93,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                         size="lg"
                         aria-label={`Play ${video.title}`}
                         className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0 hover:scale-110 transition-transform"
+                        tabIndex={-1}
                       >
                         <Play size={28} weight="fill" aria-hidden="true" />
                       </Button>

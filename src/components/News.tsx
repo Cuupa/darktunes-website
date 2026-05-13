@@ -17,9 +17,14 @@ interface NewsProps extends SectionProps {
   locale: Locale
 }
 
+/** Number of news items shown as a sneak peek on the homepage. */
+const SNEAK_PEEK_COUNT = 3
+
 export function News({ news, dict, locale }: NewsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
+  const sneakPeek = news.slice(0, SNEAK_PEEK_COUNT)
+  const hasMore = news.length > SNEAK_PEEK_COUNT
   return (
     <section id="news" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
@@ -28,14 +33,22 @@ export function News({ news, dict, locale }: NewsProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-12"
+          className="mb-12 flex items-end justify-between gap-4 flex-wrap"
         >
-          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-          <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+          <div>
+            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
+            <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+          </div>
+          <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
+            <Link href="/news">
+              {dict.viewAll}
+              <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
+            </Link>
+          </Button>
         </motion.div>
 
         <ul className="space-y-8 list-none">
-          {news.map((post, index) => (
+          {sneakPeek.map((post, index) => (
             <motion.li
               key={post.id}
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -30 }}
@@ -90,6 +103,23 @@ export function News({ news, dict, locale }: NewsProps) {
             </motion.li>
           ))}
         </ul>
+
+        {hasMore && (
+          <motion.div
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
+            className="mt-10 flex justify-center"
+          >
+            <Button size="lg" variant="outline" className="gap-2 font-bold uppercase tracking-wider hover:bg-accent hover:text-accent-foreground hover:border-accent" asChild>
+              <Link href="/news">
+                {dict.viewAll}
+                <ArrowRight weight="bold" />
+              </Link>
+            </Button>
+          </motion.div>
+        )}
       </div>
     </section>
   )

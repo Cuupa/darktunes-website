@@ -16,6 +16,8 @@ function rowToVideo(row: VideoRow): Video {
     youtubeId: row.youtube_id,
     thumbnailUrl: row.thumbnail_url ?? '',
     publishedAt: row.published_at,
+    isVisible: row.is_visible,
+    isShort: row.is_short,
   }
 }
 
@@ -23,6 +25,17 @@ export async function getVideos(db: DbClient): Promise<Video[]> {
   const { data, error } = await db
     .from('videos')
     .select('*')
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToVideo)
+}
+
+/** Public-facing: only returns visible videos. */
+export async function getPublicVideos(db: DbClient): Promise<Video[]> {
+  const { data, error } = await db
+    .from('videos')
+    .select('*')
+    .eq('is_visible', true)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToVideo)

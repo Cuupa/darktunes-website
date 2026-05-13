@@ -5,6 +5,7 @@ import { Plus, PencilSimple, Trash } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
 import { NewsForm, type NewsFormData } from './forms/NewsForm'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -42,6 +43,7 @@ const EMPTY_FORM: NewsFormData = {
   imageUrl: '',
   publishedAt: new Date().toISOString().split('T')[0],
   isPressOnly: false,
+  status: 'published',
 }
 
 function newsPostToFormData(post: NewsPost): NewsFormData {
@@ -53,6 +55,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     imageUrl: post.imageUrl ?? '',
     publishedAt: post.publishedAt.split('T')[0],
     isPressOnly: post.isPressOnly,
+    status: post.status,
   }
 }
 
@@ -65,6 +68,7 @@ function formDataToInsert(data: NewsFormData): NewsInsert {
     image_url: data.imageUrl || null,
     published_at: data.publishedAt || new Date().toISOString(),
     is_press_only: data.isPressOnly,
+    status: data.status,
   }
 }
 
@@ -105,6 +109,16 @@ export function NewsManager() {
     }
   }
 
+  const handleToggleStatus = async (post: NewsPost) => {
+    const newStatus = post.status === 'published' ? 'draft' : 'published'
+    try {
+      await updateNewsPost(post.id, { status: newStatus })
+      toast.success(`"${post.title}" ${newStatus === 'published' ? 'published' : 'set to draft'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Update failed')
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteTarget) return
     setIsMutating(true)
@@ -135,6 +149,7 @@ export function NewsManager() {
             <TableHead>Title</TableHead>
             <TableHead>Slug</TableHead>
             <TableHead>Published</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Audience</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -142,13 +157,13 @@ export function NewsManager() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : news.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                 No posts yet. Click "New Post" to add one.
               </TableCell>
             </TableRow>
@@ -160,6 +175,24 @@ export function NewsManager() {
                   {post.slug}
                 </TableCell>
                 <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleStatus(post)}
+                    title={post.status === 'published' ? 'Click to set to draft' : 'Click to publish'}
+                    className="focus:outline-none"
+                  >
+                    {post.status === 'published' ? (
+                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
+                        Published
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
+                        Draft
+                      </Badge>
+                    )}
+                  </button>
+                </TableCell>
                 <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
