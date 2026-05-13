@@ -49,6 +49,11 @@ const DEFAULTS: SiteSettings = {
   youtubeChannelId: '',
   carouselAutoplayMs: 0,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
+  logoUrl: '',
+  faviconUrl: '',
+  aboutHeadline: '',
+  aboutSubheading: '',
+  aboutBody: '',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -123,6 +128,11 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     youtubeChannelId: map['youtube_channel_id'] ?? DEFAULTS.youtubeChannelId,
     carouselAutoplayMs: parseInt(map['carousel_autoplay_ms'] ?? '0', 10) || 0,
     featureToggles,
+    logoUrl: map['logo_url'] ?? '',
+    faviconUrl: map['favicon_url'] ?? '',
+    aboutHeadline: map['about_headline'] ?? '',
+    aboutSubheading: map['about_subheading'] ?? '',
+    aboutBody: map['about_body'] ?? '',
   }
 }
 

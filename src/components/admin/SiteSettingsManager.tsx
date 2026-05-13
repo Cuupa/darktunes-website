@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { SiteSettings } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 
@@ -60,6 +61,11 @@ const schema = z.object({
   crtScanlinesEnabled: z.boolean().default(true),
   vignetteIntensity: z.number().min(0).max(1).default(0.5),
   carouselAutoplayMs: z.number().int().min(0).default(0),
+  logoUrl: z.string().optional().default(''),
+  faviconUrl: z.string().optional().default(''),
+  aboutHeadline: z.string().optional().default(''),
+  aboutSubheading: z.string().optional().default(''),
+  aboutBody: z.string().optional().default(''),
 })
 
 type FormData = z.infer<typeof schema>
@@ -96,6 +102,8 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
     handleSubmit,
     reset,
     control,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -105,6 +113,39 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
     control,
     name: 'spotifyPlaylists',
   })
+
+  const logoUrl = watch('logoUrl')
+  const faviconUrl = watch('faviconUrl')
+
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [isUploadingFavicon, setIsUploadingFavicon] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const faviconInputRef = useRef<HTMLInputElement>(null)
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+
+  async function uploadFile(file: File, fieldName: 'logoUrl' | 'faviconUrl', setUploading: (v: boolean) => void) {
+    setUploading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      })
+      if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`)
+      const json = await res.json() as { publicUrl: string }
+      setValue(fieldName, json.publicUrl, { shouldDirty: true })
+      toast.success('File uploaded successfully')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   // Sync form state when settings load from Supabase
   useEffect(() => {
@@ -133,8 +174,10 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Tabs defaultValue="global" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="global">Global</TabsTrigger>
+          <TabsTrigger value="branding">Logo &amp; Favicon</TabsTrigger>
+          <TabsTrigger value="about">About Page</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
@@ -191,6 +234,164 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   <Input id="termsUrl" {...register('termsUrl')} disabled={isSubmitting} />
                 </Field>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Branding — Logo & Favicon                                           */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="branding">
+          <Card>
+            <CardHeader>
+              <CardTitle>Logo &amp; Favicon</CardTitle>
+              <CardDescription>
+                Upload a custom logo (shown in the header and footer) and a favicon (shown in the browser tab).
+                Leave blank to fall back to the default static assets.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* Logo */}
+              <div className="space-y-3">
+                <Label>Label Logo</Label>
+                {logoUrl && (
+                  <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
+                    <img src={logoUrl} alt="Current logo" className="h-12 w-auto object-contain max-w-[200px]" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setValue('logoUrl', '', { shouldDirty: true })}
+                      disabled={isSubmitting}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadFile(file, 'logoUrl', setIsUploadingLogo)
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={isSubmitting || isUploadingLogo}
+                  >
+                    {isUploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">PNG, SVG, or WebP recommended · transparent background preferred</span>
+                </div>
+                <Input
+                  placeholder="Or paste R2 URL directly…"
+                  {...register('logoUrl')}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Favicon */}
+              <div className="space-y-3">
+                <Label>Favicon</Label>
+                {faviconUrl && (
+                  <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
+                    <img src={faviconUrl} alt="Current favicon" className="h-8 w-8 object-contain" />
+                    <span className="text-sm text-muted-foreground font-mono truncate max-w-xs">{faviconUrl}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setValue('faviconUrl', '', { shouldDirty: true })}
+                      disabled={isSubmitting}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={faviconInputRef}
+                    type="file"
+                    accept="image/x-icon,image/png,image/svg+xml,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadFile(file, 'faviconUrl', setIsUploadingFavicon)
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => faviconInputRef.current?.click()}
+                    disabled={isSubmitting || isUploadingFavicon}
+                  >
+                    {isUploadingFavicon ? 'Uploading…' : faviconUrl ? 'Replace Favicon' : 'Upload Favicon'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">ICO or 32×32 PNG recommended</span>
+                </div>
+                <Input
+                  placeholder="Or paste R2 URL directly…"
+                  {...register('faviconUrl')}
+                  disabled={isSubmitting}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* About Page                                                           */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="about">
+          <Card>
+            <CardHeader>
+              <CardTitle>About Page Content</CardTitle>
+              <CardDescription>
+                Manage all text shown on <code>/about</code>. Leave headline/subheading blank to use the default i18n values.
+                The body supports Markdown (headings, bold, italic, links, lists).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field id="aboutHeadline" label="Headline (optional — overrides i18n default)">
+                <Input
+                  id="aboutHeadline"
+                  placeholder="e.g. ABOUT DARKTUNES"
+                  {...register('aboutHeadline')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="aboutSubheading" label="Subheading (optional — overrides i18n default)">
+                <Input
+                  id="aboutSubheading"
+                  placeholder="e.g. The creative force behind the sound"
+                  {...register('aboutSubheading')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="aboutBody" label="Body Text (Markdown)">
+                <Textarea
+                  id="aboutBody"
+                  rows={16}
+                  placeholder={`## Our Story\n\nWe are darkTunes Music Group...\n\n## Mission\n\nPushing boundaries in alternative music.`}
+                  {...register('aboutBody')}
+                  disabled={isSubmitting}
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Supports: ## headings, **bold**, *italic*, [links](url), - list items, {'>'} blockquotes.
+                  Bare YouTube URLs on their own line embed as videos.
+                </p>
+              </Field>
             </CardContent>
           </Card>
         </TabsContent>

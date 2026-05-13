@@ -41,6 +41,11 @@ const DEFAULT_SETTINGS: SiteSettings = {
   youtubeChannelId: '',
   carouselAutoplayMs: 0,
   featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
+  logoUrl: '',
+  faviconUrl: '',
+  aboutHeadline: '',
+  aboutSubheading: '',
+  aboutBody: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -80,6 +85,11 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     youtube_channel_id: s.youtubeChannelId,
     carousel_autoplay_ms: String(s.carouselAutoplayMs ?? 0),
     feature_toggles: JSON.stringify(s.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }),
+    logo_url: s.logoUrl ?? '',
+    favicon_url: s.faviconUrl ?? '',
+    about_headline: s.aboutHeadline ?? '',
+    about_subheading: s.aboutSubheading ?? '',
+    about_body: s.aboutBody ?? '',
   }
 }
 

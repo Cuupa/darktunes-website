@@ -35,9 +35,17 @@ export function Footer({ siteSettings, dict }: FooterProps) {
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">dT</span>
-              </div>
+              {siteSettings.logoUrl ? (
+                <img
+                  src={siteSettings.logoUrl}
+                  alt={`${siteSettings.labelName} logo`}
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">dT</span>
+                </div>
+              )}
               <div>
                 <h3 className="text-lg font-bold tracking-tight uppercase">{siteSettings.labelName}</h3>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{dict.musicGroup}</p>
@@ -53,32 +61,40 @@ export function Footer({ siteSettings, dict }: FooterProps) {
             <nav aria-label="Footer navigation">
               <ul className="flex flex-col gap-2 list-none">
                 <li>
-                  <a href="#artists" onClick={(e) => handleSmoothScroll(e, '#artists')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <Link
+                    href="/artists"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     {dict.artistsLink}
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    {dict.aboutLink ?? 'About'}
+                  </Link>
+                </li>
+                <li>
+                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.releasesLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.newsLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.videosLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.tourLink}
                   </a>
                 </li>
                 <li>
-                  <Link href="/contact" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+                  <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.contactLink}
                   </Link>
                 </li>
@@ -87,7 +103,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href="https://www.submithub.com/playlister/darktunes-music-group"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-muted-foreground hover:text-accent transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {dict.submitMusicLink}
                   </a>
@@ -98,7 +114,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                       href={siteSettings.shopifyStoreUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-accent transition-colors flex items-center gap-1"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                     >
                       <ShoppingBag size={14} />
                       {dict.shopLink}
@@ -156,19 +172,19 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           <div className="flex gap-6">
             <Link
               href="/contact"
-              className="text-sm text-muted-foreground hover:text-accent transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {dict.contact}
             </Link>
             <Link
               href="/impressum"
-              className="text-sm text-muted-foreground hover:text-accent transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {dict.legalNotice}
             </Link>
             <Link
               href="/datenschutz"
-              className="text-sm text-muted-foreground hover:text-accent transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {dict.privacyPolicy}
             </Link>

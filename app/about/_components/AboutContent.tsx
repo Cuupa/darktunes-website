@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { MarkdownContent } from '@/components/MarkdownContent'
 import {
   InstagramLogo, YoutubeLogo, SpotifyLogo,
 } from '@phosphor-icons/react'
@@ -20,6 +21,10 @@ interface AboutContentProps {
 export function AboutContent({ siteSettings, artists, news, dict }: AboutContentProps) {
   const prefersReducedMotion = useReducedMotion()
 
+  const heading = siteSettings?.aboutHeadline || dict.heading
+  const subheading = siteSettings?.aboutSubheading || dict.subheading
+  const body = siteSettings?.aboutBody || ''
+
   const stats = [
     { label: 'Artists', value: artists.length },
     { label: 'News Posts', value: news.length },
@@ -35,7 +40,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
     <div className="container mx-auto px-4 lg:px-16 pt-36 pb-24 space-y-20">
       {/* Breadcrumb */}
       <div>
-        <Link href="/" className="text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-6 inline-block">
+        <Link href="/" className="text-xs text-muted-foreground hover:text-foreground font-mono uppercase tracking-widest mb-6 inline-block transition-colors">
           ← HOME
         </Link>
         <motion.div
@@ -43,13 +48,23 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
         >
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{dict.heading}</h1>
-          <p className="text-xl text-muted-foreground font-serif mt-4">{dict.subheading}</p>
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{heading}</h1>
+          <p className="text-xl text-muted-foreground font-serif mt-4">{subheading}</p>
         </motion.div>
       </div>
 
-      {/* Label description */}
-      {siteSettings?.labelTagline && (
+      {/* Editable body text (Markdown) */}
+      {body ? (
+        <motion.section
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+        >
+          <MarkdownContent content={body} className="max-w-3xl text-lg" />
+        </motion.section>
+      ) : siteSettings?.labelTagline ? (
+        /* Fallback: show hero description when no dedicated about body is set */
         <motion.section
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -61,7 +76,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
             {siteSettings.heroDescription || siteSettings.labelTagline}
           </p>
         </motion.section>
-      )}
+      ) : null}
 
       {/* Stats */}
       {stats.some((s) => s.value > 0) && (

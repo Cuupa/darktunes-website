@@ -279,92 +279,92 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     >
       {/* ── 3D Stage ───────────────────────────────────────────────────────── */}
       {/*
-        `perspective` lives here — on the outer wrapper — NOT on the
-        overflow-hidden Embla viewport.  Placing both `overflow: hidden` and
-        `transform-style: preserve-3d` on the same element would flatten the
-        3D context per the CSS spec.  Keeping them on separate elements avoids
-        this trap while still clipping the carousel edges correctly.
+        Outer wrapper clips horizontal overflow at the section level so the page
+        never scrolls sideways, while the inner Embla viewport is overflow-visible
+        so that perspective-rotated adjacent slides are FULLY visible and not
+        cropped at the viewport edge.
+
+        Layout:
+          [outer overflow-hidden] ← page-level horizontal clip
+            [perspective wrapper] ← 3D context
+              [emblaRef overflow-visible] ← Embla scrolls this but clips nothing
+                [flex container] ← translated by Embla
       */}
-      <div style={{ perspective: '1000px' }}>
-        {/* Embla viewport: overflow-hidden clips side-card overflow */}
-        <div ref={emblaRef} className="overflow-hidden">
-          {/* Embla container: Embla translates this element for scrolling */}
-          <div className="flex">
-            {releases.map((release, index) => (
-              <div
-                key={release.id}
-                // Fluid viewport-relative widths — no hardcoded pixel values.
-                // Mobile-first: 70 vw → tablet 50 vw → desktop 35 vw / 2xl cap.
-                className="flex-none w-[70vw] md:w-[50vw] lg:w-[35vw] max-w-2xl px-2"
-              >
-                {/*
-                  Inner wrapper: this element receives all 3D transforms
-                  (rotateY, scale, translate3d) via direct DOM mutation inside
-                  tweenSlides().  It is never re-rendered on scroll — the GPU
-                  compositor handles every frame at 60 fps.
-
-                  Virtual windowing: when this slide is outside the rendered
-                  window we render an empty aspect-square placeholder to
-                  preserve Embla layout calculation.  The `aspect-square` class
-                  keeps dimensions identical to the real slide so the scroll
-                  physics remain accurate.
-
-                  willChange is applied only to rendered slides (within the
-                  virtual window) to avoid promoting every slide to a GPU
-                  compositor layer — which exhausts VRAM on large catalogues.
-                */}
+      <div className="overflow-hidden">
+        <div style={{ perspective: '1200px' }}>
+          {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
+          <div ref={emblaRef} className="overflow-visible">
+            {/* Embla container: Embla translates this element for scrolling */}
+            <div className="flex">
+              {releases.map((release, index) => (
                 <div
-                  style={
-                    renderedIndices.has(index)
-                      ? { transformStyle: 'preserve-3d', willChange: 'transform, opacity' }
-                      : { transformStyle: 'preserve-3d' }
-                  }
+                  key={release.id}
+                  // Narrower slides so adjacent cards fit in the visible area.
+                  // With overflow-visible the neighbours are no longer cropped.
+                  // Mobile-first: 60vw → tablet 42vw → desktop 26vw / cap 440px.
+                  className="flex-none w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] px-3"
                 >
-                  {renderedIndices.has(index) ? (
-                    <Link
-                      href={`/releases/${release.id}`}
-                      aria-label={`${release.title} by ${release.artistName} – cover art`}
-                      draggable={false}
-                      tabIndex={release.id === activeRelease?.id ? 0 : -1}
-                    >
-                      <div
-                        className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
-                          release.id === activeRelease?.id
-                            ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
-                            : 'border-border hover:border-accent/30'
-                        }`}
+                  {/*
+                    Inner wrapper: receives 3D transforms (rotateY, scale, translate3d)
+                    via direct DOM mutation in tweenSlides(). Never re-renders on scroll.
+
+                    Virtual windowing: off-window slides render an empty placeholder
+                    that preserves Embla's layout calculation (same dimensions as
+                    a real slide) without loading the image.
+                  */}
+                  <div
+                    style={
+                      renderedIndices.has(index)
+                        ? { transformStyle: 'preserve-3d', willChange: 'transform, opacity' }
+                        : { transformStyle: 'preserve-3d' }
+                    }
+                  >
+                    {renderedIndices.has(index) ? (
+                      <Link
+                        href={`/releases/${release.id}`}
+                        aria-label={`${release.title} by ${release.artistName} – cover art`}
+                        draggable={false}
+                        tabIndex={release.id === activeRelease?.id ? 0 : -1}
                       >
-                        <img
-                          src={getOptimizedImageUrl(release.coverArt, 600)}
-                          alt={`${release.title} by ${release.artistName} – cover art`}
-                          className="w-full h-full object-cover"
-                          sizes="(max-width: 640px) 70vw, 320px"
-                          draggable={false}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                        {/* Cinematic gradient overlay on centre card */}
-                        {release.id === activeRelease?.id && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
-                        )}
-                        {release.featured && (
-                          <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                            {dict.featured}
-                          </Badge>
-                        )}
-                      </div>
-                    </Link>
-                  ) : (
-                    /* Lightweight placeholder — maintains slide dimensions so
-                       Embla measures the full carousel width correctly. */
-                    <div
-                      className="aspect-square rounded-lg bg-muted/20 border border-border/20"
-                      aria-hidden="true"
-                    />
-                  )}
+                        <div
+                          className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
+                            release.id === activeRelease?.id
+                              ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
+                              : 'border-border hover:border-accent/30'
+                          }`}
+                        >
+                          <img
+                            src={getOptimizedImageUrl(release.coverArt, 600)}
+                            alt={`${release.title} by ${release.artistName} – cover art`}
+                            className="w-full h-full object-cover"
+                            sizes="(max-width: 640px) 60vw, 320px"
+                            draggable={false}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          {/* Cinematic gradient overlay on centre card */}
+                          {release.id === activeRelease?.id && (
+                            <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+                          )}
+                          {release.featured && (
+                            <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                              {dict.featured}
+                            </Badge>
+                          )}
+                        </div>
+                      </Link>
+                    ) : (
+                      /* Lightweight placeholder — maintains slide dimensions so
+                         Embla measures the full carousel width correctly. */
+                      <div
+                        className="aspect-square rounded-lg bg-muted/20 border border-border/20"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
