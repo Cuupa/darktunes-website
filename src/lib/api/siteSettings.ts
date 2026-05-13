@@ -130,6 +130,9 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     featureToggles,
     logoUrl: map['logo_url'] ?? '',
     faviconUrl: map['favicon_url'] ?? '',
+    aboutHeadline: map['about_headline'] ?? '',
+    aboutSubheading: map['about_subheading'] ?? '',
+    aboutBody: map['about_body'] ?? '',
   }
 }
 

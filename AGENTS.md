@@ -377,3 +377,5 @@ Only slides within `VIRTUAL_BUFFER = 3` positions of the active index have their
 The rendered window (`renderedIndices: Set<number>`) grows monotonically as the user navigates — once an index enters the window it is never evicted, acting as a natural browser image cache. Maximum DOM-heavy nodes at any time: 7.
 Images use `loading="lazy" decoding="async"` and pass through `getOptimizedImageUrl(url, 600)` (wsrv.nl → WebP).
 Artist images in `Artists.tsx` also use `loading="lazy" decoding="async"` + `getSquareThumbnail`.
+
+3D Coverflow Clip Architecture: The outer wrapper has `overflow: hidden` to prevent horizontal page scroll. The Embla viewport div (emblaRef) uses `overflow: visible` so perspective-rotated adjacent slides are fully visible and not cropped at the viewport edge. The perspective (1200px) is on a middle wrapper between the two. This three-layer structure — [clip] → [perspective] → [embla-visible] — is required; do NOT collapse layers or move overflow-hidden onto the perspective/embla elements.
