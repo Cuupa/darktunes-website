@@ -25,7 +25,7 @@ import {
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
-import type { Artist, Release, Concert, Video } from '@/types'
+import type { Artist, Release, Concert, Video, NewsPost } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ArtistDetailContentProps {
@@ -33,6 +33,7 @@ interface ArtistDetailContentProps {
   releases: Release[]
   concerts: Concert[]
   videos: Video[]
+  news: NewsPost[]
   dict: Dictionary['artistDetail']
   consentDict: Dictionary['consent']
   locale: Locale
@@ -50,6 +51,7 @@ export function ArtistDetailContent({
   releases,
   concerts,
   videos,
+  news,
   dict,
   consentDict,
   locale,
@@ -245,6 +247,31 @@ export function ArtistDetailContent({
           </motion.section>
         )}
 
+        {/* Spotify player */}
+        {artist.spotifyId && (
+          <motion.section
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+          >
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">Spotify</h2>
+            <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
+              <div className="rounded-xl overflow-hidden max-w-2xl">
+                <iframe
+                  src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
+                  width="100%"
+                  height="352"
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="border-0"
+                  title={`${artist.name} on Spotify`}
+                />
+              </div>
+            </ConsentGate>
+          </motion.section>
+        )}
+
         {/* Videos */}
         {videos.length > 0 && (
           <motion.section
@@ -376,6 +403,47 @@ export function ArtistDetailContent({
                     </div>
                   </Link>
                 </motion.li>
+              ))}
+            </ul>
+          </motion.section>
+        )}
+
+        {/* Latest News */}
+        {news.length > 0 && (
+          <motion.section
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+          >
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">News</h2>
+            <ul className="space-y-4 list-none max-w-3xl">
+              {news.map((post) => (
+                <li key={post.id}>
+                  <Link
+                    href={`/news/${post.slug}`}
+                    className="group flex gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
+                  >
+                    {post.imageUrl && (
+                      <img
+                        src={getOptimizedImageUrl(post.imageUrl, 120)}
+                        alt={post.title}
+                        className="w-20 h-20 object-cover rounded-lg shrink-0"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">
+                        {new Date(post.publishedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
+                      <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">{post.title}</h3>
+                      {post.excerpt && (
+                        <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{post.excerpt}</p>
+                      )}
+                    </div>
+                  </Link>
+                </li>
               ))}
             </ul>
           </motion.section>

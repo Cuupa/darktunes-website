@@ -60,11 +60,11 @@ function slotStyle(offset: number, reduced: boolean, cardWidth: number): CardSlo
   }
 
   // Pronounced coverflow: side cards are noticeably smaller and rotated
-  const translateX = offset * (cardWidth * 0.68)
-  const rotateY = -offset * 44
-  const translateZ = abs === 0 ? 140 : -abs * 100
-  const scale = abs === 0 ? 1 : 1 - abs * 0.28   // 1.0 → 0.72 → 0.44
-  const opacity = abs === 0 ? 1 : 1 - abs * 0.32  // 1.0 → 0.68 → 0.36
+  const translateX = offset * (cardWidth * 0.62)
+  const rotateY = -offset * 28
+  const translateZ = abs === 0 ? 80 : -abs * 60
+  const scale = abs === 0 ? 1 : 1 - abs * 0.18   // 1.0 → 0.82 → 0.64
+  const opacity = abs === 0 ? 1 : 1 - abs * 0.2  // 1.0 → 0.8 → 0.6
   const zIndex = 10 - abs * 2
 
   return { translateX, translateZ, rotateY, scale, opacity, zIndex }

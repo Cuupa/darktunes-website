@@ -2,6 +2,7 @@
   "navigation": {
     "home": "HOME",
     "artists": "ARTISTS",
+    "about": "ABOUT",
     "releases": "RELEASES",
     "tour": "TOUR",
     "news": "NEWS",
@@ -328,5 +329,14 @@
     "readMore": "Read More",
     "backToNews": "← Back to News",
     "noNews": "No news posts yet."
+  },
+  "about": {
+    "heading": "ABOUT",
+    "subheading": "About the Label",
+    "historyHeading": "Our Story",
+    "teamHeading": "Team",
+    "statsHeading": "By the Numbers",
+    "linksHeading": "Links & Social",
+    "noContent": "About page content coming soon."
   }
 }

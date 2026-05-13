@@ -136,13 +136,8 @@ export function Artists({ artists, dict }: ArtistsProps) {
         {filteredArtists.length === 0 ? (
           <p className="text-muted-foreground font-serif">{dict.noResults}</p>
         ) : (
-          // data-lenis-prevent: tell Lenis to hand off scroll events inside
-          // this horizontal swipe container back to the native browser handler,
-          // preventing "scroll-fighting" between Lenis (vertical) and the
-          // snap carousel (horizontal) on touch devices.
           <motion.ul
             className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
-            data-lenis-prevent
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
             whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}

@@ -33,6 +33,7 @@ export function Header({ dict, locale }: HeaderProps) {
   const navItems = [
     { label: dict.home, href: '#hero' },
     { label: dict.artists, href: '/artists', isLink: true },
+    { label: dict.about, href: '/about', isLink: true },
     { label: dict.releases, href: '#releases' },
     { label: dict.tour, href: '#concerts' },
     { label: dict.news, href: '/news', isLink: true },

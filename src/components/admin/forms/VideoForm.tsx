@@ -10,6 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { Artist } from '@/types'
 import { ImageUploadButton } from './ImageUploadButton'
 
 export interface VideoFormData {
@@ -22,13 +30,13 @@ export interface VideoFormData {
   isShort: boolean
 }
 
-type Props = AdminPanelProps<VideoFormData>
+type Props = AdminPanelProps<VideoFormData> & { artists?: Artist[] }
 
 /** Extracts a YouTube video ID from a URL or returns null if unrecognised. */
 // Uses the centralized parser from platformUrlParser.ts
 const localExtractYouTubeId = extractYouTubeVideoId
 
-export function VideoForm({ value, onChange, isLoading }: Props) {
+export function VideoForm({ value, onChange, isLoading, artists }: Props) {
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset } = useForm<VideoFormData>({
     defaultValues: value,
@@ -158,7 +166,24 @@ export function VideoForm({ value, onChange, isLoading }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="artistName">Artist / Channel Name *</Label>
-          <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
+          {artists && artists.length > 0 ? (
+            <Select
+              value={watch('artistName')}
+              onValueChange={(val) => setValue('artistName', val)}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="artistName">
+                <SelectValue placeholder="Select artist…" />
+              </SelectTrigger>
+              <SelectContent>
+                {artists.map((a) => (
+                  <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
+          )}
         </div>
         <div className="space-y-1">
           <Label htmlFor="publishedAt">Published At</Label>

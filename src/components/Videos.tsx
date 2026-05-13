@@ -36,7 +36,12 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [page, setPage] = useState(1)
   const prefersReducedMotion = useReducedMotion()
+
+  const VIDEOS_PER_PAGE = 9
+  const paginatedVideos = videos.slice(0, page * VIDEOS_PER_PAGE)
+  const hasMore = paginatedVideos.length < videos.length
 
   const handleVideoClick = (video: Video) => {
     setSelectedVideo(video)
@@ -58,28 +63,25 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
-          {/* data-lenis-prevent: hand off horizontal touch-scroll to the native
-              browser handler so Lenis (vertical) and snap carousel (horizontal)
-              don't fight on mobile. */}
+          {/* data-lenis-prevent removed: vertical Lenis scroll is not affected by the grid layout */}
           <motion.ul
-            className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
-            data-lenis-prevent
+            className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
             whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}
             viewport={{ once: true }}
           >
-            {videos.map((video) => (
+            {paginatedVideos.map((video) => (
               <motion.li
                 key={video.id}
-                className="flex-none w-[82vw] snap-start md:w-auto"
+                className="flex-none w-[82vw] snap-start md:w-auto flex"
                 variants={prefersReducedMotion ? undefined : itemVariants}
               >
-                <Card 
-                  className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer"
+                <Card
+                  className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer flex flex-col w-full"
                   onClick={() => handleVideoClick(video)}
                 >
-                  <div className="relative aspect-video overflow-hidden">
+                  <div className="relative aspect-video overflow-hidden shrink-0">
                     <img
                       src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                       alt={`${video.title} – video thumbnail`}
@@ -99,14 +101,14 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                       </Button>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <Badge className="mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase tracking-wider font-mono text-xs">
+                  <div className="p-6 flex flex-col flex-1">
+                    <Badge className="mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase tracking-wider font-mono text-xs self-start">
                       {video.artistName}
                     </Badge>
-                    <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors">
+                    <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors flex-1">
                       {video.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground font-mono">
+                    <p className="text-sm text-muted-foreground font-mono mt-auto">
                       {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
                         year: 'numeric',
                         month: 'long',
@@ -118,12 +120,25 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
               </motion.li>
             ))}
           </motion.ul>
+
+          {hasMore && (
+            <div className="flex justify-center mt-12">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setPage((p) => p + 1)}
+                className="min-w-[160px]"
+              >
+                Load More
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
-      <VideoModal 
-        video={selectedVideo} 
-        open={modalOpen} 
+      <VideoModal
+        video={selectedVideo}
+        open={modalOpen}
         onClose={() => setModalOpen(false)}
         placeholderUrl={placeholderUrl}
         youtubeLabel={consentDict.loadYouTube}

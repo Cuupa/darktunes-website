@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getNewsPostBySlug } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { MarkdownContent } from '@/components/MarkdownContent'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -81,12 +82,8 @@ export default async function NewsDetailPage({ params }: Props) {
           </p>
         )}
 
-        <div className="prose prose-invert prose-sm max-w-none space-y-4">
-          {post.content.split('\n\n').map((paragraph, idx) => (
-            <p key={idx} className="text-foreground/90 leading-relaxed font-serif">
-              {paragraph}
-            </p>
-          ))}
+        <div className="prose prose-invert prose-sm max-w-none">
+          <MarkdownContent content={post.content} />
         </div>
       </div>
     </div>

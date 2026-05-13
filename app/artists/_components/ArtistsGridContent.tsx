@@ -7,8 +7,10 @@
  * Clicking any card navigates to /artists/[slug].
  */
 
+import { useState, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 
@@ -28,73 +30,97 @@ const itemVariants = {
 
 export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
   const prefersReducedMotion = useReducedMotion()
+  const [searchQuery, setSearchQuery] = useState('')
+  const deferredQuery = useDeferredValue(searchQuery)
 
-  if (artists.length === 0) {
-    return (
-      <p className="text-center text-muted-foreground py-24 text-lg">
-        No artists found.
-      </p>
+  const sortedArtists = useMemo(
+    () => [...artists].sort((a, b) => a.name.localeCompare(b.name)),
+    [artists],
+  )
+
+  const filteredArtists = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase()
+    if (!q) return sortedArtists
+    return sortedArtists.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.genres.some((g) => g.toLowerCase().includes(q)),
     )
-  }
+  }, [deferredQuery, sortedArtists])
+
+  const isFiltered = deferredQuery !== searchQuery
 
   return (
-    <motion.ul
-      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 list-none"
-      variants={prefersReducedMotion ? {} : containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {artists.map((artist) => (
-        <motion.li key={artist.id} variants={prefersReducedMotion ? {} : itemVariants}>
-          <Link
-            href={`/artists/${artist.slug}`}
-            className="group relative block overflow-hidden rounded-lg aspect-square bg-card border border-border hover:border-accent/50 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            aria-label={artist.name}
-          >
-            {/* Artist photo */}
-            {artist.imageUrl ? (
-              <img
-                src={getSquareThumbnail(artist.imageUrl, 400)}
-                alt={`${artist.name} – artist photo`}
-                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110"
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">
-                <span className="text-6xl font-bold text-muted-foreground/30 uppercase select-none">
-                  {artist.name.slice(0, 2)}
-                </span>
-              </div>
-            )}
+    <>
+      <div className="relative mb-8 max-w-md">
+        <MagnifyingGlass
+          size={18}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search artists or genres…"
+          className="h-11 w-full rounded-md border border-border bg-muted pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Search artists or genres"
+        />
+      </div>
 
-            {/* Default overlay: darkened gradient + name at bottom */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:opacity-0 transition-opacity duration-300" />
-            <div className="absolute bottom-0 left-0 right-0 p-3 group-hover:opacity-0 transition-opacity duration-300">
-              <p className="text-white font-bold text-sm leading-tight truncate drop-shadow-lg">
-                {artist.name}
-              </p>
-            </div>
-
-            {/* Hover overlay: show logo or large name */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
-              {artist.logoUrl ? (
-                <img
-                  src={getOptimizedImageUrl(artist.logoUrl, 300)}
-                  alt={`${artist.name} – logo`}
-                  className="max-w-full max-h-full object-contain"
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <p className="text-white font-bold text-lg text-center leading-tight">
-                  {artist.name}
-                </p>
-              )}
-            </div>
-          </Link>
-        </motion.li>
-      ))}
-    </motion.ul>
+      {filteredArtists.length === 0 ? (
+        <p className="text-center text-muted-foreground py-24 text-lg">No artists found.</p>
+      ) : (
+        <motion.ul
+          className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 list-none transition-opacity duration-150 ${isFiltered ? 'opacity-60' : 'opacity-100'}`}
+          variants={prefersReducedMotion ? {} : containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {filteredArtists.map((artist) => (
+            <motion.li key={artist.id} variants={prefersReducedMotion ? {} : itemVariants}>
+              <Link
+                href={`/artists/${artist.slug}`}
+                className="group relative block overflow-hidden rounded-lg aspect-square bg-card border border-border hover:border-accent/50 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                aria-label={artist.name}
+              >
+                {artist.imageUrl ? (
+                  <img
+                    src={getSquareThumbnail(artist.imageUrl, 400)}
+                    alt={`${artist.name} – artist photo`}
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">
+                    <span className="text-6xl font-bold text-muted-foreground/30 uppercase select-none">
+                      {artist.name.slice(0, 2)}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:opacity-0 transition-opacity duration-300" />
+                <div className="absolute bottom-0 left-0 right-0 p-3 group-hover:opacity-0 transition-opacity duration-300">
+                  <p className="text-white font-bold text-sm leading-tight truncate drop-shadow-lg">{artist.name}</p>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+                  {artist.logoUrl ? (
+                    <img
+                      src={getOptimizedImageUrl(artist.logoUrl, 300)}
+                      alt={`${artist.name} – logo`}
+                      className="max-w-full max-h-full object-contain"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <p className="text-white font-bold text-lg text-center leading-tight">{artist.name}</p>
+                  )}
+                </div>
+              </Link>
+            </motion.li>
+          ))}
+        </motion.ul>
+      )}
+    </>
   )
 }
