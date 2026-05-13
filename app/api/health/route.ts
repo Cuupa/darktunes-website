@@ -22,7 +22,7 @@ const KNOWN_APIS: Record<string, boolean> = {
   spotify: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
   discogs: !!process.env.DISCOGS_TOKEN,
   songkick: !!process.env.SONGKICK_API_KEY,
-  bandsintown: !!process.env.BANDSINTOWN_APP_ID,
+  bandsintown: !!process.env.BANDSINTOWN_API_KEY,
   odesli: true, // no key required
   youtube: !!process.env.YOUTUBE_API_KEY,
 }

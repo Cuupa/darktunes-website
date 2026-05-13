@@ -102,7 +102,7 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
 | `DISCOGS_TOKEN` | Discogs personal access token (sync releases by Discogs Artist ID) |
 | `SONGKICK_API_KEY` | Songkick API key (sync tour dates by Songkick Artist ID) |
-| `BANDSINTOWN_APP_ID` | Bandsintown app_id / API key (sync tour dates by Bandsintown artist name) |
+| `BANDSINTOWN_API_KEY` | Bandsintown API key (sync tour dates by Bandsintown artist name) |
 | `YOUTUBE_API_KEY` | Google API key with YouTube Data API v3 (sync videos via `POST /api/sync-youtube`) |
 | `YOUTUBE_CHANNEL_ID` | YouTube channel ID (starts with `UC`) |
 | `CRON_SECRET` | Optional secret for Vercel cron requests to `POST /api/sync-youtube` (Bearer token) |

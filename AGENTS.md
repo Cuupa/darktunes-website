@@ -137,7 +137,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires deps and calls `sy
 Sync functions MUST NOT throw — capture all errors in `SyncResult.errors` and return gracefully.
 Every sync run writes a `sync_logs` entry with status 'success', 'partial', or 'error'.
 `sync_logs` also records `api_source` (itunes | spotify | discogs | songkick | bandsintown | odesli | all) and `rate_limited` (boolean) per run.
-The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps extends SyncDeps with optional spotify/discogsToken/songkickApiKey/bandsintownAppId). Called by `POST /api/sync`.
+The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps extends SyncDeps with optional spotify/discogsToken/songkickApiKey/bandsintownApiKey). Called by `POST /api/sync`.
 Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs releases using ISRC → barcode/UPC → normalised title + year precedence.
 `syncAllReleases()` in `useReleases.ts` returns the full `SyncAllResult` (typed import from `src/lib/sync/syncAll.ts`). `ReleasesManager` parses the result: on success shows a toast with total items synced; on errors shows a warning toast and a "View Errors" button that opens a dialog with per-API error details.
 

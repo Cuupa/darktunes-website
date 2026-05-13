@@ -78,7 +78,7 @@ require_env "SPOTIFY_CLIENT_ID"     "Spotify app client ID (sync: releases by Sp
 require_env "SPOTIFY_CLIENT_SECRET" "Spotify app client secret"
 require_env "DISCOGS_TOKEN"         "Discogs personal access token (sync: releases by Discogs Artist ID)"
 require_env "SONGKICK_API_KEY"      "Songkick API key (sync: tour dates by Songkick Artist ID)"
-require_env "BANDSINTOWN_APP_ID"    "Bandsintown app_id (sync: tour dates by Bandsintown artist name/id)"
+require_env "BANDSINTOWN_API_KEY"   "Bandsintown API key (sync: tour dates by Bandsintown artist name/id)"
 echo ""
 
 echo "  — Newsletter (optional — DOI email delivery via Resend Edge Function) —"

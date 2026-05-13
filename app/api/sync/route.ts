@@ -60,7 +60,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     SPOTIFY_CLIENT_SECRET,
     DISCOGS_TOKEN,
     SONGKICK_API_KEY,
-    BANDSINTOWN_APP_ID,
+    BANDSINTOWN_API_KEY,
   } = process.env
 
   if (
@@ -102,7 +102,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         : undefined,
     discogsToken: DISCOGS_TOKEN,
     songkickApiKey: SONGKICK_API_KEY,
-    bandsintownAppId: BANDSINTOWN_APP_ID,
+    bandsintownApiKey: BANDSINTOWN_API_KEY,
   })
 
   revalidateTag('releases')
