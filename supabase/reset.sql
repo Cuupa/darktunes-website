@@ -105,6 +105,25 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
 
+-- Guard: existing databases may have role as TEXT with a CHECK constraint
+-- (created before the user_role enum was introduced). Drop the constraint and
+-- cast the column to the enum so that all five role values are accepted.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'profiles'
+      AND column_name  = 'role'
+      AND data_type    = 'text'
+  ) THEN
+    ALTER TABLE public.profiles
+      ALTER COLUMN role TYPE public.user_role USING role::public.user_role;
+  END IF;
+END $$;
+
 DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
 CREATE TRIGGER trg_profiles_updated_at
   BEFORE UPDATE ON public.profiles
