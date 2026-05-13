@@ -11,12 +11,11 @@ import { Footer } from '@/components/Footer'
 import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion } from 'framer-motion'
-import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
+import type { Release, NewsPost, Video, SiteSettings, Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface HomePageContentProps {
   releases: Release[]
-  artists: Artist[]
   news: NewsPost[]
   videos: Video[]
   concerts: Concert[]
@@ -36,7 +35,6 @@ interface HomePageContentProps {
  */
 export function HomePageContent({
   releases,
-  artists,
   news,
   videos,
   concerts,

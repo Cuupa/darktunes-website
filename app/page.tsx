@@ -14,13 +14,12 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import { HomePageContent } from './_components/HomePageContent'
 import { getPublicReleases } from '@/lib/api/releases'
-import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { getPublicVideos } from '@/lib/api/videos'
 import { getPublicConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
-import type { Release, Artist, NewsPost, Video, SiteSettings, Concert } from '@/types'
+import type { Release, NewsPost, Video, SiteSettings, Concert } from '@/types'
 import type { Database } from '@/types/database'
 
 // ---------------------------------------------------------------------------
@@ -48,14 +47,6 @@ const getCachedReleases = unstable_cache(
   },
   ['releases'],
   { revalidate: 60, tags: ['releases'] },
-)
-
-const getCachedArtists = unstable_cache(
-  async (): Promise<Artist[]> => {
-    return getPublicArtists(createPublicSupabaseClient())
-  },
-  ['artists'],
-  { revalidate: 60, tags: ['artists'] },
 )
 
 const getCachedNews = unstable_cache(
@@ -96,9 +87,8 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, artists, news, videos, concerts, siteSettings, locale] = await Promise.all([
+  const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
     getCachedReleases().catch(() => [] as Release[]),
-    getCachedArtists().catch(() => [] as Artist[]),
     getCachedNews().catch(() => [] as NewsPost[]),
     getCachedVideos().catch(() => [] as Video[]),
     getCachedConcerts().catch(() => [] as Concert[]),
@@ -150,7 +140,6 @@ export default async function HomePage() {
   return (
     <HomePageContent
       releases={releases}
-      artists={artists}
       news={news}
       videos={videos}
       concerts={concerts}
