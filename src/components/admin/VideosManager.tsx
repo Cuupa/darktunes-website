@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise, Eye, EyeSlash } from '@phosphor-icons/react'
 import { useVideos } from '@/hooks/useVideos'
+import { useArtists } from '@/hooks/useArtists'
 import { VideoForm, type VideoFormData } from './forms/VideoForm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -79,6 +80,7 @@ function formDataToInsert(data: VideoFormData): VideoInsert {
 
 export function VideosManager() {
   const { videos, isLoading, createVideo, updateVideo, deleteVideo, syncYouTube } = useVideos()
+  const { artists } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingVideo, setEditingVideo] = useState<Video | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Video | null>(null)
@@ -274,7 +276,7 @@ export function VideosManager() {
           <DialogHeader>
             <DialogTitle>{editingVideo ? 'Edit Video' : 'New Video'}</DialogTitle>
           </DialogHeader>
-          <VideoForm value={formValue} onChange={handleSave} isLoading={isMutating} />
+          <VideoForm value={formValue} onChange={handleSave} isLoading={isMutating} artists={artists} />
         </DialogContent>
       </Dialog>
 

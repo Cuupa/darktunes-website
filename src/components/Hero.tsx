@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
+import Link from 'next/link'
 import { motion, useReducedMotion, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -34,14 +35,6 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
       const elementPosition = target.getBoundingClientRect().top
       const offsetPosition = elementPosition + window.scrollY - headerOffset
       window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
-    }
-  }
-
-  const handleListenNow = () => {
-    if (featuredRelease.spotifyUrl) {
-      window.open(featuredRelease.spotifyUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      handleSmoothScroll('#spotify-player')
     }
   }
 
@@ -99,12 +92,23 @@ export function Hero({ featuredRelease, siteSettings, dict }: HeroProps) {
               {featuredRelease.promoText || siteSettings.heroDescription}
             </p>
 
-            <div className="flex flex-wrap gap-4">
-              <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider group text-base px-8 py-6" onClick={handleListenNow}>
-                <Play className="mr-2 group-hover:scale-110 transition-transform" weight="fill" size={24} />
-                {dict.listenNow}
+            <div className="flex flex-wrap gap-4 items-center">
+              <Button
+                size="lg"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
+                asChild
+              >
+                <Link href={`/releases/${featuredRelease.id}`}>
+                  <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
+                  {dict.listenNow}
+                </Link>
               </Button>
-              <Button size="lg" variant="outline" className="border-2 font-bold uppercase tracking-wider group text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary" onClick={() => handleSmoothScroll('#artists')}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                onClick={() => handleSmoothScroll('#artists')}
+              >
                 {dict.exploreArtist}
               </Button>
             </div>
