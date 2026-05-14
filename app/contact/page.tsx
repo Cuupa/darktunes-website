@@ -37,8 +37,13 @@ export default async function ContactPage() {
           <p className="text-xl text-muted-foreground font-serif">{c.subheading}</p>
         </div>
 
+        {/* Contact form */}
+        <section className="mb-14 rounded-xl border border-border bg-card/40 p-8">
+          <ContactForm dict={c} />
+        </section>
+
         {/* Submit Music section */}
-        <section className="mb-14 rounded-xl border border-primary/30 bg-card/60 p-8 space-y-4">
+        <section className="rounded-xl border border-primary/30 bg-card/60 p-8 space-y-4">
           <h2 className="text-2xl font-bold uppercase tracking-wider">{c.submitMusicHeading}</h2>
           <p className="text-muted-foreground font-serif leading-relaxed">
             {c.submitMusicDescription}
@@ -52,11 +57,6 @@ export default async function ContactPage() {
             {c.submitMusicButton}
             <ArrowSquareOut size={18} weight="bold" />
           </a>
-        </section>
-
-        {/* Contact form */}
-        <section className="rounded-xl border border-border bg-card/40 p-8">
-          <ContactForm dict={c} />
         </section>
       </div>
     </div>

@@ -96,7 +96,7 @@ app/releases/[id]/page.tsx — Data API Waterfall:
 
 app/artists/[slug]/page.tsx — Data API Waterfall:
   1. URL segment `slug` → artist slug
-  2. `getArtistBySlug(client, slug)` → SELECT * FROM artists WHERE slug = ? (RLS: anon sees visible artists)
+  2. `getArtistBySlug(client, slug)` → Stage 1 direct slug match; Stage 2 fallback scans rows with NULL/empty slug and matches the mapper-generated slug from artist name (RLS: anon sees visible artists)
   3. `getReleasesByArtistId` + `getConcertsByArtistId` + `getVideosByArtistId` → three parallel queries using the resolved artist.id
   4. `getDictionary(locale)` → locale resolution
   Steps 2+3+4 run concurrently after step 1 resolves. Cookie-free public client used inside unstable_cache (revalidate: 60, tags: artists/releases/concerts/videos).

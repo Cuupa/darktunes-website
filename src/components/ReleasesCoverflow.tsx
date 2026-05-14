@@ -36,7 +36,23 @@ const VIRTUAL_BUFFER = 3
  * Performance: slides further than TWEEN_CUTOFF units from the active slide
  * are skipped immediately — only the 7 centre slides receive DOM mutations.
  */
-const TWEEN_CUTOFF = VIRTUAL_BUFFER + 0.5
+const TWEEN_CUTOFF = VIRTUAL_BUFFER
+const ROTATION_DEGREES_PER_SLIDE = 45
+const Z_OFFSET_PER_SLIDE = 120
+const SCALE_FACTOR_PER_SLIDE = 0.25
+const MIN_SCALE = 0.4
+const OPACITY_FACTOR_PER_SLIDE = 0.35
+
+/**
+ * Calculates wrapped slide distance in a looping carousel and returns whether
+ * a slide index is currently inside the active virtual-render buffer window.
+ */
+function isWithinVirtualBuffer(index: number, centre: number, total: number): boolean {
+  if (total <= 1) return true
+  const directDistance = Math.abs(index - centre)
+  const wrappedDistance = total - directDistance
+  return Math.min(directDistance, wrappedDistance) <= VIRTUAL_BUFFER
+}
 
 function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): void {
   const engine = api.internalEngine()
@@ -83,12 +99,12 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     }
 
     // 3D coverflow interpolation — GPU-only properties (transform + opacity)
-    const rotateY = -distInSlides * 44                    // deg: fan inward
-    const translateZ = abs > 0 ? -(abs * 80) : 0         // px: push back in Z
-    const scale = Math.max(0.4, 1 - abs * 0.28)          // 1.0 → 0.72 → 0.44
-    const opacity = abs > 2.5 ? 0 : Math.max(0.2, 1 - abs * 0.35)
+    const rotateY = -distInSlides * ROTATION_DEGREES_PER_SLIDE
+    const translateZ = -(abs * Z_OFFSET_PER_SLIDE)
+    const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_FACTOR_PER_SLIDE)
+    const opacity = Math.max(0, 1 - abs * OPACITY_FACTOR_PER_SLIDE)
 
-    inner.style.transform = `rotateY(${rotateY}deg) scale(${scale}) translate3d(0, 0, ${translateZ}px)`
+    inner.style.transform = `scale(${scale}) translate3d(0, 0, ${translateZ}px) rotateY(${rotateY}deg)`
     inner.style.opacity = String(Math.max(0, opacity))
   })
 }
@@ -147,6 +163,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   // React state only for the selected index — drives the metadata panel and
   // dot indicators.  Scroll progress itself never enters React state.
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [imageLoadedById, setImageLoadedById] = useState<Record<string, boolean>>({})
+
+  /** Marks one cover image as loaded while preserving state identity if unchanged. */
+  const markImageLoaded = useCallback((releaseId: string) => {
+    setImageLoadedById((prev) =>
+      prev[releaseId] ? prev : { ...prev, [releaseId]: true },
+    )
+  }, [])
 
   /**
    * Stable initial window helper — extracts the setup logic so both the
@@ -290,80 +314,101 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
               [emblaRef overflow-visible] ← Embla scrolls this but clips nothing
                 [flex container] ← translated by Embla
       */}
-      <div className="overflow-hidden">
-        <div style={{ perspective: '1200px' }}>
+      <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
+        <div style={{ perspective: '1400px', transformStyle: 'preserve-3d' }}>
           {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
-          <div ref={emblaRef} className="overflow-visible">
+          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
             {/* Embla container: Embla translates this element for scrolling */}
             <div className="flex">
-              {releases.map((release, index) => (
-                <div
-                  key={release.id}
-                  // Narrower slides so adjacent cards fit in the visible area.
-                  // With overflow-visible the neighbours are no longer cropped.
-                  // Mobile-first: 60vw → tablet 42vw → desktop 26vw / cap 440px.
-                  className="flex-none w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] px-3"
-                >
-                  {/*
-                    Inner wrapper: receives 3D transforms (rotateY, scale, translate3d)
-                    via direct DOM mutation in tweenSlides(). Never re-renders on scroll.
+              {releases.map((release, index) => {
+                const isActive = release.id === activeRelease?.id
+                const imageLoaded = imageLoadedById[release.id] ?? false
 
-                    Virtual windowing: off-window slides render an empty placeholder
-                    that preserves Embla's layout calculation (same dimensions as
-                    a real slide) without loading the image.
-                  */}
+                return (
                   <div
-                    style={
-                      renderedIndices.has(index)
-                        ? { transformStyle: 'preserve-3d', willChange: 'transform, opacity' }
-                        : { transformStyle: 'preserve-3d' }
-                    }
+                    key={release.id}
+                    // Narrower slides so adjacent cards fit in the visible area.
+                    // With overflow-visible the neighbours are no longer cropped.
+                    // Mobile-first: 60vw → tablet 42vw → desktop 26vw / cap 440px.
+                    className="flex-none w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] px-3"
                   >
-                    {renderedIndices.has(index) ? (
-                      <Link
-                        href={`/releases/${release.id}`}
-                        aria-label={`${release.title} by ${release.artistName} – cover art`}
-                        draggable={false}
-                        tabIndex={release.id === activeRelease?.id ? 0 : -1}
-                      >
-                        <div
-                          className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
-                            release.id === activeRelease?.id
-                              ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
-                              : 'border-border hover:border-accent/30'
-                          }`}
+                    {/*
+                      Inner wrapper: receives 3D transforms (rotateY, scale, translate3d)
+                      via direct DOM mutation in tweenSlides(). Never re-renders on scroll.
+
+                      Virtual windowing: off-window slides render an empty placeholder
+                      that preserves Embla's layout calculation (same dimensions as
+                      a real slide) without loading the image.
+                    */}
+                    <div
+                      style={{
+                        transformStyle: 'preserve-3d',
+                        ...(isWithinVirtualBuffer(index, selectedIndex, total)
+                          ? { willChange: 'transform, opacity' }
+                          : {}),
+                      }}
+                    >
+                      {renderedIndices.has(index) ? (
+                        <Link
+                          href={`/releases/${release.id}`}
+                          aria-label={`${release.title} by ${release.artistName} – cover art`}
+                          draggable={false}
+                          tabIndex={isActive ? 0 : -1}
                         >
-                          <img
-                            src={getOptimizedImageUrl(release.coverArt, 600)}
-                            alt={`${release.title} by ${release.artistName} – cover art`}
-                            className="w-full h-full object-cover"
-                            sizes="(max-width: 640px) 60vw, 320px"
-                            draggable={false}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                          {/* Cinematic gradient overlay on centre card */}
-                          {release.id === activeRelease?.id && (
-                            <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
-                          )}
-                          {release.featured && (
-                            <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                              {dict.featured}
-                            </Badge>
-                          )}
-                        </div>
-                      </Link>
-                    ) : (
-                      /* Lightweight placeholder — maintains slide dimensions so
-                         Embla measures the full carousel width correctly. */
-                      <div
-                        className="aspect-square rounded-lg bg-muted/20 border border-border/20"
-                        aria-hidden="true"
-                      />
-                    )}
+                          <div
+                            className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
+                              isActive
+                                ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
+                                : 'border-border hover:border-accent/30'
+                            }`}
+                          >
+                            {!imageLoaded && (
+                              <div
+                                className="absolute inset-0 bg-muted animate-pulse rounded-lg"
+                                aria-hidden="true"
+                              >
+                                <div
+                                  className="absolute inset-0 m-auto h-8 w-8 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin"
+                                  aria-hidden="true"
+                                />
+                              </div>
+                            )}
+                            <img
+                              src={getOptimizedImageUrl(release.coverArt, 600)}
+                              alt={`${release.title} by ${release.artistName} – cover art`}
+                              className={`w-full h-full aspect-square object-cover transition-opacity duration-300 ${
+                                imageLoaded ? 'opacity-100' : 'opacity-0'
+                              }`}
+                              sizes="(max-width: 640px) 60vw, 320px"
+                              draggable={false}
+                              loading={isActive ? 'eager' : 'lazy'}
+                              fetchPriority={isActive ? 'high' : 'auto'}
+                              decoding="async"
+                              onLoad={() => markImageLoaded(release.id)}
+                            />
+                            {/* Cinematic gradient overlay on centre card */}
+                            {isActive && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+                            )}
+                            {release.featured && (
+                              <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                                {dict.featured}
+                              </Badge>
+                            )}
+                          </div>
+                        </Link>
+                      ) : (
+                        /* Lightweight placeholder — maintains slide dimensions so
+                           Embla measures the full carousel width correctly. */
+                        <div
+                          className="aspect-square rounded-lg bg-muted/20 border border-border/20"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>

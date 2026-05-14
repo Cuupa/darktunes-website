@@ -28,7 +28,7 @@ import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getArtistBySlug } from '@/lib/api/artists'
+import { getArtistBySlug, getPublicArtists } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
@@ -62,6 +62,7 @@ function makeGetArtistData(slug: string) {
       if (!artist) return null
       const [releases, concerts, videos, news] = await Promise.all([
         getReleasesByArtistId(client, artist.id),
+        // Concerts include Songkick + Bandsintown records upserted into `concerts`.
         getConcertsByArtistId(client, artist.id),
         getVideosByArtistId(client, artist.id),
         getPublicNewsPosts(client).then((posts) => posts.slice(0, 3)),
@@ -71,6 +72,15 @@ function makeGetArtistData(slug: string) {
     [`artist-detail-${slug}`],
     { revalidate: 60, tags: ['artists', 'releases', 'concerts', 'videos', 'news'] },
   )
+}
+
+export async function generateStaticParams() {
+  const client = createPublicSupabaseClient()
+  const artists = await getPublicArtists(client).catch((error) => {
+    console.error('generateStaticParams(/artists/[slug]) failed:', error)
+    return []
+  })
+  return artists.map((artist) => ({ slug: artist.slug }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -118,6 +118,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     artist_name: v.channelTitle,
     thumbnail_url: v.thumbnailUrl,
     published_at: v.publishedAt,
+    is_visible: true,
   }))
 
   const { error } = await db
