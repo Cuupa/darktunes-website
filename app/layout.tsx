@@ -49,7 +49,11 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
     },
     icons: {
-      icon: faviconUrl,
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: faviconUrl },
+      ],
+      shortcut: '/favicon.svg',
       apple: faviconUrl,
     },
   }
@@ -73,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Roboto+Slab:wght@100..900&family=JetBrains+Mono:wght@100..800&display=fallback"
           rel="stylesheet"
         />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         {/* PWA meta — prevents white flash and styles the status bar */}
         <meta name="theme-color" content="#101010" />
         <meta name="mobile-web-app-capable" content="yes" />

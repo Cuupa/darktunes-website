@@ -17,7 +17,9 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -151,15 +153,28 @@ describe('getArtistById', () => {
 })
 
 describe('getArtistBySlug', () => {
-  it('returns null when artist not found (PGRST116)', async () => {
-    const db = makeMockDb(null, { message: 'Not found', code: 'PGRST116' })
+  it('returns null when artist not found', async () => {
+    const first = makeBuilder(null, null)
+    const second = makeBuilder([], null)
+    const db = {
+      from: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
+    } as unknown as DbClient
     const result = await getArtistBySlug(db, 'nonexistent-slug')
     expect(result).toBeNull()
   })
 
-  it('throws for non-PGRST116 errors', async () => {
+  it('throws for direct slug lookup errors', async () => {
     const db = makeMockDb(null, { message: 'Permission denied', code: 'PGRST301' })
     await expect(getArtistBySlug(db, 'czarina')).rejects.toThrow('Permission denied')
+  })
+
+  it('throws for fallback null/empty slug lookup errors', async () => {
+    const first = makeBuilder(null, null)
+    const second = makeBuilder(null, { message: 'Fallback failed', code: 'PGRST301' })
+    const db = {
+      from: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
+    } as unknown as DbClient
+    await expect(getArtistBySlug(db, 'czarina')).rejects.toThrow('Fallback failed')
   })
 
   it('returns mapped Artist for found row', async () => {
@@ -168,6 +183,17 @@ describe('getArtistBySlug', () => {
     expect(result).not.toBeNull()
     expect(result?.slug).toBe('czarina')
     expect(result?.name).toBe('C Z A R I N A')
+  })
+
+  it('falls back to generated slug when stored slug is null/empty', async () => {
+    const first = makeBuilder(null, null)
+    const second = makeBuilder([{ ...mockArtistRow, slug: null }], null)
+    const db = {
+      from: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
+    } as unknown as DbClient
+    const result = await getArtistBySlug(db, 'c-z-a-r-i-n-a')
+    expect(result).not.toBeNull()
+    expect(result?.slug).toBe('c-z-a-r-i-n-a')
   })
 })
 

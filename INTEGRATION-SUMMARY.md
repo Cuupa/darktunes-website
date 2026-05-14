@@ -237,7 +237,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
 | `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |
 | `app/api/webhooks/sos/confirm/route.ts` | SOS webhook Step 2 — insert sales_statements DB record |
-| `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (admin bearer token or Vercel cron; optional `CRON_SECRET` check), upserts `artist_id` by case-insensitive title match against visible artists |
+| `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (admin bearer token or Vercel cron; optional `CRON_SECRET` check), upserts `artist_id` by case-insensitive title match against visible artists and writes `is_visible=true` for synced rows |
 | `src/lib/api/youtubeApi.ts` | YouTube Data API v3 utility — `fetchYouTubeChannelVideos(channelId, apiKey, maxResults)` |
 | `app/news/page.tsx` | Public news list RSC — paginated via ContentPagination |
 | `app/news/[slug]/page.tsx` | Public news detail RSC — `getNewsPostBySlug` DAL |

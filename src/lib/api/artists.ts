@@ -43,12 +43,18 @@ export async function getArtistById(db: DbClient, id: string): Promise<Artist | 
 }
 
 export async function getArtistBySlug(db: DbClient, slug: string): Promise<Artist | null> {
-  const { data, error } = await db.from('artists').select('*').eq('slug', slug).single()
-  if (error) {
-    if (error.code === 'PGRST116') return null
-    throw new Error(error.message)
-  }
-  return data ? rowToArtist(data) : null
+  const { data, error } = await db.from('artists').select('*').eq('slug', slug).maybeSingle()
+  if (error) throw new Error(error.message)
+  if (data) return rowToArtist(data)
+
+  const { data: nullSlugArtists, error: nullSlugError } = await db
+    .from('artists')
+    .select('*')
+    .or('slug.is.null,slug.eq.')
+  if (nullSlugError) throw new Error(nullSlugError.message)
+
+  const match = (nullSlugArtists ?? []).find((row) => rowToArtist(row).slug === slug)
+  return match ? rowToArtist(match) : null
 }
 
 export async function createArtist(db: DbClient, artistData: ArtistInsert): Promise<Artist> {

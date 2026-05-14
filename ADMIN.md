@@ -106,7 +106,7 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Add music videos by YouTube ID
 - Organize video gallery
 - Set thumbnails and metadata
-- Trigger `POST /api/sync-youtube` to import the latest label-channel videos; synced rows are auto-linked to visible artists via title matching (`videos.artist_id`), so artist profile pages can render artist-specific video grids.
+- Trigger `POST /api/sync-youtube` to import the latest label-channel videos; synced rows are auto-linked to visible artists via title matching (`videos.artist_id`) and default to `is_visible=true`, so public sections and artist profile pages render them immediately.
 
 ### Assets
 - Upload images and media files to Cloudflare R2 (upload goes via the secure Next.js Route Handler `app/api/upload/route.ts` — credentials never exposed to browser)
