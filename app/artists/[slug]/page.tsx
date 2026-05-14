@@ -76,7 +76,10 @@ function makeGetArtistData(slug: string) {
 
 export async function generateStaticParams() {
   const client = createPublicSupabaseClient()
-  const artists = await getPublicArtists(client).catch(() => [])
+  const artists = await getPublicArtists(client).catch((error) => {
+    console.error('generateStaticParams(/artists/[slug]) failed:', error)
+    return []
+  })
   return artists.map((artist) => ({ slug: artist.slug }))
 }
 

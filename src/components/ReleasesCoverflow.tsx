@@ -36,8 +36,17 @@ const VIRTUAL_BUFFER = 3
  * Performance: slides further than TWEEN_CUTOFF units from the active slide
  * are skipped immediately — only the 7 centre slides receive DOM mutations.
  */
-const TWEEN_CUTOFF = VIRTUAL_BUFFER + 0.5
+const TWEEN_CUTOFF = VIRTUAL_BUFFER
+const ROTATION_DEGREES_PER_SLIDE = 45
+const Z_OFFSET_PER_SLIDE = 120
+const SCALE_FACTOR_PER_SLIDE = 0.25
+const MIN_SCALE = 0.4
+const OPACITY_FACTOR_PER_SLIDE = 0.35
 
+/**
+ * Calculates wrapped slide distance in a looping carousel and returns whether
+ * a slide index is currently inside the active virtual-render buffer window.
+ */
 function isWithinVirtualBuffer(index: number, centre: number, total: number): boolean {
   if (total <= 1) return true
   const directDistance = Math.abs(index - centre)
@@ -90,12 +99,12 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     }
 
     // 3D coverflow interpolation — GPU-only properties (transform + opacity)
-    const rotateY = -distInSlides * 45
-    const translateZ = -(abs * 120)
-    const scale = Math.max(0.4, 1 - abs * 0.25)
-    const opacity = Math.max(0, 1 - abs * 0.35)
+    const rotateY = -distInSlides * ROTATION_DEGREES_PER_SLIDE
+    const translateZ = -(abs * Z_OFFSET_PER_SLIDE)
+    const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_FACTOR_PER_SLIDE)
+    const opacity = Math.max(0, 1 - abs * OPACITY_FACTOR_PER_SLIDE)
 
-    inner.style.transform = `rotateY(${rotateY}deg) translate3d(0, 0, ${translateZ}px) scale(${scale})`
+    inner.style.transform = `scale(${scale}) translate3d(0, 0, ${translateZ}px) rotateY(${rotateY}deg)`
     inner.style.opacity = String(Math.max(0, opacity))
   })
 }
@@ -155,6 +164,13 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   // dot indicators.  Scroll progress itself never enters React state.
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [imageLoadedById, setImageLoadedById] = useState<Record<string, boolean>>({})
+
+  /** Marks one cover image as loaded while preserving state identity if unchanged. */
+  const markImageLoaded = useCallback((releaseId: string) => {
+    setImageLoadedById((prev) =>
+      prev[releaseId] ? prev : { ...prev, [releaseId]: true },
+    )
+  }, [])
 
   /**
    * Stable initial window helper — extracts the setup logic so both the
@@ -298,10 +314,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
               [emblaRef overflow-visible] ← Embla scrolls this but clips nothing
                 [flex container] ← translated by Embla
       */}
-      <div className="overflow-hidden [transform-style:preserve-3d]">
+      <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
         <div style={{ perspective: '1400px', transformStyle: 'preserve-3d' }}>
           {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
-          <div ref={emblaRef} className="overflow-visible [transform-style:preserve-3d]">
+          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
             {/* Embla container: Embla translates this element for scrolling */}
             <div className="flex">
               {releases.map((release, index) => {
@@ -347,7 +363,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                             }`}
                           >
                             {!imageLoaded && (
-                              <div className="absolute inset-0 bg-muted animate-pulse rounded-lg">
+                              <div
+                                className="absolute inset-0 bg-muted animate-pulse rounded-lg"
+                                aria-hidden="true"
+                              >
                                 <div
                                   className="absolute inset-0 m-auto h-8 w-8 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin"
                                   aria-hidden="true"
@@ -365,11 +384,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               loading={isActive ? 'eager' : 'lazy'}
                               fetchPriority={isActive ? 'high' : 'auto'}
                               decoding="async"
-                              onLoad={() =>
-                                setImageLoadedById((prev) =>
-                                  prev[release.id] ? prev : { ...prev, [release.id]: true },
-                                )
-                              }
+                              onLoad={() => markImageLoaded(release.id)}
                             />
                             {/* Cinematic gradient overlay on centre card */}
                             {isActive && (

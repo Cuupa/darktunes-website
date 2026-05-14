@@ -53,8 +53,11 @@ export async function getArtistBySlug(db: DbClient, slug: string): Promise<Artis
     .or('slug.is.null,slug.eq.')
   if (nullSlugError) throw new Error(nullSlugError.message)
 
-  const match = (nullSlugArtists ?? []).find((row) => rowToArtist(row).slug === slug)
-  return match ? rowToArtist(match) : null
+  for (const row of nullSlugArtists ?? []) {
+    const mappedArtist = rowToArtist(row)
+    if (mappedArtist.slug === slug) return mappedArtist
+  }
+  return null
 }
 
 export async function createArtist(db: DbClient, artistData: ArtistInsert): Promise<Artist> {
