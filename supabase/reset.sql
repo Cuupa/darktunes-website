@@ -119,8 +119,12 @@ BEGIN
       AND column_name  = 'role'
       AND data_type    = 'text'
   ) THEN
+    -- Drop the text default first; it cannot be auto-cast to the enum type.
+    ALTER TABLE public.profiles ALTER COLUMN role DROP DEFAULT;
     ALTER TABLE public.profiles
       ALTER COLUMN role TYPE public.user_role USING role::public.user_role;
+    -- Re-apply the default as an enum literal.
+    ALTER TABLE public.profiles ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
   END IF;
 END $$;
 
