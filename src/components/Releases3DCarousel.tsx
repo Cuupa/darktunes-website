@@ -16,19 +16,6 @@ interface Releases3DCarouselProps {
   locale: Locale
 }
 
-/** Pixel offsets and visual properties for each card slot relative to centre */
-interface CardSlotStyle {
-  translateX: number
-  translateZ: number
-  rotateY: number
-  scale: number
-  opacity: number
-  zIndex: number
-}
-
-/** Distance of the viewer from the Z=0 plane. Higher = more subtle 3D effect. */
-const PERSPECTIVE = 1200 // px
-
 /**
  * Returns a fluid card width in pixels: 36 vw, clamped between 260 px and 560 px.
  * Falls back to 380 on the server (component is 'use client').
@@ -38,41 +25,11 @@ function computeCardWidth(): number {
   return Math.min(560, Math.max(260, Math.round(window.innerWidth * 0.36)))
 }
 
-/**
- * Compute display style for a card at `offset` positions from the centre.
- * Offset 0 = centre card, ±1 = adjacent, ±2 = far sides.
- *
- * Side cards are pushed back in Z AND rotated around Y so they read as
- * genuinely three-dimensional rather than just scaled-down copies.
- * The narrower horizontal spacing (55 % of card width) keeps the full
- * card face visible even after the rotateY transform.
- */
-function slotStyle(offset: number, reduced: boolean, cardWidth: number): CardSlotStyle | null {
-  const abs = Math.abs(offset)
-  if (abs > 2) return null
-
-  if (reduced) {
-    return {
-      translateX: offset * (cardWidth * 0.65),
-      translateZ: 0,
-      rotateY: 0,
-      scale: abs === 0 ? 1 : 0.75,
-      opacity: abs === 0 ? 1 : 0.55,
-      zIndex: 10 - abs,
-    }
-  }
-
-  // Lateral offset: spread cards so the rotated faces are still visible
-  const translateX = offset * (cardWidth * 0.55)
-  // Y rotation: 45 ° for first neighbours, 55 ° for outer
-  const rotateY = -offset * (abs === 1 ? 45 : 55)
-  // Push side cards behind the centre card along Z
-  const translateZ = abs === 0 ? 60 : -abs * 140
-  const scale = abs === 0 ? 1 : 1 - abs * 0.12   // 1.0 → 0.88 → 0.76
-  const opacity = abs === 0 ? 1 : 1 - abs * 0.15 // 1.0 → 0.85 → 0.70
-  const zIndex = 10 - abs * 2
-
-  return { translateX, translateZ, rotateY, scale, opacity, zIndex }
+function getWrappedOffset(index: number, currentIndex: number, total: number): number {
+  let offset = index - currentIndex
+  if (offset > total / 2) offset -= total
+  if (offset < -total / 2) offset += total
+  return offset
 }
 
 export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouselProps) {
@@ -99,6 +56,9 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
 
   // Stage height = square card + metadata area
   const stageHeight = cardWidth + 140
+  const anglePerCard = total > 0 ? 360 / total : 0
+  const radius = total > 0 ? (cardWidth * total) / (2 * Math.PI) : 0
+  const perspective = Math.round(radius * 2.5)
 
   const handlePrev = useCallback(() => {
     setCurrentIndex((prev) => (prev - 1 + total) % total)
@@ -129,108 +89,123 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
       <div
         className="relative mx-auto"
         style={{
-          perspective: PERSPECTIVE,
+          perspective: `${perspective}px`,
           perspectiveOrigin: '50% 40%',
-          height: stageHeight,
           maxWidth: '100%',
           /* Must NOT be overflow:hidden — that clips the 3D transforms */
           overflow: 'visible',
         }}
       >
-        {releases.map((release, releaseIdx) => {
-          // Compute this release's offset from centre, wrapping to [-total/2, total/2]
-          let offset = releaseIdx - currentIndex
-          if (offset > total / 2) offset -= total
-          if (offset < -total / 2) offset += total
+        <motion.div
+          style={{ transformStyle: 'preserve-3d', position: 'relative', height: stageHeight }}
+          animate={{ rotateY: prefersReducedMotion ? 0 : -currentIndex * anglePerCard }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: 'easeInOut' }}
+          drag={total > 1 ? 'x' : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -50) handleNext()
+            else if (info.offset.x > 50) handlePrev()
+          }}
+        >
+          {releases.map((release, releaseIdx) => {
+            const offset = getWrappedOffset(releaseIdx, currentIndex, total)
+            const angleDistance = Math.abs(offset * anglePerCard)
+            if (angleDistance > 90) return null
 
-          const style = slotStyle(offset, prefersReducedMotion, cardWidth)
-          if (!style) return null
+            const centerProximity = 1 - Math.min(angleDistance / 90, 1)
+            const scale = prefersReducedMotion
+              ? offset === 0
+                ? 1
+                : 0.75
+              : 0.72 + centerProximity * 0.28
+            const opacity = prefersReducedMotion
+              ? offset === 0
+                ? 1
+                : 0.55
+              : 0.35 + centerProximity * 0.65
+            const isCenter = offset === 0
 
-          const isCenter = offset === 0
-
-          return (
-            <motion.div
-              key={release.id}
-              className="absolute top-0 cursor-pointer"
-              style={{
-                width: cardWidth,
-                left: '50%',
-                marginLeft: -(cardWidth / 2),
-                transformStyle: 'preserve-3d',
-              }}
-              animate={{
-                x: style.translateX,
-                z: style.translateZ,
-                rotateY: style.rotateY,
-                scale: style.scale,
-                opacity: style.opacity,
-                zIndex: style.zIndex,
-              }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: 'easeInOut' }}
-              onClick={() => {
-                if (isCenter) {
-                  router.push(`/releases/${release.id}`)
-                } else {
-                  setCurrentIndex(releaseIdx)
-                }
-              }}
-              whileHover={isCenter ? { scale: style.scale * 1.03 } : { scale: style.scale * 1.02 }}
-              aria-label={
-                isCenter
-                  ? `View release: ${release.title}`
-                  : `Show release: ${release.title}`
-              }
-            >
-              <Card
-                className={`bg-card overflow-hidden transition-colors duration-300 ${
+            return (
+              <motion.div
+                key={release.id}
+                className="absolute top-0 cursor-pointer"
+                style={{
+                  width: cardWidth,
+                  left: '50%',
+                  marginLeft: -(cardWidth / 2),
+                  transformStyle: 'preserve-3d',
+                  transform: prefersReducedMotion
+                    ? `translateX(${offset * (cardWidth * 0.65)}px)`
+                    : `rotateY(${releaseIdx * anglePerCard}deg) translateZ(${radius}px)`,
+                }}
+                animate={{ scale, opacity }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: 'easeInOut' }}
+                onClick={() => {
+                  if (isCenter) {
+                    router.push(`/releases/${release.id}`)
+                  } else {
+                    setCurrentIndex(releaseIdx)
+                  }
+                }}
+                whileHover={isCenter ? { scale: scale * 1.03 } : { scale: scale * 1.02 }}
+                aria-label={
                   isCenter
-                    ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
-                    : 'border-border hover:border-accent/30'
-                }`}
+                    ? `View release: ${release.title}`
+                    : `Show release: ${release.title}`
+                }
               >
-                <div className="relative aspect-square overflow-hidden">
-                  <img
-                    src={getOptimizedImageUrl(release.coverArt, 600)}
-                    alt={`${release.title} – cover art`}
-                    className="w-full h-full object-cover"
-                    draggable={false}
-                  />
-                  {/* Gradient overlay on centre card */}
-                  {isCenter && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
-                  )}
-                  {release.featured && (
-                    <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                      {dict.featured}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Only show text metadata on the centre card */}
-                {isCenter && (
-                  <div className="p-4 space-y-1.5">
-                    <Badge
-                      variant="outline"
-                      className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground"
-                    >
-                      {release.type}
-                    </Badge>
-                    <h3 className="text-lg font-bold line-clamp-1 text-foreground">{release.title}</h3>
-                    <p className="text-sm text-muted-foreground font-medium">{release.artistName}</p>
-                    <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
-                      <Calendar size={12} weight="bold" aria-hidden="true" />
-                      {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </p>
+                <Card
+                  className={`bg-card overflow-hidden transition-colors duration-300 ${
+                    isCenter
+                      ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
+                      : 'border-border hover:border-accent/30'
+                  }`}
+                >
+                  <div className="relative aspect-square overflow-hidden">
+                    <img
+                      src={getOptimizedImageUrl(release.coverArt, 600)}
+                      alt={`${release.title} – cover art`}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                    />
+                    {/* Gradient overlay on centre card */}
+                    {isCenter && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
+                    )}
+                    {release.featured && (
+                      <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                        {dict.featured}
+                      </Badge>
+                    )}
                   </div>
-                )}
-              </Card>
-            </motion.div>
-          )
-        })}
+
+                  {/* Only show text metadata on the centre card */}
+                  {isCenter && (
+                    <div className="p-4 space-y-1.5">
+                      <Badge
+                        variant="outline"
+                        className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground"
+                      >
+                        {release.type}
+                      </Badge>
+                      <h3 className="text-lg font-bold line-clamp-1 text-foreground">{release.title}</h3>
+                      <p className="text-sm text-muted-foreground font-medium">{release.artistName}</p>
+                      <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Calendar size={12} weight="bold" aria-hidden="true" />
+                        {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </Card>
+              </motion.div>
+            )
+          })}
+        </motion.div>
       </div>
 
       {/* ------------------------------------------------------------------ */}
