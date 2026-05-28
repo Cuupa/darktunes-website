@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- cast the column to the enum so that all five role values are accepted.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 
+-- Drop legacy policy that may block the role column type change below
+DROP POLICY IF EXISTS "Only admins can insert artists" ON public.artists;
+
 DO $$
 BEGIN
   IF EXISTS (
