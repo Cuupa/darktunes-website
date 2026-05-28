@@ -110,9 +110,25 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- cast the column to the enum so that all five role values are accepted.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 
--- Drop legacy policies that may block the role column type change below
-DROP POLICY IF EXISTS "Only admins can insert artists" ON public.artists;
-DROP POLICY IF EXISTS "Only admins can update artists" ON public.artists;
+-- Drop ALL policies on tables whose legacy policies may reference profiles.role
+-- (they are fully recreated below, so this is safe and idempotent)
+DO $$
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN
+    SELECT policyname, tablename
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('artists', 'releases', 'profiles', 'concerts', 'videos', 'assets', 'sync_logs')
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON public.%I',
+      pol.policyname,
+      pol.tablename
+    );
+  END LOOP;
+END $$;
 
 DO $$
 BEGIN
