@@ -468,12 +468,14 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
         try {
           let odesliErr: string | null = null
-          const odesli = await withExponentialBackoff(() =>
-            resolveOdesliSmartLink(musicUrl, fetchFn),
-          ).catch((e) => {
+          let odesli: Awaited<ReturnType<typeof resolveOdesliSmartLink>> | null = null
+          try {
+            odesli = await withExponentialBackoff(() =>
+              resolveOdesliSmartLink(musicUrl, fetchFn),
+            )
+          } catch (e) {
             odesliErr = String(e)
-            return null
-          })
+          }
 
           if (odesli) {
             const appleMusicUrl =
