@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { X } from '@phosphor-icons/react'
+import { X, CircleNotch } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { Video } from '@/types'
 import { ConsentGate } from '@/components/ConsentGate'
@@ -17,11 +18,20 @@ interface VideoModalProps extends DialogProps {
 
 export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel }: VideoModalProps) {
   const prefersReducedMotion = useReducedMotion()
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+
+  // Reset iframe-loaded flag each time a new video opens
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      onClose()
+      setIframeLoaded(false)
+    }
+  }
 
   if (!video) return null
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent aria-labelledby="video-modal-title" aria-describedby={undefined} className="max-w-full w-screen p-0 bg-background/95 backdrop-blur-xl border-accent/30 overflow-hidden max-h-[92vh] flex flex-col rounded-none sm:rounded-lg sm:max-w-[95vw] sm:w-[95vw]">
         <AnimatePresence>
           {open && (
@@ -43,12 +53,19 @@ export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel 
               <div className="relative w-full" style={{ paddingBottom: '56.25%', minHeight: 180 }}>
                 <div className="absolute inset-0">
                   <ConsentGate label={youtubeLabel ?? 'YouTube laden'} placeholderUrl={placeholderUrl}>
+                    {/* Loading spinner shown while the iframe content is fetching */}
+                    {!iframeLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10" aria-label="Video wird geladen" role="status">
+                        <CircleNotch size={40} className="animate-spin text-accent" aria-hidden="true" />
+                      </div>
+                    )}
                     <iframe
                       className="w-full h-full rounded-t-lg"
                       src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0`}
                       title={video.title}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
+                      onLoad={() => setIframeLoaded(true)}
                     />
                   </ConsentGate>
                 </div>

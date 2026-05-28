@@ -245,6 +245,10 @@ export interface SiteSettings {
   shopifyStoreUrl: string
   /** YouTube channel ID for video sync. */
   youtubeChannelId: string
+  /** Number of videos shown per page in the Videos grid. Default: 9. */
+  videosPerPage: number
+  /** When true, the Videos section on the homepage shows only the first page and links to /videos for all videos. */
+  videosLinkToPage: boolean
   /** Auto-advance interval for the releases carousel in ms. 0 = disabled. Default 0. */
   carouselAutoplayMs: number
   /** Feature flags: enable/disable portal modules globally. */

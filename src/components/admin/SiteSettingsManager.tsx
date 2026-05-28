@@ -74,6 +74,8 @@ const schema = z.object({
   crtScanlinesEnabled: z.boolean().default(true),
   vignetteIntensity: z.number().min(0).max(1).default(0.5),
   carouselAutoplayMs: z.number().int().min(0).default(0),
+  videosPerPage: z.number().int().min(1).max(50).default(9),
+  videosLinkToPage: z.boolean().default(false),
   logoUrl: z.string().optional().default(''),
   faviconUrl: z.string().optional().default(''),
   aboutHeadline: z.string().optional().default(''),
@@ -648,6 +650,42 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   E.g. 5000 = 5 seconds.
                 </p>
               </Field>
+
+              <Field id="videosPerPage" label="Videos per page">
+                <Input
+                  id="videosPerPage"
+                  type="number"
+                  min={1}
+                  max={50}
+                  step={1}
+                  {...register('videosPerPage', { valueAsNumber: true })}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Number of video tiles shown per page on the homepage video grid (e.g. 9 = 3×3).
+                </p>
+              </Field>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="videosLinkToPage">Link videos grid to /videos page</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Show only the first page on the homepage and add a &quot;View all&quot; link to the full /videos page with search.
+                  </p>
+                </div>
+                <Controller
+                  name="videosLinkToPage"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="videosLinkToPage"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

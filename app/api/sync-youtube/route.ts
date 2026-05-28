@@ -79,7 +79,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   // 3. Fetch from YouTube
   let videos
   try {
-    videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
+    videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 200)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     // Surface quota / key issues as 502 with a helpful message

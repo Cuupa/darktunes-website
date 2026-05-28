@@ -35,9 +35,9 @@ export function Footer({ siteSettings, dict }: FooterProps) {
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              {siteSettings.logoUrl ? (
+              {siteSettings.logoUrl || siteSettings.faviconUrl ? (
                 <img
-                  src={siteSettings.logoUrl}
+                  src={siteSettings.logoUrl || siteSettings.faviconUrl}
                   alt={`${siteSettings.labelName} logo`}
                   className="h-10 w-auto object-contain"
                 />

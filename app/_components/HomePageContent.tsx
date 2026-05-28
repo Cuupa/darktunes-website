@@ -129,6 +129,8 @@ export function HomePageContent({
           dict={dict.videos}
           consentDict={dict.consent}
           locale={locale}
+          videosPerPage={siteSettings.videosPerPage}
+          videosLinkToPage={siteSettings.videosLinkToPage}
         />
         <Concerts concerts={concerts} dict={dict.concerts} locale={locale} />
         <News news={news} dict={dict.news} locale={locale} />

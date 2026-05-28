@@ -69,6 +69,7 @@ export function ArtistDetailContent({
 
   const socialLinks = [
     { url: artist.spotifyUrl, icon: SpotifyLogo, label: `${artist.name} on Spotify` },
+    { url: artist.appleMusicUrl, icon: MusicNote, label: `${artist.name} on Apple Music` },
     { url: artist.instagramUrl, icon: InstagramLogo, label: `${artist.name} on Instagram` },
     { url: artist.youtubeUrl, icon: YoutubeLogo, label: `${artist.name} on YouTube` },
     { url: artist.facebookUrl, icon: FacebookLogo, label: `${artist.name} on Facebook` },
@@ -221,6 +222,17 @@ export function ArtistDetailContent({
                       <Icon size={20} weight="fill" aria-hidden="true" />
                     </a>
                   ))}
+                {artist.bandsintownId && (
+                  <a
+                    href={`https://www.bandsintown.com/a/${encodeURIComponent(artist.bandsintownId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${artist.name} on Bandsintown`}
+                    className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110 font-mono text-xs font-bold uppercase tracking-tighter"
+                  >
+                    BIT
+                  </a>
+                )}
               </div>
             </motion.div>
           </div>
@@ -257,14 +269,14 @@ export function ArtistDetailContent({
           >
             <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">Spotify</h2>
             <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
-              <div className="rounded-xl overflow-hidden max-w-2xl">
+              <div className="rounded-xl overflow-hidden max-w-2xl" style={{ height: 352 }}>
                 <iframe
                   src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
                   width="100%"
                   height="352"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                   loading="lazy"
-                  className="border-0"
+                  className="border-0 block"
                   title={`${artist.name} on Spotify`}
                 />
               </div>

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ArrowsClockwise } from '@phosphor-icons/react'
+import { ArrowsClockwise, MagnifyingGlass } from '@phosphor-icons/react'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
 import {
   Select,
@@ -42,6 +42,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
     defaultValues: value,
   })
   const [isFetchingInfo, setIsFetchingInfo] = useState(false)
+  const [artistSearch, setArtistSearch] = useState('')
 
   useEffect(() => {
     reset(value)
@@ -167,20 +168,41 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
         <div className="space-y-1">
           <Label htmlFor="artistName">Artist / Channel Name *</Label>
           {artists && artists.length > 0 ? (
-            <Select
-              value={watch('artistName')}
-              onValueChange={(val) => setValue('artistName', val)}
-              disabled={isLoading}
-            >
-              <SelectTrigger id="artistName">
-                <SelectValue placeholder="Select artist…" />
-              </SelectTrigger>
-              <SelectContent>
-                {artists.map((a) => (
-                  <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-1">
+              <div className="relative">
+                <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden="true" />
+                <Input
+                  placeholder="Search artist…"
+                  value={artistSearch}
+                  onChange={(e) => setArtistSearch(e.target.value)}
+                  disabled={isLoading}
+                  className="pl-8 text-sm"
+                  aria-label="Search artists"
+                />
+              </div>
+              <Select
+                value={watch('artistName')}
+                onValueChange={(val) => {
+                  setValue('artistName', val)
+                  setArtistSearch('')
+                }}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="artistName">
+                  <SelectValue placeholder="Select artist…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {artists
+                    .filter((a) =>
+                      artistSearch === '' ||
+                      a.name.toLowerCase().includes(artistSearch.toLowerCase()),
+                    )
+                    .map((a) => (
+                      <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           ) : (
             <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
           )}

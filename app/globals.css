@@ -233,3 +233,10 @@
   .no-print { display: none !important; }
   .epk-print-area { display: block !important; }
 }
+
+/* Indeterminate progress bar animation used in ArtistForm async ops */
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(0.8); }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}

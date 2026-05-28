@@ -7,7 +7,7 @@
  * Keeping this in its own module makes it easy to inject in tests.
  */
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 
 /**
@@ -63,4 +63,24 @@ export async function uploadUrlToR2(
   )
 
   return `${r2PublicUrl.replace(/\/$/, '')}/${key}`
+}
+
+/**
+ * Deletes a single object from R2 by its key.
+ *
+ * @param r2Key - The object key to delete (e.g. 'uploads/uuid.jpg')
+ * @param s3    - Pre-configured S3Client for R2
+ * @param bucket - R2 bucket name
+ */
+export async function deleteObjectFromR2(
+  r2Key: string,
+  s3: S3Client,
+  bucket: string,
+): Promise<void> {
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: r2Key,
+    }),
+  )
 }
