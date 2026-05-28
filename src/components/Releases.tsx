@@ -13,9 +13,10 @@ interface ReleasesProps extends SectionProps {
   dict: Dictionary['releases']
   locale: Locale
   autoplayMs?: number
+  consentDict: Dictionary['consent']
 }
 
-export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) {
+export function Releases({ releases, dict, locale, autoplayMs, consentDict }: ReleasesProps) {
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -133,7 +134,7 @@ export function Releases({ releases, dict, locale, autoplayMs }: ReleasesProps) 
               {dict.noResults}
             </p>
           ) : (
-            <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} autoplayMs={autoplayMs} />
+            <ReleasesCoverflow releases={filtered} dict={dict} locale={locale} autoplayMs={autoplayMs} consentDict={consentDict} />
           )}
         </div>
       </div>
