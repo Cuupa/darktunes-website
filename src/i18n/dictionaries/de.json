@@ -43,7 +43,8 @@
     "heading": "VIDEOS",
     "subheading": "Die neuesten Musikvideos und Visualizer",
     "loadMore": "Mehr laden",
-    "noVideos": "Noch keine Videos verfügbar."
+    "noVideos": "Noch keine Videos verfügbar.",
+    "viewAll": "Alle Videos anzeigen"
   },
   "concerts": {
     "heading": "TOUR",

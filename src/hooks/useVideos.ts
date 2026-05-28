@@ -38,8 +38,29 @@ export function useVideos() {
   }
 
   const updateVideo = async (id: string, data: VideoUpdate): Promise<void> => {
-    await videosApi.updateVideo(supabase, id, data)
-    await load()
+    // Optimistic update: patch local state immediately so the list does not reload
+    setVideos((prev) =>
+      prev.map((v) => {
+        if (v.id !== id) return v
+        return {
+          ...v,
+          ...(data.is_visible !== undefined ? { isVisible: data.is_visible } : {}),
+          ...(data.is_short !== undefined ? { isShort: data.is_short } : {}),
+          ...(data.title !== undefined ? { title: data.title } : {}),
+          ...(data.artist_name !== undefined ? { artistName: data.artist_name } : {}),
+          ...(data.youtube_id !== undefined ? { youtubeId: data.youtube_id } : {}),
+          ...(data.thumbnail_url !== undefined ? { thumbnailUrl: data.thumbnail_url ?? '' } : {}),
+          ...(data.published_at !== undefined ? { publishedAt: data.published_at ?? v.publishedAt } : {}),
+        }
+      }),
+    )
+    try {
+      await videosApi.updateVideo(supabase, id, data)
+    } catch (err) {
+      // Rollback on error
+      await load()
+      throw err
+    }
   }
 
   const deleteVideo = async (id: string): Promise<void> => {

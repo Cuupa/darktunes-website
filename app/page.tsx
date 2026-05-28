@@ -129,6 +129,8 @@ export default async function HomePage() {
         shopifyStoreUrl: '',
         youtubeChannelId: '',
         carouselAutoplayMs: 0,
+        videosPerPage: 9,
+        videosLinkToPage: false,
         featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
       }),
     ),
