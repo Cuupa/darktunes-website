@@ -28,7 +28,10 @@
     "subheading": "Discover the latest music from our roster",
     "featured": "Featured",
     "searchPlaceholder": "Search releases…",
-    "noResults": "No releases found."
+    "noResults": "No releases found.",
+    "viewFullPage": "View Full Page",
+    "streamingLinks": "Streaming Links",
+    "previewTitle": "Preview"
   },
   "news": {
     "heading": "NEWS",
@@ -38,7 +41,9 @@
   },
   "videos": {
     "heading": "VIDEOS",
-    "subheading": "Watch the latest music videos and visualizers"
+    "subheading": "Watch the latest music videos and visualizers",
+    "loadMore": "Load More",
+    "noVideos": "No videos available yet."
   },
   "concerts": {
     "heading": "TOUR",

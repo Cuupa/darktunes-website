@@ -44,6 +44,11 @@ export interface SyncAllDeps extends SyncDeps {
   songkickApiKey?: string
   /** Bandsintown API key — undefined means Bandsintown sync is skipped */
   bandsintownApiKey?: string
+  /**
+   * When set, only the sync step for this API source is executed.
+   * Useful for per-API force-sync from the admin health widget.
+   */
+  onlyApi?: string
 }
 
 export interface ApiSyncResult {
@@ -69,7 +74,7 @@ export interface SyncAllResult {
  * Returns a consolidated result — never throws.
  */
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
-  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey } = deps
+  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey, onlyApi } = deps
   const results: ApiSyncResult[] = []
 
   // 1. Fetch all artists
@@ -91,25 +96,27 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   }
 
   // 2. iTunes sync (existing pipeline)
-  const itunesResult: ApiSyncResult = {
-    api: 'itunes',
-    artistsProcessed: 0,
-    releasesUpserted: 0,
-    concertsUpserted: 0,
-    rateLimited: false,
-    errors: [],
+  if (!onlyApi || onlyApi === 'itunes') {
+    const itunesResult: ApiSyncResult = {
+      api: 'itunes',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      errors: [],
+    }
+    for (const artist of artists) {
+      const r = await syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2 })
+      itunesResult.artistsProcessed++
+      itunesResult.releasesUpserted += r.releasesUpserted
+      itunesResult.errors.push(...r.errors)
+    }
+    await writeSyncLog(db, 'itunes', itunesResult)
+    results.push(itunesResult)
   }
-  for (const artist of artists) {
-    const r = await syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2 })
-    itunesResult.artistsProcessed++
-    itunesResult.releasesUpserted += r.releasesUpserted
-    itunesResult.errors.push(...r.errors)
-  }
-  await writeSyncLog(db, 'itunes', itunesResult)
-  results.push(itunesResult)
 
   // 3. Spotify sync
-  if (spotify) {
+  if ((!onlyApi || onlyApi === 'spotify') && spotify) {
     const spotifyResult: ApiSyncResult = {
       api: 'spotify',
       artistsProcessed: 0,
@@ -232,7 +239,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // 3.5. Standalone Discogs sync — runs independently of Spotify
   // Syncs releases for artists that have a discogs_id but may not have been
   // covered by the Spotify block (or when Spotify is not configured).
-  if (discogsToken) {
+  if ((!onlyApi || onlyApi === 'discogs') && discogsToken) {
     const discogsResult: ApiSyncResult = {
       api: 'discogs',
       artistsProcessed: 0,
@@ -308,7 +315,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   }
 
   // 4. Songkick sync
-  if (songkickApiKey) {
+  if ((!onlyApi || onlyApi === 'songkick') && songkickApiKey) {
     const songkickResult: ApiSyncResult = {
       api: 'songkick',
       artistsProcessed: 0,
@@ -368,7 +375,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   }
 
   // 5. Bandsintown sync — upcoming concerts (second source)
-  if (bandsintownApiKey) {
+  if ((!onlyApi || onlyApi === 'bandsintown') && bandsintownApiKey) {
     const bandsintownResult: ApiSyncResult = {
       api: 'bandsintown',
       artistsProcessed: 0,
@@ -425,6 +432,64 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
     await writeSyncLog(db, 'bandsintown', bandsintownResult)
     results.push(bandsintownResult)
+  }
+
+  // 6. Standalone Odesli smart-link resolution — runs regardless of whether
+  // Spotify sync succeeded or was skipped.  Finds all releases that have a
+  // Spotify URL or Apple Music URL but no smart_url yet, and resolves each
+  // one through Odesli so they always get a working link.
+  if (!onlyApi || onlyApi === 'odesli') {
+    const odesliResult: ApiSyncResult = {
+      api: 'odesli',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      errors: [],
+    }
+
+    try {
+      const { data: releasesWithoutSmartUrl } = await db
+        .from('releases')
+        .select('id, spotify_url, apple_music_url')
+        .is('smart_url', null)
+        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+
+      for (const release of releasesWithoutSmartUrl ?? []) {
+        const musicUrl = release.spotify_url ?? release.apple_music_url
+        if (!musicUrl) continue
+
+        try {
+          const odesli = await withExponentialBackoff(() =>
+            resolveOdesliSmartLink(musicUrl, fetchFn),
+          ).catch(() => null)
+
+          if (odesli) {
+            const appleMusicUrl =
+              odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
+
+            await db
+              .from('releases')
+              .update({
+                smart_url: odesli.smartUrl,
+                ...(appleMusicUrl && !release.apple_music_url
+                  ? { apple_music_url: appleMusicUrl }
+                  : {}),
+              })
+              .eq('id', release.id)
+
+            odesliResult.releasesUpserted++
+          }
+        } catch (e) {
+          odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${String(e)}`)
+        }
+      }
+    } catch (e) {
+      odesliResult.errors.push(`Odesli batch query failed: ${String(e)}`)
+    }
+
+    await writeSyncLog(db, 'odesli', odesliResult)
+    results.push(odesliResult)
   }
 
   return {

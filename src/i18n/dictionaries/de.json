@@ -28,7 +28,10 @@
     "subheading": "Entdecke die neueste Musik unserer Künstler",
     "featured": "Featured",
     "searchPlaceholder": "Releases suchen…",
-    "noResults": "Keine Releases gefunden."
+    "noResults": "Keine Releases gefunden.",
+    "viewFullPage": "Zur vollen Seite",
+    "streamingLinks": "Streaming-Links",
+    "previewTitle": "Vorschau"
   },
   "news": {
     "heading": "NEWS",
@@ -38,7 +41,9 @@
   },
   "videos": {
     "heading": "VIDEOS",
-    "subheading": "Die neuesten Musikvideos und Visualizer"
+    "subheading": "Die neuesten Musikvideos und Visualizer",
+    "loadMore": "Mehr laden",
+    "noVideos": "Noch keine Videos verfügbar."
   },
   "concerts": {
     "heading": "TOUR",

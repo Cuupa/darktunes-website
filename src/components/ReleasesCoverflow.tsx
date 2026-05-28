@@ -3,11 +3,11 @@
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import type { EmblaCarouselType } from 'embla-carousel'
-import Link from 'next/link'
 import { useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { ReleasePreviewModal } from '@/components/ReleasePreviewModal'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -16,6 +16,7 @@ export interface ReleasesCoverflowProps {
   dict: Dictionary['releases']
   locale: Locale
   autoplayMs?: number
+  consentDict: Dictionary['consent']
 }
 
 /**
@@ -136,10 +137,13 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  * - `overflow-hidden` is on the Embla viewport (clips card edges only).
  * - `transform-style: preserve-3d` is on each slide's inner content wrapper.
  */
-export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
+export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, consentDict }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
+
+  const [previewRelease, setPreviewRelease] = useState<Release | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Pre-compute all date strings once — avoids repeated toLocaleDateString() on every swipe
   const formattedDates = useMemo(
@@ -349,11 +353,13 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                       }}
                     >
                       {renderedIndices.has(index) ? (
-                        <Link
-                          href={`/releases/${release.id}`}
-                          aria-label={`${release.title} by ${release.artistName} – cover art`}
+                        <button
+                          type="button"
+                          aria-label={`${release.title} by ${release.artistName} – open preview`}
                           draggable={false}
                           tabIndex={isActive ? 0 : -1}
+                          className="block w-full text-left cursor-pointer"
+                          onClick={() => { setPreviewRelease(release); setPreviewOpen(true) }}
                         >
                           <div
                             className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
@@ -396,7 +402,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               </Badge>
                             )}
                           </div>
-                        </Link>
+                        </button>
                       ) : (
                         /* Lightweight placeholder — maintains slide dimensions so
                            Embla measures the full carousel width correctly. */
@@ -483,6 +489,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       <p className="text-center text-xs text-muted-foreground font-mono mt-2">
         {selectedIndex + 1} / {total}
       </p>
+
+      <ReleasePreviewModal
+        release={previewRelease}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        dict={dict}
+        consentDict={consentDict}
+      />
     </div>
   )
 }

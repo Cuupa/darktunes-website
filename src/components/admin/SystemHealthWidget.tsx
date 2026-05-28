@@ -100,6 +100,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncingYoutube, setSyncingYoutube] = useState(false)
+  const [syncingApi, setSyncingApi] = useState<string | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
 
   const fetchHealth = useCallback(async () => {
@@ -194,6 +195,35 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       toast.error(`YouTube sync failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSyncingYoutube(false)
+    }
+  }
+
+  const handleSyncApi = async (api: string) => {
+    setSyncingApi(api)
+    try {
+      const res = await fetch('/api/sync-api', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiSource: api }),
+      })
+
+      const data: unknown = await res.json()
+
+      if (!res.ok) {
+        const errorData = data as { error?: string }
+        throw new Error(errorData.error ?? `Sync failed with status ${res.status}`)
+      }
+
+      const meta = getApiMeta(api)
+      toast.success(`${meta.label} sync completed.`)
+      await fetchHealth()
+    } catch (err) {
+      toast.error(`${getApiMeta(api).label} sync failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSyncingApi(null)
     }
   }
 
@@ -398,6 +428,24 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                     )}
                   </div>
                 )}
+
+                {/* Force sync button */}
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs px-2"
+                    disabled={!dbOnline || syncingApi === api || syncing}
+                    onClick={() => handleSyncApi(api)}
+                  >
+                    {syncingApi === api ? (
+                      <ArrowsClockwise size={10} className="mr-1 animate-spin" />
+                    ) : (
+                      <ArrowsClockwise size={10} className="mr-1" />
+                    )}
+                    Force Sync
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )

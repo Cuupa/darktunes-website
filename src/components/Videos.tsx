@@ -63,6 +63,12 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
+          {paginatedVideos.length === 0 && (
+            <p className="text-center text-muted-foreground font-mono py-12">
+              {dict.noVideos}
+            </p>
+          )}
+
           {/* data-lenis-prevent removed: vertical Lenis scroll is not affected by the grid layout */}
           <motion.ul
             className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
@@ -129,7 +135,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale }: Vi
                 onClick={() => setPage((p) => p + 1)}
                 className="min-w-[160px]"
               >
-                Load More
+                {dict.loadMore}
               </Button>
             </div>
           )}
