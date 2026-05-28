@@ -117,16 +117,21 @@ export async function fetchSpotifyArtistReleases(
   const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
   const artistId = extractSpotifyId(spotifyArtistId)
 
-  const url = new URL(`https://api.spotify.com/v1/artists/${artistId}/albums`)
-  url.searchParams.set('limit', '50')
-  url.searchParams.set('include_groups', 'album,single,compilation')
+  // URLSearchParams encodes commas as %2C; Spotify requires literal commas in
+  // include_groups, so we build the query string manually to avoid 400 errors.
+  const url = `https://api.spotify.com/v1/artists/${artistId}/albums?limit=50&include_groups=album,single,compilation`
 
-  const response = await fetchFn(url.toString(), {
+  const response = await fetchFn(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
 
   if (!response.ok) {
-    throw new HttpError(response.status, `Spotify albums fetch failed: ${response.status}`)
+    let detail = ''
+    try {
+      const errBody = (await response.json()) as { error?: { message?: string } }
+      if (errBody?.error?.message) detail = ': ' + errBody.error.message
+    } catch { /* ignore parse errors */ }
+    throw new HttpError(response.status, 'Spotify albums fetch failed: ' + String(response.status) + detail)
   }
 
   const data = (await response.json()) as { items: SpotifyAlbum[] }

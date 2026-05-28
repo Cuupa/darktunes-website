@@ -181,7 +181,8 @@ export async function fetchDiscogsArtistReleases(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function deriveFormat(format: string): DiscogsRelease['format'] {
+function deriveFormat(format: string | undefined | null): DiscogsRelease['format'] {
+  if (!format) return 'other'
   const f = format.toLowerCase()
   if (f.includes('vinyl') || f.includes('lp') || f.includes('ep')) return 'vinyl'
   if (f.includes('cd') || f.includes('cdr')) return 'cd'

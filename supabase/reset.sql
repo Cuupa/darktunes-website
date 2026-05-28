@@ -1201,3 +1201,78 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('journalist.press_releases', 'Journalist Press Releases', TRUE, 'journalist'),
   ('journalist.download_history', 'Journalist Download History', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- artist_assets — files uploaded by artists via the portal
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.artist_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  r2_key TEXT NOT NULL,
+  public_url TEXT NOT NULL,
+  label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.artist_assets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_assets_select_own" ON public.artist_assets;
+DROP POLICY IF EXISTS "artist_assets_insert_own" ON public.artist_assets;
+DROP POLICY IF EXISTS "artist_assets_delete_own" ON public.artist_assets;
+DROP POLICY IF EXISTS "artist_assets_admin_all" ON public.artist_assets;
+
+CREATE POLICY "artist_assets_select_own" ON public.artist_assets
+  FOR SELECT USING (
+    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_assets_insert_own" ON public.artist_assets
+  FOR INSERT WITH CHECK (
+    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
+  FOR DELETE USING (
+    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_assets_admin_all" ON public.artist_assets
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- ============================================================
+-- artist_replies — artist replies to label messages
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.artist_replies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id UUID NOT NULL REFERENCES public.label_messages(id) ON DELETE CASCADE,
+  artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  body TEXT NOT NULL CHECK (char_length(body) > 0),
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.artist_replies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_replies_select_own" ON public.artist_replies;
+DROP POLICY IF EXISTS "artist_replies_insert_own" ON public.artist_replies;
+DROP POLICY IF EXISTS "artist_replies_admin_all" ON public.artist_replies;
+
+CREATE POLICY "artist_replies_select_own" ON public.artist_replies
+  FOR SELECT USING (
+    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
+  FOR INSERT WITH CHECK (
+    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );

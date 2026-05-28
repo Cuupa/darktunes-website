@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Trash, Copy, UploadSimple } from '@phosphor-icons/react'
 import { useAssets } from '@/hooks/useAssets'
@@ -25,7 +25,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { Asset } from '@/types'
+import type { Asset, ArtistAsset } from '@/types'
+
+interface ArtistAssetRow extends ArtistAsset {
+  artistName?: string
+}
 
 interface UploadResult {
   publicUrl: string
@@ -52,6 +56,45 @@ export function AssetsManager() {
   const [isMutating, setIsMutating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Artist assets — loaded separately; admins see all via the admin_all RLS policy
+  const [artistAssets, setArtistAssets] = useState<ArtistAssetRow[]>([])
+  const [artistAssetsLoading, setArtistAssetsLoading] = useState(true)
+
+  const loadArtistAssets = useCallback(async () => {
+    setArtistAssetsLoading(true)
+    try {
+      const { data } = await supabase
+        .from('artist_assets')
+        .select('*, artists(name)')
+        .order('created_at', { ascending: false })
+      if (data) {
+        setArtistAssets(
+          data.map((row) => ({
+            id: row.id,
+            artistId: row.artist_id,
+            artistName: (row.artists as { name?: string } | null)?.name ?? undefined,
+            filename: row.filename,
+            originalFilename: row.original_filename,
+            mimeType: row.mime_type,
+            sizeBytes: row.size_bytes,
+            r2Key: row.r2_key,
+            publicUrl: row.public_url,
+            label: row.label ?? undefined,
+            createdAt: row.created_at,
+          })),
+        )
+      }
+    } catch {
+      // non-fatal — just show empty state
+    } finally {
+      setArtistAssetsLoading(false)
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    void loadArtistAssets()
+  }, [loadArtistAssets])
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -263,6 +306,80 @@ export function AssetsManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Artist-uploaded assets — all uploads from the artist portal, visible to admins */}
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold">Artist Assets</h3>
+        <p className="text-sm text-muted-foreground mb-2">{artistAssets.length} artist asset(s)</p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Preview</TableHead>
+              <TableHead>Filename</TableHead>
+              <TableHead>Artist</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Size</TableHead>
+              <TableHead>Label</TableHead>
+              <TableHead>Uploaded</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {artistAssetsLoading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  Loading…
+                </TableCell>
+              </TableRow>
+            ) : artistAssets.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  No artist assets yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              artistAssets.map((asset) => (
+                <TableRow key={asset.id}>
+                  <TableCell>
+                    {isImageMimeType(asset.mimeType) ? (
+                      <img
+                        src={asset.publicUrl}
+                        alt={asset.originalFilename}
+                        className="w-10 h-10 object-cover rounded border border-border"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 flex items-center justify-center rounded border border-border bg-muted text-muted-foreground">
+                        <span className="text-xs font-mono uppercase truncate px-1">
+                          {asset.mimeType.split('/')[1]?.slice(0, 3) ?? '?'}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{asset.originalFilename}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{asset.artistName ?? asset.artistId}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{asset.mimeType}</TableCell>
+                  <TableCell>{formatBytes(asset.sizeBytes)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{asset.label ?? '—'}</TableCell>
+                  <TableCell>{asset.createdAt.split('T')[0]}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleCopyUrl(asset.publicUrl)}
+                      title="Copy URL"
+                      aria-label={`Copy URL for ${asset.originalFilename}`}
+                    >
+                      <Copy size={16} aria-hidden="true" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

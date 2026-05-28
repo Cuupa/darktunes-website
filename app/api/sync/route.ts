@@ -16,14 +16,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
+import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 
 // ---------------------------------------------------------------------------
-// Auth helper
+// Auth helpers
 // ---------------------------------------------------------------------------
+
+function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
+  const expected = `Bearer ${cronSecret}`
+  const authBuffer = Buffer.from(authHeader, 'utf-8')
+  const expectedBuffer = Buffer.from(expected, 'utf-8')
+  if (authBuffer.length !== expectedBuffer.length) return false
+  return timingSafeEqual(authBuffer, expectedBuffer)
+}
 
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -40,12 +49,20 @@ async function verifyToken(token: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  // 1. Authenticate
+  // 1. Authenticate — accept either a Vercel cron call or a ******
+  const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Missing or invalid Authorization header')
+  const cronSecret = process.env.CRON_SECRET
+  if (isCron) {
+    if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
+      throw new ApiError(401, 'Invalid cron secret')
+    }
+  } else {
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new ApiError(401, 'Missing or invalid Authorization header')
+    }
+    await verifyToken(authHeader.slice(7))
   }
-  await verifyToken(authHeader.slice(7))
 
   // 2. Validate required configuration
   const {
