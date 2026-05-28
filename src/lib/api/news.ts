@@ -8,6 +8,11 @@ export type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
 export type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
 
 function rowToNewsPost(row: NewsRow): NewsPost {
+  const validStatuses = ['draft', 'published', 'scheduled', 'archived'] as const
+  type NewsStatus = typeof validStatuses[number]
+  const status: NewsStatus = (validStatuses as readonly string[]).includes(row.status)
+    ? (row.status as NewsStatus)
+    : 'published'
   return {
     id: row.id,
     title: row.title,
@@ -17,7 +22,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
     isPressOnly: row.is_press_only,
-    status: (row.status === 'draft' ? 'draft' : 'published') as 'draft' | 'published',
+    status,
   }
 }
 
@@ -30,12 +35,17 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
   return (data ?? []).map(rowToNewsPost)
 }
 
-/** Public-facing: only returns posts with status='published'. */
+/**
+ * Public-facing: only returns posts with status='published' AND published_at ≤ now.
+ * Scheduled posts (published_at in the future) are withheld until their publish time.
+ */
 export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
+  const now = new Date().toISOString()
   const { data, error } = await db
     .from('news_posts')
     .select('*')
     .eq('status', 'published')
+    .lte('published_at', now)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToNewsPost)

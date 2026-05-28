@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, RolePermissions } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 
@@ -9,6 +9,15 @@ const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
   promoPool: true,
   sosStatements: true,
   editorTools: true,
+}
+
+/** Default permission sets per role. Admin has all permissions; others are restricted. */
+const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
+  admin: { canPublishNews: true, canEditNews: true, canManageArtists: true, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
+  editor: { canPublishNews: true, canEditNews: true, canManageArtists: false, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
+  journalist: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
+  artist: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
+  user: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
 }
 
 /** Default values used when a key is missing from the database. */
@@ -54,6 +63,10 @@ const DEFAULTS: SiteSettings = {
   aboutHeadline: '',
   aboutSubheading: '',
   aboutBody: '',
+  heroContentType: 'release',
+  heroFeaturedId: '',
+  heroCustomBgUrl: '',
+  rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -67,8 +80,16 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
       // Keep this runtime guard aligned with the admin Zod schema in SiteSettingsManager.tsx.
       spotifyPlaylists = parsed.filter((entry): entry is SpotifyPlaylistEntry => {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
-        const candidate = entry as { label?: unknown; uri?: unknown }
+        const candidate = entry as { label?: unknown; uri?: unknown; theme?: unknown; accentColor?: unknown }
         return typeof candidate.label === 'string' && typeof candidate.uri === 'string'
+      }).map((entry) => {
+        const e = entry as { label: string; uri: string; theme?: unknown; accentColor?: unknown }
+        return {
+          label: e.label,
+          uri: e.uri,
+          theme: (e.theme === 'light' ? 'light' : 'dark') as 'dark' | 'light',
+          accentColor: typeof e.accentColor === 'string' ? e.accentColor : '',
+        }
       })
     }
   } catch {
@@ -133,6 +154,18 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     aboutHeadline: map['about_headline'] ?? '',
     aboutSubheading: map['about_subheading'] ?? '',
     aboutBody: map['about_body'] ?? '',
+    heroContentType: (map['hero_content_type'] === 'news' ? 'news' : 'release') as 'release' | 'news',
+    heroFeaturedId: map['hero_featured_id'] ?? '',
+    heroCustomBgUrl: map['hero_custom_bg_url'] ?? '',
+    rolePermissions: (() => {
+      try {
+        const parsed = JSON.parse(map['role_permissions'] ?? '{}') as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return { ...DEFAULT_ROLE_PERMISSIONS, ...(parsed as Record<string, RolePermissions>) }
+        }
+      } catch { /* ignore */ }
+      return DEFAULT_ROLE_PERMISSIONS
+    })(),
   }
 }
 

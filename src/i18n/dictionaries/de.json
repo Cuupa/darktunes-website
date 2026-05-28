@@ -14,7 +14,8 @@
   "hero": {
     "listenNow": "Jetzt anhören",
     "exploreArtist": "Künstler entdecken",
-    "scrollDown": "Nach unten"
+    "scrollDown": "Nach unten",
+    "readMore": "Weiterlesen"
   },
   "artists": {
     "heading": "ARTISTS",

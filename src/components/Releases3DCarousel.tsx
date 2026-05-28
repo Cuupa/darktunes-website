@@ -26,45 +26,50 @@ interface CardSlotStyle {
   zIndex: number
 }
 
-const PERSPECTIVE = 1600 // px – deeper perspective for a more dramatic coverflow
+/** Distance of the viewer from the Z=0 plane. Higher = more subtle 3D effect. */
+const PERSPECTIVE = 1200 // px
 
 /**
- * Returns a fluid card width in pixels: 40 vw, clamped between 280 px and 720 px.
- * At 40 vw the centre card occupies ≈ 40 % of the viewport on all screen sizes.
- * Falls back to 420 on the server (component is 'use client', so this only runs
- * during the very first render before the useEffect fires).
+ * Returns a fluid card width in pixels: 36 vw, clamped between 260 px and 560 px.
+ * Falls back to 380 on the server (component is 'use client').
  */
 function computeCardWidth(): number {
-  if (typeof window === 'undefined') return 420
-  return Math.min(720, Math.max(280, Math.round(window.innerWidth * 0.40)))
+  if (typeof window === 'undefined') return 380
+  return Math.min(560, Math.max(260, Math.round(window.innerWidth * 0.36)))
 }
 
 /**
  * Compute display style for a card at `offset` positions from the centre.
  * Offset 0 = centre card, ±1 = adjacent, ±2 = far sides.
+ *
+ * Side cards are pushed back in Z AND rotated around Y so they read as
+ * genuinely three-dimensional rather than just scaled-down copies.
+ * The narrower horizontal spacing (55 % of card width) keeps the full
+ * card face visible even after the rotateY transform.
  */
 function slotStyle(offset: number, reduced: boolean, cardWidth: number): CardSlotStyle | null {
   const abs = Math.abs(offset)
   if (abs > 2) return null
 
   if (reduced) {
-    // No rotation / depth for users who prefer reduced motion
     return {
-      translateX: offset * (cardWidth * 0.68),
+      translateX: offset * (cardWidth * 0.65),
       translateZ: 0,
       rotateY: 0,
-      scale: abs === 0 ? 1 : 0.72,
-      opacity: abs === 0 ? 1 : 0.5,
+      scale: abs === 0 ? 1 : 0.75,
+      opacity: abs === 0 ? 1 : 0.55,
       zIndex: 10 - abs,
     }
   }
 
-  // Pronounced coverflow: side cards are noticeably smaller and rotated
-  const translateX = offset * (cardWidth * 0.62)
-  const rotateY = -offset * 28
-  const translateZ = abs === 0 ? 80 : -abs * 60
-  const scale = abs === 0 ? 1 : 1 - abs * 0.18   // 1.0 → 0.82 → 0.64
-  const opacity = abs === 0 ? 1 : 1 - abs * 0.2  // 1.0 → 0.8 → 0.6
+  // Lateral offset: spread cards so the rotated faces are still visible
+  const translateX = offset * (cardWidth * 0.55)
+  // Y rotation: 45 ° for first neighbours, 55 ° for outer
+  const rotateY = -offset * (abs === 1 ? 45 : 55)
+  // Push side cards behind the centre card along Z
+  const translateZ = abs === 0 ? 60 : -abs * 140
+  const scale = abs === 0 ? 1 : 1 - abs * 0.12   // 1.0 → 0.88 → 0.76
+  const opacity = abs === 0 ? 1 : 1 - abs * 0.15 // 1.0 → 0.85 → 0.70
   const zIndex = 10 - abs * 2
 
   return { translateX, translateZ, rotateY, scale, opacity, zIndex }
@@ -119,14 +124,17 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
       onKeyDown={handleKeyDown}
     >
       {/* ------------------------------------------------------------------ */}
-      {/* 3D stage                                                            */}
+      {/* 3D stage — overflow-visible so rotated side cards aren't clipped    */}
       {/* ------------------------------------------------------------------ */}
       <div
-        className="relative mx-auto overflow-visible"
+        className="relative mx-auto"
         style={{
           perspective: PERSPECTIVE,
+          perspectiveOrigin: '50% 40%',
           height: stageHeight,
           maxWidth: '100%',
+          /* Must NOT be overflow:hidden — that clips the 3D transforms */
+          overflow: 'visible',
         }}
       >
         {releases.map((release, releaseIdx) => {

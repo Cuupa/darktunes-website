@@ -84,8 +84,14 @@ export interface NewsPost {
   imageUrl?: string
   slug: string
   isPressOnly: boolean
-  /** Draft posts are only visible in the admin/editor CMS; published posts appear on the public site. */
-  status: 'draft' | 'published'
+  /**
+   * Post lifecycle status:
+   * - `draft`     — only visible to admins/editors
+   * - `published` — public (and `published_at` ≤ now)
+   * - `scheduled` — will become public at `published_at` (which is in the future)
+   * - `archived`  — removed from public view, kept for record
+   */
+  status: 'draft' | 'published' | 'scheduled' | 'archived'
 }
 
 export interface PortalFeatureFlag {
@@ -182,6 +188,10 @@ export interface ArtistAsset {
 export interface SpotifyPlaylistEntry {
   label: string
   uri: string
+  /** Spotify embed theme. 'dark' is the default Spotify look; 'light' inverts it. */
+  theme?: 'dark' | 'light'
+  /** Optional hex accent colour used for the tab-selector button in the multi-player UI. */
+  accentColor?: string
 }
 
 export interface FeatureToggles {
@@ -249,6 +259,29 @@ export interface SiteSettings {
   aboutSubheading?: string
   /** Main About page body text (Markdown). Rendered via MarkdownContent on /about. */
   aboutBody?: string
+  // ── Hero Section ──────────────────────────────────────────────────────────
+  /** What the hero section features. 'release' = latest/featured release, 'news' = latest news post. Default: 'release'. */
+  heroContentType?: 'release' | 'news'
+  /** ID of the specific release or news post to feature. Empty = auto-pick the latest featured item. */
+  heroFeaturedId?: string
+  /** R2 URL of a custom hero background image that overrides the release/news cover art. */
+  heroCustomBgUrl?: string
+  // ── Role Permissions ──────────────────────────────────────────────────────
+  /**
+   * Per-role permission map. Keys are role names ('admin','editor','journalist','user','artist').
+   * Stored as JSON in site_settings under key 'role_permissions'.
+   */
+  rolePermissions?: Record<string, RolePermissions>
+}
+
+/** Granular permission flags configurable per role. */
+export interface RolePermissions {
+  canPublishNews: boolean
+  canEditNews: boolean
+  canManageArtists: boolean
+  canManageReleases: boolean
+  canManageVideos: boolean
+  canViewAdminPanel: boolean
 }
 
 export interface Concert {

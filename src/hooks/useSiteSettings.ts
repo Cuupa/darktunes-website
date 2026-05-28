@@ -63,6 +63,9 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     spotify_playlists: JSON.stringify(s.spotifyPlaylists ?? []),
     hero_badge: s.heroBadge,
     hero_description: s.heroDescription,
+    hero_content_type: s.heroContentType ?? 'release',
+    hero_featured_id: s.heroFeaturedId ?? '',
+    hero_custom_bg_url: s.heroCustomBgUrl ?? '',
     seo_title: s.seoTitle,
     seo_description: s.seoDescription,
     og_title: s.ogTitle,
@@ -90,6 +93,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     about_headline: s.aboutHeadline ?? '',
     about_subheading: s.aboutSubheading ?? '',
     about_body: s.aboutBody ?? '',
+    role_permissions: JSON.stringify(s.rolePermissions ?? {}),
   }
 }
 
