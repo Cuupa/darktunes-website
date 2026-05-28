@@ -110,8 +110,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- cast the column to the enum so that all five role values are accepted.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 
--- Drop ALL policies on tables whose legacy policies may reference profiles.role
--- (they are fully recreated below, so this is safe and idempotent)
+-- Drop ALL policies in the public schema before any column-type alterations.
+-- Policies are fully recreated below, so this is safe and idempotent.
 DO $$
 DECLARE
   pol RECORD;
@@ -120,7 +120,6 @@ BEGIN
     SELECT policyname, tablename
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename IN ('artists', 'releases', 'profiles', 'concerts', 'videos', 'assets', 'sync_logs')
   LOOP
     EXECUTE format(
       'DROP POLICY IF EXISTS %I ON public.%I',
