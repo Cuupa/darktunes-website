@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Play, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
 import { VideoModal } from '@/components/VideoModal'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -35,6 +36,67 @@ const listVariants = {
 const itemVariants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
+}
+
+/** Individual video card with skeleton loading state for the thumbnail. */
+function VideoCard({
+  video,
+  dateLocale,
+  onPlay,
+}: {
+  video: Video
+  dateLocale: string
+  onPlay: (video: Video) => void
+}) {
+  const [imgLoaded, setImgLoaded] = useState(false)
+
+  return (
+    <Card
+      className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer flex flex-col w-full"
+      onClick={() => onPlay(video)}
+    >
+      <div className="relative aspect-video overflow-hidden shrink-0">
+        {/* Skeleton shown until the thumbnail image has loaded */}
+        {!imgLoaded && (
+          <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
+        )}
+        <img
+          src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
+          alt={`${video.title} – video thumbnail`}
+          className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+          sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setImgLoaded(true)}
+        />
+        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
+          <Button
+            size="lg"
+            aria-label={`Play ${video.title}`}
+            className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0 hover:scale-110 transition-transform"
+            tabIndex={-1}
+          >
+            <Play size={28} weight="fill" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+      <div className="p-6 flex flex-col flex-1">
+        <Badge className="mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase tracking-wider font-mono text-xs self-start">
+          {video.artistName}
+        </Badge>
+        <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors flex-1">
+          {video.title}
+        </h3>
+        <p className="text-sm text-muted-foreground font-mono mt-auto">
+          {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
+    </Card>
+  )
 }
 
 export function Videos({ videos, placeholderUrl, dict, consentDict, locale, videosPerPage = 9, videosLinkToPage = false }: VideosProps) {
@@ -91,46 +153,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
                 className="flex-none w-[82vw] snap-start md:w-auto flex"
                 variants={prefersReducedMotion ? undefined : itemVariants}
               >
-                <Card
-                  className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer flex flex-col w-full"
-                  onClick={() => handleVideoClick(video)}
-                >
-                  <div className="relative aspect-video overflow-hidden shrink-0">
-                    <img
-                      src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
-                      alt={`${video.title} – video thumbnail`}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
-                      <Button
-                        size="lg"
-                        aria-label={`Play ${video.title}`}
-                        className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0 hover:scale-110 transition-transform"
-                        tabIndex={-1}
-                      >
-                        <Play size={28} weight="fill" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-6 flex flex-col flex-1">
-                    <Badge className="mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase tracking-wider font-mono text-xs self-start">
-                      {video.artistName}
-                    </Badge>
-                    <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors flex-1">
-                      {video.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground font-mono mt-auto">
-                      {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                </Card>
+                <VideoCard video={video} dateLocale={dateLocale} onPlay={handleVideoClick} />
               </motion.li>
             ))}
           </motion.ul>
