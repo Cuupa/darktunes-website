@@ -4,7 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users, ToggleRight, ClipboardText } from '@phosphor-icons/react'
+import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users, ToggleRight, ClipboardText, ShieldCheck } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -20,6 +20,7 @@ import { FeatureFlagsManager } from './FeatureFlagsManager'
 import { MessagesManager } from './MessagesManager'
 import { AccreditationsManager } from './AccreditationsManager'
 import { LogsManager } from './LogsManager'
+import { RolesManager } from './RolesManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 export function AdminDashboard() {
@@ -31,7 +32,7 @@ export function AdminDashboard() {
   const isEditor = profile?.role === 'editor'
 
   // Tabs visible only to admin (not editor)
-  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs']
+  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs', 'roles']
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -175,6 +176,12 @@ export function AdminDashboard() {
               <TabsTrigger value="logs" className="gap-2">
                 <ClipboardText size={16} weight="bold" aria-hidden="true" />
                 Logs
+              </TabsTrigger>
+            )}
+            {canSeeTab('roles') && (
+              <TabsTrigger value="roles" className="gap-2">
+                <ShieldCheck size={16} weight="bold" aria-hidden="true" />
+                Roles & Permissions
               </TabsTrigger>
             )}
           </TabsList>
@@ -394,6 +401,21 @@ export function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <LogsManager />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+          {canSeeTab('roles') && (
+            <TabsContent value="roles" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Roles &amp; Permissions</CardTitle>
+                  <CardDescription>
+                    Configure what each user role is allowed to do. Admin always has full access.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RolesManager />
                 </CardContent>
               </Card>
             </TabsContent>

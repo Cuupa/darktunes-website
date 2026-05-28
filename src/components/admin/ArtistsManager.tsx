@@ -179,7 +179,7 @@ function ArtistSkeletonRows() {
 export function ArtistsManager() {
   const router = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { artists, isLoading, createArtist, deleteArtist, reload } = useArtists()
+  const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)

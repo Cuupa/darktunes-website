@@ -24,24 +24,28 @@ function artistToFormData(artist: Artist): ArtistFormData {
     genres: artist.genres.join(', '),
     imageUrl: artist.imageUrl ?? '',
     logoUrl: artist.logoUrl ?? '',
-    country: artist.country ?? '',
-    website: artist.website ?? '',
-    spotifyArtistId: artist.spotifyArtistId ?? '',
     spotifyUrl: artist.spotifyUrl ?? '',
     appleMusicUrl: artist.appleMusicUrl ?? '',
-    discogsUrl: artist.discogsUrl ?? '',
-    deezerUrl: artist.deezerUrl ?? '',
-    amazonMusicUrl: artist.amazonMusicUrl ?? '',
-    youtubeChannelUrl: artist.youtubeChannelUrl ?? '',
-    youtubeChannelId: artist.youtubeChannelId ?? '',
     instagramUrl: artist.instagramUrl ?? '',
+    youtubeUrl: artist.youtubeUrl ?? '',
+    websiteUrl: artist.websiteUrl ?? '',
     facebookUrl: artist.facebookUrl ?? '',
     twitterUrl: artist.twitterUrl ?? '',
+    tiktokUrl: artist.tiktokUrl ?? '',
     bandcampUrl: artist.bandcampUrl ?? '',
-    soundcloudUrl: artist.soundcloudUrl ?? '',
-    active: artist.active ?? true,
-    featured: artist.featured ?? false,
-    autoSync: artist.autoSync ?? true,
+    shopUrl: artist.shopUrl ?? '',
+    country: artist.country ?? '',
+    foundedYear: artist.foundedYear ? String(artist.foundedYear) : '',
+    email: artist.email ?? '',
+    vatNumber: artist.vatNumber ?? '',
+    featured: artist.featured,
+    isEuNonGerman: artist.isEuNonGerman ?? false,
+    isVisible: artist.isVisible,
+    notes: artist.notes ?? '',
+    spotifyId: artist.spotifyId ?? '',
+    discogsId: artist.discogsId ?? '',
+    songkickId: artist.songkickId ?? '',
+    bandsintownId: artist.bandsintownId ?? '',
   }
 }
 
@@ -53,24 +57,28 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     genres: data.genres.split(',').map((g) => g.trim()).filter(Boolean),
     image_url: data.imageUrl || null,
     logo_url: data.logoUrl || null,
-    country: data.country || null,
-    website: data.website || null,
-    spotify_artist_id: data.spotifyArtistId || null,
     spotify_url: data.spotifyUrl || null,
     apple_music_url: data.appleMusicUrl || null,
-    discogs_url: data.discogsUrl || null,
-    deezer_url: data.deezerUrl || null,
-    amazon_music_url: data.amazonMusicUrl || null,
-    youtube_channel_url: data.youtubeChannelUrl || null,
-    youtube_channel_id: data.youtubeChannelId || null,
     instagram_url: data.instagramUrl || null,
+    youtube_url: data.youtubeUrl || null,
+    website_url: data.websiteUrl || null,
     facebook_url: data.facebookUrl || null,
     twitter_url: data.twitterUrl || null,
+    tiktok_url: data.tiktokUrl || null,
     bandcamp_url: data.bandcampUrl || null,
-    soundcloud_url: data.soundcloudUrl || null,
-    active: data.active ?? true,
-    featured: data.featured ?? false,
-    auto_sync: data.autoSync ?? true,
+    shop_url: data.shopUrl || null,
+    country: data.country || null,
+    founded_year: data.foundedYear ? parseInt(data.foundedYear, 10) : null,
+    email: data.email || null,
+    vat_number: data.vatNumber || null,
+    featured: data.featured,
+    is_eu_non_german: data.isEuNonGerman,
+    is_visible: data.isVisible,
+    notes: data.notes || null,
+    spotify_id: data.spotifyId || null,
+    discogs_id: data.discogsId || null,
+    songkick_id: data.songkickId || null,
+    bandsintown_id: data.bandsintownId || null,
   }
 }
 
@@ -98,20 +106,18 @@ export default function ArtistEditPage() {
     if (!artist) return
     setIsSaving(true)
     try {
-      // Re-sync Spotify if artist ID changed
       await updateArtist(artist.id, formDataToInsert(data))
       toast.success(`Updated "${data.name}"`)
 
       // Trigger release sync if Spotify ID changed
-      if (data.spotifyArtistId && data.spotifyArtistId !== artist.spotifyArtistId) {
+      if (data.spotifyId && data.spotifyId !== artist.spotifyId) {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
-          const token = session.access_token
           void fetch('/api/sync-artist', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: 'Bearer ' + token,
+              Authorization: 'Bearer ' + session.access_token,
             },
             body: JSON.stringify({ artistId: artist.id }),
           }).then(() => toast.success('Release sync triggered'))

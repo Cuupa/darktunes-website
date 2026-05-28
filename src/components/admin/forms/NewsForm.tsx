@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useRef } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useRef, useState } from 'react'
+import { useForm, Controller } from 'react-hook-form'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ImageUploadButton } from './ImageUploadButton'
+import { TiptapEditor } from '@/components/admin/TiptapEditor'
 
 export interface NewsFormData {
   title: string
@@ -23,8 +24,9 @@ export interface NewsFormData {
   content: string
   imageUrl: string
   publishedAt: string
+  scheduledAt: string
   isPressOnly: boolean
-  status: 'draft' | 'published'
+  status: 'draft' | 'published' | 'scheduled' | 'archived'
 }
 
 function toSlug(text: string): string {
@@ -38,12 +40,15 @@ function toSlug(text: string): string {
 type Props = AdminPanelProps<NewsFormData>
 
 export function NewsForm({ value, onChange, isLoading }: Props) {
-  const { register, handleSubmit, watch, setValue, reset } = useForm<NewsFormData>({
+  const { register, handleSubmit, watch, setValue, reset, control } = useForm<NewsFormData>({
     defaultValues: value,
   })
 
+  const [htmlContent, setHtmlContent] = useState(value?.content ?? '')
+
   useEffect(() => {
     reset(value)
+    setHtmlContent(value?.content ?? '')
   }, [value, reset])
 
   const title = watch('title')
@@ -62,8 +67,12 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
 
   const isPressOnly = watch('isPressOnly')
 
+  const onSubmit = (data: NewsFormData) => {
+    onChange({ ...data, content: htmlContent })
+  }
+
   return (
-    <form onSubmit={handleSubmit(onChange)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-1">
         <Label htmlFor="title">Title *</Label>
         <Input id="title" {...register('title', { required: true })} disabled={isLoading} />
@@ -75,35 +84,61 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="excerpt">Excerpt</Label>
+        <Label htmlFor="excerpt">Excerpt (shown in listings)</Label>
         <Textarea id="excerpt" {...register('excerpt')} rows={2} disabled={isLoading} />
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="content">Content *</Label>
-        <Textarea id="content" {...register('content', { required: true })} rows={6} disabled={isLoading} />
+        <Label>Content *</Label>
+        <TiptapEditor
+          value={htmlContent}
+          onChange={setHtmlContent}
+          disabled={isLoading}
+          placeholder="Write your news post here…"
+        />
       </div>
 
+      {/* Status + scheduling */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="publishedAt">Published At</Label>
-          <Input id="publishedAt" type="date" {...register('publishedAt')} disabled={isLoading} />
+          <Label htmlFor="status">Status</Label>
+          <Controller
+            name="status"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={(val) => field.onChange(val as NewsFormData['status'])}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="status">Status</Label>
-          <Select
-            value={status}
-            onValueChange={(val) => setValue('status', val as 'draft' | 'published')}
+          <Label htmlFor="publishedAt">
+            {status === 'scheduled' ? 'Publish At (date & time)' : 'Published At'}
+          </Label>
+          <Input
+            id="publishedAt"
+            type="datetime-local"
+            {...register('publishedAt')}
             disabled={isLoading}
-          >
-            <SelectTrigger id="status">
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-            </SelectContent>
-          </Select>
+          />
+          {status === 'scheduled' && (
+            <p className="text-xs text-muted-foreground">
+              Post will go live automatically at this time.
+            </p>
+          )}
         </div>
       </div>
 

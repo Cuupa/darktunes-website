@@ -83,7 +83,11 @@ export default async function NewsDetailPage({ params }: Props) {
         )}
 
         <div className="prose prose-invert prose-sm max-w-none">
-          <MarkdownContent content={post.content} />
+          {post.content.trimStart().startsWith('<') ? (
+            <div dangerouslySetInnerHTML={{ __html: post.content }} />
+          ) : (
+            <MarkdownContent content={post.content} />
+          )}
         </div>
       </div>
     </div>
