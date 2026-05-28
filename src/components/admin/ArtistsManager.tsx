@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
@@ -176,10 +177,11 @@ function ArtistSkeletonRows() {
 }
 
 export function ArtistsManager() {
+  const router = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
+  const [editingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -233,28 +235,22 @@ export function ArtistsManager() {
   }
 
   const openNew = () => {
-    setEditingArtist(null)
     setDialogOpen(true)
   }
 
   const openEdit = (artist: Artist) => {
-    setEditingArtist(artist)
-    setDialogOpen(true)
+    router.push(`/admin/artists/${artist.id}/edit`)
   }
 
   const handleSave = async (data: ArtistFormData) => {
     setIsMutating(true)
     try {
-      if (editingArtist) {
-        await updateArtist(editingArtist.id, formDataToInsert(data))
-        toast.success(`Updated "${data.name}"`)
-        setDialogOpen(false)
-      } else {
-        const newArtist = await createArtist(formDataToInsert(data))
-        setDialogOpen(false)
-        toast.success(`Created "${data.name}" — syncing releases…`)
-        void handleSync(newArtist)
-      }
+      // In ArtistsManager, the dialog only creates new artists.
+      // Editing existing artists happens on /admin/artists/[id]/edit.
+      const newArtist = await createArtist(formDataToInsert(data))
+      setDialogOpen(false)
+      toast.success(`Created "${data.name}" — syncing releases…`)
+      void handleSync(newArtist)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -479,7 +475,7 @@ export function ArtistsManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingArtist ? 'Edit Artist' : 'New Artist'}</DialogTitle>
+            <DialogTitle>New Artist</DialogTitle>
           </DialogHeader>
           <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} />
         </DialogContent>

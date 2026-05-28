@@ -4,6 +4,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,13 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { SiteSettings } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
@@ -35,6 +43,8 @@ const schema = z.object({
     z.object({
       label: z.string().min(1, 'Label required'),
       uri: z.string().min(1, 'URI required'),
+      theme: z.enum(['dark', 'light']).optional().default('dark'),
+      accentColor: z.string().optional().default(''),
     }),
   ).default([]).refine(
     (entries) => new Set(entries.map((entry) => entry.uri.trim())).size === entries.length,
@@ -42,6 +52,9 @@ const schema = z.object({
   ),
   heroBadge: z.string().min(1, 'Hero badge text is required'),
   heroDescription: z.string().min(1, 'Hero description is required'),
+  heroContentType: z.enum(['release', 'news']).default('release'),
+  heroFeaturedId: z.string().optional().default(''),
+  heroCustomBgUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   seoTitle: z.string().min(1, 'SEO title is required'),
   seoDescription: z.string().min(1, 'SEO description is required'),
   ogTitle: z.string().min(1, 'OG title is required'),
@@ -109,21 +122,24 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
     resolver: zodResolver(schema),
     defaultValues: settings,
   })
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'spotifyPlaylists',
   })
 
   const logoUrl = watch('logoUrl')
   const faviconUrl = watch('faviconUrl')
+  const heroContentType = watch('heroContentType')
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingFavicon, setIsUploadingFavicon] = useState(false)
+  const [isUploadingHeroBg, setIsUploadingHeroBg] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const faviconInputRef = useRef<HTMLInputElement>(null)
+  const heroBgInputRef = useRef<HTMLInputElement>(null)
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
-  async function uploadFile(file: File, fieldName: 'logoUrl' | 'faviconUrl', setUploading: (v: boolean) => void) {
+  async function uploadFile(file: File, fieldName: 'logoUrl' | 'faviconUrl' | 'heroCustomBgUrl', setUploading: (v: boolean) => void) {
     setUploading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -180,6 +196,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <TabsTrigger value="about">About Page</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
+          <TabsTrigger value="hero">Hero Section</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
           <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
           <TabsTrigger value="visual">Visual Effects</TabsTrigger>
@@ -499,7 +516,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ label: '', uri: '' })}
+                    onClick={() => append({ label: '', uri: '', theme: 'dark', accentColor: '' })}
                     disabled={isSubmitting}
                   >
                     + Add playlist
@@ -513,43 +530,102 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   </p>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="grid gap-2 md:grid-cols-[1fr_1fr_auto] md:items-start">
-                      <div className="space-y-1">
-                        <Input
-                          placeholder="Label (e.g. Darkwave Mix)"
-                          {...register(`spotifyPlaylists.${index}.label` as const)}
-                          disabled={isSubmitting}
-                        />
-                        {errors.spotifyPlaylists?.[index]?.label?.message && (
-                          <p className="text-xs text-destructive">
-                            {errors.spotifyPlaylists[index]?.label?.message}
-                          </p>
-                        )}
+                    <div key={field.id} className="border rounded-md p-3 space-y-2">
+                      <div className="grid gap-2 md:grid-cols-[1fr_1fr] items-start">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Label</Label>
+                          <Input
+                            placeholder="Darkwave Mix"
+                            {...register(`spotifyPlaylists.${index}.label` as const)}
+                            disabled={isSubmitting}
+                          />
+                          {errors.spotifyPlaylists?.[index]?.label?.message && (
+                            <p className="text-xs text-destructive">
+                              {errors.spotifyPlaylists[index]?.label?.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">URI / URL</Label>
+                          <Input
+                            placeholder="spotify:playlist:xxx or share URL"
+                            {...register(`spotifyPlaylists.${index}.uri` as const)}
+                            disabled={isSubmitting}
+                          />
+                          {errors.spotifyPlaylists?.[index]?.uri?.message && (
+                            <p className="text-xs text-destructive">
+                              {errors.spotifyPlaylists[index]?.uri?.message}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Input
-                          placeholder="URI or URL"
-                          {...register(`spotifyPlaylists.${index}.uri` as const)}
-                          disabled={isSubmitting}
-                        />
-                        {errors.spotifyPlaylists?.[index]?.uri?.message && (
-                          <p className="text-xs text-destructive">
-                            {errors.spotifyPlaylists[index]?.uri?.message}
-                          </p>
-                        )}
+                      <div className="grid gap-2 md:grid-cols-[160px_1fr_auto] items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Player Theme</Label>
+                          <Controller
+                            name={`spotifyPlaylists.${index}.theme` as const}
+                            control={control}
+                            render={({ field: f }) => (
+                              <Select
+                                value={f.value ?? 'dark'}
+                                onValueChange={f.onChange}
+                                disabled={isSubmitting}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Theme" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="dark">Dark</SelectItem>
+                                  <SelectItem value="light">Light</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Tab Accent Color (hex, optional)
+                          </Label>
+                          <Input
+                            placeholder="#1db954"
+                            {...register(`spotifyPlaylists.${index}.accentColor` as const)}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div className="flex gap-1 pb-0.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => move(index, index - 1)}
+                            disabled={isSubmitting || index === 0}
+                            title="Move up"
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => move(index, index + 1)}
+                            disabled={isSubmitting || index === fields.length - 1}
+                            title="Move down"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => remove(index)}
+                            disabled={isSubmitting}
+                          >
+                            Remove
+                          </Button>
+                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                        disabled={isSubmitting}
-                        className="justify-self-start md:justify-self-end"
-                      >
-                        Remove
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -570,6 +646,119 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 <p className="text-xs text-muted-foreground mt-1">
                   Milliseconds between automatic slide advances. 0 = disabled (recommended default).
                   E.g. 5000 = 5 seconds.
+                </p>
+              </Field>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Hero Section                                                         */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="hero">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hero Section</CardTitle>
+              <CardDescription>
+                Configure what is featured on the homepage hero. Choose between showcasing the
+                latest release or a highlighted news post, and optionally set a custom background image.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Content type toggle */}
+              <div className="space-y-2">
+                <Label>Featured Content Type</Label>
+                <Controller
+                  name="heroContentType"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="release">Latest Release</SelectItem>
+                        <SelectItem value="news">News Post</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  "Latest Release" auto-selects the most recent release. "News Post" shows a specific news post.
+                </p>
+              </div>
+
+              {/* Featured news ID — only shown when heroContentType === 'news' */}
+              {heroContentType === 'news' && (
+                <Field id="heroFeaturedId" label="News Post Slug or ID">
+                  <Input
+                    id="heroFeaturedId"
+                    placeholder="my-news-post-slug"
+                    {...register('heroFeaturedId')}
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the slug of the news post to feature. Leave blank to auto-select the latest
+                    published news post.
+                  </p>
+                </Field>
+              )}
+
+              {/* Custom background */}
+              <div className="space-y-2">
+                <Label>Custom Background Image</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://cdn.darktunes.com/hero-bg.jpg"
+                    {...register('heroCustomBgUrl')}
+                    disabled={isSubmitting}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => heroBgInputRef.current?.click()}
+                    disabled={isSubmitting || isUploadingHeroBg}
+                  >
+                    {isUploadingHeroBg ? 'Uploading…' : 'Upload'}
+                  </Button>
+                  <input
+                    ref={heroBgInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) uploadFile(file, 'heroCustomBgUrl', setIsUploadingHeroBg)
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Optional. If set, this image overrides the release artwork or news image in the hero
+                  background. Leave blank to use the featured item&apos;s own image.
+                </p>
+                {errors.heroCustomBgUrl?.message && (
+                  <p className="text-xs text-destructive">{errors.heroCustomBgUrl.message}</p>
+                )}
+              </div>
+
+              <Field id="heroBadge" label="Hero Badge Text *" error={errors.heroBadge?.message}>
+                <Input id="heroBadge" {...register('heroBadge')} disabled={isSubmitting} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Short label shown on the hero badge pill, e.g. "⚡ New Release".
+                </p>
+              </Field>
+
+              <Field id="heroDescription" label="Hero Description *" error={errors.heroDescription?.message}>
+                <Textarea
+                  id="heroDescription"
+                  rows={3}
+                  {...register('heroDescription')}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fallback description shown beneath the hero title. Used when the featured item has no excerpt.
                 </p>
               </Field>
             </CardContent>

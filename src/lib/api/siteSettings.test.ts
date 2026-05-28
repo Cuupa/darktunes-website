@@ -62,8 +62,8 @@ describe('getSiteSettings', () => {
     expect(result.instagramUrl).toBe('https://instagram.com/test')
     expect(result.spotifyPlaylistUri).toBe('abc123')
     expect(result.spotifyPlaylists).toEqual([
-      { label: 'Darkwave Mix', uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6' },
-      { label: 'EBM Essentials', uri: 'https://open.spotify.com/playlist/abc123' },
+      { label: 'Darkwave Mix', uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6', theme: 'dark', accentColor: '' },
+      { label: 'EBM Essentials', uri: 'https://open.spotify.com/playlist/abc123', theme: 'dark', accentColor: '' },
     ])
     expect(result.heroBadge).toBe('🎵 New')
     expect(result.seoTitle).toBe('Test SEO Title')

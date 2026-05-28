@@ -1,11 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
-import { NewsForm, type NewsFormData } from './forms/NewsForm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -14,12 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,91 +27,44 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import type { NewsPost } from '@/types'
-import type { Database } from '@/types/database'
 
-type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
+type StatusFilter = 'all' | 'published' | 'draft' | 'scheduled' | 'archived'
 
-const EMPTY_FORM: NewsFormData = {
-  title: '',
-  slug: '',
-  excerpt: '',
-  content: '',
-  imageUrl: '',
-  publishedAt: new Date().toISOString().split('T')[0],
-  isPressOnly: false,
-  status: 'published',
-}
-
-function newsPostToFormData(post: NewsPost): NewsFormData {
-  return {
-    title: post.title,
-    slug: post.slug,
-    excerpt: post.excerpt ?? '',
-    content: post.content,
-    imageUrl: post.imageUrl ?? '',
-    publishedAt: post.publishedAt.split('T')[0],
-    isPressOnly: post.isPressOnly,
-    status: post.status,
-  }
-}
-
-function formDataToInsert(data: NewsFormData): NewsInsert {
-  return {
-    title: data.title,
-    slug: data.slug,
-    excerpt: data.excerpt || null,
-    content: data.content,
-    image_url: data.imageUrl || null,
-    published_at: data.publishedAt || new Date().toISOString(),
-    is_press_only: data.isPressOnly,
-    status: data.status,
-  }
+const STATUS_BADGE: Record<NewsPost['status'], { label: string; className: string }> = {
+  published: { label: 'Published', className: 'text-green-400 border-green-400/30' },
+  draft: { label: 'Draft', className: 'text-muted-foreground border-border' },
+  scheduled: { label: 'Scheduled', className: 'text-yellow-400 border-yellow-400/30' },
+  archived: { label: 'Archived', className: 'text-orange-400 border-orange-400/30' },
 }
 
 export function NewsManager() {
-  const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingPost, setEditingPost] = useState<NewsPost | null>(null)
+  const router = useRouter()
+  const { news, isLoading, updateNewsPost, deleteNewsPost } = useNews()
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  const formValue = editingPost ? newsPostToFormData(editingPost) : EMPTY_FORM
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return news
+      .filter((p) => {
+        if (statusFilter !== 'all' && p.status !== statusFilter) return false
+        return !q || p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)
+      })
+      .sort((a, b) => {
+        const cmp = new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()
+        return sortDir === 'desc' ? -cmp : cmp
+      })
+  }, [news, search, statusFilter, sortDir])
 
-  const openNew = () => {
-    setEditingPost(null)
-    setDialogOpen(true)
-  }
-
-  const openEdit = (post: NewsPost) => {
-    setEditingPost(post)
-    setDialogOpen(true)
-  }
-
-  const handleSave = async (data: NewsFormData) => {
-    setIsMutating(true)
+  const handleArchive = async (post: NewsPost) => {
     try {
-      if (editingPost) {
-        await updateNewsPost(editingPost.id, formDataToInsert(data))
-        toast.success(`Updated "${data.title}"`)
-      } else {
-        await createNewsPost(formDataToInsert(data))
-        toast.success(`Created "${data.title}"`)
-      }
-      setDialogOpen(false)
+      await updateNewsPost(post.id, { status: 'archived' })
+      toast.success(`"${post.title}" archived`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
-    } finally {
-      setIsMutating(false)
-    }
-  }
-
-  const handleToggleStatus = async (post: NewsPost) => {
-    const newStatus = post.status === 'published' ? 'draft' : 'published'
-    try {
-      await updateNewsPost(post.id, { status: newStatus })
-      toast.success(`"${post.title}" ${newStatus === 'published' ? 'published' : 'set to draft'}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Update failed')
+      toast.error(err instanceof Error ? err.message : 'Archive failed')
     }
   }
 
@@ -135,20 +84,47 @@ export function NewsManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{news.length} post(s)</p>
-        <Button size="sm" onClick={openNew} className="gap-2">
-          <Plus size={16} weight="bold" />
-          New Post
-        </Button>
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search posts…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+          >
+            Date {sortDir === 'desc' ? '↓' : '↑'}
+          </Button>
+          <Button size="sm" onClick={() => router.push('/admin/news/new')} className="gap-2">
+            <Plus size={16} weight="bold" />
+            New Post
+          </Button>
+        </div>
       </div>
+
+      <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="all">All ({news.length})</TabsTrigger>
+          <TabsTrigger value="published">Published ({news.filter((p) => p.status === 'published').length})</TabsTrigger>
+          <TabsTrigger value="draft">Draft ({news.filter((p) => p.status === 'draft').length})</TabsTrigger>
+          <TabsTrigger value="scheduled">Scheduled ({news.filter((p) => p.status === 'scheduled').length})</TabsTrigger>
+          <TabsTrigger value="archived">Archived ({news.filter((p) => p.status === 'archived').length})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
             <TableHead>Slug</TableHead>
-            <TableHead>Published</TableHead>
+            <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Audience</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -161,69 +137,64 @@ export function NewsManager() {
                 Loading…
               </TableCell>
             </TableRow>
-          ) : news.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                No posts yet. Click "New Post" to add one.
+                {search || statusFilter !== 'all' ? 'No posts match your filters.' : 'No posts yet. Click "New Post" to add one.'}
               </TableCell>
             </TableRow>
           ) : (
-            news.map((post) => (
-              <TableRow key={post.id}>
-                <TableCell className="font-medium">{post.title}</TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">
-                  {post.slug}
-                </TableCell>
-                <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleStatus(post)}
-                    title={post.status === 'published' ? 'Click to set to draft' : 'Click to publish'}
-                    className="focus:outline-none"
-                  >
-                    {post.status === 'published' ? (
-                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
-                        Published
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
-                        Draft
-                      </Badge>
-                    )}
-                  </button>
-                </TableCell>
-                <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(post)} title="Edit">
-                      <PencilSimple size={16} />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setDeleteTarget(post)}
-                      title="Delete"
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash size={16} />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
+            filtered.map((post) => {
+              const badge = STATUS_BADGE[post.status] ?? STATUS_BADGE['draft']
+              return (
+                <TableRow key={post.id}>
+                  <TableCell className="font-medium max-w-[200px] truncate">{post.title}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">{post.slug}</TableCell>
+                  <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`gap-1 ${badge.className}`}>
+                      {badge.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => router.push(`/admin/news/${post.id}`)}
+                        title="Edit"
+                      >
+                        <PencilSimple size={16} />
+                      </Button>
+                      {post.status !== 'archived' && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleArchive(post)}
+                          title="Archive"
+                          className="text-orange-400 hover:text-orange-400"
+                        >
+                          <Archive size={16} />
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(post)}
+                        title="Delete"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash size={16} />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })
           )}
         </TableBody>
       </Table>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingPost ? 'Edit News Post' : 'New News Post'}</DialogTitle>
-          </DialogHeader>
-          <NewsForm value={formValue} onChange={handleSave} isLoading={isMutating} />
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

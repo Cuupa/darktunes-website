@@ -62,6 +62,13 @@ export function HomePageContent({
   }, [featuredReleases])
 
   const featuredRelease = featuredReleases[heroIndex] ?? featuredReleases[0]
+  const featuredNews = useMemo(() => {
+    if (siteSettings.heroContentType !== 'news') return undefined
+    if (siteSettings.heroFeaturedId) {
+      return news.find((n) => n.slug === siteSettings.heroFeaturedId || n.id === siteSettings.heroFeaturedId) ?? news[0]
+    }
+    return news[0]
+  }, [news, siteSettings.heroContentType, siteSettings.heroFeaturedId])
   const playlists =
     siteSettings.spotifyPlaylists?.length
       ? siteSettings.spotifyPlaylists
@@ -72,7 +79,7 @@ export function HomePageContent({
       <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} />
       <main id="main-content">
         <div className="relative">
-          <Hero featuredRelease={featuredRelease} siteSettings={siteSettings} dict={dict.hero} />
+          <Hero featuredRelease={featuredRelease} featuredNews={featuredNews} siteSettings={siteSettings} dict={dict.hero} />
           {featuredReleases.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
               {featuredReleases.map((_, i) => (

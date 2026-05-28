@@ -2,30 +2,24 @@
  * app/artists/[slug]/page.tsx — Artist profile page (RSC)
  *
  * Fetches artist by slug + their releases and concerts server-side.
- * Uses unstable_cache for ISR with 60-second revalidation.
+ * Uses Next.js route-segment revalidation (60 s ISR) instead of
+ * unstable_cache so that newly-created artists are always reachable
+ * without a permanent 404 from a stale negative-cache entry.
  *
  * ── Data API Waterfall ──────────────────────────────────────────────────────
  * 1. `params.slug`              → URL slug of the artist
  * 2. `getArtistBySlug`          → SELECT * FROM artists WHERE slug = ?
- *                                 (RLS: only visible artists returned to anon)
- * 3. `getReleasesByArtistId`    → SELECT * FROM releases WHERE artist_id = ?
- *                                 ordered by release_date DESC
+ * 3. Parallel:
+ *    `getReleasesByArtistId`    → SELECT * FROM releases WHERE artist_id = ?
  *    `getConcertsByArtistId`    → SELECT * FROM concerts WHERE artist_id = ?
- *                                 filtered to future dates, ordered by date ASC
  *    `getVideosByArtistId`      → SELECT * FROM videos WHERE artist_id = ?
- *                                 ordered by published_at DESC
+ *    `getPublicNewsPosts`       → latest 3 news posts
  * 4. Dictionary                 → resolved from NEXT_LOCALE cookie / Accept-Language
- *
- * Steps 3 + 4 run in parallel via Promise.all after step 2 resolves.
- * The Supabase queries use a cookie-free public client (anon key) so they can
- * be safely cached by unstable_cache without hitting Next.js 15's
- * "cookies() not available inside unstable_cache" restriction.
  * ──────────────────────────────────────────────────────────────────────────
  */
 
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getArtistBySlug, getPublicArtists } from '@/lib/api/artists'
@@ -40,12 +34,19 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
+/** Opt-in ISR: revalidate every 60 s instead of using unstable_cache. */
+export const revalidate = 60
+
 /**
- * Cookie-free Supabase client — safe to use inside unstable_cache.
- *
- * In Next.js 15, dynamic APIs like cookies() cannot be called inside
- * unstable_cache callbacks.  For public read operations the anon key with
- * RLS is sufficient; no session cookie is required.
+ * Allow slugs not returned by generateStaticParams to render on-demand
+ * (ISR fallback). Without this explicit export Next.js 15 defaults to
+ * dynamicParams = true, but being explicit prevents accidental regressions.
+ */
+export const dynamicParams = true
+
+/**
+ * Cookie-free Supabase client — safe inside RSC / ISR.
+ * Uses the public anon key; RLS governs row visibility.
  */
 function createPublicSupabaseClient() {
   return createClient<Database>(
@@ -54,24 +55,17 @@ function createPublicSupabaseClient() {
   )
 }
 
-function makeGetArtistData(slug: string) {
-  return unstable_cache(
-    async () => {
-      const client = createPublicSupabaseClient()
-      const artist = await getArtistBySlug(client, slug)
-      if (!artist) return null
-      const [releases, concerts, videos, news] = await Promise.all([
-        getReleasesByArtistId(client, artist.id),
-        // Concerts include Songkick + Bandsintown records upserted into `concerts`.
-        getConcertsByArtistId(client, artist.id),
-        getVideosByArtistId(client, artist.id),
-        getPublicNewsPosts(client).then((posts) => posts.slice(0, 3)),
-      ])
-      return { artist, releases, concerts, videos, news }
-    },
-    [`artist-detail-${slug}`],
-    { revalidate: 60, tags: ['artists', 'releases', 'concerts', 'videos', 'news'] },
-  )
+async function getArtistData(slug: string) {
+  const client = createPublicSupabaseClient()
+  const artist = await getArtistBySlug(client, slug)
+  if (!artist) return null
+  const [releases, concerts, videos, news] = await Promise.all([
+    getReleasesByArtistId(client, artist.id),
+    getConcertsByArtistId(client, artist.id),
+    getVideosByArtistId(client, artist.id),
+    getPublicNewsPosts(client).then((posts) => posts.slice(0, 3)),
+  ])
+  return { artist, releases, concerts, videos, news }
 }
 
 export async function generateStaticParams() {
@@ -85,7 +79,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const data = await makeGetArtistData(slug)().catch(() => null)
+  const data = await getArtistData(slug).catch(() => null)
   if (!data) return { title: 'Artist not found — darkTunes' }
   const { artist } = data
   return {
@@ -103,7 +97,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ArtistDetailPage({ params }: Props) {
   const { slug } = await params
   const [data, locale] = await Promise.all([
-    makeGetArtistData(slug)().catch(() => null),
+    getArtistData(slug).catch(() => null),
     getLocale(),
   ])
   if (!data) notFound()

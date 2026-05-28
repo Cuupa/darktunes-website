@@ -29,42 +29,55 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
       >
         <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
           <div className="relative h-[352px] rounded-md overflow-hidden">
-            {playlists.map((playlist, i) => (
-              <div
-                key={playlist.uri}
-                className={`absolute inset-0 transition-opacity duration-300 ${
-                  i === activeIndex
-                    ? 'opacity-100 pointer-events-auto'
-                    : 'opacity-0 pointer-events-none'
-                }`}
-              >
-                <iframe
-                  src={`https://open.spotify.com/embed${getSpotifyEmbedPath(playlist.uri)}`}
-                  title={`Spotify playlist: ${playlist.label}`}
-                  width="100%"
-                  height="352"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  className="rounded-md border-0"
-                />
-              </div>
-            ))}
+            {playlists.map((playlist, i) => {
+              const theme = playlist.theme === 'light' ? '?theme=0' : ''
+              return (
+                <div
+                  key={playlist.uri}
+                  className={`absolute inset-0 transition-opacity duration-300 ${
+                    i === activeIndex
+                      ? 'opacity-100 pointer-events-auto'
+                      : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <iframe
+                    src={`https://open.spotify.com/embed${getSpotifyEmbedPath(playlist.uri)}${theme}`}
+                    title={`Spotify playlist: ${playlist.label}`}
+                    width="100%"
+                    height="352"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    className="rounded-md border-0"
+                  />
+                </div>
+              )
+            })}
           </div>
 
           {playlists.length > 1 && (
             <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              {playlists.map((playlist, i) => (
-                <Button
-                  key={playlist.uri}
-                  size="sm"
-                  variant={i === activeIndex ? 'default' : 'outline'}
-                  onClick={() => setActiveIndex(i)}
-                  aria-pressed={i === activeIndex}
-                  className="text-xs"
-                  type="button"
-                >
-                  {playlist.label}
-                </Button>
-              ))}
+              {playlists.map((playlist, i) => {
+                const isActive = i === activeIndex
+                const accentStyle =
+                  playlist.accentColor && isActive
+                    ? { backgroundColor: playlist.accentColor, borderColor: playlist.accentColor, color: '#fff' }
+                    : playlist.accentColor && !isActive
+                    ? { borderColor: playlist.accentColor, color: playlist.accentColor }
+                    : {}
+                return (
+                  <Button
+                    key={playlist.uri}
+                    size="sm"
+                    variant={isActive ? 'default' : 'outline'}
+                    onClick={() => setActiveIndex(i)}
+                    aria-pressed={isActive}
+                    className="text-xs"
+                    type="button"
+                    style={accentStyle}
+                  >
+                    {playlist.label}
+                  </Button>
+                )
+              })}
             </div>
           )}
         </ConsentGate>
