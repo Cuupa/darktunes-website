@@ -489,7 +489,7 @@ export function UsersManager() {
             }
           }}
         >
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>
                 <div className="flex items-center gap-2">

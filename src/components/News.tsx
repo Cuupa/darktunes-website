@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -60,10 +61,11 @@ export function News({ news, dict, locale }: NewsProps) {
                 <div className="grid lg:grid-cols-[320px_1fr] gap-0">
                   {post.imageUrl && (
                     <div className="relative aspect-[16/9] lg:aspect-auto overflow-hidden">
-                      <img 
+                      <Image 
+                        fill
                         src={getOptimizedImageUrl(post.imageUrl, 800)} 
                         alt={post.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
                         sizes="(max-width: 1024px) 100vw, 320px"
                         onError={(e) => {
                           e.currentTarget.closest('.relative')?.remove()

@@ -196,6 +196,7 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose() }}>
       <DialogContent
         aria-labelledby="artist-modal-title"
+        aria-describedby={undefined}
         className="max-w-2xl w-[95vw] p-0 border-accent/30 overflow-hidden bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col"
       >
         <motion.div
