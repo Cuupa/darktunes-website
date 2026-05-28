@@ -47,28 +47,42 @@ export function HomePageContent({
     if (featured.length > 0) return featured
     return releases.length > 0 ? [releases[0]] : []
   }, [releases])
+
+  const featuredNewsPost = useMemo(() => {
+    if (!news.length) return undefined
+    if (siteSettings.heroFeaturedId) {
+      return (
+        news.find(
+          (n) => n.slug === siteSettings.heroFeaturedId || n.id === siteSettings.heroFeaturedId,
+        ) ?? news[0]
+      )
+    }
+    return news[0]
+  }, [news, siteSettings.heroFeaturedId])
+
+  // Build a unified hero carousel combining featured releases and the latest
+  // news post so the hero can cycle through all types of content.
+  const heroItems = useMemo<(Release | NewsPost)[]>(() => {
+    const items: (Release | NewsPost)[] = [...featuredReleases]
+    if (featuredNewsPost) items.push(featuredNewsPost)
+    return items
+  }, [featuredReleases, featuredNewsPost])
+
   const [heroIndex, setHeroIndex] = useState(0)
 
   useEffect(() => {
     setHeroIndex(0)
-  }, [featuredReleases])
+  }, [heroItems])
 
   useEffect(() => {
-    if (featuredReleases.length <= 1) return
+    if (heroItems.length <= 1) return
     const intervalId = setInterval(() => {
-      setHeroIndex((previousIndex) => (previousIndex + 1) % featuredReleases.length)
+      setHeroIndex((previousIndex) => (previousIndex + 1) % heroItems.length)
     }, 6000)
     return () => clearInterval(intervalId)
-  }, [featuredReleases])
+  }, [heroItems])
 
-  const featuredRelease = featuredReleases[heroIndex] ?? featuredReleases[0]
-  const featuredNews = useMemo(() => {
-    if (siteSettings.heroContentType !== 'news') return undefined
-    if (siteSettings.heroFeaturedId) {
-      return news.find((n) => n.slug === siteSettings.heroFeaturedId || n.id === siteSettings.heroFeaturedId) ?? news[0]
-    }
-    return news[0]
-  }, [news, siteSettings.heroContentType, siteSettings.heroFeaturedId])
+  const currentHeroItem = heroItems[heroIndex] ?? heroItems[0]
   const playlists =
     siteSettings.spotifyPlaylists?.length
       ? siteSettings.spotifyPlaylists
@@ -79,10 +93,10 @@ export function HomePageContent({
       <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} />
       <main id="main-content">
         <div className="relative">
-          <Hero featuredRelease={featuredRelease} featuredNews={featuredNews} siteSettings={siteSettings} dict={dict.hero} />
-          {featuredReleases.length > 1 && (
+          <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />
+          {heroItems.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-              {featuredReleases.map((_, i) => (
+              {heroItems.map((_, i) => (
                 <button
                   key={i}
                   type="button"

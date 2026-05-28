@@ -449,26 +449,37 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     }
 
     try {
-      const { data: releasesWithoutSmartUrl } = await db
+      // PostgREST "not null" filter: column.not.is.null is valid PostgREST syntax
+      const { data: releasesWithoutSmartUrl, error: batchErr } = await db
         .from('releases')
         .select('id, spotify_url, apple_music_url')
         .is('smart_url', null)
         .or('spotify_url.not.is.null,apple_music_url.not.is.null')
 
+      if (batchErr) {
+        odesliResult.errors.push(`Odesli batch query failed: ${batchErr.message}`)
+      }
+
       for (const release of releasesWithoutSmartUrl ?? []) {
         const musicUrl = release.spotify_url ?? release.apple_music_url
         if (!musicUrl) continue
 
+        odesliResult.artistsProcessed++ // counts releases attempted (field reused for parity)
+
         try {
+          let odesliErr: string | null = null
           const odesli = await withExponentialBackoff(() =>
             resolveOdesliSmartLink(musicUrl, fetchFn),
-          ).catch(() => null)
+          ).catch((e) => {
+            odesliErr = String(e)
+            return null
+          })
 
           if (odesli) {
             const appleMusicUrl =
               odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
 
-            await db
+            const { error: updateErr } = await db
               .from('releases')
               .update({
                 smart_url: odesli.smartUrl,
@@ -478,7 +489,19 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               })
               .eq('id', release.id)
 
-            odesliResult.releasesUpserted++
+            if (updateErr) {
+              odesliResult.errors.push(
+                `Odesli DB update for release ${release.id}: ${updateErr.message}`,
+              )
+            } else {
+              odesliResult.releasesUpserted++
+            }
+          } else if (odesliErr) {
+            // Only push an error if there was an actual failure (not just "not found")
+            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+              odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${odesliErr}`)
+            }
+            if (odesliErr.includes('429')) odesliResult.rateLimited = true
           }
         } catch (e) {
           odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${String(e)}`)

@@ -12,28 +12,27 @@ import type { Dictionary } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 interface HeroProps extends SectionProps {
-  featuredRelease?: Release
-  featuredNews?: NewsPost
+  heroItem?: Release | NewsPost
   siteSettings: SiteSettings
   dict: Dictionary['hero']
 }
 
-export function Hero({ featuredRelease, featuredNews, siteSettings, dict }: HeroProps) {
+function isRelease(item: Release | NewsPost): item is Release {
+  return 'artistName' in item
+}
+
+export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
   // Stop the bounce animation as soon as the hero scrolls out of view so the
   // Framer Motion rAF loop doesn't keep running while the user reads below.
   const isInView = useInView(sectionRef, { margin: '0px 0px -20% 0px' })
 
-  const isNewsMode = siteSettings.heroContentType === 'news'
-
-  // Select which item to display
-  const activeNews = isNewsMode ? featuredNews : undefined
-  const activeRelease = !isNewsMode ? featuredRelease : undefined
-
-  if (!activeNews && !activeRelease) {
+  if (!heroItem) {
     return null
   }
+
+  const itemIsRelease = isRelease(heroItem)
 
   const handleSmoothScroll = (targetId: string) => {
     const target = document.querySelector(targetId)
@@ -49,28 +48,28 @@ export function Hero({ featuredRelease, featuredNews, siteSettings, dict }: Hero
   let bgUrl: string | undefined
   if (siteSettings.heroCustomBgUrl) {
     bgUrl = getOptimizedImageUrl(siteSettings.heroCustomBgUrl, 1200)
-  } else if (activeRelease) {
-    const coverUrl = getOptimizedImageUrl(activeRelease.coverArt, 1200)
-    bgUrl = activeRelease.heroBgUrl
-      ? getOptimizedImageUrl(activeRelease.heroBgUrl, 1200)
+  } else if (itemIsRelease) {
+    const coverUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
+    bgUrl = heroItem.heroBgUrl
+      ? getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
       : coverUrl
-  } else if (activeNews?.imageUrl) {
-    bgUrl = getOptimizedImageUrl(activeNews.imageUrl, 1200)
+  } else if (!itemIsRelease && heroItem.imageUrl) {
+    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
   }
 
   // Title / subtitle / description
-  const heroTitle = activeRelease ? activeRelease.title : (activeNews?.title ?? '')
-  const heroSubtitle = activeRelease ? activeRelease.artistName : undefined
-  const heroDescription = activeRelease
-    ? (activeRelease.promoText || siteSettings.heroDescription)
-    : (activeNews?.excerpt || siteSettings.heroDescription)
-  const heroLink = activeRelease
-    ? `/releases/${activeRelease.id}`
-    : `/news/${activeNews?.slug ?? ''}`
-  const coverImageUrl = activeRelease
-    ? getOptimizedImageUrl(activeRelease.coverArt, 800)
-    : activeNews?.imageUrl
-    ? getOptimizedImageUrl(activeNews.imageUrl, 800)
+  const heroTitle = heroItem.title
+  const heroSubtitle = itemIsRelease ? heroItem.artistName : undefined
+  const heroDescription = itemIsRelease
+    ? (heroItem.promoText || siteSettings.heroDescription)
+    : (heroItem.excerpt || siteSettings.heroDescription)
+  const heroLink = itemIsRelease
+    ? `/releases/${heroItem.id}`
+    : `/news/${heroItem.slug}`
+  const coverImageUrl = itemIsRelease
+    ? getOptimizedImageUrl(heroItem.coverArt, 800)
+    : heroItem.imageUrl
+    ? getOptimizedImageUrl(heroItem.imageUrl, 800)
     : undefined
 
   return (
@@ -94,7 +93,7 @@ export function Hero({ featuredRelease, featuredNews, siteSettings, dict }: Hero
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(to bottom, rgba(var(--background-rgb), 0.65), rgba(var(--background-rgb), 0.97))`,
+            background: `linear-gradient(to bottom, rgba(var(--background-rgb), 0.55), rgba(var(--background-rgb), 0.85))`,
           }}
         />
       </div>
@@ -134,14 +133,14 @@ export function Hero({ featuredRelease, featuredNews, siteSettings, dict }: Hero
               >
                 <Link href={heroLink}>
                   <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
-                  {isNewsMode ? dict.readMore ?? 'Read More' : dict.listenNow}
+                  {!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow}
                 </Link>
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                onClick={() => handleSmoothScroll(isNewsMode ? '#news' : '#artists')}
+                onClick={() => handleSmoothScroll(!itemIsRelease ? '#news' : '#releases')}
               >
                 {dict.exploreArtist}
               </Button>

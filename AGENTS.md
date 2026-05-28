@@ -144,6 +144,20 @@ The full multi-API orchestrator lives in `src/lib/sync/syncAll.ts` (SyncAllDeps 
 Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs releases using ISRC → barcode/UPC → normalised title + year precedence.
 `syncAllReleases()` in `useReleases.ts` returns the full `SyncAllResult` (typed import from `src/lib/sync/syncAll.ts`). `ReleasesManager` parses the result: on success shows a toast with total items synced; on errors shows a warning toast and a "View Errors" button that opens a dialog with per-API error details.
 
+Cron Jobs (Vercel):
+  Two cron jobs are configured in `vercel.json`:
+  - `/api/sync-youtube` — daily at 06:00 UTC: fetches latest YouTube channel videos.
+  - `/api/sync` — daily at 03:00 UTC: runs the full multi-API artist sync (Spotify, Discogs, iTunes, Odesli, Songkick/Bandsintown).
+  Both routes accept either a ****** (manual trigger) or a Vercel cron call (`x-vercel-cron: 1` header) optionally guarded by `CRON_SECRET` env var.
+  The `isValidCronSecret` helper uses `timingSafeEqual` to prevent timing attacks.
+
+Spotify Sync Notes:
+  `fetchSpotifyArtistReleases` builds the URL as a manual template literal to avoid `URLSearchParams` encoding commas in `include_groups` as `%2C`, which Spotify rejects with HTTP 400.
+  `deriveFormat` in `discogsApi.ts` accepts `string | undefined | null` and returns `'other'` for missing format fields (prevents TypeError on undefined Discogs releases).
+
+Odesli Sync Notes:
+  The Odesli batch in `syncAll.ts` tracks `artistsProcessed` (counts release attempts) and captures API errors per-release into `odesliResult.errors`. Rate-limit errors (HTTP 429) set `rateLimited = true`. 404/no-match responses are silently skipped (expected for unlisted tracks).
+
 Admin Utility Routes (admin/editor auth required):
   `POST /api/admin/cleanup-orphaned-releases` — deletes all releases where `artist_id IS NULL` (uses service-role client). Returns `{ deleted: number }`. Triggered by the "Clean Orphaned" button in ReleasesManager.
   `POST /api/admin/fetch-youtube-info` — resolves a YouTube URL or video ID to `{ videoId, title, channelTitle, thumbnailUrl }` via YouTube oEmbed (no API key needed). Called by the "Fetch Info" button in VideoForm.
@@ -242,6 +256,7 @@ Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-dat
 Release submission: `POST /api/portal/submit-release` creates a new release with `is_visible = FALSE` (pending admin approval). Optional cover uploads use `POST /api/portal/upload-release-cover` (max 5 MB images) into `release-covers/{artistId}/`.
 Artist-owned marketing uploads: `POST /api/portal/upload-asset` stores files in `artist-assets/{artistId}/` and inserts into `artist_assets`; `DELETE /api/portal/upload-asset` deletes own rows. Allowed MIME types: JPEG, PNG, WebP, PDF, ZIP (max 20 MB).
 Label replies: `artist_replies` stores artist-side responses to inbox messages. The portal uses `sendPortalReply` Server Action + `src/lib/api/artistReplies.ts`.
+Admin asset visibility: `AssetsManager` (admin Assets tab) shows both the general `assets` table and a second "Artist Assets" section that lists all `artist_assets` rows (joined with `artists.name` for identification). Admins can copy URLs; artists manage their own rows via the portal.
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
@@ -362,6 +377,13 @@ Feature-flag-gated modules: promo pool, press kit, press releases, accreditation
 
 Schema note
 `supabase/reset.sql` is the sole, canonical, idempotent schema script. ⛔ There are NO migration files — `supabase/migrations/` MUST NOT exist. If any file exists there, delete it and fold the change into `reset.sql`.
+Tables `artist_assets` and `artist_replies` are defined at the bottom of `reset.sql`.
+
+Hero Section (src/components/Hero.tsx + app/_components/HomePageContent.tsx)
+The Hero component accepts a single `heroItem?: Release | NewsPost` prop (union type). Use the exported `isRelease(item)` type guard to distinguish between the two.
+`HomePageContent` builds a unified `heroItems: (Release | NewsPost)[]` array combining all featured releases plus the latest news post. The carousel index (`heroIndex`) cycles through ALL items every 6 seconds with dot-indicators shown when `heroItems.length > 1`.
+The "Explore" scroll button scrolls to `#releases` for release items and `#news` for news items — the `#artists` anchor does NOT exist on the home page.
+The hero background gradient uses `rgba(var(--background-rgb), 0.55)` → `0.85` (bottom) to keep titles legible without fully obscuring the background image.
 
 PWA (Progressive Web App)
 The site is a fully installable PWA powered by @serwist/next (v9) + serwist.
