@@ -41,9 +41,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function isImageMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('image/')
+}
+
 export function AssetsManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { assets, isLoading, createAssetRecord, deleteAssetRecord } = useAssets()
+  const { assets, isLoading, createAssetRecord, reload } = useAssets()
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -119,9 +123,24 @@ export function AssetsManager() {
     if (!deleteTarget) return
     setIsMutating(true)
     try {
-      await deleteAssetRecord(deleteTarget.id)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const response = await fetch(`/api/admin/assets/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`Delete failed: ${text}`)
+      }
+
       toast.success(`Deleted "${deleteTarget.originalFilename}"`)
       setDeleteTarget(null)
+      await reload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed')
     } finally {
@@ -147,6 +166,7 @@ export function AssetsManager() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-16">Preview</TableHead>
               <TableHead>Filename</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Size</TableHead>
@@ -157,19 +177,36 @@ export function AssetsManager() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : assets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   No assets yet. Upload a file above.
                 </TableCell>
               </TableRow>
             ) : (
               assets.map((asset) => (
                 <TableRow key={asset.id}>
+                  <TableCell>
+                    {isImageMimeType(asset.mimeType) ? (
+                      <img
+                        src={asset.publicUrl}
+                        alt={asset.originalFilename}
+                        className="w-10 h-10 object-cover rounded border border-border"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 flex items-center justify-center rounded border border-border bg-muted text-muted-foreground">
+                        <span className="text-xs font-mono uppercase truncate px-1">
+                          {asset.mimeType.split('/')[1]?.slice(0, 3) ?? '?'}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium">{asset.originalFilename}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{asset.mimeType}</TableCell>
                   <TableCell>{formatBytes(asset.sizeBytes)}</TableCell>
@@ -181,17 +218,19 @@ export function AssetsManager() {
                         variant="ghost"
                         onClick={() => handleCopyUrl(asset.publicUrl)}
                         title="Copy URL"
+                        aria-label={`Copy URL for ${asset.originalFilename}`}
                       >
-                        <Copy size={16} />
+                        <Copy size={16} aria-hidden="true" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => setDeleteTarget(asset)}
                         title="Delete"
+                        aria-label={`Delete ${asset.originalFilename}`}
                         className="text-destructive hover:text-destructive"
                       >
-                        <Trash size={16} />
+                        <Trash size={16} aria-hidden="true" />
                       </Button>
                     </div>
                   </TableCell>
@@ -207,9 +246,9 @@ export function AssetsManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Asset</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete{' '}
-              <strong>{deleteTarget?.originalFilename}</strong>? The file record will be removed from
-              the database. The object in R2 may need to be deleted separately.
+              Are you sure you want to permanently delete{' '}
+              <strong>{deleteTarget?.originalFilename}</strong>? This removes the file from both the
+              database and Cloudflare R2 storage and cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -147,6 +147,7 @@ Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs 
 Admin Utility Routes (admin/editor auth required):
   `POST /api/admin/cleanup-orphaned-releases` — deletes all releases where `artist_id IS NULL` (uses service-role client). Returns `{ deleted: number }`. Triggered by the "Clean Orphaned" button in ReleasesManager.
   `POST /api/admin/fetch-youtube-info` — resolves a YouTube URL or video ID to `{ videoId, title, channelTitle, thumbnailUrl }` via YouTube oEmbed (no API key needed). Called by the "Fetch Info" button in VideoForm.
+  `DELETE /api/admin/assets/[id]` — permanently deletes an asset record from Supabase AND its corresponding object from Cloudflare R2 via `deleteObjectFromR2()` from `src/lib/r2Utils.ts`. The R2 object is deleted first; if that fails the DB record remains. Returns `{ success: true }`.
 
 Video Admin UX:
   VideoForm accepts full YouTube URLs (watch?v=, youtu.be/, /shorts/, /embed/) and auto-extracts the 11-char video ID on input.
@@ -184,6 +185,7 @@ Throw `new ApiError(status, message, code?)` inside route handlers instead of ma
 
 R2 Image Caching
 When syncing external content, always download cover/artwork images and upload to Cloudflare R2 via `uploadUrlToR2()` from `src/lib/r2Utils.ts`.
+`src/lib/r2Utils.ts` also exports `createR2Client()` and `deleteObjectFromR2(r2Key, s3, bucket)` — use `deleteObjectFromR2` whenever a DB record that carries an `r2_key` is deleted, to keep R2 storage in sync.
 Store the R2 public URL (not the external URL) in the database. The public website reads only from Supabase + R2.
 If R2 upload fails during sync, fall back to the external URL and log the error — do not abort the sync.
 

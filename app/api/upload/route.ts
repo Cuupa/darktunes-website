@@ -21,6 +21,7 @@ import { extname } from 'path'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { createR2Client } from '@/lib/r2Utils'
+import { eventBus } from '@/domain/events/eventBus'
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate — admin or editor role required
@@ -65,6 +66,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   )
 
   const publicUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${r2Key}`
+
+  eventBus.emit({ type: 'asset.uploaded', r2Key, publicUrl, mimeType: file.type, sizeBytes: buffer.length })
 
   return NextResponse.json({
     publicUrl,

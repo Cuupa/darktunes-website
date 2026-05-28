@@ -110,9 +110,9 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 
 ### Assets
 - Upload images and media files to Cloudflare R2 (upload goes via the secure Next.js Route Handler `app/api/upload/route.ts` — credentials never exposed to browser)
-- Browse uploaded assets
+- Browse uploaded assets with inline image previews for image/* MIME types
 - Copy public URLs for use in content
-- Delete unused assets
+- Delete assets — permanently removes both the database record and the R2 object via `DELETE /api/admin/assets/[id]`
 
 ### Site Settings
 Manage all global site content from the **Settings** tab — no code changes needed:
