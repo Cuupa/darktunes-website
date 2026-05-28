@@ -7,6 +7,10 @@
  * Uses react-hook-form + zod for validation.
  * Photo upload goes via the /api/portal/upload-photo Route Handler (not directly
  * to R2) to avoid CORS issues and keep credentials server-side only.
+ *
+ * Organized into 2 tabs:
+ *  1. Bio & Press — photo, bio variants, genres, press quote
+ *  2. Links       — website, Instagram, YouTube, Bandcamp
  */
 
 import { useRef, useState } from 'react'
@@ -20,8 +24,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Camera, FloppyDisk, Eye } from '@phosphor-icons/react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
+import { Camera, FloppyDisk, Eye, TextAlignLeft, LinkSimple } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Dictionary } from '@/i18n/types'
@@ -64,7 +70,8 @@ interface ProfileFormProps {
 
 export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormProps) {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
-  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const isUploading = uploadProgress !== null && uploadProgress < 100
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<ProfileFormValues>({
@@ -95,18 +102,17 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
 
   // ---------------------------------------------------------------------------
   // Photo upload — sends to Next.js Route Handler to avoid CORS
+  // Uses XHR for real upload progress feedback.
   // ---------------------------------------------------------------------------
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setIsUploading(true)
+    setUploadProgress(0)
     try {
       const supabase = createBrowserSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
         toast.error(dict.profile_photoError)
@@ -116,25 +122,47 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
       const body = new FormData()
       body.append('file', file)
       body.append('artistId', artistId)
+      const token = session.access_token
 
-      const res = await fetch('/api/portal/upload-photo', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body,
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+
+        xhr.upload.addEventListener('progress', (ev) => {
+          if (ev.lengthComputable) {
+            setUploadProgress(Math.round((ev.loaded / ev.total) * 100))
+          }
+        })
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText) as { url?: string }
+              if (data.url) {
+                setPhotoUrl(data.url)
+                setUploadProgress(100)
+                resolve()
+              } else {
+                reject(new Error('No URL in response'))
+              }
+            } catch {
+              reject(new Error('Invalid server response'))
+            }
+          } else {
+            reject(new Error(`Upload failed (${xhr.status})`))
+          }
+        })
+
+        xhr.addEventListener('error', () => reject(new Error('Network error')))
+        xhr.open('POST', '/api/portal/upload-photo')
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+        xhr.send(body)
       })
 
-      if (!res.ok) {
-        toast.error(dict.profile_photoError)
-        return
-      }
-
-      const { url } = (await res.json()) as { url: string }
-      setPhotoUrl(url)
       toast.success(dict.profile_photoUploaded)
     } catch {
       toast.error(dict.profile_photoError)
     } finally {
-      setIsUploading(false)
+      setTimeout(() => setUploadProgress(null), 800)
     }
   }
 
@@ -145,9 +173,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
   const onSubmit = async (values: ProfileFormValues) => {
     try {
       const supabase = createBrowserSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
         toast.error(dict.profile_error)
@@ -175,7 +201,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: 'Bearer ' + session.access_token,
         },
         body: JSON.stringify(payload),
       })
@@ -192,9 +218,20 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
+        <div>
+          <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
+          {artistName && (
+            <p className="text-muted-foreground text-sm mt-1">
+              Artist: <span className="font-medium text-foreground">{artistName}</span>
+              {artistSlug && (
+                <span className="text-muted-foreground"> · /{artistSlug}</span>
+              )}
+            </p>
+          )}
+        </div>
         <div className="no-print flex items-center gap-2">
           <Button type="button" variant="outline" onClick={() => window.print()}>
             {dict.profile_download_epk}
@@ -214,160 +251,205 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
         </div>
       </div>
 
-      {/* Photo upload */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-base">{dict.profile_photo}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center gap-6">
-          <Avatar className="w-24 h-24">
-            <AvatarImage src={photoUrl} alt="Profile photo" />
-            <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-              <Camera size={32} />
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePhotoChange}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="border-border"
-            >
-              <Camera size={16} className="mr-2" />
-              {isUploading ? '…' : dict.profile_photo_upload}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Tabs defaultValue="bio" className="w-full">
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
+            <TabsTrigger value="bio" className="gap-1.5">
+              <TextAlignLeft size={14} aria-hidden="true" />
+              Bio &amp; Press
+            </TabsTrigger>
+            <TabsTrigger value="links" className="gap-1.5">
+              <LinkSimple size={14} aria-hidden="true" />
+              Links
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Profile fields */}
-      <Card className="bg-card border-border">
-        <CardContent className="pt-6">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="bio">{dict.profile_bio}</Label>
-              <Textarea
-                id="bio"
-                rows={5}
-                className="bg-muted border-border resize-none"
-                {...form.register('bio')}
-              />
-              {form.formState.errors.bio && (
-                <p className="text-sm text-destructive">{form.formState.errors.bio.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio_short">{dict.profile_bio_short}</Label>
-              <Textarea
-                id="bio_short"
-                rows={3}
-                className="bg-muted border-border resize-none"
-                {...form.register('bio_short')}
-              />
-              {form.formState.errors.bio_short && (
-                <p className="text-sm text-destructive">{form.formState.errors.bio_short.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio_medium">{dict.profile_bio_medium}</Label>
-              <Textarea
-                id="bio_medium"
-                rows={6}
-                className="bg-muted border-border resize-none"
-                {...form.register('bio_medium')}
-              />
-              {form.formState.errors.bio_medium && (
-                <p className="text-sm text-destructive">{form.formState.errors.bio_medium.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio_long">{dict.profile_bio_long}</Label>
-              <Textarea
-                id="bio_long"
-                rows={10}
-                className="bg-muted border-border resize-none"
-                {...form.register('bio_long')}
-              />
-              {form.formState.errors.bio_long && (
-                <p className="text-sm text-destructive">{form.formState.errors.bio_long.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="genres">{dict.profile_genres}</Label>
-              <Input
-                id="genres"
-                className="bg-muted border-border"
-                placeholder="Darkpop, EBM, Industrial"
-                {...form.register('genres')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="press_quote">{dict.profile_pressQuote}</Label>
-              <Textarea
-                id="press_quote"
-                rows={2}
-                className="bg-muted border-border resize-none"
-                {...form.register('press_quote')}
-              />
-              {form.formState.errors.press_quote && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.press_quote.message}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(
-                [
-                  ['website_url', dict.profile_website],
-                  ['instagram_url', dict.profile_instagram],
-                  ['youtube_url', dict.profile_youtube],
-                  ['bandcamp_url', dict.profile_bandcamp],
-                ] as const
-              ).map(([field, label]) => (
-                <div key={field} className="space-y-2">
-                  <Label htmlFor={field}>{label}</Label>
-                  <Input
-                    id={field}
-                    type="url"
-                    className="bg-muted border-border"
-                    placeholder="https://"
-                    {...form.register(field)}
+          {/* ── Tab 1: Bio & Press ──────────────────────────────────────── */}
+          <TabsContent value="bio" className="space-y-4 mt-0">
+            {/* Photo upload */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{dict.profile_photo}</CardTitle>
+                <CardDescription>Upload a profile photo for your EPK.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center gap-6">
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={photoUrl} alt="Profile photo" />
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                    <Camera size={32} />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-2 flex-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
                   />
-                  {form.formState.errors[field] && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="border-border gap-1.5"
+                  >
+                    <Camera size={16} aria-hidden="true" />
+                    {isUploading ? `${uploadProgress}%` : dict.profile_photo_upload}
+                  </Button>
+                  {uploadProgress !== null && (
+                    <Progress value={uploadProgress} className="h-1 w-48" aria-label="Upload progress" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Bios */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Biography</CardTitle>
+                <CardDescription>Provide bios of different lengths for various press uses.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bio">{dict.profile_bio}</Label>
+                  <Textarea
+                    id="bio"
+                    rows={5}
+                    className="bg-muted border-border resize-none"
+                    {...form.register('bio')}
+                  />
+                  {form.formState.errors.bio && (
+                    <p className="text-sm text-destructive">{form.formState.errors.bio.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio_short">{dict.profile_bio_short}</Label>
+                  <Textarea
+                    id="bio_short"
+                    rows={3}
+                    className="bg-muted border-border resize-none"
+                    {...form.register('bio_short')}
+                  />
+                  {form.formState.errors.bio_short && (
+                    <p className="text-sm text-destructive">{form.formState.errors.bio_short.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio_medium">{dict.profile_bio_medium}</Label>
+                  <Textarea
+                    id="bio_medium"
+                    rows={6}
+                    className="bg-muted border-border resize-none"
+                    {...form.register('bio_medium')}
+                  />
+                  {form.formState.errors.bio_medium && (
+                    <p className="text-sm text-destructive">{form.formState.errors.bio_medium.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio_long">{dict.profile_bio_long}</Label>
+                  <Textarea
+                    id="bio_long"
+                    rows={10}
+                    className="bg-muted border-border resize-none"
+                    {...form.register('bio_long')}
+                  />
+                  {form.formState.errors.bio_long && (
+                    <p className="text-sm text-destructive">{form.formState.errors.bio_long.message}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Genres & Press Quote */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Genres &amp; Press</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="genres">{dict.profile_genres}</Label>
+                  <Input
+                    id="genres"
+                    className="bg-muted border-border"
+                    placeholder="Darkpop, EBM, Industrial"
+                    {...form.register('genres')}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="press_quote">{dict.profile_pressQuote}</Label>
+                  <Textarea
+                    id="press_quote"
+                    rows={2}
+                    className="bg-muted border-border resize-none"
+                    {...form.register('press_quote')}
+                  />
+                  {form.formState.errors.press_quote && (
                     <p className="text-sm text-destructive">
-                      {form.formState.errors[field]?.message}
+                      {form.formState.errors.press_quote.message}
                     </p>
                   )}
                 </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <Button
-              type="submit"
-              disabled={form.formState.isSubmitting}
-              className="w-full md:w-auto"
-            >
-              <FloppyDisk size={16} className="mr-2" />
-              {form.formState.isSubmitting ? dict.profile_saving : dict.profile_save}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          {/* ── Tab 2: Links ─────────────────────────────────────────────── */}
+          <TabsContent value="links" className="space-y-4 mt-0">
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Online Presence</CardTitle>
+                <CardDescription>Links shown on your public profile and EPK.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(
+                    [
+                      ['website_url', dict.profile_website],
+                      ['instagram_url', dict.profile_instagram],
+                      ['youtube_url', dict.profile_youtube],
+                      ['bandcamp_url', dict.profile_bandcamp],
+                    ] as const
+                  ).map(([field, label]) => (
+                    <div key={field} className="space-y-2">
+                      <Label htmlFor={field}>{label}</Label>
+                      <Input
+                        id={field}
+                        type="url"
+                        className="bg-muted border-border"
+                        placeholder="https://"
+                        {...form.register(field)}
+                      />
+                      {form.formState.errors[field] && (
+                        <p className="text-sm text-destructive">
+                          {form.formState.errors[field]?.message}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex justify-end pt-2 border-t border-border">
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting}
+            className="gap-2 min-w-32"
+          >
+            <FloppyDisk size={16} aria-hidden="true" />
+            {form.formState.isSubmitting ? dict.profile_saving : dict.profile_save}
+          </Button>
+        </div>
+      </form>
 
       <EPKPreview
         dict={dict}

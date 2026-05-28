@@ -9,7 +9,17 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ArrowsClockwise, VinylRecord } from '@phosphor-icons/react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  ArrowsClockwise,
+  VinylRecord,
+  User,
+  LinkSimple,
+  InstagramLogo,
+  Briefcase,
+  Database,
+  FloppyDisk,
+} from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 import { ImageUploadButton } from './ImageUploadButton'
 
@@ -67,6 +77,14 @@ export interface ArtistFormData {
   bandsintownId: string
 }
 
+/**
+ * Mode controls which tabs and fields are exposed.
+ * - 'admin'  → all 5 tabs (Identity, Streaming, Social, Business, Sync-IDs); all fields editable
+ * - 'artist' → 3 tabs (Identity, Streaming, Social);
+ *              name + slug are read-only; Business / Sync-IDs tabs hidden
+ */
+export type ArtistFormMode = 'admin' | 'artist'
+
 function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -75,7 +93,16 @@ function toSlug(name: string): string {
     .replace(/\s+/g, '-')
 }
 
-type Props = AdminPanelProps<ArtistFormData>
+/** Thin indeterminate bar shown during async API calls. */
+function IndeterminateBar() {
+  return (
+    <div className="h-1 w-full bg-primary/20 rounded-full overflow-hidden mt-1" role="progressbar" aria-label="Loading">
+      <div className="h-full bg-primary rounded-full animate-[progress-indeterminate_1.4s_ease-in-out_infinite]" />
+    </div>
+  )
+}
+
+type Props = AdminPanelProps<ArtistFormData> & { mode?: ArtistFormMode }
 type PrefillItunesResponse = {
   name: string
   genres: string[]
@@ -83,7 +110,7 @@ type PrefillItunesResponse = {
   appleMusicUrl: string
 }
 
-export function ArtistForm({ value, onChange, isLoading }: Props) {
+export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props) {
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset, getValues } = useForm<ArtistFormData>({
     defaultValues: value,
@@ -93,6 +120,8 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
 
+  const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs
+
   useEffect(() => {
     reset(value)
   }, [value, reset])
@@ -101,17 +130,18 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
   const slugValue = watch('slug')
   const shopUrl = watch('shopUrl')
 
-  // Track whether the slug was auto-generated so we stop overwriting manual edits
+  // Auto-generate slug from name while user hasn't manually changed it
   const lastAutoSlug = useRef(toSlug(name))
   useEffect(() => {
+    if (mode === 'artist') return
     const auto = toSlug(name)
     if (!slugValue || slugValue === lastAutoSlug.current) {
       setValue('slug', auto)
       lastAutoSlug.current = auto
     }
-  }, [name, slugValue, setValue])
+  }, [name, slugValue, setValue, mode])
 
-  // Track whether the shopUrl was auto-generated so we stop overwriting manual edits
+  // Auto-generate shop URL from slug
   const lastAutoShopUrl = useRef(slugValue ? `https://darkmerch.com/${slugValue}` : '')
   useEffect(() => {
     const auto = slugValue ? `https://darkmerch.com/${slugValue}` : ''
@@ -138,13 +168,9 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
-
       const res = await fetch('/api/admin/fetch-artist-image', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
         body: JSON.stringify({ spotifyId: spotifyId || undefined, discogsId: discogsId || undefined }),
       })
       if (!res.ok) {
@@ -168,46 +194,29 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       toast.error('Enter a Spotify URL or Spotify ID first')
       return
     }
-
     setIsPrefillingSpotify(true)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
-
       const source = spotifyUrlInput || `https://open.spotify.com/artist/${spotifyIdInput}`
       const res = await fetch('/api/admin/prefill-artist', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
         body: JSON.stringify({ spotifyUrl: source }),
       })
-
       if (!res.ok) {
         const err = (await res.json()) as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
-
       const profile = (await res.json()) as {
-        spotifyId: string
-        name: string
-        imageUrl: string | null
-        genres: string[]
-        spotifyUrl: string
+        spotifyId: string; name: string; imageUrl: string | null; genres: string[]; spotifyUrl: string
       }
-
       const current = getValues()
       if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
       if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
-      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) {
-        setValue('genres', profile.genres.join(', '))
-      }
+      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) setValue('genres', profile.genres.join(', '))
       setValue('spotifyId', profile.spotifyId)
       setValue('spotifyUrl', profile.spotifyUrl)
-
       toast.success('Artist data prefilled from Spotify')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to prefill from Spotify')
@@ -222,62 +231,39 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       toast.error('Enter a Discogs Artist ID first')
       return
     }
-
     setIsEnrichingDiscogs(true)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
-
       const res = await fetch('/api/admin/enrich-artist-discogs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
         body: JSON.stringify({ discogsId: discogsIdInput }),
       })
-
       if (!res.ok) {
         const err = (await res.json()) as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
-
-      const profile = (await res.json()) as {
-        name: string
-        bio: string | null
-        imageUrl: string | null
-        urls: string[]
-      }
-
+      const profile = (await res.json()) as { name: string; bio: string | null; imageUrl: string | null; urls: string[] }
       const current = getValues()
-
-      // Only fill empty fields — never overwrite data the admin has entered
       if (!(current.bio?.trim() ?? '') && profile.bio) setValue('bio', profile.bio)
       if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
-
-      // Parse and fill platform URLs from Discogs external links
       let urlsApplied = 0
       for (const urlStr of profile.urls) {
         const field = classifyDiscogsUrl(urlStr)
         if (!field) continue
         const existingVal = current[field]
         if (!(typeof existingVal === 'string' ? existingVal.trim() : '')) {
-          // Special case: if Spotify URL, also try to extract spotifyId
           if (field === 'spotifyUrl') {
-            const spotifyId = extractSpotifyArtistId(urlStr)
-            if (spotifyId && !(current.spotifyId?.trim() ?? '')) {
-              setValue('spotifyId', spotifyId)
-            }
+            const id = extractSpotifyArtistId(urlStr)
+            if (id && !(current.spotifyId?.trim() ?? '')) setValue('spotifyId', id)
           }
           setValue(field, urlStr)
           urlsApplied++
         }
       }
-
       const msg = urlsApplied > 0
-        ? `Discogs enrichment applied for "${profile.name}" (${urlsApplied} platform link${urlsApplied > 1 ? 's' : ''} added)`
+        ? `Discogs enrichment applied for "${profile.name}" (${urlsApplied} link${urlsApplied > 1 ? 's' : ''} added)`
         : `Discogs enrichment applied for "${profile.name}"`
       toast.success(msg)
     } catch (err) {
@@ -293,36 +279,24 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
       toast.error('Enter an Apple Music artist URL first')
       return
     }
-
     setIsPrefillingItunes(true)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
-
       const res = await fetch('/api/admin/prefill-artist-itunes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
         body: JSON.stringify({ appleMusicUrl: appleMusicUrlInput }),
       })
-
       if (!res.ok) {
         const err = (await res.json()) as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
-
       const profile: PrefillItunesResponse = await res.json()
-
       const current = getValues()
       if (!(current.name?.trim() ?? '')) setValue('name', profile.name)
       if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
-      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) {
-        setValue('genres', profile.genres.join(', '))
-      }
+      if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) setValue('genres', profile.genres.join(', '))
       setValue('appleMusicUrl', profile.appleMusicUrl)
       toast.success('Artist data prefilled from Apple Music')
     } catch (err) {
@@ -334,270 +308,371 @@ export function ArtistForm({ value, onChange, isLoading }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="name">Name *</Label>
-          <Input id="name" {...register('name', { required: true })} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="slug">Slug *</Label>
-          <Input id="slug" {...register('slug', { required: true })} disabled={isLoading} />
-        </div>
+      {/* Global async indicator – thin bar at top of form */}
+      <div className="h-1 w-full">
+        {isAnyAsyncRunning && <IndeterminateBar />}
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="bio">Bio</Label>
-        <Textarea id="bio" {...register('bio')} rows={3} disabled={isLoading} />
-      </div>
+      <Tabs defaultValue="identity" className="w-full">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
+          <TabsTrigger value="identity" className="gap-1.5">
+            <User size={14} aria-hidden="true" />
+            Identity
+          </TabsTrigger>
+          <TabsTrigger value="streaming" className="gap-1.5">
+            <LinkSimple size={14} aria-hidden="true" />
+            Streaming &amp; Links
+          </TabsTrigger>
+          <TabsTrigger value="social" className="gap-1.5">
+            <InstagramLogo size={14} aria-hidden="true" />
+            Social Media
+          </TabsTrigger>
+          {mode === 'admin' && (
+            <TabsTrigger value="business" className="gap-1.5">
+              <Briefcase size={14} aria-hidden="true" />
+              Business
+            </TabsTrigger>
+          )}
+          {mode === 'admin' && (
+            <TabsTrigger value="sync" className="gap-1.5">
+              <Database size={14} aria-hidden="true" />
+              Sync-IDs
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      <div className="space-y-1">
-        <Label htmlFor="genres">Genres (comma-separated)</Label>
-        <Input id="genres" {...register('genres')} placeholder="e.g. Industrial, EBM, Darkwave" disabled={isLoading} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="imageUrl">Image URL</Label>
-          <div className="flex gap-2">
-            <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
-            <ImageUploadButton
-              label="Upload"
-              onUploaded={(url) => setValue('imageUrl', url)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => void handleFetchImage()}
-              disabled={isLoading || isFetchingImage || (!spotifyId && !discogsId)}
-              title="Auto-fetch from Spotify or Discogs"
-            >
-              <ArrowsClockwise size={14} className={isFetchingImage ? 'animate-spin' : ''} />
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="logoUrl">Logo / Wordmark URL (hover effect)</Label>
-          <div className="flex gap-2">
-            <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} className="flex-1" />
-            <ImageUploadButton
-              label="Upload"
-              onUploaded={(url) => setValue('logoUrl', url)}
-            />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="country">Country</Label>
-          <Input id="country" {...register('country')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="foundedYear">Founded Year</Label>
-          <Input id="foundedYear" type="number" {...register('foundedYear')} placeholder="e.g. 2012" disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="spotifyUrl">Spotify URL</Label>
-          <div className="flex gap-2">
-            <Input id="spotifyUrl" {...register('spotifyUrl')} disabled={isLoading} className="flex-1" />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => void handlePrefillFromSpotify()}
-              disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
-            >
-              {isPrefillingSpotify && <ArrowsClockwise size={14} className="animate-spin mr-1.5" />}
-              Import
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="instagramUrl">Instagram URL</Label>
-          <Input id="instagramUrl" {...register('instagramUrl')} disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="appleMusicUrl">Apple Music URL</Label>
-        <div className="flex gap-2">
-          <Input
-            id="appleMusicUrl"
-            {...register('appleMusicUrl')}
-            disabled={isLoading}
-            className="flex-1"
-            placeholder="https://music.apple.com/..."
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={() => void handlePrefillFromItunes()}
-            disabled={isLoading || isPrefillingItunes || !appleMusicUrl.trim()}
-          >
-            {isPrefillingItunes && <ArrowsClockwise size={14} className="animate-spin mr-1.5" />}
-            Import
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="youtubeUrl">YouTube URL</Label>
-          <Input id="youtubeUrl" {...register('youtubeUrl')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="websiteUrl">Website URL</Label>
-          <Input id="websiteUrl" {...register('websiteUrl')} disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="facebookUrl">Facebook URL</Label>
-          <Input id="facebookUrl" {...register('facebookUrl')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="twitterUrl">X / Twitter URL</Label>
-          <Input id="twitterUrl" {...register('twitterUrl')} disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="tiktokUrl">TikTok URL</Label>
-          <Input id="tiktokUrl" {...register('tiktokUrl')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="bandcampUrl">Bandcamp URL</Label>
-          <Input id="bandcampUrl" {...register('bandcampUrl')} disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="shopUrl">Shop URL (Darkmerch)</Label>
-        <Input id="shopUrl" {...register('shopUrl')} placeholder="Auto-filled from slug" disabled={isLoading} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" {...register('email')} disabled={isLoading} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="vatNumber">VAT Number</Label>
-          <Input id="vatNumber" {...register('vatNumber')} disabled={isLoading} />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" {...register('notes')} rows={2} disabled={isLoading} />
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Auto-Sync IDs
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="spotifyId">Spotify Artist ID (optional)</Label>
-            <Input
-              id="spotifyId"
-              {...register('spotifyId')}
-              placeholder="e.g. 1Cs0zKBU1kc0i8ypK3B9ai"
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="discogsId">Discogs Artist ID (optional)</Label>
-            <div className="flex gap-2">
+        {/* ── Tab 1: Identity ─────────────────────────────────────────── */}
+        <TabsContent value="identity" className="space-y-4 mt-0">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="name">Name *</Label>
+              {mode === 'artist' ? (
+                <>
+                  <Input
+                    id="name"
+                    value={name}
+                    disabled
+                    readOnly
+                    className="bg-muted text-muted-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">Band name can only be changed by an admin.</p>
+                </>
+              ) : (
+                <Input id="name" {...register('name', { required: true })} disabled={isLoading} />
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="slug">Slug *</Label>
               <Input
-                id="discogsId"
-                {...register('discogsId')}
-                placeholder="e.g. 123456"
+                id="slug"
+                {...register('slug', { required: true })}
+                disabled={isLoading || mode === 'artist'}
+                readOnly={mode === 'artist'}
+                className={mode === 'artist' ? 'bg-muted text-muted-foreground' : ''}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea id="bio" {...register('bio')} rows={4} disabled={isLoading} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="genres">
+              Genres{' '}
+              <span className="text-muted-foreground text-xs font-normal">(comma-separated)</span>
+            </Label>
+            <Input id="genres" {...register('genres')} placeholder="e.g. Industrial, EBM, Darkwave" disabled={isLoading} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="country">Country</Label>
+              <Input id="country" {...register('country')} disabled={isLoading} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="foundedYear">Founded Year</Label>
+              <Input id="foundedYear" type="number" {...register('foundedYear')} placeholder="e.g. 2012" disabled={isLoading} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="imageUrl">Image URL</Label>
+              <div className="flex gap-2 items-start">
+                <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} />
+                {mode === 'admin' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => void handleFetchImage()}
+                    disabled={isLoading || isFetchingImage || (!spotifyId && !discogsId)}
+                    title="Auto-fetch from Spotify or Discogs"
+                  >
+                    <ArrowsClockwise size={14} className={isFetchingImage ? 'animate-spin' : ''} />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="logoUrl">
+                Logo / Wordmark URL{' '}
+                <span className="text-muted-foreground text-xs font-normal">(hover effect)</span>
+              </Label>
+              <div className="flex gap-2 items-start">
+                <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} className="flex-1" />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} />
+              </div>
+            </div>
+          </div>
+
+          {mode === 'admin' && (
+            <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-border">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="isVisible"
+                  checked={isVisible}
+                  onCheckedChange={(val) => setValue('isVisible', val)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="isVisible">Visible (public)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="featured"
+                  checked={featured}
+                  onCheckedChange={(val) => setValue('featured', val)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="featured">Featured</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="isEuNonGerman"
+                  checked={isEuNonGerman}
+                  onCheckedChange={(val) => setValue('isEuNonGerman', val)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="isEuNonGerman">EU Non-German</Label>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Tab 2: Streaming & Links ─────────────────────────────────── */}
+        <TabsContent value="streaming" className="space-y-4 mt-0">
+          <div className="space-y-1">
+            <Label htmlFor="spotifyUrl">Spotify URL</Label>
+            <div className="flex gap-2 items-start">
+              <Input
+                id="spotifyUrl"
+                {...register('spotifyUrl')}
                 disabled={isLoading}
                 className="flex-1"
+                placeholder="https://open.spotify.com/artist/…"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0"
-                onClick={() => void handleEnrichFromDiscogs()}
-                disabled={isLoading || isEnrichingDiscogs || !discogsId.trim()}
-                title="Enrich bio & image from Discogs"
+                className="shrink-0 gap-1.5"
+                onClick={() => void handlePrefillFromSpotify()}
+                disabled={isLoading || isPrefillingSpotify || (!spotifyUrl.trim() && !spotifyId.trim())}
+                title="Import artist data from Spotify"
               >
-                {isEnrichingDiscogs ? (
-                  <ArrowsClockwise size={14} className="animate-spin" />
-                ) : (
-                  <VinylRecord size={14} />
-                )}
-                <span className="ml-1.5">Enrich from Discogs</span>
+                <ArrowsClockwise size={14} className={isPrefillingSpotify ? 'animate-spin' : ''} />
+                Import
               </Button>
             </div>
+            {isPrefillingSpotify && <IndeterminateBar />}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="songkickId">Songkick Artist ID (optional)</Label>
-            <Input
-              id="songkickId"
-              {...register('songkickId')}
-              placeholder="e.g. 789012"
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="bandsintownId">Bandsintown Artist ID (optional)</Label>
-            <Input
-              id="bandsintownId"
-              {...register('bandsintownId')}
-              placeholder="e.g. Artist Name or id:12345"
-              disabled={isLoading}
-            />
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          These IDs are used for automatic release sync. All fields are optional.
-        </p>
-      </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Switch
-            id="isVisible"
-            checked={isVisible}
-            onCheckedChange={(val) => setValue('isVisible', val)}
-            disabled={isLoading}
-          />
-          <Label htmlFor="isVisible">Visible (public)</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="featured"
-            checked={featured}
-            onCheckedChange={(val) => setValue('featured', val)}
-            disabled={isLoading}
-          />
-          <Label htmlFor="featured">Featured</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="isEuNonGerman"
-            checked={isEuNonGerman}
-            onCheckedChange={(val) => setValue('isEuNonGerman', val)}
-            disabled={isLoading}
-          />
-          <Label htmlFor="isEuNonGerman">EU Non-German</Label>
-        </div>
-      </div>
+          <div className="space-y-1">
+            <Label htmlFor="appleMusicUrl">Apple Music URL</Label>
+            <div className="flex gap-2 items-start">
+              <Input
+                id="appleMusicUrl"
+                {...register('appleMusicUrl')}
+                disabled={isLoading}
+                className="flex-1"
+                placeholder="https://music.apple.com/…"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                onClick={() => void handlePrefillFromItunes()}
+                disabled={isLoading || isPrefillingItunes || !appleMusicUrl.trim()}
+                title="Import artist data from Apple Music"
+              >
+                <ArrowsClockwise size={14} className={isPrefillingItunes ? 'animate-spin' : ''} />
+                Import
+              </Button>
+            </div>
+            {isPrefillingItunes && <IndeterminateBar />}
+          </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full">
-        Save Artist
-      </Button>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="youtubeUrl">YouTube URL</Label>
+              <Input id="youtubeUrl" {...register('youtubeUrl')} disabled={isLoading} placeholder="https://youtube.com/…" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="bandcampUrl">Bandcamp URL</Label>
+              <Input id="bandcampUrl" {...register('bandcampUrl')} disabled={isLoading} placeholder="https://…bandcamp.com" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="websiteUrl">Website URL</Label>
+              <Input id="websiteUrl" {...register('websiteUrl')} disabled={isLoading} placeholder="https://…" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="shopUrl">
+                Shop URL{' '}
+                <span className="text-muted-foreground text-xs font-normal">(Darkmerch)</span>
+              </Label>
+              <Input id="shopUrl" {...register('shopUrl')} placeholder="Auto-filled from slug" disabled={isLoading} />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── Tab 3: Social Media ───────────────────────────────────────── */}
+        <TabsContent value="social" className="space-y-4 mt-0">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="instagramUrl">Instagram</Label>
+              <Input id="instagramUrl" {...register('instagramUrl')} disabled={isLoading} placeholder="https://instagram.com/…" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="facebookUrl">Facebook</Label>
+              <Input id="facebookUrl" {...register('facebookUrl')} disabled={isLoading} placeholder="https://facebook.com/…" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="twitterUrl">X / Twitter</Label>
+              <Input id="twitterUrl" {...register('twitterUrl')} disabled={isLoading} placeholder="https://x.com/…" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="tiktokUrl">TikTok</Label>
+              <Input id="tiktokUrl" {...register('tiktokUrl')} disabled={isLoading} placeholder="https://tiktok.com/@…" />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── Tab 4: Business (admin only) ─────────────────────────────── */}
+        {mode === 'admin' && (
+          <TabsContent value="business" className="space-y-4 mt-0">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" {...register('email')} disabled={isLoading} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vatNumber">VAT Number</Label>
+                <Input id="vatNumber" {...register('vatNumber')} disabled={isLoading} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="notes">Internal Notes</Label>
+              <Textarea
+                id="notes"
+                {...register('notes')}
+                rows={3}
+                disabled={isLoading}
+                placeholder="Internal notes — not visible to the artist."
+              />
+            </div>
+          </TabsContent>
+        )}
+
+        {/* ── Tab 5: Sync-IDs (admin only) ─────────────────────────────── */}
+        {mode === 'admin' && (
+          <TabsContent value="sync" className="space-y-4 mt-0">
+            <p className="text-sm text-muted-foreground">
+              Platform IDs used for automatic release synchronisation. All fields are optional.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="spotifyId">Spotify Artist ID</Label>
+                <Input
+                  id="spotifyId"
+                  {...register('spotifyId')}
+                  placeholder="e.g. 1Cs0zKBU1kc0i8ypK3B9ai"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="discogsId">Discogs Artist ID</Label>
+                <div className="flex gap-2 items-start">
+                  <Input
+                    id="discogsId"
+                    {...register('discogsId')}
+                    placeholder="e.g. 123456"
+                    disabled={isLoading}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => void handleEnrichFromDiscogs()}
+                    disabled={isLoading || isEnrichingDiscogs || !discogsId.trim()}
+                    title="Enrich bio & image from Discogs"
+                  >
+                    {isEnrichingDiscogs ? (
+                      <ArrowsClockwise size={14} className="animate-spin" />
+                    ) : (
+                      <VinylRecord size={14} />
+                    )}
+                    Enrich
+                  </Button>
+                </div>
+                {isEnrichingDiscogs && <IndeterminateBar />}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="songkickId">Songkick Artist ID</Label>
+                <Input
+                  id="songkickId"
+                  {...register('songkickId')}
+                  placeholder="e.g. 789012"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="bandsintownId">Bandsintown Artist ID</Label>
+                <Input
+                  id="bandsintownId"
+                  {...register('bandsintownId')}
+                  placeholder="e.g. Artist Name or id:12345"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <div className="flex justify-end pt-2 border-t border-border">
+        <Button type="submit" disabled={isLoading} className="gap-2 min-w-32">
+          <FloppyDisk size={16} aria-hidden="true" />
+          {isLoading ? 'Saving…' : 'Save Artist'}
+        </Button>
+      </div>
     </form>
   )
 }
