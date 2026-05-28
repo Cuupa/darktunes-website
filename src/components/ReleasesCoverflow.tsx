@@ -38,8 +38,8 @@ const VIRTUAL_BUFFER = 3
  * are skipped immediately — only the 7 centre slides receive DOM mutations.
  */
 const TWEEN_CUTOFF = VIRTUAL_BUFFER
-const ROTATION_DEGREES_PER_SLIDE = 45
-const Z_OFFSET_PER_SLIDE = 120
+const ROTATION_DEGREES_PER_SLIDE = 55
+const Z_OFFSET_PER_SLIDE = 150
 const SCALE_FACTOR_PER_SLIDE = 0.25
 const MIN_SCALE = 0.4
 const OPACITY_FACTOR_PER_SLIDE = 0.35
@@ -89,12 +89,14 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     // Early-exit: slides beyond the tween cutoff are invisible — skip DOM work
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
+      inner.style.filter = ''
       return
     }
 
     if (prefersReducedMotion) {
       // Reduced motion: no rotation or depth, just a slight opacity fade
       inner.style.transform = ''
+      inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
       return
     }
@@ -105,8 +107,10 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_FACTOR_PER_SLIDE)
     const opacity = Math.max(0, 1 - abs * OPACITY_FACTOR_PER_SLIDE)
 
-    inner.style.transform = `scale(${scale}) translate3d(0, 0, ${translateZ}px) rotateY(${rotateY}deg)`
+    inner.style.transform = `rotateY(${rotateY}deg) translateZ(${translateZ}px) scale(${scale})`
     inner.style.opacity = String(Math.max(0, opacity))
+    const blurPx = Math.min(3, abs * 1.2)
+    inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
   })
 }
 
@@ -135,7 +139,10 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  * - `perspective` lives on an outer wrapper div — NOT on the overflow-hidden
  *   Embla viewport.  This keeps the 3D context intact.
  * - `overflow-hidden` is on the Embla viewport (clips card edges only).
- * - `transform-style: preserve-3d` is on each slide's inner content wrapper.
+ * - `transform-style: preserve-3d` is propagated through every intermediate
+ *   element in the chain: outer overflow div → perspective div → embla viewport
+ *   → flex container → slide outer div → slide inner div.  Any gap in this
+ *   chain would flatten the 3D context and eliminate the trapez perspective.
  */
 export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, consentDict }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
@@ -319,11 +326,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                 [flex container] ← translated by Embla
       */}
       <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
-        <div style={{ perspective: '1400px', transformStyle: 'preserve-3d' }}>
+        <div style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}>
           {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
           <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
             {/* Embla container: Embla translates this element for scrolling */}
-            <div className="flex">
+            <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
               {releases.map((release, index) => {
                 const isActive = release.id === activeRelease?.id
                 const imageLoaded = imageLoadedById[release.id] ?? false
@@ -335,6 +342,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                     // With overflow-visible the neighbours are no longer cropped.
                     // Mobile-first: 60vw → tablet 42vw → desktop 26vw / cap 440px.
                     className="flex-none w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] px-3"
+                    style={{ transformStyle: 'preserve-3d' }}
                   >
                     {/*
                       Inner wrapper: receives 3D transforms (rotateY, scale, translate3d)
