@@ -1276,3 +1276,20 @@ CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
+
+
+-- ============================================================
+-- Scheduled news publishing (pg_cron)
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.schedule(
+  'publish-scheduled-news',
+  '* * * * *',
+  $$
+    UPDATE public.news_posts
+    SET status = 'published', updated_at = NOW()
+    WHERE status = 'scheduled'
+      AND published_at <= NOW();
+  $$
+);
