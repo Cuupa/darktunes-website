@@ -832,6 +832,7 @@ ALTER TABLE public.portal_feature_flags  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
@@ -1043,12 +1044,42 @@ CREATE POLICY "site_settings_admin_write" ON public.site_settings
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
+-- TABLE: app_logs  (UI errors, R2 errors, Vercel errors, etc.)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.app_logs (
+  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  source      TEXT        NOT NULL,           -- e.g. 'r2', 'supabase', 'upload', 'ui', 'vercel'
+  level       TEXT        NOT NULL DEFAULT 'error', -- 'error' | 'warn' | 'info'
+  message     TEXT        NOT NULL,
+  details     JSONB       NOT NULL DEFAULT '{}',
+  user_id     UUID        REFERENCES public.profiles (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_logs_source     ON public.app_logs (source);
+CREATE INDEX IF NOT EXISTS idx_app_logs_level      ON public.app_logs (level);
+CREATE INDEX IF NOT EXISTS idx_app_logs_created_at ON public.app_logs (created_at DESC);
+
+-- ---------------------------------------------------------------------------
 -- RLS: sync_logs
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "sync_logs: editor+ read" ON public.sync_logs;
 
 CREATE POLICY "sync_logs: editor+ read" ON public.sync_logs
   FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: app_logs
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "app_logs: admin read"   ON public.app_logs;
+DROP POLICY IF EXISTS "app_logs: admin insert" ON public.app_logs;
+
+-- Any authenticated user can write (so the UI can report its own errors)
+CREATE POLICY "app_logs: admin read" ON public.app_logs
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+CREATE POLICY "app_logs: authenticated insert" ON public.app_logs
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ---------------------------------------------------------------------------
 -- RLS: concerts

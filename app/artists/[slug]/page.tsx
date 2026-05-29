@@ -57,6 +57,9 @@ function createPublicSupabaseClient() {
 
 async function getArtistData(slug: string) {
   const client = createPublicSupabaseClient()
+  // getArtistBySlug returns null when no artist matches the slug.
+  // Any Supabase connection/auth error is allowed to throw so that Next.js
+  // treats it as a server error (5xx) rather than caching it as a 404.
   const artist = await getArtistBySlug(client, slug)
   if (!artist) return null
   const [releases, concerts, videos, news] = await Promise.all([
@@ -79,6 +82,8 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
+  // Silently swallow errors only in metadata generation — a missing artist
+  // just returns a generic title; the page itself will show the proper 404.
   const data = await getArtistData(slug).catch(() => null)
   if (!data) return { title: 'Artist not found — darkTunes' }
   const { artist } = data
@@ -96,8 +101,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ArtistDetailPage({ params }: Props) {
   const { slug } = await params
+  // Do NOT swallow errors here — a Supabase failure must propagate so that
+  // Next.js returns a 500 (uncached) rather than caching a false 404 for 60s.
   const [data, locale] = await Promise.all([
-    getArtistData(slug).catch(() => null),
+    getArtistData(slug),
     getLocale(),
   ])
   if (!data) notFound()

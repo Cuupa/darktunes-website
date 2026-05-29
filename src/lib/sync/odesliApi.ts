@@ -68,11 +68,20 @@ export async function resolveOdesliSmartLink(
 
   const response = await fetchFn(url.toString())
 
+  // Read the body as text first so we can provide a meaningful error even when
+  // the server returns a non-JSON body (e.g. "An error occurred …").
+  const text = await response.text()
+
   if (!response.ok) {
-    throw new HttpError(response.status, `Odesli API failed: ${response.status}`)
+    throw new HttpError(response.status, `Odesli API failed: ${response.status} — ${text.slice(0, 200)}`)
   }
 
-  const data = (await response.json()) as OdesliResponse
+  let data: OdesliResponse
+  try {
+    data = JSON.parse(text) as OdesliResponse
+  } catch {
+    throw new HttpError(response.status, `Odesli returned non-JSON response: ${text.slice(0, 200)}`)
+  }
 
   const platforms: Record<string, string> = {}
   for (const [platform, entity] of Object.entries(data.linksByPlatform)) {
