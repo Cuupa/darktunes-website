@@ -46,6 +46,7 @@ async function uploadAssetToR2(
       Body: buffer,
       ContentType: contentType,
       ContentLength: buffer.length,
+      CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
 

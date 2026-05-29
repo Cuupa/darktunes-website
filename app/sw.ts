@@ -3,7 +3,6 @@ import {
   Serwist,
   CacheFirst,
   NetworkFirst,
-  StaleWhileRevalidate,
   ExpirationPlugin,
 } from 'serwist'
 
@@ -59,12 +58,12 @@ const serwist = new Serwist({
     // --- Cloudflare R2 public assets ---
     {
       matcher: /^https:\/\/.*\.r2\.dev\//,
-      handler: new StaleWhileRevalidate({
+      handler: new CacheFirst({
         cacheName: 'r2-assets',
         plugins: [
           new ExpirationPlugin({
             maxEntries: 200,
-            maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+            maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year (immutable UUID keys)
           }),
         ],
       }),

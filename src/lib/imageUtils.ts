@@ -24,7 +24,7 @@ const WSRV_BASE = 'https://wsrv.nl/'
  */
 export function getOptimizedImageUrl(url: string, width: number): string {
   if (!url) return ''
-  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${width}&output=webp`
+  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${width}&output=webp&maxage=31d`
 }
 
 /**
@@ -37,5 +37,5 @@ export function getOptimizedImageUrl(url: string, width: number): string {
  */
 export function getSquareThumbnail(url: string, size: number): string {
   if (!url) return ''
-  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${size}&h=${size}&fit=cover&output=webp`
+  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${size}&h=${size}&fit=cover&output=webp&maxage=31d`
 }

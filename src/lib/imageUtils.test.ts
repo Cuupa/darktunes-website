@@ -10,6 +10,7 @@ describe('getOptimizedImageUrl', () => {
     const url = getOptimizedImageUrl('https://cdn.darktunes.com/cover.jpg', 400)
     expect(url).toContain('https://wsrv.nl/')
     expect(url).toContain('output=webp')
+    expect(url).toContain('maxage=31d')
     expect(url).toContain('w=400')
     expect(url).toContain(encodeURIComponent('https://cdn.darktunes.com/cover.jpg'))
   })
@@ -39,6 +40,7 @@ describe('getSquareThumbnail', () => {
     expect(url).toContain('h=300')
     expect(url).toContain('fit=cover')
     expect(url).toContain('output=webp')
+    expect(url).toContain('maxage=31d')
   })
 
   it('uses the same value for width and height', () => {
