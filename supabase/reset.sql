@@ -30,7 +30,16 @@ GRANT USAGE, CREATE ON SCHEMA public TO anon;
 -- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
-CREATE TYPE IF NOT EXISTS public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'user_role' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
+  END IF;
+END $$;
 
 -- Ensure 'journalist' exists even if the type was created without it
 DO $$
@@ -56,9 +65,27 @@ BEGIN
   END IF;
 END $$;
 
-CREATE TYPE IF NOT EXISTS public.release_type AS ENUM ('album', 'ep', 'single');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'release_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
+  END IF;
+END $$;
 
-CREATE TYPE IF NOT EXISTS public.sync_status AS ENUM ('success', 'partial', 'error');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'sync_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.sync_status AS ENUM ('success', 'partial', 'error');
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: auto-update updated_at on every row change
@@ -270,6 +297,22 @@ CREATE TRIGGER trg_artists_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: asset_folders
+-- (must be created before create_artist_asset_folder() and its DO backfill)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.asset_folders (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  parent_id   UUID REFERENCES public.asset_folders(id) ON DELETE CASCADE,
+  artist_id   UUID REFERENCES public.artists(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_asset_folders_parent_id ON public.asset_folders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_asset_folders_artist_id ON public.asset_folders(artist_id);
+
+-- ---------------------------------------------------------------------------
 -- FUNCTION + TRIGGER: auto-create artist folder in asset_folders on artist insert
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.create_artist_asset_folder()
@@ -477,21 +520,6 @@ CREATE TABLE IF NOT EXISTS public.assets (
   uploaded_by       UUID    REFERENCES public.profiles (id) ON DELETE SET NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- ---------------------------------------------------------------------------
--- TABLE: asset_folders
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.asset_folders (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        TEXT NOT NULL,
-  parent_id   UUID REFERENCES public.asset_folders(id) ON DELETE CASCADE,
-  artist_id   UUID REFERENCES public.artists(id) ON DELETE SET NULL,
-  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_asset_folders_parent_id ON public.asset_folders(parent_id);
-CREATE INDEX IF NOT EXISTS idx_asset_folders_artist_id ON public.asset_folders(artist_id);
 
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS folder_id UUID REFERENCES public.asset_folders(id) ON DELETE SET NULL;
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists(id) ON DELETE SET NULL;
