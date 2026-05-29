@@ -226,6 +226,9 @@ export interface FeatureToggles {
   editorTools: boolean
 }
 
+/** Identifies a reorderable section on the public homepage. */
+export type HomepageSection = 'releases' | 'spotify' | 'videos' | 'concerts' | 'news' | 'newsletter'
+
 export interface SiteSettings {
   labelName: string
   labelTagline: string
@@ -293,6 +296,13 @@ export interface SiteSettings {
   heroFeaturedId?: string
   /** R2 URL of a custom hero background image that overrides the release/news cover art. */
   heroCustomBgUrl?: string
+  // ── Homepage Section Order ────────────────────────────────────────────────
+  /**
+   * Order in which the reorderable sections appear on the homepage.
+   * Hero is always first and is not included here.
+   * Defaults to ['releases','spotify','videos','concerts','news','newsletter'].
+   */
+  homepageSectionOrder?: HomepageSection[]
   // ── Role Permissions ──────────────────────────────────────────────────────
   /**
    * Per-role permission map. Keys are role names ('admin','editor','journalist','user','artist').

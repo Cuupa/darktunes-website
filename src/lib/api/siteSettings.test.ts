@@ -304,6 +304,44 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.videosLinkToPage).toBe(false)
   })
 
+  it('maps homepageSectionOrder from DB row', async () => {
+    const order = ['news', 'releases', 'concerts', 'videos', 'spotify', 'newsletter']
+    const db = makeMockDb([{ key: 'homepage_section_order', value: JSON.stringify(order) }])
+    const result = await getSiteSettings(db)
+    expect(result.homepageSectionOrder).toEqual(order)
+  })
+
+  it('returns default section order when key is absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.homepageSectionOrder).toEqual([
+      'releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter',
+    ])
+  })
+
+  it('falls back to default section order when JSON is invalid', async () => {
+    const db = makeMockDb([{ key: 'homepage_section_order', value: '{bad' }])
+    const result = await getSiteSettings(db)
+    expect(result.homepageSectionOrder).toEqual([
+      'releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter',
+    ])
+  })
+
+  it('falls back to default section order when array is empty', async () => {
+    const db = makeMockDb([{ key: 'homepage_section_order', value: '[]' }])
+    const result = await getSiteSettings(db)
+    expect(result.homepageSectionOrder).toEqual([
+      'releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter',
+    ])
+  })
+
+  it('filters out unknown section values from homepageSectionOrder', async () => {
+    const order = ['releases', 'unknown_section', 'news']
+    const db = makeMockDb([{ key: 'homepage_section_order', value: JSON.stringify(order) }])
+    const result = await getSiteSettings(db)
+    expect(result.homepageSectionOrder).toEqual(['releases', 'news'])
+  })
+
   it('maps role permissions from DB row', async () => {
     const customPerms = {
       admin: { canPublishNews: true, canEditNews: true, canManageArtists: true, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
