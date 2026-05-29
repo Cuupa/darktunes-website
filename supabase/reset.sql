@@ -869,9 +869,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- RLS: profiles
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "profiles: own read"      ON public.profiles;
-DROP POLICY IF EXISTS "profiles: own update"    ON public.profiles;
-DROP POLICY IF EXISTS "profiles: admin read all" ON public.profiles;
+DROP POLICY IF EXISTS "profiles: own read"        ON public.profiles;
+DROP POLICY IF EXISTS "profiles: own update"      ON public.profiles;
+DROP POLICY IF EXISTS "profiles: admin read all"  ON public.profiles;
+DROP POLICY IF EXISTS "profiles: admin update all" ON public.profiles;
 
 CREATE POLICY "profiles: own read" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
@@ -883,6 +884,13 @@ CREATE POLICY "profiles: own update" ON public.profiles
 -- would occur if this policy queried the profiles table directly.
 CREATE POLICY "profiles: admin read all" ON public.profiles
   FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- Allows admins to update any user's profile row (e.g. change role, etc.)
+-- get_my_role() is SECURITY DEFINER so it safely reads the caller's own role
+-- without triggering recursive RLS evaluation.
+CREATE POLICY "profiles: admin update all" ON public.profiles
+  FOR UPDATE USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: artists
