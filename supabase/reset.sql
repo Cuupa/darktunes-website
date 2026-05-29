@@ -30,16 +30,11 @@ GRANT USAGE, CREATE ON SCHEMA public TO anon;
 -- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'user_role' AND n.nspname = 'public'
-  ) THEN
-    CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
-  END IF;
-END $$;
+-- Create types directly (NOT inside DO blocks) so schema grants apply in
+-- dashboard execution contexts.
+CREATE TYPE IF NOT EXISTS public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
+CREATE TYPE IF NOT EXISTS public.release_type AS ENUM ('album', 'ep', 'single');
+CREATE TYPE IF NOT EXISTS public.sync_status AS ENUM ('success', 'partial', 'error');
 
 -- Ensure 'journalist' exists even if the type was created without it
 DO $$
@@ -62,28 +57,6 @@ BEGIN
       AND enumlabel = 'artist'
   ) THEN
     ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'artist';
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'release_type' AND n.nspname = 'public'
-  ) THEN
-    CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'sync_status' AND n.nspname = 'public'
-  ) THEN
-    CREATE TYPE public.sync_status AS ENUM ('success', 'partial', 'error');
   END IF;
 END $$;
 
