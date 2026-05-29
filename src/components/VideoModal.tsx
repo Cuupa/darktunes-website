@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { X, CircleNotch } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { Video } from '@/types'
@@ -33,6 +33,7 @@ export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent aria-labelledby="video-modal-title" aria-describedby={undefined} className="max-w-full w-screen p-0 bg-background/95 backdrop-blur-xl border-accent/30 overflow-hidden max-h-[92vh] flex flex-col rounded-none sm:rounded-lg sm:max-w-[95vw] sm:w-[95vw]">
+        <DialogTitle className="sr-only">{video?.title}</DialogTitle>
         <AnimatePresence>
           {open && (
             <motion.div

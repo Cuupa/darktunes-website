@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { SpotifyLogo, AppleLogo, LinkSimple, X } from '@phosphor-icons/react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ConsentGate } from '@/components/ConsentGate'
@@ -35,6 +35,7 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
         aria-describedby={undefined}
         className="max-w-lg w-full p-0 overflow-hidden bg-card border-border"
       >
+        <DialogTitle className="sr-only">{release.title}</DialogTitle>
         {/* Close button */}
         <button
           type="button"
