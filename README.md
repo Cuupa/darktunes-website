@@ -128,6 +128,19 @@ The script is safe to re-run at any time — it never deletes existing data.
 
 ---
 
+## ♿ Accessibility & Quality
+
+| Requirement | Status | Implementation |
+|---|---|---|
+| **WCAG 2.1 AA** | ✅ | Skip-to-main link, `lang` attribute, ARIA labels/roles on all interactive elements, decorative images `alt=""` + `aria-hidden`, 44 × 44 px touch targets, visible focus rings |
+| **Reduced Motion** | ✅ | `useReducedMotion()` (Framer Motion) in every animated component; transitions and stagger animations are disabled when the OS preference is set |
+| **Artist Navigation** | ✅ | All artist cards navigate to `/artists/[slug]` via Next.js `<Link>`. No modal used for artist navigation |
+| **TypeScript `any`** | ✅ | Zero `any` annotations in production code; ESLint enforces this |
+| **LenisProvider** | ✅ | Single global instance in `app/_components/Providers.tsx`. No `scroll-behavior: smooth` in CSS (Lenis handles it) |
+| **Code Splitting** | ✅ | 15 heavy admin manager panels lazy-loaded via `React.lazy` + `Suspense` in `AdminDashboard`. `VideoModal` lazy-loaded in `Videos` (interaction-only) |
+
+---
+
 ## 🚀 Deployment
 
 Deployments run on **Vercel** with `"framework": "nextjs"` in `vercel.json`.  

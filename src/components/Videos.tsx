@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
@@ -9,11 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Play, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
-import { VideoModal } from '@/components/VideoModal'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Video } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
+
+// VideoModal is interaction-only — lazy-load to exclude it from the initial bundle.
+const VideoModal = lazy(() => import('@/components/VideoModal').then((m) => ({ default: m.VideoModal })))
 
 interface VideosProps extends SectionProps {
   videos: Video[]
@@ -203,13 +205,15 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
         </div>
       </section>
 
-      <VideoModal
-        video={selectedVideo}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        placeholderUrl={placeholderUrl}
-        youtubeLabel={consentDict.loadYouTube}
-      />
+      <Suspense fallback={null}>
+        <VideoModal
+          video={selectedVideo}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          placeholderUrl={placeholderUrl}
+          youtubeLabel={consentDict.loadYouTube}
+        />
+      </Suspense>
     </>
   )
 }
