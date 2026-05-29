@@ -350,7 +350,7 @@ function AppLogsPanel() {
         query = query.eq('source', source)
       }
       if (level && level !== 'all') {
-        query = query.eq('level', level)
+        query = query.eq('level', level as 'error' | 'warn' | 'info')
       }
       if (search.trim()) {
         query = query.or(

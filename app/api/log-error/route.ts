@@ -18,7 +18,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
   // Require an authenticated user (prevents abuse from anonymous callers)
   const { data: { user } } = await supabase.auth.getUser()
