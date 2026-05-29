@@ -62,6 +62,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       Body: buffer,
       ContentType: file.type,
       ContentLength: buffer.length,
+      CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
 
