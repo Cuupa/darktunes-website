@@ -99,10 +99,11 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
 
           {/* Type filter tabs */}
           {allTypes.length > 1 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter releases by type">
               <button
                 onClick={() => handleTypeChange(null)}
-                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all ${
+                aria-pressed={selectedType === null}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                   selectedType === null
                     ? 'bg-accent text-accent-foreground border-accent'
                     : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
@@ -114,7 +115,8 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
                 <button
                   key={type}
                   onClick={() => handleTypeChange(type)}
-                  className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all ${
+                  aria-pressed={selectedType === type}
+                  className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                     selectedType === type
                       ? 'bg-accent text-accent-foreground border-accent'
                       : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
