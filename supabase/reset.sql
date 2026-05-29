@@ -24,14 +24,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- "permission denied for schema public".
 -- ---------------------------------------------------------------------------
 GRANT USAGE, CREATE ON SCHEMA public TO postgres;
+GRANT USAGE, CREATE ON SCHEMA public TO authenticated;
+GRANT USAGE, CREATE ON SCHEMA public TO anon;
 
 -- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
-DO $$ BEGIN
-  CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+CREATE TYPE IF NOT EXISTS public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
 
 -- Ensure 'journalist' exists even if the type was created without it
 DO $$
@@ -41,7 +40,7 @@ BEGIN
     WHERE enumtypid = 'public.user_role'::regtype
       AND enumlabel = 'journalist'
   ) THEN
-    ALTER TYPE public.user_role ADD VALUE 'journalist';
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'journalist';
   END IF;
 END $$;
 
@@ -53,19 +52,13 @@ BEGIN
     WHERE enumtypid = 'public.user_role'::regtype
       AND enumlabel = 'artist'
   ) THEN
-    ALTER TYPE public.user_role ADD VALUE 'artist';
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'artist';
   END IF;
 END $$;
 
-DO $$ BEGIN
-  CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+CREATE TYPE IF NOT EXISTS public.release_type AS ENUM ('album', 'ep', 'single');
 
-DO $$ BEGIN
-  CREATE TYPE public.sync_status AS ENUM ('success', 'partial', 'error');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+CREATE TYPE IF NOT EXISTS public.sync_status AS ENUM ('success', 'partial', 'error');
 
 -- ---------------------------------------------------------------------------
 -- HELPER: auto-update updated_at on every row change
