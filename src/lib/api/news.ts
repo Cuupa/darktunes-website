@@ -36,15 +36,14 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
 }
 
 /**
- * Public-facing: only returns posts with status='published' AND published_at ≤ now.
- * Scheduled posts (published_at in the future) are withheld until their publish time.
+ * Public-facing: returns published posts and scheduled posts once their publish time is reached.
  */
 export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const now = new Date().toISOString()
   const { data, error } = await db
     .from('news_posts')
     .select('*')
-    .eq('status', 'published')
+    .in('status', ['published', 'scheduled'])
     .lte('published_at', now)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
