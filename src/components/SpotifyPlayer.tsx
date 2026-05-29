@@ -1,7 +1,7 @@
 'use client'
 
 import { Card } from '@/components/ui/card'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { ConsentGate } from '@/components/ConsentGate'
 import { MusicNote } from '@phosphor-icons/react'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
@@ -18,11 +18,12 @@ interface SpotifyPlayerProps {
 
 export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl, loadLabel }: SpotifyPlayerProps) {
   const spotifyUri = trackUri || playlistUri || artistUri
+  const prefersReducedMotion = useReducedMotion()
 
   return (
     <Card className="bg-card/80 backdrop-blur-md border-border p-6 shadow-xl">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
         {spotifyUri ? (

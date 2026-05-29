@@ -10,7 +10,7 @@ import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { Release, NewsPost, Video, SiteSettings, Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -42,6 +42,7 @@ export function HomePageContent({
   dict,
   locale,
 }: HomePageContentProps) {
+  const prefersReducedMotion = useReducedMotion()
   const featuredReleases = useMemo(() => {
     const featured = releases.filter((release) => release.featured)
     if (featured.length > 0) return featured
@@ -110,9 +111,9 @@ export function HomePageContent({
         </div>
 
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
         >
           <Releases releases={releases} dict={dict.releases} locale={locale} autoplayMs={siteSettings.carouselAutoplayMs ?? 0} consentDict={dict.consent} />
         </motion.div>
@@ -120,10 +121,10 @@ export function HomePageContent({
         <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
           <div className="container mx-auto">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
               className="mb-8 text-center"
             >
               <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{dict.spotify.heading}</h2>

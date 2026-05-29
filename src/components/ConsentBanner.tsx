@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { getConsentState, setConsentState } from '@/lib/consentState'
@@ -22,6 +22,7 @@ interface ConsentBannerProps {
  */
 export function ConsentBanner({ dict }: ConsentBannerProps) {
   const [visible, setVisible] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     // Show banner only if no prior decision was made
@@ -44,10 +45,10 @@ export function ConsentBanner({ dict }: ConsentBannerProps) {
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          initial={prefersReducedMotion ? { opacity: 0 } : { y: 100, opacity: 0 }}
+          animate={prefersReducedMotion ? { opacity: 1 } : { y: 0, opacity: 1 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { y: 100, opacity: 0 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { type: 'spring', damping: 30, stiffness: 300 }}
           className="fixed bottom-0 left-0 right-0 z-50 p-4 lg:p-6"
           role="dialog"
           aria-label={dict.bannerAriaLabel}
