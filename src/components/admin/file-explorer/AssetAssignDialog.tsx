@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, MagnifyingGlass, UserCircle, Vinyl } from '@phosphor-icons/react'
+import { Check, MagnifyingGlass, UserCircle, VinylRecord } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -144,7 +144,7 @@ export function AssignReleaseDialog({ open, onClose, releases, selectedReleaseId
       <DialogContent className="max-w-sm" aria-labelledby="assign-release-title">
         <DialogHeader>
           <DialogTitle id="assign-release-title" className="flex items-center gap-2">
-            <Vinyl size={18} aria-hidden="true" />
+            <VinylRecord size={18} aria-hidden="true" />
             Assign release
           </DialogTitle>
           <DialogDescription>Optionally link this asset to a release.</DialogDescription>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Copy, DownloadSimple, Eye, FolderSimple, PencilSimple, Plus, Tag, Trash, UserCircle, Vinyl } from '@phosphor-icons/react'
+import { Copy, DownloadSimple, Eye, FolderSimple, PencilSimple, Plus, Tag, Trash, UserCircle, VinylRecord } from '@phosphor-icons/react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -114,7 +114,7 @@ export function AssetContextMenu({
 
           {itemType === 'file' && onAssignRelease && (
             <ContextMenuItem onSelect={(e) => { e.preventDefault(); setReleaseDialogOpen(true) }}>
-              <Vinyl aria-hidden="true" />
+              <VinylRecord aria-hidden="true" />
               Assign release…
             </ContextMenuItem>
           )}
