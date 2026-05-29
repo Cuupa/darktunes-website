@@ -147,6 +147,29 @@ describe('supabase/reset.sql — static analysis', () => {
     expect(violations, violations.join('\n')).toHaveLength(0)
   })
 
+  // ── CREATE TYPE should be direct and idempotent ──────────────────────────
+  it('all CREATE TYPE statements use IF NOT EXISTS and are outside DO blocks', () => {
+    const violations: string[] = []
+    let insideDoBlock = false
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      if (/^\s*DO\s+\$\$/i.test(lines[i])) insideDoBlock = true
+      if (insideDoBlock && /END\s+\$\$/i.test(lines[i])) insideDoBlock = false
+
+      if (/^CREATE\s+TYPE\b/i.test(clean)) {
+        if (!/^CREATE\s+TYPE\s+IF\s+NOT\s+EXISTS\b/i.test(clean)) {
+          violations.push(`Line ${i + 1}: CREATE TYPE without IF NOT EXISTS: ${lines[i].trim()}`)
+        }
+        if (insideDoBlock) {
+          violations.push(`Line ${i + 1}: CREATE TYPE appears inside DO block: ${lines[i].trim()}`)
+        }
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
   // ── No bare ALTER TYPE … ADD VALUE (must be guarded in a DO block) ─────
   it('all ALTER TYPE … ADD VALUE statements are inside DO blocks (idempotency)', () => {
     const violations: string[] = []
