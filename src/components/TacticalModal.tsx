@@ -34,7 +34,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { DialogProps } from '@/lib/component-contracts'
@@ -106,6 +106,8 @@ export function TacticalModal({
   // SSR guard – createPortal must only run in the browser.
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+
+  const prefersReducedMotion = useReducedMotion()
 
   const titleId = useId()
   const descId = useId()
@@ -188,9 +190,7 @@ export function TacticalModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            // Backdrop fades almost instantly; the panel animation is the focal
-            // point.
-            transition={{ duration: 0.12, ease: 'linear' }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.12, ease: 'linear' }}
             onClick={onClose}
           />
 
@@ -212,10 +212,10 @@ export function TacticalModal({
               )}
               // "Blade Slice": panel starts as a horizontal sliver and opens
               // vertically like a mechanical shutter.
-              initial={{ clipPath: 'inset(50% 0 50% 0)' }}
-              animate={{ clipPath: 'inset(0% 0 0% 0)' }}
-              exit={{ clipPath: 'inset(50% 0 50% 0)' }}
-              transition={BLADE_SPRING}
+              initial={prefersReducedMotion ? { opacity: 0 } : { clipPath: 'inset(50% 0 50% 0)' }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { clipPath: 'inset(0% 0 0% 0)' }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { clipPath: 'inset(50% 0 50% 0)' }}
+              transition={prefersReducedMotion ? { duration: 0 } : BLADE_SPRING}
               // Prevent backdrop-click from firing when clicking inside the panel.
               onClick={(e) => e.stopPropagation()}
             >

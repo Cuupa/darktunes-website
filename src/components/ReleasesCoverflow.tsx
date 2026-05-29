@@ -91,6 +91,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
       inner.style.filter = ''
+      inner.style.pointerEvents = 'none'
       return
     }
 
@@ -99,6 +100,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       inner.style.transform = ''
       inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
+      inner.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
       return
     }
 
@@ -112,6 +114,9 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     inner.style.opacity = String(Math.max(0, opacity))
     const blurPx = Math.min(3, abs * 1.2)
     inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
+    // Only the centre slide (abs < 0.5) is fully interactive; side slides are
+    // decorative and must not intercept pointer events meant for the front card.
+    inner.style.pointerEvents = abs < 0.5 ? '' : 'none'
   })
 }
 
@@ -329,7 +334,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
       <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
         <div style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}>
           {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
-          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }} data-lenis-prevent>
+          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
             {/* Embla container: Embla translates this element for scrolling */}
             <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
               {releases.map((release, index) => {

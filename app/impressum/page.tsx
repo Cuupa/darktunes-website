@@ -8,15 +8,25 @@
 import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
+import type { Database } from '@/types/database'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
+
+// Cookie-free public client — safe inside unstable_cache callbacks where
+// Next.js Dynamic APIs (cookies, headers) are unavailable. site_settings has
+// a public-read RLS policy (FOR SELECT USING (TRUE)), so the anon key works.
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+  )
+}
 
 const getCachedSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
-    const client = await createServerSupabaseClient()
-    return getSiteSettings(client)
+    return getSiteSettings(createPublicSupabaseClient())
   },
   ['site-settings'],
   { revalidate: 60, tags: ['site-settings'] },
@@ -78,7 +88,7 @@ export default async function ImpressumPage() {
       <div className="container mx-auto px-4 lg:px-8 py-24 max-w-3xl">
         <Link
           href="/"
-          className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
+          className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           {dict.pages.backToHome}
         </Link>
@@ -88,9 +98,9 @@ export default async function ImpressumPage() {
         </h1>
 
         <div className="space-y-8 text-sm text-foreground/90 leading-relaxed">
-          {/* § 5 TMG — Angaben gemäß § 5 TMG */}
-          <section>
-            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+          {/* § 5 DDG — Angaben gemäß § 5 DDG */}
+          <section aria-labelledby="impr-angaben">
+            <h2 id="impr-angaben" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
               Angaben gemäß § 5 DDG
             </h2>
             <p className="font-semibold">{settings.impressumCompanyName}</p>
@@ -104,8 +114,8 @@ export default async function ImpressumPage() {
 
           {/* Vertreten durch */}
           {settings.impressumRepresentative && (
-            <section>
-              <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+            <section aria-labelledby="impr-vertreten">
+              <h2 id="impr-vertreten" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
                 Vertreten durch
               </h2>
               <p>{settings.impressumRepresentative}</p>
@@ -113,8 +123,8 @@ export default async function ImpressumPage() {
           )}
 
           {/* Kontakt */}
-          <section>
-            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+          <section aria-labelledby="impr-kontakt">
+            <h2 id="impr-kontakt" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
               Kontakt
             </h2>
             {settings.impressumPhone && (
@@ -122,7 +132,7 @@ export default async function ImpressumPage() {
                 Telefon:{' '}
                 <a
                   href={`tel:${settings.impressumPhone}`}
-                  className="hover:text-accent transition-colors"
+                  className="hover:text-accent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {settings.impressumPhone}
                 </a>
@@ -132,7 +142,7 @@ export default async function ImpressumPage() {
               E-Mail:{' '}
               <a
                 href={`mailto:${settings.impressumEmail}`}
-                className="hover:text-accent transition-colors"
+                className="hover:text-accent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 {settings.impressumEmail}
               </a>
@@ -141,8 +151,8 @@ export default async function ImpressumPage() {
 
           {/* Umsatzsteuer-ID */}
           {settings.impressumVatId && (
-            <section>
-              <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+            <section aria-labelledby="impr-vat">
+              <h2 id="impr-vat" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
                 Umsatzsteuer-Identifikationsnummer
               </h2>
               <p>
@@ -153,8 +163,8 @@ export default async function ImpressumPage() {
 
           {/* Handelsregister */}
           {(settings.impressumRegisterCourt || settings.impressumRegisterNumber) && (
-            <section>
-              <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+            <section aria-labelledby="impr-register">
+              <h2 id="impr-register" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
                 Handelsregister
               </h2>
               {settings.impressumRegisterCourt && (
@@ -169,8 +179,8 @@ export default async function ImpressumPage() {
           )}
 
           {/* Streitschlichtung */}
-          <section>
-            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+          <section aria-labelledby="impr-streit">
+            <h2 id="impr-streit" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
               Streitschlichtung
             </h2>
             <p className="text-muted-foreground mb-2">
@@ -179,7 +189,8 @@ export default async function ImpressumPage() {
                 href="https://ec.europa.eu/consumers/odr/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-accent transition-colors underline"
+                aria-label="EU-Plattform zur Online-Streitbeilegung (öffnet in neuem Tab)"
+                className="hover:text-accent transition-colors underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 https://ec.europa.eu/consumers/odr/
               </a>
@@ -191,8 +202,8 @@ export default async function ImpressumPage() {
           </section>
 
           {/* Haftungsausschluss */}
-          <section>
-            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+          <section aria-labelledby="impr-haftung">
+            <h2 id="impr-haftung" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
               Haftungsausschluss (Disclaimer)
             </h2>
             <h3 className="font-semibold mb-1">Haftung für Inhalte</h3>
@@ -212,8 +223,8 @@ export default async function ImpressumPage() {
           </section>
 
           {/* Urheberrecht */}
-          <section>
-            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+          <section aria-labelledby="impr-urheber">
+            <h2 id="impr-urheber" className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
               Urheberrecht
             </h2>
             <p className="text-muted-foreground">

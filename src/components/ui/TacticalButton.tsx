@@ -15,7 +15,7 @@
  */
 
 import { forwardRef } from 'react'
-import { motion, type HTMLMotionProps } from 'framer-motion'
+import { motion, useReducedMotion, type HTMLMotionProps } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 /** High-stiffness spring – elements snap/lock, never wobble. */
@@ -59,11 +59,12 @@ export const TacticalButton = forwardRef<HTMLButtonElement, TacticalButtonProps>
     { className, variant = 'secondary', size = 'default', ...props },
     ref,
   ) {
+    const prefersReducedMotion = useReducedMotion()
     return (
       <motion.button
         ref={ref}
         // Press: compress 3 % with a snap spring – like a physical button click.
-        whileTap={{ scale: 0.97 }}
+        whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
         transition={SNAP_SPRING}
         className={cn(
           // Layout
