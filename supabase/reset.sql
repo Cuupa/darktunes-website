@@ -17,6 +17,15 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ---------------------------------------------------------------------------
+-- SCHEMA PERMISSIONS
+-- PostgreSQL 15+ revoked CREATE on the public schema from PUBLIC by default.
+-- Explicitly grant it to postgres so that DO blocks (and direct DDL) can
+-- create types, functions, and triggers in this schema without hitting
+-- "permission denied for schema public".
+-- ---------------------------------------------------------------------------
+GRANT USAGE, CREATE ON SCHEMA public TO postgres;
+
+-- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
 DO $$ BEGIN
@@ -101,9 +110,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id         UUID             PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   email      TEXT             NOT NULL,
   role       public.user_role NOT NULL DEFAULT 'user',
+  avatar_url TEXT,
+  provider   TEXT             NOT NULL DEFAULT 'email',
   created_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
+
+-- Idempotent guards for columns added after initial schema creation
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS provider   TEXT NOT NULL DEFAULT 'email';
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
@@ -156,6 +171,41 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- ---------------------------------------------------------------------------
+-- HELPER: auto-link Spotify OAuth users to matching artist rows
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_oauth_artist_verification()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_spotify_id TEXT;
+  v_artist_id  UUID;
+BEGIN
+  v_spotify_id := NEW.raw_user_meta_data->>'provider_id';
+
+  IF NEW.raw_app_meta_data->>'provider' = 'spotify' AND v_spotify_id IS NOT NULL THEN
+    SELECT id INTO v_artist_id
+    FROM public.artists
+    WHERE spotify_id = v_spotify_id
+    LIMIT 1;
+
+    IF v_artist_id IS NOT NULL THEN
+      UPDATE public.artists SET user_id = NEW.id WHERE id = v_artist_id;
+      UPDATE public.profiles SET role = 'artist' WHERE id = NEW.id;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_oauth_artist_verify ON auth.users;
+CREATE TRIGGER on_oauth_artist_verify
+  AFTER INSERT OR UPDATE ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_artist_verification();
 
 -- Backfill: sync any auth users who registered before this trigger existed
 INSERT INTO public.profiles (id, email, role)

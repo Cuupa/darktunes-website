@@ -44,6 +44,8 @@ export interface Database {
           id: string
           email: string
           role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          avatar_url: string | null
+          provider: string
           created_at: string
           updated_at: string
         }
@@ -51,6 +53,8 @@ export interface Database {
           id: string
           email: string
           role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          avatar_url?: string | null
+          provider?: string
           created_at?: string
           updated_at?: string
         }
@@ -58,6 +62,8 @@ export interface Database {
           id?: string
           email?: string
           role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          avatar_url?: string | null
+          provider?: string
           created_at?: string
           updated_at?: string
         }
