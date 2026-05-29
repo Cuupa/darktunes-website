@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
@@ -105,6 +105,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [page, setPage] = useState(1)
+  const listRef = useRef<HTMLUListElement>(null)
   const prefersReducedMotion = useReducedMotion()
 
   const perPage = Math.max(1, videosPerPage)
@@ -113,6 +114,10 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
   const effectiveTotalPages = videosLinkToPage ? 1 : totalPages
   const currentPage = Math.min(page, effectiveTotalPages)
   const pageVideos = videos.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior })
+  }, [currentPage])
 
   const handleVideoClick = (video: Video) => {
     setSelectedVideo(video)
@@ -142,6 +147,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
 
           {/* data-lenis-prevent removed: vertical Lenis scroll is not affected by the grid layout */}
           <motion.ul
+            ref={listRef}
             className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
