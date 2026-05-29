@@ -13,6 +13,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<{ error: Error | null }>
+  signInWithOAuth: (provider: 'google' | 'spotify') => Promise<{ error: Error | null }>
   isAdmin: boolean
   isEditor: boolean
   isArtist: boolean

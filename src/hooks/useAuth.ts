@@ -90,6 +90,17 @@ export function useAuth() {
     return { error }
   }
 
+  const signInWithOAuth = async (provider: 'google' | 'spotify'): Promise<{ error: AuthError | null }> => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: provider === 'spotify' ? 'user-read-email user-read-private' : undefined,
+      },
+    })
+    return { error }
+  }
+
   const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor' || profile?.role === 'admin'
   const isArtist = profile?.role === 'artist' || profile?.role === 'admin'
@@ -102,6 +113,7 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    signInWithOAuth,
     isAdmin,
     isEditor,
     isArtist,

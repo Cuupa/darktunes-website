@@ -150,7 +150,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  *   → flex container → slide outer div → slide inner div.  Any gap in this
  *   chain would flatten the 3D context and eliminate the trapez perspective.
  */
-export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, consentDict: _consentDict }: ReleasesCoverflowProps) {
+export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
@@ -272,7 +272,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
   useEffect(() => {
     if (!emblaApi) return
     const onPointerDown = () => { isDragging.current = false }
-    const onDragStart = () => { isDragging.current = true }
     const onSettle = () => { setTimeout(() => { isDragging.current = false }, 50) }
     emblaApi.on('pointerDown', onPointerDown)
     emblaApi.on('settle', onSettle)
