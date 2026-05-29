@@ -10,7 +10,7 @@
 - **Videos section** — YouTube embed gallery; semantic `<ul>/<li>` grid; image proxy via wsrv.nl; `useReducedMotion` support
 - **News section** — server-side data from Supabase; semantic `<ul>/<li>` list; "Read Full Story" links to `/news/${slug}`; `useReducedMotion` support
 - **Tour section** — upcoming concert dates from Supabase with ticket links
-- **Header** — shrinking logo on scroll, navigation, Lenis smooth scroll, full ARIA (nav label, mobile toggle aria-expanded/controls, mobile nav id), 44px touch targets (`"use client"`)
+- **Header** — shrinking logo on scroll, navigation (including external darkmerch.com shop link), Lenis smooth scroll, full ARIA (nav label, mobile toggle aria-expanded/controls, mobile nav id), 44px touch targets (`"use client"`)
 - **Footer** — Lenis smooth scroll, footer nav wrapped in `<nav aria-label="Footer navigation">`, aria-labels on social icons (`"use client"`)
 - **CRT scanline overlay** — full-page vintage aesthetic
 - **WCAG 2.1 AA/AAA compliance** — skip navigation link in `app/layout.tsx`, `id="main-content"` on `<main>`, `useReducedMotion` in all animated sections, descriptive alt text, icon aria-labels, 44×44px touch targets, semantic lists
@@ -20,7 +20,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
-- **Vitest** unit test suite (`npm test`) — 380 tests passing (41 test files)
+- **Vitest** unit test suite (`npm test`) — 395 tests passing (42 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -61,13 +61,13 @@
 - Dashboard UI with tabbed interface
 - **ArtistsManager** — table + create/edit dialog + delete confirm + **"Sync Now"** per-artist button + skeleton loading states + last-synced-at display
 - **ReleasesManager** — table + create/edit dialog + iTunes sync button
-- **NewsManager** — table + create/edit dialog + delete confirm
+- **NewsManager** — table + create/edit (redirects to `/admin/news/new` and `/admin/news/[id]`) + delete confirm; supports artist association (news post linked to a specific artist)
 - **VideosManager** — table + create/edit dialog + delete confirm
 - **AssetsManager** — folder-based file explorer with tree navigation, grid/list views, drag/drop upload, search, multi-select, batch delete, and artist assignment. Backed by `/api/upload` plus `/api/admin/assets`, `/api/admin/assets/folders`, and `/api/admin/assets/batch`.
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 - **UsersManager** *(admin-only tab)* — full user management: lists all registered users (via Supabase Auth Admin API), allows role changes (admin/editor/journalist/user), ban/unban with confirmation dialog, user deletion, and artist ↔ user linking/unlinking. Tab is only rendered when `profile.role === 'admin'`. API routes: `GET/PATCH/DELETE /api/admin/users`, `PATCH /api/admin/users/[id]/link-artist`.
 - **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
-- **MessagesManager** *(admin-only tab)* — sends artist inbox messages (`label_messages`) and shows read status.
+- **MessagesManager** *(admin-only tab)* — sends artist inbox messages (`label_messages`), shows read status, multi-select + bulk delete.
 - **AccreditationsManager** *(admin-only tab)* — reviews and updates journalist accreditation requests (`accreditation_requests`).
 
 ### SOS Webhook — Statement of Sales PDF Upload
@@ -88,7 +88,7 @@
 ### Admin Form Components (`src/components/admin/forms/`)
 - `ArtistForm` — auto-slug, featured/isEuNonGerman toggles, and integrated `AssetPicker` controls for image/logo fields
 - `ReleaseForm` — cover art, type select, streaming URL fields
-- `NewsForm` — title, auto-slug, excerpt, content, image, publish date
+- `NewsForm` — title, auto-slug, excerpt, content, image, publish date, status, press-only toggle, and optional artist association dropdown
 - `VideoForm` — youtubeId with auto-thumbnail generation
 
 ### Multi-API Sync Engine (`src/lib/sync/`)
@@ -187,6 +187,9 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 | Artist social/shop links | ✅ Implemented | `facebook_url`, `twitter_url`, `tiktok_url`, `bandcamp_url`, `shop_url` columns in `artists` table; icon buttons in public artist cards + modal + admin form |
 | News full page + detail page | ✅ Implemented | `/news` RSC with pagination via `ContentPagination`; `/news/[slug]` RSC detail page with `getNewsPostBySlug` DAL |
+| Artist-specific news on profile pages | ✅ Implemented | `news_posts.artist_id` FK; `getPublicNewsPostsByArtistId` DAL (up to 3 latest); rendered in artist detail below discography |
+| News artist association (admin) | ✅ Implemented | `NewsForm` artist dropdown + dedicated edit routes `/admin/news/new` and `/admin/news/[id]`; `artist_id` stored in `news_posts` |
+| Admin dashboard tab URL persistence | ✅ Implemented | Active tab synced to `?tab=` URL param via `router.replace` — supports direct links and browser back/forward |
 | Contact page + API route | ✅ Implemented | `/contact` RSC with SubmitHub link; `POST /api/contact` (Zod, honeypot, Resend delivery); `CONTACT_EMAIL` env var |
 | SubmitHub link | ✅ Implemented | Footer → "Submit Your Music" link + Contact page SubmitHub section |
 | Shopify/Darkmerch shop link | ✅ Implemented | `shopifyStoreUrl` in `SiteSettings` (`site_settings` KV key `shopify_store_url`); conditional display in Footer |

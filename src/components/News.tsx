@@ -56,6 +56,7 @@ export function News({ news, dict, locale }: NewsProps) {
               viewport={{ once: true }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
             >
+              <Link href={`/news/${post.slug}`} className="block">
               <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300">
                 <div className="grid lg:grid-cols-[320px_1fr] gap-0">
                   {post.imageUrl && (
@@ -87,19 +88,16 @@ export function News({ news, dict, locale }: NewsProps) {
                     <p className="text-muted-foreground mb-6 font-serif leading-relaxed">
                       {post.excerpt}
                     </p>
-                    <Button 
-                      variant="ghost" 
-                      className="self-start group/btn hover:text-accent px-0 uppercase tracking-wider font-bold"
-                      asChild
+                    <span
+                      className="self-start group/btn flex items-center text-accent px-0 uppercase tracking-wider font-bold text-sm"
                     >
-                      <Link href={`/news/${post.slug}`}>
-                        {dict.readFullStory}
-                        <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
-                      </Link>
-                    </Button>
+                      {dict.readFullStory}
+                      <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" weight="bold" />
+                    </span>
                   </div>
                 </div>
               </Card>
+              </Link>
             </motion.li>
           ))}
         </ul>

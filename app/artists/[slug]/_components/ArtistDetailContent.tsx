@@ -85,7 +85,7 @@ export function ArtistDetailContent({
       {/* ------------------------------------------------------------------ */}
       {/* Hero                                                                 */}
       {/* ------------------------------------------------------------------ */}
-      <div className="relative">
+      <div className="relative overflow-hidden">
         <div
           className="absolute inset-0 h-[60vh] overflow-hidden"
           style={{ zIndex: 0 }}
@@ -106,7 +106,7 @@ export function ArtistDetailContent({
 
         <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-8 pb-16">
           <Link
-            href="/#artists"
+            href="/artists"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
           >
             <ArrowLeft size={16} weight="bold" aria-hidden="true" />
@@ -438,7 +438,7 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">News</h2>
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.news}</h2>
             <ul className="space-y-4 list-none max-w-3xl">
               {news.map((post) => (
                 <li key={post.id}>

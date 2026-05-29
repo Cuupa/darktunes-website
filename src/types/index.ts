@@ -85,6 +85,11 @@ export interface NewsPost {
   slug: string
   isPressOnly: boolean
   /**
+   * Optional artist association. When set, this news post is shown only on that
+   * artist's profile page and not under any other artist.
+   */
+  artistId?: string | null
+  /**
    * Post lifecycle status:
    * - `draft`     — only visible to admins/editors
    * - `published` — public (and `published_at` ≤ now)

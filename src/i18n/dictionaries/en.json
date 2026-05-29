@@ -9,7 +9,8 @@
     "videos": "VIDEOS",
     "newsletter": "Newsletter",
     "switchLocale": "EN",
-    "contact": "CONTACT"
+    "contact": "CONTACT",
+    "shop": "SHOP"
   },
   "hero": {
     "listenNow": "Listen Now",
@@ -124,7 +125,8 @@
     "since": "Since",
     "latestVideo": "Latest Video",
     "getTickets": "Tickets",
-    "fullProfile": "Full Profile →"
+    "fullProfile": "Full Profile →",
+    "news": "News"
   },
   "pages": {
     "backToHome": "← Back to home"

@@ -20,6 +20,7 @@ const EMPTY_FORM: NewsFormData = {
   scheduledAt: '',
   isPressOnly: false,
   status: 'draft',
+  artistId: '',
 }
 
 export default function NewsNewPage() {
@@ -39,6 +40,7 @@ export default function NewsNewPage() {
         published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : new Date().toISOString(),
         is_press_only: data.isPressOnly,
         status: data.status,
+        artist_id: data.artistId || null,
       })
       toast.success(`Created "${data.title}"`)
       router.push('/admin?tab=news')

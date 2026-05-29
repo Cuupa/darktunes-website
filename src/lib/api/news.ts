@@ -22,6 +22,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
     isPressOnly: row.is_press_only,
+    artistId: row.artist_id ?? null,
     status,
   }
 }
@@ -43,6 +44,22 @@ export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const { data, error } = await db
     .from('news_posts')
     .select('*')
+    .in('status', ['published', 'scheduled'])
+    .lte('published_at', now)
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToNewsPost)
+}
+
+/**
+ * Public-facing: returns published posts associated with a specific artist.
+ */
+export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: string): Promise<NewsPost[]> {
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('news_posts')
+    .select('*')
+    .eq('artist_id', artistId)
     .in('status', ['published', 'scheduled'])
     .lte('published_at', now)
     .order('published_at', { ascending: false })

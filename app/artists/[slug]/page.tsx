@@ -26,7 +26,7 @@ import { getArtistBySlug, getPublicArtists } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
-import { getPublicNewsPosts } from '@/lib/api/news'
+import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 
@@ -63,7 +63,7 @@ async function getArtistData(slug: string) {
     getReleasesByArtistId(client, artist.id),
     getConcertsByArtistId(client, artist.id),
     getVideosByArtistId(client, artist.id),
-    getPublicNewsPosts(client).then((posts) => posts.slice(0, 3)),
+    getPublicNewsPostsByArtistId(client, artist.id).then((posts) => posts.slice(0, 3)),
   ])
   return { artist, releases, concerts, videos, news }
 }

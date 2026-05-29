@@ -5,15 +5,22 @@
 import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { NewsList } from './_components/NewsList'
 
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+  )
+}
+
 const getCachedPosts = unstable_cache(
   async () => {
-    const client = await createServerSupabaseClient()
-    return getPublicNewsPosts(client)
+    return getPublicNewsPosts(createPublicSupabaseClient())
   },
   ['news-posts'],
   { revalidate: 60, tags: ['news'] },
