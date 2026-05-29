@@ -15,6 +15,7 @@ import { getPressPhotos } from '@/lib/api/pressPhotos'
 import { getArtists } from '@/lib/api/artists'
 import { getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { getConcerts } from '@/lib/api/concerts'
+import { getSiteSettings } from '@/lib/api/siteSettings'
 import { PressPageClient } from './_components/PressPageClient'
 
 export const metadata: Metadata = {
@@ -33,10 +34,11 @@ export default async function PressPage() {
   const dict = await getDictionary(locale)
   const supabase = await createServerSupabaseClient()
 
-  const [photos, concerts, artists] = await Promise.all([
+  const [photos, concerts, artists, siteSettings] = await Promise.all([
     getPressPhotos(supabase).catch(() => []),
     getConcerts(supabase).catch(() => []),
     getArtists(supabase).catch(() => []),
+    getSiteSettings(supabase).catch(() => ({ labelName: 'darkTunes Music Group' })),
   ])
 
   const featured = artists.find((a) => a.featured) ?? artists[0]
@@ -50,7 +52,7 @@ export default async function PressPage() {
       photos={photos}
       concerts={concerts}
       profile={profile}
-      artistName={featured?.name ?? 'darkTunes'}
+      artistName={siteSettings.labelName}
     />
   )
 }
