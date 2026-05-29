@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { CaretDown, CaretUp } from '@phosphor-icons/react'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { SortDir, SortField } from '@/hooks/useFileExplorer'
 import type { Artist, Asset, AssetFolder, Release } from '@/types'
@@ -100,7 +101,7 @@ export function FileList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <ScrollArea className="flex-1">
       <Table>
         <TableHeader>
           <TableRow>
@@ -202,6 +203,6 @@ export function FileList({
           })}
         </TableBody>
       </Table>
-    </div>
+    </ScrollArea>
   )
 }

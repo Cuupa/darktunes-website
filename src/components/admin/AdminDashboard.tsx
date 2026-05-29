@@ -32,7 +32,7 @@ import { VideosManager } from './VideosManager'
 import { AssetsManager } from './AssetsManager'
 import { SiteSettingsManager } from './SiteSettingsManager'
 import { SystemHealthWidget } from './SystemHealthWidget'
-import { JournalistManager } from './JournalistManager'
+import { MediaManager } from './MediaManager'
 import { UsersManager } from './UsersManager'
 import { FeatureTogglesManager } from './FeatureTogglesManager'
 import { FeatureFlagsManager } from './FeatureFlagsManager'
@@ -419,7 +419,7 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <JournalistManager />
+                  <MediaManager />
                 </CardContent>
               </Card>
             </TabsContent>

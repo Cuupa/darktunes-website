@@ -31,6 +31,7 @@ export function FileExplorer({ className }: { className?: string }) {
   const { artists } = useArtists()
   const { releases } = useReleases()
   const uploadRef = useRef<UploadDropZoneRef>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
 
@@ -149,6 +150,11 @@ export function FileExplorer({ className }: { className?: string }) {
         explorer.clearSelection()
         setRenaming(null)
       }
+      if ((event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -205,6 +211,7 @@ export function FileExplorer({ className }: { className?: string }) {
             <ExplorerToolbar
               searchQuery={explorer.searchQuery}
               onSearchChange={explorer.setSearchQuery}
+              searchInputRef={searchInputRef}
               viewMode={explorer.viewMode}
               onViewModeChange={explorer.setViewMode}
               sortField={explorer.sortField}
