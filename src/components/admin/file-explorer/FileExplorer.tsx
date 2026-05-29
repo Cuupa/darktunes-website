@@ -14,6 +14,7 @@ import { ExplorerToolbar } from './ExplorerToolbar'
 import { FileGrid } from './FileGrid'
 import { FileList } from './FileList'
 import { FolderTree } from './FolderTree'
+import { TagsEditorDialog } from './AssetAssignDialog'
 import { AssetPreviewModal } from './AssetPreviewModal'
 import { UploadDropZone, type UploadDropZoneRef } from './UploadDropZone'
 
@@ -31,8 +32,10 @@ export function FileExplorer({ className }: { className?: string }) {
   const { artists } = useArtists()
   const { releases } = useReleases()
   const uploadRef = useRef<UploadDropZoneRef>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
+  const [tagsAsset, setTagsAsset] = useState<Asset | null>(null)
 
   const artistNames = useMemo(
     () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
@@ -109,17 +112,19 @@ export function FileExplorer({ className }: { className?: string }) {
     }
   }, [explorer])
 
-  const handleAssetTags = useCallback(async (asset: Asset) => {
-    const value = window.prompt('Comma-separated tags', asset.tags.join(', '))
-    if (value === null) return
-    const tags = value.split(',').map((tag) => tag.trim()).filter(Boolean)
+  const handleAssetTags = useCallback((asset: Asset) => {
+    setTagsAsset(asset)
+  }, [])
+
+  const handleTagsConfirm = useCallback(async (tags: string[]) => {
+    if (!tagsAsset) return
     try {
-      await explorer.updateAsset(asset.id, { tags })
+      await explorer.updateAsset(tagsAsset.id, { tags })
       toast.success('Tags updated')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update tags')
     }
-  }, [explorer])
+  }, [explorer, tagsAsset])
 
   const handleAssignArtists = useCallback(async (assetId: string, artistIds: string[]) => {
     try {
@@ -148,6 +153,11 @@ export function FileExplorer({ className }: { className?: string }) {
       if (event.key === 'Escape') {
         explorer.clearSelection()
         setRenaming(null)
+      }
+      if ((event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
       }
     }
     window.addEventListener('keydown', handler)
@@ -184,7 +194,7 @@ export function FileExplorer({ className }: { className?: string }) {
     onAssetDownload: (asset: Asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer'),
     onAssetAssignArtists: (assetId: string, artistIds: string[]) => void handleAssignArtists(assetId, artistIds),
     onAssetAssignRelease: (assetId: string, releaseId: string | null) => void handleAssignRelease(assetId, releaseId),
-    onAssetEditTags: (asset: Asset) => void handleAssetTags(asset),
+    onAssetEditTags: (asset: Asset) => handleAssetTags(asset),
     onAssetPreview: (asset: Asset) => setPreviewAsset(asset),
   }
 
@@ -205,6 +215,7 @@ export function FileExplorer({ className }: { className?: string }) {
             <ExplorerToolbar
               searchQuery={explorer.searchQuery}
               onSearchChange={explorer.setSearchQuery}
+              searchInputRef={searchInputRef}
               viewMode={explorer.viewMode}
               onViewModeChange={explorer.setViewMode}
               sortField={explorer.sortField}
@@ -234,6 +245,12 @@ export function FileExplorer({ className }: { className?: string }) {
       </ResizablePanelGroup>
 
       <AssetPreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+      <TagsEditorDialog
+        open={tagsAsset !== null}
+        initialTags={tagsAsset?.tags ?? []}
+        onConfirm={(tags) => void handleTagsConfirm(tags)}
+        onClose={() => setTagsAsset(null)}
+      />
     </>
   )
 }

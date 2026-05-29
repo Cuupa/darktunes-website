@@ -2,6 +2,7 @@
 
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { useRef, useState } from 'react'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Artist, Asset, AssetFolder, Release } from '@/types'
 import { FileItem } from './FileItem'
 import { FolderItem } from './FolderItem'
@@ -111,8 +112,9 @@ export function FileGrid({
   }
 
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-y-auto p-4" onMouseDown={startSelection}>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
+    <div ref={containerRef} className="relative flex-1 overflow-hidden" onMouseDown={startSelection}>
+      <ScrollArea className="h-full p-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
         {folders.map((folder) => (
           <FolderItem
             key={folder.id}
@@ -156,7 +158,8 @@ export function FileGrid({
             onPreview={() => onAssetPreview(asset)}
           />
         ))}
-      </div>
+        </div>
+      </ScrollArea>
       {selectionRect && (
         <div
           className="pointer-events-none fixed z-10 border border-primary bg-primary/10"

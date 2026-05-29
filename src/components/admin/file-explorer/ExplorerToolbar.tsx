@@ -1,5 +1,6 @@
 'use client'
 
+import { type RefObject } from 'react'
 import { ListBullets, MagnifyingGlass, SquaresFour, Trash, UploadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import type { SortDir, SortField, ViewMode } from '@/hooks/useFileExplorer'
 interface ExplorerToolbarProps {
   searchQuery: string
   onSearchChange: (value: string) => void
+  searchInputRef?: RefObject<HTMLInputElement | null>
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   sortField: SortField
@@ -30,6 +32,7 @@ interface ExplorerToolbarProps {
 export function ExplorerToolbar({
   searchQuery,
   onSearchChange,
+  searchInputRef,
   viewMode,
   onViewModeChange,
   sortField,
@@ -47,9 +50,10 @@ export function ExplorerToolbar({
         <div className="relative min-w-0 flex-1">
           <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
+            ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search by filename…"
+            placeholder="Search by filename… (Ctrl+F)"
             className="pl-9"
             aria-label="Search assets"
           />
