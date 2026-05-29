@@ -89,10 +89,12 @@ export type ArtistFormMode = 'admin' | 'artist'
 
 function toSlug(name: string): string {
   return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritical marks
+    .replace(/ß/g, 'ss')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
 }
 
 /** Thin indeterminate bar shown during async API calls. */

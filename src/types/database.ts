@@ -9,6 +9,36 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      app_logs: {
+        Row: {
+          id: string
+          source: string
+          level: 'error' | 'warn' | 'info'
+          message: string
+          details: Record<string, unknown>
+          user_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source: string
+          level?: 'error' | 'warn' | 'info'
+          message: string
+          details?: Record<string, unknown>
+          user_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source?: string
+          level?: 'error' | 'warn' | 'info'
+          message?: string
+          details?: Record<string, unknown>
+          user_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string

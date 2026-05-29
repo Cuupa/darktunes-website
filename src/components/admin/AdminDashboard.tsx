@@ -5,7 +5,25 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SignOut, User, MusicNotes, Newspaper, VideoCamera, Image as ImageIcon, Gear, Heartbeat, Broadcast, Users, ToggleRight, ClipboardText, ShieldCheck } from '@phosphor-icons/react'
+import {
+  SignOut,
+  User,
+  MusicNotes,
+  Newspaper,
+  VideoCamera,
+  Image as ImageIcon,
+  Gear,
+  Heartbeat,
+  Broadcast,
+  Users,
+  ToggleRight,
+  ClipboardText,
+  ShieldCheck,
+  ArrowUp,
+  ArrowDown,
+  ArrowsDownUp,
+  CheckCircle,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { ArtistsManager } from './ArtistsManager'
 import { ReleasesManager } from './ReleasesManager'
@@ -24,12 +42,67 @@ import { LogsManager } from './LogsManager'
 import { RolesManager } from './RolesManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
-const ALL_TABS = ['artists', 'releases', 'news', 'videos', 'assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs', 'roles'] as const
-type TabValue = typeof ALL_TABS[number]
+// ---------------------------------------------------------------------------
+// Tab definitions — single source of truth for labels, icons, and metadata
+// ---------------------------------------------------------------------------
+
+type TabValue =
+  | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
+  | 'settings' | 'health' | 'media' | 'users' | 'features'
+  | 'feature-flags' | 'messages' | 'accreditations' | 'logs' | 'roles'
+
+interface TabDef {
+  value: TabValue
+  label: string
+  /** True if only admins can see this tab */
+  adminOnly: boolean
+  icon: React.ElementType
+}
+
+const TAB_DEFS: TabDef[] = [
+  { value: 'artists',        label: 'Artists',            adminOnly: false, icon: User },
+  { value: 'releases',       label: 'Releases',           adminOnly: false, icon: MusicNotes },
+  { value: 'news',           label: 'News',               adminOnly: false, icon: Newspaper },
+  { value: 'videos',         label: 'Videos',             adminOnly: false, icon: VideoCamera },
+  { value: 'assets',         label: 'Assets',             adminOnly: true,  icon: ImageIcon },
+  { value: 'settings',       label: 'Settings',           adminOnly: true,  icon: Gear },
+  { value: 'health',         label: 'Health',             adminOnly: true,  icon: Heartbeat },
+  { value: 'media',          label: 'Media',              adminOnly: true,  icon: Broadcast },
+  { value: 'users',          label: 'Users',              adminOnly: true,  icon: Users },
+  { value: 'features',       label: 'Features',           adminOnly: true,  icon: ToggleRight },
+  { value: 'feature-flags',  label: 'Feature Flags',      adminOnly: true,  icon: ToggleRight },
+  { value: 'messages',       label: 'Messages',           adminOnly: true,  icon: Broadcast },
+  { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
+  { value: 'logs',           label: 'Logs',               adminOnly: true,  icon: ClipboardText },
+  { value: 'roles',          label: 'Roles & Permissions',adminOnly: true,  icon: ShieldCheck },
+]
+
+const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
+const LS_KEY = 'admin-tab-order'
 
 function isValidTab(value: string | null): value is TabValue {
-  return ALL_TABS.includes(value as TabValue)
+  return ALL_TAB_VALUES.includes(value as TabValue)
 }
+
+/** Load persisted order from localStorage, filling in any new tabs at the end */
+function loadTabOrder(): TabValue[] {
+  if (typeof window === 'undefined') return ALL_TAB_VALUES
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return ALL_TAB_VALUES
+    const saved = JSON.parse(raw) as TabValue[]
+    // Keep only known values, then append any new ones not yet saved
+    const filtered = saved.filter((v) => isValidTab(v))
+    const missing = ALL_TAB_VALUES.filter((v) => !filtered.includes(v))
+    return [...filtered, ...missing]
+  } catch {
+    return ALL_TAB_VALUES
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function AdminDashboard() {
   const { user, profile, signOut, session } = useAuthContext()
@@ -40,15 +113,19 @@ export function AdminDashboard() {
   const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor'
 
-  // Tabs visible only to admin (not editor)
-  const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs', 'roles']
-
   const getInitialTab = useCallback((): TabValue => {
     const tabParam = searchParams.get('tab')
     return isValidTab(tabParam) ? tabParam : 'artists'
   }, [searchParams])
 
   const [activeTab, setActiveTab] = useState<TabValue>(getInitialTab)
+  const [tabOrder, setTabOrder] = useState<TabValue[]>(ALL_TAB_VALUES)
+  const [reorderMode, setReorderMode] = useState(false)
+
+  // Load persisted order after hydration
+  useEffect(() => {
+    setTabOrder(loadTabOrder())
+  }, [])
 
   // Sync tab from URL on mount and when search params change
   useEffect(() => {
@@ -82,6 +159,33 @@ export function AdminDashboard() {
     toast.success('Feature toggles saved')
   }
 
+  const canSeeTab = (tab: TabValue) => {
+    const def = TAB_DEFS.find((t) => t.value === tab)
+    if (!def) return false
+    if (isAdmin) return true
+    if (isEditor) return !def.adminOnly
+    return false
+  }
+
+  // Move a tab up or down in the order list
+  const moveTab = (value: TabValue, direction: 'up' | 'down') => {
+    setTabOrder((prev) => {
+      const idx = prev.indexOf(value)
+      if (idx === -1) return prev
+      const next = [...prev]
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= next.length) return prev
+      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+      localStorage.setItem(LS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleDoneReorder = () => {
+    setReorderMode(false)
+    toast.success('Tab order saved')
+  }
+
   // If editor tools feature is disabled, editors cannot access the admin
   if (isEditor && !siteSettings.featureToggles?.editorTools && !siteSettingsLoading) {
     return (
@@ -101,12 +205,10 @@ export function AdminDashboard() {
     )
   }
 
-  // Compute which tabs are available for this role
-  const canSeeTab = (tab: string) => {
-    if (isAdmin) return true
-    if (isEditor) return !adminOnlyTabs.includes(tab)
-    return false
-  }
+  // Ordered + filtered list of tabs visible to this user
+  const visibleTabs = tabOrder
+    .map((v) => TAB_DEFS.find((t) => t.value === v))
+    .filter((def): def is TabDef => !!def && canSeeTab(def.value))
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,91 +237,74 @@ export function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="artists" className="gap-2">
-              <User size={16} weight="bold" aria-hidden="true" />
-              Artists
-            </TabsTrigger>
-            <TabsTrigger value="releases" className="gap-2">
-              <MusicNotes size={16} weight="bold" aria-hidden="true" />
-              Releases
-            </TabsTrigger>
-            <TabsTrigger value="news" className="gap-2">
-              <Newspaper size={16} weight="bold" aria-hidden="true" />
-              News
-            </TabsTrigger>
-            <TabsTrigger value="videos" className="gap-2">
-              <VideoCamera size={16} weight="bold" aria-hidden="true" />
-              Videos
-            </TabsTrigger>
-            {canSeeTab('assets') && (
-              <TabsTrigger value="assets" className="gap-2">
-                <ImageIcon size={16} weight="bold" aria-hidden="true" />
-                Assets
-              </TabsTrigger>
+          {/* Tab bar + reorder controls */}
+          <div className="space-y-2">
+            {!reorderMode ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+                  {visibleTabs.map(({ value, label, icon: Icon }) => (
+                    <TabsTrigger key={value} value={value} className="gap-2">
+                      <Icon size={16} weight="bold" aria-hidden="true" />
+                      {label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setReorderMode(true)}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Reorder tabs"
+                  >
+                    <ArrowsDownUp size={16} className="mr-1" aria-hidden="true" />
+                    Reorder
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="border border-border rounded-lg p-3 space-y-1 bg-card">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-muted-foreground">Drag to reorder — use arrows to move tabs</p>
+                  <Button size="sm" variant="default" onClick={handleDoneReorder}>
+                    <CheckCircle size={16} className="mr-1" aria-hidden="true" />
+                    Done
+                  </Button>
+                </div>
+                {visibleTabs.map(({ value, label, icon: Icon }, idx) => (
+                  <div
+                    key={value}
+                    className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/50"
+                  >
+                    <Icon size={16} aria-hidden="true" className="text-muted-foreground shrink-0" />
+                    <span className="flex-1 text-sm">{label}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={idx === 0}
+                      onClick={() => moveTab(value, 'up')}
+                      aria-label={`Move ${label} up`}
+                    >
+                      <ArrowUp size={14} aria-hidden="true" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={idx === visibleTabs.length - 1}
+                      onClick={() => moveTab(value, 'down')}
+                      aria-label={`Move ${label} down`}
+                    >
+                      <ArrowDown size={14} aria-hidden="true" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
-            {canSeeTab('settings') && (
-              <TabsTrigger value="settings" className="gap-2">
-                <Gear size={16} weight="bold" aria-hidden="true" />
-                Settings
-              </TabsTrigger>
-            )}
-            {canSeeTab('health') && (
-              <TabsTrigger value="health" className="gap-2">
-                <Heartbeat size={16} weight="bold" aria-hidden="true" />
-                Health
-              </TabsTrigger>
-            )}
-            {canSeeTab('media') && (
-              <TabsTrigger value="media" className="gap-2">
-                <Broadcast size={16} weight="bold" aria-hidden="true" />
-                Media
-              </TabsTrigger>
-            )}
-            {canSeeTab('features') && (
-              <TabsTrigger value="features" className="gap-2">
-                <ToggleRight size={16} weight="bold" aria-hidden="true" />
-                Features
-              </TabsTrigger>
-            )}
-            {canSeeTab('users') && (
-              <TabsTrigger value="users" className="gap-2">
-                <Users size={16} weight="bold" aria-hidden="true" />
-                Users
-              </TabsTrigger>
-            )}
-            {canSeeTab('feature-flags') && (
-              <TabsTrigger value="feature-flags" className="gap-2">
-                <ToggleRight size={16} weight="bold" aria-hidden="true" />
-                Feature Flags
-              </TabsTrigger>
-            )}
-            {canSeeTab('messages') && (
-              <TabsTrigger value="messages" className="gap-2">
-                <Broadcast size={16} weight="bold" aria-hidden="true" />
-                Messages
-              </TabsTrigger>
-            )}
-            {canSeeTab('accreditations') && (
-              <TabsTrigger value="accreditations" className="gap-2">
-                <Newspaper size={16} weight="bold" aria-hidden="true" />
-                Accreditations
-              </TabsTrigger>
-            )}
-            {canSeeTab('logs') && (
-              <TabsTrigger value="logs" className="gap-2">
-                <ClipboardText size={16} weight="bold" aria-hidden="true" />
-                Logs
-              </TabsTrigger>
-            )}
-            {canSeeTab('roles') && (
-              <TabsTrigger value="roles" className="gap-2">
-                <ShieldCheck size={16} weight="bold" aria-hidden="true" />
-                Roles & Permissions
-              </TabsTrigger>
-            )}
-          </TabsList>
+          </div>
 
+          {/* Tab content panels */}
           <TabsContent value="artists" className="space-y-4">
             <Card>
               <CardHeader>
@@ -439,6 +524,7 @@ export function AdminDashboard() {
               </Card>
             </TabsContent>
           )}
+
           {canSeeTab('roles') && (
             <TabsContent value="roles" className="space-y-4">
               <Card>

@@ -5,12 +5,11 @@
  *
  * Admin interface for:
  *   1. Reviewing and approving/rejecting journalist applications
- *   2. Uploading press photos (EPK) via presigned PUT URL → Cloudflare R2
- *   3. Uploading promo tracks via presigned PUT URL → Cloudflare R2
+ *   2. Uploading press photos (EPK) via the /api/upload-epk server-side route
+ *   3. Uploading promo tracks via the /api/upload-epk server-side route
  *
- * Upload flow avoids Vercel's 4.5 MB body limit:
- *   Admin requests a presigned PUT URL via Server Action → fetches file
- *   directly from the browser to R2 → inserts metadata into Supabase.
+ * Upload flow routes files through Next.js to avoid the CORS restriction that
+ * prevented direct browser → r2.cloudflarestorage.com presigned uploads.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -29,7 +28,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { getEpkUploadUrl } from '@/actions/epkUpload'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getPressPhotos, createPressPhoto, deletePressPhoto } from '@/lib/api/pressPhotos'
 import { getPromoTracks, createPromoTrack, deletePromoTrack } from '@/lib/api/promoTracks'
@@ -126,17 +124,24 @@ export function JournalistManager() {
     if (!photoFile || !photoTitle) return
     setPhotoUploading(true)
     try {
-      const { url, r2Key, publicUrl } = await getEpkUploadUrl(
-        'press-photos',
-        photoFile.name,
-        photoFile.type,
-      )
-      const uploadRes = await fetch(url, {
-        method: 'PUT',
-        body: photoFile,
-        headers: { 'Content-Type': photoFile.type },
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const form = new FormData()
+      form.append('file', photoFile)
+      form.append('category', 'press-photos')
+
+      const uploadRes = await fetch('/api/upload-epk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
       })
-      if (!uploadRes.ok) throw new Error('R2 upload failed')
+      if (!uploadRes.ok) {
+        const err = (await uploadRes.json().catch(() => ({}) )) as { error?: string }
+        throw new Error(err.error ?? `Upload failed (${uploadRes.status})`)
+      }
+      const { r2Key, publicUrl } = (await uploadRes.json()) as { r2Key: string; publicUrl: string }
+
       await createPressPhoto(supabase, {
         title: photoTitle,
         alt_text: photoAlt || null,
@@ -148,8 +153,8 @@ export function JournalistManager() {
       setPhotoAlt('')
       setPhotoFile(null)
       fetchAll()
-    } catch {
-      toast.error('Upload failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setPhotoUploading(false)
     }
@@ -164,17 +169,24 @@ export function JournalistManager() {
     if (!trackFile || !trackTitle || !trackArtist) return
     setTrackUploading(true)
     try {
-      const { url, r2Key } = await getEpkUploadUrl(
-        'promo-tracks',
-        trackFile.name,
-        trackFile.type,
-      )
-      const uploadRes = await fetch(url, {
-        method: 'PUT',
-        body: trackFile,
-        headers: { 'Content-Type': trackFile.type },
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      const form = new FormData()
+      form.append('file', trackFile)
+      form.append('category', 'promo-tracks')
+
+      const uploadRes = await fetch('/api/upload-epk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
       })
-      if (!uploadRes.ok) throw new Error('R2 upload failed')
+      if (!uploadRes.ok) {
+        const err = (await uploadRes.json().catch(() => ({}) )) as { error?: string }
+        throw new Error(err.error ?? `Upload failed (${uploadRes.status})`)
+      }
+      const { r2Key } = (await uploadRes.json()) as { r2Key: string; publicUrl: string }
+
       await createPromoTrack(supabase, {
         title: trackTitle,
         artist_name: trackArtist,
@@ -186,8 +198,8 @@ export function JournalistManager() {
       setTrackArtist('')
       setTrackFile(null)
       fetchAll()
-    } catch {
-      toast.error('Upload failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setTrackUploading(false)
     }

@@ -1,0 +1,104 @@
+/**
+ * app/api/upload-epk/route.ts — Server-side EPK file upload
+ *
+ * POST /api/upload-epk
+ * Auth: ****** (admin only)
+ *
+ * Accepts press-photo and promo-track file uploads and stores them in
+ * Cloudflare R2 entirely server-side, avoiding the CORS restriction that
+ * prevents the browser from PUT-ing directly to the r2.cloudflarestorage.com
+ * endpoint via a presigned URL.
+ *
+ * Form fields:
+ *   file         — the binary file (required)
+ *   category     — "press-photos" | "promo-tracks" (required)
+ *
+ * Returns: { r2Key, publicUrl }
+ *
+ * Note: Vercel's serverless body limit is 4.5 MB on Hobby and 50 MB on Pro.
+ * For larger files, configure CLOUDFLARE_R2_CORS_ORIGINS in the Cloudflare
+ * dashboard instead (see DEPLOYMENT.md).
+ */
+
+import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { randomUUID } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { ApiError, withErrorHandler } from '@/lib/errors'
+import { createR2Client } from '@/lib/r2Utils'
+
+const ALLOWED_CATEGORIES = ['press-photos', 'promo-tracks'] as const
+type EpkCategory = (typeof ALLOWED_CATEGORIES)[number]
+
+function isAllowedCategory(v: string | null): v is EpkCategory {
+  return ALLOWED_CATEGORIES.includes(v as EpkCategory)
+}
+
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 1. Auth — admin only (EPK content is sensitive)
+  const token = extractBearerToken(request.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
+
+  // 2. Parse form data
+  let formData: FormData
+  try {
+    formData = await request.formData()
+  } catch {
+    throw new ApiError(400, 'Failed to parse form data')
+  }
+
+  const file = formData.get('file')
+  if (!(file instanceof File)) {
+    throw new ApiError(400, 'No file found in request')
+  }
+
+  const category = formData.get('category') as string | null
+  if (!isAllowedCategory(category)) {
+    throw new ApiError(400, `Invalid category. Must be one of: ${ALLOWED_CATEGORIES.join(', ')}`)
+  }
+
+  // 3. Read R2 config
+  const {
+    CLOUDFLARE_R2_ACCOUNT_ID,
+    CLOUDFLARE_R2_ACCESS_KEY_ID,
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    CLOUDFLARE_R2_BUCKET_NAME,
+    CLOUDFLARE_R2_PUBLIC_URL,
+  } = process.env
+
+  if (
+    !CLOUDFLARE_R2_ACCOUNT_ID ||
+    !CLOUDFLARE_R2_ACCESS_KEY_ID ||
+    !CLOUDFLARE_R2_SECRET_ACCESS_KEY ||
+    !CLOUDFLARE_R2_BUCKET_NAME ||
+    !CLOUDFLARE_R2_PUBLIC_URL
+  ) {
+    throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
+  }
+
+  // 4. Upload to R2 server-side
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const r2Key = `${category}/${randomUUID()}.${ext}`
+  const publicUrl = `${CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${r2Key}`
+  const mimeType = file.type || 'application/octet-stream'
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  const r2 = createR2Client(
+    CLOUDFLARE_R2_ACCOUNT_ID,
+    CLOUDFLARE_R2_ACCESS_KEY_ID,
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+      Key: r2Key,
+      Body: buffer,
+      ContentType: mimeType,
+      ContentLength: buffer.length,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
+  )
+
+  return NextResponse.json({ r2Key, publicUrl })
+})
