@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import {
@@ -368,10 +369,13 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
                     {tracks.map((track) => (
                       <li key={track.trackId}>
                         <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors">
-                          <img
+                          <Image
                             src={track.artworkUrl60}
                             alt={`${track.collectionName} cover`}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded shrink-0 object-cover"
+                            unoptimized
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{track.trackName}</p>

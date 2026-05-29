@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { getConsentState, setConsentState, type ConsentState } from '@/lib/consentState'
 
@@ -57,10 +58,12 @@ export function ConsentGate({
     <div className="relative w-full rounded-md overflow-hidden bg-muted aspect-video flex items-center justify-center">
       {/* Placeholder — R2 image if configured, else brand gradient */}
       {placeholderUrl ? (
-        <img
+        <Image
           src={placeholderUrl}
           alt={placeholderAlt}
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          fill
+          className="object-cover opacity-40"
+          unoptimized
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />

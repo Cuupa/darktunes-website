@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Image, MagnifyingGlass, MusicNotes } from '@phosphor-icons/react'
+import NextImage from 'next/image'
+import { Image as ImageIcon, MagnifyingGlass, MusicNotes } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -32,10 +33,10 @@ function AssetPickerCard({ asset, onSelect }: { asset: Asset; onSelect: (asset: 
       onClick={() => onSelect(asset)}
     >
       {isImageAsset(asset) ? (
-        <img src={asset.publicUrl} alt={`${asset.originalFilename} – asset preview`} className="h-28 w-full rounded-md object-cover" loading="lazy" decoding="async" />
+        <NextImage src={asset.publicUrl} alt={`${asset.originalFilename} – asset preview`} width={200} height={112} className="h-28 w-full rounded-md object-cover" unoptimized />
       ) : (
         <div className="flex h-28 items-center justify-center rounded-md border border-border bg-background/60">
-          {isAudioAsset(asset) ? <MusicNotes size={24} className="text-secondary" aria-hidden="true" /> : <Image size={24} className="text-muted-foreground" aria-hidden="true" />}
+          {isAudioAsset(asset) ? <MusicNotes size={24} className="text-secondary" aria-hidden="true" /> : <ImageIcon size={24} className="text-muted-foreground" aria-hidden="true" />}
         </div>
       )}
       <div className="space-y-1">

@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import {
   CheckCircle,
   XCircle,
@@ -321,11 +322,12 @@ export function JournalistManager() {
                   key={photo.id}
                   className="relative group rounded overflow-hidden border border-border"
                 >
-                  <img
+                  <Image
                     src={photo.publicUrl}
                     alt={photo.altText ?? photo.title}
-                    className="w-full aspect-square object-cover"
-                    loading="lazy"
+                    fill
+                    className="object-cover"
+                    unoptimized
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Button

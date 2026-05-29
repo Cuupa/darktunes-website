@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
+import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -60,14 +61,14 @@ function VideoCard({
         {!imgLoaded && (
           <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
         )}
-        <img
+        <Image
           src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
           alt={`${video.title} – video thumbnail`}
-          className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+          fill
+          className={`object-cover group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
           sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
-          loading="lazy"
-          decoding="async"
           onLoad={() => setImgLoaded(true)}
+          unoptimized
         />
         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
           <Button

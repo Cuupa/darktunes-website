@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -48,10 +49,12 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
           style={{ zIndex: 0 }}
           aria-hidden
         >
-          <img
+          <Image
             src={getOptimizedImageUrl(release.coverArt, 1200)}
             alt=""
-            className="w-full h-full object-cover opacity-20 blur-2xl scale-110"
+            fill
+            className="object-cover opacity-20 blur-2xl scale-110"
+            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
         </div>
@@ -71,10 +74,13 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
               layoutId={`release-cover-${release.id}`}
               className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
-              <img
+              <Image
                 src={getOptimizedImageUrl(release.coverArt, 600)}
                 alt={`${release.title} cover`}
+                width={480}
+                height={480}
                 className="w-full aspect-square object-cover"
+                unoptimized
               />
             </motion.div>
 

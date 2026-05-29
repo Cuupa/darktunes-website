@@ -21,6 +21,18 @@ const nextConfig: NextConfig = {
         hostname: 'is*.mzstatic.com',
         pathname: '/image/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'wsrv.nl',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
     ],
   },
   // Tailwind v4 + tw-animate-css use PostCSS features that require transpiling

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -90,10 +91,12 @@ export function ArtistDetailContent({
           style={{ zIndex: 0 }}
           aria-hidden
         >
-          <img
+          <Image
             src={getOptimizedImageUrl(artist.imageUrl, 1400)}
             alt=""
-            className="w-full h-full object-cover opacity-20 blur-2xl scale-110"
+            fill
+            className="object-cover opacity-20 blur-2xl scale-110"
+            unoptimized
             onError={(e) => {
               e.currentTarget.style.display = 'none'
             }}
@@ -119,10 +122,13 @@ export function ArtistDetailContent({
               className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               {getSquareThumbnail(artist.imageUrl, 600) ? (
-                <img
+                <Image
                   src={getSquareThumbnail(artist.imageUrl, 600)}
                   alt={`${artist.name} – artist photo`}
+                  width={480}
+                  height={480}
                   className="w-full aspect-square object-cover"
+                  unoptimized
                   onError={(e) => {
                     e.currentTarget.style.display = 'none'
                     const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
@@ -312,10 +318,12 @@ export function ArtistDetailContent({
                       onClick={() => openVideoModal(video)}
                       aria-label={`Play ${video.title}`}
                     >
-                      <img
+                      <Image
                         src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
                         alt={`${video.title} – video thumbnail`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        unoptimized
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
                         <div
@@ -389,10 +397,12 @@ export function ArtistDetailContent({
                   <Link href={`/releases/${release.id}`} aria-label={`${release.title} by ${release.artistName}`}>
                     <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
                       <div className="relative aspect-square overflow-hidden">
-                        <img
+                        <Image
                           src={getOptimizedImageUrl(release.coverArt, 400)}
                           alt={`${release.title} cover`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          unoptimized
                         />
                         <Badge
                           variant="outline"
@@ -437,12 +447,13 @@ export function ArtistDetailContent({
                     className="group flex gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
                   >
                     {post.imageUrl && (
-                      <img
+                      <Image
                         src={getOptimizedImageUrl(post.imageUrl, 120)}
                         alt={post.title}
+                        width={80}
+                        height={80}
                         className="w-20 h-20 object-cover rounded-lg shrink-0"
-                        loading="lazy"
-                        decoding="async"
+                        unoptimized
                       />
                     )}
                     <div className="min-w-0">

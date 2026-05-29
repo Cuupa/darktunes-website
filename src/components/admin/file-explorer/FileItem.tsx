@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import NextImage from 'next/image'
 import { File, MusicNotes, Tag } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -31,12 +32,13 @@ interface FileItemProps {
 function FilePreview({ asset }: { asset: Asset }) {
   if (isImageAsset(asset)) {
     return (
-      <img
+      <NextImage
         src={asset.publicUrl}
         alt={`${asset.originalFilename} preview`}
+        width={200}
+        height={64}
         className="h-16 w-full rounded-md border border-border object-cover"
-        loading="lazy"
-        decoding="async"
+        unoptimized
       />
     )
   }

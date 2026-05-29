@@ -5,6 +5,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getNewsPostBySlug } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
@@ -57,10 +58,13 @@ export default async function NewsDetailPage({ params }: Props) {
 
         {post.imageUrl && (
           <div className="relative aspect-video overflow-hidden rounded-lg mb-8">
-            <img
+            <Image
               src={post.imageUrl}
               alt={post.title}
-              className="w-full h-full object-cover"
+              fill
+              priority
+              className="object-cover"
+              unoptimized
             />
           </div>
         )}

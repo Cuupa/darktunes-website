@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useMemo, useDeferredValue } from 'react'
+import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -157,14 +158,14 @@ export function Artists({ artists, dict }: ArtistsProps) {
                 >
                   <div className="relative aspect-square overflow-hidden">
                     {thumbUrl ? (
-                      <img
+                      <Image
                         src={thumbUrl}
                         alt={`${artist.name} – artist photo`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
                         style={{ transformOrigin: 'center' }}
                         sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"
-                        loading="lazy"
-                        decoding="async"
+                        unoptimized
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                           const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null

@@ -134,6 +134,14 @@ All public-facing images MUST be served via `getOptimizedImageUrl(url, width)` o
 These functions proxy through wsrv.nl and output WebP format, preventing origin load.
 Use `getOptimizedImageUrl` for rectangular/banner images and `getSquareThumbnail` for cover art / profile photos.
 
+Next.js `<Image>` Component – ALWAYS use `<Image />` from `next/image` instead of bare `<img>` tags. Raw `<img>` causes the `@next/next/no-img-element` lint error and degrades LCP.
+- Images already proxied through wsrv.nl: add `unoptimized` so Next.js does not double-process them.
+- Images in position:relative containers: use `fill` prop (e.g. carousels, hero, thumbnails).
+- Logos and images with known natural dimensions: use `width` / `height` props + `style={{ width: 'auto' }}` CSS override to preserve aspect ratio.
+- Unknown dimensions at render time (e.g. markdown content): use `width={0} height={0} sizes="100vw" className="max-w-full h-auto" unoptimized`.
+- Priority images above the fold: add `priority` prop (equivalent to `fetchPriority="high" loading="eager"`).
+- Naming conflict with icon libraries (e.g. `@phosphor-icons/react` exports `Image`): import the icon as `ImageIcon` to avoid a clash with `import Image from 'next/image'`.
+
 Sync Service Pattern
 Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps` interface (db, fetch, uploadToR2).
 The HTTP handler in `app/api/sync-artist/route.ts` only wires deps and calls `syncArtist()`. Tests mock all deps.

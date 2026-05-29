@@ -8,6 +8,7 @@
  * Intentionally avoids the react-markdown dependency to keep the bundle lean.
  */
 
+import Image from 'next/image'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
 
 interface MarkdownContentProps {
@@ -73,13 +74,15 @@ function renderInlineParts(parts: TextPart[]): React.ReactNode[] {
         )
       case 'image':
         return (
-          <img
+          <Image
             key={i}
-            src={part.src}
+            src={part.src!}
             alt={part.alt ?? ''}
-            className="max-w-full rounded-lg my-2"
-            loading="lazy"
-            decoding="async"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="max-w-full h-auto rounded-lg my-2"
+            unoptimized
           />
         )
       default:

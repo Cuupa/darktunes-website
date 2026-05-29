@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -72,10 +73,14 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
             onClick={(e) => handleSmoothScroll(e, '#hero')}
             className="flex items-center flex-shrink-0"
           >
-            <img 
+            <Image 
               src={logoUrl || logoImage.src} 
               alt="darkTunes Music Group" 
+              width={200}
+              height={80}
               className={`w-auto transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
+              style={{ width: 'auto' }}
+              unoptimized
             />
           </motion.a>
 

@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Copy, Check, Download, CalendarBlank, Quotes } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -93,12 +94,15 @@ export function PressPageClient({ dict, photos, concerts, profile, artistName }:
                   key={photo.id}
                   className="group relative overflow-hidden rounded-lg border border-border bg-card"
                 >
-                  <img
-                    src={getOptimizedImageUrl(photo.publicUrl, 800)}
-                    alt={photo.altText ?? photo.title}
-                    className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                  />
+                  <div className="relative aspect-square overflow-hidden">
+                    <Image
+                      src={getOptimizedImageUrl(photo.publicUrl, 800)}
+                      alt={photo.altText ?? photo.title}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      unoptimized
+                    />
+                  </div>
                   <div className="p-3 flex items-center justify-between gap-2">
                     <span className="text-sm font-medium truncate">{photo.title}</span>
                     <a
