@@ -137,7 +137,7 @@ export async function deleteUser(adminClient: DbClient, userId: string): Promise
 
 /**
  * Sets `artists.user_id = userId` for the given artist.
- * Fails if the artist already has a different user linked (unique constraint).
+ * Conflict protection (artist already linked to another user) is handled by the route handler.
  */
 export async function linkArtistToUser(
   db: DbClient,
@@ -148,7 +148,6 @@ export async function linkArtistToUser(
     .from('artists')
     .update({ user_id: userId })
     .eq('id', artistId)
-    .is('user_id', null)
 
   if (error) throw new Error(error.message)
 }
