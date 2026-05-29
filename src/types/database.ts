@@ -489,6 +489,7 @@ export interface Database {
           artist_id: string | null
           tags: string[]
           sha256_hash: string | null
+          release_id: string | null
         }
         Insert: {
           id?: string
@@ -504,6 +505,7 @@ export interface Database {
           artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
+          release_id?: string | null
         }
         Update: {
           id?: string
@@ -519,6 +521,22 @@ export interface Database {
           artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
+          release_id?: string | null
+        }
+        Relationships: []
+      }
+      asset_artists: {
+        Row: {
+          asset_id: string
+          artist_id: string
+        }
+        Insert: {
+          asset_id: string
+          artist_id: string
+        }
+        Update: {
+          asset_id?: string
+          artist_id?: string
         }
         Relationships: []
       }

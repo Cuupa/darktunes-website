@@ -41,6 +41,8 @@ export interface UseFileExplorerState {
   updateAsset: (assetId: string, updates: {
     tags?: string[]
     artistId?: string | null
+    artistIds?: string[]
+    releaseId?: string | null
     folderId?: string | null
     originalFilename?: string
   }) => Promise<void>
@@ -76,6 +78,8 @@ function mapAsset(row: AssetRow): Asset {
     createdAt: row.created_at,
     folderId: row.folder_id ?? undefined,
     artistId: row.artist_id ?? undefined,
+    artistIds: [],
+    releaseId: row.release_id ?? undefined,
     tags: row.tags ?? [],
     sha256Hash: row.sha256_hash ?? undefined,
   }
@@ -345,6 +349,8 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
     updates: {
       tags?: string[]
       artistId?: string | null
+      artistIds?: string[]
+      releaseId?: string | null
       folderId?: string | null
       originalFilename?: string
     },
@@ -353,6 +359,8 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
     const body: Record<string, string | string[] | null> = {}
     if ('tags' in updates) body.tags = updates.tags ?? []
     if ('artistId' in updates) body.artistId = updates.artistId ?? null
+    if ('artistIds' in updates) body.artistIds = updates.artistIds ?? []
+    if ('releaseId' in updates) body.releaseId = updates.releaseId ?? null
     if ('folderId' in updates) body.folderId = updates.folderId ?? null
     if ('originalFilename' in updates) body.originalFilename = updates.originalFilename ?? ''
 

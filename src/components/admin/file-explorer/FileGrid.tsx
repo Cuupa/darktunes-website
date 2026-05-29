@@ -2,7 +2,7 @@
 
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { useRef, useState } from 'react'
-import type { Artist, Asset, AssetFolder } from '@/types'
+import type { Artist, Asset, AssetFolder, Release } from '@/types'
 import { FileItem } from './FileItem'
 import { FolderItem } from './FolderItem'
 
@@ -16,6 +16,7 @@ interface FileGridProps {
   assets: Asset[]
   allFolders: AssetFolder[]
   artists: Artist[]
+  releases: Release[]
   selectedIds: Set<string>
   renaming: RenamingState | null
   artistNames: Record<string, string>
@@ -35,8 +36,10 @@ interface FileGridProps {
   onAssetMove: (assetId: string, folderId: string | null) => void
   onAssetCopyUrl: (asset: Asset) => void
   onAssetDownload: (asset: Asset) => void
-  onAssetAssignArtist: (assetId: string, artistId: string | null) => void
+  onAssetAssignArtists: (assetId: string, artistIds: string[]) => void
+  onAssetAssignRelease: (assetId: string, releaseId: string | null) => void
   onAssetEditTags: (asset: Asset) => void
+  onAssetPreview: (asset: Asset) => void
 }
 
 export function FileGrid({
@@ -44,6 +47,7 @@ export function FileGrid({
   assets,
   allFolders,
   artists,
+  releases,
   selectedIds,
   renaming,
   artistNames,
@@ -63,8 +67,10 @@ export function FileGrid({
   onAssetMove,
   onAssetCopyUrl,
   onAssetDownload,
-  onAssetAssignArtist,
+  onAssetAssignArtists,
+  onAssetAssignRelease,
   onAssetEditTags,
+  onAssetPreview,
 }: FileGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const selectionRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -131,6 +137,7 @@ export function FileGrid({
             key={asset.id}
             asset={asset}
             artists={artists}
+            releases={releases}
             folders={allFolders}
             artistName={asset.artistId ? artistNames[asset.artistId] : undefined}
             viewMode="grid"
@@ -143,8 +150,10 @@ export function FileGrid({
             onMoveToFolder={(folderId) => onAssetMove(asset.id, folderId)}
             onCopyUrl={() => onAssetCopyUrl(asset)}
             onDownload={() => onAssetDownload(asset)}
-            onAssignArtist={(artistId) => onAssetAssignArtist(asset.id, artistId)}
+            onAssignArtists={(artistIds) => onAssetAssignArtists(asset.id, artistIds)}
+            onAssignRelease={(releaseId) => onAssetAssignRelease(asset.id, releaseId)}
             onEditTags={() => onAssetEditTags(asset)}
+            onPreview={() => onAssetPreview(asset)}
           />
         ))}
       </div>

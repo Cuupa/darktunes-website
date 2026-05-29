@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useArtists } from '@/hooks/useArtists'
 import { useFileExplorer } from '@/hooks/useFileExplorer'
+import { useReleases } from '@/hooks/useReleases'
 import { cn } from '@/lib/utils'
 import type { Asset } from '@/types'
 import { ExplorerBreadcrumb } from './ExplorerBreadcrumb'
@@ -13,6 +14,7 @@ import { ExplorerToolbar } from './ExplorerToolbar'
 import { FileGrid } from './FileGrid'
 import { FileList } from './FileList'
 import { FolderTree } from './FolderTree'
+import { AssetPreviewModal } from './AssetPreviewModal'
 import { UploadDropZone, type UploadDropZoneRef } from './UploadDropZone'
 
 interface RenamingState {
@@ -27,8 +29,10 @@ export function FileExplorer({ className }: { className?: string }) {
   const folderId = searchParams.get('folder') ?? null
   const explorer = useFileExplorer(folderId)
   const { artists } = useArtists()
+  const { releases } = useReleases()
   const uploadRef = useRef<UploadDropZoneRef>(null)
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
 
   const artistNames = useMemo(
     () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
@@ -54,7 +58,7 @@ export function FileExplorer({ className }: { className?: string }) {
     if (!name) return
     try {
       await explorer.createFolder(name, parentId, null)
-      toast.success(`Created folder “${name}”`)
+      toast.success(`Created folder "${name}"`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create folder')
     }
@@ -117,6 +121,24 @@ export function FileExplorer({ className }: { className?: string }) {
     }
   }, [explorer])
 
+  const handleAssignArtists = useCallback(async (assetId: string, artistIds: string[]) => {
+    try {
+      await explorer.updateAsset(assetId, { artistIds })
+      toast.success('Artists assigned')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Assign failed')
+    }
+  }, [explorer])
+
+  const handleAssignRelease = useCallback(async (assetId: string, releaseId: string | null) => {
+    try {
+      await explorer.updateAsset(assetId, { releaseId })
+      toast.success(releaseId ? 'Release assigned' : 'Release unlinked')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Assign failed')
+    }
+  }, [explorer])
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Delete' && explorer.selectedIds.size > 0) {
@@ -135,98 +157,83 @@ export function FileExplorer({ className }: { className?: string }) {
   const displayedFolders = explorer.searchQuery.trim() ? [] : explorer.folders
   const displayedAssets = explorer.searchQuery.trim() ? explorer.searchResults : explorer.assets
 
+  const sharedGridListProps = {
+    folders: displayedFolders,
+    assets: displayedAssets,
+    allFolders: explorer.allFolders,
+    artists,
+    releases: releases ?? [],
+    selectedIds: explorer.selectedIds,
+    renaming,
+    artistNames,
+    onSelectionReplace: replaceSelection,
+    onFolderSelect: (currentFolderId: string, multi: boolean) => explorer.toggleSelect(`folder:${currentFolderId}`, multi),
+    onFolderNavigate: navigate,
+    onFolderRenameStart: (currentFolderId: string) => setRenaming({ type: 'folder', id: currentFolderId }),
+    onFolderRenameCommit: (currentFolderId: string, name: string) => void renameFolder(currentFolderId, name),
+    onFolderDelete: (currentFolderId: string) => void explorer.deleteFolder(currentFolderId).then(() => toast.success('Folder deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed')),
+    onFolderCreate: (parentId: string | null) => void createFolder(parentId),
+    onFolderMove: (currentFolderId: string, parentId: string | null) => void explorer.moveFolder(currentFolderId, parentId).then(() => toast.success('Folder moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed')),
+    onFolderFilesDropped: (files: File[], currentFolderId: string) => void uploadRef.current?.uploadToFolder(files, currentFolderId),
+    onAssetSelect: (assetId: string, multi: boolean) => explorer.toggleSelect(assetId, multi),
+    onAssetRenameStart: (assetId: string) => setRenaming({ type: 'file', id: assetId }),
+    onAssetRenameCommit: (assetId: string, name: string) => void renameAsset(assetId, name),
+    onAssetDelete: (assetId: string) => void explorer.deleteAsset(assetId).then(() => toast.success('File deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed')),
+    onAssetMove: (assetId: string, currentFolderId: string | null) => void explorer.moveAsset(assetId, currentFolderId).then(() => toast.success('File moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed')),
+    onAssetCopyUrl: (asset: Asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied')),
+    onAssetDownload: (asset: Asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer'),
+    onAssetAssignArtists: (assetId: string, artistIds: string[]) => void handleAssignArtists(assetId, artistIds),
+    onAssetAssignRelease: (assetId: string, releaseId: string | null) => void handleAssignRelease(assetId, releaseId),
+    onAssetEditTags: (asset: Asset) => void handleAssetTags(asset),
+    onAssetPreview: (asset: Asset) => setPreviewAsset(asset),
+  }
+
   return (
-    <ResizablePanelGroup direction="horizontal" className={cn('h-[calc(100vh-10rem)] rounded-lg border border-border bg-background', className)}>
-      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-        <FolderTree
-          folders={explorer.allFolders}
-          currentFolderId={explorer.currentFolderId}
-          onNavigate={navigate}
-          onCreateRootFolder={() => void createFolder(null)}
-        />
-      </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={80}>
-        <div className="flex h-full flex-col">
-          <ExplorerToolbar
-            searchQuery={explorer.searchQuery}
-            onSearchChange={explorer.setSearchQuery}
-            viewMode={explorer.viewMode}
-            onViewModeChange={explorer.setViewMode}
-            sortField={explorer.sortField}
-            sortDir={explorer.sortDir}
-            onSortChange={explorer.setSort}
-            itemCount={displayedFolders.length + displayedAssets.length}
-            selectedCount={explorer.selectedIds.size}
-            onCreateFolder={() => void createFolder(explorer.currentFolderId)}
-            onDeleteSelected={() => void deleteSelected()}
-            onUpload={() => uploadRef.current?.openPicker()}
+    <>
+      <ResizablePanelGroup direction="horizontal" className={cn('h-[calc(100vh-10rem)] rounded-lg border border-border bg-background', className)}>
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+          <FolderTree
+            folders={explorer.allFolders}
+            currentFolderId={explorer.currentFolderId}
+            onNavigate={navigate}
+            onCreateRootFolder={() => void createFolder(null)}
           />
-          <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
-          <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
-            {explorer.viewMode === 'grid' ? (
-              <FileGrid
-                folders={displayedFolders}
-                assets={displayedAssets}
-                allFolders={explorer.allFolders}
-                artists={artists}
-                selectedIds={explorer.selectedIds}
-                renaming={renaming}
-                artistNames={artistNames}
-                onSelectionReplace={replaceSelection}
-                onFolderSelect={(currentFolderId, multi) => explorer.toggleSelect(`folder:${currentFolderId}`, multi)}
-                onFolderNavigate={navigate}
-                onFolderRenameStart={(currentFolderId) => setRenaming({ type: 'folder', id: currentFolderId })}
-                onFolderRenameCommit={(currentFolderId, name) => void renameFolder(currentFolderId, name)}
-                onFolderDelete={(currentFolderId) => void explorer.deleteFolder(currentFolderId).then(() => toast.success('Folder deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))}
-                onFolderCreate={(parentId) => void createFolder(parentId)}
-                onFolderMove={(currentFolderId, parentId) => void explorer.moveFolder(currentFolderId, parentId).then(() => toast.success('Folder moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))}
-                onFolderFilesDropped={(files, currentFolderId) => void uploadRef.current?.uploadToFolder(files, currentFolderId)}
-                onAssetSelect={(assetId, multi) => explorer.toggleSelect(assetId, multi)}
-                onAssetRenameStart={(assetId) => setRenaming({ type: 'file', id: assetId })}
-                onAssetRenameCommit={(assetId, name) => void renameAsset(assetId, name)}
-                onAssetDelete={(assetId) => void explorer.deleteAsset(assetId).then(() => toast.success('File deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))}
-                onAssetMove={(assetId, currentFolderId) => void explorer.moveAsset(assetId, currentFolderId).then(() => toast.success('File moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))}
-                onAssetCopyUrl={(asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied'))}
-                onAssetDownload={(asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer')}
-                onAssetAssignArtist={(assetId, artistId) => void explorer.updateAsset(assetId, { artistId }).then(() => toast.success('Artist assigned')).catch((error) => toast.error(error instanceof Error ? error.message : 'Assign failed'))}
-                onAssetEditTags={(asset) => void handleAssetTags(asset)}
-              />
-            ) : (
-              <FileList
-                folders={displayedFolders}
-                assets={displayedAssets}
-                allFolders={explorer.allFolders}
-                artists={artists}
-                selectedIds={explorer.selectedIds}
-                renaming={renaming}
-                sortField={explorer.sortField}
-                sortDir={explorer.sortDir}
-                artistNames={artistNames}
-                onSortChange={explorer.setSort}
-                onSelectionReplace={replaceSelection}
-                onFolderSelect={(currentFolderId, multi) => explorer.toggleSelect(`folder:${currentFolderId}`, multi)}
-                onFolderNavigate={navigate}
-                onFolderRenameStart={(currentFolderId) => setRenaming({ type: 'folder', id: currentFolderId })}
-                onFolderRenameCommit={(currentFolderId, name) => void renameFolder(currentFolderId, name)}
-                onFolderDelete={(currentFolderId) => void explorer.deleteFolder(currentFolderId).then(() => toast.success('Folder deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))}
-                onFolderCreate={(parentId) => void createFolder(parentId)}
-                onFolderMove={(currentFolderId, parentId) => void explorer.moveFolder(currentFolderId, parentId).then(() => toast.success('Folder moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))}
-                onFolderFilesDropped={(files, currentFolderId) => void uploadRef.current?.uploadToFolder(files, currentFolderId)}
-                onAssetSelect={(assetId, multi) => explorer.toggleSelect(assetId, multi)}
-                onAssetRenameStart={(assetId) => setRenaming({ type: 'file', id: assetId })}
-                onAssetRenameCommit={(assetId, name) => void renameAsset(assetId, name)}
-                onAssetDelete={(assetId) => void explorer.deleteAsset(assetId).then(() => toast.success('File deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))}
-                onAssetMove={(assetId, currentFolderId) => void explorer.moveAsset(assetId, currentFolderId).then(() => toast.success('File moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))}
-                onAssetCopyUrl={(asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied'))}
-                onAssetDownload={(asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer')}
-                onAssetAssignArtist={(assetId, artistId) => void explorer.updateAsset(assetId, { artistId }).then(() => toast.success('Artist assigned')).catch((error) => toast.error(error instanceof Error ? error.message : 'Assign failed'))}
-                onAssetEditTags={(asset) => void handleAssetTags(asset)}
-              />
-            )}
-          </UploadDropZone>
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={80}>
+          <div className="flex h-full flex-col">
+            <ExplorerToolbar
+              searchQuery={explorer.searchQuery}
+              onSearchChange={explorer.setSearchQuery}
+              viewMode={explorer.viewMode}
+              onViewModeChange={explorer.setViewMode}
+              sortField={explorer.sortField}
+              sortDir={explorer.sortDir}
+              onSortChange={explorer.setSort}
+              itemCount={displayedFolders.length + displayedAssets.length}
+              selectedCount={explorer.selectedIds.size}
+              onCreateFolder={() => void createFolder(explorer.currentFolderId)}
+              onDeleteSelected={() => void deleteSelected()}
+              onUpload={() => uploadRef.current?.openPicker()}
+            />
+            <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+            <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
+              {explorer.viewMode === 'grid' ? (
+                <FileGrid {...sharedGridListProps} />
+              ) : (
+                <FileList
+                  {...sharedGridListProps}
+                  sortField={explorer.sortField}
+                  sortDir={explorer.sortDir}
+                  onSortChange={explorer.setSort}
+                />
+              )}
+            </UploadDropZone>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
+      <AssetPreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+    </>
   )
 }
