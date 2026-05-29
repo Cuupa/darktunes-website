@@ -108,11 +108,25 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       .upsert(rows, { onConflict: 'youtube_id', ignoreDuplicates: false })
     if (error) throw new ApiError(500, `DB upsert failed: ${error.message}`)
 
+    // Write a sync_log entry so the health dashboard reflects the last YouTube sync time
+    await db.from('sync_logs').insert({
+      artist_id: null,
+      status: 'success',
+      message: null,
+      releases_synced: videos.length,
+      errors: [],
+      api_source: 'youtube',
+      rate_limited: false,
+    })
+
     revalidateTag('videos')
     return NextResponse.json({ synced: videos.length })
   }
 
-  // 5. All other APIs — require R2 config
+  // APIs that do not require R2 (no image uploads): odesli, songkick, bandsintown
+  const NO_R2_APIS = new Set(['odesli', 'songkick', 'bandsintown'])
+
+  // 5. APIs that need R2 — enforce R2 config, or skip for no-upload APIs
   const {
     CLOUDFLARE_R2_ACCOUNT_ID,
     CLOUDFLARE_R2_ACCESS_KEY_ID,
@@ -133,19 +147,33 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     !CLOUDFLARE_R2_BUCKET_NAME ||
     !CLOUDFLARE_R2_PUBLIC_URL
   ) {
-    throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
+    if (!NO_R2_APIS.has(apiSource ?? '')) {
+      throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
+    }
   }
 
   const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
-  const s3 = createR2Client(
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-  )
-
-  const uploadFn = (imageUrl: string, keyPrefix: string) =>
-    uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
+  const uploadFn: (imageUrl: string, keyPrefix: string) => Promise<string> =
+    CLOUDFLARE_R2_ACCOUNT_ID &&
+    CLOUDFLARE_R2_ACCESS_KEY_ID &&
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY &&
+    CLOUDFLARE_R2_BUCKET_NAME &&
+    CLOUDFLARE_R2_PUBLIC_URL
+      ? (imageUrl, keyPrefix) =>
+          uploadUrlToR2(
+            imageUrl,
+            createR2Client(
+              CLOUDFLARE_R2_ACCOUNT_ID,
+              CLOUDFLARE_R2_ACCESS_KEY_ID,
+              CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+            ),
+            CLOUDFLARE_R2_BUCKET_NAME,
+            CLOUDFLARE_R2_PUBLIC_URL,
+            keyPrefix,
+          )
+      : // No R2 configured — only safe for APIs that never upload images
+        async (_imageUrl: string) => _imageUrl
 
   const result = await syncAll({
     db,

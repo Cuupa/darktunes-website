@@ -7,9 +7,10 @@
  *
  * Auth strategy:
  *   - Any request to /admin/* (except /admin/login) requires a valid
- *     Supabase session cookie.
+ *     Supabase session cookie AND a role of 'admin' or 'editor'.
  *   - If no session is found, redirect to /admin/login.
- *   - If a session exists and the user visits /admin/login, redirect to /admin.
+ *   - If a session exists but the role is insufficient, redirect to /admin/login?error=unauthorized.
+ *   - If a session with sufficient role exists and the user visits /admin/login, redirect to /admin.
  *
  * The middleware also refreshes the Supabase session cookie on every request
  * so tokens stay alive for active users.
@@ -17,6 +18,8 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+
+const ADMIN_ROLES = new Set(['admin', 'editor'])
 
 export async function middleware(request: NextRequest) {
   // Guard: if Supabase env vars are missing, skip auth checks.
@@ -63,6 +66,8 @@ export async function middleware(request: NextRequest) {
   const isPressLoginPage = pathname === '/press/login'
   const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
 
+  // --- Admin route protection ---
+
   // Redirect unauthenticated users away from protected admin routes
   if (isAdminRoute && !isAdminLoginPage && !user) {
     const loginUrl = request.nextUrl.clone()
@@ -70,12 +75,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Redirect already-authenticated users away from login page
-  if (isAdminLoginPage && user) {
-    const adminUrl = request.nextUrl.clone()
-    adminUrl.pathname = '/admin'
-    return NextResponse.redirect(adminUrl)
+  // For authenticated users on admin routes (or the login page), fetch the role
+  if (isAdminRoute && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
+
+    if (isAdminLoginPage) {
+      // Redirect users WITH admin access away from the login page
+      if (hasAdminAccess) {
+        const adminUrl = request.nextUrl.clone()
+        adminUrl.pathname = '/admin'
+        return NextResponse.redirect(adminUrl)
+      }
+      // Users without admin access may stay on the login page (already rejected above via no-session path)
+    } else {
+      // Protect all other /admin/* routes — deny non-admin/editor roles
+      if (!hasAdminAccess) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/admin/login'
+        loginUrl.searchParams.set('error', 'unauthorized')
+        return NextResponse.redirect(loginUrl)
+      }
+    }
   }
+
+  // --- Portal route protection ---
 
   // Redirect unauthenticated users away from the artist portal
   if (isPortalRoute && !isPortalLoginPage && !user) {
@@ -85,23 +114,48 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPortalRoute && !isPortalLoginPage && user) {
-    const { data: linkedArtist } = await supabase
-      .from('artists')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .maybeSingle()
 
-    if (!linkedArtist) {
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/portal/login'
-      loginUrl.searchParams.set('error', 'no_artist')
-      return NextResponse.redirect(loginUrl)
+    // Admins can access the portal without a linked artist
+    const isAdmin = profile?.role === 'admin'
+
+    if (!isAdmin) {
+      const { data: linkedArtist } = await supabase
+        .from('artists')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (!linkedArtist) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/portal/login'
+        loginUrl.searchParams.set('error', 'no_artist')
+        return NextResponse.redirect(loginUrl)
+      }
     }
   }
 
   // Redirect already-authenticated portal users away from the login page
   if (isPortalLoginPage && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const isAdmin = profile?.role === 'admin'
+
+    if (isAdmin) {
+      const portalUrl = request.nextUrl.clone()
+      portalUrl.pathname = '/portal'
+      return NextResponse.redirect(portalUrl)
+    }
+
     const { data: linkedArtist } = await supabase
       .from('artists')
       .select('id')
@@ -190,3 +244,4 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
+

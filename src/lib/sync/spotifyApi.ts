@@ -117,9 +117,11 @@ export async function fetchSpotifyArtistReleases(
   const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
   const artistId = extractSpotifyId(spotifyArtistId)
 
-  // URLSearchParams encodes commas as %2C; Spotify requires literal commas in
-  // include_groups, so we build the query string manually to avoid 400 errors.
-  const url = `https://api.spotify.com/v1/artists/${artistId}/albums?limit=50&include_groups=album,single,compilation`
+  const params = new URLSearchParams({
+    limit: '50',
+    include_groups: 'album,single,compilation',
+  })
+  const url = `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums?${params.toString()}`
 
   const response = await fetchFn(url, {
     headers: { Authorization: `Bearer ${token}` },
