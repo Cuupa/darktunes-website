@@ -438,7 +438,7 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">News</h2>
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.news}</h2>
             <ul className="space-y-4 list-none max-w-3xl">
               {news.map((post) => (
                 <li key={post.id}>

@@ -41,7 +41,8 @@ WHERE slug = 'artist-slug';
 - **Releases Management**: Manage music releases with iTunes API integration
 - **News Management**: Create and publish news posts and announcements
 - **Feature Flags (admin-only)**: New **Feature Flags** tab to toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`)
-- **Messages (admin-only)**: New **Messages** tab to send label messages to artists (`label_messages`)
+- **Admin Dashboard**: Tab state is persisted to the URL as a `?tab=` query param — tabs are bookmarkable and support browser back/forward navigation
+- **Messages (admin-only)**: New **Messages** tab to send label messages to artists (`label_messages`); supports multi-select and bulk delete of messages
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.
@@ -95,6 +96,7 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Schedule or publish immediately
 - Edit or delete existing posts
 - Toggle **Press-only** visibility (`is_press_only`) for journalist dashboard content
+- Optionally associate a news post with a specific **artist** — that post then appears on the artist's public profile page in addition to the main news feed
 
 ### Journalist Dashboard
 - Login at `/press/login`

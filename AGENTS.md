@@ -97,9 +97,9 @@ app/releases/[id]/page.tsx — Data API Waterfall:
 app/artists/[slug]/page.tsx — Data API Waterfall:
   1. URL segment `slug` → artist slug
   2. `getArtistBySlug(client, slug)` → Stage 1 direct slug match; Stage 2 fallback scans rows with NULL/empty slug and matches the mapper-generated slug from artist name (RLS: anon sees visible artists)
-  3. `getReleasesByArtistId` + `getConcertsByArtistId` + `getVideosByArtistId` → three parallel queries using the resolved artist.id
+  3. `getReleasesByArtistId` + `getConcertsByArtistId` + `getVideosByArtistId` + `getPublicNewsPostsByArtistId` → four parallel queries using the resolved artist.id (news capped at 3 most recent)
   4. `getDictionary(locale)` → locale resolution
-  Steps 2+3+4 run concurrently after step 1 resolves. Cookie-free public client used inside unstable_cache (revalidate: 60, tags: artists/releases/concerts/videos).
+  Steps 2+3+4 run concurrently after step 1 resolves. Cookie-free public client used with route-segment `revalidate = 60` (ISR) and `dynamicParams = true`.
 
 Inversion of Control (IoC) & Component Contracts
 Props Over State: UI components MUST receive all data and callbacks as props — they must not directly access global state, context, or external stores.

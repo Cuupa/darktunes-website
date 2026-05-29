@@ -125,7 +125,8 @@
     "since": "Since",
     "latestVideo": "Latest Video",
     "getTickets": "Tickets",
-    "fullProfile": "Full Profile →"
+    "fullProfile": "Full Profile →",
+    "news": "News"
   },
   "pages": {
     "backToHome": "← Back to home"
