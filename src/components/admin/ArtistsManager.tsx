@@ -477,7 +477,7 @@ export function ArtistsManager() {
           <DialogHeader>
             <DialogTitle>New Artist</DialogTitle>
           </DialogHeader>
-          <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} />
+          <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} artistId={editingArtist?.id} />
         </DialogContent>
       </Dialog>
 

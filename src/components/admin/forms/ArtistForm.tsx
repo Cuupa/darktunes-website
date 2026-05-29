@@ -19,8 +19,10 @@ import {
   Briefcase,
   Database,
   FloppyDisk,
+  Image,
 } from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
+import { AssetPicker } from '../file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
 
 /** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
@@ -102,7 +104,10 @@ function IndeterminateBar() {
   )
 }
 
-type Props = AdminPanelProps<ArtistFormData> & { mode?: ArtistFormMode }
+type Props = AdminPanelProps<ArtistFormData> & {
+  mode?: ArtistFormMode
+  artistId?: string
+}
 type PrefillItunesResponse = {
   name: string
   genres: string[]
@@ -110,7 +115,7 @@ type PrefillItunesResponse = {
   appleMusicUrl: string
 }
 
-export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props) {
+export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistId }: Props) {
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset, getValues } = useForm<ArtistFormData>({
     defaultValues: value,
@@ -119,6 +124,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
   const [isPrefillingSpotify, setIsPrefillingSpotify] = useState(false)
   const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
+  const [assetPickerTarget, setAssetPickerTarget] = useState<'imageUrl' | 'logoUrl' | null>(null)
 
   const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs
 
@@ -327,6 +333,10 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
             <InstagramLogo size={14} aria-hidden="true" />
             Social Media
           </TabsTrigger>
+          <TabsTrigger value="assets" className="gap-1.5">
+            <Image size={14} aria-hidden="true" />
+            Assets
+          </TabsTrigger>
           {mode === 'admin' && (
             <TabsTrigger value="business" className="gap-1.5">
               <Briefcase size={14} aria-hidden="true" />
@@ -402,6 +412,9 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
               <Label htmlFor="imageUrl">Image URL</Label>
               <div className="flex gap-2 items-start">
                 <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('imageUrl')}>
+                  Open Asset Picker
+                </Button>
                 <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} />
                 {mode === 'admin' && (
                   <Button
@@ -425,6 +438,9 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
               </Label>
               <div className="flex gap-2 items-start">
                 <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} className="flex-1" />
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('logoUrl')}>
+                  Open Asset Picker
+                </Button>
                 <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} />
               </div>
             </div>
@@ -568,6 +584,39 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
           </div>
         </TabsContent>
 
+        <TabsContent value="assets" className="space-y-4 mt-0">
+          <div className="rounded-lg border border-border bg-card/40 p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Asset Library</h3>
+            <p className="text-sm text-muted-foreground">
+              Pick existing files from the asset manager for the artist photo or logo. The picker is filtered to the current artist when available.
+            </p>
+            {!artistId ? (
+              <p className="text-xs text-muted-foreground">
+                Save the artist first to filter assets by ownership. You can still use the field-level asset picker above.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('imageUrl')}>
+                  Pick Artist Image
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('logoUrl')}>
+                  Pick Logo / Wordmark
+                </Button>
+              </div>
+            )}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-md border border-border p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current image</p>
+                <p className="mt-2 break-all text-sm">{watch('imageUrl') || 'No image selected yet.'}</p>
+              </div>
+              <div className="rounded-md border border-border p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current logo</p>
+                <p className="mt-2 break-all text-sm">{watch('logoUrl') || 'No logo selected yet.'}</p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
         {/* ── Tab 4: Business (admin only) ─────────────────────────────── */}
         {mode === 'admin' && (
           <TabsContent value="business" className="space-y-4 mt-0">
@@ -666,6 +715,18 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin' }: Props
           </TabsContent>
         )}
       </Tabs>
+
+      <AssetPicker
+        open={assetPickerTarget !== null}
+        onClose={() => setAssetPickerTarget(null)}
+        mimeTypeFilter="image/"
+        artistId={artistId}
+        onSelect={(asset) => {
+          if (!assetPickerTarget) return
+          setValue(assetPickerTarget, asset.publicUrl)
+          toast.success('Asset selected')
+        }}
+      />
 
       <div className="flex justify-end pt-2 border-t border-border">
         <Button type="submit" disabled={isLoading} className="gap-2 min-w-32">

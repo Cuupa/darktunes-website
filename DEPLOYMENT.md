@@ -122,10 +122,11 @@ File uploads are handled server-side at Next.js Route Handlers (`app/api/upload/
 This eliminates CORS issues that arise from client-side direct uploads. No Supabase Edge Functions are needed for uploads.
 
 The Route Handler:
-1. Verifies the Bearer token via the Supabase service-role key
-2. Parses the multipart `FormData` on the server
-3. Uploads the file to R2 using the AWS SDK v3
-4. Returns the public CDN URL
+1. Verifies the Bearer token and requires an `admin` or `editor` role
+2. Parses multipart `FormData` on the server (including optional `folderId` / `artistId` metadata)
+3. Computes a SHA-256 hash and short-circuits duplicate uploads to the existing asset record
+4. Uploads new files to R2 using the AWS SDK v3
+5. Creates the `assets` table row server-side and returns the stored asset metadata plus public CDN URL
 
 ---
 
@@ -169,8 +170,8 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 - `CRON_SECRET`: Optional Bearer token for Vercel cron calls to `POST /api/sync-youtube`. If set, cron requests must send `Authorization: Bearer <CRON_SECRET>`.
 
 ### Newsletter Double Opt-In (optional — confirmation email delivery)
-The following vars are consumed by the **Supabase Edge Function** (`newsletter-confirm`), NOT by the Next.js app. Set them as Edge Function secrets in Supabase Dashboard → Edge Functions → Secrets.
-- `RESEND_API_KEY`: API key from https://resend.com — used to send DOI confirmation emails.
+These variables are shared between the **Supabase Edge Function** (`newsletter-confirm`) and the Next.js app. Configure `RESEND_*` both as Supabase Edge Function secrets (for DOI emails) and in Vercel when you want the contact form Route Handler to send mail.
+- `RESEND_API_KEY`: API key from https://resend.com — used to send DOI confirmation emails and contact-form emails.
 - `RESEND_FROM_EMAIL`: Verified sender address, e.g. `noreply@darktunes.com`. Must be a domain verified in Resend.
 - `NEXT_PUBLIC_SITE_URL`: The public site URL without trailing slash (e.g. `https://darktunes.com`) — used to build the confirmation link inside the email. Also set this as a Vercel env var (with the `NEXT_PUBLIC_` prefix) so the confirmation page can be rendered.
 

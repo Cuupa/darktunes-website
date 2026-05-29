@@ -367,9 +367,33 @@ CREATE TABLE IF NOT EXISTS public.assets (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ---------------------------------------------------------------------------
+-- TABLE: asset_folders
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.asset_folders (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  parent_id   UUID REFERENCES public.asset_folders(id) ON DELETE CASCADE,
+  artist_id   UUID REFERENCES public.artists(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_asset_folders_parent_id ON public.asset_folders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_asset_folders_artist_id ON public.asset_folders(artist_id);
+
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS folder_id UUID REFERENCES public.asset_folders(id) ON DELETE SET NULL;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists(id) ON DELETE SET NULL;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS sha256_hash TEXT;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS original_filename TEXT NOT NULL DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_assets_uploaded_by ON public.assets (uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_assets_mime_type   ON public.assets (mime_type);
 CREATE INDEX IF NOT EXISTS idx_assets_created_at  ON public.assets (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
+CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
+CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: site_settings  (CMS key-value store)
@@ -872,6 +896,7 @@ CREATE POLICY "videos: admin delete" ON public.videos
 DROP POLICY IF EXISTS "assets: authenticated read" ON public.assets;
 DROP POLICY IF EXISTS "assets: editor+ insert"     ON public.assets;
 DROP POLICY IF EXISTS "assets: admin delete"       ON public.assets;
+DROP POLICY IF EXISTS "assets: editor+ update"     ON public.assets;
 
 CREATE POLICY "assets: authenticated read" ON public.assets
   FOR SELECT USING (auth.role() = 'authenticated');
@@ -879,8 +904,28 @@ CREATE POLICY "assets: authenticated read" ON public.assets
 CREATE POLICY "assets: editor+ insert" ON public.assets
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+CREATE POLICY "assets: editor+ update" ON public.assets
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
 CREATE POLICY "assets: admin delete" ON public.assets
   FOR DELETE USING (public.get_my_role() = 'admin');
+
+ALTER TABLE public.asset_folders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "asset_folders: authenticated read" ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: editor+ write"     ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: admin delete"      ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: editor+ update"    ON public.asset_folders;
+CREATE POLICY "asset_folders: authenticated read" ON public.asset_folders FOR SELECT TO authenticated USING (true);
+CREATE POLICY "asset_folders: editor+ write"      ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
+CREATE POLICY "asset_folders: admin delete"       ON public.asset_folders FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "asset_folders: editor+ update"     ON public.asset_folders FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
 
 -- ---------------------------------------------------------------------------
 -- RLS: site_settings
