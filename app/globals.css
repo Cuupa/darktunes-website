@@ -21,7 +21,7 @@
   h1,
   h2,
   h3 {
-    font-family: 'Oxanium', sans-serif;
+    font-family: var(--font-sans), sans-serif;
   }
 }
 
@@ -48,9 +48,6 @@
   --ring: #493687;
   --radius: 0.25rem;
   --spacing: 0.25rem;
-  --font-sans: Oxanium;
-  --font-serif: Roboto Slab;
-  --font-mono: JetBrains Mono;
   --z-global-fx: 9996;
 }
 

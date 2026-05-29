@@ -187,6 +187,7 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
             >
               {/* Hidden canvas for crop rendering */}
               <canvas ref={canvasRef} className="hidden" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- canvas crop requires naturalWidth/naturalHeight from the raw img element */}
               <img
                 ref={imgRef}
                 src={asset.publicUrl}

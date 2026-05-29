@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { Providers } from './_components/Providers'
@@ -7,6 +8,27 @@ import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { unstable_cache } from 'next/cache'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import './globals.css'
+
+const oxanium = Oxanium({
+  subsets: ['latin'],
+  weight: ['200', '300', '400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const robotoSlab = Roboto_Slab({
+  subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  variable: '--font-serif',
+  display: 'swap',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
+  variable: '--font-mono',
+  display: 'swap',
+})
 
 /**
  * Cookie-free Supabase client — safe to use inside unstable_cache.
@@ -69,14 +91,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const settings = await getCachedSiteSettings().catch(() => null)
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Roboto+Slab:wght@100..900&family=JetBrains+Mono:wght@100..800&display=fallback"
-          rel="stylesheet"
-        />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         {/* PWA meta — prevents white flash and styles the status bar */}
         <meta name="theme-color" content="#101010" />
