@@ -41,6 +41,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
     { label: dict.news, href: '/news', isLink: true },
     { label: dict.videos, href: '#videos' },
     { label: dict.contact, href: '/contact', isLink: true },
+    { label: dict.shop, href: 'https://darkmerch.com/', isLink: true, external: true },
   ]
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
@@ -93,7 +94,11 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
                 className="text-sm font-medium tracking-wider transition-colors"
               >
                 {item.isLink ? (
-                  <Link href={item.href}>{item.label}</Link>
+                  item.external ? (
+                    <a href={item.href} target="_blank" rel="noopener noreferrer">{item.label}</a>
+                  ) : (
+                    <Link href={item.href}>{item.label}</Link>
+                  )
                 ) : (
                   <a href={item.href} onClick={(e) => handleSmoothScroll(e, item.href)}>{item.label}</a>
                 )}
@@ -145,7 +150,11 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
                     asChild
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Link href={item.href}>{item.label}</Link>
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer">{item.label}</a>
+                    ) : (
+                      <Link href={item.href}>{item.label}</Link>
+                    )}
                   </Button>
                 ) : (
                   <Button

@@ -403,6 +403,7 @@ export interface Database {
           published_at: string
           created_at: string
           updated_at: string
+          artist_id: string | null
         }
         Insert: {
           id?: string
@@ -416,6 +417,7 @@ export interface Database {
           published_at?: string
           created_at?: string
           updated_at?: string
+          artist_id?: string | null
         }
         Update: {
           id?: string
@@ -429,6 +431,7 @@ export interface Database {
           published_at?: string
           created_at?: string
           updated_at?: string
+          artist_id?: string | null
         }
         Relationships: []
       }

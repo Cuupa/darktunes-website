@@ -28,6 +28,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     scheduledAt: '',
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
+    artistId: post.artistId ?? '',
   }
 }
 
@@ -55,6 +56,7 @@ export default function NewsEditPage() {
         published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : new Date().toISOString(),
         is_press_only: data.isPressOnly,
         status: data.status,
+        artist_id: data.artistId || null,
       })
       toast.success('News post saved')
       router.push('/admin?tab=news')

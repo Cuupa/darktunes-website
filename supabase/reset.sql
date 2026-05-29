@@ -375,10 +375,12 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
 );
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_news_posts_status       ON public.news_posts (status);
+CREATE INDEX IF NOT EXISTS idx_news_posts_artist_id    ON public.news_posts (artist_id);
 
 DROP TRIGGER IF EXISTS trg_news_posts_updated_at ON public.news_posts;
 CREATE TRIGGER trg_news_posts_updated_at

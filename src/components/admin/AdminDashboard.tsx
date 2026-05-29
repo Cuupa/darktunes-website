@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,9 +24,17 @@ import { LogsManager } from './LogsManager'
 import { RolesManager } from './RolesManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
+const ALL_TABS = ['artists', 'releases', 'news', 'videos', 'assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs', 'roles'] as const
+type TabValue = typeof ALL_TABS[number]
+
+function isValidTab(value: string | null): value is TabValue {
+  return ALL_TABS.includes(value as TabValue)
+}
+
 export function AdminDashboard() {
   const { user, profile, signOut, session } = useAuthContext()
-  const [activeTab, setActiveTab] = useState('artists')
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { settings: siteSettings, isLoading: siteSettingsLoading, saveSettings } = useSiteSettings()
 
   const isAdmin = profile?.role === 'admin'
@@ -33,6 +42,31 @@ export function AdminDashboard() {
 
   // Tabs visible only to admin (not editor)
   const adminOnlyTabs = ['assets', 'settings', 'health', 'media', 'users', 'features', 'feature-flags', 'messages', 'accreditations', 'logs', 'roles']
+
+  const getInitialTab = useCallback((): TabValue => {
+    const tabParam = searchParams.get('tab')
+    return isValidTab(tabParam) ? tabParam : 'artists'
+  }, [searchParams])
+
+  const [activeTab, setActiveTab] = useState<TabValue>(getInitialTab)
+
+  // Sync tab from URL on mount and when search params change
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (isValidTab(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+    // intentionally exclude activeTab to avoid loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  const handleTabChange = useCallback((value: string) => {
+    const tab = value as TabValue
+    setActiveTab(tab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [router, searchParams])
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -100,7 +134,7 @@ export function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="artists" className="gap-2">
               <User size={16} weight="bold" aria-hidden="true" />

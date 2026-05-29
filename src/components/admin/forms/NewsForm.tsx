@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { getArtists } from '@/lib/api/artists'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +29,7 @@ export interface NewsFormData {
   scheduledAt: string
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
+  artistId: string
 }
 
 function toSlug(text: string): string {
@@ -45,11 +48,19 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
   })
 
   const [htmlContent, setHtmlContent] = useState(value?.content ?? '')
+  const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
     reset(value)
     setHtmlContent(value?.content ?? '')
   }, [value, reset])
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    getArtists(supabase).then((rows) =>
+      setArtists(rows.map((a) => ({ id: a.id, name: a.name })))
+    ).catch(() => {})
+  }, [])
 
   const title = watch('title')
   const slugValue = watch('slug')
@@ -96,6 +107,37 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           disabled={isLoading}
           placeholder="Write your news post here…"
         />
+      </div>
+
+      {/* Artist association */}
+      <div className="space-y-1">
+        <Label htmlFor="artistId">Artist (optional)</Label>
+        <Controller
+          name="artistId"
+          control={control}
+          render={({ field }) => (
+            <Select
+              value={field.value ?? ''}
+              onValueChange={(val) => field.onChange(val === '__none__' ? '' : val)}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="artistId">
+                <SelectValue placeholder="General news (not tied to an artist)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">General news (no artist)</SelectItem>
+                {artists.map((artist) => (
+                  <SelectItem key={artist.id} value={artist.id}>
+                    {artist.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        <p className="text-xs text-muted-foreground">
+          If selected, this news post appears only on that artist&apos;s profile page.
+        </p>
       </div>
 
       {/* Status + scheduling */}
