@@ -5,10 +5,10 @@ import useEmblaCarousel from 'embla-carousel-react'
 import type { EmblaCarouselType } from 'embla-carousel'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
-import { ReleasePreviewModal } from '@/components/ReleasePreviewModal'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -150,13 +150,14 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  *   → flex container → slide outer div → slide inner div.  Any gap in this
  *   chain would flatten the 3D context and eliminate the trapez perspective.
  */
-export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, consentDict }: ReleasesCoverflowProps) {
+export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, consentDict: _consentDict }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
 
-  const [previewRelease, setPreviewRelease] = useState<Release | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
+  // Track whether the user just performed a drag gesture so we can suppress
+  // the synthetic click that Embla/pointer fires after a swipe.
+  const isDragging = useRef(false)
 
   // Pre-compute all date strings once — avoids repeated toLocaleDateString() on every swipe
   const formattedDates = useMemo(
@@ -267,6 +268,22 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
     tweenSlides(emblaApi, prefersReducedMotion)
   }, [emblaApi, prefersReducedMotion, expandWindow])
 
+  // Set isDragging=true when a drag starts, reset after click has had a chance to fire
+  useEffect(() => {
+    if (!emblaApi) return
+    const onPointerDown = () => { isDragging.current = false }
+    const onDragStart = () => { isDragging.current = true }
+    const onSettle = () => { setTimeout(() => { isDragging.current = false }, 50) }
+    emblaApi.on('pointerDown', onPointerDown)
+    emblaApi.on('settle', onSettle)
+    // Embla doesn't have a dedicated dragStart event, so we detect via scroll
+    emblaApi.on('scroll', () => { isDragging.current = true })
+    return () => {
+      emblaApi.off('pointerDown', onPointerDown)
+      emblaApi.off('settle', onSettle)
+    }
+  }, [emblaApi])
+
   useEffect(() => {
     if (!emblaApi) return
     emblaApi.on('scroll', onTween)
@@ -318,7 +335,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
       onFocus={() => { isPaused.current = true }}
       onBlur={() => { isPaused.current = false }}
     >
-      {/* ── 3D Stage ───────────────────────────────────────────────────────── */}
       {/*
         Outer wrapper clips horizontal overflow at the section level so the page
         never scrolls sideways, while the inner Embla viewport is overflow-visible
@@ -367,13 +383,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                       }}
                     >
                       {renderedIndices.has(index) ? (
-                        <button
-                          type="button"
-                          aria-label={`${release.title} by ${release.artistName} – open preview`}
+                        <Link
+                          href={`/releases/${release.id}`}
+                          aria-label={`${release.title} by ${release.artistName}`}
                           draggable={false}
                           tabIndex={isActive ? 0 : -1}
-                          className="block w-full text-left cursor-pointer touch-manipulation"
-                          onClick={() => { setPreviewRelease(release); setPreviewOpen(true) }}
+                          className="block w-full cursor-pointer touch-manipulation"
+                          onClick={(e) => {
+                            // Suppress navigation if the user just dragged/swiped
+                            if (isDragging.current) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }
+                          }}
                         >
                           <div
                             className={`relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300 ${
@@ -416,7 +438,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                               </Badge>
                             )}
                           </div>
-                        </button>
+                        </Link>
                       ) : (
                         /* Lightweight placeholder — maintains slide dimensions so
                            Embla measures the full carousel width correctly. */
@@ -503,14 +525,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
       <p className="text-center text-xs text-muted-foreground font-mono mt-2">
         {selectedIndex + 1} / {total}
       </p>
-
-      <ReleasePreviewModal
-        release={previewRelease}
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        dict={dict}
-        consentDict={consentDict}
-      />
     </div>
   )
 }
