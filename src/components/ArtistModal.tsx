@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   X,
   SpotifyLogo,
@@ -199,12 +199,8 @@ export function ArtistModal({ artist, open, onClose }: ArtistModalProps) {
         aria-describedby={undefined}
         className="max-w-2xl w-[95vw] p-0 border-accent/30 overflow-hidden bg-background/95 backdrop-blur-xl max-h-[90vh] flex flex-col"
       >
+        <DialogTitle className="sr-only">{artist.name}</DialogTitle>
         <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={prefersReducedMotion ? { opacity: 0 } : { scale: 0.9, opacity: 0, y: 20 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="flex flex-col overflow-hidden"
         >
           {/* ── Hero image with Tactical FUI overlay ── */}
           <div className="relative h-52 sm:h-64 shrink-0 overflow-hidden">
