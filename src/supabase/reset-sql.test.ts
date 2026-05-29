@@ -1,0 +1,232 @@
+/**
+ * src/supabase/reset-sql.test.ts
+ *
+ * Static-analysis tests for supabase/reset.sql.
+ *
+ * These tests run entirely in Node — no database connection required.
+ * They guard against a class of ordering / idempotency bugs that are easy
+ * to introduce when adding new tables or columns to reset.sql:
+ *
+ *   • Every `ALTER TABLE X ENABLE ROW LEVEL SECURITY` must come AFTER
+ *     the corresponding `CREATE TABLE IF NOT EXISTS X`.
+ *
+ *   • Every `ALTER TABLE X ADD COLUMN IF NOT EXISTS colname` must
+ *     reference a table that has a `CREATE TABLE IF NOT EXISTS X` somewhere
+ *     in the file (so the ALTER is never orphaned).
+ *
+ *   • Common non-idempotent patterns (bare CREATE TABLE, bare ALTER TYPE ADD
+ *     without a DO-block guard, etc.) must not appear.
+ */
+
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+import { describe, it, expect } from 'vitest'
+
+const SQL_PATH = resolve(__dirname, '../../supabase/reset.sql')
+
+function loadLines(): string[] {
+  return readFileSync(SQL_PATH, 'utf-8').split('\n')
+}
+
+/** Strip inline SQL comments and trim whitespace from a line. */
+function stripComment(line: string): string {
+  const idx = line.indexOf('--')
+  return (idx >= 0 ? line.slice(0, idx) : line).trim()
+}
+
+// ---------------------------------------------------------------------------
+// Parse the SQL file once and build a lookup of the first line number for
+// each CREATE TABLE and ALTER TABLE operation.
+// ---------------------------------------------------------------------------
+interface TablePosition {
+  createLine: number | undefined
+  enableRlsLine: number | undefined
+  addColumnLines: { column: string; line: number }[]
+}
+
+function parseResetSql(): Map<string, TablePosition> {
+  const lines = loadLines()
+  const tables = new Map<string, TablePosition>()
+
+  function get(table: string): TablePosition {
+    if (!tables.has(table)) {
+      tables.set(table, { createLine: undefined, enableRlsLine: undefined, addColumnLines: [] })
+    }
+    return tables.get(table)!
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineNo = i + 1
+    const clean = stripComment(lines[i])
+
+    // CREATE TABLE IF NOT EXISTS public.<name>
+    let m = clean.match(/^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.(\w+)/i)
+    if (m) {
+      const pos = get(m[1])
+      if (pos.createLine === undefined) pos.createLine = lineNo
+      continue
+    }
+
+    // ALTER TABLE public.<name> ENABLE ROW LEVEL SECURITY
+    m = clean.match(/^ALTER\s+TABLE\s+public\.(\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i)
+    if (m) {
+      const pos = get(m[1])
+      if (pos.enableRlsLine === undefined) pos.enableRlsLine = lineNo
+      continue
+    }
+
+    // ALTER TABLE public.<name> ADD COLUMN IF NOT EXISTS <colname>
+    m = clean.match(/^ALTER\s+TABLE\s+public\.(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)/i)
+    if (m) {
+      get(m[1]).addColumnLines.push({ column: m[2], line: lineNo })
+      continue
+    }
+  }
+
+  return tables
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+describe('supabase/reset.sql — static analysis', () => {
+  const tables = parseResetSql()
+  const lines = loadLines()
+
+  // ── Ordering: ENABLE RLS must come after CREATE TABLE ──────────────────
+  it('ALTER TABLE … ENABLE ROW LEVEL SECURITY always comes after CREATE TABLE', () => {
+    const violations: string[] = []
+
+    for (const [table, pos] of tables) {
+      if (pos.enableRlsLine === undefined) continue // no RLS statement — not an error
+      if (pos.createLine === undefined) {
+        violations.push(
+          `Table "${table}" has ENABLE ROW LEVEL SECURITY at line ${pos.enableRlsLine} but no CREATE TABLE IF NOT EXISTS found`,
+        )
+        continue
+      }
+      if (pos.enableRlsLine < pos.createLine) {
+        violations.push(
+          `Table "${table}": ENABLE ROW LEVEL SECURITY at line ${pos.enableRlsLine} comes BEFORE CREATE TABLE at line ${pos.createLine}`,
+        )
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── ADD COLUMN IF NOT EXISTS must reference an existing CREATE TABLE ────
+  it('ALTER TABLE … ADD COLUMN IF NOT EXISTS references a known CREATE TABLE', () => {
+    const violations: string[] = []
+
+    for (const [table, pos] of tables) {
+      for (const { column, line } of pos.addColumnLines) {
+        if (pos.createLine === undefined) {
+          violations.push(
+            `ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "${column}" at line ${line} references a table with no CREATE TABLE IF NOT EXISTS`,
+          )
+        }
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── No bare CREATE TABLE (without IF NOT EXISTS) ────────────────────────
+  it('all CREATE TABLE statements use IF NOT EXISTS (idempotency)', () => {
+    const violations: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      // Match CREATE TABLE that is NOT followed by IF NOT EXISTS
+      if (/^CREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS)/i.test(clean)) {
+        violations.push(`Line ${i + 1}: bare CREATE TABLE (missing IF NOT EXISTS): ${lines[i].trim()}`)
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── No bare ALTER TYPE … ADD VALUE (must be guarded in a DO block) ─────
+  it('all ALTER TYPE … ADD VALUE statements are inside DO blocks (idempotency)', () => {
+    const violations: string[] = []
+    let insideDoBlock = false
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      if (/^\s*DO\s+\$\$/i.test(lines[i])) insideDoBlock = true
+      if (insideDoBlock && /END\s+\$\$/i.test(lines[i])) insideDoBlock = false
+
+      if (!insideDoBlock && /ALTER\s+TYPE\s+\S+\s+ADD\s+VALUE/i.test(clean)) {
+        violations.push(
+          `Line ${i + 1}: bare ALTER TYPE … ADD VALUE outside a DO block (not idempotent): ${lines[i].trim()}`,
+        )
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── CREATE INDEX statements use IF NOT EXISTS ───────────────────────────
+  it('all CREATE INDEX statements use IF NOT EXISTS (idempotency)', () => {
+    const violations: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      if (/^CREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF\s+NOT\s+EXISTS)/i.test(clean)) {
+        violations.push(`Line ${i + 1}: CREATE INDEX without IF NOT EXISTS: ${lines[i].trim()}`)
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── Every table that has RLS policies is known ──────────────────────────
+  it('all DROP POLICY / CREATE POLICY statements reference a known CREATE TABLE', () => {
+    const violations: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      // DROP POLICY … ON public.<table> or CREATE POLICY … ON public.<table>
+      const m = clean.match(/(?:DROP|CREATE)\s+POLICY\b.*\bON\s+public\.(\w+)/i)
+      if (m) {
+        const table = m[1]
+        if (!tables.has(table) || tables.get(table)!.createLine === undefined) {
+          violations.push(
+            `Line ${i + 1}: POLICY on "${table}" but no CREATE TABLE IF NOT EXISTS found`,
+          )
+        }
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  // ── news_posts must contain artist_id in the CREATE TABLE body ──────────
+  it('news_posts CREATE TABLE includes artist_id column', () => {
+    let inNewsPostsCreate = false
+    let depth = 0
+    let found = false
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const clean = stripComment(line)
+
+      if (/^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.news_posts/i.test(clean)) {
+        inNewsPostsCreate = true
+        depth = 0
+      }
+
+      if (inNewsPostsCreate) {
+        if (line.includes('(')) depth++
+        if (line.includes(')')) depth--
+        if (/\bartist_id\b/.test(clean)) found = true
+        if (depth === 0 && inNewsPostsCreate && i > 0) {
+          inNewsPostsCreate = false
+        }
+      }
+    }
+
+    expect(found).toBe(true)
+  })
+})
