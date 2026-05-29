@@ -83,7 +83,7 @@ const schema = z.object({
   aboutBody: z.string().optional().default(''),
 })
 
-type FormData = z.infer<typeof schema>
+type FormData = z.input<typeof schema>
 
 // ---------------------------------------------------------------------------
 // Sub-sections
