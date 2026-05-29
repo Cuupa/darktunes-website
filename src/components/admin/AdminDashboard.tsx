@@ -1,10 +1,11 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   SignOut,
   User,
@@ -25,22 +26,36 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { ArtistsManager } from './ArtistsManager'
-import { ReleasesManager } from './ReleasesManager'
-import { NewsManager } from './NewsManager'
-import { VideosManager } from './VideosManager'
-import { AssetsManager } from './AssetsManager'
-import { SiteSettingsManager } from './SiteSettingsManager'
-import { SystemHealthWidget } from './SystemHealthWidget'
-import { MediaManager } from './MediaManager'
-import { UsersManager } from './UsersManager'
-import { FeatureTogglesManager } from './FeatureTogglesManager'
-import { FeatureFlagsManager } from './FeatureFlagsManager'
-import { MessagesManager } from './MessagesManager'
-import { AccreditationsManager } from './AccreditationsManager'
-import { LogsManager } from './LogsManager'
-import { RolesManager } from './RolesManager'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
+
+// Heavy manager panels are lazy-loaded so each tab's JS bundle is fetched only
+// when the user first opens that tab, keeping the initial admin page lightweight.
+const ArtistsManager = lazy(() => import('./ArtistsManager').then((m) => ({ default: m.ArtistsManager })))
+const ReleasesManager = lazy(() => import('./ReleasesManager').then((m) => ({ default: m.ReleasesManager })))
+const NewsManager = lazy(() => import('./NewsManager').then((m) => ({ default: m.NewsManager })))
+const VideosManager = lazy(() => import('./VideosManager').then((m) => ({ default: m.VideosManager })))
+const AssetsManager = lazy(() => import('./AssetsManager').then((m) => ({ default: m.AssetsManager })))
+const SiteSettingsManager = lazy(() => import('./SiteSettingsManager').then((m) => ({ default: m.SiteSettingsManager })))
+const SystemHealthWidget = lazy(() => import('./SystemHealthWidget').then((m) => ({ default: m.SystemHealthWidget })))
+const MediaManager = lazy(() => import('./MediaManager').then((m) => ({ default: m.MediaManager })))
+const UsersManager = lazy(() => import('./UsersManager').then((m) => ({ default: m.UsersManager })))
+const FeatureTogglesManager = lazy(() => import('./FeatureTogglesManager').then((m) => ({ default: m.FeatureTogglesManager })))
+const FeatureFlagsManager = lazy(() => import('./FeatureFlagsManager').then((m) => ({ default: m.FeatureFlagsManager })))
+const MessagesManager = lazy(() => import('./MessagesManager').then((m) => ({ default: m.MessagesManager })))
+const AccreditationsManager = lazy(() => import('./AccreditationsManager').then((m) => ({ default: m.AccreditationsManager })))
+const LogsManager = lazy(() => import('./LogsManager').then((m) => ({ default: m.LogsManager })))
+const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
+
+function TabFallback() {
+  return (
+    <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading panel">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Tab definitions — single source of truth for labels, icons, and metadata
@@ -304,7 +319,7 @@ export function AdminDashboard() {
             )}
           </div>
 
-          {/* Tab content panels */}
+          {/* Tab content panels — each manager is lazy-loaded on first tab visit */}
           <TabsContent value="artists" className="space-y-4">
             <Card>
               <CardHeader>
@@ -314,7 +329,9 @@ export function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ArtistsManager />
+                <Suspense fallback={<TabFallback />}>
+                  <ArtistsManager />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -328,7 +345,9 @@ export function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ReleasesManager />
+                <Suspense fallback={<TabFallback />}>
+                  <ReleasesManager />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -342,7 +361,9 @@ export function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <NewsManager />
+                <Suspense fallback={<TabFallback />}>
+                  <NewsManager />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -356,7 +377,9 @@ export function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <VideosManager />
+                <Suspense fallback={<TabFallback />}>
+                  <VideosManager />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -371,7 +394,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <AssetsManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <AssetsManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -387,7 +412,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />
+                  <Suspense fallback={<TabFallback />}>
+                    <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -403,7 +430,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
+                  <Suspense fallback={<TabFallback />}>
+                    <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -419,7 +448,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <MediaManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <MediaManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -435,11 +466,13 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <FeatureTogglesManager
-                    value={siteSettings.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }}
-                    onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
-                    isLoading={siteSettingsLoading}
-                  />
+                  <Suspense fallback={<TabFallback />}>
+                    <FeatureTogglesManager
+                      value={siteSettings.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }}
+                      onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
+                      isLoading={siteSettingsLoading}
+                    />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -455,7 +488,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <UsersManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <UsersManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -471,7 +506,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <FeatureFlagsManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <FeatureFlagsManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -487,7 +524,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <MessagesManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <MessagesManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -503,7 +542,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <AccreditationsManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <AccreditationsManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -519,7 +560,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <LogsManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <LogsManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -535,7 +578,9 @@ export function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RolesManager />
+                  <Suspense fallback={<TabFallback />}>
+                    <RolesManager />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
