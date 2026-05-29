@@ -1,6 +1,7 @@
 'use client'
 
 import { motion, useReducedMotion } from 'framer-motion'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -61,14 +62,11 @@ export function News({ news, dict, locale }: NewsProps) {
                 <div className="grid lg:grid-cols-[320px_1fr] gap-0">
                   {post.imageUrl && (
                     <div className="relative aspect-[16/9] lg:aspect-auto overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={getOptimizedImageUrl(post.imageUrl, 800)}
                         alt={post.title}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        onError={(e) => {
-                          e.currentTarget.closest('.relative')?.remove()
-                        }}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/20" />
                     </div>
