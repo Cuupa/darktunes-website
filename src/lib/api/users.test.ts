@@ -198,7 +198,7 @@ describe('listUsersWithProfiles', () => {
 
 describe('updateUserRole', () => {
   it('resolves without error on success', async () => {
-    const db = makeMockDb(null, null)
+    const db = makeMockDb([{ id: 'user-1' }], null)
     await expect(updateUserRole(db, 'user-1', 'editor')).resolves.toBeUndefined()
   })
 
@@ -208,7 +208,7 @@ describe('updateUserRole', () => {
   })
 
   it('calls update on the profiles table', async () => {
-    const builder = makeBuilder(null, null)
+    const builder = makeBuilder([{ id: 'user-1' }], null)
     const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
     await updateUserRole(db, 'user-1', 'journalist')
     expect(db.from).toHaveBeenCalledWith('profiles')

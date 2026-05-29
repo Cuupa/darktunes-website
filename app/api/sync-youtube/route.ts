@@ -127,6 +127,17 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   if (error) throw new ApiError(500, `DB upsert failed: ${error.message}`)
 
+  // Write a sync_log entry so the health dashboard shows the last YouTube sync time
+  await db.from('sync_logs').insert({
+    artist_id: null,
+    status: 'success',
+    message: null,
+    releases_synced: videos.length,
+    errors: [],
+    api_source: 'youtube',
+    rate_limited: false,
+  })
+
   revalidateTag('videos')
 
   return NextResponse.json({ synced: videos.length })

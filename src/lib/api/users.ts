@@ -95,12 +95,14 @@ export async function updateUserRole(
   userId: string,
   role: UserRole,
 ): Promise<void> {
-  const { error } = await adminClient
+  const { data, error } = await adminClient
     .from('profiles')
     .update({ role })
     .eq('id', userId)
+    .select('id')
 
   if (error) throw new Error(error.message)
+  if (!data || data.length === 0) throw new Error(`No profile found for user ${userId}`)
 }
 
 /**
