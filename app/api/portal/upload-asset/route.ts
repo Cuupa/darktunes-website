@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 import { createArtistAsset, deleteArtistAsset } from '@/lib/api/artistAssets'
+import { createAssetRecord } from '@/lib/api/assets'
 
 const allowedTypes = [
   'image/jpeg',
@@ -68,11 +69,25 @@ async function authenticateArtist(req: NextRequest) {
   const artist = await getArtistByUserId(supabase, user.id)
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  return { supabase, artist }
+  return { supabase, artist, userId: user.id }
+}
+
+/** Look up the asset_folder that belongs to this artist (the artist's root folder). */
+async function getOrCreateArtistFolder(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  artistId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('asset_folders')
+    .select('id')
+    .eq('artist_id', artistId)
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, artist } = await authenticateArtist(req)
+  const { supabase, artist, userId } = await authenticateArtist(req)
 
   const formData = await req.formData()
   const file = formData.get('file')
@@ -100,6 +115,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
     serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
+
+  // Get artist's folder id (auto-created by DB trigger on artist insert)
+  const folderId = await getOrCreateArtistFolder(supabase, artist.id)
+
+  // Insert into main assets table so admin file explorer can see portal uploads
+  await createAssetRecord(supabase, {
+    filename: file.name,
+    original_filename: file.name,
+    mime_type: file.type || 'application/octet-stream',
+    size_bytes: file.size,
+    r2_key: uploaded.key,
+    public_url: uploaded.url,
+    uploaded_by: userId,
+    folder_id: folderId,
+    artist_id: artist.id,
+  })
 
   const asset = await createArtistAsset(supabase, {
     artist_id: artist.id,

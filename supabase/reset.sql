@@ -227,6 +227,71 @@ CREATE TRIGGER trg_artists_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- FUNCTION + TRIGGER: auto-create artist folder in asset_folders on artist insert
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_artist_asset_folder()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_root_id UUID;
+BEGIN
+  -- Ensure the top-level "artists" root folder exists
+  INSERT INTO public.asset_folders (name, parent_id, artist_id, created_by)
+  VALUES ('artists', NULL, NULL, NULL)
+  ON CONFLICT DO NOTHING;
+
+  SELECT id INTO v_root_id
+  FROM public.asset_folders
+  WHERE name = 'artists' AND parent_id IS NULL
+  LIMIT 1;
+
+  -- Create a subfolder named after the artist under the root
+  INSERT INTO public.asset_folders (name, parent_id, artist_id, created_by)
+  VALUES (NEW.name, v_root_id, NEW.id, NULL)
+  ON CONFLICT DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_artists_create_folder ON public.artists;
+CREATE TRIGGER trg_artists_create_folder
+  AFTER INSERT ON public.artists
+  FOR EACH ROW EXECUTE FUNCTION public.create_artist_asset_folder();
+
+-- Idempotent: create folders for all existing artists that don't have one yet
+DO $$
+DECLARE
+  v_root_id UUID;
+  v_artist  RECORD;
+BEGIN
+  -- Ensure root folder
+  INSERT INTO public.asset_folders (name, parent_id, artist_id, created_by)
+  VALUES ('artists', NULL, NULL, NULL)
+  ON CONFLICT DO NOTHING;
+
+  SELECT id INTO v_root_id
+  FROM public.asset_folders
+  WHERE name = 'artists' AND parent_id IS NULL
+  LIMIT 1;
+
+  -- For each artist without a dedicated folder
+  FOR v_artist IN
+    SELECT a.id, a.name FROM public.artists a
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.asset_folders f WHERE f.artist_id = a.id
+    )
+  LOOP
+    INSERT INTO public.asset_folders (name, parent_id, artist_id, created_by)
+    VALUES (v_artist.name, v_root_id, v_artist.id, NULL)
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- TABLE: releases
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.releases (
@@ -387,6 +452,7 @@ ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES pub
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS sha256_hash TEXT;
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS original_filename TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS release_id UUID REFERENCES public.releases(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_assets_uploaded_by ON public.assets (uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_assets_mime_type   ON public.assets (mime_type);
@@ -394,6 +460,18 @@ CREATE INDEX IF NOT EXISTS idx_assets_created_at  ON public.assets (created_at D
 CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
 CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
+CREATE INDEX IF NOT EXISTS idx_assets_release_id  ON public.assets (release_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: asset_artists  (many-to-many: one asset can belong to multiple artists)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.asset_artists (
+  asset_id  UUID NOT NULL REFERENCES public.assets(id) ON DELETE CASCADE,
+  artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  PRIMARY KEY (asset_id, artist_id)
+);
+CREATE INDEX IF NOT EXISTS idx_asset_artists_asset_id  ON public.asset_artists(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_artists_artist_id ON public.asset_artists(artist_id);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: site_settings  (CMS key-value store)
@@ -926,6 +1004,27 @@ CREATE POLICY "asset_folders: admin delete"       ON public.asset_folders FOR DE
 CREATE POLICY "asset_folders: editor+ update"     ON public.asset_folders FOR UPDATE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
+
+-- ---------------------------------------------------------------------------
+-- RLS: asset_artists
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.asset_artists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "asset_artists: authenticated read"  ON public.asset_artists;
+DROP POLICY IF EXISTS "asset_artists: editor+ write"       ON public.asset_artists;
+DROP POLICY IF EXISTS "asset_artists: editor+ delete"      ON public.asset_artists;
+
+CREATE POLICY "asset_artists: authenticated read" ON public.asset_artists
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "asset_artists: editor+ write" ON public.asset_artists
+  FOR INSERT TO authenticated WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+  );
+
+CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
+  FOR DELETE TO authenticated USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+  );
 
 -- ---------------------------------------------------------------------------
 -- RLS: site_settings

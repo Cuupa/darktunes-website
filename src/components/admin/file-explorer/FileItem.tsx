@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { File, MusicNotes, Tag } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import type { Artist, Asset, AssetFolder } from '@/types'
+import type { Artist, Asset, AssetFolder, Release } from '@/types'
 import { AssetContextMenu } from './AssetContextMenu'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { formatBytes, formatDate, isAudioAsset, isImageAsset } from './utils'
@@ -12,6 +12,7 @@ import { formatBytes, formatDate, isAudioAsset, isImageAsset } from './utils'
 interface FileItemProps {
   asset: Asset
   artists: Artist[]
+  releases: Release[]
   folders: AssetFolder[]
   artistName?: string
   viewMode: 'grid' | 'list'
@@ -24,8 +25,10 @@ interface FileItemProps {
   onMoveToFolder: (folderId: string | null) => void
   onCopyUrl: () => void
   onDownload: () => void
-  onAssignArtist: (artistId: string | null) => void
+  onAssignArtists: (artistIds: string[]) => void
+  onAssignRelease: (releaseId: string | null) => void
   onEditTags: () => void
+  onPreview: () => void
 }
 
 function FilePreview({ asset }: { asset: Asset }) {
@@ -59,6 +62,7 @@ function FilePreview({ asset }: { asset: Asset }) {
 export function FileItem({
   asset,
   artists,
+  releases,
   folders,
   artistName,
   viewMode,
@@ -71,8 +75,10 @@ export function FileItem({
   onMoveToFolder,
   onCopyUrl,
   onDownload,
-  onAssignArtist,
+  onAssignArtists,
+  onAssignRelease,
   onEditTags,
+  onPreview,
 }: FileItemProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [draftName, setDraftName] = useState(asset.originalFilename)
@@ -96,6 +102,7 @@ export function FileItem({
         selected && 'border-primary bg-primary/10',
       )}
       onClick={(event) => onSelect(event.metaKey || event.ctrlKey || event.shiftKey)}
+      onDoubleClick={onPreview}
     >
       {viewMode === 'list' && <div className="size-4 rounded-full border border-border" aria-hidden="true" />}
       <div className={cn(viewMode === 'list' ? 'w-14' : 'w-full')}>
@@ -156,14 +163,19 @@ export function FileItem({
       itemType="file"
       folders={folders}
       artists={artists}
+      releases={releases}
       folderId={asset.folderId ?? null}
+      selectedArtistIds={asset.artistIds}
+      selectedReleaseId={asset.releaseId ?? undefined}
       onRename={onRename}
       onDelete={onDelete}
       onMoveToFolder={onMoveToFolder}
       onDownload={onDownload}
       onCopyUrl={onCopyUrl}
-      onAssignArtist={onAssignArtist}
+      onAssignArtists={onAssignArtists}
+      onAssignRelease={onAssignRelease}
       onEditTags={onEditTags}
+      onPreview={onPreview}
     >
       {content}
     </AssetContextMenu>

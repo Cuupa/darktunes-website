@@ -9,6 +9,8 @@ import { deleteR2Objects, getAssetsForDeletion } from '../_utils'
 interface PatchAssetBody {
   folderId?: string | null
   artistId?: string | null
+  artistIds?: string[]
+  releaseId?: string | null
   tags?: string[]
   originalFilename?: string
 }
@@ -29,6 +31,8 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
   const updates: PatchAssetBody = {}
   if ('folderId' in body) updates.folderId = body.folderId ?? null
   if ('artistId' in body) updates.artistId = body.artistId ?? null
+  if ('artistIds' in body) updates.artistIds = body.artistIds ?? []
+  if ('releaseId' in body) updates.releaseId = body.releaseId ?? null
   if ('tags' in body) updates.tags = body.tags ?? []
   if ('originalFilename' in body) updates.originalFilename = body.originalFilename?.trim() ?? ''
   if (Object.keys(updates).length === 0) throw new ApiError(400, 'No asset changes provided')

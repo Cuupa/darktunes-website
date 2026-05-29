@@ -5,7 +5,7 @@ import { CaretDown, CaretUp } from '@phosphor-icons/react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { SortDir, SortField } from '@/hooks/useFileExplorer'
-import type { Artist, Asset, AssetFolder } from '@/types'
+import type { Artist, Asset, AssetFolder, Release } from '@/types'
 import { FileItem } from './FileItem'
 import { FolderItem } from './FolderItem'
 
@@ -19,6 +19,7 @@ interface FileListProps {
   assets: Asset[]
   allFolders: AssetFolder[]
   artists: Artist[]
+  releases: Release[]
   selectedIds: Set<string>
   renaming: RenamingState | null
   sortField: SortField
@@ -41,8 +42,10 @@ interface FileListProps {
   onAssetMove: (assetId: string, folderId: string | null) => void
   onAssetCopyUrl: (asset: Asset) => void
   onAssetDownload: (asset: Asset) => void
-  onAssetAssignArtist: (assetId: string, artistId: string | null) => void
+  onAssetAssignArtists: (assetId: string, artistIds: string[]) => void
+  onAssetAssignRelease: (assetId: string, releaseId: string | null) => void
   onAssetEditTags: (asset: Asset) => void
+  onAssetPreview: (asset: Asset) => void
 }
 
 export function FileList({
@@ -50,6 +53,7 @@ export function FileList({
   assets,
   allFolders,
   artists,
+  releases,
   selectedIds,
   renaming,
   sortField,
@@ -72,8 +76,10 @@ export function FileList({
   onAssetMove,
   onAssetCopyUrl,
   onAssetDownload,
-  onAssetAssignArtist,
+  onAssetAssignArtists,
+  onAssetAssignRelease,
   onAssetEditTags,
+  onAssetPreview,
 }: FileListProps) {
   const lastIndexRef = useRef<number | null>(null)
   const rows = [...folders.map((folder) => ({ id: `folder:${folder.id}` })), ...assets.map((asset) => ({ id: asset.id }))]
@@ -171,20 +177,23 @@ export function FileList({
                     <FileItem
                       asset={asset}
                       artists={artists}
-                      folders={allFolders}
-                      artistName={asset.artistId ? artistNames[asset.artistId] : undefined}
-                      viewMode="list"
-                      selected={selectedIds.has(asset.id)}
-                      renaming={renaming?.type === 'file' && renaming.id === asset.id}
-                      onSelect={(multi) => onAssetSelect(asset.id, multi)}
-                      onRename={() => onAssetRenameStart(asset.id)}
-                      onRenameCommit={(name) => onAssetRenameCommit(asset.id, name)}
-                      onDelete={() => onAssetDelete(asset.id)}
-                      onMoveToFolder={(folderId) => onAssetMove(asset.id, folderId)}
-                      onCopyUrl={() => onAssetCopyUrl(asset)}
-                      onDownload={() => onAssetDownload(asset)}
-                      onAssignArtist={(artistId) => onAssetAssignArtist(asset.id, artistId)}
-                      onEditTags={() => onAssetEditTags(asset)}
+                     releases={releases}
+                     folders={allFolders}
+                     artistName={asset.artistId ? artistNames[asset.artistId] : undefined}
+                     viewMode="list"
+                     selected={selectedIds.has(asset.id)}
+                     renaming={renaming?.type === 'file' && renaming.id === asset.id}
+                     onSelect={(multi) => onAssetSelect(asset.id, multi)}
+                     onRename={() => onAssetRenameStart(asset.id)}
+                     onRenameCommit={(name) => onAssetRenameCommit(asset.id, name)}
+                     onDelete={() => onAssetDelete(asset.id)}
+                     onMoveToFolder={(folderId) => onAssetMove(asset.id, folderId)}
+                     onCopyUrl={() => onAssetCopyUrl(asset)}
+                     onDownload={() => onAssetDownload(asset)}
+                     onAssignArtists={(artistIds) => onAssetAssignArtists(asset.id, artistIds)}
+                     onAssignRelease={(releaseId) => onAssetAssignRelease(asset.id, releaseId)}
+                     onEditTags={() => onAssetEditTags(asset)}
+                     onPreview={() => onAssetPreview(asset)}
                     />
                   </div>
                 </TableCell>

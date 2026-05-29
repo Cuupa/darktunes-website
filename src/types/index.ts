@@ -172,6 +172,8 @@ export interface Asset {
   createdAt: string
   folderId?: string
   artistId?: string
+  artistIds: string[]
+  releaseId?: string
   tags: string[]
   sha256Hash?: string
 }
