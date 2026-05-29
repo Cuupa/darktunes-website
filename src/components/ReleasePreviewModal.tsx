@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { SpotifyLogo, AppleLogo, LinkSimple, X } from '@phosphor-icons/react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,29 +33,26 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <DialogContent
         aria-describedby={undefined}
+        hideCloseButton
         className="max-w-lg w-full p-0 overflow-hidden bg-card border-border"
       >
         <DialogTitle className="sr-only">{release.title}</DialogTitle>
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={onClose}
+        {/* Close button – uses Radix DialogPrimitive.Close so it properly closes the dialog */}
+        <DialogPrimitive.Close
           aria-label="Close"
           className="absolute top-3 right-3 z-10 rounded-full bg-background/70 backdrop-blur-sm p-1.5 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X size={16} />
-        </button>
+        </DialogPrimitive.Close>
 
         <div className="flex flex-col sm:flex-row">
           {/* Cover art */}
           <div className="relative w-full sm:w-48 shrink-0 aspect-square sm:aspect-auto">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={getOptimizedImageUrl(release.coverArt, 400)}
               alt={`${release.title} by ${release.artistName}`}
-              fill
-              sizes="(max-width: 640px) 100vw, 192px"
-              className="object-cover"
-              priority
+              className="absolute inset-0 w-full h-full object-cover"
             />
           </div>
 

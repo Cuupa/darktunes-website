@@ -328,7 +328,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
       <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
         <div style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}>
           {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
-          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
+          <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }} data-lenis-prevent>
             {/* Embla container: Embla translates this element for scrolling */}
             <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
               {releases.map((release, index) => {
@@ -366,7 +366,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                           aria-label={`${release.title} by ${release.artistName} – open preview`}
                           draggable={false}
                           tabIndex={isActive ? 0 : -1}
-                          className="block w-full text-left cursor-pointer"
+                          className="block w-full text-left cursor-pointer touch-manipulation"
                           onClick={() => { setPreviewRelease(release); setPreviewOpen(true) }}
                         >
                           <div
