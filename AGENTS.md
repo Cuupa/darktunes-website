@@ -163,6 +163,12 @@ Admin Utility Routes (admin/editor auth required):
   `POST /api/admin/fetch-youtube-info` — resolves a YouTube URL or video ID to `{ videoId, title, channelTitle, thumbnailUrl }` via YouTube oEmbed (no API key needed). Called by the "Fetch Info" button in VideoForm.
   `DELETE /api/admin/assets/[id]` — permanently deletes an asset record from Supabase AND its corresponding object from Cloudflare R2 via `deleteObjectFromR2()` from `src/lib/r2Utils.ts`. The R2 object is deleted first; if that fails the DB record remains. Returns `{ success: true }`.
 
+Admin Asset Explorer
+The admin Assets tab is a folder-based file explorer backed by the `asset_folders` table and the enriched `assets` schema (`folder_id`, `artist_id`, `tags`, `sha256_hash`, `original_filename`).
+`app/api/upload/route.ts` is the single admin upload entry point: it verifies admin/editor auth, computes a SHA-256 hash, returns the existing asset on duplicate upload, uploads new files to R2, and inserts the asset row server-side.
+Folder/list/search/batch mutations live under `app/api/admin/assets/*`; destructive deletes must remove the R2 object(s) before deleting database rows.
+`src/hooks/useFileExplorer.ts` is the client-side orchestration hook for the explorer, and `src/components/admin/file-explorer/AssetPicker.tsx` is the reusable selector used by `ArtistForm` for image/logo assignment.
+
 Video Admin UX:
   VideoForm accepts full YouTube URLs (watch?v=, youtu.be/, /shorts/, /embed/) and auto-extracts the 11-char video ID on input.
   "Fetch Info" button calls `/api/admin/fetch-youtube-info` to auto-fill title, channel name, and thumbnail.

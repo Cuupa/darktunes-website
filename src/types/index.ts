@@ -170,6 +170,22 @@ export interface Asset {
   publicUrl: string
   uploadedBy?: string
   createdAt: string
+  folderId?: string
+  artistId?: string
+  tags: string[]
+  sha256Hash?: string
+}
+
+export interface AssetFolder {
+  id: string
+  name: string
+  parentId: string | null
+  artistId: string | null
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+  children?: AssetFolder[]
+  assetCount?: number
 }
 
 export interface ArtistAsset {

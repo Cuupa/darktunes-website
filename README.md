@@ -12,7 +12,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
-- **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets; Artist Auto-Sync; Skeleton loading)
+- **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets; folder-based asset explorer with search/bulk actions; artist asset picker; Artist Auto-Sync; Skeleton loading)
 - **Artist Auto-Sync** – "Sync Now" per artist triggers iTunes release import, R2 cover art caching, and Supabase upsert
 - **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; Vercel cron can trigger daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
@@ -69,6 +69,8 @@ npm run dev
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:e2e` | Run Playwright E2E & visual regression tests |
+| `npm run db:push` | Push local Supabase schema changes to a configured Supabase project |
+| `npm run db:diff` | Generate a local schema diff with the Supabase CLI |
 
 ---
 
@@ -163,8 +165,9 @@ app/                          # Next.js App Router entry points
 │   ├── releases/new/page.tsx # Artist release submission form
 │   └── settings/page.tsx     # Account settings (password + locale switch)
 └── api/
-    ├── upload/route.ts       # R2 file upload Route Handler (admin)
+    ├── upload/route.ts       # Admin upload Route Handler (R2 upload + SHA-256 dedupe + asset row create)
     ├── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
+    ├── admin/assets/         # Asset explorer APIs (list/search, folders, batch delete)
     └── portal/
         ├── upload-photo/route.ts         # Portal: profile photo upload to R2
         ├── upload-release-cover/route.ts # Portal: release cover upload to R2
@@ -175,6 +178,7 @@ middleware.ts                 # Edge Middleware — auth for /admin/* and /porta
 src/
 ├── components/               # UI components (Header, Hero, Releases, Artists, …)
 │   ├── admin/                # Admin panel + manager components ("use client")
+│   │   ├── file-explorer/    # Folder tree, grid/list views, upload dropzone, asset picker
 │   │   └── forms/            # Admin CRUD form components
 │   ├── animations/           # LenisProvider ("use client")
 │   └── ui/                   # Shadcn/Radix primitives

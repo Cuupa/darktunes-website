@@ -3,7 +3,7 @@
 ## What Is Implemented
 
 ### Public Website
-- **Hero section** — featured release with dynamic background; supports rotating multiple featured releases (6s auto-advance + clickable dot indicators); buttons functional (Listen Now → Spotify/player, Explore Artist → #artists)
+- **Hero section** — rotating featured release/news carousel with dynamic background (6s auto-advance + clickable dot indicators); buttons functional (Listen Now → streaming/player, Explore → `#releases` for releases or `#news` for news)
 - **Releases section** — server-side fetched from Supabase via RSC + ISR (60s revalidate); semantic `<ul>/<li>` grid; `useReducedMotion` support
 - **Spotify Player** — embedded iframe player for the label playlist
 - **Artists section** — server-side data, passed as props to client component; shows max 6 cards per visit with stable per-visit shuffle; featured artists are guaranteed in those 6; quick search (name/genre) shows all matches; semantic `<ul>/<li>` grid; full ARIA on icon links; 44×44px touch targets; `useReducedMotion` support
@@ -20,13 +20,13 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
-- **Vitest** unit test suite (`npm test`) — 147 tests passing (18 test files)
+- **Vitest** unit test suite (`npm test`) — 380 tests passing (41 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
 - **Edge Middleware** (`middleware.ts`) — auth protection for all `/admin/*` and `/portal/*` routes before page render; also detects locale from `Accept-Language` header and sets `NEXT_LOCALE` cookie
 - **Internationalisation (i18n)** — `src/i18n/` custom dictionary pattern; `en.json` + `de.json`; `getDictionary.ts` loads server-side; RSCs pass dict as props to Client Components (IoC); Header has DE/EN locale switcher
-- **Database schema** defined in `supabase/reset.sql` (single idempotent script) and mirrored by targeted migration patch `supabase/migrations/20260512000002_add_journalist_and_feature_flags.sql`
+- **Database schema** defined only in `supabase/reset.sql` (single idempotent script; no migration files) and mirrored in `src/types/database.ts`
 - **TypeScript DB types** in `src/types/database.ts`
 
 ### Environment Validation
@@ -39,7 +39,8 @@
 - `news.ts` — CRUD for news_posts table
 - `videos.ts` — CRUD for videos table
 - `concerts.ts` — read upcoming concerts from concerts table
-- `assets.ts` — `getAssets`, `createAssetRecord`, `deleteAssetRecord`
+- `assets.ts` — asset mapping, folder/artist filtering, search, update/move, SHA-256 lookup, and batch delete helpers
+- `assetFolders.ts` — folder CRUD plus breadcrumb/path helpers for the admin file explorer
 - `siteSettings.ts` — `getSiteSettings` (returns typed `SiteSettings`), `upsertSiteSetting`, `upsertSiteSettings` (batch)
 - Each DAL function receives `SupabaseClient<Database>` as first arg; fully unit-tested
 
@@ -48,7 +49,8 @@
 - `useReleases` — loads releases, exposes create/update/delete + `syncFromItunes()`
 - `useNews` — loads news posts, exposes create/update/delete
 - `useVideos` — loads videos, exposes create/update/delete
-- `useAssets` — loads assets, exposes createAssetRecord/deleteAssetRecord
+- `useAssets` — legacy asset CRUD hook used by older admin flows
+- `useFileExplorer` — admin asset explorer hook for folder navigation, search, selection, and authenticated mutations
 - `useSiteSettings` — loads site settings, exposes `saveSettings()` + cache revalidation
 - All hooks check `isSupabaseConfigured` and short-circuit gracefully in dev
 
@@ -61,7 +63,7 @@
 - **ReleasesManager** — table + create/edit dialog + iTunes sync button
 - **NewsManager** — table + create/edit dialog + delete confirm
 - **VideosManager** — table + create/edit dialog + delete confirm
-- **AssetsManager** — file upload form → `/api/upload` (R2 Route Handler) + table + delete confirm
+- **AssetsManager** — folder-based file explorer with tree navigation, grid/list views, drag/drop upload, search, multi-select, batch delete, and artist assignment. Backed by `/api/upload` plus `/api/admin/assets`, `/api/admin/assets/folders`, and `/api/admin/assets/batch`.
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 - **UsersManager** *(admin-only tab)* — full user management: lists all registered users (via Supabase Auth Admin API), allows role changes (admin/editor/journalist/user), ban/unban with confirmation dialog, user deletion, and artist ↔ user linking/unlinking. Tab is only rendered when `profile.role === 'admin'`. API routes: `GET/PATCH/DELETE /api/admin/users`, `PATCH /api/admin/users/[id]/link-artist`.
 - **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
@@ -77,13 +79,14 @@
 
 ### File Upload (Next.js Route Handler)
 - `app/api/upload/route.ts` — POST Route Handler that:
-  1. Verifies `Authorization: Bearer <token>` via Supabase service-role key
-  2. Parses multipart/form-data (native Next.js `FormData` API)
-  3. Uploads file to Cloudflare R2 via `@aws-sdk/client-s3`
-  4. Returns `{ publicUrl, r2Key, filename, mimeType, sizeBytes }`
+  1. Verifies `Authorization: Bearer <token>` and requires `admin` or `editor` role
+  2. Parses multipart/form-data (native Next.js `FormData` API), including optional `folderId` / `artistId`
+  3. Computes a SHA-256 hash and returns the existing asset when the file is already stored
+  4. Uploads new files to Cloudflare R2 via `@aws-sdk/client-s3`
+  5. Creates the `assets` row server-side and returns `{ duplicate, asset, publicUrl, r2Key, filename, mimeType, sizeBytes }`
 
 ### Admin Form Components (`src/components/admin/forms/`)
-- `ArtistForm` — 15 fields, auto-slug, featured/isEuNonGerman toggles
+- `ArtistForm` — auto-slug, featured/isEuNonGerman toggles, and integrated `AssetPicker` controls for image/logo fields
 - `ReleaseForm` — cover art, type select, streaming URL fields
 - `NewsForm` — title, auto-slug, excerpt, content, image, publish date
 - `VideoForm` — youtubeId with auto-thumbnail generation
@@ -207,11 +210,13 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/lib/supabase/server.ts` | Server Supabase client (`@supabase/ssr`, reads auth cookies) |
 | `src/lib/supabase.ts` | Legacy Supabase client (deprecated; kept for backward compatibility) |
 | `src/lib/api/` | Data Access Layer (DAL) for all tables |
+| `src/lib/api/assetFolders.ts` | Asset folder DAL for the admin file explorer |
 | `src/lib/itunesApi.ts` | iTunes Search API client |
 | `src/hooks/use*.ts` | React hooks wrapping DAL + state management |
+| `src/hooks/useFileExplorer.ts` | Asset explorer state + authenticated admin mutations |
 | `src/hooks/useAuth.ts` | Supabase authentication hook |
 | `src/lib/component-contracts.ts` | Shared prop interfaces (SectionProps, AdminPanelProps, etc.) |
-| `src/types/database.ts` | TypeScript DB types (must stay in sync with migrations) |
+| `src/types/database.ts` | TypeScript DB types (must stay in sync with `supabase/reset.sql`) |
 | `src/components/admin/forms/` | Admin CRUD form components |
 | `src/lib/api/syncLogs.ts` | DAL for sync_logs table (getSyncLogsByArtist, insertSyncLog) |
 | `src/lib/api/siteSettings.ts` | DAL for site_settings table (getSiteSettings, upsertSiteSetting, upsertSiteSettings) |

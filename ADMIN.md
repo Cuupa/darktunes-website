@@ -37,14 +37,14 @@ WHERE slug = 'artist-slug';
 - **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
 - **Role-Based Access Control**: Admin and Editor roles with different permissions
 - **User Management** *(admin-only)*: View all registered users, change their roles (admin / editor / journalist / user), ban/unban accounts, delete users, and link/unlink artists — no raw SQL required. Accessible via the **Users** tab (only visible to admins).
-- **Artists Management**: Create, read, update, and delete artist profiles. The artist form now includes five additional URL fields: **Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, and a **Shop URL** (Darkmerch or Shopify link). These appear as clickable icons in the public artist cards and in artist modals.
+- **Artists Management**: Create, read, update, and delete artist profiles. The artist form now includes five additional URL fields: **Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, and a **Shop URL** (Darkmerch or Shopify link). It also includes an **Assets** tab plus image/logo **Asset Picker** buttons so editors can reuse uploaded R2 assets without pasting URLs manually. These links appear as clickable icons in the public artist cards and artist detail surfaces.
 - **Releases Management**: Manage music releases with iTunes API integration
 - **News Management**: Create and publish news posts and announcements
 - **Feature Flags (admin-only)**: New **Feature Flags** tab to toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`)
 - **Messages (admin-only)**: New **Messages** tab to send label messages to artists (`label_messages`)
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Videos Management**: Manage music videos and YouTube content
-- **Assets Management**: Upload and organize media files via Cloudflare R2 (server-side upload)
+- **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
 - **Visual Effects**: Configure the three dark-industrial overlay effects (noise/grain opacity, CRT scanlines toggle, vignette intensity) from the **Visual Effects** tab — changes go live immediately via ISR cache revalidation.
 - **Legal / DSGVO (New)**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
@@ -109,10 +109,13 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Trigger `POST /api/sync-youtube` to import the latest label-channel videos; synced rows are auto-linked to visible artists via title matching (`videos.artist_id`) and default to `is_visible=true`, so public sections and artist profile pages render them immediately.
 
 ### Assets
-- Upload images and media files to Cloudflare R2 (upload goes via the secure Next.js Route Handler `app/api/upload/route.ts` — credentials never exposed to browser)
-- Browse uploaded assets with inline image previews for image/* MIME types
-- Copy public URLs for use in content
-- Delete assets — permanently removes both the database record and the R2 object via `DELETE /api/admin/assets/[id]`
+- Upload images and media files to Cloudflare R2 through the secure Next.js Route Handler `app/api/upload/route.ts` — credentials never reach the browser
+- Organize files into nested folders (`asset_folders`) and optionally assign assets to an artist
+- Search globally, switch between grid/list views, multi-select files, and bulk-delete from the explorer
+- Duplicate uploads are detected server-side via SHA-256 and return the existing asset instead of storing a second copy
+- Browse uploaded assets with inline previews/audio playback and copy public URLs for use in content
+- Delete assets or folder subtrees — R2 objects are deleted before their database rows are removed
+- Reuse uploaded image/logo assets directly inside the Artist form via the built-in `AssetPicker`
 
 ### Site Settings
 Manage all global site content from the **Settings** tab — no code changes needed:
