@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,6 +29,7 @@ type FormData = { email: string; name?: string }
  */
 export function NewsletterSection({ dict }: NewsletterSectionProps) {
   const [submitted, setSubmitted] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
 
   // Build schema with translated error message
   const schema = z.object({
@@ -61,10 +62,10 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
     <section id="newsletter" className="py-24 px-4 lg:px-16 bg-muted/20">
       <div className="container mx-auto max-w-2xl">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="text-center mb-10"
         >
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/20 mb-5">
@@ -77,10 +78,10 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.15 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : 0.15 }}
         >
           {submitted ? (
             <div className="text-center py-8">

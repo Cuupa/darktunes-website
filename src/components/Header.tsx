@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import logoImage from '@/assets/images/logo_(1).png'
 import { useLenis } from '@/components/animations/LenisProvider'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -22,6 +22,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
   const lenis = useLenis()
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -135,9 +136,9 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
             className="lg:hidden border-t border-border overflow-hidden bg-background/98 backdrop-blur-md"
           >
             <nav id="mobile-menu" aria-label="Mobile navigation" className="container mx-auto px-4 py-6 flex flex-col gap-2">

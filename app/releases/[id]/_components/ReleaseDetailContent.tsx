@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +31,7 @@ interface ReleaseDetailContentProps {
  */
 export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailContentProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const prefersReducedMotion = useReducedMotion()
   const formattedDate = new Date(release.releaseDate).toLocaleDateString(dateLocale, {
     year: 'numeric',
     month: 'long',
@@ -86,9 +87,9 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
 
             {/* Metadata */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
+              transition={{ delay: prefersReducedMotion ? 0 : 0.15, duration: prefersReducedMotion ? 0 : 0.5 }}
               className="flex-1 min-w-0 space-y-5 pt-2"
             >
               <div className="flex flex-wrap gap-2">

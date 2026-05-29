@@ -439,7 +439,7 @@ export function ReleasesManager() {
                     type="button"
                     onClick={() => void handleToggleVisibility(release)}
                     title={release.isVisible ? 'Click to hide' : 'Click to show'}
-                    className="focus:outline-none"
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {release.isVisible ? (
                       <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">

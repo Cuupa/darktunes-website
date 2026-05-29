@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,15 +17,16 @@ interface ConcertsProps extends SectionProps {
 
 export function Concerts({ concerts, dict, locale }: ConcertsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const prefersReducedMotion = useReducedMotion()
 
   return (
     <section id="concerts" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="mb-12"
         >
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
@@ -34,10 +35,10 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
 
         {concerts.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           >
             <Card className="bg-card border-border p-8 text-center">
               <p className="text-lg font-semibold mb-2">{dict.noShows}</p>
@@ -52,10 +53,10 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
               return (
                 <motion.div
                   key={concert.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.08 }}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.08 }}
                 >
                   <Card className="bg-card border-border p-5 md:p-6">
                     <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

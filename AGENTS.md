@@ -39,10 +39,10 @@ LenisProvider uses ReactLenis from lenis/react (root mode) so any component can 
 useLenis is re-exported from src/components/animations/LenisProvider.tsx. Import from there (not directly from lenis/react) for consistency.
 For anchor-based scrolling in Header/Footer, use: const lenis = useLenis(); lenis?.scrollTo(href, { offset: -140 })
 
-WCAG 2.1 AA/AAA Accessibility
-All public-facing pages MUST comply with WCAG 2.1 AA at minimum; strive for AAA where feasible.
+WCAG 2.1 AA/AAA Accessibility — MANDATORY
+COMPLIANCE IS NON-NEGOTIABLE: Every public-facing page and component MUST comply with WCAG 2.1 AA as a hard requirement. Strive for AAA where feasible. Any new UI element introduced without meeting at minimum AA criteria is considered a defect and must be fixed before merging. Violations found in existing code must be remediated immediately.
 Skip Navigation: app/layout.tsx includes a sr-only skip link (<a href="#main-content">) as the first focusable element. The <main> element in HomePageContent.tsx carries id="main-content".
-Semantic HTML: Content grids (Artists, News, Videos, Releases) use <ul>/<li> with list-none to allow grid styling while preserving list semantics for screen readers.
+Semantic HTML: Content grids (Artists, News, Videos, Releases) use <ul>/<li> with list-none to allow grid styling while preserving list semantics for screen readers. Use <section> with aria-labelledby for major page sections.
 Reduced Motion (WCAG 2.3.3 – AAA): Import useReducedMotion from framer-motion in every animated component. When prefersReducedMotion is true, set duration: 0 and skip initial offset transforms.
 ARIA on dialogs: All Dialog components must set aria-labelledby pointing to the modal title's id. Close buttons must have a descriptive aria-label (e.g. "Close ${artist.name}"). Icons inside interactive elements must carry aria-hidden="true".
 Icon-only links: Any link that renders only an icon MUST have a descriptive aria-label (e.g. aria-label="`${artist.name} on Spotify`").
@@ -50,6 +50,18 @@ Touch Targets (WCAG 2.5.5 – AAA): Icon-only interactive elements must include 
 Navigation ARIA: Desktop <nav> must have aria-label="Main navigation". Mobile toggle button must have aria-expanded and aria-controls="mobile-menu". Mobile <nav> must have id="mobile-menu" and aria-label="Mobile navigation".
 Alt text: Images must have descriptive alt text, e.g. "${artist.name} – artist photo", "${release.title} by ${artistName} – cover art", "${video.title} – video thumbnail".
 Decorative elements (e.g. animated scroll-down indicator) must carry aria-hidden="true".
+Focus Visible (WCAG 2.4.7 – AA): Every interactive element (buttons, links, inputs) MUST display a visible focus indicator. Use focus-visible:outline or focus-visible:ring-2 ring-accent Tailwind utilities. Never use focus:outline-none without providing an equivalent focus-visible style.
+Toggle/Filter Buttons (WCAG 4.1.2 – AA): Stateful buttons that toggle or filter content MUST use aria-pressed="true|false" so screen readers can announce the pressed state. Do NOT use role="tab"/aria-selected for standalone toggle buttons that are not part of a tab panel widget.
+Color Contrast (WCAG 1.4.3 – AA): Foreground/background pairs must meet 4.5:1 for normal text and 3:1 for large text (≥18pt regular or ≥14pt bold). The project's `text-muted-foreground` (#a0a0a0 on #101010) provides ~7:1 and is AA-compliant. Do not reduce contrast below these thresholds.
+Language (WCAG 3.1.1 – A): The `<html>` element must always carry a `lang` attribute. The current value is resolved dynamically from the locale (app/layout.tsx). Never remove or hard-code it to an empty string.
+External Links (WCAG 2.4.4 – AA): External links that open in a new tab must carry rel="noopener noreferrer". If the link text alone is not descriptive, add an aria-label.
+
+Single Source of Truth (SSOT) / Server State Synchronization / Reactivity — MANDATORY
+All data displayed in the UI must originate from a single authoritative source — the Supabase database. The following principles are non-negotiable:
+SSOT: Each piece of data has exactly one owner. The Supabase `site_settings` table is the sole source for CMS settings (Impressum, Datenschutz, Hero, SEO, etc.). Admin UI components read and write exclusively to the DB via DAL functions; they must never maintain a separate in-memory copy as the primary record.
+Server State Synchronization: After any write to the database (upsert, insert, delete), the UI must immediately reflect the updated server state. For Next.js ISR pages (`unstable_cache`), the write path MUST call `/api/revalidate-site-settings` (or the relevant revalidation endpoint) so the ISR cache is purged and the next render shows fresh data. Stale data after a save is a defect.
+Reactivity / Data Binding: Client components that display persisted data MUST react to server state changes. Use optimistic updates sparingly and only where latency matters; always reconcile with the server response. Hooks that fetch data (e.g., `useSiteSettings`) must re-fetch after a successful mutation so local state stays in sync with the DB.
+Impressum & Datenschutz pages specifically: both pages use `unstable_cache` to fetch `site_settings`. The cache is invalidated by POSTing to `/api/revalidate-site-settings` after each admin save. The cache callback MUST use a cookie-free Supabase client (see the `unstable_cache` rule above) so that it works correctly during on-demand revalidation where no request-scoped cookies are available.
 
 Unit Testing & Quality Assurance
 Unit Testing: Write unit tests for all new utilities, API routes, and complex hooks using Vitest.

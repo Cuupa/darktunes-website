@@ -2,6 +2,7 @@
 
 import { useRef, useState, useMemo, useDeferredValue } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +18,6 @@ import {
   ShoppingBag,
   MagnifyingGlass,
 } from '@phosphor-icons/react'
-import { ArtistModal } from '@/components/ArtistModal'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
@@ -61,8 +61,6 @@ function getVisibleArtists(artists: Artist[]): Artist[] {
 }
 
 export function Artists({ artists, dict }: ArtistsProps) {
-  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const prefersReducedMotion = useReducedMotion()
   const stableVisibleArtistsRef = useRef<{ idsKey: string; artists: Artist[] }>({
@@ -97,11 +95,6 @@ export function Artists({ artists, dict }: ArtistsProps) {
         artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
     )
   }, [normalisedQuery, artists, stableVisibleArtists])
-
-  const handleArtistClick = (artist: Artist) => {
-    setSelectedArtist(artist)
-    setModalOpen(true)
-  }
 
   return (
     <>
@@ -153,9 +146,14 @@ export function Artists({ artists, dict }: ArtistsProps) {
                 variants={prefersReducedMotion ? undefined : itemVariants}
               >
                 <Card
-                  className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full cursor-pointer"
-                  onClick={() => handleArtistClick(artist)}
+                  className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full relative"
                 >
+                  {/* Stretched link — navigates to artist detail page. Social icons sit above via z-[2]. */}
+                  <Link
+                    href={`/artists/${artist.slug}`}
+                    className="absolute inset-0 z-[1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset rounded-[inherit]"
+                    aria-label={`${artist.name} – view profile`}
+                  />
                   <div className="relative aspect-square overflow-hidden">
                     {thumbUrl ? (
                       <Image
@@ -197,7 +195,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                     <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
                       {artist.bio}
                     </p>
-                    <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative z-[2] flex flex-wrap gap-2">
                       {artist.spotifyUrl && (
                         <a
                           href={artist.spotifyUrl}
@@ -307,12 +305,6 @@ export function Artists({ artists, dict }: ArtistsProps) {
         )}
       </div>
     </section>
-
-    <ArtistModal 
-      artist={selectedArtist} 
-      open={modalOpen} 
-      onClose={() => setModalOpen(false)}
-    />
     </>
   )
 }
