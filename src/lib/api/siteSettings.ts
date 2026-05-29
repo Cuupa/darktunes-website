@@ -1,8 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, RolePermissions } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, RolePermissions, HomepageSection } from '@/types'
 
 type DbClient = SupabaseClient<Database>
+
+/** Default homepage section order. Hero is always at top and is not listed here. */
+const DEFAULT_HOMEPAGE_SECTION_ORDER: HomepageSection[] = [
+  'releases',
+  'spotify',
+  'videos',
+  'concerts',
+  'news',
+  'newsletter',
+]
 
 /** Default feature toggle values — all features enabled by default. */
 const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
@@ -68,6 +78,7 @@ const DEFAULTS: SiteSettings = {
   heroContentType: 'release',
   heroFeaturedId: '',
   heroCustomBgUrl: '',
+  homepageSectionOrder: DEFAULT_HOMEPAGE_SECTION_ORDER,
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 }
 
@@ -161,6 +172,17 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     heroContentType: (map['hero_content_type'] === 'news' ? 'news' : 'release') as 'release' | 'news',
     heroFeaturedId: map['hero_featured_id'] ?? '',
     heroCustomBgUrl: map['hero_custom_bg_url'] ?? '',
+    homepageSectionOrder: (() => {
+      try {
+        const parsed = JSON.parse(map['homepage_section_order'] ?? '[]') as unknown
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid: HomepageSection[] = ['releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter']
+          const filtered = (parsed as string[]).filter((s): s is HomepageSection => valid.includes(s as HomepageSection))
+          if (filtered.length > 0) return filtered
+        }
+      } catch { /* ignore */ }
+      return DEFAULT_HOMEPAGE_SECTION_ORDER
+    })(),
     rolePermissions: (() => {
       try {
         const parsed = JSON.parse(map['role_permissions'] ?? '{}') as unknown

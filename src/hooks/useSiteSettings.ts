@@ -48,6 +48,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   aboutHeadline: '',
   aboutSubheading: '',
   aboutBody: '',
+  homepageSectionOrder: ['releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter'],
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -98,6 +99,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     about_subheading: s.aboutSubheading ?? '',
     about_body: s.aboutBody ?? '',
     role_permissions: JSON.stringify(s.rolePermissions ?? {}),
+    homepage_section_order: JSON.stringify(s.homepageSectionOrder ?? ['releases', 'spotify', 'videos', 'concerts', 'news', 'newsletter']),
   }
 }
 

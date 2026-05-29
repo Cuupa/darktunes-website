@@ -11,7 +11,7 @@ import { Footer } from '@/components/Footer'
 import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { motion, useReducedMotion } from 'framer-motion'
-import type { Release, NewsPost, Video, SiteSettings, Concert } from '@/types'
+import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface HomePageContentProps {
@@ -23,6 +23,16 @@ interface HomePageContentProps {
   dict: Dictionary
   locale: Locale
 }
+
+/** Default section order when none is configured. */
+const DEFAULT_SECTION_ORDER: HomepageSection[] = [
+  'releases',
+  'spotify',
+  'videos',
+  'concerts',
+  'news',
+  'newsletter',
+]
 
 /**
  * Client Component that renders the full home page.
@@ -89,6 +99,67 @@ export function HomePageContent({
       ? siteSettings.spotifyPlaylists
       : [{ label: 'Label Playlist', uri: siteSettings.spotifyPlaylistUri }]
 
+  const sectionOrder = siteSettings.homepageSectionOrder ?? DEFAULT_SECTION_ORDER
+
+  function renderSection(section: HomepageSection) {
+    switch (section) {
+      case 'releases':
+        return (
+          <motion.div
+            key="releases"
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
+          >
+            <Releases releases={releases} dict={dict.releases} locale={locale} autoplayMs={siteSettings.carouselAutoplayMs ?? 0} consentDict={dict.consent} />
+          </motion.div>
+        )
+      case 'spotify':
+        return (
+          <section key="spotify" id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
+            <div className="container mx-auto">
+              <motion.div
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
+                className="mb-8 text-center"
+              >
+                <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{dict.spotify.heading}</h2>
+                <p className="text-lg text-muted-foreground font-serif">{dict.spotify.subheading}</p>
+              </motion.div>
+              <SpotifyMultiPlayer
+                playlists={playlists}
+                placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
+                loadLabel={dict.consent.loadSpotify}
+              />
+            </div>
+          </section>
+        )
+      case 'videos':
+        return (
+          <Videos
+            key="videos"
+            videos={videos}
+            placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
+            dict={dict.videos}
+            consentDict={dict.consent}
+            locale={locale}
+            videosPerPage={siteSettings.videosPerPage}
+            videosLinkToPage={siteSettings.videosLinkToPage}
+          />
+        )
+      case 'concerts':
+        return <Concerts key="concerts" concerts={concerts} dict={dict.concerts} locale={locale} />
+      case 'news':
+        return <News key="news" news={news} dict={dict.news} locale={locale} />
+      case 'newsletter':
+        return <NewsletterSection key="newsletter" dict={dict.newsletter} />
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} />
@@ -110,47 +181,7 @@ export function HomePageContent({
           )}
         </div>
 
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
-        >
-          <Releases releases={releases} dict={dict.releases} locale={locale} autoplayMs={siteSettings.carouselAutoplayMs ?? 0} consentDict={dict.consent} />
-        </motion.div>
-
-        <section id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
-          <div className="container mx-auto">
-            <motion.div
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-              className="mb-8 text-center"
-            >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{dict.spotify.heading}</h2>
-              <p className="text-lg text-muted-foreground font-serif">{dict.spotify.subheading}</p>
-            </motion.div>
-            <SpotifyMultiPlayer
-              playlists={playlists}
-              placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-              loadLabel={dict.consent.loadSpotify}
-            />
-          </div>
-        </section>
-
-        <Videos
-          videos={videos}
-          placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-          dict={dict.videos}
-          consentDict={dict.consent}
-          locale={locale}
-          videosPerPage={siteSettings.videosPerPage}
-          videosLinkToPage={siteSettings.videosLinkToPage}
-        />
-        <Concerts concerts={concerts} dict={dict.concerts} locale={locale} />
-        <News news={news} dict={dict.news} locale={locale} />
-
-        <NewsletterSection dict={dict.newsletter} />
+        {sectionOrder.map((section) => renderSection(section))}
       </main>
       <Footer siteSettings={siteSettings} dict={dict.footer} />
     </div>

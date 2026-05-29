@@ -23,8 +23,30 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { SiteSettings } from '@/types'
+import type { SiteSettings, HomepageSection } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
+
+// ---------------------------------------------------------------------------
+// Homepage section ordering
+// ---------------------------------------------------------------------------
+
+const HOMEPAGE_SECTION_LABELS: Record<HomepageSection, string> = {
+  releases: 'Releases',
+  spotify: 'Spotify Player',
+  videos: 'Videos',
+  concerts: 'Concerts',
+  news: 'News',
+  newsletter: 'Newsletter',
+}
+
+const DEFAULT_SECTION_ORDER: HomepageSection[] = [
+  'releases',
+  'spotify',
+  'videos',
+  'concerts',
+  'news',
+  'newsletter',
+]
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -144,6 +166,51 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   const heroBgInputRef = useRef<HTMLInputElement>(null)
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
+  // Section ordering state (managed outside RHF as it's an array not in the schema)
+  const [sectionOrder, setSectionOrder] = useState<HomepageSection[]>(
+    () => settings?.homepageSectionOrder ?? DEFAULT_SECTION_ORDER,
+  )
+  const dragIndexRef = useRef<number | null>(null)
+
+  function moveSectionUp(index: number) {
+    if (index === 0) return
+    setSectionOrder((prev) => {
+      const next = [...prev]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      return next
+    })
+  }
+
+  function moveSectionDown(index: number) {
+    setSectionOrder((prev) => {
+      if (index === prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+      return next
+    })
+  }
+
+  function handleDragStart(index: number) {
+    dragIndexRef.current = index
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault()
+    const from = dragIndexRef.current
+    if (from === null || from === index) return
+    setSectionOrder((prev) => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(index, 0, item)
+      return next
+    })
+    dragIndexRef.current = index
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null
+  }
+
   async function uploadFile(file: File, fieldName: 'logoUrl' | 'faviconUrl' | 'heroCustomBgUrl', setUploading: (v: boolean) => void) {
     setUploading(true)
     try {
@@ -171,13 +238,14 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   // Sync form state when settings load from Supabase
   useEffect(() => {
     reset(settings)
+    setSectionOrder(settings?.homepageSectionOrder ?? DEFAULT_SECTION_ORDER)
   }, [settings, reset])
 
   const onSubmit = async (data: FormData) => {
     try {
       // Merge form data with current settings so fields not rendered in this
       // form (featureToggles, rolePermissions) are never silently overwritten.
-      await saveSettings({ ...settings, ...data } as SiteSettings)
+      await saveSettings({ ...settings, ...data, homepageSectionOrder: sectionOrder } as SiteSettings)
       toast.success('Site settings saved successfully')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save settings')
@@ -708,6 +776,53 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     />
                   )}
                 />
+              </div>
+
+              {/* Section order */}
+              <div className="space-y-3 pt-2">
+                <div className="space-y-1">
+                  <Label>Section Order</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Drag rows or use the arrows to set the display order of homepage sections. The Hero is always at the top.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {sectionOrder.map((section, index) => (
+                    <div
+                      key={section}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 cursor-grab active:cursor-grabbing select-none"
+                    >
+                      <span className="text-muted-foreground text-sm w-5 shrink-0">{index + 1}.</span>
+                      <span className="flex-1 text-sm font-medium">{HOMEPAGE_SECTION_LABELS[section]}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moveSectionUp(index)}
+                          disabled={isSubmitting || index === 0}
+                          title="Move up"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moveSectionDown(index)}
+                          disabled={isSubmitting || index === sectionOrder.length - 1}
+                          title="Move down"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
