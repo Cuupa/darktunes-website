@@ -17,12 +17,12 @@ export default tseslint.config(
     },
     plugins: {
       'react-hooks': reactHooks,
-      '@next/next': nextPlugin,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      ...nextPlugin.configs.recommended.rules,
     },
   },
+  // Use the flat-config export so Next.js detects the plugin during `next build`.
+  nextPlugin.flatConfig.recommended,
 )
 

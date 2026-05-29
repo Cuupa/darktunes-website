@@ -91,7 +91,7 @@ export default async function ImpressumPage() {
           {/* § 5 TMG — Angaben gemäß § 5 TMG */}
           <section>
             <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
-              Angaben gemäß § 5 TMG
+              Angaben gemäß § 5 DDG
             </h2>
             <p className="font-semibold">{settings.impressumCompanyName}</p>
             {settings.impressumLegalForm && (
@@ -168,6 +168,28 @@ export default async function ImpressumPage() {
             </section>
           )}
 
+          {/* Streitschlichtung */}
+          <section>
+            <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
+              Streitschlichtung
+            </h2>
+            <p className="text-muted-foreground mb-2">
+              Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:{' '}
+              <a
+                href="https://ec.europa.eu/consumers/odr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors underline"
+              >
+                https://ec.europa.eu/consumers/odr/
+              </a>
+            </p>
+            <p className="text-muted-foreground">
+              Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer
+              Verbraucherschlichtungsstelle teilzunehmen.
+            </p>
+          </section>
+
           {/* Haftungsausschluss */}
           <section>
             <h2 className="text-lg font-bold uppercase tracking-wider mb-3 text-foreground">
@@ -177,7 +199,7 @@ export default async function ImpressumPage() {
             <p className="text-muted-foreground mb-4">
               Die Inhalte unserer Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit,
               Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen.
-              Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten
+              Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten
               nach den allgemeinen Gesetzen verantwortlich.
             </p>
             <h3 className="font-semibold mb-1">Haftung für Links</h3>

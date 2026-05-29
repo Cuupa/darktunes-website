@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag } from '@phosphor-icons/react'
 import { useLenis } from '@/components/animations/LenisProvider'
 import type { SiteSettings } from '@/types'
@@ -36,10 +37,14 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           <div>
             <div className="flex items-center gap-3 mb-4">
               {siteSettings.logoUrl || siteSettings.faviconUrl ? (
-                <img
-                  src={siteSettings.logoUrl || siteSettings.faviconUrl}
+                <Image
+                  src={siteSettings.logoUrl || siteSettings.faviconUrl!}
                   alt={`${siteSettings.labelName} logo`}
+                  width={160}
+                  height={40}
                   className="h-10 w-auto object-contain"
+                  style={{ width: 'auto' }}
+                  unoptimized
                 />
               ) : (
                 <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">

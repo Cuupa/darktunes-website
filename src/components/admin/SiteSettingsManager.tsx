@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -81,6 +82,8 @@ const schema = z.object({
   aboutHeadline: z.string().optional().default(''),
   aboutSubheading: z.string().optional().default(''),
   aboutBody: z.string().optional().default(''),
+  shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+  youtubeChannelId: z.string().optional().default(''),
 })
 
 type FormData = z.input<typeof schema>
@@ -172,7 +175,9 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
 
   const onSubmit = async (data: FormData) => {
     try {
-      await saveSettings(data as SiteSettings)
+      // Merge form data with current settings so fields not rendered in this
+      // form (featureToggles, rolePermissions) are never silently overwritten.
+      await saveSettings({ ...settings, ...data } as SiteSettings)
       toast.success('Site settings saved successfully')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save settings')
@@ -275,7 +280,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 <Label>Label Logo</Label>
                 {logoUrl && (
                   <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
-                    <img src={logoUrl} alt="Current logo" className="h-12 w-auto object-contain max-w-[200px]" />
+                    <Image src={logoUrl} alt="Current logo" width={200} height={48} className="h-12 w-auto object-contain max-w-[200px]" style={{ width: 'auto' }} unoptimized />
                     <Button
                       type="button"
                       variant="ghost"
@@ -321,7 +326,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 <Label>Favicon</Label>
                 {faviconUrl && (
                   <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
-                    <img src={faviconUrl} alt="Current favicon" className="h-8 w-8 object-contain" />
+                    <Image src={faviconUrl} alt="Current favicon" width={32} height={32} className="h-8 w-8 object-contain" unoptimized />
                     <span className="text-sm text-muted-foreground font-mono truncate max-w-xs">{faviconUrl}</span>
                     <Button
                       type="button"
@@ -454,6 +459,24 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   id="spotifyUrl"
                   placeholder="https://open.spotify.com/user/..."
                   {...register('spotifyUrl')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="shopifyStoreUrl" label="Shopify / Merch Store URL" error={errors.shopifyStoreUrl?.message}>
+                <Input
+                  id="shopifyStoreUrl"
+                  placeholder="https://your-store.myshopify.com"
+                  {...register('shopifyStoreUrl')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="youtubeChannelId" label="YouTube Channel ID" error={errors.youtubeChannelId?.message}>
+                <Input
+                  id="youtubeChannelId"
+                  placeholder="UCxxxxxxxxxxxxxxxxxxxxxxxx"
+                  {...register('youtubeChannelId')}
                   disabled={isSubmitting}
                 />
               </Field>
@@ -856,9 +879,9 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Impressum (§ 5 TMG)</CardTitle>
+                <CardTitle>Impressum (§ 5 DDG)</CardTitle>
                 <CardDescription>
-                  Pflichtangaben für das Impressum nach deutschem Recht. Diese Daten erscheinen auf
+                  Pflichtangaben für das Impressum nach deutschem Recht (DDG/ehem. TMG). Diese Daten erscheinen auf
                   der Seite /impressum.
                 </CardDescription>
               </CardHeader>

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
+import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
@@ -163,11 +164,13 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
                   }`}
                 >
                   <div className="relative aspect-square overflow-hidden">
-                    <img
+                    <Image
                       src={getOptimizedImageUrl(release.coverArt, 600)}
                       alt={`${release.title} – cover art`}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
                       draggable={false}
+                      unoptimized
                     />
                     {/* Gradient overlay on centre card */}
                     {isCenter && (

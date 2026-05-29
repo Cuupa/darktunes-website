@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -135,13 +136,13 @@ export function VideosPageContent({
                     }}
                   >
                     <div className="relative aspect-video overflow-hidden shrink-0">
-                      <img
+                      <Image
                         src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                         alt={`${video.title} – video thumbnail`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        loading="lazy"
-                        decoding="async"
+                        unoptimized
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
                         <Button

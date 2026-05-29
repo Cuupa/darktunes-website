@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ContentPagination } from '@/components/ContentPagination'
 import type { NewsPost } from '@/types'
@@ -44,10 +45,12 @@ export function NewsList({ posts, dict }: NewsListProps) {
           >
             {post.imageUrl && (
               <div className="relative aspect-video overflow-hidden">
-                <img
+                <Image
                   src={post.imageUrl}
                   alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-700"
+                  unoptimized
                 />
               </div>
             )}

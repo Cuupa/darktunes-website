@@ -9,6 +9,7 @@
 
 import { useState, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -85,12 +86,13 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                 aria-label={artist.name}
               >
                 {artist.imageUrl ? (
-                  <img
+                  <Image
                     src={getSquareThumbnail(artist.imageUrl, 400)}
                     alt={`${artist.name} – artist photo`}
-                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110"
-                    loading="lazy"
-                    decoding="async"
+                    fill
+                    className="object-cover object-center transition-transform duration-500 group-hover:scale-110"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    unoptimized
                   />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">
@@ -105,12 +107,13 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
                   {artist.logoUrl ? (
-                    <img
+                    <Image
                       src={getOptimizedImageUrl(artist.logoUrl, 300)}
                       alt={`${artist.name} – logo`}
+                      width={200}
+                      height={200}
                       className="max-w-full max-h-full object-contain"
-                      loading="lazy"
-                      decoding="async"
+                      unoptimized
                     />
                   ) : (
                     <p className="text-white font-bold text-lg text-center leading-tight">{artist.name}</p>

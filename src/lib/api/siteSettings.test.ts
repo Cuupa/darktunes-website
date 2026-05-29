@@ -212,3 +212,168 @@ describe('upsertSiteSettings', () => {
     await expect(upsertSiteSettings(db, { label_name: 'X' })).rejects.toThrow('Batch upsert failed')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Round-trip tests: verify every admin-form field is correctly stored/read back
+// ---------------------------------------------------------------------------
+
+describe('getSiteSettings – round-trip for all admin-managed fields', () => {
+  it('maps shopifyStoreUrl and youtubeChannelId from DB rows', async () => {
+    const db = makeMockDb([
+      { key: 'shopify_store_url', value: 'https://store.myshopify.com' },
+      { key: 'youtube_channel_id', value: 'UCabcdef1234567890' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.shopifyStoreUrl).toBe('https://store.myshopify.com')
+    expect(result.youtubeChannelId).toBe('UCabcdef1234567890')
+  })
+
+  it('returns empty string defaults for shopifyStoreUrl and youtubeChannelId when absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.shopifyStoreUrl).toBe('')
+    expect(result.youtubeChannelId).toBe('')
+  })
+
+  it('maps hero section fields (heroContentType, heroFeaturedId, heroCustomBgUrl)', async () => {
+    const db = makeMockDb([
+      { key: 'hero_content_type', value: 'news' },
+      { key: 'hero_featured_id', value: 'my-slug' },
+      { key: 'hero_custom_bg_url', value: 'https://cdn.example.com/bg.webp' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.heroContentType).toBe('news')
+    expect(result.heroFeaturedId).toBe('my-slug')
+    expect(result.heroCustomBgUrl).toBe('https://cdn.example.com/bg.webp')
+  })
+
+  it('defaults heroContentType to "release" when key is absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.heroContentType).toBe('release')
+    expect(result.heroFeaturedId).toBe('')
+    expect(result.heroCustomBgUrl).toBe('')
+  })
+
+  it('maps branding fields (logoUrl, faviconUrl)', async () => {
+    const db = makeMockDb([
+      { key: 'logo_url', value: 'https://cdn.example.com/logo.svg' },
+      { key: 'favicon_url', value: 'https://cdn.example.com/favicon.png' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.logoUrl).toBe('https://cdn.example.com/logo.svg')
+    expect(result.faviconUrl).toBe('https://cdn.example.com/favicon.png')
+  })
+
+  it('returns empty strings for logoUrl and faviconUrl when absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.logoUrl).toBe('')
+    expect(result.faviconUrl).toBe('')
+  })
+
+  it('maps About page fields (aboutHeadline, aboutSubheading, aboutBody)', async () => {
+    const db = makeMockDb([
+      { key: 'about_headline', value: 'Our Story' },
+      { key: 'about_subheading', value: 'Est. 2020' },
+      { key: 'about_body', value: '## History\nFounded in Berlin.' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.aboutHeadline).toBe('Our Story')
+    expect(result.aboutSubheading).toBe('Est. 2020')
+    expect(result.aboutBody).toBe('## History\nFounded in Berlin.')
+  })
+
+  it('maps carousel and videos settings', async () => {
+    const db = makeMockDb([
+      { key: 'carousel_autoplay_ms', value: '4000' },
+      { key: 'videos_per_page', value: '12' },
+      { key: 'videos_link_to_page', value: 'true' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.carouselAutoplayMs).toBe(4000)
+    expect(result.videosPerPage).toBe(12)
+    expect(result.videosLinkToPage).toBe(true)
+  })
+
+  it('returns defaults for carousel and videos when keys are absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.carouselAutoplayMs).toBe(0)
+    expect(result.videosPerPage).toBe(9)
+    expect(result.videosLinkToPage).toBe(false)
+  })
+
+  it('maps role permissions from DB row', async () => {
+    const customPerms = {
+      admin: { canPublishNews: true, canEditNews: true, canManageArtists: true, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
+      editor: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
+    }
+    const db = makeMockDb([
+      { key: 'role_permissions', value: JSON.stringify(customPerms) },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.rolePermissions?.admin.canPublishNews).toBe(true)
+    expect(result.rolePermissions?.editor.canPublishNews).toBe(false)
+  })
+
+  it('returns default role permissions when key is absent', async () => {
+    const db = makeMockDb([])
+    const result = await getSiteSettings(db)
+    expect(result.rolePermissions?.admin.canViewAdminPanel).toBe(true)
+    expect(result.rolePermissions?.user.canViewAdminPanel).toBe(false)
+  })
+
+  it('falls back to default role permissions on invalid JSON', async () => {
+    const db = makeMockDb([{ key: 'role_permissions', value: '{bad json' }])
+    const result = await getSiteSettings(db)
+    expect(result.rolePermissions?.admin.canViewAdminPanel).toBe(true)
+  })
+
+  it('maps all social URLs including spotify playlists with theme and accent', async () => {
+    const playlists = [
+      { label: 'Mix A', uri: 'spotify:playlist:abc', theme: 'light', accentColor: '#ff0000' },
+      { label: 'Mix B', uri: 'spotify:playlist:def', theme: 'dark', accentColor: '' },
+    ]
+    const db = makeMockDb([
+      { key: 'instagram_url', value: 'https://instagram.com/test' },
+      { key: 'youtube_url', value: 'https://youtube.com/@test' },
+      { key: 'spotify_url', value: 'https://open.spotify.com/user/test' },
+      { key: 'spotify_playlists', value: JSON.stringify(playlists) },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.instagramUrl).toBe('https://instagram.com/test')
+    expect(result.spotifyPlaylists).toHaveLength(2)
+    expect(result.spotifyPlaylists[0].theme).toBe('light')
+    expect(result.spotifyPlaylists[0].accentColor).toBe('#ff0000')
+    expect(result.spotifyPlaylists[1].theme).toBe('dark')
+  })
+
+  it('maps all impressum fields including consent placeholder', async () => {
+    const db = makeMockDb([
+      { key: 'impressum_company_name', value: 'ACME GmbH' },
+      { key: 'impressum_legal_form', value: 'GmbH' },
+      { key: 'impressum_representative', value: 'Jane Doe' },
+      { key: 'impressum_address', value: 'Musterstraße 1\n10115 Berlin' },
+      { key: 'impressum_vat_id', value: 'DE987654321' },
+      { key: 'impressum_register_court', value: 'Amtsgericht Berlin-Charlottenburg' },
+      { key: 'impressum_register_number', value: 'HRB 99999' },
+      { key: 'impressum_phone', value: '+49 30 999888' },
+      { key: 'impressum_email', value: 'contact@acme.com' },
+      { key: 'datenschutz_content', value: '## Datenschutz\nText here.' },
+      { key: 'consent_placeholder_url', value: 'https://cdn.example.com/placeholder.jpg' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.impressumCompanyName).toBe('ACME GmbH')
+    expect(result.impressumLegalForm).toBe('GmbH')
+    expect(result.impressumRepresentative).toBe('Jane Doe')
+    expect(result.impressumAddress).toBe('Musterstraße 1\n10115 Berlin')
+    expect(result.impressumVatId).toBe('DE987654321')
+    expect(result.impressumRegisterCourt).toBe('Amtsgericht Berlin-Charlottenburg')
+    expect(result.impressumRegisterNumber).toBe('HRB 99999')
+    expect(result.impressumPhone).toBe('+49 30 999888')
+    expect(result.impressumEmail).toBe('contact@acme.com')
+    expect(result.datenschutzContent).toBe('## Datenschutz\nText here.')
+    expect(result.consentPlaceholderUrl).toBe('https://cdn.example.com/placeholder.jpg')
+  })
+})

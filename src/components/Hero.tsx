@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, useReducedMotion, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -74,20 +75,19 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
-      {/* Hero background — using <img> instead of CSS background-image so the
-          browser can apply fetchPriority="high" and start loading the LCP
-          image as early as possible, before CSSOM construction completes. */}
+      {/* Hero background — Next.js Image with priority delivers fetchPriority="high"
+          + eager loading for the LCP image before CSSOM construction completes. */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         {bgUrl && (
-          <img
+          <Image
             src={bgUrl}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-center"
+            fill
+            className="object-cover object-center"
             sizes="100vw"
-            fetchPriority="high"
-            loading="eager"
-            decoding="sync"
+            priority
+            unoptimized
           />
         )}
         <div
@@ -155,11 +155,13 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
               className="relative hidden lg:block"
             >
               <div className="glow-card relative aspect-square rounded-lg overflow-hidden shadow-2xl shadow-accent/20">
-                <img 
+                <Image 
                   src={coverImageUrl}
                   alt={heroTitle}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
                   sizes="50vw"
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
               </div>

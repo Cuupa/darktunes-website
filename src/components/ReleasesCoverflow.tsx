@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState, useRef, useMemo } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import type { EmblaCarouselType } from 'embla-carousel'
 import { useReducedMotion } from 'framer-motion'
+import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -387,18 +388,18 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0, cons
                                 />
                               </div>
                             )}
-                            <img
+                            <Image
                               src={getOptimizedImageUrl(release.coverArt, 600)}
                               alt={`${release.title} by ${release.artistName} – cover art`}
-                              className={`w-full h-full aspect-square object-cover transition-opacity duration-300 ${
+                              fill
+                              className={`object-cover transition-opacity duration-300 ${
                                 imageLoaded ? 'opacity-100' : 'opacity-0'
                               }`}
                               sizes="(max-width: 640px) 60vw, 320px"
                               draggable={false}
-                              loading={isActive ? 'eager' : 'lazy'}
-                              fetchPriority={isActive ? 'high' : 'auto'}
-                              decoding="async"
+                              priority={isActive}
                               onLoad={() => markImageLoaded(release.id)}
+                              unoptimized
                             />
                             {/* Cinematic gradient overlay on centre card */}
                             {isActive && (
