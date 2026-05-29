@@ -282,7 +282,7 @@ describe('linkArtistToUser', () => {
     expect(db.from).toHaveBeenCalledWith('artists')
     expect(builder.update).toHaveBeenCalledWith({ user_id: 'user-1' })
     expect(builder.eq).toHaveBeenCalledWith('id', 'artist-1')
-    expect(builder.is).toHaveBeenCalledWith('user_id', null)
+    expect(builder.is).not.toHaveBeenCalled()
   })
 })
 
