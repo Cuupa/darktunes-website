@@ -18,23 +18,34 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ---------------------------------------------------------------------------
 -- SCHEMA PERMISSIONS
--- PostgreSQL 15+ revoked CREATE on the public schema from PUBLIC by default.
--- Explicitly grant it to postgres so that DO blocks (and direct DDL) can
--- create types, functions, and triggers in this schema without hitting
--- "permission denied for schema public".
 -- ---------------------------------------------------------------------------
-GRANT USAGE, CREATE ON SCHEMA public TO postgres;
-GRANT USAGE, CREATE ON SCHEMA public TO authenticated;
-GRANT USAGE, CREATE ON SCHEMA public TO anon;
+-- MANUAL PREREQUISITE: Run these commands FIRST in Supabase Dashboard SQL Editor
+-- (requires postgres superuser or schema owner privileges):
+--
+--   ALTER SCHEMA public OWNER TO postgres;
+--   GRANT ALL ON SCHEMA public TO postgres;
+--   GRANT USAGE, CREATE ON SCHEMA public TO authenticated, anon, service_role;
+--
+-- These grants cannot be executed within this script because the Supabase
+-- Dashboard SQL Editor does not run with sufficient privileges.
+-- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
 -- ENUM TYPES
 -- ---------------------------------------------------------------------------
--- Create types directly (NOT inside DO blocks) so schema grants apply in
--- dashboard execution contexts.
-CREATE TYPE IF NOT EXISTS public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
-CREATE TYPE IF NOT EXISTS public.release_type AS ENUM ('album', 'ep', 'single');
-CREATE TYPE IF NOT EXISTS public.sync_status AS ENUM ('success', 'partial', 'error');
+-- Create types using DO blocks with EXCEPTION handling for true idempotency.
+-- This approach works in Supabase Dashboard without requiring schema OWNER rights.
+DO $$ BEGIN
+  CREATE TYPE public.user_role AS ENUM ('admin', 'editor', 'user', 'journalist', 'artist');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.sync_status AS ENUM ('success', 'partial', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Ensure 'journalist' exists even if the type was created without it
 DO $$

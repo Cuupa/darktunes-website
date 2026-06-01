@@ -147,22 +147,45 @@ describe('supabase/reset.sql — static analysis', () => {
     expect(violations, violations.join('\n')).toHaveLength(0)
   })
 
-  // ── CREATE TYPE should be direct and idempotent ──────────────────────────
-  it('all CREATE TYPE statements use IF NOT EXISTS and are outside DO blocks', () => {
+  // ── CREATE TYPE should be idempotent (IF NOT EXISTS or DO block) ────────
+  it('all CREATE TYPE statements are idempotent', () => {
     const violations: string[] = []
     let insideDoBlock = false
+    let doBlockHasException = false
+    // Collects CREATE TYPE lines inside the current DO block; flushed on END $$
+    const pendingDoBlockChecks: string[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const clean = stripComment(lines[i])
-      if (/^\s*DO\s+\$\$/i.test(lines[i])) insideDoBlock = true
-      if (insideDoBlock && /END\s+\$\$/i.test(lines[i])) insideDoBlock = false
+
+      if (/^\s*DO\s+\$\$/i.test(lines[i])) {
+        insideDoBlock = true
+        doBlockHasException = false
+        pendingDoBlockChecks.length = 0
+      }
+
+      if (insideDoBlock && /EXCEPTION\s+WHEN\s+duplicate_object/i.test(clean)) {
+        doBlockHasException = true
+      }
+
+      // Process END $$ after checking EXCEPTION so a same-line "EXCEPTION … END $$" works
+      if (insideDoBlock && /END\s+\$\$/i.test(lines[i])) {
+        insideDoBlock = false
+        if (!doBlockHasException) {
+          violations.push(...pendingDoBlockChecks)
+        }
+        pendingDoBlockChecks.length = 0
+      }
 
       if (/^CREATE\s+TYPE\b/i.test(clean)) {
-        if (!/^CREATE\s+TYPE\s+IF\s+NOT\s+EXISTS\b/i.test(clean)) {
-          violations.push(`Line ${i + 1}: CREATE TYPE without IF NOT EXISTS: ${lines[i].trim()}`)
+        const hasIfNotExists = /^CREATE\s+TYPE\s+IF\s+NOT\s+EXISTS\b/i.test(clean)
+
+        if (!hasIfNotExists && !insideDoBlock) {
+          violations.push(`Line ${i + 1}: CREATE TYPE without IF NOT EXISTS or DO block: ${lines[i].trim()}`)
         }
+
         if (insideDoBlock) {
-          violations.push(`Line ${i + 1}: CREATE TYPE appears inside DO block: ${lines[i].trim()}`)
+          pendingDoBlockChecks.push(`Line ${i + 1}: CREATE TYPE in DO block without EXCEPTION WHEN duplicate_object: ${lines[i].trim()}`)
         }
       }
     }
