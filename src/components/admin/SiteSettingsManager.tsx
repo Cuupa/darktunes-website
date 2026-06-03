@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { SiteSettings, HomepageSection } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
@@ -38,15 +39,6 @@ const HOMEPAGE_SECTION_LABELS: Record<HomepageSection, string> = {
   news: 'News',
   newsletter: 'Newsletter',
 }
-
-const DEFAULT_SECTION_ORDER: HomepageSection[] = [
-  'releases',
-  'spotify',
-  'videos',
-  'concerts',
-  'news',
-  'newsletter',
-]
 
 // ---------------------------------------------------------------------------
 // Validation schema

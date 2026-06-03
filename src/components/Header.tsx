@@ -9,15 +9,18 @@ import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import logoImage from '@/assets/images/logo_(1).png'
 import { useLenis } from '@/components/animations/LenisProvider'
+import { buildNavItems } from '@/config/sections'
 import type { Dictionary, Locale } from '@/i18n/types'
+import type { HomepageSection } from '@/types'
 
 interface HeaderProps {
   dict: Dictionary['navigation']
   locale: Locale
   logoUrl?: string
+  sectionOrder?: HomepageSection[]
 }
 
-export function Header({ dict, locale, logoUrl }: HeaderProps) {
+export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
@@ -33,17 +36,13 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const navItems = [
-    { label: dict.home, href: '#hero' },
-    { label: dict.artists, href: '/artists', isLink: true },
-    { label: dict.about, href: '/about', isLink: true },
-    { label: dict.releases, href: '#releases' },
-    { label: dict.tour, href: '#concerts' },
-    { label: dict.news, href: '/news', isLink: true },
-    { label: dict.videos, href: '#videos' },
-    { label: dict.contact, href: '/contact', isLink: true },
-    { label: dict.shop, href: 'https://darkmerch.com/', isLink: true, external: true },
-  ]
+  const navItems = buildNavItems(sectionOrder).map((item) => ({
+    id: item.id,
+    label: dict[item.labelKey],
+    href: item.href,
+    isLink: item.routeType !== 'anchor',
+    external: item.routeType === 'external',
+  }))
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
     e.preventDefault()
@@ -89,7 +88,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
           <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
             {navItems.map((item) => (
               <Button
-                key={item.label}
+                key={item.id}
                 variant="ghost"
                 asChild
                 className="text-sm font-medium tracking-wider transition-colors"
@@ -105,9 +104,6 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
                 )}
               </Button>
             ))}
-            <Button className="ml-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider transition-all hover:scale-105" asChild>
-              <Link href="/newsletter">{dict.newsletter}</Link>
-            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -145,7 +141,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
               {navItems.map((item) => (
                 item.isLink ? (
                   <Button
-                    key={item.label}
+                    key={item.id}
                     variant="ghost"
                     className="justify-start text-base font-medium tracking-wider"
                     asChild
@@ -159,7 +155,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
                   </Button>
                 ) : (
                   <Button
-                    key={item.label}
+                    key={item.id}
                     variant="ghost"
                     className="justify-start text-base font-medium tracking-wider"
                     onClick={(e) => {
@@ -171,9 +167,6 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
                   </Button>
                 )
               ))}
-              <Button className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider" asChild>
-                <Link href="/newsletter">{dict.newsletter}</Link>
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"

@@ -10,6 +10,7 @@ import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
+import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -23,16 +24,6 @@ interface HomePageContentProps {
   dict: Dictionary
   locale: Locale
 }
-
-/** Default section order when none is configured. */
-const DEFAULT_SECTION_ORDER: HomepageSection[] = [
-  'releases',
-  'spotify',
-  'videos',
-  'concerts',
-  'news',
-  'newsletter',
-]
 
 /**
  * Client Component that renders the full home page.
@@ -107,6 +98,7 @@ export function HomePageContent({
         return (
           <motion.div
             key="releases"
+            id="releases"
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
@@ -138,23 +130,36 @@ export function HomePageContent({
         )
       case 'videos':
         return (
-          <Videos
-            key="videos"
-            videos={videos}
-            placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-            dict={dict.videos}
-            consentDict={dict.consent}
-            locale={locale}
-            videosPerPage={siteSettings.videosPerPage}
-            videosLinkToPage={siteSettings.videosLinkToPage}
-          />
+          <div key="videos" id="videos">
+            <Videos
+              videos={videos}
+              placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
+              dict={dict.videos}
+              consentDict={dict.consent}
+              locale={locale}
+              videosPerPage={siteSettings.videosPerPage}
+              videosLinkToPage={siteSettings.videosLinkToPage}
+            />
+          </div>
         )
       case 'concerts':
-        return <Concerts key="concerts" concerts={concerts} dict={dict.concerts} locale={locale} />
+        return (
+          <div key="concerts" id="concerts">
+            <Concerts concerts={concerts} dict={dict.concerts} locale={locale} />
+          </div>
+        )
       case 'news':
-        return <News key="news" news={news} dict={dict.news} locale={locale} />
+        return (
+          <div key="news" id="news">
+            <News news={news} dict={dict.news} locale={locale} />
+          </div>
+        )
       case 'newsletter':
-        return <NewsletterSection key="newsletter" dict={dict.newsletter} />
+        return (
+          <div key="newsletter" id="newsletter">
+            <NewsletterSection dict={dict.newsletter} />
+          </div>
+        )
       default:
         return null
     }
@@ -162,7 +167,7 @@ export function HomePageContent({
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} />
+      <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} sectionOrder={sectionOrder} />
       <main id="main-content">
         <div className="relative">
           <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />
