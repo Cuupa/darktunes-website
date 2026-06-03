@@ -116,7 +116,10 @@ export function VideosPageContent({
           </p>
         ) : (
           <>
+            {/* key={currentPage} forces remount on page change so initial→visible
+                animation replays and new items animate in. */}
             <motion.ul
+              key={currentPage}
               className="list-none grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10"
               variants={prefersReducedMotion ? undefined : listVariants}
               initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
