@@ -19,7 +19,7 @@
     "perf:dev": "next dev --turbo",
     "perf:build": "next build --profile",
     "perf:analyze": "ANALYZE=true npm run build",
-    "perf:lighthouse": "node_modules/.bin/lhci collect && node_modules/.bin/lhci assert",
+    "perf:lighthouse": "node_modules/.bin/lhci collect --config=lighthouserc.cjs && node_modules/.bin/lhci assert --config=lighthouserc.cjs",
     "perf:test": "playwright test tests/performance"
   },
   "dependencies": {

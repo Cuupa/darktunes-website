@@ -1,9 +1,10 @@
-export default {
+/** @type {import('@lhci/cli').LighthouseRcConfig} */
+module.exports = {
   ci: {
     collect: {
       startServerCommand: 'npm run preview',
       startServerReadyPattern: 'Ready on',
-      startServerReadyTimeout: 60_000,
+      startServerReadyTimeout: 60000,
       url: [
         'http://localhost:3000/',
         'http://localhost:3000/artists',

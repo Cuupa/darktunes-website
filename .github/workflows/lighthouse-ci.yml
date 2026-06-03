@@ -25,9 +25,15 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Collect Lighthouse reports
-        run: node_modules/.bin/lhci collect
+        run: node_modules/.bin/lhci collect --config=lighthouserc.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Assert Lighthouse budgets
-        run: node_modules/.bin/lhci assert
+        run: node_modules/.bin/lhci assert --config=lighthouserc.cjs
