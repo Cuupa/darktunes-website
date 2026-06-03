@@ -517,6 +517,79 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     results.push(odesliResult)
   }
 
+  // 7. Odesli platform links for artists — finds all artists that have a
+  // Spotify URL or Apple Music URL but no platform_links yet, and resolves
+  // each one through Odesli to populate per-platform streaming URLs.
+  if (!onlyApi || onlyApi === 'odesli') {
+    const odesliArtistResult: ApiSyncResult = {
+      api: 'odesli',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      errors: [],
+    }
+
+    try {
+      const { data: artistsWithoutPlatformLinks, error: batchErr } = await db
+        .from('artists')
+        .select('id, spotify_url, apple_music_url')
+        .is('platform_links', null)
+        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+
+      if (batchErr) {
+        odesliArtistResult.errors.push(`Odesli artist batch query failed: ${batchErr.message}`)
+      }
+
+      for (const artist of artistsWithoutPlatformLinks ?? []) {
+        const musicUrl = artist.spotify_url ?? artist.apple_music_url
+        if (!musicUrl) continue
+
+        odesliArtistResult.artistsProcessed++
+
+        try {
+          let odesliErr: string | null = null
+          let odesli: Awaited<ReturnType<typeof resolveOdesliSmartLink>> | null = null
+          try {
+            odesli = await withExponentialBackoff(() =>
+              resolveOdesliSmartLink(musicUrl, fetchFn),
+            )
+          } catch (e) {
+            odesliErr = String(e)
+          }
+
+          if (odesli && Object.keys(odesli.platforms).length > 0) {
+            const { error: updateErr } = await db
+              .from('artists')
+              .update({ platform_links: odesli.platforms })
+              .eq('id', artist.id)
+
+            if (updateErr) {
+              odesliArtistResult.errors.push(
+                `Odesli DB update for artist ${artist.id}: ${updateErr.message}`,
+              )
+            } else {
+              odesliArtistResult.releasesUpserted++ // counts artist updates (field reused for parity)
+            }
+          } else if (odesliErr) {
+            // 404/no-match responses are expected for some artists — skip silently
+            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+              odesliArtistResult.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
+            }
+            if (odesliErr.includes('429')) odesliArtistResult.rateLimited = true
+          }
+        } catch (e) {
+          odesliArtistResult.errors.push(`Odesli resolve for artist ${artist.id}: ${String(e)}`)
+        }
+      }
+    } catch (e) {
+      odesliArtistResult.errors.push(`Odesli artist batch query failed: ${String(e)}`)
+    }
+
+    await writeSyncLog(db, 'odesli', odesliArtistResult)
+    results.push(odesliArtistResult)
+  }
+
   return {
     results,
     totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),

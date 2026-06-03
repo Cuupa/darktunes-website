@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import {
   ArrowLeft,
   SpotifyLogo,
+  AppleLogo,
   InstagramLogo,
   YoutubeLogo,
   Globe,
@@ -48,6 +49,35 @@ function extractYouTubeId(url: string): string | null {
   )
   return match?.[1] ?? null
 }
+
+/**
+ * Visual config for each Odesli platform key.
+ * Keys match what the Odesli API returns in `linksByPlatform`.
+ */
+const PLATFORM_CONFIG: Record<
+  string,
+  { label: string; bg: string; textColor: string; icon: React.ElementType }
+> = {
+  spotify:      { label: 'Spotify',       bg: '#1DB954', textColor: 'text-black',  icon: SpotifyLogo },
+  appleMusic:   { label: 'Apple Music',   bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo },
+  youtube:      { label: 'YouTube',       bg: '#FF0000', textColor: 'text-white',  icon: YoutubeLogo },
+  youtubeMusic: { label: 'YT Music',      bg: '#FF0033', textColor: 'text-white',  icon: MusicNote },
+  deezer:       { label: 'Deezer',        bg: '#A238FF', textColor: 'text-white',  icon: MusicNote },
+  tidal:        { label: 'Tidal',         bg: '#000000', textColor: 'text-white',  icon: MusicNote },
+  amazonMusic:  { label: 'Amazon Music',  bg: '#25D1DA', textColor: 'text-black',  icon: MusicNote },
+  pandora:      { label: 'Pandora',       bg: '#005483', textColor: 'text-white',  icon: MusicNote },
+  soundcloud:   { label: 'SoundCloud',    bg: '#FF5500', textColor: 'text-white',  icon: MusicNote },
+  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: MusicNote },
+  napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote },
+  audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote },
+  anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote },
+}
+
+const PLATFORM_ORDER = [
+  'spotify', 'appleMusic', 'youtube', 'youtubeMusic',
+  'deezer', 'tidal', 'amazonMusic', 'soundcloud',
+  'bandcamp', 'pandora', 'napster', 'audiomack', 'anghami',
+]
 
 /** Collapsible section header with animated chevron. */
 function SectionHeader({
@@ -243,19 +273,52 @@ export function ArtistDetailContent({
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-3 pt-2">
-                {artist.spotifyUrl && (
-                  <Button asChild size="sm" className="bg-[#1DB954] hover:bg-[#1DB954]/90 text-black font-semibold">
-                    <a href={artist.spotifyId
-                      ? `https://song.link/s/${artist.spotifyId}`
-                      : artist.spotifyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <SpotifyLogo size={18} weight="fill" className="mr-2" aria-hidden="true" />
-                      {dict.listenEverywhere}
-                    </a>
-                  </Button>
-                )}
+                {/* Per-platform streaming buttons from Odesli, or fallback to individual URL fields */}
+                {(() => {
+                  const platformLinks = artist.platformLinks
+                  const platformEntries: Array<{ key: string; url: string }> = (() => {
+                    if (platformLinks && Object.keys(platformLinks).length > 0) {
+                      const known = PLATFORM_ORDER.filter((k) => platformLinks[k])
+                      const unknown = Object.keys(platformLinks)
+                        .filter((k) => !PLATFORM_ORDER.includes(k))
+                        .sort()
+                      return [...known, ...unknown].map((k) => ({ key: k, url: platformLinks[k] }))
+                    }
+                    // Fallback: use individual URL fields
+                    const fallback: Array<{ key: string; url: string }> = []
+                    if (artist.spotifyUrl)    fallback.push({ key: 'spotify',    url: artist.spotifyUrl })
+                    if (artist.appleMusicUrl) fallback.push({ key: 'appleMusic', url: artist.appleMusicUrl })
+                    if (artist.youtubeUrl)    fallback.push({ key: 'youtube',    url: artist.youtubeUrl })
+                    return fallback
+                  })()
+
+                  if (platformEntries.length === 0) return null
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {platformEntries.map(({ key, url }) => {
+                        const cfg = PLATFORM_CONFIG[key]
+                        const Icon = cfg?.icon ?? Globe
+                        const label = cfg?.label ?? key
+                        const bg = cfg?.bg ?? undefined
+                        const textColor = cfg?.textColor ?? 'text-white'
+                        return (
+                          <a
+                            key={key}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Listen on ${label}`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 hover:scale-105 ${textColor}`}
+                            style={bg ? { backgroundColor: bg } : undefined}
+                          >
+                            <Icon size={14} weight="fill" aria-hidden="true" />
+                            {label}
+                          </a>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
                 {artist.shopUrl && (
                   <Button asChild size="sm" className="bg-secondary hover:bg-secondary/90 text-white font-semibold">
                     <a href={artist.shopUrl} target="_blank" rel="noopener noreferrer">

@@ -268,6 +268,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS platform_links JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);

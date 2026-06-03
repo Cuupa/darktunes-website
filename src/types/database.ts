@@ -102,6 +102,7 @@ export interface Database {
           founded_year: number | null
           is_visible: boolean
           logo_url: string | null
+          platform_links: Record<string, string> | null
           created_at: string
           updated_at: string
         }
@@ -137,6 +138,7 @@ export interface Database {
           founded_year?: number | null
           is_visible?: boolean
           logo_url?: string | null
+          platform_links?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }
@@ -172,6 +174,7 @@ export interface Database {
           founded_year?: number | null
           is_visible?: boolean
           logo_url?: string | null
+          platform_links?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }
