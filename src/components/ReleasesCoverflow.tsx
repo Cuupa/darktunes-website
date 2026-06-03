@@ -324,7 +324,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
   return (
     <div
-      className="relative select-none focus:outline-none py-4"
+      className="relative select-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 py-4"
       role="region"
       aria-label="Releases coverflow"
       tabIndex={0}

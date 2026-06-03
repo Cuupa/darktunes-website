@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 
 type WebVitalMetric = {
   id: string
@@ -26,20 +27,20 @@ function isWebVitalMetric(value: unknown): value is WebVitalMetric {
   )
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   let body: unknown
 
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON')
   }
 
   if (!isWebVitalMetric(body)) {
-    return NextResponse.json({ error: 'Invalid metric payload' }, { status: 400 })
+    throw new ApiError(400, 'Invalid metric payload')
   }
 
   console.info('[WebVitals API]', JSON.stringify(body))
 
   return NextResponse.json({ ok: true })
-}
+})

@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { withErrorHandler } from '@/lib/errors'
 
 /** Known API sources with their configuration check. Auto-discovery adds any others found in sync_logs. */
 const KNOWN_APIS: Record<string, boolean> = {
@@ -42,7 +43,7 @@ export interface HealthResponse {
   checkedAt: string
 }
 
-export async function GET(): Promise<NextResponse<HealthResponse>> {
+export const GET = withErrorHandler(async (): Promise<NextResponse> => {
   const checkedAt = new Date().toISOString()
 
   // ---------------------------------------------------------------------------
@@ -147,12 +148,12 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     },
     { status: overallStatus === 'unhealthy' ? 503 : 200 },
   )
-}
+})
 
-export async function HEAD(): Promise<NextResponse> {
-  const res = await GET()
+export const HEAD = withErrorHandler(async (req): Promise<NextResponse> => {
+  const res = await GET(req)
   return new NextResponse(null, { status: res.status })
-}
+})
 
 export async function OPTIONS(): Promise<NextResponse> {
   return new NextResponse(null, {

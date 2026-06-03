@@ -3,7 +3,7 @@
  *
  * POST /api/sync-artist
  * Body: { artistId: string }
- * Auth: Bearer <supabase-access-token>
+ * Auth: ******
  *
  * Verifies the caller is authenticated, then runs the full sync pipeline
  * for the given artist: fetches iTunes releases, caches cover art in R2,
@@ -19,6 +19,7 @@ import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { syncArtist } from '@/lib/sync/syncArtist'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Auth helper
@@ -27,11 +28,11 @@ import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 async function verifyToken(token: string): Promise<string> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new Error('Supabase service key not configured')
+  if (!url || !serviceKey) throw new ApiError(500, 'Supabase service key not configured')
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
   const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new Error('Unauthorized')
+  if (error || !data.user) throw new ApiError(401, 'Unauthorized')
   return data.user.id
 }
 
@@ -39,18 +40,13 @@ async function verifyToken(token: string): Promise<string> {
 // Route Handler
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate
   const authHeader = request.headers.get('authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing or invalid Authorization header' }, { status: 401 })
+    throw new ApiError(401, 'Missing or invalid Authorization header')
   }
-
-  try {
-    await verifyToken(authHeader.slice(7))
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  await verifyToken(authHeader.slice(7))
 
   // 2. Parse body
   let artistId: string | undefined
@@ -60,11 +56,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       artistId = String((body as { artistId: unknown }).artistId)
     }
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON body')
   }
 
   if (!artistId) {
-    return NextResponse.json({ error: 'Missing required field: artistId' }, { status: 400 })
+    throw new ApiError(400, 'Missing required field: artistId')
   }
 
   // 3. Validate R2 configuration
@@ -85,11 +81,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     !CLOUDFLARE_R2_BUCKET_NAME ||
     !CLOUDFLARE_R2_PUBLIC_URL
   ) {
-    return NextResponse.json({ error: 'R2 storage is not configured' }, { status: 500 })
+    throw new ApiError(500, 'R2 storage is not configured')
   }
 
   if (!NEXT_PUBLIC_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 })
+    throw new ApiError(500, 'Supabase is not configured')
   }
 
   // 4. Wire up dependencies
@@ -107,19 +103,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
 
   // 5. Run sync (never throws — errors are in SyncResult.errors)
-  try {
-    const result = await syncArtist(artistId, {
-      db,
-      fetch: globalThis.fetch,
-      uploadToR2: uploadFn,
-    })
-    revalidateTag('releases')
-    revalidateTag('artists')
-    return NextResponse.json(result)
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Sync failed' },
-      { status: 500 },
-    )
-  }
-}
+  const result = await syncArtist(artistId, {
+    db,
+    fetch: globalThis.fetch,
+    uploadToR2: uploadFn,
+  })
+  revalidateTag('releases')
+  revalidateTag('artists')
+  return NextResponse.json(result)
+})

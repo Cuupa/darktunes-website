@@ -255,4 +255,4 @@ scripts/
 
 ## 📄 License
 
-MIT
+Proprietary — All Rights Reserved. See [LICENSE](./LICENSE).

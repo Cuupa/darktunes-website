@@ -78,7 +78,7 @@ export function Releases3DCarousel({ releases, dict, locale }: Releases3DCarouse
 
   return (
     <div
-      className="relative select-none py-4 focus:outline-none"
+      className="relative select-none py-4 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       role="region"
       aria-label="Releases 3D carousel"
       tabIndex={0}
