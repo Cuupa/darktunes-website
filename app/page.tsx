@@ -43,7 +43,7 @@ function createPublicSupabaseClient() {
 
 const getCachedReleases = unstable_cache(
   async (): Promise<Release[]> => {
-    return getPublicReleases(createPublicSupabaseClient())
+    return getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[])
   },
   ['releases'],
   { revalidate: 60, tags: ['releases'] },
@@ -51,7 +51,7 @@ const getCachedReleases = unstable_cache(
 
 const getCachedNews = unstable_cache(
   async (): Promise<NewsPost[]> => {
-    return getPublicNewsPosts(createPublicSupabaseClient())
+    return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[])
   },
   ['news'],
   { revalidate: 60, tags: ['news'] },
@@ -59,7 +59,7 @@ const getCachedNews = unstable_cache(
 
 const getCachedVideos = unstable_cache(
   async (): Promise<Video[]> => {
-    return getPublicVideos(createPublicSupabaseClient())
+    return getPublicVideos(createPublicSupabaseClient()).catch(() => [] as Video[])
   },
   ['videos'],
   { revalidate: 60, tags: ['videos'] },
@@ -67,7 +67,7 @@ const getCachedVideos = unstable_cache(
 
 const getCachedConcerts = unstable_cache(
   async (): Promise<Concert[]> => {
-    return getPublicConcerts(createPublicSupabaseClient())
+    return getPublicConcerts(createPublicSupabaseClient()).catch(() => [] as Concert[])
   },
   ['concerts'],
   { revalidate: 60, tags: ['concerts'] },
@@ -75,24 +75,7 @@ const getCachedConcerts = unstable_cache(
 
 const getCachedSiteSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
-    return getSiteSettings(createPublicSupabaseClient())
-  },
-  ['site-settings'],
-  { revalidate: 60, tags: ['site-settings'] },
-)
-
-// ---------------------------------------------------------------------------
-// Page component
-// ---------------------------------------------------------------------------
-
-export default async function HomePage() {
-  // Fetch all data in parallel on the server
-  const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
-    getCachedReleases().catch(() => [] as Release[]),
-    getCachedNews().catch(() => [] as NewsPost[]),
-    getCachedVideos().catch(() => [] as Video[]),
-    getCachedConcerts().catch(() => [] as Concert[]),
-    getCachedSiteSettings().catch(
+    return getSiteSettings(createPublicSupabaseClient()).catch(
       (): SiteSettings => ({
         labelName: 'darkTunes Music Group',
         labelTagline: "We don't follow trends—we create them.",
@@ -133,7 +116,24 @@ export default async function HomePage() {
         videosLinkToPage: false,
         featureToggles: { promoPool: true, editorTools: true },
       }),
-    ),
+    )
+  },
+  ['site-settings'],
+  { revalidate: 60, tags: ['site-settings'] },
+)
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
+export default async function HomePage() {
+  // Fetch all data in parallel on the server
+  const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
+    getCachedReleases(),
+    getCachedNews(),
+    getCachedVideos(),
+    getCachedConcerts(),
+    getCachedSiteSettings(),
     getLocale(),
   ])
 

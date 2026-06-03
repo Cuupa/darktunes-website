@@ -20,7 +20,7 @@ function createPublicSupabaseClient() {
 
 const getCachedPosts = unstable_cache(
   async () => {
-    return getPublicNewsPosts(createPublicSupabaseClient())
+    return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [])
   },
   ['news-posts'],
   { revalidate: 60, tags: ['news'] },
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 export default async function NewsPage() {
   const locale = await getLocale()
   const [posts, dict] = await Promise.all([
-    getCachedPosts().catch(() => []),
+    getCachedPosts(),
     getDictionary(locale),
   ])
 

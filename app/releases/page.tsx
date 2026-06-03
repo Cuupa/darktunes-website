@@ -24,7 +24,7 @@ function createPublicSupabaseClient() {
 }
 
 const getCachedReleases = unstable_cache(
-  async () => getPublicReleases(createPublicSupabaseClient()),
+  async () => getPublicReleases(createPublicSupabaseClient()).catch(() => []),
   ['releases-page'],
   { revalidate: 60, tags: ['releases'] },
 )
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 export default async function ReleasesPage() {
   const locale = await getLocale()
   const [releases, dict] = await Promise.all([
-    getCachedReleases().catch(() => []),
+    getCachedReleases(),
     getDictionary(locale),
   ])
 

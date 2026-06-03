@@ -24,13 +24,13 @@ function createPublicSupabaseClient() {
 }
 
 const getCachedVideos = unstable_cache(
-  async () => getPublicVideos(createPublicSupabaseClient()),
+  async () => getPublicVideos(createPublicSupabaseClient()).catch(() => []),
   ['all-videos-page'],
   { revalidate: 60, tags: ['videos'] },
 )
 
 const getCachedSiteSettings = unstable_cache(
-  async () => getSiteSettings(createPublicSupabaseClient()),
+  async () => getSiteSettings(createPublicSupabaseClient()).catch(() => null),
   ['site-settings-videos-page'],
   { revalidate: 60, tags: ['site-settings'] },
 )
@@ -47,9 +47,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function VideosPage() {
   const locale = await getLocale()
   const [videos, dict, settings] = await Promise.all([
-    getCachedVideos().catch(() => []),
+    getCachedVideos(),
     getDictionary(locale),
-    getCachedSiteSettings().catch(() => null),
+    getCachedSiteSettings(),
   ])
 
   return (
