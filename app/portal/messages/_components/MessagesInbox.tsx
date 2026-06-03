@@ -65,7 +65,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
     let isMounted = true
 
     const subscribe = async () => {
-      let artistId = initialMessages[0]?.artistId ?? null
+      let artistId: string | null = initialMessages[0]?.artistId ?? null
       if (!artistId) {
         const {
           data: { user },
