@@ -41,7 +41,8 @@ describe('app/layout favicon metadata', () => {
 
     expect(icons.icon[0]).toMatchObject({ url: 'https://cdn.example.com/custom-favicon.png' })
     expect(icons.icon[1]).toMatchObject({ url: '/favicon.svg' })
-    expect(icons.shortcut).toBe('https://cdn.example.com/custom-favicon.png')
+    expect(icons.icon[2]).toMatchObject({ url: '/favicon.ico', sizes: '32x32' })
+    expect(icons.shortcut).toBe('/favicon.ico')
   })
 
   it('falls back to /icons/icon-192.png when custom favicon is absent', async () => {
@@ -53,6 +54,7 @@ describe('app/layout favicon metadata', () => {
 
     expect(icons.icon[0]).toMatchObject({ url: '/icons/icon-192.png' })
     expect(icons.icon[1]).toMatchObject({ url: '/favicon.svg' })
-    expect(icons.shortcut).toBe('/icons/icon-192.png')
+    expect(icons.icon[2]).toMatchObject({ url: '/favicon.ico', sizes: '32x32' })
+    expect(icons.shortcut).toBe('/favicon.ico')
   })
 })

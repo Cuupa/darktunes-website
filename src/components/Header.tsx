@@ -80,7 +80,7 @@ export function Header({ dict, locale, logoUrl }: HeaderProps) {
               alt="darkTunes Music Group" 
               width={200}
               height={80}
-              className={`w-auto transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
+              className={`w-auto max-w-[180px] md:max-w-[200px] transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}
               style={{ width: 'auto' }}
               unoptimized
             />
