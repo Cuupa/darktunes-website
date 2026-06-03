@@ -24,6 +24,20 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
     status,
+    heroPrimaryBtn: (row.hero_primary_btn_action || row.hero_primary_btn_label || row.hero_primary_btn_href)
+      ? {
+          label: row.hero_primary_btn_label ?? undefined,
+          action: (row.hero_primary_btn_action as 'link' | 'scroll' | 'none') ?? undefined,
+          href: row.hero_primary_btn_href ?? undefined,
+        }
+      : undefined,
+    heroSecondaryBtn: (row.hero_secondary_btn_action || row.hero_secondary_btn_label || row.hero_secondary_btn_href)
+      ? {
+          label: row.hero_secondary_btn_label ?? undefined,
+          action: (row.hero_secondary_btn_action as 'link' | 'scroll' | 'none') ?? undefined,
+          href: row.hero_secondary_btn_href ?? undefined,
+        }
+      : undefined,
   }
 }
 

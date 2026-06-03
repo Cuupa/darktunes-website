@@ -21,6 +21,12 @@ const EMPTY_FORM: NewsFormData = {
   isPressOnly: false,
   status: 'draft',
   artistId: '',
+  heroPrimaryBtnLabel: '',
+  heroPrimaryBtnAction: '',
+  heroPrimaryBtnHref: '',
+  heroSecondaryBtnLabel: '',
+  heroSecondaryBtnAction: '',
+  heroSecondaryBtnHref: '',
 }
 
 export default function NewsNewPage() {
@@ -41,6 +47,12 @@ export default function NewsNewPage() {
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,
+        hero_primary_btn_label: data.heroPrimaryBtnLabel || null,
+        hero_primary_btn_action: data.heroPrimaryBtnAction || null,
+        hero_primary_btn_href: data.heroPrimaryBtnHref || null,
+        hero_secondary_btn_label: data.heroSecondaryBtnLabel || null,
+        hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
+        hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
       })
       toast.success(`Created "${data.title}"`)
       router.push('/admin?tab=news')

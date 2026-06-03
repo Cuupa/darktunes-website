@@ -73,6 +73,19 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
     ? getOptimizedImageUrl(heroItem.imageUrl, 800)
     : undefined
 
+  // ── Hero button resolution ──────────────────────────────────────────────
+  // Primary button
+  const rawPrimary = heroItem.heroPrimaryBtn
+  const primaryLabel = rawPrimary?.label || (!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow)
+  const primaryAction = rawPrimary?.action || 'link'
+  const primaryHref = rawPrimary?.href || heroLink
+
+  // Secondary button
+  const rawSecondary = heroItem.heroSecondaryBtn
+  const secondaryLabel = rawSecondary?.label || dict.exploreArtist
+  const secondaryAction = rawSecondary?.action || 'scroll'
+  const secondaryHref = rawSecondary?.href || (!itemIsRelease ? '#news' : '#releases')
+
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">
       {/* Hero background — Next.js Image with priority delivers fetchPriority="high"
@@ -126,24 +139,52 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
             </p>
 
             <div className="flex flex-wrap gap-4 items-center">
-              <Button
-                size="lg"
-                className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
-                asChild
-              >
-                <Link href={heroLink}>
-                  <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
-                  {!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow}
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                onClick={() => handleSmoothScroll(!itemIsRelease ? '#news' : '#releases')}
-              >
-                {dict.exploreArtist}
-              </Button>
+              {primaryAction !== 'none' && (
+                primaryAction === 'scroll' ? (
+                  <Button
+                    size="lg"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
+                    onClick={() => handleSmoothScroll(primaryHref)}
+                  >
+                    <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
+                    {primaryLabel}
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
+                    asChild
+                  >
+                    <Link href={primaryHref}>
+                      <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
+                      {primaryLabel}
+                    </Link>
+                  </Button>
+                )
+              )}
+              {secondaryAction !== 'none' && (
+                secondaryAction === 'link' ? (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                    asChild
+                  >
+                    <Link href={secondaryHref}>
+                      {secondaryLabel}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                    onClick={() => handleSmoothScroll(secondaryHref)}
+                  >
+                    {secondaryLabel}
+                  </Button>
+                )
+              )}
             </div>
           </motion.div>
 

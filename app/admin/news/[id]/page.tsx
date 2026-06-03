@@ -29,6 +29,12 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
     artistId: post.artistId ?? '',
+    heroPrimaryBtnLabel: post.heroPrimaryBtn?.label ?? '',
+    heroPrimaryBtnAction: post.heroPrimaryBtn?.action ?? '',
+    heroPrimaryBtnHref: post.heroPrimaryBtn?.href ?? '',
+    heroSecondaryBtnLabel: post.heroSecondaryBtn?.label ?? '',
+    heroSecondaryBtnAction: post.heroSecondaryBtn?.action ?? '',
+    heroSecondaryBtnHref: post.heroSecondaryBtn?.href ?? '',
   }
 }
 
@@ -57,6 +63,12 @@ export default function NewsEditPage() {
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,
+        hero_primary_btn_label: data.heroPrimaryBtnLabel || null,
+        hero_primary_btn_action: data.heroPrimaryBtnAction || null,
+        hero_primary_btn_href: data.heroPrimaryBtnHref || null,
+        hero_secondary_btn_label: data.heroSecondaryBtnLabel || null,
+        hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
+        hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
       })
       toast.success('News post saved')
       router.push('/admin?tab=news')

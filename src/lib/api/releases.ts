@@ -33,6 +33,20 @@ function rowToRelease(row: ReleaseRow): Release {
     isPromo: row.is_promo,
     promoText: row.promo_text ?? undefined,
     heroBgUrl: row.hero_bg_url ?? undefined,
+    heroPrimaryBtn: (row.hero_primary_btn_action || row.hero_primary_btn_label || row.hero_primary_btn_href)
+      ? {
+          label: row.hero_primary_btn_label ?? undefined,
+          action: (row.hero_primary_btn_action as 'link' | 'scroll' | 'none') ?? undefined,
+          href: row.hero_primary_btn_href ?? undefined,
+        }
+      : undefined,
+    heroSecondaryBtn: (row.hero_secondary_btn_action || row.hero_secondary_btn_label || row.hero_secondary_btn_href)
+      ? {
+          label: row.hero_secondary_btn_label ?? undefined,
+          action: (row.hero_secondary_btn_action as 'link' | 'scroll' | 'none') ?? undefined,
+          href: row.hero_secondary_btn_href ?? undefined,
+        }
+      : undefined,
   }
 }
 
