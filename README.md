@@ -69,8 +69,25 @@ npm run dev
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:e2e` | Run Playwright E2E & visual regression tests |
+| `npm run analyze` | Build with bundle analyzer enabled |
+| `npm run perf:bundle` | Alias for `npm run analyze` |
+| `npm run perf:dev` | Start turbo dev server for performance work |
+| `npm run perf:build` | Run production profiling build |
+| `npm run perf:analyze` | Build with analyzer enabled |
+| `npm run perf:lighthouse` | Run Lighthouse CI locally |
+| `npm run perf:test` | Run Playwright performance tests |
 | `npm run db:push` | Push local Supabase schema changes to a configured Supabase project |
 | `npm run db:diff` | Generate a local schema diff with the Supabase CLI |
+
+---
+
+## 📈 Performance Monitoring
+
+- **Lighthouse CI**: `.github/workflows/lighthouse-ci.yml` with budgets in `lighthouserc.js`
+- **Web Vitals RUM**: `app/web-vitals.tsx` sends Core Web Vitals to `POST /api/vitals`
+- **Bundle analysis**: enabled via `@next/bundle-analyzer` and `npm run analyze`
+- **Playwright performance tests**: `tests/performance/core-web-vitals.spec.ts`
+- **Bundle budget enforcement**: `scripts/check-bundle-budget.js` + `.github/workflows/performance-budget.yml`
 
 ---
 

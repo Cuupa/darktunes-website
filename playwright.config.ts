@@ -13,7 +13,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
 
   /* Maximum time a single test may run. */
   timeout: 30_000,
@@ -47,6 +47,7 @@ export default defineConfig({
   projects: [
     {
       name: 'Desktop Chrome',
+      testMatch: /e2e\/.*\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
@@ -54,14 +55,24 @@ export default defineConfig({
     },
     {
       name: 'Mobile Safari',
+      testMatch: /e2e\/.*\.spec\.ts/,
       use: {
         ...devices['iPhone 13'],
       },
     },
     {
       name: 'Mobile Chrome',
+      testMatch: /e2e\/.*\.spec\.ts/,
       use: {
         ...devices['Pixel 5'],
+      },
+    },
+    {
+      name: 'Performance Chrome',
+      testMatch: /performance\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
       },
     },
   ],

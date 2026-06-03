@@ -84,6 +84,19 @@ The webServer block in `playwright.config.ts` runs `npm run build && npm run pre
 Tests that require Supabase data gracefully skip via `test.skip(true, reason)` when the relevant DOM section is absent (i.e. Supabase is unconfigured).
 Never commit `.playwright-snapshots/` baselines — they are regenerated with `playwright test --update-snapshots` on each environment.
 
+Performance Monitoring & Budget Enforcement
+Performance tests live in `tests/performance/` and are run by the `Performance Chrome` project in `playwright.config.ts`. Run with `npm run perf:test`.
+CI-aware timing budgets: GitHub Actions shared runners are significantly slower than production hardware. All timing-based Playwright assertions MUST use the `budget(production, ci)` helper pattern so that CI uses a generous threshold (default 15 000 ms) while the production target is documented inline. NEVER hardcode a single timing constant for both CI and local runs.
+LCP measurement: Always call `page.waitForLoadState('networkidle')` before reading LCP from `PerformanceObserver` with `buffered: true`. Using only `requestAnimationFrame` is insufficient — the LCP entry may not be buffered yet.
+Bundle size assertions: Measure `rootMainFiles` from `.next/build-manifest.json` as uncompressed bytes on disk. The `next build` output shows gzipped sizes (~3× smaller). The current shared bundle budget is 450 KB uncompressed (≈ 104 KB gzipped).
+Lighthouse CI: Use `node_modules/.bin/lhci collect` followed by `node_modules/.bin/lhci assert` as separate workflow steps. Do NOT use `lhci autorun` — it attempts static-site auto-detection and fails on Next.js server-rendered projects. Config lives in `lighthouserc.js` (ESM, `export default`). Remove or omit the `upload` section unless an LHCI server is configured.
+Bundle budget script (`scripts/check-bundle-budget.js`): Measures route-specific JS (excluding shared rootMainFiles) from `app-build-manifest.json`. Route keys use the URL segment path format (e.g. `/page`, `/artists/[slug]/page`). Chunk-name-based size checks (e.g. searching for "framer-motion" in filenames) will ALWAYS return 0 KB because Next.js uses hash-based chunk names — do NOT add such checks. Budget thresholds reflect uncompressed on-disk sizes; update them (with a comment) whenever a deliberate new dependency is added.
+Performance scripts summary:
+  - `npm run analyze` / `npm run perf:analyze` — bundle analyzer (ANALYZE=true next build)
+  - `npm run perf:lighthouse` — run `lhci collect && lhci assert` locally (requires prior build)
+  - `npm run perf:test` — Playwright performance suite
+  - `npm run perf:build` — profiling build (`next build --profile`)
+
 Data Access Layer (DAL)
 All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.

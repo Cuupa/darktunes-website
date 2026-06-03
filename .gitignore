@@ -33,7 +33,9 @@ pids
 
 .spark-workbench-id
 .next/
-tsconfig.tsbuildinfo
+playwright-report/
+test-results/
+*.tsbuildinfo
 
 # Serwist / Workbox generated service worker files
 public/sw.js
