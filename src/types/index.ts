@@ -140,7 +140,11 @@ export interface LabelMessage {
   artistId: string
   subject: string
   body: string
+  bodyHtml?: string | null
   read: boolean
+  readAt?: string | null
+  starred?: boolean
+  deletedAt?: string | null
   sentAt: string
 }
 
@@ -149,7 +153,17 @@ export interface ArtistReply {
   messageId: string
   artistId: string
   body: string
+  bodyHtml?: string | null
+  deletedAt?: string | null
   sentAt: string
+}
+
+export interface MessageTemplate {
+  id: string
+  name: string
+  subject: string
+  bodyHtml: string
+  createdAt: string
 }
 
 export interface JournalistDownload {

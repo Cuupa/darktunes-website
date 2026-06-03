@@ -896,7 +896,11 @@ export interface Database {
           artist_id: string
           subject: string
           body: string
+          body_html: string | null
           read: boolean
+          read_at: string | null
+          starred: boolean
+          deleted_at: string | null
           sent_at: string
         }
         Insert: {
@@ -904,7 +908,11 @@ export interface Database {
           artist_id: string
           subject: string
           body: string
+          body_html?: string | null
           read?: boolean
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
           sent_at?: string
         }
         Update: {
@@ -912,8 +920,36 @@ export interface Database {
           artist_id?: string
           subject?: string
           body?: string
+          body_html?: string | null
           read?: boolean
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
           sent_at?: string
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          id: string
+          name: string
+          subject: string
+          body_html: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          subject?: string
+          body_html?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          subject?: string
+          body_html?: string
+          created_at?: string
         }
         Relationships: []
       }
@@ -923,6 +959,8 @@ export interface Database {
           message_id: string
           artist_id: string
           body: string
+          body_html: string | null
+          deleted_at: string | null
           sent_at: string
         }
         Insert: {
@@ -930,6 +968,8 @@ export interface Database {
           message_id: string
           artist_id: string
           body: string
+          body_html?: string | null
+          deleted_at?: string | null
           sent_at?: string
         }
         Update: {
@@ -937,6 +977,8 @@ export interface Database {
           message_id?: string
           artist_id?: string
           body?: string
+          body_html?: string | null
+          deleted_at?: string | null
           sent_at?: string
         }
         Relationships: []

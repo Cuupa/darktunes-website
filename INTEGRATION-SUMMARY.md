@@ -67,7 +67,7 @@
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 - **UsersManager** *(admin-only tab)* — full user management: lists all registered users (via Supabase Auth Admin API), allows role changes (admin/editor/journalist/user), ban/unban with confirmation dialog, user deletion, and artist ↔ user linking/unlinking. Tab is only rendered when `profile.role === 'admin'`. API routes: `GET/PATCH/DELETE /api/admin/users`, `PATCH /api/admin/users/[id]/link-artist`.
 - **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
-- **MessagesManager** *(admin-only tab)* — sends artist inbox messages (`label_messages`), shows read status, multi-select + bulk delete.
+- **MessagesManager** *(admin-only tab)* — rich-text artist inbox manager (`label_messages`) with templates, artist-thread accordions, search/unread filters, starring, realtime updates, and soft-delete bulk actions.
 - **AccreditationsManager** *(admin-only tab)* — reviews and updates journalist accreditation requests (`accreditation_requests`).
 
 ### SOS Webhook — Statement of Sales PDF Upload
@@ -177,7 +177,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` + empty-state CTA |
 | Artist Portal — release submission | ✅ Implemented | `/portal/releases/new` + `POST /api/portal/submit-release` (`is_visible=false` pending admin approval) + optional cover upload via `POST /api/portal/upload-release-cover` |
 | Artist Portal — marketing assets | ✅ Implemented | `/portal/marketing` — assigned asset downloads + artist-owned uploads/deletes via `artist_assets` and `POST/DELETE /api/portal/upload-asset` |
-| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — Suspense + mark-as-read + artist replies via `artist_replies` (`sendPortalReply`) |
+| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — Suspense + rich-text rendering + realtime inbox updates + mark-as-read + rich-text artist replies via `artist_replies` (`sendPortalReply`) |
 | Artist Portal — account settings | ✅ Implemented | `/portal/settings` — password update (`supabase.auth.updateUser`) + locale switch (NEXT_LOCALE cookie) |
 | Artist Portal — module feature flags | ✅ Implemented | `portal_feature_flags` (`artist.*`) controls nav + page availability |
 | Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |

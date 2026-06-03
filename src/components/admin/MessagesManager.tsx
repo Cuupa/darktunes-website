@@ -2,233 +2,293 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { sendMessage } from '@/lib/api/labelMessages'
 import { getArtists } from '@/lib/api/artists'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { getRepliesForMessage } from '@/lib/api/artistReplies'
+import {
+  getAllLabelMessages,
+  getMessageTemplates,
+  searchLabelMessages,
+  sendMessage,
+  softDeleteMessage,
+  starMessage,
+} from '@/lib/api/labelMessages'
+import type { ArtistReply, LabelMessage, MessageTemplate } from '@/types'
+import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
-import { Check, X } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { MessageComposer } from '@/components/messaging/MessageComposer'
+import { MessageSearch } from '@/components/messaging/MessageSearch'
+import { ThreadView } from '@/components/messaging/ThreadView'
 
-interface SentMessageRow {
-  id: string
-  subject: string
-  artistName: string
-  read: boolean
-  sentAt: string
+interface SearchState {
+  query: string
+  artistId: string | null
+  unreadOnly: boolean
 }
 
-const ALL_ARTISTS_ID = '__all__'
+type MessageRow = Database['public']['Tables']['label_messages']['Row']
+type ReplyRow = Database['public']['Tables']['artist_replies']['Row']
+
+const DEFAULT_SEARCH_STATE: SearchState = { query: '', artistId: null, unreadOnly: false }
+
+function rowToMessage(row: MessageRow): LabelMessage {
+  return {
+    id: row.id,
+    artistId: row.artist_id,
+    subject: row.subject,
+    body: row.body,
+    bodyHtml: row.body_html,
+    read: row.read,
+    readAt: row.read_at,
+    starred: row.starred,
+    deletedAt: row.deleted_at,
+    sentAt: row.sent_at,
+  }
+}
+
+function rowToReply(row: ReplyRow): ArtistReply {
+  return {
+    id: row.id,
+    messageId: row.message_id,
+    artistId: row.artist_id,
+    body: row.body,
+    bodyHtml: row.body_html,
+    deletedAt: row.deleted_at,
+    sentAt: row.sent_at,
+  }
+}
+
+async function loadReplies(
+  supabase: ReturnType<typeof createBrowserSupabaseClient>,
+  messages: LabelMessage[],
+): Promise<Record<string, ArtistReply[]>> {
+  const entries = await Promise.allSettled(
+    messages.map(async (message) => [message.id, await getRepliesForMessage(supabase, message.id)] as const),
+  )
+
+  return entries.reduce<Record<string, ArtistReply[]>>((accumulator, result) => {
+    if (result.status === 'fulfilled') {
+      accumulator[result.value[0]] = result.value[1]
+    }
+    return accumulator
+  }, {})
+}
 
 export function MessagesManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([])
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
+  const searchStateRef = useRef<SearchState>(DEFAULT_SEARCH_STATE)
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
-  const [messages, setMessages] = useState<SentMessageRow[]>([])
+  const [messages, setMessages] = useState<LabelMessage[]>([])
+  const [repliesByMessageId, setRepliesByMessageId] = useState<Record<string, ArtistReply[]>>({})
+  const [templates, setTemplates] = useState<MessageTemplate[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isSending, setIsSending] = useState(false)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const refreshMessages = useCallback(
+    async (state: SearchState) => {
+      const nextMessages = state.query.trim() || state.artistId || state.unreadOnly
+        ? await searchLabelMessages(supabase, state.query, {
+            artistId: state.artistId ?? undefined,
+            unreadOnly: state.unreadOnly,
+          })
+        : await getAllLabelMessages(supabase)
+
+      setMessages(nextMessages)
+      setRepliesByMessageId(await loadReplies(supabase, nextMessages))
+    },
+    [supabase],
+  )
 
   const load = useCallback(async () => {
     try {
-      const [artistRows, messageRows] = await Promise.all([
-        getArtists(supabase),
-        supabase
-          .from('label_messages')
-          .select('id, artist_id, subject, read, sent_at')
-          .order('sent_at', { ascending: false })
-          .limit(50),
-      ])
-      const artistMap = new Map(artistRows.map((a) => [a.id, a.name]))
-      setArtists(artistRows.map((a) => ({ id: a.id, name: a.name })))
-      if (messageRows.error) throw messageRows.error
-      setMessages(
-        (messageRows.data ?? []).map((row) => ({
-          id: row.id,
-          subject: row.subject,
-          artistName: artistMap.get(row.artist_id) ?? 'Unknown',
-          read: row.read,
-          sentAt: row.sent_at,
-        })),
-      )
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load messages')
+      const [artistRows, templateRows] = await Promise.all([getArtists(supabase), getMessageTemplates(supabase)])
+      setArtists(artistRows.map((artist) => ({ id: artist.id, name: artist.name })))
+      setTemplates(templateRows)
+      await refreshMessages(searchStateRef.current)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load messages')
     }
-  }, [supabase])
+  }, [refreshMessages, supabase])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
+    const messageChannel = supabase
+      .channel('admin-label-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'label_messages' },
+        (payload: RealtimePostgresInsertPayload<MessageRow>) => {
+          const nextMessage = rowToMessage(payload.new)
+          const state = searchStateRef.current
+          if (state.query.trim() || state.artistId || state.unreadOnly) {
+            void refreshMessages(state)
+            return
+          }
+          setMessages((current) => [nextMessage, ...current.filter((message) => message.id !== nextMessage.id)])
+        },
+      )
+      .subscribe()
+
+    const replyChannel = supabase
+      .channel('admin-artist-replies')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'artist_replies' },
+        (payload: RealtimePostgresInsertPayload<ReplyRow>) => {
+          const nextReply = rowToReply(payload.new)
+          setRepliesByMessageId((current) => ({
+            ...current,
+            [nextReply.messageId]: [...(current[nextReply.messageId] ?? []), nextReply],
+          }))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(messageChannel)
+      void supabase.removeChannel(replyChannel)
+    }
+  }, [refreshMessages, supabase])
+
+  const unreadCount = useMemo(() => messages.filter((message) => !message.read && !message.deletedAt).length, [messages])
+
+  const handleSearch = useCallback(
+    (query: string, artistId: string | null, unreadOnly: boolean) => {
+      const nextState = { query, artistId, unreadOnly }
+      searchStateRef.current = nextState
+      void refreshMessages(nextState)
+    },
+    [refreshMessages],
+  )
+
+  const handleSend = useCallback(
+    async (artistIds: string[], subject: string, html: string, text: string) => {
+      setIsSending(true)
+      try {
+        await Promise.all(artistIds.map((artistId) => sendMessage(supabase, artistId, subject, text, html)))
+        await refreshMessages(searchStateRef.current)
+        toast.success(`Message sent to ${artistIds.length} artist${artistIds.length === 1 ? '' : 's'}`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to send message')
+        throw error
+      } finally {
+        setIsSending(false)
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    },
+    [refreshMessages, supabase],
+  )
 
-  const toggleArtist = (id: string) => {
-    if (id === ALL_ARTISTS_ID) {
-      // Select all / deselect all
-      setSelectedArtistIds((prev) =>
-        prev.includes(ALL_ARTISTS_ID) ? [] : [ALL_ARTISTS_ID, ...artists.map((a) => a.id)]
-      )
-    } else {
-      setSelectedArtistIds((prev) => {
-        const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev.filter((x) => x !== ALL_ARTISTS_ID), id]
-        // If all individual artists selected, also check "all"
-        return next.length === artists.length ? [ALL_ARTISTS_ID, ...artists.map((a) => a.id)] : next
-      })
-    }
+  const handleStar = useCallback(
+    async (id: string, starred: boolean) => {
+      try {
+        const updated = await starMessage(supabase, id, starred)
+        setMessages((current) => current.map((message) => (message.id === id ? updated : message)))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to update star')
+      }
+    },
+    [supabase],
+  )
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      try {
+        await softDeleteMessage(supabase, id)
+        setSelectedIds((current) => {
+          const next = new Set(current)
+          next.delete(id)
+          return next
+        })
+        await refreshMessages(searchStateRef.current)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete message')
+      }
+    },
+    [refreshMessages, supabase],
+  )
+
+  const handleExport = useCallback(
+    (id: string) => {
+      const message = messages.find((item) => item.id === id)
+      if (!message) return
+      const payload = {
+        message,
+        replies: repliesByMessageId[id] ?? [],
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `message-${id}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    },
+    [messages, repliesByMessageId],
+  )
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
   }
 
-  const removeArtist = (id: string) => {
-    setSelectedArtistIds((prev) => prev.filter((x) => x !== id && x !== ALL_ARTISTS_ID))
-  }
-
-  const targetArtistIds = selectedArtistIds.includes(ALL_ARTISTS_ID)
-    ? artists.map((a) => a.id)
-    : selectedArtistIds
-
-  const onSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (targetArtistIds.length === 0 || !subject.trim() || !body.trim()) return
-    setIsSending(true)
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    setIsBulkDeleting(true)
     try {
-      await Promise.all(
-        targetArtistIds.map((id) => sendMessage(supabase, id, subject.trim(), body.trim()))
-      )
-      await load()
-      setSubject('')
-      setBody('')
-      setSelectedArtistIds([])
-      toast.success(`Message sent to ${targetArtistIds.length} artist${targetArtistIds.length > 1 ? 's' : ''}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send message')
+      await Promise.all(Array.from(selectedIds).map((id) => softDeleteMessage(supabase, id)))
+      setSelectedIds(new Set())
+      await refreshMessages(searchStateRef.current)
+      toast.success('Selected messages deleted')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete selected messages')
     } finally {
-      setIsSending(false)
+      setIsBulkDeleting(false)
     }
   }
-
-  const selectedLabels = selectedArtistIds.includes(ALL_ARTISTS_ID)
-    ? [{ id: ALL_ARTISTS_ID, name: 'All Artists' }]
-    : artists.filter((a) => selectedArtistIds.includes(a.id))
 
   return (
     <div className="space-y-6">
-      <form onSubmit={onSend} className="space-y-4 rounded-lg border border-border p-4">
-        {/* Multi-select artist picker */}
-        <div className="space-y-2">
-          <Label>Artist(s)</Label>
-          <div ref={dropdownRef} className="relative">
-            {/* Trigger */}
-            <button
-              type="button"
-              className="w-full flex flex-wrap items-center gap-1.5 min-h-10 px-3 py-2 rounded-md border border-input bg-background text-sm text-left hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={() => setDropdownOpen((v) => !v)}
-            >
-              {selectedLabels.length === 0 ? (
-                <span className="text-muted-foreground">Select artist(s)…</span>
-              ) : (
-                selectedLabels.map((a) => (
-                  <Badge key={a.id} variant="secondary" className="flex items-center gap-1 pr-1">
-                    {a.name}
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Remove ${a.name}`}
-                      className="ml-0.5 rounded-full hover:bg-destructive/20 cursor-pointer"
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                        removeArtist(a.id)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.stopPropagation()
-                          removeArtist(a.id)
-                        }
-                      }}
-                    >
-                      <X size={12} />
-                    </span>
-                  </Badge>
-                ))
-              )}
-            </button>
-
-            {/* Dropdown */}
-            {dropdownOpen && (
-              <div
-                className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg overflow-y-auto"
-                style={{ maxHeight: 220 }}
-                onWheel={(e) => e.stopPropagation()}
-              >
-                {/* All Artists option */}
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors font-semibold border-b border-border"
-                  onClick={() => toggleArtist(ALL_ARTISTS_ID)}
-                >
-                  <span className="flex h-4 w-4 items-center justify-center rounded border border-primary">
-                    {selectedArtistIds.includes(ALL_ARTISTS_ID) && <Check size={10} weight="bold" />}
-                  </span>
-                  All Artists
-                </button>
-                {artists.map((artist) => (
-                  <button
-                    key={artist.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                    onClick={() => toggleArtist(artist.id)}
-                  >
-                    <span className="flex h-4 w-4 items-center justify-center rounded border border-primary">
-                      {selectedArtistIds.includes(artist.id) && <Check size={10} weight="bold" />}
-                    </span>
-                    {artist.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="message-subject">Subject</Label>
-          <Input id="message-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="message-body">Body</Label>
-          <Textarea id="message-body" rows={5} value={body} onChange={(e) => setBody(e.target.value)} />
-        </div>
-        <Button type="submit" disabled={isSending || targetArtistIds.length === 0 || !subject.trim() || !body.trim()}>
-          {isSending ? 'Sending…' : `Send Message${targetArtistIds.length > 1 ? ` to ${targetArtistIds.length} Artists` : ''}`}
-        </Button>
-      </form>
-
-      <div className="rounded-lg border border-border divide-y divide-border">
-        {messages.map((message) => (
-          <div key={message.id} className="p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium">{message.subject}</p>
-              <p className="text-sm text-muted-foreground">
-                {message.artistName} · {new Date(message.sentAt).toLocaleString()}
-              </p>
-            </div>
-            <span className="text-xs text-muted-foreground">{message.read ? 'Read' : 'Unread'}</span>
-          </div>
-        ))}
-        {messages.length === 0 && (
-          <div className="p-4 text-sm text-muted-foreground">No messages sent yet.</div>
-        )}
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-2xl font-semibold">Artist Messages</h2>
+        <Badge>{unreadCount} unread</Badge>
       </div>
+
+      <MessageComposer artists={artists} templates={templates} isSending={isSending} onSend={handleSend} />
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card/40 p-4">
+          <p className="text-sm text-muted-foreground">{selectedIds.size} message{selectedIds.size === 1 ? '' : 's'} selected</p>
+          <Button type="button" variant="destructive" disabled={isBulkDeleting} onClick={() => void handleDeleteSelected()}>
+            {isBulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
+          </Button>
+        </div>
+      )}
+
+      <MessageSearch artists={artists} onSearch={handleSearch} />
+
+      <ThreadView
+        messages={messages}
+        repliesByMessageId={repliesByMessageId}
+        artists={artists}
+        onStar={handleStar}
+        onDelete={handleDelete}
+        onExport={handleExport}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelected}
+      />
     </div>
   )
 }
