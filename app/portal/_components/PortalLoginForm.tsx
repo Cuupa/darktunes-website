@@ -8,13 +8,13 @@
  */
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MusicNote, GoogleLogo, SpotifyLogo } from '@phosphor-icons/react'
+import { MusicNote, GoogleLogo, SpotifyLogo, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Dictionary } from '@/i18n/types'
 
@@ -30,6 +30,8 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isOAuthLoading, setIsOAuthLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const errorParam = searchParams.get('error')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,6 +125,12 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {errorParam === 'no_artist' && (
+            <div className="flex items-start gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-400">
+              <Warning size={18} weight="bold" className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p>{dict.login_no_artist}</p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">
