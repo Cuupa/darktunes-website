@@ -7,6 +7,7 @@ import { getSiteSettings } from '@/lib/api/siteSettings'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { unstable_cache } from 'next/cache'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { WebVitals } from './web-vitals'
 import './globals.css'
 
 const oxanium = Oxanium({
@@ -114,6 +115,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
           vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
         />
+        {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
         <Providers consentDict={dict.consent}>{children}</Providers>
       </body>
     </html>
