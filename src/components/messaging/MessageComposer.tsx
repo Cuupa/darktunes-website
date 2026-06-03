@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Files, X } from '@phosphor-icons/react'
 import type { MessageTemplate } from '@/types'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,8 @@ interface MessageComposerProps {
   artists: Array<{ id: string; name: string }>
   onSend: (artistIds: string[], subject: string, html: string, text: string) => Promise<void>
   isSending?: boolean
+  isArtistsLoading?: boolean
+  artistLoadError?: string | null
   templates?: MessageTemplate[]
 }
 
@@ -36,7 +38,14 @@ function htmlToText(html: string): string {
   return container.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 }
 
-export function MessageComposer({ artists, onSend, isSending = false, templates = [] }: MessageComposerProps) {
+export function MessageComposer({
+  artists,
+  onSend,
+  isSending = false,
+  isArtistsLoading = false,
+  artistLoadError = null,
+  templates = [],
+}: MessageComposerProps) {
   const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([])
   const [subject, setSubject] = useState('')
   const [bodyHtml, setBodyHtml] = useState('')
@@ -93,6 +102,7 @@ export function MessageComposer({ artists, onSend, isSending = false, templates 
         : artists.filter((artist) => selectedArtistIds.includes(artist.id)),
     [artists, selectedArtistIds],
   )
+  const artistSelectionDisabled = isArtistsLoading || !!artistLoadError || artists.length === 0
 
   const toggleArtist = (id: string) => {
     if (id === ALL_ARTISTS_ID) {
@@ -150,10 +160,19 @@ export function MessageComposer({ artists, onSend, isSending = false, templates 
             aria-expanded={dropdownOpen}
             aria-label="Select artists"
             className="flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-left text-sm hover:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={artistSelectionDisabled}
             onClick={() => setDropdownOpen((current) => !current)}
           >
             {selectedLabels.length === 0 ? (
-              <span className="text-muted-foreground">Select artist(s)…</span>
+              <span className="text-muted-foreground">
+                {isArtistsLoading
+                  ? 'Loading artists…'
+                  : artistLoadError
+                    ? 'Unable to load artists'
+                    : artists.length === 0
+                      ? 'No artists available'
+                      : 'Select artist(s)…'}
+              </span>
             ) : (
               selectedLabels.map((artist) => (
                 <Badge key={artist.id} variant="secondary" className="flex items-center gap-1 pr-1">
@@ -209,6 +228,11 @@ export function MessageComposer({ artists, onSend, isSending = false, templates 
             </div>
           )}
         </div>
+        {isArtistsLoading && <p className="text-sm text-muted-foreground">Loading artists…</p>}
+        {!isArtistsLoading && artistLoadError && <p className="text-sm text-destructive">{artistLoadError}</p>}
+        {!isArtistsLoading && !artistLoadError && artists.length === 0 && (
+          <p className="text-sm text-muted-foreground">No artists are available to message yet.</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
