@@ -2,6 +2,8 @@ export default {
   ci: {
     collect: {
       startServerCommand: 'npm run preview',
+      startServerReadyPattern: 'Ready on',
+      startServerReadyTimeout: 60_000,
       url: [
         'http://localhost:3000/',
         'http://localhost:3000/artists',
@@ -13,6 +15,7 @@ export default {
       settings: {
         preset: 'desktop',
         throttlingMethod: 'provided',
+        chromeFlags: '--no-sandbox --disable-dev-shm-usage',
       },
     },
     assert: {
@@ -25,9 +28,6 @@ export default {
         'total-blocking-time': ['error', { maxNumericValue: 300 }],
         interactive: ['error', { maxNumericValue: 3500 }],
       },
-    },
-    upload: {
-      target: 'temporary-public-storage',
     },
   },
 }

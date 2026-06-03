@@ -26,5 +26,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run Lighthouse CI
-        run: npx lhci autorun
+      - name: Collect Lighthouse reports
+        run: node_modules/.bin/lhci collect
+
+      - name: Assert Lighthouse budgets
+        run: node_modules/.bin/lhci assert
