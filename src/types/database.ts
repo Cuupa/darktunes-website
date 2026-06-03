@@ -309,6 +309,7 @@ export interface Database {
           catalog_number: string | null
           preview_url: string | null
           smart_url: string | null
+          platform_links: Record<string, string> | null
           popularity: number | null
           is_visible: boolean
           is_promo: boolean
@@ -337,6 +338,7 @@ export interface Database {
           catalog_number?: string | null
           preview_url?: string | null
           smart_url?: string | null
+          platform_links?: Record<string, string> | null
           popularity?: number | null
           is_visible?: boolean
           is_promo?: boolean
@@ -365,6 +367,7 @@ export interface Database {
           catalog_number?: string | null
           preview_url?: string | null
           smart_url?: string | null
+          platform_links?: Record<string, string> | null
           popularity?: number | null
           is_visible?: boolean
           is_promo?: boolean
