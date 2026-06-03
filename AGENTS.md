@@ -309,6 +309,8 @@ Step 2 — POST /api/webhooks/sos/confirm: Validates API key, validates payload 
 Authentication: Both endpoints check `Authorization: Bearer <SOS_WEBHOOK_SECRET>` against the `SOS_WEBHOOK_SECRET` environment variable. Return 503 if the variable is unset; 401 on mismatch.
 DAL: `createSalesStatement(db, data)` in `src/lib/api/salesStatements.ts` inserts the record. MUST be called with a service-role client to bypass RLS.
 Duplicate handling: If the r2Key already exists (unique constraint), the confirm endpoint returns 409 — the SOS generator should treat this as a no-op.
+Email notification: After a successful `sales_statements` insert, the confirm route calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. The email is sent via Resend API to `artist.email` with period, optional amount, and a CTA button linking to `/portal/statements`. This call is wrapped in a try/catch — failure is logged with `[SOS confirm]` prefix but does NOT block the 201 response (graceful degradation). Skipped silently when `RESEND_API_KEY` is not set.
+Admin statements overview: `StatementsManager` component (`src/components/admin/StatementsManager.tsx`) provides a read-only table in the Admin dashboard (Statements tab, admin-only) showing all `sales_statements` rows joined with `artists.name`. Columns: Artist Name, Period, Amount (EUR), Filename (monospace), Created At. Sorted newest first.
 
 Vercel Deployment
 Install script: scripts/vercel-install.sh runs npm ci and validates all required environment variables.
