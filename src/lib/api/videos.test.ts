@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getVideos, createVideo, updateVideo, deleteVideo, getVideosByArtistId } from './videos'
+import { getVideos, getPublicVideos, createVideo, updateVideo, deleteVideo, getVideosByArtistId } from './videos'
 
 type DbClient = SupabaseClient<Database>
 type VideoRow = Database['public']['Tables']['videos']['Row']
@@ -131,3 +131,125 @@ describe('deleteVideo', () => {
     await expect(deleteVideo(db, 'vid-001')).rejects.toThrow('Delete denied')
   })
 })
+
+// ---------------------------------------------------------------------------
+// getPublicVideos — only returns visible videos
+// ---------------------------------------------------------------------------
+
+describe('getPublicVideos', () => {
+  it('returns only visible videos', async () => {
+    const visibleRow = { ...mockVideoRow, is_visible: true }
+    const db = makeMockDb([visibleRow])
+    const result = await getPublicVideos(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].isVisible).toBe(true)
+  })
+
+  it('returns an empty array when there are no visible videos', async () => {
+    const db = makeMockDb([])
+    const result = await getPublicVideos(db)
+    expect(result).toEqual([])
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'RLS denied', code: 'PGRST301' })
+    await expect(getPublicVideos(db)).rejects.toThrow('RLS denied')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pagination slice logic (pure, no DB needed)
+//
+// The Videos component and VideosPageContent both apply this logic to paginate
+// a flat array of videos before rendering.  We test it here to ensure edge
+// cases are handled correctly.
+// ---------------------------------------------------------------------------
+
+describe('pagination slice logic', () => {
+  /** Replicates the slice logic used in Videos.tsx and VideosPageContent.tsx */
+  function paginate(
+    items: unknown[],
+    page: number,
+    videosPerPage: number,
+    videosLinkToPage = false,
+  ) {
+    const perPage = Math.max(1, videosPerPage)
+    const totalPages = Math.ceil(items.length / perPage)
+    const effectiveTotalPages = videosLinkToPage ? 1 : totalPages
+    const currentPage = Math.min(Math.max(1, page), Math.max(1, effectiveTotalPages))
+    return {
+      pageItems: items.slice((currentPage - 1) * perPage, currentPage * perPage),
+      currentPage,
+      totalPages,
+      effectiveTotalPages,
+    }
+  }
+
+  const ITEMS = Array.from({ length: 25 }, (_, i) => i + 1)
+
+  it('returns the first 9 items on page 1 with default perPage', () => {
+    const { pageItems, currentPage } = paginate(ITEMS, 1, 9)
+    expect(currentPage).toBe(1)
+    expect(pageItems).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('returns the correct slice for page 2', () => {
+    const { pageItems, currentPage } = paginate(ITEMS, 2, 9)
+    expect(currentPage).toBe(2)
+    expect(pageItems).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18])
+  })
+
+  it('returns the last partial slice on the final page', () => {
+    const { pageItems, currentPage } = paginate(ITEMS, 3, 9)
+    expect(currentPage).toBe(3)
+    expect(pageItems).toEqual([19, 20, 21, 22, 23, 24, 25])
+  })
+
+  it('clamps currentPage to effectiveTotalPages when page exceeds range', () => {
+    const { pageItems, currentPage } = paginate(ITEMS, 99, 9)
+    expect(currentPage).toBe(3) // ceil(25/9) = 3
+    expect(pageItems).toEqual([19, 20, 21, 22, 23, 24, 25])
+  })
+
+  it('returns page 1 when page is 0 or negative', () => {
+    const { pageItems, currentPage } = paginate(ITEMS, 0, 9)
+    expect(currentPage).toBe(1)
+    expect(pageItems).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('returns all items on a single page when perPage >= items.length', () => {
+    const { pageItems, totalPages } = paginate(ITEMS, 1, 100)
+    expect(totalPages).toBe(1)
+    expect(pageItems).toHaveLength(25)
+  })
+
+  it('returns empty array and page 1 when items list is empty', () => {
+    const { pageItems, currentPage, totalPages } = paginate([], 1, 9)
+    expect(pageItems).toEqual([])
+    expect(currentPage).toBe(1)
+    expect(totalPages).toBe(0)
+  })
+
+  it('when videosLinkToPage=true effectiveTotalPages is always 1', () => {
+    const { effectiveTotalPages, pageItems } = paginate(ITEMS, 1, 9, true)
+    expect(effectiveTotalPages).toBe(1)
+    expect(pageItems).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('perPage of 1 produces totalPages equal to items length', () => {
+    const { totalPages } = paginate(ITEMS, 1, 1)
+    expect(totalPages).toBe(25)
+  })
+
+  it('treats perPage=0 as perPage=1 (Math.max guard)', () => {
+    const { totalPages } = paginate(ITEMS, 1, 0)
+    expect(totalPages).toBe(25)
+  })
+
+  it('returns correct totals for exactly divisible count', () => {
+    const items = Array.from({ length: 18 }, (_, i) => i + 1)
+    const { totalPages } = paginate(items, 1, 9)
+    expect(totalPages).toBe(2)
+  })
+})
+
