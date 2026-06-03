@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { SpotifyLogo, AppleLogo, LinkSimple, X } from '@phosphor-icons/react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -48,11 +49,12 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
         <div className="flex flex-col sm:flex-row">
           {/* Cover art */}
           <div className="relative w-full sm:w-48 shrink-0 aspect-square sm:aspect-auto">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={getOptimizedImageUrl(release.coverArt, 400)}
               alt={`${release.title} by ${release.artistName}`}
-              className="absolute inset-0 w-full h-full object-cover"
+              fill
+              unoptimized
+              className="object-cover"
             />
           </div>
 

@@ -38,4 +38,5 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **External API rate limiting** — all calls to external APIs (iTunes, Spotify, Discogs, Songkick) go through `withExponentialBackoff()` from `src/lib/rateLimiter.ts`. This prevents runaway requests and provides graceful handling of HTTP 429 / 5xx responses.
 - **External API keys** (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `DISCOGS_TOKEN`, `SONGKICK_API_KEY`) are server-side only — never prefixed with `NEXT_PUBLIC_` and never sent to the browser.
 - **Image caching** — external cover art images are downloaded server-side and uploaded to Cloudflare R2. The browser only ever loads images from R2 (via wsrv.nl proxy). External image URLs are never stored in the database or sent to the browser.
+- **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content, but every client-side render path sanitizes the HTML with DOMPurify before using `dangerouslySetInnerHTML`, reducing XSS risk in the admin inbox and artist portal.
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.

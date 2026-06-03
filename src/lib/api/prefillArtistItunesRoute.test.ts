@@ -55,7 +55,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
             },
           ],
         }),
-      })) as typeof fetch,
+      })) as unknown as typeof fetch,
     )
 
     const { POST } = await loadRoute()
@@ -156,7 +156,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
           resultCount: 0,
           results: [],
         }),
-      })) as typeof fetch,
+      })) as unknown as typeof fetch,
     )
 
     const { POST } = await loadRoute()
@@ -185,7 +185,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
       vi.fn(async () => ({
         ok: false,
         status: 503,
-      })) as typeof fetch,
+      })) as unknown as typeof fetch,
     )
 
     const { POST } = await loadRoute()

@@ -14,6 +14,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -30,7 +31,11 @@ const row = {
   artist_id: 'artist-1',
   subject: 'Subject',
   body: 'Body',
+  body_html: null,
   read: false,
+  read_at: null,
+  starred: false,
+  deleted_at: null,
   sent_at: '2026-01-01T00:00:00Z',
 }
 

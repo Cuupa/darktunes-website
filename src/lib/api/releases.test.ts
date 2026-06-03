@@ -64,6 +64,13 @@ const mockReleaseRow: ReleaseRow = {
   is_promo: false,
   promo_text: null,
   hero_bg_url: null,
+  platform_links: null,
+  hero_primary_btn_label: null,
+  hero_primary_btn_action: null,
+  hero_primary_btn_href: null,
+  hero_secondary_btn_label: null,
+  hero_secondary_btn_href: null,
+  hero_secondary_btn_action: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -67,8 +67,10 @@
 - **SiteSettingsManager** — tabbed form (Global / Social Links / Homepage / SEO / Legal / DSGVO / Visual Effects) with Zod validation; Homepage tab supports both a fallback Spotify playlist URI and a multi-playlist array (label + URI) for instant tab switching. Saves all settings to Supabase and revalidates the Next.js ISR cache via `/api/revalidate-site-settings`. Follows IoC pattern: accepts `value: SiteSettings` and `onChange` props; `useSiteSettings` is wired in `AdminDashboard`.
 - **UsersManager** *(admin-only tab)* — full user management: lists all registered users (via Supabase Auth Admin API), allows role changes (admin/editor/journalist/user), ban/unban with confirmation dialog, user deletion, and artist ↔ user linking/unlinking. Tab is only rendered when `profile.role === 'admin'`. API routes: `GET/PATCH/DELETE /api/admin/users`, `PATCH /api/admin/users/[id]/link-artist`.
 - **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
-- **MessagesManager** *(admin-only tab)* — sends artist inbox messages (`label_messages`), shows read status, multi-select + bulk delete.
+- **MessagesManager** *(admin-only tab)* — rich-text artist inbox manager (`label_messages`) with templates, artist-thread accordions, search/unread filters, starring, realtime updates, and soft-delete bulk actions.
 - **AccreditationsManager** *(admin-only tab)* — reviews and updates journalist accreditation requests (`accreditation_requests`).
+- **LogsManager** *(admin-only tab)* — three-pane log viewer: Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filter dropdowns, and pagination.
+- **RolesManager** *(admin-only tab)* — configures per-role content permissions (`canPublishNews`, `canEditNews`, `canManageArtists`, `canManageReleases`, `canManageVideos`, `canViewAdminPanel`) stored as JSON in `site_settings` under key `role_permissions`. Admin permissions are always full and cannot be restricted.
 
 ### SOS Webhook — Statement of Sales PDF Upload
 - `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
@@ -177,7 +179,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` + empty-state CTA |
 | Artist Portal — release submission | ✅ Implemented | `/portal/releases/new` + `POST /api/portal/submit-release` (`is_visible=false` pending admin approval) + optional cover upload via `POST /api/portal/upload-release-cover` |
 | Artist Portal — marketing assets | ✅ Implemented | `/portal/marketing` — assigned asset downloads + artist-owned uploads/deletes via `artist_assets` and `POST/DELETE /api/portal/upload-asset` |
-| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — Suspense + mark-as-read + artist replies via `artist_replies` (`sendPortalReply`) |
+| Artist Portal — label messages | ✅ Implemented | `/portal/messages` — Suspense + rich-text rendering + realtime inbox updates + mark-as-read + rich-text artist replies via `artist_replies` (`sendPortalReply`) |
 | Artist Portal — account settings | ✅ Implemented | `/portal/settings` — password update (`supabase.auth.updateUser`) + locale switch (NEXT_LOCALE cookie) |
 | Artist Portal — module feature flags | ✅ Implemented | `portal_feature_flags` (`artist.*`) controls nav + page availability |
 | Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |
@@ -241,6 +243,8 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `app/error.tsx` | Next.js error boundary (route-segment level) |
 | `app/global-error.tsx` | Next.js global error boundary (root layout level) |
 | `src/components/admin/SystemHealthWidget.tsx` | Admin health dashboard widget (DB status + per-API cards + Force Sync) |
+| `src/components/admin/LogsManager.tsx` | Admin log viewer: Audit Log, Error Log, and App Errors tabs with search, filters, and pagination |
+| `src/components/admin/RolesManager.tsx` | Admin role-permissions configurator — per-role toggle matrix stored in `site_settings.role_permissions` |
 | `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
 | `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |

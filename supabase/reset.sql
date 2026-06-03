@@ -825,16 +825,37 @@ CREATE TRIGGER trg_portal_feature_flags_updated_at
 -- TABLE: label_messages
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.label_messages (
-  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  artist_id UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
-  subject   TEXT        NOT NULL,
-  body      TEXT        NOT NULL,
-  read      BOOLEAN     NOT NULL DEFAULT FALSE,
-  sent_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id     UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  subject       TEXT        NOT NULL,
+  body          TEXT        NOT NULL,
+  body_html     TEXT,
+  read          BOOLEAN     NOT NULL DEFAULT FALSE,
+  read_at       TIMESTAMPTZ,
+  starred       BOOLEAN     NOT NULL DEFAULT FALSE,
+  deleted_at    TIMESTAMPTZ,
+  search_vector TSVECTOR GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
+  ) STORED,
+  sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.label_messages
+  ADD COLUMN IF NOT EXISTS body_html TEXT;
+ALTER TABLE public.label_messages
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+ALTER TABLE public.label_messages
+  ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.label_messages
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.label_messages
+  ADD COLUMN IF NOT EXISTS search_vector TSVECTOR GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
+  ) STORED;
 
 CREATE INDEX IF NOT EXISTS idx_label_messages_artist_id_sent_at
   ON public.label_messages (artist_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_label_messages_search ON public.label_messages USING GIN(search_vector);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: journalist_downloads
@@ -1503,8 +1524,15 @@ CREATE TABLE IF NOT EXISTS public.artist_replies (
   message_id UUID NOT NULL REFERENCES public.label_messages(id) ON DELETE CASCADE,
   artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
   body TEXT NOT NULL CHECK (char_length(body) > 0),
+  body_html TEXT,
+  deleted_at TIMESTAMPTZ,
   sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.artist_replies
+  ADD COLUMN IF NOT EXISTS body_html TEXT;
+ALTER TABLE public.artist_replies
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 ALTER TABLE public.artist_replies ENABLE ROW LEVEL SECURITY;
 
@@ -1527,6 +1555,22 @@ CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
+ALTER TABLE public.label_messages REPLICA IDENTITY FULL;
+ALTER TABLE public.artist_replies REPLICA IDENTITY FULL;
+
+-- TABLE: message_templates
+CREATE TABLE IF NOT EXISTS public.message_templates (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  subject    TEXT        NOT NULL DEFAULT '',
+  body_html  TEXT        NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.message_templates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "message_templates: admin all" ON public.message_templates;
+CREATE POLICY "message_templates: admin all" ON public.message_templates
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ============================================================
 -- TABLE: media_folders  (dedicated filesystem for Press & Media tab)

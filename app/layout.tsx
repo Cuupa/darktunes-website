@@ -47,7 +47,7 @@ function createPublicSupabaseClient() {
 
 const getCachedSiteSettings = unstable_cache(
   async () => {
-    return getSiteSettings(createPublicSupabaseClient())
+    return getSiteSettings(createPublicSupabaseClient()).catch(() => null)
   },
   ['site-settings'],
   { revalidate: 60, tags: ['site-settings'] },

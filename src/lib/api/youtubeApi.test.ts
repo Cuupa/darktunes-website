@@ -134,7 +134,9 @@ describe('fetchYouTubeChannelVideos', () => {
         publishedAt: '2024-01-01T00:00:00Z',
         channelTitle: 'Test',
         resourceId: { videoId: '' },
-        thumbnails: {},
+        thumbnails: {
+          high: { url: '' },
+        },
       },
       contentDetails: { videoId: '', videoPublishedAt: '2024-01-01T00:00:00Z' },
     }

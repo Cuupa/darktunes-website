@@ -23,14 +23,14 @@ function createPublicSupabaseClient() {
 }
 
 const getCachedArtists = unstable_cache(
-  async (): Promise<Artist[]> => getPublicArtists(createPublicSupabaseClient()),
+  async (): Promise<Artist[]> => getPublicArtists(createPublicSupabaseClient()).catch(() => [] as Artist[]),
   ['artists-page'],
   { revalidate: 60, tags: ['artists'] },
 )
 
 export default async function ArtistsPage() {
   const [artists, locale] = await Promise.all([
-    getCachedArtists().catch(() => [] as Artist[]),
+    getCachedArtists(),
     getLocale(),
   ])
 

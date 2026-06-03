@@ -13,6 +13,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     order: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -29,6 +30,8 @@ const row = {
   message_id: 'msg-1',
   artist_id: 'artist-1',
   body: 'Thanks!',
+  body_html: null,
+  deleted_at: null,
   sent_at: '2026-05-01T00:00:00Z',
 }
 

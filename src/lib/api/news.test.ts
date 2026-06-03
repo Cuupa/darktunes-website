@@ -41,6 +41,12 @@ const mockNewsRow: NewsRow = {
   created_at: '2024-04-24T00:00:00Z',
   updated_at: '2024-04-24T00:00:00Z',
   artist_id: null,
+  hero_primary_btn_label: null,
+  hero_primary_btn_action: null,
+  hero_primary_btn_href: null,
+  hero_secondary_btn_label: null,
+  hero_secondary_btn_href: null,
+  hero_secondary_btn_action: null,
 }
 
 describe('getNewsPosts', () => {
