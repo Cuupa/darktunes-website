@@ -1447,17 +1447,9 @@ INSERT INTO public.site_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
-  ('artist.analytics', 'Artist Analytics', TRUE, 'artist'),
   ('artist.statements', 'Artist Statements', TRUE, 'artist'),
-  ('artist.releases', 'Artist Releases', TRUE, 'artist'),
-  ('artist.tour', 'Artist Tour', TRUE, 'artist'),
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
-  ('artist.messages', 'Artist Messages', TRUE, 'artist'),
-  ('journalist.promo_pool', 'Journalist Promo Pool', TRUE, 'journalist'),
-  ('journalist.press_kit', 'Journalist Press Kit', TRUE, 'journalist'),
-  ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist'),
-  ('journalist.press_releases', 'Journalist Press Releases', TRUE, 'journalist'),
-  ('journalist.download_history', 'Journalist Download History', TRUE, 'journalist')
+  ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================

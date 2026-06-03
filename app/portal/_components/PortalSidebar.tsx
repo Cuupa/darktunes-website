@@ -35,11 +35,11 @@ interface PortalSidebarProps {
 const baseNavItems = [
   { href: '/portal', label: 'overview', icon: ChartBar },
   { href: '/portal/profile', label: 'profile', icon: User },
-  { href: '/portal/analytics', label: 'analytics', icon: ChartBar, flag: 'artist.analytics' },
-  { href: '/portal/releases', label: 'releases', icon: MusicNotes, flag: 'artist.releases' },
-  { href: '/portal/tour', label: 'tour', icon: MapPin, flag: 'artist.tour' },
+  { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
+  { href: '/portal/releases', label: 'releases', icon: MusicNotes },
+  { href: '/portal/tour', label: 'tour', icon: MapPin },
   { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
-  { href: '/portal/messages', label: 'messages', icon: ChatCircleText, flag: 'artist.messages' },
+  { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
   { href: '/portal/settings', label: 'settings', icon: Gear },
 ] as const
 

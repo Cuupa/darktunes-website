@@ -76,7 +76,7 @@ export default async function ImpressumPage() {
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
-        featureToggles: { promoPool: true, sosStatements: true, editorTools: true },
+        featureToggles: { promoPool: true, editorTools: true },
       }),
     ),
     getLocale(),

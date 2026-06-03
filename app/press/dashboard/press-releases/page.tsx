@@ -1,16 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getPressOnlyNewsPosts } from '@/lib/api/news'
 
 export default async function PressReleasesPage() {
   const supabase = await createServerSupabaseClient()
-  const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
-  if (flags['journalist.press_releases'] === false) {
-    return <p className="text-muted-foreground">Press releases are currently disabled.</p>
-  }
-
   const posts = await getPressOnlyNewsPosts(supabase).catch(() => [])
 
   return (

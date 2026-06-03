@@ -468,7 +468,7 @@ export function AdminDashboard() {
                 <CardContent>
                   <Suspense fallback={<TabFallback />}>
                     <FeatureTogglesManager
-                      value={siteSettings.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }}
+                      value={siteSettings.featureToggles ?? { promoPool: true, editorTools: true }}
                       onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
                       isLoading={siteSettingsLoading}
                     />
