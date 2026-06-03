@@ -6,14 +6,14 @@
  * Admin interface for the "Media" tab — combines:
  *   1. Press Kit & Applications  — journalist applications, EPK press photos,
  *      and private promo tracks (legacy form-based upload).
- *   2. Media Files               — full FileExplorer with access to all assets,
- *      drag-and-drop upload, folder organisation, context-menu actions, etc.
+ *   2. Media Files               — dedicated file browser backed by the
+ *      media_files / media_folders tables, fully independent from the Assets tab.
  */
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Broadcast, FolderOpen } from '@phosphor-icons/react'
 import { JournalistManager } from './JournalistManager'
-import { FileExplorer } from './file-explorer/FileExplorer'
+import { MediaFileExplorer } from './media-explorer/MediaFileExplorer'
 
 export function MediaManager() {
   return (
@@ -29,14 +29,13 @@ export function MediaManager() {
         </TabsTrigger>
       </TabsList>
 
-      {/* ── Media Files — full file explorer ─────────────────────────── */}
+      {/* ── Media Files — dedicated media filesystem ──────────────────── */}
       <TabsContent value="files">
         <p className="mb-3 text-sm text-muted-foreground">
-          Upload and organise all media assets. Drag and drop files, create folders,
-          assign artists or releases, and manage tags. All assets are shared with the
-          Assets tab.
+          Upload and organise media assets. Drag and drop files, create folders, and manage tags.
+          Media files are stored in a dedicated filesystem, separate from the Assets tab.
         </p>
-        <FileExplorer />
+        <MediaFileExplorer />
       </TabsContent>
 
       {/* ── Press Kit & Applications ──────────────────────────────────── */}

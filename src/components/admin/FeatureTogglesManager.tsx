@@ -8,7 +8,6 @@
  *
  * Features:
  *  - Toggle Promo Pool (journalist access)
- *  - Toggle Statement of Sales (artist royalty PDFs)
  *  - Toggle Editor Tools (editor CMS access)
  */
 
@@ -19,7 +18,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   MusicNote,
   Newspaper,
-  FileText,
   Info,
 } from '@phosphor-icons/react'
 import type { FeatureToggles } from '@/types'
@@ -108,21 +106,6 @@ export function FeatureTogglesManager({ value, onChange, isLoading = false }: Fe
             affectedRole="journalist"
             checked={value.promoPool}
             onCheckedChange={(checked) => handleChange('promoPool', checked)}
-            disabled={isLoading}
-          />
-        </div>
-
-        <Separator />
-
-        <div className="px-4">
-          <FeatureToggleRow
-            id="toggle-sos-statements"
-            icon={<FileText size={18} aria-hidden="true" />}
-            label="Statement of Sales"
-            description="Artists can securely download their royalty statement PDFs in the Artist Portal."
-            affectedRole="artist"
-            checked={value.sosStatements}
-            onCheckedChange={(checked) => handleChange('sosStatements', checked)}
             disabled={isLoading}
           />
         </div>

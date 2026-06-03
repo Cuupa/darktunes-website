@@ -31,8 +31,8 @@ export function Footer({ siteSettings, dict }: FooterProps) {
   }
 
   return (
-    <footer className="border-t border-border bg-card/50 backdrop-blur-sm">
-      <div className="container mx-auto px-4 lg:px-8 py-12">
+    <footer className="border-t border-border bg-card/50 backdrop-blur-sm overflow-x-hidden">
+      <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-4">

@@ -94,23 +94,22 @@ export function PortalOverview({
         </Link>
 
         {isEnabled('artist.statements') && (
-        <Link href="/portal/statements">
-          <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.statements}
-              </CardTitle>
-              <FileText size={18} className="text-primary" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{statementCount}</p>
-              <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
-            </CardContent>
-          </Card>
-        </Link>
+          <Link href="/portal/statements">
+            <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {dict.statements}
+                </CardTitle>
+                <FileText size={18} className="text-primary" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{statementCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
-        {isEnabled('artist.releases') && (
         <Link href="/portal/releases">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -125,9 +124,7 @@ export function PortalOverview({
             </CardContent>
           </Card>
         </Link>
-        )}
 
-        {isEnabled('artist.tour') && (
         <Link href="/portal/tour">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -142,7 +139,6 @@ export function PortalOverview({
             </CardContent>
           </Card>
         </Link>
-        )}
 
         {isEnabled('artist.marketing') && (
           <Link href="/portal/marketing">
@@ -159,20 +155,18 @@ export function PortalOverview({
           </Link>
         )}
 
-        {isEnabled('artist.messages') && (
-          <Link href="/portal/messages">
-            <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{dict.messages}</CardTitle>
-                <ChatCircleText size={18} className="text-primary" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{unreadMessageCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">unread messages</p>
-              </CardContent>
-            </Card>
-          </Link>
-        )}
+        <Link href="/portal/messages">
+          <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{dict.messages}</CardTitle>
+              <ChatCircleText size={18} className="text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{unreadMessageCount}</p>
+              <p className="text-xs text-muted-foreground mt-1">unread messages</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   )

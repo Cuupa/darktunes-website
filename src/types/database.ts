@@ -650,6 +650,77 @@ export interface Database {
         }
         Relationships: []
       }
+      media_folders: {
+        Row: {
+          id: string
+          name: string
+          parent_id: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          parent_id?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          parent_id?: string | null
+          created_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      media_files: {
+        Row: {
+          id: string
+          filename: string
+          original_filename: string
+          mime_type: string
+          size_bytes: number
+          r2_key: string
+          public_url: string
+          uploaded_by: string | null
+          created_at: string
+          folder_id: string | null
+          tags: string[]
+          sha256_hash: string | null
+        }
+        Insert: {
+          id?: string
+          filename: string
+          original_filename: string
+          mime_type: string
+          size_bytes: number
+          r2_key: string
+          public_url: string
+          uploaded_by?: string | null
+          created_at?: string
+          folder_id?: string | null
+          tags?: string[]
+          sha256_hash?: string | null
+        }
+        Update: {
+          id?: string
+          filename?: string
+          original_filename?: string
+          mime_type?: string
+          size_bytes?: number
+          r2_key?: string
+          public_url?: string
+          uploaded_by?: string | null
+          created_at?: string
+          folder_id?: string | null
+          tags?: string[]
+          sha256_hash?: string | null
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           key: string

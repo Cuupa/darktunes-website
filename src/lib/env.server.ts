@@ -62,6 +62,16 @@ const serverEnvSchema = z.object({
     .string()
     .optional()
     .describe('Bandsintown API key — leave blank to disable Bandsintown sync'),
+  /** Resend API key — used for contact form emails and SOS statement notifications */
+  RESEND_API_KEY: z
+    .string()
+    .optional()
+    .describe('Resend API key — leave blank to disable email notifications'),
+  /** Resend verified sender address for outgoing emails */
+  RESEND_FROM_EMAIL: z
+    .string()
+    .optional()
+    .describe('Resend from address, e.g. noreply@darktunes.com'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -81,6 +91,8 @@ function validateServerEnv(): ServerEnv {
     DISCOGS_TOKEN: process.env.DISCOGS_TOKEN,
     SONGKICK_API_KEY: process.env.SONGKICK_API_KEY,
     BANDSINTOWN_API_KEY: process.env.BANDSINTOWN_API_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
   })
 
   if (!result.success) {

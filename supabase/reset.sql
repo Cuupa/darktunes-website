@@ -1468,17 +1468,9 @@ INSERT INTO public.site_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
-  ('artist.analytics', 'Artist Analytics', TRUE, 'artist'),
   ('artist.statements', 'Artist Statements', TRUE, 'artist'),
-  ('artist.releases', 'Artist Releases', TRUE, 'artist'),
-  ('artist.tour', 'Artist Tour', TRUE, 'artist'),
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
-  ('artist.messages', 'Artist Messages', TRUE, 'artist'),
-  ('journalist.promo_pool', 'Journalist Promo Pool', TRUE, 'journalist'),
-  ('journalist.press_kit', 'Journalist Press Kit', TRUE, 'journalist'),
-  ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist'),
-  ('journalist.press_releases', 'Journalist Press Releases', TRUE, 'journalist'),
-  ('journalist.download_history', 'Journalist Download History', TRUE, 'journalist')
+  ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
@@ -1579,6 +1571,74 @@ DROP POLICY IF EXISTS "message_templates: admin all" ON public.message_templates
 CREATE POLICY "message_templates: admin all" ON public.message_templates
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ============================================================
+-- TABLE: media_folders  (dedicated filesystem for Press & Media tab)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.media_folders (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  parent_id   UUID REFERENCES public.media_folders(id) ON DELETE CASCADE,
+  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_media_folders_parent_id ON public.media_folders(parent_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: media_files  (dedicated filesystem for Press & Media tab)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.media_files (
+  id                UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  filename          TEXT    NOT NULL,
+  original_filename TEXT    NOT NULL,
+  mime_type         TEXT    NOT NULL,
+  size_bytes        BIGINT  NOT NULL,
+  r2_key            TEXT    NOT NULL UNIQUE,
+  public_url        TEXT    NOT NULL,
+  uploaded_by       UUID    REFERENCES public.profiles(id) ON DELETE SET NULL,
+  folder_id         UUID    REFERENCES public.media_folders(id) ON DELETE SET NULL,
+  tags              TEXT[]  NOT NULL DEFAULT '{}',
+  sha256_hash       TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_media_files_folder_id   ON public.media_files(folder_id);
+CREATE INDEX IF NOT EXISTS idx_media_files_created_at  ON public.media_files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_files_sha256_hash ON public.media_files(sha256_hash);
+
+-- RLS: media_folders
+ALTER TABLE public.media_folders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "media_folders: authenticated read" ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: editor+ write"     ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: admin delete"      ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: editor+ update"    ON public.media_folders;
+CREATE POLICY "media_folders: authenticated read" ON public.media_folders FOR SELECT TO authenticated USING (true);
+CREATE POLICY "media_folders: editor+ write"      ON public.media_folders FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
+CREATE POLICY "media_folders: admin delete"       ON public.media_folders FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "media_folders: editor+ update"     ON public.media_folders FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
+
+-- RLS: media_files
+ALTER TABLE public.media_files ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "media_files: authenticated read" ON public.media_files;
+DROP POLICY IF EXISTS "media_files: editor+ write"     ON public.media_files;
+DROP POLICY IF EXISTS "media_files: editor+ update"    ON public.media_files;
+DROP POLICY IF EXISTS "media_files: admin delete"      ON public.media_files;
+CREATE POLICY "media_files: authenticated read" ON public.media_files FOR SELECT TO authenticated USING (true);
+CREATE POLICY "media_files: editor+ write"      ON public.media_files FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
+CREATE POLICY "media_files: editor+ update"     ON public.media_files FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+);
+CREATE POLICY "media_files: admin delete"       ON public.media_files FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
 -- ============================================================
 -- Scheduled news publishing (pg_cron)

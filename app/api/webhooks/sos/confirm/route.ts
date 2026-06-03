@@ -109,5 +109,25 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw err
   }
 
+  // 5. Send email notification (non-blocking — failure must not abort the response)
+  try {
+    const { serverEnv } = await import('@/lib/env.server')
+    const { sendStatementNotification } = await import('@/lib/email/sendStatementNotification')
+
+    await sendStatementNotification(
+      artist,
+      { filename, period, amountEur },
+      {
+        resendApiKey: serverEnv.RESEND_API_KEY ?? '',
+        resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? 'noreply@darktunes.com',
+        siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com',
+        fetch,
+      },
+    )
+  } catch (emailErr) {
+    // Email failure is non-critical — log but don't abort response
+    console.error('[SOS confirm] Email notification failed:', emailErr)
+  }
+
   return NextResponse.json({ statementId: statement.id }, { status: 201 })
 })

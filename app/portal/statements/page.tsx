@@ -4,7 +4,7 @@
  * Fetches the artist's statements server-side and passes them to the
  * StatementsTable client leaf component. Follows IoC principle.
  *
- * If the 'sosStatements' feature toggle is disabled, an unavailable message
+ * If the 'artist.statements' portal feature flag is disabled, an unavailable message
  * is shown instead of the statements table.
  */
 

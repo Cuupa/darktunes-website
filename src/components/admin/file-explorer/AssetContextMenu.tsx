@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactElement, type ReactNode } from 'react'
 import { Copy, DownloadSimple, Eye, FolderSimple, MagnifyingGlass, PencilSimple, Plus, Tag, Trash, UserCircle, VinylRecord } from '@phosphor-icons/react'
 import {
   ContextMenu,
@@ -17,7 +17,27 @@ import {
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
 import type { Artist, AssetFolder, Release } from '@/types'
-import { getFolderPathLabel } from './utils'
+import { buildFolderTree } from './utils'
+
+function renderFolderTree(
+  tree: AssetFolder[],
+  currentFolderId: string | null,
+  onMoveToFolder: (folderId: string | null) => void,
+  depth = 0,
+): ReactElement[] {
+  return tree.flatMap((folder) => [
+    <ContextMenuItem
+      key={folder.id}
+      disabled={folder.id === currentFolderId}
+      onClick={() => onMoveToFolder(folder.id)}
+    >
+      {'\u00a0\u00a0'.repeat(depth)}{folder.name}
+    </ContextMenuItem>,
+    ...(folder.children && folder.children.length > 0
+      ? renderFolderTree(folder.children, currentFolderId, onMoveToFolder, depth + 1)
+      : []),
+  ])
+}
 
 interface AssetContextMenuProps {
   children: ReactNode
@@ -76,6 +96,11 @@ export function AssetContextMenu({
     [releases, releaseSearch],
   )
 
+  const folderTree = useMemo(
+    () => buildFolderTree(folders),
+    [folders],
+  )
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -98,17 +123,9 @@ export function AssetContextMenu({
               <FolderSimple aria-hidden="true" />
               Move to…
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="max-h-72 overflow-y-auto">
+            <ContextMenuSubContent className="max-h-72 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
               <ContextMenuItem onClick={() => onMoveToFolder(null)}>Root</ContextMenuItem>
-              {folders.map((folder) => (
-                <ContextMenuItem
-                  key={folder.id}
-                  disabled={folder.id === folderId}
-                  onClick={() => onMoveToFolder(folder.id)}
-                >
-                  {getFolderPathLabel(folder.id, folders)}
-                </ContextMenuItem>
-              ))}
+              {renderFolderTree(folderTree, folderId ?? null, onMoveToFolder)}
             </ContextMenuSubContent>
           </ContextMenuSub>
         )}
@@ -143,7 +160,7 @@ export function AssetContextMenu({
                   autoFocus={false}
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto">
+              <div className="max-h-60 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
                 {filteredArtists.length === 0 ? (
                   <p className="py-3 text-center text-xs text-muted-foreground">No artists found</p>
                 ) : (
@@ -191,7 +208,7 @@ export function AssetContextMenu({
                   autoFocus={false}
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto">
+              <div className="max-h-60 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
                 <ContextMenuRadioGroup
                   value={selectedReleaseId ?? ''}
                   onValueChange={(value) => onAssignRelease(value === '' ? null : value)}

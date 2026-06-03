@@ -24,6 +24,7 @@ import {
   ArrowDown,
   ArrowsDownUp,
   CheckCircle,
+  FileText,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -45,6 +46,7 @@ const MessagesManager = lazy(() => import('./MessagesManager').then((m) => ({ de
 const AccreditationsManager = lazy(() => import('./AccreditationsManager').then((m) => ({ default: m.AccreditationsManager })))
 const LogsManager = lazy(() => import('./LogsManager').then((m) => ({ default: m.LogsManager })))
 const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
+const StatementsManager = lazy(() => import('./StatementsManager').then((m) => ({ default: m.StatementsManager })))
 
 function TabFallback() {
   return (
@@ -65,6 +67,7 @@ type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'settings' | 'health' | 'media' | 'users' | 'features'
   | 'feature-flags' | 'messages' | 'accreditations' | 'logs' | 'roles'
+  | 'statements'
 
 interface TabDef {
   value: TabValue
@@ -90,6 +93,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
   { value: 'logs',           label: 'Logs',               adminOnly: true,  icon: ClipboardText },
   { value: 'roles',          label: 'Roles & Permissions',adminOnly: true,  icon: ShieldCheck },
+  { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
 ]
 
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
@@ -468,7 +472,7 @@ export function AdminDashboard() {
                 <CardContent>
                   <Suspense fallback={<TabFallback />}>
                     <FeatureTogglesManager
-                      value={siteSettings.featureToggles ?? { promoPool: true, sosStatements: true, editorTools: true }}
+                      value={siteSettings.featureToggles ?? { promoPool: true, editorTools: true }}
                       onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
                       isLoading={siteSettingsLoading}
                     />
@@ -580,6 +584,24 @@ export function AdminDashboard() {
                 <CardContent>
                   <Suspense fallback={<TabFallback />}>
                     <RolesManager />
+                  </Suspense>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('statements') && (
+            <TabsContent value="statements" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Statements</CardTitle>
+                  <CardDescription>
+                    Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<TabFallback />}>
+                    <StatementsManager />
                   </Suspense>
                 </CardContent>
               </Card>

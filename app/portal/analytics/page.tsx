@@ -15,7 +15,6 @@ import {
   getStreamingStatsByArtistId,
   getAggregatedStreamsByPlatform,
 } from '@/lib/api/streamingStats'
-import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StreamingChart } from './_components/StreamingChart'
 
@@ -42,11 +41,6 @@ async function AnalyticsContent() {
   } = await supabase.auth.getUser()
 
   if (!user) return null
-
-  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
-  if (flags['artist.analytics'] === false) {
-    return <p className="text-muted-foreground">Analytics module is currently disabled.</p>
-  }
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
   const stats = artist

@@ -10,11 +10,11 @@ export default async function PressDashboardPage() {
   const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
 
   const cards = [
-    { href: '/press/dashboard/promo-pool', label: 'Promo Pool', enabled: flags['journalist.promo_pool'] ?? true },
-    { href: '/press/dashboard/press-kit', label: 'Press Kit', enabled: flags['journalist.press_kit'] ?? true },
-    { href: '/press/dashboard/press-releases', label: 'Press Releases', enabled: flags['journalist.press_releases'] ?? true },
+    { href: '/press/dashboard/promo-pool', label: 'Promo Pool', enabled: true },
+    { href: '/press/dashboard/press-kit', label: 'Press Kit', enabled: true },
+    { href: '/press/dashboard/press-releases', label: 'Press Releases', enabled: true },
     { href: '/press/dashboard/accreditation', label: 'Accreditation', enabled: flags['journalist.accreditation'] ?? true },
-    { href: '/press/dashboard/download-history', label: 'Download History', enabled: flags['journalist.download_history'] ?? true },
+    { href: '/press/dashboard/download-history', label: 'Download History', enabled: true },
   ].filter((item) => item.enabled)
 
   return (
