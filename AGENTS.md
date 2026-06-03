@@ -429,3 +429,20 @@ Images use `loading="lazy" decoding="async"` and pass through `getOptimizedImage
 Artist images in `Artists.tsx` also use `loading="lazy" decoding="async"` + `getSquareThumbnail`.
 
 3D Coverflow Clip Architecture: The outer wrapper has `overflow: hidden` to prevent horizontal page scroll. The Embla viewport div (emblaRef) uses `overflow: visible` so perspective-rotated adjacent slides are fully visible and not cropped at the viewport edge. The perspective (1200px) is on a middle wrapper between the two. This three-layer structure — [clip] → [perspective] → [embla-visible] — is required; do NOT collapse layers or move overflow-hidden onto the perspective/embla elements.
+
+robots.txt & llms.txt Maintenance
+Two auto-generated discovery files are served by Next.js at build/request time — no static files to edit manually:
+
+`app/robots.ts` — generates `/robots.txt` via the Next.js Metadata API.
+  - To BLOCK a new private route prefix (e.g. `/members/`): add `'/members/'` to the `disallow` array in the `rules[0]` entry.
+  - To BLOCK an additional AI training crawler: add its user-agent string to the `userAgent` array in the second rules entry.
+  - To add a NEW sitemap URL: add the full URL to the `sitemap` property.
+  - ⛔ Never add allow rules for routes protected by middleware — middleware already blocks them; allow rules would be misleading.
+
+`app/llms.txt/route.ts` — generates `/llms.txt` dynamically from live Supabase data (ISR revalidate: 300 s).
+  - New artists and releases appear automatically — no manual update needed.
+  - To ADD a new public section (e.g. `/merch`): add a line to the `## Sections` block inside `buildLlmsTxt()`.
+  - To REMOVE a section: delete its line from the `## Sections` block and its corresponding data fetch/render block.
+  - To ADD extra metadata (e.g. label social links): add it to the header block in `buildLlmsTxt()`.
+  - ⛔ Never list admin, portal, press, or promo-pool routes in `llms.txt` — those are restricted by robots.txt.
+  - Cache tags: the route uses `artists` and `releases` tags — it is automatically refreshed when those caches are invalidated by the sync cron jobs.
