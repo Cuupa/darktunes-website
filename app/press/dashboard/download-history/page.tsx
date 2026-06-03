@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getDownloadHistory } from '@/lib/api/journalistDownloads'
 
 export default async function DownloadHistoryPage() {
@@ -10,11 +9,6 @@ export default async function DownloadHistoryPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-
-  const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
-  if (flags['journalist.download_history'] === false) {
-    return <p className="text-muted-foreground">Download history is currently disabled.</p>
-  }
 
   const history = await getDownloadHistory(supabase, user.id).catch(() => [])
 

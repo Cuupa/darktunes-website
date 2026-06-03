@@ -248,8 +248,6 @@ export interface SpotifyPlaylistEntry {
 export interface FeatureToggles {
   /** Enable/disable the journalist Promo Pool area. Default: true */
   promoPool: boolean
-  /** Enable/disable the Statement-of-Sales (royalty PDFs) feature for artists. Default: true */
-  sosStatements: boolean
   /** Enable/disable editor access to the admin CMS. Default: true */
   editorTools: boolean
 }

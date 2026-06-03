@@ -4,7 +4,6 @@ import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getLabelMessages } from '@/lib/api/labelMessages'
 import { getRepliesForMessage } from '@/lib/api/artistReplies'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -33,11 +32,6 @@ async function MessagesContent() {
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
   if (!artist) return null
-
-  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
-  if (flags['artist.messages'] === false) {
-    return <p className="text-muted-foreground">Messages are currently disabled.</p>
-  }
 
   const messages = await getLabelMessages(supabase, artist.id).catch(() => [])
   const repliesByMessageId: Record<string, ArtistReply[]> = {}

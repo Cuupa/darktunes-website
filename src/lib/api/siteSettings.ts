@@ -17,7 +17,6 @@ const DEFAULT_HOMEPAGE_SECTION_ORDER: HomepageSection[] = [
 /** Default feature toggle values — all features enabled by default. */
 const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
   promoPool: true,
-  sosStatements: true,
   editorTools: true,
 }
 
@@ -116,7 +115,6 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
       const candidate = parsed as Record<string, unknown>
       featureToggles = {
         promoPool: typeof candidate['promoPool'] === 'boolean' ? candidate['promoPool'] : DEFAULT_FEATURE_TOGGLES.promoPool,
-        sosStatements: typeof candidate['sosStatements'] === 'boolean' ? candidate['sosStatements'] : DEFAULT_FEATURE_TOGGLES.sosStatements,
         editorTools: typeof candidate['editorTools'] === 'boolean' ? candidate['editorTools'] : DEFAULT_FEATURE_TOGGLES.editorTools,
       }
     }

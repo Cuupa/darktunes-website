@@ -151,7 +151,7 @@ describe('getSiteSettings', () => {
   it('returns default feature toggles when key is missing', async () => {
     const db = makeMockDb([])
     const result = await getSiteSettings(db)
-    expect(result.featureToggles).toEqual({ promoPool: true, sosStatements: true, editorTools: true })
+    expect(result.featureToggles).toEqual({ promoPool: true, editorTools: true })
   })
 
   it('parses feature toggles from DB row', async () => {
@@ -159,19 +159,29 @@ describe('getSiteSettings', () => {
       ...mockRows,
       {
         key: 'feature_toggles',
-        value: JSON.stringify({ promoPool: false, sosStatements: true, editorTools: false }),
+        value: JSON.stringify({ promoPool: false, editorTools: false }),
       },
     ])
     const result = await getSiteSettings(db)
     expect(result.featureToggles.promoPool).toBe(false)
-    expect(result.featureToggles.sosStatements).toBe(true)
     expect(result.featureToggles.editorTools).toBe(false)
+  })
+
+  it('ignores legacy sosStatements toggle from DB row', async () => {
+    const db = makeMockDb([
+      {
+        key: 'feature_toggles',
+        value: JSON.stringify({ promoPool: false, sosStatements: false, editorTools: true }),
+      },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.featureToggles).toEqual({ promoPool: false, editorTools: true })
   })
 
   it('falls back to default feature toggles when JSON is invalid', async () => {
     const db = makeMockDb([{ key: 'feature_toggles', value: 'not-valid-json' }])
     const result = await getSiteSettings(db)
-    expect(result.featureToggles).toEqual({ promoPool: true, sosStatements: true, editorTools: true })
+    expect(result.featureToggles).toEqual({ promoPool: true, editorTools: true })
   })
 
   it('throws on database error', async () => {
