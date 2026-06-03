@@ -81,6 +81,8 @@ export interface Release {
   catalogNumber?: string
   previewUrl?: string
   smartUrl?: string
+  /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */
+  platformLinks?: Record<string, string>
   popularity?: number
   isVisible: boolean
   /** When true, this release is only visible in the journalist Promo Pool and never shown on the public homepage. */

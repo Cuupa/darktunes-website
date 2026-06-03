@@ -126,7 +126,9 @@
     "latestVideo": "Latest Video",
     "getTickets": "Tickets",
     "fullProfile": "Full Profile →",
-    "news": "News"
+    "news": "News",
+    "collapse": "Collapse",
+    "expand": "Expand"
   },
   "pages": {
     "backToHome": "← Back to home"

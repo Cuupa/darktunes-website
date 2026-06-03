@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -22,6 +22,8 @@ import {
   Calendar,
   Ticket,
   Play,
+  CaretDown,
+  CaretUp,
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
@@ -47,6 +49,38 @@ function extractYouTubeId(url: string): string | null {
   return match?.[1] ?? null
 }
 
+/** Collapsible section header with animated chevron. */
+function SectionHeader({
+  title,
+  isOpen,
+  onToggle,
+  collapseLabel,
+  expandLabel,
+}: {
+  title: string
+  isOpen: boolean
+  onToggle: () => void
+  collapseLabel: string
+  expandLabel: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="group flex items-center gap-3 w-full text-left mb-6"
+      aria-expanded={isOpen}
+      aria-label={isOpen ? collapseLabel : expandLabel}
+    >
+      <h2 className="text-3xl font-bold tracking-tight text-foreground flex-1">
+        {title}
+      </h2>
+      <span className="shrink-0 p-1 rounded-md text-muted-foreground group-hover:text-foreground transition-colors">
+        {isOpen ? <CaretUp size={22} weight="bold" aria-hidden="true" /> : <CaretDown size={22} weight="bold" aria-hidden="true" />}
+      </span>
+    </button>
+  )
+}
+
 export function ArtistDetailContent({
   artist,
   releases,
@@ -62,6 +96,17 @@ export function ArtistDetailContent({
   const youtubeId = artist.youtubeUrl ? extractYouTubeId(artist.youtubeUrl) : null
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
+  // Collapsible state — all sections open by default
+  const [openSections, setOpenSections] = useState({
+    videos: true,
+    discography: true,
+    news: true,
+    tourDates: true,
+  })
+
+  const toggleSection = (key: keyof typeof openSections) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
 
   const openVideoModal = (video: Video) => {
     setSelectedVideo(video)
@@ -79,6 +124,14 @@ export function ArtistDetailContent({
     { url: artist.bandcampUrl, icon: MusicNote, label: `${artist.name} on Bandcamp` },
     { url: artist.websiteUrl, icon: Globe, label: `${artist.name} official website` },
   ]
+
+  const collapseLabel = dict.collapse ?? 'Collapse'
+  const expandLabel = dict.expand ?? 'Expand'
+
+  const collapseVariants = {
+    open: { opacity: 1, height: 'auto' },
+    closed: { opacity: 0, height: 0 },
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -113,13 +166,14 @@ export function ArtistDetailContent({
             {dict.backToArtists}
           </Link>
 
-          <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
+          {/* Three-column hero on desktop: photo | metadata | spotify player */}
+          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-10 lg:gap-12 items-start">
             {/* Artist photo */}
             <motion.div
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-              className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
+              className="w-full max-w-xs lg:w-72 shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               {getSquareThumbnail(artist.imageUrl, 600) ? (
                 <Image
@@ -151,7 +205,7 @@ export function ArtistDetailContent({
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: prefersReducedMotion ? 0 : 0.2, duration: prefersReducedMotion ? 0 : 0.5 }}
-              className="flex-1 min-w-0 space-y-5 pt-2"
+              className="min-w-0 space-y-5 pt-2"
             >
               {/* Tactical FUI metadata */}
               {(artist.country || artist.foundedYear) && (
@@ -241,6 +295,30 @@ export function ArtistDetailContent({
                 )}
               </div>
             </motion.div>
+
+            {/* Spotify preview player — fills the empty space on desktop */}
+            {artist.spotifyId && (
+              <motion.div
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: prefersReducedMotion ? 0 : 0.35, duration: prefersReducedMotion ? 0 : 0.5 }}
+                className="w-full lg:w-80 xl:w-96 shrink-0"
+              >
+                <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
+                  <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60" style={{ height: 352 }}>
+                    <iframe
+                      src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
+                      width="100%"
+                      height="352"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      className="border-0 block"
+                      title={`${artist.name} on Spotify`}
+                    />
+                  </div>
+                </ConsentGate>
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
@@ -248,7 +326,7 @@ export function ArtistDetailContent({
       {/* ------------------------------------------------------------------ */}
       {/* Content below hero                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <div className="container mx-auto px-4 lg:px-8 pb-24 space-y-20">
+      <div className="container mx-auto px-4 lg:px-8 pb-24 space-y-16">
 
         {/* Biography */}
         {artist.bio && (
@@ -265,114 +343,102 @@ export function ArtistDetailContent({
           </motion.section>
         )}
 
-        {/* Spotify player */}
-        {artist.spotifyId && (
-          <motion.section
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-          >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">Spotify</h2>
-            <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
-              <div className="rounded-xl overflow-hidden max-w-2xl" style={{ height: 352 }}>
-                <iframe
-                  src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
-                  width="100%"
-                  height="352"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  className="border-0 block"
-                  title={`${artist.name} on Spotify`}
-                />
-              </div>
-            </ConsentGate>
-          </motion.section>
-        )}
-
         {/* Videos */}
-        {videos.length > 0 && (
+        {(videos.length > 0 || youtubeId) && (
           <motion.section
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.latestVideo}</h2>
-            <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 list-none">
-              {videos.map((video, index) => (
-                <motion.li
-                  key={video.id}
-                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{
-                    duration: prefersReducedMotion ? 0 : 0.5,
-                    delay: prefersReducedMotion ? 0 : index * 0.05,
-                  }}
+            <SectionHeader
+              title={dict.latestVideo}
+              isOpen={openSections.videos}
+              onToggle={() => toggleSection('videos')}
+              collapseLabel={collapseLabel}
+              expandLabel={expandLabel}
+            />
+            <AnimatePresence initial={false}>
+              {openSections.videos && (
+                <motion.div
+                  key="videos-body"
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  variants={collapseVariants}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
                 >
-                  <Card className="group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300">
-                    <button
-                      type="button"
-                      className="relative aspect-video overflow-hidden cursor-pointer"
-                      onClick={() => openVideoModal(video)}
-                      aria-label={`Play ${video.title}`}
-                    >
-                      <Image
-                        src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
-                        alt={`${video.title} – video thumbnail`}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        unoptimized
-                      />
-                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
-                        <div
-                          aria-hidden="true"
-                          className="bg-accent text-accent-foreground rounded-full w-16 h-16 p-0 flex items-center justify-center"
+                  {videos.length > 0 ? (
+                    <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 list-none">
+                      {videos.map((video, index) => (
+                        <motion.li
+                          key={video.id}
+                          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{
+                            duration: prefersReducedMotion ? 0 : 0.5,
+                            delay: prefersReducedMotion ? 0 : index * 0.05,
+                          }}
                         >
-                          <Play size={26} weight="fill" aria-hidden="true" />
+                          <Card className="group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300">
+                            <button
+                              type="button"
+                              className="relative aspect-video w-full overflow-hidden cursor-pointer"
+                              onClick={() => openVideoModal(video)}
+                              aria-label={`Play ${video.title}`}
+                            >
+                              <Image
+                                src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
+                                alt={`${video.title} – video thumbnail`}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
+                                <div
+                                  aria-hidden="true"
+                                  className="bg-accent text-accent-foreground rounded-full w-16 h-16 p-0 flex items-center justify-center"
+                                >
+                                  <Play size={26} weight="fill" aria-hidden="true" />
+                                </div>
+                              </div>
+                            </button>
+                            <div className="p-4">
+                              <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">
+                                {video.title}
+                              </h3>
+                              <p className="text-xs text-muted-foreground font-mono mt-2">
+                                {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </p>
+                            </div>
+                          </Card>
+                        </motion.li>
+                      ))}
+                    </ul>
+                  ) : youtubeId ? (
+                    <div className="max-w-3xl">
+                      <ConsentGate label={consentDict.loadYouTube} gateText={consentDict.gateText}>
+                        <div className="aspect-video rounded-xl overflow-hidden">
+                          <iframe
+                            src={`https://www.youtube.com/embed/${youtubeId}`}
+                            title={`${artist.name} – latest video`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className="w-full h-full"
+                          />
                         </div>
-                      </div>
-                    </button>
-                    <div className="p-4">
-                      <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">
-                        {video.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground font-mono mt-2">
-                        {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </p>
+                      </ConsentGate>
                     </div>
-                  </Card>
-                </motion.li>
-              ))}
-            </ul>
-          </motion.section>
-        )}
-        {videos.length === 0 && youtubeId && (
-          <motion.section
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-          >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.latestVideo}</h2>
-            <div className="max-w-3xl">
-              <ConsentGate label={consentDict.loadYouTube} gateText={consentDict.gateText}>
-                <div className="aspect-video rounded-xl overflow-hidden">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${youtubeId}`}
-                    title={`${artist.name} – latest video`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full"
-                  />
-                </div>
-              </ConsentGate>
-            </div>
+                  ) : null}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.section>
         )}
 
@@ -384,49 +450,69 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.discography}</h2>
-            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 list-none">
-              {releases.map((release, index) => (
-                <motion.li
-                  key={release.id}
-                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.05 }}
+            <SectionHeader
+              title={dict.discography}
+              isOpen={openSections.discography}
+              onToggle={() => toggleSection('discography')}
+              collapseLabel={collapseLabel}
+              expandLabel={expandLabel}
+            />
+            <AnimatePresence initial={false}>
+              {openSections.discography && (
+                <motion.div
+                  key="discography-body"
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  variants={collapseVariants}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
                 >
-                  <Link href={`/releases/${release.id}`} aria-label={`${release.title} by ${release.artistName}`}>
-                    <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
-                      <div className="relative aspect-square overflow-hidden">
-                        <Image
-                          src={getOptimizedImageUrl(release.coverArt, 400)}
-                          alt={`${release.title} cover`}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
-                          unoptimized
-                        />
-                        <Badge
-                          variant="outline"
-                          className="absolute bottom-2 left-2 uppercase text-xs font-mono tracking-widest border-primary/40 text-primary-foreground bg-background/70 backdrop-blur-sm"
-                        >
-                          {release.type}
-                        </Badge>
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-bold line-clamp-1 group-hover:text-accent transition-colors">
-                          {release.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground font-mono mt-1">
-                          {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
-                            year: 'numeric',
-                            month: 'short',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.li>
-              ))}
-            </ul>
+                  <ul className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 list-none">
+                    {releases.map((release, index) => (
+                      <motion.li
+                        key={release.id}
+                        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.05 }}
+                      >
+                        <Link href={`/releases/${release.id}`} aria-label={`${release.title} by ${release.artistName}`}>
+                          <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
+                            <div className="relative aspect-square overflow-hidden">
+                              <Image
+                                src={getOptimizedImageUrl(release.coverArt, 400)}
+                                alt={`${release.title} cover`}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                unoptimized
+                              />
+                              <Badge
+                                variant="outline"
+                                className="absolute bottom-2 left-2 uppercase text-xs font-mono tracking-widest border-primary/40 text-primary-foreground bg-background/70 backdrop-blur-sm"
+                              >
+                                {release.type}
+                              </Badge>
+                            </div>
+                            <div className="p-4">
+                              <h3 className="font-bold line-clamp-1 group-hover:text-accent transition-colors">
+                                {release.title}
+                              </h3>
+                              <p className="text-xs text-muted-foreground font-mono mt-1">
+                                {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.section>
         )}
 
@@ -438,37 +524,57 @@ export function ArtistDetailContent({
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.news}</h2>
-            <ul className="space-y-4 list-none max-w-3xl">
-              {news.map((post) => (
-                <li key={post.id}>
-                  <Link
-                    href={`/news/${post.slug}`}
-                    className="group flex gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
-                  >
-                    {post.imageUrl && (
-                      <Image
-                        src={getOptimizedImageUrl(post.imageUrl, 120)}
-                        alt={post.title}
-                        width={80}
-                        height={80}
-                        className="w-20 h-20 object-cover rounded-lg shrink-0"
-                        unoptimized
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">
-                        {new Date(post.publishedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </p>
-                      <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">{post.title}</h3>
-                      {post.excerpt && (
-                        <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{post.excerpt}</p>
-                      )}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <SectionHeader
+              title={dict.news}
+              isOpen={openSections.news}
+              onToggle={() => toggleSection('news')}
+              collapseLabel={collapseLabel}
+              expandLabel={expandLabel}
+            />
+            <AnimatePresence initial={false}>
+              {openSections.news && (
+                <motion.div
+                  key="news-body"
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  variants={collapseVariants}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <ul className="space-y-4 list-none max-w-3xl">
+                    {news.map((post) => (
+                      <li key={post.id}>
+                        <Link
+                          href={`/news/${post.slug}`}
+                          className="group flex gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
+                        >
+                          {post.imageUrl && (
+                            <Image
+                              src={getOptimizedImageUrl(post.imageUrl, 120)}
+                              alt={post.title}
+                              width={80}
+                              height={80}
+                              className="w-20 h-20 object-cover rounded-lg shrink-0"
+                              unoptimized
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">
+                              {new Date(post.publishedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </p>
+                            <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">{post.title}</h3>
+                            {post.excerpt && (
+                              <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{post.excerpt}</p>
+                            )}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.section>
         )}
 
@@ -479,49 +585,69 @@ export function ArtistDetailContent({
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.tourDates}</h2>
-          {concerts.length === 0 ? (
-            <p className="text-foreground/70 font-serif">{dict.noShows}</p>
-          ) : (
-            <ul className="space-y-3 list-none max-w-2xl">
-              {concerts.map((concert) => (
-                <li
-                  key={concert.id}
-                  className="flex items-center justify-between gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="text-center shrink-0">
-                      <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
-                        {new Date(concert.concertDate).toLocaleDateString(dateLocale, { month: 'short' })}
-                      </p>
-                      <p className="text-2xl font-bold leading-none">
-                        {new Date(concert.concertDate).getDate()}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{concert.eventName}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin size={12} aria-hidden="true" />
-                        {[concert.venueName, concert.venueCity].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                  </div>
-                  {concert.ticketUrl && (
-                    <a
-                      href={concert.ticketUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all hover:scale-105 text-sm font-medium"
-                      aria-label={`Tickets for ${concert.eventName}`}
-                    >
-                      <Ticket size={16} weight="fill" aria-hidden="true" />
-                      {dict.getTickets}
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <SectionHeader
+            title={dict.tourDates}
+            isOpen={openSections.tourDates}
+            onToggle={() => toggleSection('tourDates')}
+            collapseLabel={collapseLabel}
+            expandLabel={expandLabel}
+          />
+          <AnimatePresence initial={false}>
+            {openSections.tourDates && (
+              <motion.div
+                key="tour-body"
+                initial="closed"
+                animate="open"
+                exit="closed"
+                variants={collapseVariants}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
+                style={{ overflow: 'hidden' }}
+              >
+                {concerts.length === 0 ? (
+                  <p className="text-foreground/70 font-serif">{dict.noShows}</p>
+                ) : (
+                  <ul className="space-y-3 list-none max-w-2xl">
+                    {concerts.map((concert) => (
+                      <li
+                        key={concert.id}
+                        className="flex items-center justify-between gap-4 p-4 rounded-xl bg-card border border-border hover:border-accent/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="text-center shrink-0">
+                            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+                              {new Date(concert.concertDate).toLocaleDateString(dateLocale, { month: 'short' })}
+                            </p>
+                            <p className="text-2xl font-bold leading-none">
+                              {new Date(concert.concertDate).getDate()}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{concert.eventName}</p>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <MapPin size={12} aria-hidden="true" />
+                              {[concert.venueName, concert.venueCity].filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                        </div>
+                        {concert.ticketUrl && (
+                          <a
+                            href={concert.ticketUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all hover:scale-105 text-sm font-medium"
+                            aria-label={`Tickets for ${concert.eventName}`}
+                          >
+                            <Ticket size={16} weight="fill" aria-hidden="true" />
+                            {dict.getTickets}
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.section>
       </div>
       <VideoModal

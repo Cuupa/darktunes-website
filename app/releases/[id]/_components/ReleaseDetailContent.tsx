@@ -5,7 +5,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, ArrowLeft, SpotifyLogo, AppleLogo, YoutubeLogo, LinkSimple } from '@phosphor-icons/react'
+import {
+  Calendar,
+  ArrowLeft,
+  SpotifyLogo,
+  AppleLogo,
+  YoutubeLogo,
+  LinkSimple,
+  MusicNote,
+  Globe,
+} from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -15,6 +24,39 @@ interface ReleaseDetailContentProps {
   dict: Dictionary['releaseDetail']
   locale: Locale
 }
+
+/**
+ * Visual config for each Odesli platform key.
+ * Keys match what the Odesli API returns in `linksByPlatform`.
+ */
+const PLATFORM_CONFIG: Record<
+  string,
+  { label: string; bg: string; textColor: string; icon: React.ElementType }
+> = {
+  spotify:      { label: 'Spotify',       bg: '#1DB954', textColor: 'text-black',  icon: SpotifyLogo },
+  appleMusic:   { label: 'Apple Music',   bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo },
+  youtube:      { label: 'YouTube',       bg: '#FF0000', textColor: 'text-white',  icon: YoutubeLogo },
+  youtubeMusic: { label: 'YT Music',      bg: '#FF0033', textColor: 'text-white',  icon: MusicNote },
+  deezer:       { label: 'Deezer',        bg: '#A238FF', textColor: 'text-white',  icon: MusicNote },
+  tidal:        { label: 'Tidal',         bg: '#000000', textColor: 'text-white',  icon: MusicNote },
+  amazonMusic:  { label: 'Amazon Music',  bg: '#25D1DA', textColor: 'text-black',  icon: MusicNote },
+  pandora:      { label: 'Pandora',       bg: '#005483', textColor: 'text-white',  icon: MusicNote },
+  soundcloud:   { label: 'SoundCloud',    bg: '#FF5500', textColor: 'text-white',  icon: MusicNote },
+  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: MusicNote },
+  napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote },
+  audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote },
+  anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote },
+}
+
+/**
+ * Ordered list of Odesli platform keys for deterministic display order.
+ * Platforms appearing in platformLinks but NOT in this list are shown at the end.
+ */
+const PLATFORM_ORDER = [
+  'spotify', 'appleMusic', 'youtube', 'youtubeMusic',
+  'deezer', 'tidal', 'amazonMusic', 'soundcloud',
+  'bandcamp', 'pandora', 'napster', 'audiomack', 'anghami',
+]
 
 /**
  * Client component for the release detail page.
@@ -28,6 +70,10 @@ interface ReleaseDetailContentProps {
  * syncAll pipeline via the Odesli API), a "Listen Everywhere" button is
  * shown that deep-links to song.link — a universal streaming hub that
  * redirects the visitor to their preferred platform.
+ *
+ * Per-platform links: if `release.platformLinks` is populated, individual
+ * platform buttons are rendered for all available services (Deezer, Tidal,
+ * Amazon Music, etc.) rather than only Spotify and Apple Music.
  */
 export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailContentProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
@@ -37,6 +83,29 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
     month: 'long',
     day: 'numeric',
   })
+
+  /**
+   * Resolve all platform URLs to display.
+   * Priority order:
+   *   1. Odesli-resolved `platformLinks` (most complete – includes all streaming services)
+   *   2. Fallback to the individually stored spotify_url / apple_music_url / youtube_url fields
+   */
+  const platformEntries: Array<{ key: string; url: string }> = (() => {
+    if (release.platformLinks && Object.keys(release.platformLinks).length > 0) {
+      // Sort by PLATFORM_ORDER, then append any unknown keys alphabetically
+      const known = PLATFORM_ORDER.filter((k) => release.platformLinks![k])
+      const unknown = Object.keys(release.platformLinks)
+        .filter((k) => !PLATFORM_ORDER.includes(k))
+        .sort()
+      return [...known, ...unknown].map((k) => ({ key: k, url: release.platformLinks![k] }))
+    }
+    // Fallback: use the individual URL fields
+    const fallback: Array<{ key: string; url: string }> = []
+    if (release.spotifyUrl)    fallback.push({ key: 'spotify',    url: release.spotifyUrl })
+    if (release.appleMusicUrl) fallback.push({ key: 'appleMusic', url: release.appleMusicUrl })
+    if (release.youtubeUrl)    fallback.push({ key: 'youtube',    url: release.youtubeUrl })
+    return fallback
+  })()
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -119,39 +188,44 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
               </p>
 
               {/* Streaming links */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                {/* Odesli smart link — shown first as the universal hub */}
+              <div className="space-y-3 pt-2">
+                {/* Odesli smart link — universal hub shown first */}
                 {release.smartUrl && (
-                  <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                    <a href={release.smartUrl} target="_blank" rel="noopener noreferrer">
-                      <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
-                      {dict.listenEverywhere}
-                    </a>
-                  </Button>
+                  <div>
+                    <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                      <a href={release.smartUrl} target="_blank" rel="noopener noreferrer">
+                        <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
+                        {dict.listenEverywhere}
+                      </a>
+                    </Button>
+                  </div>
                 )}
-                {release.spotifyUrl && (
-                  <Button asChild size="sm" className="bg-[#1DB954] hover:bg-[#1DB954]/90 text-black font-semibold">
-                    <a href={release.spotifyUrl} target="_blank" rel="noopener noreferrer">
-                      <SpotifyLogo size={18} weight="fill" className="mr-2" />
-                      Spotify
-                    </a>
-                  </Button>
-                )}
-                {release.appleMusicUrl && (
-                  <Button asChild size="sm" className="bg-[#FA2D48] hover:bg-[#FA2D48]/90 text-white font-semibold">
-                    <a href={release.appleMusicUrl} target="_blank" rel="noopener noreferrer">
-                      <AppleLogo size={18} weight="fill" className="mr-2" />
-                      Apple Music
-                    </a>
-                  </Button>
-                )}
-                {release.youtubeUrl && (
-                  <Button asChild size="sm" className="bg-[#FF0000] hover:bg-[#FF0000]/90 text-white font-semibold">
-                    <a href={release.youtubeUrl} target="_blank" rel="noopener noreferrer">
-                      <YoutubeLogo size={18} weight="fill" className="mr-2" />
-                      YouTube
-                    </a>
-                  </Button>
+
+                {/* Per-platform buttons */}
+                {platformEntries.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {platformEntries.map(({ key, url }) => {
+                      const cfg = PLATFORM_CONFIG[key]
+                      const Icon = cfg?.icon ?? Globe
+                      const label = cfg?.label ?? key
+                      const bg = cfg?.bg ?? undefined
+                      const textColor = cfg?.textColor ?? 'text-white'
+                      return (
+                        <a
+                          key={key}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Listen on ${label}`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 hover:scale-105 ${textColor}`}
+                          style={bg ? { backgroundColor: bg } : undefined}
+                        >
+                          <Icon size={14} weight="fill" aria-hidden="true" />
+                          {label}
+                        </a>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </motion.div>

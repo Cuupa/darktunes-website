@@ -80,17 +80,17 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       resolveOdesliSmartLink(musicUrl, globalThis.fetch),
     )
 
-    // 5. Persist smart_url back to the release
+    // 5. Persist smart_url and all per-platform links back to the release
     const { error: updateErr } = await db
       .from('releases')
-      .update({ smart_url: result.smartUrl })
+      .update({ smart_url: result.smartUrl, platform_links: result.platforms })
       .eq('id', releaseId)
 
     if (updateErr) {
       throw new ApiError(500, updateErr.message)
     }
 
-    return NextResponse.json({ smartUrl: result.smartUrl })
+    return NextResponse.json({ smartUrl: result.smartUrl, platforms: result.platforms })
   } catch (err) {
     if (err instanceof ApiError) throw err
     if (err instanceof HttpError) {
