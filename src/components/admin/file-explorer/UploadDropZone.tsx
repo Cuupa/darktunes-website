@@ -17,12 +17,13 @@ interface UploadDropZoneProps {
   folderId: string | null
   artistId?: string | null
   token: string | null
+  uploadEndpoint?: string
   onUploadComplete: () => void
   children: ReactNode
 }
 
 export const UploadDropZone = forwardRef<UploadDropZoneRef, UploadDropZoneProps>(function UploadDropZone(
-  { folderId, artistId = null, token, onUploadComplete, children },
+  { folderId, artistId = null, token, uploadEndpoint = '/api/upload', onUploadComplete, children },
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -41,6 +42,7 @@ export const UploadDropZone = forwardRef<UploadDropZoneRef, UploadDropZoneProps>
         token,
         folderId: targetFolderId,
         artistId,
+        endpoint: uploadEndpoint,
         onProgress: (fileKey, progress) => {
           setUploadProgress((previous) => ({ ...previous, [fileKey]: progress }))
         },

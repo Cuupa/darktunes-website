@@ -15,6 +15,7 @@ interface UploadOptions {
   token: string
   folderId: string | null
   artistId?: string | null
+  endpoint?: string
   onProgress?: (fileKey: string, progress: number) => void
 }
 
@@ -23,6 +24,7 @@ function uploadSingleFile(
   token: string,
   folderId: string | null,
   artistId: string | null,
+  endpoint: string,
   onProgress?: (progress: number) => void,
 ): Promise<UploadedAssetResponse> {
   return new Promise((resolve, reject) => {
@@ -49,16 +51,16 @@ function uploadSingleFile(
       }
     })
     xhr.addEventListener('error', () => reject(new Error('Network error')))
-    xhr.open('POST', '/api/upload')
+    xhr.open('POST', endpoint)
     xhr.setRequestHeader('Authorization', 'Bearer ' + token)
     xhr.send(formData)
   })
 }
 
-export async function uploadFiles({ files, token, folderId, artistId = null, onProgress }: UploadOptions): Promise<UploadedAssetResponse[]> {
+export async function uploadFiles({ files, token, folderId, artistId = null, endpoint = '/api/upload', onProgress }: UploadOptions): Promise<UploadedAssetResponse[]> {
   const uploads: UploadedAssetResponse[] = []
   for (const file of files) {
-    const result = await uploadSingleFile(file, token, folderId, artistId, (progress) => onProgress?.(file.name, progress))
+    const result = await uploadSingleFile(file, token, folderId, artistId, endpoint, (progress) => onProgress?.(file.name, progress))
     uploads.push(result)
   }
   return uploads
