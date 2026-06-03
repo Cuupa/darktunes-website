@@ -34,13 +34,13 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
       <DialogContent
         aria-describedby={undefined}
         hideCloseButton
-        className="max-w-lg w-full p-0 overflow-hidden bg-card border-border"
+        className="sm:max-w-lg md:max-w-xl lg:max-w-2xl w-full p-0 overflow-hidden bg-card border-border"
       >
         <DialogTitle className="sr-only">{release.title}</DialogTitle>
         {/* Close button – uses Radix DialogPrimitive.Close so it properly closes the dialog */}
         <DialogPrimitive.Close
-          aria-label="Close"
-          className="absolute top-3 right-3 z-10 rounded-full bg-background/70 backdrop-blur-sm p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Close release preview"
+          className="absolute top-3 right-3 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-background/70 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <X size={16} />
         </DialogPrimitive.Close>
@@ -56,8 +56,8 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
             />
           </div>
 
-          {/* Info */}
-          <div className="flex flex-col gap-3 p-4 flex-1 min-w-0">
+          {/* Info – scrollable body so long content never clips the viewport */}
+          <div className="overflow-y-auto max-h-[70vh] flex flex-col gap-3 p-4 flex-1 min-w-0">
             <div>
               <Badge variant="secondary" className="text-xs uppercase tracking-wider mb-2">
                 {release.type}

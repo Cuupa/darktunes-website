@@ -531,7 +531,7 @@ export function ReleasesManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingRelease ? 'Edit Release' : 'New Release'}</DialogTitle>
           </DialogHeader>
@@ -563,7 +563,7 @@ export function ReleasesManager() {
 
       {/* Sync error details dialog */}
       <Dialog open={!!syncResult && syncResult.totalErrors > 0} onOpenChange={(open) => !open && setSyncResult(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Sync Errors ({syncResult?.totalErrors ?? 0})</DialogTitle>
             <DialogDescription>

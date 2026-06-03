@@ -49,7 +49,7 @@ export function AssignArtistDialog({ open, onClose, artists, selectedArtistIds, 
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-sm" aria-labelledby="assign-artist-title">
+      <DialogContent className="sm:max-w-sm" aria-labelledby="assign-artist-title">
         <DialogHeader>
           <DialogTitle id="assign-artist-title" className="flex items-center gap-2">
             <UserCircle size={18} aria-hidden="true" />
@@ -141,7 +141,7 @@ export function AssignReleaseDialog({ open, onClose, releases, selectedReleaseId
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-sm" aria-labelledby="assign-release-title">
+      <DialogContent className="sm:max-w-sm" aria-labelledby="assign-release-title">
         <DialogHeader>
           <DialogTitle id="assign-release-title" className="flex items-center gap-2">
             <VinylRecord size={18} aria-hidden="true" />
@@ -276,7 +276,7 @@ export function TagsEditorDialog({ open, onClose, initialTags, onConfirm }: Tags
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm" aria-labelledby="tags-editor-title">
+      <DialogContent className="sm:max-w-sm" aria-labelledby="tags-editor-title">
         <DialogHeader>
           <DialogTitle id="tags-editor-title" className="flex items-center gap-2">
             <Tag size={18} aria-hidden="true" />

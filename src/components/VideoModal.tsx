@@ -40,7 +40,7 @@ export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel 
               initial={prefersReducedMotion ? { opacity: 1 } : { scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={prefersReducedMotion ? { opacity: 0 } : { scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              transition={{ type: "spring", damping: 40, stiffness: 400 }}
               className="relative"
             >
               <button
