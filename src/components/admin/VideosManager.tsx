@@ -272,7 +272,7 @@ export function VideosManager() {
       </Table>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingVideo ? 'Edit Video' : 'New Video'}</DialogTitle>
           </DialogHeader>

@@ -113,7 +113,7 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[90vh] max-w-[calc(100%-2rem)] sm:max-w-5xl flex-col gap-0 overflow-hidden p-0"
         aria-labelledby="preview-title"
       >
         {/* Header */}
@@ -168,7 +168,7 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
               <DownloadSimple size={16} aria-hidden="true" />
               <span className="sr-only">Download</span>
             </Button>
-            <Button variant="ghost" size="icon" title="Close" onClick={onClose} className="size-8">
+            <Button variant="ghost" size="icon" title="Close" onClick={onClose} aria-label="Close preview" className="min-w-[44px] min-h-[44px]">
               <X size={16} aria-hidden="true" />
               <span className="sr-only">Close</span>
             </Button>
