@@ -69,6 +69,8 @@
 - **FeatureFlagsManager** *(admin-only tab)* — toggles `portal_feature_flags` entries via `PATCH /api/admin/feature-flags/[id]`.
 - **MessagesManager** *(admin-only tab)* — rich-text artist inbox manager (`label_messages`) with templates, artist-thread accordions, search/unread filters, starring, realtime updates, and soft-delete bulk actions.
 - **AccreditationsManager** *(admin-only tab)* — reviews and updates journalist accreditation requests (`accreditation_requests`).
+- **LogsManager** *(admin-only tab)* — three-pane log viewer: Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filter dropdowns, and pagination.
+- **RolesManager** *(admin-only tab)* — configures per-role content permissions (`canPublishNews`, `canEditNews`, `canManageArtists`, `canManageReleases`, `canManageVideos`, `canViewAdminPanel`) stored as JSON in `site_settings` under key `role_permissions`. Admin permissions are always full and cannot be restricted.
 
 ### SOS Webhook — Statement of Sales PDF Upload
 - `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
@@ -241,6 +243,8 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `app/error.tsx` | Next.js error boundary (route-segment level) |
 | `app/global-error.tsx` | Next.js global error boundary (root layout level) |
 | `src/components/admin/SystemHealthWidget.tsx` | Admin health dashboard widget (DB status + per-API cards + Force Sync) |
+| `src/components/admin/LogsManager.tsx` | Admin log viewer: Audit Log, Error Log, and App Errors tabs with search, filters, and pagination |
+| `src/components/admin/RolesManager.tsx` | Admin role-permissions configurator — per-role toggle matrix stored in `site_settings.role_permissions` |
 | `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
 | `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |

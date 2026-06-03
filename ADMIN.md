@@ -44,6 +44,8 @@ WHERE slug = 'artist-slug';
 - **Admin Dashboard**: Tab state is persisted to the URL as a `?tab=` query param — tabs are bookmarkable and support browser back/forward navigation
 - **Messages (admin-only)**: Rich-text **Messages** tab for artist inbox communication (`label_messages`); supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
+- **Logs (admin-only)**: **Logs** tab with three sub-views — Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filters, and pagination.
+- **Roles & Permissions (admin-only)**: **Roles & Permissions** tab to configure per-role content permissions (`canPublishNews`, `canEditNews`, `canManageArtists`, `canManageReleases`, `canManageVideos`, `canViewAdminPanel`) stored as JSON in `site_settings` under key `role_permissions`.
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
