@@ -272,7 +272,8 @@
     "oauth_or": "or",
     "oauth_google": "Continue with Google",
     "oauth_spotify": "Continue with Spotify",
-    "oauth_error": "OAuth sign-in failed. Please try again."
+    "oauth_error": "OAuth sign-in failed. Please try again.",
+    "login_no_artist": "Your account is not linked to an artist profile yet. Please contact the label administrator to get access."
   },
   "press": {
     "title": "Press & Media",

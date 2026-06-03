@@ -31,10 +31,10 @@ export interface ReleaseFormData {
   promoText: string
   heroBgUrl: string
   heroPrimaryBtnLabel: string
-  heroPrimaryBtnAction: '' | 'link' | 'scroll' | 'none'
+  heroPrimaryBtnAction: 'default' | 'link' | 'scroll' | 'none'
   heroPrimaryBtnHref: string
   heroSecondaryBtnLabel: string
-  heroSecondaryBtnAction: '' | 'link' | 'scroll' | 'none'
+  heroSecondaryBtnAction: 'default' | 'link' | 'scroll' | 'none'
   heroSecondaryBtnHref: string
 }
 
@@ -198,7 +198,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                   <SelectValue placeholder="Default (go to release page)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Default (go to release page)</SelectItem>
+                  <SelectItem value="default">Default (go to release page)</SelectItem>
                   <SelectItem value="link">Link — URL or internal path</SelectItem>
                   <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
                   <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
@@ -265,7 +265,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                   <SelectValue placeholder="Default (scroll to releases)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Default (scroll to releases)</SelectItem>
+                  <SelectItem value="default">Default (scroll to releases)</SelectItem>
                   <SelectItem value="link">Link — URL or internal path</SelectItem>
                   <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
                   <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>

@@ -272,7 +272,8 @@
     "oauth_or": "oder",
     "oauth_google": "Mit Google fortfahren",
     "oauth_spotify": "Mit Spotify fortfahren",
-    "oauth_error": "OAuth-Anmeldung fehlgeschlagen. Bitte erneut versuchen."
+    "oauth_error": "OAuth-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "login_no_artist": "Dein Konto ist noch nicht mit einem Künstlerprofil verknüpft. Bitte wende dich an den Label-Administrator, um Zugang zu erhalten."
   },
   "press": {
     "title": "Presse & Medien",

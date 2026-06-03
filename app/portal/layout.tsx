@@ -36,7 +36,10 @@ export default async function PortalLayout({ children }: { children: ReactNode }
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return null
+  // No user — let children render (middleware already handles redirecting
+  // non-login portal routes to /portal/login, so here we only reach this
+  // branch for /portal/login itself where the login form must be visible).
+  if (!user) return <>{children}</>
 
   // Fetch the user's role from their profile
   const { data: profile } = await supabase
