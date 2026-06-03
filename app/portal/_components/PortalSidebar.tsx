@@ -113,7 +113,7 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
 
   return (
     <>
-      <header className="portal-main-header sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
+      <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <div className="font-bold tracking-widest text-primary">darkTunes</div>
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
@@ -133,7 +133,7 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
         </Sheet>
       </header>
 
-      <aside className="portal-sidebar hidden min-h-screen w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
+      <aside className="portal-sidebar max-md:hidden flex flex-col min-h-screen w-64 shrink-0 border-r border-border bg-card">
         <div className="p-6">
           <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
         </div>
