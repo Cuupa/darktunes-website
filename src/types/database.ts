@@ -314,6 +314,12 @@ export interface Database {
           is_promo: boolean
           promo_text: string | null
           hero_bg_url: string | null
+          hero_primary_btn_label: string | null
+          hero_primary_btn_action: string | null
+          hero_primary_btn_href: string | null
+          hero_secondary_btn_label: string | null
+          hero_secondary_btn_action: string | null
+          hero_secondary_btn_href: string | null
           created_at: string
           updated_at: string
         }
@@ -342,6 +348,12 @@ export interface Database {
           is_promo?: boolean
           promo_text?: string | null
           hero_bg_url?: string | null
+          hero_primary_btn_label?: string | null
+          hero_primary_btn_action?: string | null
+          hero_primary_btn_href?: string | null
+          hero_secondary_btn_label?: string | null
+          hero_secondary_btn_action?: string | null
+          hero_secondary_btn_href?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -370,6 +382,12 @@ export interface Database {
           is_promo?: boolean
           promo_text?: string | null
           hero_bg_url?: string | null
+          hero_primary_btn_label?: string | null
+          hero_primary_btn_action?: string | null
+          hero_primary_btn_href?: string | null
+          hero_secondary_btn_label?: string | null
+          hero_secondary_btn_action?: string | null
+          hero_secondary_btn_href?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -440,6 +458,12 @@ export interface Database {
           created_at: string
           updated_at: string
           artist_id: string | null
+          hero_primary_btn_label: string | null
+          hero_primary_btn_action: string | null
+          hero_primary_btn_href: string | null
+          hero_secondary_btn_label: string | null
+          hero_secondary_btn_action: string | null
+          hero_secondary_btn_href: string | null
         }
         Insert: {
           id?: string
@@ -454,6 +478,12 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          hero_primary_btn_label?: string | null
+          hero_primary_btn_action?: string | null
+          hero_primary_btn_href?: string | null
+          hero_secondary_btn_label?: string | null
+          hero_secondary_btn_action?: string | null
+          hero_secondary_btn_href?: string | null
         }
         Update: {
           id?: string
@@ -468,6 +498,12 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          hero_primary_btn_label?: string | null
+          hero_primary_btn_action?: string | null
+          hero_primary_btn_href?: string | null
+          hero_secondary_btn_label?: string | null
+          hero_secondary_btn_action?: string | null
+          hero_secondary_btn_href?: string | null
         }
         Relationships: []
       }

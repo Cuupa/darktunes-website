@@ -45,6 +45,22 @@ export interface SyncLog {
   createdAt: string
 }
 
+/**
+ * Configuration for a single CTA button in the Hero section.
+ * When omitted, the Hero falls back to its default behaviour.
+ */
+export interface HeroButton {
+  /** Custom label. Falls back to the dictionary key when empty/undefined. */
+  label?: string
+  /** How the button behaves: navigate to a URL, scroll to a page section, or hide it entirely. */
+  action?: 'link' | 'scroll' | 'none'
+  /**
+   * For action='link'  : absolute or relative URL (e.g. '/releases/abc', 'https://open.spotify.com/…').
+   * For action='scroll': CSS selector of the target section (e.g. '#releases').
+   */
+  href?: string
+}
+
 export interface Release {
   id: string
   title: string
@@ -73,6 +89,10 @@ export interface Release {
   promoText?: string
   /** Optional hero background image URL, different from the release cover art. */
   heroBgUrl?: string
+  /** Custom configuration for the primary CTA button in the Hero section. */
+  heroPrimaryBtn?: HeroButton
+  /** Custom configuration for the secondary CTA button in the Hero section. */
+  heroSecondaryBtn?: HeroButton
 }
 
 export interface NewsPost {
@@ -97,6 +117,10 @@ export interface NewsPost {
    * - `archived`  — removed from public view, kept for record
    */
   status: 'draft' | 'published' | 'scheduled' | 'archived'
+  /** Custom configuration for the primary CTA button in the Hero section. */
+  heroPrimaryBtn?: HeroButton
+  /** Custom configuration for the secondary CTA button in the Hero section. */
+  heroSecondaryBtn?: HeroButton
 }
 
 export interface PortalFeatureFlag {

@@ -409,6 +409,13 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT 
 -- Optional per-release hero customisation
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS promo_text     TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_bg_url    TEXT;
+-- Hero button overrides (primary + secondary)
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_href   TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
@@ -447,6 +454,13 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;
+-- Hero button overrides (primary + secondary)
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_href   TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);

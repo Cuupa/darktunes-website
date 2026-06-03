@@ -30,6 +30,12 @@ export interface NewsFormData {
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   artistId: string
+  heroPrimaryBtnLabel: string
+  heroPrimaryBtnAction: '' | 'link' | 'scroll' | 'none'
+  heroPrimaryBtnHref: string
+  heroSecondaryBtnLabel: string
+  heroSecondaryBtnAction: '' | 'link' | 'scroll' | 'none'
+  heroSecondaryBtnHref: string
 }
 
 function toSlug(text: string): string {
@@ -77,6 +83,8 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
   }, [title, slugValue, setValue])
 
   const isPressOnly = watch('isPressOnly')
+  const heroPrimaryBtnAction = watch('heroPrimaryBtnAction')
+  const heroSecondaryBtnAction = watch('heroSecondaryBtnAction')
 
   const onSubmit = (data: NewsFormData) => {
     onChange({ ...data, content: htmlContent })
@@ -203,6 +211,149 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           disabled={isLoading}
         />
         <Label htmlFor="isPressOnly">Press-only</Label>
+      </div>
+
+      {/* ── Hero Buttons ── */}
+      <div className="space-y-4 rounded-lg border border-border p-4">
+        <p className="text-sm font-semibold text-foreground">Hero Buttons</p>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Customise the two CTA buttons shown in the Hero section for this news post.
+          Leave fields empty to use the site defaults.
+        </p>
+
+        {/* Primary button */}
+        <div className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary Button (filled)</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="heroPrimaryBtnLabel">Label</Label>
+              <Input
+                id="heroPrimaryBtnLabel"
+                {...register('heroPrimaryBtnLabel')}
+                disabled={isLoading}
+                placeholder="e.g. Read More"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="heroPrimaryBtnAction">Action</Label>
+              <Select
+                value={heroPrimaryBtnAction}
+                onValueChange={(val) => setValue('heroPrimaryBtnAction', val as NewsFormData['heroPrimaryBtnAction'])}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="heroPrimaryBtnAction">
+                  <SelectValue placeholder="Default (go to news article)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default (go to news article)</SelectItem>
+                  <SelectItem value="link">Link — URL or internal path</SelectItem>
+                  <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
+                  <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {heroPrimaryBtnAction === 'link' && (
+            <div className="space-y-1">
+              <Label htmlFor="heroPrimaryBtnHref">URL / Path</Label>
+              <Input
+                id="heroPrimaryBtnHref"
+                {...register('heroPrimaryBtnHref')}
+                disabled={isLoading}
+                placeholder="e.g. /releases/xyz or https://…"
+              />
+            </div>
+          )}
+          {heroPrimaryBtnAction === 'scroll' && (
+            <div className="space-y-1">
+              <Label htmlFor="heroPrimaryBtnHref-scroll">Section target</Label>
+              <Select
+                value={watch('heroPrimaryBtnHref')}
+                onValueChange={(val) => setValue('heroPrimaryBtnHref', val)}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="heroPrimaryBtnHref-scroll">
+                  <SelectValue placeholder="Select section…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="#releases">Releases</SelectItem>
+                  <SelectItem value="#artists">Artists</SelectItem>
+                  <SelectItem value="#videos">Videos</SelectItem>
+                  <SelectItem value="#concerts">Concerts</SelectItem>
+                  <SelectItem value="#news">News</SelectItem>
+                  <SelectItem value="#newsletter">Newsletter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* Secondary button */}
+        <div className="space-y-3 pt-2 border-t border-border">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Secondary Button (outline)</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="heroSecondaryBtnLabel">Label</Label>
+              <Input
+                id="heroSecondaryBtnLabel"
+                {...register('heroSecondaryBtnLabel')}
+                disabled={isLoading}
+                placeholder="e.g. Browse News"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="heroSecondaryBtnAction">Action</Label>
+              <Select
+                value={heroSecondaryBtnAction}
+                onValueChange={(val) => setValue('heroSecondaryBtnAction', val as NewsFormData['heroSecondaryBtnAction'])}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="heroSecondaryBtnAction">
+                  <SelectValue placeholder="Default (scroll to news)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default (scroll to news)</SelectItem>
+                  <SelectItem value="link">Link — URL or internal path</SelectItem>
+                  <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
+                  <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {heroSecondaryBtnAction === 'link' && (
+            <div className="space-y-1">
+              <Label htmlFor="heroSecondaryBtnHref">URL / Path</Label>
+              <Input
+                id="heroSecondaryBtnHref"
+                {...register('heroSecondaryBtnHref')}
+                disabled={isLoading}
+                placeholder="e.g. /artists/xyz or https://…"
+              />
+            </div>
+          )}
+          {heroSecondaryBtnAction === 'scroll' && (
+            <div className="space-y-1">
+              <Label htmlFor="heroSecondaryBtnHref-scroll">Section target</Label>
+              <Select
+                value={watch('heroSecondaryBtnHref')}
+                onValueChange={(val) => setValue('heroSecondaryBtnHref', val)}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="heroSecondaryBtnHref-scroll">
+                  <SelectValue placeholder="Select section…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="#releases">Releases</SelectItem>
+                  <SelectItem value="#artists">Artists</SelectItem>
+                  <SelectItem value="#videos">Videos</SelectItem>
+                  <SelectItem value="#concerts">Concerts</SelectItem>
+                  <SelectItem value="#news">News</SelectItem>
+                  <SelectItem value="#newsletter">Newsletter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">

@@ -67,6 +67,12 @@ const EMPTY_FORM: ReleaseFormData = {
   isPromo: false,
   promoText: '',
   heroBgUrl: '',
+  heroPrimaryBtnLabel: '',
+  heroPrimaryBtnAction: '',
+  heroPrimaryBtnHref: '',
+  heroSecondaryBtnLabel: '',
+  heroSecondaryBtnAction: '',
+  heroSecondaryBtnHref: '',
 }
 
 function releaseToFormData(release: Release): ReleaseFormData {
@@ -84,6 +90,12 @@ function releaseToFormData(release: Release): ReleaseFormData {
     isPromo: release.isPromo,
     promoText: release.promoText ?? '',
     heroBgUrl: release.heroBgUrl ?? '',
+    heroPrimaryBtnLabel: release.heroPrimaryBtn?.label ?? '',
+    heroPrimaryBtnAction: release.heroPrimaryBtn?.action ?? '',
+    heroPrimaryBtnHref: release.heroPrimaryBtn?.href ?? '',
+    heroSecondaryBtnLabel: release.heroSecondaryBtn?.label ?? '',
+    heroSecondaryBtnAction: release.heroSecondaryBtn?.action ?? '',
+    heroSecondaryBtnHref: release.heroSecondaryBtn?.href ?? '',
   }
 }
 
@@ -102,6 +114,12 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     is_promo: data.isPromo,
     promo_text: data.promoText || null,
     hero_bg_url: data.heroBgUrl || null,
+    hero_primary_btn_label: data.heroPrimaryBtnLabel || null,
+    hero_primary_btn_action: data.heroPrimaryBtnAction || null,
+    hero_primary_btn_href: data.heroPrimaryBtnHref || null,
+    hero_secondary_btn_label: data.heroSecondaryBtnLabel || null,
+    hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
+    hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
   }
 }
 
