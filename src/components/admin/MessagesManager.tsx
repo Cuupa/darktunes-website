@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { MessageComposer } from '@/components/messaging/MessageComposer'
 import { MessageSearch } from '@/components/messaging/MessageSearch'
 import { ThreadView } from '@/components/messaging/ThreadView'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface SearchState {
   query: string
@@ -77,6 +78,7 @@ async function loadReplies(
 }
 
 export function MessagesManager() {
+  const { loading: authLoading, session } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const searchStateRef = useRef<SearchState>(DEFAULT_SEARCH_STATE)
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
@@ -86,6 +88,8 @@ export function MessagesManager() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isSending, setIsSending] = useState(false)
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [isLoadingArtists, setIsLoadingArtists] = useState(true)
+  const [artistLoadError, setArtistLoadError] = useState<string | null>(null)
 
   const refreshMessages = useCallback(
     async (state: SearchState) => {
@@ -103,19 +107,55 @@ export function MessagesManager() {
   )
 
   const load = useCallback(async () => {
+    if (authLoading) return
+    if (!session?.access_token || !session.refresh_token) {
+      setArtists([])
+      setIsLoadingArtists(false)
+      setArtistLoadError('Please sign in again to load artists.')
+      return
+    }
+
+    setIsLoadingArtists(true)
+    setArtistLoadError(null)
+
     try {
-      const [artistRows, templateRows] = await Promise.all([getArtists(supabase), getMessageTemplates(supabase)])
-      setArtists(artistRows.map((artist) => ({ id: artist.id, name: artist.name })))
-      setTemplates(templateRows)
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+      if (sessionError) throw new Error(sessionError.message)
+
+      const [artistResult, templateResult] = await Promise.allSettled([getArtists(supabase), getMessageTemplates(supabase)])
+
+      if (artistResult.status === 'fulfilled') {
+        setArtists(artistResult.value.map((artist) => ({ id: artist.id, name: artist.name })))
+      } else {
+        setArtists([])
+        setArtistLoadError(artistResult.reason instanceof Error ? artistResult.reason.message : 'Failed to load artists')
+      }
+
+      if (templateResult.status === 'fulfilled') {
+        setTemplates(templateResult.value)
+      } else {
+        setTemplates([])
+        toast.error(templateResult.reason instanceof Error ? templateResult.reason.message : 'Failed to load message templates')
+      }
+
       await refreshMessages(searchStateRef.current)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load messages')
+      const message = error instanceof Error ? error.message : 'Failed to load messages'
+      setArtists([])
+      setArtistLoadError(message)
+      toast.error(message)
+    } finally {
+      setIsLoadingArtists(false)
     }
-  }, [refreshMessages, supabase])
+  }, [authLoading, refreshMessages, session?.access_token, session?.refresh_token, supabase])
 
   useEffect(() => {
+    if (authLoading) return
     void load()
-  }, [load])
+  }, [authLoading, load])
 
   useEffect(() => {
     const messageChannel = supabase
@@ -266,7 +306,14 @@ export function MessagesManager() {
         <Badge>{unreadCount} unread</Badge>
       </div>
 
-      <MessageComposer artists={artists} templates={templates} isSending={isSending} onSend={handleSend} />
+      <MessageComposer
+        artists={artists}
+        templates={templates}
+        isSending={isSending}
+        isArtistsLoading={isLoadingArtists}
+        artistLoadError={artistLoadError}
+        onSend={handleSend}
+      />
 
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-card/40 p-4">
