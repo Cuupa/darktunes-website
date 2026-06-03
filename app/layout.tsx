@@ -72,10 +72,10 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: '/favicon.svg', type: 'image/svg+xml' },
         { url: faviconUrl },
+        { url: '/favicon.svg', type: 'image/svg+xml' },
       ],
-      shortcut: '/favicon.svg',
+      shortcut: faviconUrl,
       apple: faviconUrl,
     },
   }
@@ -93,7 +93,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         {/* PWA meta — prevents white flash and styles the status bar */}
         <meta name="theme-color" content="#101010" />
         <meta name="mobile-web-app-capable" content="yes" />
