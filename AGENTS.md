@@ -356,6 +356,87 @@ Zero Cumulative Layout Shift (CLS): Loading states (using shadcn/ui Skeletons) M
 
 Defensive Overflow: Prevent horizontal scrolling on mobile at all costs. Handle long texts or overflowing images gracefully using truncate, overflow-hidden, or break-words.
 
+Modal & Dialog Quality Standards — MANDATORY
+Seven enforceable principles for consistent modal/layout quality. All new and updated modals/dialogs MUST comply.
+
+**1. Responsive Modal Sizes (Viewport-relative)**
+ALL modals/dialogs MUST use viewport-relative sizing with responsive breakpoints. Hard-coding a single `max-w-*` class without breakpoints is forbidden.
+- ✅ Correct: `className="max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-xl lg:max-w-2xl"`
+- ❌ Forbidden: `className="max-w-lg"` (fixed size without responsive context)
+
+Default breakpoints for new modals:
+- Mobile (<640px): `max-w-[calc(100%-2rem)]` (1 rem side margin)
+- sm (≥640px): `sm:max-w-lg` (32 rem / 512 px)
+- md (≥768px): `md:max-w-xl` (36 rem / 576 px)
+- lg (≥1024px): `lg:max-w-2xl` (42 rem / 672 px)
+
+Documented exceptions (must be noted in a code comment):
+- Video/gallery modals: `sm:max-w-[95vw]` (maximum width for 16:9 content)
+- Forms with many fields: `lg:max-w-4xl`
+- Confirmation dialogs (text only): `sm:max-w-sm`
+
+**2. Vertical Height Limiting (max-h + Scroll)**
+EVERY modal body MUST enforce a maximum height with internal scrolling so long content never overflows the viewport.
+- ✅ Required pattern: `<div className="overflow-y-auto max-h-[70vh] p-6">{children}</div>`
+- `max-h-[70vh]` leaves 30 % of viewport for header / footer / close button.
+- `overflow-y-auto` enables vertical scrolling on overflow.
+- `p-6` prevents content from touching the edge.
+
+`max-h` values by modal type:
+- Standard forms: `max-h-[70vh]`
+- Video / media modals: `max-h-[92vh]` (maximise space for 16:9)
+- Confirmation dialogs: `max-h-[50vh]`
+
+**3. Spacing System (8 px Grid)**
+USE ONLY multiples of `0.5rem` (8 px) from the standard Tailwind spacing scale for all padding and margin inside modals and dialogs.
+
+Allowed values:
+- Tight:     `p-2` (8 px), `p-3` (12 px), `p-4` (16 px)
+- Standard:  `p-6` (24 px) — default for modal bodies
+- Generous:  `p-8` (32 px), `p-12` (48 px)
+
+Forbidden:
+- Off-grid values: `p-5`, `p-7`, `p-9`
+- Pixel literals: `style={{ padding: '13px' }}`
+
+```tsx
+// ✅ Consistent
+<DialogContent className="p-0">
+  <div className="p-6">{/* header */}</div>
+  <div className="overflow-y-auto max-h-[70vh] p-6">{/* body */}</div>
+  <div className="p-4 border-t border-border">{/* footer */}</div>
+</DialogContent>
+```
+
+**4. Z-Index Stacking**
+Modals/dialogs are managed by Radix UI's `Dialog` primitive and live at Tailwind `z-50` by default. Do NOT manually override the z-index of a `DialogContent` or `DialogOverlay` unless there is a documented conflict (e.g., a custom full-screen overlay component that is not a Radix Dialog). The VisualEffectsOverlay layers occupy `z-[9996]`–`z-[9998]` and must always sit above modals; never raise a modal's z-index above `z-[9900]`.
+
+When building a fully custom modal (like `TacticalModal`) that does not use Radix `Dialog`, use `z-50` for both the backdrop and the panel container and document the reason.
+
+**5. Backdrop Pattern**
+Every modal MUST render a visible semi-transparent backdrop so the rest of the page is visually dimmed.
+- ✅ Standard: `bg-black/80` with `transition={{ duration: 0.12, ease: 'linear' }}` (skip transition when `prefersReducedMotion`)
+- Use `pointer-events-auto` on the backdrop and attach `onClick={onClose}` to it so clicking outside the panel dismisses the modal.
+- The `Dialog` primitive from `@/components/ui/dialog` (Radix) handles the backdrop automatically — do NOT add a second backdrop overlay on top of it.
+
+**6. Enter/Exit Animation**
+Use a consistent spring animation for panel entrance. The preferred preset ("blade snap") matches `TacticalModal` and `VideoModal`:
+```ts
+const MODAL_SPRING = { type: 'spring', stiffness: 400, damping: 40 } as const
+```
+- Entrance: opacity 0 → 1 + scale 0.96 → 1 (or `clipPath` blade-slice for panel-style dialogs).
+- When `prefersReducedMotion` is `true`: set `duration: 0` on all transitions — skip all transforms.
+- Import `useReducedMotion` from `framer-motion` in every animated modal.
+- Do NOT use `animate-bounce` or `animate-pulse` on modal panels — reserved for loading indicators.
+
+**7. Close / Dismiss Behaviour**
+Every modal MUST support all three standard dismiss paths without exception:
+1. **Close button**: visible `×` button in the top-right corner, `min-w-[44px] min-h-[44px]`, `aria-label="Close [context]"`.
+2. **ESC key**: handled automatically by Radix `Dialog`; for custom modals add a `keydown` listener on `document` that calls `onClose()` when `event.key === 'Escape'`.
+3. **Backdrop click**: `onClick={onClose}` on the backdrop element (Radix handles this via `onOpenChange`).
+
+Use `onOpenChange={(isOpen) => { if (!isOpen) onClose() }}` on `<Dialog>` so all dismiss paths funnel through a single `onClose` callback — never handle each path separately.
+
 Visual Effects (Industrial Aesthetic)
 The public site renders three non-interactive overlay layers — animated noise/grain, CRT scanlines, and a vignette — controlled by CMS settings.
 The VisualEffectsOverlay component (src/components/VisualEffectsOverlay.tsx) is a dumb Client Component mounted in app/layout.tsx. It receives noiseOpacity, crtScanlinesEnabled, and vignetteIntensity as props from the Server Component parent (IoC).
