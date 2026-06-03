@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { NextRequest } from 'next/server'
 
 const ORIGINAL_ENV = { ...process.env }
+const MOCK_REQUEST = new NextRequest('http://localhost/api/health')
 
 function mockSupabaseClientOnline(): void {
   vi.doMock('@supabase/supabase-js', () => ({
@@ -52,8 +54,8 @@ describe('app/api/health/route', () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     const { GET, HEAD } = await loadHealthRoute()
-    const getResponse = await GET()
-    const headResponse = await HEAD()
+    const getResponse = await GET(MOCK_REQUEST)
+    const headResponse = await HEAD(MOCK_REQUEST)
 
     expect(headResponse.status).toBe(getResponse.status)
     expect(await headResponse.text()).toBe('')
@@ -66,8 +68,8 @@ describe('app/api/health/route', () => {
     mockSupabaseClientOnline()
 
     const { GET, HEAD } = await loadHealthRoute()
-    const getResponse = await GET()
-    const headResponse = await HEAD()
+    const getResponse = await GET(MOCK_REQUEST)
+    const headResponse = await HEAD(MOCK_REQUEST)
 
     expect(getResponse.status).toBe(200)
     expect(headResponse.status).toBe(200)

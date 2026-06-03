@@ -83,6 +83,7 @@ const mockArtistRow: ArtistRow = {
   founded_year: null,
   is_visible: true,
   logo_url: null,
+  platform_links: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -66,6 +66,7 @@ const mockRow: AssetRow = {
   artist_id: 'artist-1',
   tags: ['cover', 'promo'],
   sha256_hash: 'abc123',
+  release_id: null,
 }
 
 describe('assets DAL', () => {
