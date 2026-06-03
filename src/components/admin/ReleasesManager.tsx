@@ -68,10 +68,10 @@ const EMPTY_FORM: ReleaseFormData = {
   promoText: '',
   heroBgUrl: '',
   heroPrimaryBtnLabel: '',
-  heroPrimaryBtnAction: '',
+  heroPrimaryBtnAction: 'default',
   heroPrimaryBtnHref: '',
   heroSecondaryBtnLabel: '',
-  heroSecondaryBtnAction: '',
+  heroSecondaryBtnAction: 'default',
   heroSecondaryBtnHref: '',
 }
 
@@ -91,10 +91,10 @@ function releaseToFormData(release: Release): ReleaseFormData {
     promoText: release.promoText ?? '',
     heroBgUrl: release.heroBgUrl ?? '',
     heroPrimaryBtnLabel: release.heroPrimaryBtn?.label ?? '',
-    heroPrimaryBtnAction: release.heroPrimaryBtn?.action ?? '',
+    heroPrimaryBtnAction: (release.heroPrimaryBtn?.action || 'default') as ReleaseFormData['heroPrimaryBtnAction'],
     heroPrimaryBtnHref: release.heroPrimaryBtn?.href ?? '',
     heroSecondaryBtnLabel: release.heroSecondaryBtn?.label ?? '',
-    heroSecondaryBtnAction: release.heroSecondaryBtn?.action ?? '',
+    heroSecondaryBtnAction: (release.heroSecondaryBtn?.action || 'default') as ReleaseFormData['heroSecondaryBtnAction'],
     heroSecondaryBtnHref: release.heroSecondaryBtn?.href ?? '',
   }
 }
@@ -115,10 +115,10 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     promo_text: data.promoText || null,
     hero_bg_url: data.heroBgUrl || null,
     hero_primary_btn_label: data.heroPrimaryBtnLabel || null,
-    hero_primary_btn_action: data.heroPrimaryBtnAction || null,
+    hero_primary_btn_action: data.heroPrimaryBtnAction === 'default' ? null : data.heroPrimaryBtnAction,
     hero_primary_btn_href: data.heroPrimaryBtnHref || null,
     hero_secondary_btn_label: data.heroSecondaryBtnLabel || null,
-    hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
+    hero_secondary_btn_action: data.heroSecondaryBtnAction === 'default' ? null : data.heroSecondaryBtnAction,
     hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
   }
 }
