@@ -236,21 +236,27 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="heroPrimaryBtnAction">Action</Label>
-              <Select
-                value={heroPrimaryBtnAction}
-                onValueChange={(val) => setValue('heroPrimaryBtnAction', val as NewsFormData['heroPrimaryBtnAction'])}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="heroPrimaryBtnAction">
-                  <SelectValue placeholder="Default (go to news article)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Default (go to news article)</SelectItem>
-                  <SelectItem value="link">Link — URL or internal path</SelectItem>
-                  <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
-                  <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                name="heroPrimaryBtnAction"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || '__default__'}
+                    onValueChange={(val) => field.onChange(val === '__default__' ? '' : val)}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="heroPrimaryBtnAction">
+                      <SelectValue placeholder="Default (go to news article)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Default (go to news article)</SelectItem>
+                      <SelectItem value="link">Link — URL or internal path</SelectItem>
+                      <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
+                      <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
           </div>
           {heroPrimaryBtnAction === 'link' && (
@@ -303,21 +309,27 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="heroSecondaryBtnAction">Action</Label>
-              <Select
-                value={heroSecondaryBtnAction}
-                onValueChange={(val) => setValue('heroSecondaryBtnAction', val as NewsFormData['heroSecondaryBtnAction'])}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="heroSecondaryBtnAction">
-                  <SelectValue placeholder="Default (scroll to news)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Default (scroll to news)</SelectItem>
-                  <SelectItem value="link">Link — URL or internal path</SelectItem>
-                  <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
-                  <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                name="heroSecondaryBtnAction"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || '__default__'}
+                    onValueChange={(val) => field.onChange(val === '__default__' ? '' : val)}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="heroSecondaryBtnAction">
+                      <SelectValue placeholder="Default (scroll to news)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Default (scroll to news)</SelectItem>
+                      <SelectItem value="link">Link — URL or internal path</SelectItem>
+                      <SelectItem value="scroll">Scroll — jump to page section</SelectItem>
+                      <SelectItem value="none">Hidden — don&apos;t show this button</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
           </div>
           {heroSecondaryBtnAction === 'link' && (
