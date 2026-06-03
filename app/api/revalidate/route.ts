@@ -6,14 +6,14 @@
  *
  * Security:
  *   The caller must pass the REVALIDATE_SECRET in the Authorization header:
- *     Authorization: Bearer <REVALIDATE_SECRET>
+ *     Authorization: ******
  *
  * Accepted tags: artists | releases | news | videos | site-settings
  *   Omit the `tags` field to revalidate ALL content tags at once.
  *
  * Example Supabase Webhook payload:
  *   POST /api/revalidate
- *   Authorization: Bearer <secret>
+ *   Authorization: ******
  *   Content-Type: application/json
  *   { "tags": ["releases", "artists"] }
  */
@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const ALL_TAGS = ['artists', 'releases', 'news', 'videos', 'site-settings'] as const
 type CacheTag = (typeof ALL_TAGS)[number]
@@ -29,20 +30,17 @@ const bodySchema = z.object({
   tags: z.array(z.enum(ALL_TAGS)).optional(),
 })
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   // Authenticate with shared secret
   const secret = process.env.REVALIDATE_SECRET
   if (!secret) {
-    return NextResponse.json(
-      { error: 'Revalidation is not configured (REVALIDATE_SECRET not set)' },
-      { status: 503 },
-    )
+    throw new ApiError(503, 'Revalidation is not configured (REVALIDATE_SECRET not set)')
   }
 
   const authHeader = request.headers.get('authorization') ?? ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
   if (token !== secret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    throw new ApiError(401, 'Unauthorized')
   }
 
   // Parse body — tolerate empty body (Supabase sends minimal payloads)
@@ -62,4 +60,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ revalidated: true, tags })
-}
+})

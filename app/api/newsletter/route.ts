@@ -1,29 +1,10 @@
-/**
- * app/api/newsletter/route.ts
- *
- * Legacy REST endpoint for newsletter subscriptions (Double Opt-In).
- *
- * This route is kept as a server-to-server fallback (e.g. for testing via
- * curl or for third-party integrations). The primary subscription path is the
- * `subscribeToNewsletter` Server Action in `app/actions/newsletter.ts`.
- *
- * Flow:
- *  1. Validates input (email required, name optional) using Zod.
- *  2. Generates a UUID verification_token.
- *  3. Inserts the subscriber into `newsletter_subscribers` with status='pending'
- *     using the service-role key (bypasses RLS).
- *  4. A Supabase Edge Function (newsletter-confirm) is triggered by the DB
- *     INSERT webhook and sends the DOI confirmation email asynchronously.
- *
- * Anti-enumeration: duplicate emails are silently treated as success.
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { createPendingSubscriber } from '@/lib/api/newsletter'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -39,20 +20,17 @@ function getServiceClient() {
   })
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   let body: unknown
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    throw new ApiError(400, 'Invalid JSON body')
   }
 
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.errors[0]?.message ?? 'Validation error' },
-      { status: 422 },
-    )
+    throw new ApiError(422, parsed.error.errors[0]?.message ?? 'Validation error')
   }
 
   const { email, name } = parsed.data
@@ -69,12 +47,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
       console.error('[newsletter] createPendingSubscriber error:', message)
-      return NextResponse.json(
-        { error: 'Subscription failed. Please try again.' },
-        { status: 500 },
-      )
+      throw new ApiError(500, 'Subscription failed. Please try again.')
     }
   }
 
   return NextResponse.json({ success: true })
-}
+})
