@@ -51,7 +51,7 @@ export function VideoModal({ video, open, onClose, placeholderUrl, youtubeLabel 
                 <X size={20} weight="bold" aria-hidden="true" />
               </button>
               
-              <div className="relative w-full" style={{ paddingBottom: '56.25%', minHeight: 180 }}>
+              <div className="relative w-full aspect-video" style={{ maxHeight: 'min(92vh, calc(95vw * 0.5625))' }}>
                 <div className="absolute inset-0">
                   <ConsentGate label={youtubeLabel ?? 'YouTube laden'} placeholderUrl={placeholderUrl}>
                     {/* Loading spinner shown while the iframe content is fetching */}
