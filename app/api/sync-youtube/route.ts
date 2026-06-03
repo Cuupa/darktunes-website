@@ -17,16 +17,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function createArtistNamePattern(artistName: string): RegExp | null {
-  const trimmedArtistName = artistName.trim()
-  if (!trimmedArtistName) return null
-  return new RegExp(`(^|\\W)${escapeRegExp(trimmedArtistName)}(\\W|$)`, 'i')
-}
+import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 
 function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
   const expected = `Bearer ${cronSecret}`
@@ -105,21 +96,23 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   if (artistsError) throw new ApiError(500, `Artist lookup failed: ${artistsError.message}`)
 
   const artistMatchers = (artists ?? [])
-    .map((artist) => ({
-      id: artist.id,
-      pattern: createArtistNamePattern(artist.name),
-    }))
-    .filter((artist): artist is { id: string; pattern: RegExp } => Boolean(artist.pattern))
+    .map(createArtistMatcher)
+    .filter((m): m is NonNullable<typeof m> => Boolean(m))
 
-  const rows = videos.map((v) => ({
-    artist_id: artistMatchers.find((artist) => artist.pattern.test(v.title))?.id ?? null,
-    youtube_id: v.youtubeId,
-    title: v.title,
-    artist_name: v.channelTitle,
-    thumbnail_url: v.thumbnailUrl,
-    published_at: v.publishedAt,
-    is_visible: true,
-  }))
+  const rows = videos.map((v) => {
+    const { artistId, artistName } = resolveVideoArtist(v.title, v.channelTitle, artistMatchers)
+    return {
+      // artist_id and artist_name: resolved from title match; fall back to channel title
+      artist_id: artistId,
+      youtube_id: v.youtubeId,
+      title: v.title,
+      artist_name: artistName,
+      thumbnail_url: v.thumbnailUrl,
+      published_at: v.publishedAt,
+      // is_visible intentionally excluded so that admin-hidden videos are not
+      // re-shown on every sync; new videos default to TRUE via the DB column default.
+    }
+  })
 
   const { error } = await db
     .from('videos')
