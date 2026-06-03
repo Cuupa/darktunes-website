@@ -385,6 +385,7 @@ CREATE TABLE IF NOT EXISTS public.releases (
   catalog_number  TEXT,
   preview_url     TEXT,
   smart_url       TEXT,
+  platform_links  JSONB,
   popularity      INTEGER,
   -- Visibility toggle: FALSE hides the release from public
   is_visible      BOOLEAN             NOT NULL DEFAULT TRUE,
@@ -403,6 +404,7 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS barcode        TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS catalog_number TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS preview_url    TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS platform_links JSONB;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT NULL DEFAULT FALSE;

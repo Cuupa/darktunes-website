@@ -28,6 +28,7 @@ function rowToRelease(row: ReleaseRow): Release {
     catalogNumber: row.catalog_number ?? undefined,
     previewUrl: row.preview_url ?? undefined,
     smartUrl: row.smart_url ?? undefined,
+    platformLinks: row.platform_links ?? undefined,
     popularity: row.popularity ?? undefined,
     isVisible: row.is_visible,
     isPromo: row.is_promo,
