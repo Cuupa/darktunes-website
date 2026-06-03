@@ -80,7 +80,7 @@ export function FolderTree({ folders, currentFolderId, onNavigate, onCreateRootF
   }, [currentFolderId, folders])
 
   return (
-    <div className="flex h-full flex-col border-r border-border bg-card/40">
+    <div className="flex h-full flex-col overflow-hidden border-r border-border bg-card/40">
       <div className="flex items-center justify-between border-b border-border px-3 py-3">
         <div>
           <h3 className="text-sm font-semibold">Folders</h3>
