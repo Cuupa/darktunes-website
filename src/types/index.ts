@@ -31,6 +31,8 @@ export interface Artist {
   lastSyncedAt?: string
   foundedYear?: number
   isVisible: boolean
+  /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */
+  platformLinks?: Record<string, string>
 }
 
 export interface SyncLog {
