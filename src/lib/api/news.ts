@@ -27,13 +27,14 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     content: row.content,
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
-    featured: row.featured,
+    featured: row.featured ?? false,
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
     status,
     embargoUntil: r.embargo_until ?? undefined,
     mediaContact: r.media_contact ?? undefined,
     releaseCategory: r.release_category ?? undefined,
+    heroBgUrl: row.hero_bg_url ?? undefined,
     heroPrimaryBtn: (row.hero_primary_btn_action || row.hero_primary_btn_label || row.hero_primary_btn_href)
       ? {
           label: row.hero_primary_btn_label ?? undefined,

@@ -112,7 +112,7 @@ export function FileGrid({
   }
 
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-hidden" onMouseDown={startSelection}>
+    <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden" onMouseDown={startSelection}>
       <ScrollArea className="h-full p-4">
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
         {folders.map((folder) => (

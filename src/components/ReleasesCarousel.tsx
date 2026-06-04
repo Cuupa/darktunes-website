@@ -57,14 +57,13 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
       if (info.offset.x < -50) handleNext()
       else if (info.offset.x > 50) handlePrev()
     }
-    // Reset after the click event has had a chance to fire
-    setTimeout(() => { isDragging.current = false }, 50)
   }
 
   const handleLinkClick = (e: React.MouseEvent) => {
     if (isDragging.current) {
       e.preventDefault()
       e.stopPropagation()
+      isDragging.current = false
     }
   }
 

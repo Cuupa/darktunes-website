@@ -2,11 +2,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
@@ -65,6 +66,14 @@ export function NewsManager() {
       toast.success(`"${post.title}" archived`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Archive failed')
+    }
+  }
+
+  const handleToggleFeatured = async (post: NewsPost) => {
+    try {
+      await updateNewsPost(post.id, { featured: !post.featured })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Update failed')
     }
   }
 
@@ -127,19 +136,20 @@ export function NewsManager() {
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Audience</TableHead>
+            <TableHead title="Show in hero carousel">Featured</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 {search || statusFilter !== 'all' ? 'No posts match your filters.' : 'No posts yet. Click "New Post" to add one.'}
               </TableCell>
             </TableRow>
@@ -148,7 +158,12 @@ export function NewsManager() {
               const badge = STATUS_BADGE[post.status] ?? STATUS_BADGE['draft']
               return (
                 <TableRow key={post.id}>
-                  <TableCell className="font-medium max-w-[200px] truncate">{post.title}</TableCell>
+                  <TableCell className="font-medium max-w-[200px] truncate">
+                    <span className="flex items-center gap-1.5">
+                      {post.featured && <Star size={12} weight="fill" className="text-yellow-400 shrink-0" aria-label="Featured" />}
+                      {post.title}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{post.slug}</TableCell>
                   <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
                   <TableCell>
@@ -157,6 +172,14 @@ export function NewsManager() {
                     </Badge>
                   </TableCell>
                   <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={post.featured}
+                      onCheckedChange={() => void handleToggleFeatured(post)}
+                      aria-label={`Toggle featured for "${post.title}"`}
+                      title="Show in hero carousel"
+                    />
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

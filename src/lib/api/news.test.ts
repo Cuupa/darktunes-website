@@ -37,6 +37,7 @@ const mockNewsRow: NewsRow = {
   excerpt: 'A haunting new single.',
   content: 'Full content here...',
   image_url: 'https://example.com/news.jpg',
+  featured: false,
   is_press_only: false,
   status: 'published',
   published_at: '2024-04-24T00:00:00Z',
@@ -53,6 +54,7 @@ const mockNewsRow: NewsRow = {
   hero_secondary_btn_label: null,
   hero_secondary_btn_href: null,
   hero_secondary_btn_action: null,
+  hero_bg_url: null,
 }
 
 describe('getNewsPosts', () => {

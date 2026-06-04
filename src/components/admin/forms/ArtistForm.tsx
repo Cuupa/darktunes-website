@@ -78,6 +78,8 @@ export interface ArtistFormData {
   discogsId: string
   songkickId: string
   bandsintownId: string
+  /** Storage quota in MB (empty string = no limit / system default). Admin-only field. */
+  storageQuotaMb: string
 }
 
 /**
@@ -435,7 +437,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('imageUrl')}>
                   Open Asset Picker
                 </Button>
-                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} artistId={artistId} />
                 {mode === 'admin' && (
                   <Button
                     type="button"
@@ -461,7 +463,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('logoUrl')}>
                   Open Asset Picker
                 </Button>
-                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} artistId={artistId} />
               </div>
             </div>
           </div>
@@ -660,6 +662,22 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 disabled={isLoading}
                 placeholder="Internal notes — not visible to the artist."
               />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="storageQuotaMb">Storage Quota (MB)</Label>
+              <Input
+                id="storageQuotaMb"
+                type="number"
+                min={0}
+                step={1}
+                {...register('storageQuotaMb')}
+                disabled={isLoading}
+                placeholder="Leave empty for system default (no limit)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum upload storage for this artist in MB. Leave empty to apply no limit.
+              </p>
             </div>
           </TabsContent>
         )}

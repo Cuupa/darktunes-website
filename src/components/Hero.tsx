@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import logoImage from '@/assets/images/logo_(1).png'
 import type { Release, NewsPost, SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -29,8 +30,38 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
   // Framer Motion rAF loop doesn't keep running while the user reads below.
   const isInView = useInView(sectionRef, { margin: '0px 0px -20% 0px' })
 
+  // ── Logo-only fallback when nothing is featured ──────────────────────────
   if (!heroItem) {
-    return null
+    const logoSrc = siteSettings.logoUrl || logoImage.src
+    return (
+      <section
+        id="hero"
+        ref={sectionRef}
+        className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16"
+      >
+        <motion.div
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.8 }}
+          className="flex flex-col items-center gap-6 text-center"
+        >
+          <Image
+            src={logoSrc}
+            alt={siteSettings.labelName}
+            width={320}
+            height={120}
+            className="h-24 w-auto object-contain md:h-36"
+            priority
+            unoptimized
+          />
+          {siteSettings.labelTagline && (
+            <p className="text-lg md:text-xl text-muted-foreground font-serif max-w-md leading-relaxed">
+              {siteSettings.labelTagline}
+            </p>
+          )}
+        </motion.div>
+      </section>
+    )
   }
 
   const itemIsRelease = isRelease(heroItem)
@@ -47,20 +78,19 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
 
   /**
    * Background image hierarchy (highest priority first):
-   * 1) Item-specific media (`release.heroBgUrl` / `news.imageUrl`)
+   * 1) Item-specific hero background (`release.heroBgUrl` / `news.heroBgUrl`)
    * 2) Global override (`siteSettings.heroCustomBgUrl`)
-   * 3) Release fallback (`release.coverArt`)
+   * 3) Item cover fallback (`release.coverArt` / `news.imageUrl`)
    */
   let bgUrl: string | undefined
-  if (itemIsRelease && heroItem.heroBgUrl) {
+  if (heroItem.heroBgUrl) {
     bgUrl = getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
-  } else if (!itemIsRelease && heroItem.imageUrl) {
-    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
   } else if (siteSettings.heroCustomBgUrl) {
     bgUrl = getOptimizedImageUrl(siteSettings.heroCustomBgUrl, 1200)
   } else if (itemIsRelease) {
-    const coverUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
-    bgUrl = coverUrl
+    bgUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
+  } else if (heroItem.imageUrl) {
+    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
   }
 
   // Title / subtitle / description

@@ -81,6 +81,7 @@ const EMPTY_FORM: ArtistFormData = {
   tiktokUrl: '',
   bandcampUrl: '',
   shopUrl: '',
+  storageQuotaMb: '',
 }
 
 function artistToFormData(artist: Artist): ArtistFormData {
@@ -113,10 +114,14 @@ function artistToFormData(artist: Artist): ArtistFormData {
     tiktokUrl: artist.tiktokUrl ?? '',
     bandcampUrl: artist.bandcampUrl ?? '',
     shopUrl: artist.shopUrl ?? '',
+    storageQuotaMb: artist.storageQuotaBytes != null
+      ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
+      : '',
   }
 }
 
 function formDataToInsert(data: ArtistFormData): ArtistInsert {
+  const quotaMb = data.storageQuotaMb ? parseInt(data.storageQuotaMb, 10) : null
   return {
     name: data.name,
     slug: data.slug,
@@ -149,6 +154,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     tiktok_url: data.tiktokUrl || null,
     bandcamp_url: data.bandcampUrl || null,
     shop_url: data.shopUrl || null,
+    storage_quota_bytes: quotaMb != null && !Number.isNaN(quotaMb) ? quotaMb * 1024 * 1024 : null,
   }
 }
 

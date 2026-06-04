@@ -105,10 +105,10 @@
     "privacyLink": "Privacy Policy",
     "reject": "Reject",
     "accept": "Accept",
-    "gateText": "This content is provided by an external provider. By loading it, you agree to the transfer of data.",
+    "gateText": "This content is hosted by Spotify (an external provider). Click the button below to load it — doing so will transfer data to Spotify as described in our privacy policy.",
     "loadExternal": "Load external content",
     "loadExternalAlt": "External content — click to load",
-    "loadSpotify": "Stream on Spotify",
+    "loadSpotify": "Click to load Spotify player",
     "loadYouTube": "Load YouTube"
   },
   "releaseDetail": {

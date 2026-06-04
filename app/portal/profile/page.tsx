@@ -55,6 +55,7 @@ async function ProfileContent() {
       artistName={artist?.name ?? null}
       artistSlug={artist?.slug ?? null}
       initialProfile={profile}
+      artist={artist}
     />
   )
 }

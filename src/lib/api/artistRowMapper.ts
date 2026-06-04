@@ -52,5 +52,6 @@ export function rowToArtist(row: ArtistRow): Artist {
     isVisible: row.is_visible,
     logoUrl: row.logo_url ?? undefined,
     platformLinks: row.platform_links ?? undefined,
+    storageQuotaBytes: row.storage_quota_bytes ?? null,
   }
 }
