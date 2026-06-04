@@ -23,6 +23,8 @@ interface ImageUploadButtonProps {
   label?: string
   /** Upload endpoint. Defaults to /api/upload (admin). */
   endpoint?: string
+  /** When provided, the uploaded asset is automatically assigned to this artist and placed in their folder. */
+  artistId?: string
 }
 
 export function ImageUploadButton({
@@ -30,6 +32,7 @@ export function ImageUploadButton({
   className,
   label = 'Upload image',
   endpoint = '/api/upload',
+  artistId,
 }: ImageUploadButtonProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -48,6 +51,7 @@ export function ImageUploadButton({
 
       const formData = new FormData()
       formData.append('file', file)
+      if (artistId) formData.append('artistId', artistId)
       const token = session.access_token
 
       await new Promise<void>((resolve, reject) => {
