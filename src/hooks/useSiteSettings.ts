@@ -50,6 +50,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   aboutSubheading: '',
   aboutBody: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
+  heroDefaultPrimaryBtnLabel: '',
+  heroDefaultSecondaryBtnLabel: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -70,6 +72,8 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     hero_content_type: s.heroContentType ?? 'release',
     hero_featured_id: s.heroFeaturedId ?? '',
     hero_custom_bg_url: s.heroCustomBgUrl ?? '',
+    hero_default_primary_btn_label: s.heroDefaultPrimaryBtnLabel ?? '',
+    hero_default_secondary_btn_label: s.heroDefaultSecondaryBtnLabel ?? '',
     seo_title: s.seoTitle,
     seo_description: s.seoDescription,
     og_title: s.ogTitle,

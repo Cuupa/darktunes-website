@@ -71,6 +71,8 @@ const schema = z.object({
   heroContentType: z.enum(['release', 'news']).default('release'),
   heroFeaturedId: z.string().optional().default(''),
   heroCustomBgUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+  heroDefaultPrimaryBtnLabel: z.string().optional().default(''),
+  heroDefaultSecondaryBtnLabel: z.string().optional().default(''),
   seoTitle: z.string().min(1, 'SEO title is required'),
   seoDescription: z.string().min(1, 'SEO description is required'),
   ogTitle: z.string().min(1, 'OG title is required'),
@@ -1001,12 +1003,38 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Optional. If set, this image overrides the release artwork or news image in the hero
-                  background. Leave blank to use the featured item&apos;s own image.
+                  Optional fallback. Used when the featured item has no dedicated hero image.
                 </p>
                 {errors.heroCustomBgUrl?.message && (
                   <p className="text-xs text-destructive">{errors.heroCustomBgUrl.message}</p>
                 )}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field
+                  id="heroDefaultPrimaryBtnLabel"
+                  label="Default Primary Button Label"
+                  error={errors.heroDefaultPrimaryBtnLabel?.message}
+                >
+                  <Input
+                    id="heroDefaultPrimaryBtnLabel"
+                    {...register('heroDefaultPrimaryBtnLabel')}
+                    disabled={isSubmitting}
+                    placeholder="e.g. Listen Now"
+                  />
+                </Field>
+                <Field
+                  id="heroDefaultSecondaryBtnLabel"
+                  label="Default Secondary Button Label"
+                  error={errors.heroDefaultSecondaryBtnLabel?.message}
+                >
+                  <Input
+                    id="heroDefaultSecondaryBtnLabel"
+                    {...register('heroDefaultSecondaryBtnLabel')}
+                    disabled={isSubmitting}
+                    placeholder="e.g. Explore Artist"
+                  />
+                </Field>
               </div>
 
               <Field id="heroBadge" label="Hero Badge Text *" error={errors.heroBadge?.message}>

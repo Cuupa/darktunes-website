@@ -80,6 +80,8 @@ const DEFAULTS: SiteSettings = {
   heroContentType: 'release',
   heroFeaturedId: '',
   heroCustomBgUrl: '',
+  heroDefaultPrimaryBtnLabel: '',
+  heroDefaultSecondaryBtnLabel: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 }
@@ -186,6 +188,8 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     heroContentType: (map['hero_content_type'] === 'news' ? 'news' : 'release') as 'release' | 'news',
     heroFeaturedId: map['hero_featured_id'] ?? '',
     heroCustomBgUrl: map['hero_custom_bg_url'] ?? '',
+    heroDefaultPrimaryBtnLabel: map['hero_default_primary_btn_label'] ?? '',
+    heroDefaultSecondaryBtnLabel: map['hero_default_secondary_btn_label'] ?? '',
     homepageSectionOrder: (() => {
       try {
         const parsed = JSON.parse(map['homepage_section_order'] ?? '[]') as unknown

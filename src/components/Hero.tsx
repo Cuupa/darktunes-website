@@ -45,17 +45,22 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
     }
   }
 
-  // Determine the background image
+  /**
+   * Background image hierarchy (highest priority first):
+   * 1) Item-specific media (`release.heroBgUrl` / `news.imageUrl`)
+   * 2) Global override (`siteSettings.heroCustomBgUrl`)
+   * 3) Release fallback (`release.coverArt`)
+   */
   let bgUrl: string | undefined
-  if (siteSettings.heroCustomBgUrl) {
+  if (itemIsRelease && heroItem.heroBgUrl) {
+    bgUrl = getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
+  } else if (!itemIsRelease && heroItem.imageUrl) {
+    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
+  } else if (siteSettings.heroCustomBgUrl) {
     bgUrl = getOptimizedImageUrl(siteSettings.heroCustomBgUrl, 1200)
   } else if (itemIsRelease) {
     const coverUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
-    bgUrl = heroItem.heroBgUrl
-      ? getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
-      : coverUrl
-  } else if (!itemIsRelease && heroItem.imageUrl) {
-    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
+    bgUrl = coverUrl
   }
 
   // Title / subtitle / description
@@ -76,13 +81,19 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
   // ── Hero button resolution ──────────────────────────────────────────────
   // Primary button
   const rawPrimary = heroItem.heroPrimaryBtn
-  const primaryLabel = rawPrimary?.label || (!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow)
+  const primaryLabel =
+    rawPrimary?.label ||
+    siteSettings.heroDefaultPrimaryBtnLabel ||
+    (!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow)
   const primaryAction = rawPrimary?.action || 'link'
   const primaryHref = rawPrimary?.href || heroLink
 
   // Secondary button
   const rawSecondary = heroItem.heroSecondaryBtn
-  const secondaryLabel = rawSecondary?.label || dict.exploreArtist
+  const secondaryLabel =
+    rawSecondary?.label ||
+    siteSettings.heroDefaultSecondaryBtnLabel ||
+    dict.exploreArtist
   const secondaryAction = rawSecondary?.action || 'scroll'
   const secondaryHref = rawSecondary?.href || (!itemIsRelease ? '#news' : '#releases')
 
