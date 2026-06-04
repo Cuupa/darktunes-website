@@ -46,7 +46,8 @@
     "subheading": "Watch the latest music videos and visualizers",
     "loadMore": "Load More",
     "noVideos": "No videos available yet.",
-    "viewAll": "View all videos"
+    "viewAll": "View all videos",
+    "searchPlaceholder": "Search videos by title or artist…"
   },
   "concerts": {
     "heading": "TOUR",
@@ -274,7 +275,53 @@
     "oauth_google": "Continue with Google",
     "oauth_spotify": "Continue with Spotify",
     "oauth_error": "OAuth sign-in failed. Please try again.",
-    "login_no_artist": "Your account is not linked to an artist profile yet. Please contact the label administrator to get access."
+    "login_no_artist": "Your account is not linked to an artist profile yet. Please contact the label administrator to get access.",
+    "profile_tab_bio": "Bio & Press",
+    "profile_tab_links": "Links",
+    "profile_photo_description": "Upload a profile photo for your EPK.",
+    "profile_biography": "Biography",
+    "profile_biography_description": "Provide bios of different lengths for various press uses.",
+    "profile_genres_press": "Genres & Press",
+    "profile_online_presence": "Online Presence",
+    "profile_links_description": "Links shown on your public profile and EPK.",
+    "profile_preview_public": "Preview Public Profile",
+    "messages_mark_read": "Mark as read",
+    "messages_no_messages": "No messages yet.",
+    "messages_no_messages_desc": "You'll see new messages from the label here.",
+    "marketing_label_assets": "Label Assets",
+    "marketing_label_assets_empty": "No label assets available yet.",
+    "profile_tab_info": "Artist Info",
+    "profile_tab_epk": "EPK Preview",
+    "profile_info_heading": "Artist Information",
+    "profile_info_description": "Details used in your Electronic Press Kit.",
+    "profile_founding_year": "Founding Year",
+    "profile_hometown": "Hometown / Origin",
+    "profile_booking_contact": "Booking Contact",
+    "profile_press_contact": "Press Contact",
+    "profile_contact_placeholder": "e.g. booking@label.com",
+    "profile_spotify": "Spotify Artist URL",
+    "profile_apple_music": "Apple Music URL",
+    "profile_tiktok": "TikTok URL",
+    "profile_facebook": "Facebook URL",
+    "profile_soundcloud": "SoundCloud URL",
+    "profile_epk_open_preview": "Open EPK Preview",
+    "profile_epk_close_preview": "Close Preview",
+    "profile_epk_copy_link": "Copy EPK Link",
+    "profile_epk_copied": "Link copied!",
+    "profile_epk_info_section": "Artist Info",
+    "profile_epk_contacts_section": "Contacts",
+    "profile_epk_links_section": "Links",
+    "profile_epk_bio_short_label": "Short Bio",
+    "profile_epk_bio_medium_label": "Press Bio",
+    "profile_epk_bio_long_label": "Full Bio",
+    "profile_epk_founded": "Founded",
+    "profile_epk_origin": "Origin",
+    "profile_epk_booking": "Booking",
+    "profile_epk_press": "Press",
+    "profile_epk_management": "Management",
+    "profile_bio_short_desc": "Short Bio (social media, ≤ 100 words) — supports rich text",
+    "profile_bio_medium_desc": "Press Bio (blogs / media, ≤ 300 words) — supports rich text",
+    "profile_bio_long_desc": "Full Bio (print / EPK, ≤ 1000 words) — supports rich text"
   },
   "press": {
     "title": "Press & Media",
@@ -387,7 +434,17 @@
     "teamHeading": "Team",
     "statsHeading": "By the Numbers",
     "linksHeading": "Links & Social",
-    "noContent": "About page content coming soon."
+    "noContent": "About page content coming soon.",
+    "backToHome": "← HOME"
+  },
+  "datenschutz": {
+    "metaTitle": "Privacy Policy — darkTunes Music Group",
+    "heading": "Privacy Policy",
+    "dateLabel": "Last updated:"
+  },
+  "impressum": {
+    "metaTitle": "Legal Notice — darkTunes Music Group",
+    "heading": "Legal Notice (Impressum)"
   },
   "pressReleases": {
     "heading": "Press Releases",

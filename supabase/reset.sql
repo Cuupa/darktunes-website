@@ -685,9 +685,18 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long   TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short        TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium       TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long         TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INTEGER;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact  TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact    TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS spotify_url      TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS apple_music_url  TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url       TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url     TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url   TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 

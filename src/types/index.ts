@@ -303,8 +303,10 @@ export interface SiteSettings {
   impressumRegisterNumber: string
   impressumPhone: string
   impressumEmail: string
-  /** Full privacy policy text (Markdown). Displayed on /datenschutz. */
+  /** Full privacy policy text (Markdown or HTML). Displayed on /datenschutz. */
   datenschutzContent: string
+  /** English privacy policy text (Markdown or HTML). Displayed on /datenschutz for the EN locale. */
+  datenschutzContentEn?: string
   /** URL of the placeholder image shown in ConsentGate before the user opts in. */
   consentPlaceholderUrl: string
   /** Visual overlay: animated noise/grain opacity (0–1). Default 0.04. */
@@ -333,8 +335,33 @@ export interface SiteSettings {
   aboutHeadline?: string
   /** Custom subheading for the About page. Falls back to i18n default when empty. */
   aboutSubheading?: string
-  /** Main About page body text (Markdown). Rendered via MarkdownContent on /about. */
+  /** Main About page body text (Markdown or HTML). Rendered on /about. */
   aboutBody?: string
+  // ── Section Text Overrides ────────────────────────────────────────────────
+  /** Override for the newsletter section heading. Falls back to i18n default when empty. */
+  newsletterHeading?: string
+  /** Override for the newsletter section description. Falls back to i18n default when empty. */
+  newsletterDescription?: string
+  /** Override for the Spotify section heading. Falls back to i18n default when empty. */
+  spotifySectionHeading?: string
+  /** Override for the Spotify section subheading. Falls back to i18n default when empty. */
+  spotifySectionSubheading?: string
+  /** Override for the Videos section heading. Falls back to i18n default when empty. */
+  videosSectionHeading?: string
+  /** Override for the Videos section subheading. Falls back to i18n default when empty. */
+  videosSectionSubheading?: string
+  /** Override for the News section heading. Falls back to i18n default when empty. */
+  newsSectionHeading?: string
+  /** Override for the News section subheading. Falls back to i18n default when empty. */
+  newsSectionSubheading?: string
+  /** Override for the Concerts section heading. Falls back to i18n default when empty. */
+  concertsSectionHeading?: string
+  /** Override for the Concerts section subheading. Falls back to i18n default when empty. */
+  concertsSectionSubheading?: string
+  /** Override for the Releases section heading. Falls back to i18n default when empty. */
+  releasesSectionHeading?: string
+  /** Override for the Releases section subheading. Falls back to i18n default when empty. */
+  releasesSectionSubheading?: string
   // ── Hero Section ──────────────────────────────────────────────────────────
   /** What the hero section features. 'release' = latest/featured release, 'news' = latest news post. Default: 'release'. */
   heroContentType?: 'release' | 'news'

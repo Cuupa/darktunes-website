@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { SiteSettings, HomepageSection } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 
@@ -84,6 +85,7 @@ const schema = z.object({
   impressumPhone: z.string().optional().default(''),
   impressumEmail: z.string().email('Must be a valid email').or(z.literal('')),
   datenschutzContent: z.string().optional().default(''),
+  datenschutzContentEn: z.string().optional().default(''),
   consentPlaceholderUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   noiseOpacity: z.number().min(0).max(1).default(0.04),
   crtScanlinesEnabled: z.boolean().default(true),
@@ -96,6 +98,19 @@ const schema = z.object({
   aboutHeadline: z.string().optional().default(''),
   aboutSubheading: z.string().optional().default(''),
   aboutBody: z.string().optional().default(''),
+  // Section text overrides
+  newsletterHeading: z.string().optional().default(''),
+  newsletterDescription: z.string().optional().default(''),
+  spotifySectionHeading: z.string().optional().default(''),
+  spotifySectionSubheading: z.string().optional().default(''),
+  videosSectionHeading: z.string().optional().default(''),
+  videosSectionSubheading: z.string().optional().default(''),
+  newsSectionHeading: z.string().optional().default(''),
+  newsSectionSubheading: z.string().optional().default(''),
+  concertsSectionHeading: z.string().optional().default(''),
+  concertsSectionSubheading: z.string().optional().default(''),
+  releasesSectionHeading: z.string().optional().default(''),
+  releasesSectionSubheading: z.string().optional().default(''),
   shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   youtubeChannelId: z.string().optional().default(''),
 })
@@ -263,6 +278,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <TabsTrigger value="about">About Page</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
+          <TabsTrigger value="sections">Section Texts</TabsTrigger>
           <TabsTrigger value="hero">Hero Section</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
           <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
@@ -462,19 +478,19 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 />
               </Field>
 
-              <Field id="aboutBody" label="Body Text (Markdown)">
-                <Textarea
-                  id="aboutBody"
-                  rows={16}
-                  placeholder={`## Our Story\n\nWe are darkTunes Music Group...\n\n## Mission\n\nPushing boundaries in alternative music.`}
-                  {...register('aboutBody')}
-                  disabled={isSubmitting}
-                  className="font-mono text-xs"
+              <Field id="aboutBody" label="Body Text (Rich Text)">
+                <Controller
+                  name="aboutBody"
+                  control={control}
+                  render={({ field }) => (
+                    <TiptapEditor
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      placeholder="Tell the story of the label — history, mission, team…"
+                    />
+                  )}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Supports: ## headings, **bold**, *italic*, [links](url), - list items, {'>'} blockquotes.
-                  Bare YouTube URLs on their own line embed as videos.
-                </p>
               </Field>
             </CardContent>
           </Card>
@@ -821,6 +837,88 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
         </TabsContent>
 
         {/* ------------------------------------------------------------------ */}
+        {/* Section Texts                                                        */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="sections">
+          <Card>
+            <CardHeader>
+              <CardTitle>Section Texts</CardTitle>
+              <CardDescription>
+                Override the default headings and subheadings for each homepage section.
+                Leave a field empty to use the default translated text.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Newsletter */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Newsletter</h3>
+                <Field id="newsletterHeading" label="Heading">
+                  <Input id="newsletterHeading" {...register('newsletterHeading')} disabled={isSubmitting} placeholder="Newsletter" />
+                </Field>
+                <Field id="newsletterDescription" label="Description">
+                  <Input id="newsletterDescription" {...register('newsletterDescription')} disabled={isSubmitting} placeholder="Stay up to date…" />
+                </Field>
+              </div>
+
+              {/* Spotify */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Spotify</h3>
+                <Field id="spotifySectionHeading" label="Heading">
+                  <Input id="spotifySectionHeading" {...register('spotifySectionHeading')} disabled={isSubmitting} placeholder="SPOTIFY" />
+                </Field>
+                <Field id="spotifySectionSubheading" label="Subheading">
+                  <Input id="spotifySectionSubheading" {...register('spotifySectionSubheading')} disabled={isSubmitting} placeholder="Listen to our playlist" />
+                </Field>
+              </div>
+
+              {/* Videos */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Videos</h3>
+                <Field id="videosSectionHeading" label="Heading">
+                  <Input id="videosSectionHeading" {...register('videosSectionHeading')} disabled={isSubmitting} placeholder="VIDEOS" />
+                </Field>
+                <Field id="videosSectionSubheading" label="Subheading">
+                  <Input id="videosSectionSubheading" {...register('videosSectionSubheading')} disabled={isSubmitting} placeholder="Watch the latest music videos" />
+                </Field>
+              </div>
+
+              {/* News */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">News</h3>
+                <Field id="newsSectionHeading" label="Heading">
+                  <Input id="newsSectionHeading" {...register('newsSectionHeading')} disabled={isSubmitting} placeholder="NEWS" />
+                </Field>
+                <Field id="newsSectionSubheading" label="Subheading">
+                  <Input id="newsSectionSubheading" {...register('newsSectionSubheading')} disabled={isSubmitting} placeholder="Always up to date" />
+                </Field>
+              </div>
+
+              {/* Concerts */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Concerts / Tour</h3>
+                <Field id="concertsSectionHeading" label="Heading">
+                  <Input id="concertsSectionHeading" {...register('concertsSectionHeading')} disabled={isSubmitting} placeholder="TOUR" />
+                </Field>
+                <Field id="concertsSectionSubheading" label="Subheading">
+                  <Input id="concertsSectionSubheading" {...register('concertsSectionSubheading')} disabled={isSubmitting} placeholder="Live dates and upcoming shows" />
+                </Field>
+              </div>
+
+              {/* Releases */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Releases</h3>
+                <Field id="releasesSectionHeading" label="Heading">
+                  <Input id="releasesSectionHeading" {...register('releasesSectionHeading')} disabled={isSubmitting} placeholder="RELEASES" />
+                </Field>
+                <Field id="releasesSectionSubheading" label="Subheading">
+                  <Input id="releasesSectionSubheading" {...register('releasesSectionSubheading')} disabled={isSubmitting} placeholder="Discover the latest music" />
+                </Field>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
         {/* Hero Section                                                         */}
         {/* ------------------------------------------------------------------ */}
         <TabsContent value="hero">
@@ -1088,23 +1186,46 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               <CardHeader>
                 <CardTitle>Datenschutzerklärung</CardTitle>
                 <CardDescription>
-                  Volltext der Datenschutzerklärung in Markdown. Erscheint auf /datenschutz.
+                  Volltext der Datenschutzerklärung. Erscheint auf /datenschutz.
                   Leer lassen für Standard-Boilerplate.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Field
                   id="datenschutzContent"
-                  label="Datenschutztext (Markdown)"
+                  label="Datenschutztext (Deutsch)"
                   error={errors.datenschutzContent?.message}
                 >
-                  <Textarea
-                    id="datenschutzContent"
-                    rows={12}
-                    placeholder="## 1. Datenschutz auf einen Blick&#10;..."
-                    {...register('datenschutzContent')}
-                    disabled={isSubmitting}
-                    className="font-mono text-xs"
+                  <Controller
+                    name="datenschutzContent"
+                    control={control}
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        disabled={isSubmitting}
+                        placeholder="Hier den deutschen Datenschutztext einfügen…"
+                      />
+                    )}
+                  />
+                </Field>
+
+                <Field
+                  id="datenschutzContentEn"
+                  label="Privacy Policy (English)"
+                  error={errors.datenschutzContentEn?.message}
+                >
+                  <Controller
+                    name="datenschutzContentEn"
+                    control={control}
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        disabled={isSubmitting}
+                        placeholder="Enter the English privacy policy text here…"
+                      />
+                    )}
                   />
                 </Field>
 

@@ -400,9 +400,18 @@ export function ArtistDetailContent({
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
             <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
-            <p className="text-foreground/80 leading-relaxed font-serif text-base max-w-3xl whitespace-pre-line">
-              {artist.bio}
-            </p>
+            {/^\s*<[a-z]/i.test(artist.bio) ? (
+              <div
+                className="prose prose-invert max-w-3xl text-foreground/80 leading-relaxed font-serif
+                  [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
+                  [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
+                dangerouslySetInnerHTML={{ __html: artist.bio }}
+              />
+            ) : (
+              <p className="text-foreground/80 leading-relaxed font-serif text-base max-w-3xl whitespace-pre-line">
+                {artist.bio}
+              </p>
+            )}
           </motion.section>
         )}
 

@@ -103,7 +103,17 @@ export function HomePageContent({
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
           >
-            <Releases releases={releases} dict={dict.releases} locale={locale} autoplayMs={siteSettings.carouselAutoplayMs ?? 0} consentDict={dict.consent} />
+            <Releases
+              releases={releases}
+              dict={{
+                ...dict.releases,
+                ...(siteSettings.releasesSectionHeading && { heading: siteSettings.releasesSectionHeading }),
+                ...(siteSettings.releasesSectionSubheading && { subheading: siteSettings.releasesSectionSubheading }),
+              }}
+              locale={locale}
+              autoplayMs={siteSettings.carouselAutoplayMs ?? 0}
+              consentDict={dict.consent}
+            />
           </motion.div>
         )
       case 'spotify':
@@ -117,8 +127,12 @@ export function HomePageContent({
                 transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
                 className="mb-8 text-center"
               >
-                <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">{dict.spotify.heading}</h2>
-                <p className="text-lg text-muted-foreground font-serif">{dict.spotify.subheading}</p>
+                <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+                  {siteSettings.spotifySectionHeading || dict.spotify.heading}
+                </h2>
+                <p className="text-lg text-muted-foreground font-serif">
+                  {siteSettings.spotifySectionSubheading || dict.spotify.subheading}
+                </p>
               </motion.div>
               <SpotifyMultiPlayer
                 playlists={playlists}
@@ -134,7 +148,11 @@ export function HomePageContent({
             <Videos
               videos={videos}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-              dict={dict.videos}
+              dict={{
+                ...dict.videos,
+                ...(siteSettings.videosSectionHeading && { heading: siteSettings.videosSectionHeading }),
+                ...(siteSettings.videosSectionSubheading && { subheading: siteSettings.videosSectionSubheading }),
+              }}
               consentDict={dict.consent}
               locale={locale}
               videosPerPage={siteSettings.videosPerPage}
@@ -145,19 +163,41 @@ export function HomePageContent({
       case 'concerts':
         return (
           <div key="concerts" id="concerts">
-            <Concerts concerts={concerts} dict={dict.concerts} locale={locale} />
+            <Concerts
+              concerts={concerts}
+              dict={{
+                ...dict.concerts,
+                ...(siteSettings.concertsSectionHeading && { heading: siteSettings.concertsSectionHeading }),
+                ...(siteSettings.concertsSectionSubheading && { subheading: siteSettings.concertsSectionSubheading }),
+              }}
+              locale={locale}
+            />
           </div>
         )
       case 'news':
         return (
           <div key="news" id="news">
-            <News news={news} dict={dict.news} locale={locale} />
+            <News
+              news={news}
+              dict={{
+                ...dict.news,
+                ...(siteSettings.newsSectionHeading && { heading: siteSettings.newsSectionHeading }),
+                ...(siteSettings.newsSectionSubheading && { subheading: siteSettings.newsSectionSubheading }),
+              }}
+              locale={locale}
+            />
           </div>
         )
       case 'newsletter':
         return (
           <div key="newsletter" id="newsletter">
-            <NewsletterSection dict={dict.newsletter} />
+            <NewsletterSection
+              dict={{
+                ...dict.newsletter,
+                ...(siteSettings.newsletterHeading && { heading: siteSettings.newsletterHeading }),
+                ...(siteSettings.newsletterDescription && { description: siteSettings.newsletterDescription }),
+              }}
+            />
           </div>
         )
       default:

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
+import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { MarkdownContent } from '@/components/MarkdownContent'
@@ -18,12 +19,23 @@ interface AboutContentProps {
   dict: Dictionary['about']
 }
 
+/** Returns true when content looks like HTML rather than Markdown. */
+function isHtml(str: string) {
+  return /^\s*<[a-z]/i.test(str)
+}
+
 export function AboutContent({ siteSettings, artists, news, dict }: AboutContentProps) {
   const prefersReducedMotion = useReducedMotion()
 
   const heading = siteSettings?.aboutHeadline || dict.heading
   const subheading = siteSettings?.aboutSubheading || dict.subheading
   const body = siteSettings?.aboutBody || ''
+
+  const bodyHtml = useMemo(() => {
+    if (!body) return ''
+    if (isHtml(body)) return body
+    return null // render via MarkdownContent below
+  }, [body])
 
   const stats = [
     { label: 'Artists', value: artists.length },
@@ -41,7 +53,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
       {/* Breadcrumb */}
       <div>
         <Link href="/" className="text-xs text-muted-foreground hover:text-foreground font-mono uppercase tracking-widest mb-6 inline-block transition-colors">
-          ← HOME
+          {dict.backToHome}
         </Link>
         <motion.div
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
@@ -53,7 +65,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
         </motion.div>
       </div>
 
-      {/* Editable body text (Markdown) */}
+      {/* Editable body text (HTML or Markdown) */}
       {body ? (
         <motion.section
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
@@ -61,7 +73,20 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <MarkdownContent content={body} className="max-w-3xl text-lg" />
+          {bodyHtml !== null ? (
+            <div
+              className="prose prose-invert max-w-3xl text-lg text-foreground/90 leading-relaxed
+                [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3
+                [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1
+                [&_p]:text-muted-foreground [&_p]:mb-4
+                [&_a]:text-accent [&_a]:underline [&_a]:hover:no-underline
+                [&_strong]:text-foreground [&_strong]:font-semibold
+                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-muted-foreground"
+              dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            />
+          ) : (
+            <MarkdownContent content={body} className="max-w-3xl text-lg" />
+          )}
         </motion.section>
       ) : siteSettings?.labelTagline ? (
         /* Fallback: show hero description when no dedicated about body is set */

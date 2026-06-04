@@ -133,7 +133,7 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
         </Sheet>
       </header>
 
-      <aside className="portal-sidebar max-md:hidden flex flex-col min-h-screen w-64 shrink-0 border-r border-border bg-card">
+      <aside className="portal-sidebar hidden md:flex flex-col min-h-screen w-64 shrink-0 border-r border-border bg-card">
         <div className="p-6">
           <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
         </div>
