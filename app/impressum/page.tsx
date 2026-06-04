@@ -56,6 +56,7 @@ export default async function ImpressumPage() {
         spotifyPlaylistUri: '',
         spotifyPlaylists: [],
         heroBadge: '',
+        heroNewsBadge: '📰 News',
         heroDescription: '',
         seoTitle: '',
         seoDescription: '',
