@@ -204,8 +204,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
             <Button
               type="button"
               variant="outline"
-              className="w-full"
-              style={{ borderColor: '#1DB954', color: '#1DB954' }}
+              className="w-full border-[#1DB954] text-[#1DB954] hover:bg-[#1DB954]/10"
               disabled={isOAuthLoading}
               onClick={() => handleOAuth('spotify')}
             >

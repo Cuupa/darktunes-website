@@ -49,19 +49,23 @@ export function HomePageContent({
     return selectHeroItems(releases, news, siteSettings)
   }, [releases, news, siteSettings])
 
-  const [heroIndex, setHeroIndex] = useState(0)
-
-  useEffect(() => {
-    setHeroIndex(0)
-  }, [heroItems])
+  const heroItemsKey = useMemo(() => heroItems.map((item) => item.id).join('|'), [heroItems])
+  const [heroState, setHeroState] = useState<{ key: string; index: number }>({ key: '', index: 0 })
+  const heroIndex = heroState.key === heroItemsKey ? heroState.index : 0
 
   useEffect(() => {
     if (heroItems.length <= 1) return
     const intervalId = setInterval(() => {
-      setHeroIndex((previousIndex) => (previousIndex + 1) % heroItems.length)
+      setHeroState((previousState) => ({
+        key: heroItemsKey,
+        index:
+          previousState.key === heroItemsKey
+            ? (previousState.index + 1) % heroItems.length
+            : 1 % heroItems.length,
+      }))
     }, 6000)
     return () => clearInterval(intervalId)
-  }, [heroItems])
+  }, [heroItemsKey, heroItems.length])
 
   const currentHeroItem = heroItems[heroIndex] ?? heroItems[0]
   const playlists =

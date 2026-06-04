@@ -1,11 +1,8 @@
 import type { Metadata } from 'next'
 import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
 import { Providers } from './_components/Providers'
-import { getSiteSettings } from '@/lib/api/siteSettings'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
-import { unstable_cache } from 'next/cache'
+import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { WebVitals } from './web-vitals'
 import './globals.css'
@@ -30,28 +27,6 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
   display: 'swap',
 })
-
-/**
- * Cookie-free Supabase client — safe to use inside unstable_cache.
- *
- * In Next.js 15, dynamic APIs like cookies() cannot be called inside
- * unstable_cache callbacks.  Site settings are publicly readable (RLS: TRUE),
- * so the anon key without a session cookie is sufficient.
- */
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
-
-const getCachedSiteSettings = unstable_cache(
-  async () => {
-    return getSiteSettings(createPublicSupabaseClient()).catch(() => null)
-  },
-  ['site-settings'],
-  { revalidate: 60, tags: ['site-settings'] },
-)
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getCachedSiteSettings().catch(() => null)

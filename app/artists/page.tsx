@@ -6,31 +6,14 @@
  * Clicking opens the artist detail page.
  */
 
-import { unstable_cache } from 'next/cache'
-import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
-import { getPublicArtists } from '@/lib/api/artists'
+import { getCachedPublicArtists } from '@/lib/cache/publicQueries'
 import { ArtistsGridContent } from './_components/ArtistsGridContent'
-import type { Database } from '@/types/database'
-import type { Artist } from '@/types'
-
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
-
-const getCachedArtists = unstable_cache(
-  async (): Promise<Artist[]> => getPublicArtists(createPublicSupabaseClient()).catch(() => [] as Artist[]),
-  ['artists-page'],
-  { revalidate: 60, tags: ['artists'] },
-)
 
 export default async function ArtistsPage() {
   const [artists, locale] = await Promise.all([
-    getCachedArtists(),
+    getCachedPublicArtists(),
     getLocale(),
   ])
 

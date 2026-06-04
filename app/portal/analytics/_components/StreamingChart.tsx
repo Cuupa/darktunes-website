@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { StreamingStat, PlatformAggregate } from '@/lib/api/streamingStats'
 import type { Dictionary } from '@/i18n/types'
@@ -42,6 +43,26 @@ function formatPlatformLabel(platform: string): string {
 }
 
 export function StreamingChart({ dict, stats, aggregates }: StreamingChartProps) {
+  // Build monthly trend data: { period, spotify, apple_music, ... }
+  // useMemo must be called before any early returns (Rules of Hooks).
+  const { platforms, monthlyData } = useMemo(() => {
+    const _periods = [...new Set(stats.map((s) => s.period))].sort()
+    const _platforms = [...new Set(stats.map((s) => s.platform))]
+    // Pre-index stats by "period|platform" for O(1) lookup
+    const statsIndex = new Map<string, number>()
+    for (const s of stats) {
+      statsIndex.set(`${s.period}|${s.platform}`, s.streams)
+    }
+    const _monthlyData = _periods.map((period) => {
+      const row: Record<string, string | number> = { period }
+      for (const platform of _platforms) {
+        row[platform] = statsIndex.get(`${period}|${platform}`) ?? 0
+      }
+      return row
+    })
+    return { platforms: _platforms, monthlyData: _monthlyData }
+  }, [stats])
+
   if (stats.length === 0) {
     return (
       <div className="space-y-4">
@@ -50,19 +71,6 @@ export function StreamingChart({ dict, stats, aggregates }: StreamingChartProps)
       </div>
     )
   }
-
-  // Build monthly trend data: { period, spotify, apple_music, ... }
-  const periods = [...new Set(stats.map((s) => s.period))].sort()
-  const platforms = [...new Set(stats.map((s) => s.platform))]
-
-  const monthlyData = periods.map((period) => {
-    const row: Record<string, string | number> = { period }
-    for (const platform of platforms) {
-      const stat = stats.find((s) => s.period === period && s.platform === platform)
-      row[platform] = stat?.streams ?? 0
-    }
-    return row
-  })
 
   const totalStreams = aggregates.reduce((sum, a) => sum + a.totalStreams, 0)
 

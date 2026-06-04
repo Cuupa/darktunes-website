@@ -71,7 +71,6 @@ function VideoCard({
           className={`object-cover group-hover:scale-110 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
           sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
           onLoad={() => setImgLoaded(true)}
-          unoptimized
         />
         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
           <Button

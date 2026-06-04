@@ -100,7 +100,6 @@ export function PressPageClient({ dict, photos, concerts, profile, artistName }:
                       alt={photo.altText ?? photo.title}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      unoptimized
                     />
                   </div>
                   <div className="p-3 flex items-center justify-between gap-2">

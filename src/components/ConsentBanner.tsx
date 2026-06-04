@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -21,15 +21,8 @@ interface ConsentBannerProps {
  * Note: This implements opt-in consent for external services (DSGVO Art. 6).
  */
 export function ConsentBanner({ dict }: ConsentBannerProps) {
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(() => getConsentState() === null)
   const prefersReducedMotion = useReducedMotion()
-
-  useEffect(() => {
-    // Show banner only if no prior decision was made
-    if (getConsentState() === null) {
-      setVisible(true)
-    }
-  }, [])
 
   const handleAccept = () => {
     setConsentState('accepted')

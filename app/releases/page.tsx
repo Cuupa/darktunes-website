@@ -6,28 +6,12 @@
  */
 
 import type { Metadata } from 'next'
-import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
-import { getPublicReleases } from '@/lib/api/releases'
+import { getCachedPublicReleases } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ReleasesPageContent } from './_components/ReleasesPageContent'
 
 export const revalidate = 60
-
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
-
-const getCachedReleases = unstable_cache(
-  async () => getPublicReleases(createPublicSupabaseClient()).catch(() => []),
-  ['releases-page'],
-  { revalidate: 60, tags: ['releases'] },
-)
 
 export const metadata: Metadata = {
   title: 'Releases — darkTunes Music Group',
@@ -37,7 +21,7 @@ export const metadata: Metadata = {
 export default async function ReleasesPage() {
   const locale = await getLocale()
   const [releases, dict] = await Promise.all([
-    getCachedReleases(),
+    getCachedPublicReleases(),
     getDictionary(locale),
   ])
 

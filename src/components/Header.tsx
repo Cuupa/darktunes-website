@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import logoImage from '@/assets/images/logo_(1).png'
-import { useLenis } from '@/components/animations/LenisProvider'
 import { buildNavItems } from '@/config/sections'
+import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { HomepageSection } from '@/types'
 
@@ -24,7 +24,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
-  const lenis = useLenis()
+  const handleSmoothScroll = useSmoothScrollToAnchor()
   const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
@@ -43,21 +43,6 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
     isLink: item.routeType !== 'anchor',
     external: item.routeType === 'external',
   }))
-
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, href: string) => {
-    e.preventDefault()
-    if (lenis) {
-      lenis.scrollTo(href, { offset: -140 })
-    } else {
-      const target = document.querySelector(href)
-      if (target) {
-        const headerOffset = 140
-        const elementPosition = target.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.scrollY - headerOffset
-        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
-      }
-    }
-  }
 
   const handleLocaleSwitch = () => {
     const next = locale === 'de' ? 'en' : 'de'

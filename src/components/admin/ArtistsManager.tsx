@@ -429,23 +429,26 @@ export function ArtistsManager() {
                       onClick={() => void handleSync(artist)}
                       disabled={syncingId === artist.id}
                       title="Sync Now"
+                      aria-label={`Sync ${artist.name}`}
                     >
                       <ArrowsClockwise
                         size={16}
+                        aria-hidden="true"
                         className={syncingId === artist.id ? 'animate-spin' : ''}
                       />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(artist)} title="Edit">
-                      <PencilSimple size={16} />
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(artist)} title="Edit" aria-label={`Edit ${artist.name}`}>
+                      <PencilSimple size={16} aria-hidden="true" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => setDeleteTarget(artist)}
                       title="Delete"
+                      aria-label={`Delete ${artist.name}`}
                       className="text-destructive hover:text-destructive"
                     >
-                      <Trash size={16} />
+                      <Trash size={16} aria-hidden="true" />
                     </Button>
                   </div>
                 </TableCell>
@@ -473,9 +476,9 @@ export function ArtistsManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="artists-form-dialog-title" className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Artist</DialogTitle>
+            <DialogTitle id="artists-form-dialog-title">{editingArtist ? 'Edit Artist' : 'New Artist'}</DialogTitle>
           </DialogHeader>
           <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} artistId={editingArtist?.id} />
         </DialogContent>

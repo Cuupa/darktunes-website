@@ -73,7 +73,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   const body: unknown = await req.json()
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) {
-    const message = parsed.error.errors.map((e) => e.message).join('; ')
+    const message = parsed.error.issues.map((e) => e.message).join('; ')
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 

@@ -30,7 +30,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    throw new ApiError(422, parsed.error.errors[0]?.message ?? 'Validation error')
+    throw new ApiError(422, parsed.error.issues[0]?.message ?? 'Validation error')
   }
 
   const { email, name } = parsed.data
