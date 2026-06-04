@@ -84,6 +84,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     impressum_phone: s.impressumPhone,
     impressum_email: s.impressumEmail,
     datenschutz_content: s.datenschutzContent,
+    datenschutz_content_en: s.datenschutzContentEn ?? '',
     consent_placeholder_url: s.consentPlaceholderUrl,
     noise_opacity: String(s.noiseOpacity),
     crt_scanlines_enabled: String(s.crtScanlinesEnabled),

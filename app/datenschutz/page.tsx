@@ -1,10 +1,10 @@
 /**
- * app/datenschutz/page.tsx — Privacy Policy (Datenschutzerklärung) [RSC]
+ * app/datenschutz/page.tsx — Privacy Policy (Datenschutzerklärung / Privacy Policy) [RSC]
  *
- * Renders the full privacy policy. The main body text is stored as Markdown
- * in the CMS (site_settings key: datenschutz_content) so the legal team can
- * update it without a deployment. Falls back to a compliant boilerplate if
- * no content is configured yet.
+ * Renders the full privacy policy. The main body text is stored as HTML or
+ * Markdown in the CMS (site_settings keys: datenschutz_content for DE,
+ * datenschutz_content_en for EN) so the legal team can update it without a
+ * deployment. Falls back to a compliant boilerplate if no content is configured.
  */
 
 import type { Metadata } from 'next'
@@ -35,58 +35,17 @@ const getCachedSettings = unstable_cache(
   { revalidate: 60, tags: ['site-settings'] },
 )
 
-export const metadata: Metadata = {
-  title: 'Datenschutzerklärung — darkTunes Music Group',
-  robots: { index: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
+  return {
+    title: dict.datenschutz.metaTitle,
+    robots: { index: false },
+  }
 }
 
-export default async function DatenschutzPage() {
-  const [settings, locale] = await Promise.all([
-    getCachedSettings().catch(
-      (): SiteSettings => ({
-        labelName: 'darkTunes Music Group',
-        labelTagline: '',
-        contactEmail: 'info@darktunes.com',
-        privacyPolicyUrl: '/datenschutz',
-        termsUrl: '/impressum',
-        instagramUrl: '',
-        youtubeUrl: '',
-        spotifyUrl: '',
-        spotifyPlaylistUri: '',
-        spotifyPlaylists: [],
-        heroBadge: '',
-        heroDescription: '',
-        seoTitle: '',
-        seoDescription: '',
-        ogTitle: '',
-        ogDescription: '',
-        impressumCompanyName: 'darkTunes Music Group',
-        impressumLegalForm: '',
-        impressumRepresentative: '',
-        impressumAddress: '',
-        impressumVatId: '',
-        impressumRegisterCourt: '',
-        impressumRegisterNumber: '',
-        impressumPhone: '',
-        impressumEmail: 'info@darktunes.com',
-        datenschutzContent: '',
-        consentPlaceholderUrl: '',
-        noiseOpacity: 0.04,
-        crtScanlinesEnabled: true,
-        vignetteIntensity: 0.5,
-        shopifyStoreUrl: '',
-        youtubeChannelId: '',
-        carouselAutoplayMs: 0,
-        videosPerPage: 9,
-        videosLinkToPage: false,
-        featureToggles: { promoPool: true, editorTools: true },
-      }),
-    ),
-    getLocale(),
-  ])
-  const dict = await getDictionary(locale)
-
-  const defaultContent = `
+function getDefaultContentDe(settings: SiteSettings): string {
+  return `
 ## 1. Datenschutz auf einen Blick
 
 ### Allgemeine Hinweise
@@ -139,8 +98,120 @@ Sie können Ihre Einwilligung jederzeit widerrufen, indem Sie uns eine E-Mail an
 ### Schriftarten (Google Fonts)
 Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Web Fonts, die von Google bereitgestellt werden. Die Google Fonts sind lokal eingebunden, sodass keine Verbindung zu Servern von Google stattfindet.
 `.trim()
+}
 
-  const content = settings.datenschutzContent || defaultContent
+function getDefaultContentEn(settings: SiteSettings): string {
+  return `
+## 1. Privacy at a Glance
+
+### General Information
+The following notes provide a simple overview of what happens to your personal data when you visit this website. Personal data is any data that can be used to identify you personally.
+
+### Data Collection on This Website
+**Who is responsible for data collection on this website?**
+Data processing on this website is carried out by the website operator. You can find their contact details in the legal notice (Impressum) of this website.
+
+## 2. Hosting
+
+This website is hosted by an external service provider (host). Personal data collected on this website is stored on the host's servers. This may include IP addresses, contact requests, metadata and communications data, contract data, contact details, names, website access data, and other data generated through a website.
+
+## 3. General Information and Mandatory Disclosures
+
+### Data Protection
+The operators of this website take the protection of your personal data very seriously. We treat your personal data confidentially and in accordance with statutory data protection regulations and this privacy policy.
+
+### Information About the Responsible Party
+The responsible party for data processing on this website is:
+
+**${settings.impressumCompanyName}**  
+${settings.impressumAddress}  
+Email: ${settings.impressumEmail}
+
+The responsible party is the natural or legal person who alone or jointly with others decides on the purposes and means of processing personal data.
+
+### Retention Period
+Unless a more specific retention period has been stated within this privacy policy, your personal data will remain with us until the purpose for data processing no longer applies.
+
+### Your Rights
+You have the right to receive information about the origin, recipient, and purpose of your stored personal data free of charge at any time. You also have the right to request the correction or deletion of this data.
+
+## 4. External Media and Embeds
+
+This website may embed external content from third-party providers (e.g. Spotify, YouTube). This content is only loaded after your explicit consent. Before consent, only placeholders are displayed. By giving your consent, you agree to data being transmitted to the respective third-party providers.
+
+**Spotify**: When using the Spotify embed player, the privacy policy of Spotify AB, Regeringsgatan 19, 111 53 Stockholm, Sweden applies. More information at: https://www.spotify.com/legal/privacy-policy/
+
+**YouTube**: When using YouTube videos, the privacy policy of Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland applies. More information at: https://policies.google.com/privacy
+
+## 5. Newsletter
+
+If you would like to receive the newsletter offered on the website, we require an email address from you as well as information that allows us to verify that you are the owner of the email address provided and that you agree to receive the newsletter. Further data will not be collected or only on a voluntary basis. We use this data exclusively for sending the requested information and do not pass it on to third parties.
+
+You can revoke your consent at any time by sending us an email to ${settings.impressumEmail}.
+
+## 6. Plugins and Tools
+
+### Web Fonts
+This website uses web fonts for uniform font rendering. The fonts are hosted locally, so no connection to Google's servers takes place.
+`.trim()
+}
+
+export default async function DatenschutzPage() {
+  const [settings, locale] = await Promise.all([
+    getCachedSettings().catch(
+      (): SiteSettings => ({
+        labelName: 'darkTunes Music Group',
+        labelTagline: '',
+        contactEmail: 'info@darktunes.com',
+        privacyPolicyUrl: '/datenschutz',
+        termsUrl: '/impressum',
+        instagramUrl: '',
+        youtubeUrl: '',
+        spotifyUrl: '',
+        spotifyPlaylistUri: '',
+        spotifyPlaylists: [],
+        heroBadge: '',
+        heroDescription: '',
+        seoTitle: '',
+        seoDescription: '',
+        ogTitle: '',
+        ogDescription: '',
+        impressumCompanyName: 'darkTunes Music Group',
+        impressumLegalForm: '',
+        impressumRepresentative: '',
+        impressumAddress: '',
+        impressumVatId: '',
+        impressumRegisterCourt: '',
+        impressumRegisterNumber: '',
+        impressumPhone: '',
+        impressumEmail: 'info@darktunes.com',
+        datenschutzContent: '',
+        consentPlaceholderUrl: '',
+        noiseOpacity: 0.04,
+        crtScanlinesEnabled: true,
+        vignetteIntensity: 0.5,
+        shopifyStoreUrl: '',
+        youtubeChannelId: '',
+        carouselAutoplayMs: 0,
+        videosPerPage: 9,
+        videosLinkToPage: false,
+        featureToggles: { promoPool: true, editorTools: true },
+      }),
+    ),
+    getLocale(),
+  ])
+  const dict = await getDictionary(locale)
+
+  const isEn = locale === 'en'
+  const content = isEn
+    ? (settings.datenschutzContentEn || getDefaultContentEn(settings))
+    : (settings.datenschutzContent || getDefaultContentDe(settings))
+
+  const dateLabel = dict.datenschutz.dateLabel
+  const formattedDate = new Date().toLocaleDateString(isEn ? 'en-GB' : 'de-DE', {
+    year: 'numeric',
+    month: 'long',
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -153,13 +224,13 @@ Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Web
         </Link>
 
         <h1 className="text-4xl lg:text-5xl font-bold mb-10 tracking-tight uppercase">
-          Datenschutzerklärung
+          {dict.datenschutz.heading}
         </h1>
 
         <DatenschutzContent content={content} />
 
         <p className="text-xs text-muted-foreground border-t border-border pt-6 mt-12">
-          Stand: {new Date().toLocaleDateString('de-DE', { year: 'numeric', month: 'long' })}
+          {dateLabel} {formattedDate}
         </p>
       </div>
     </div>
