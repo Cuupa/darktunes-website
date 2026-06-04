@@ -45,7 +45,7 @@ WHERE slug = 'artist-slug';
 - **Messages (admin-only)**: Rich-text **Messages** tab for artist inbox communication (`label_messages`); supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Logs (admin-only)**: **Logs** tab with three sub-views — Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filters, and pagination.
-- **Roles & Permissions (admin-only)**: **Roles & Permissions** tab to configure per-role content permissions (`canPublishNews`, `canEditNews`, `canManageArtists`, `canManageReleases`, `canManageVideos`, `canViewAdminPanel`) stored as JSON in `site_settings` under key `role_permissions`.
+- **Roles & Permissions (admin-only)**: **Roles & Permissions** tab to configure per-role content permissions (`can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`) stored in the dedicated `role_permissions` PostgreSQL table. Changes are enforced by backend API routes and PostgreSQL RLS policies — the admin role always retains full access and cannot be restricted.
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
@@ -133,9 +133,35 @@ Changes are saved to the `site_settings` Supabase table. The Admin CMS immediate
 
 ## Permissions
 
-- **Admin**: Full access to all features, user management
-- **Editor**: Can manage content (artists, releases, news, videos, assets)
-- **User**: Read-only access (default for new signups)
+The permission system is database-backed via the `role_permissions` table in PostgreSQL. Each role has a row with boolean columns for every permission. Permissions are enforced at three levels: backend API routes, PostgreSQL RLS policies, and the frontend UI.
+
+### Available Permissions
+
+| Permission | Controls |
+|---|---|
+| `can_publish_news` | Creating new news posts (INSERT) |
+| `can_edit_news` | Editing existing news posts (UPDATE) |
+| `can_manage_artists` | Creating and editing artist profiles |
+| `can_manage_releases` | Creating and editing releases |
+| `can_manage_videos` | Creating and editing videos |
+| `can_view_admin_panel` | Accessing assets, media files, and the admin panel |
+
+### Default Role Permissions
+
+| Role | publish news | edit news | manage artists | manage releases | manage videos | view admin |
+|---|---|---|---|---|---|---|
+| **admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **editor** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
+| **journalist** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **artist** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **user** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+### Important Notes
+
+- The **admin** role always has full access and **cannot be restricted** — all RLS policies include an `OR get_my_role() = 'admin'` bypass.
+- Permission changes take effect **immediately** without requiring users to log out and back in.
+- To modify permissions for a role, use the **Roles & Permissions** tab in the admin panel (admin-only), which writes directly to the `role_permissions` table.
+- The `role_permissions` table is defined in `supabase/reset.sql` (the single source of truth for the schema).
 
 ## Development
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFolder, getFolders } from '@/lib/api/assetFolders'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
@@ -12,7 +12,7 @@ interface CreateFolderBody {
 
 export const GET = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const supabase = await createServerSupabaseClient()
   const folders = await getFolders(supabase)
@@ -21,7 +21,7 @@ export const GET = withErrorHandler(async (request: NextRequest): Promise<NextRe
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyPermission(token, 'can_view_admin_panel')
 
   const body = (await request.json()) as CreateFolderBody
   const name = body.name?.trim()

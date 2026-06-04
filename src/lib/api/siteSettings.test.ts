@@ -358,32 +358,6 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.homepageSectionOrder).toEqual(['releases', 'news'])
   })
 
-  it('maps role permissions from DB row', async () => {
-    const customPerms = {
-      admin: { canPublishNews: true, canEditNews: true, canManageArtists: true, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
-      editor: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
-    }
-    const db = makeMockDb([
-      { key: 'role_permissions', value: JSON.stringify(customPerms) },
-    ])
-    const result = await getSiteSettings(db)
-    expect(result.rolePermissions?.admin.canPublishNews).toBe(true)
-    expect(result.rolePermissions?.editor.canPublishNews).toBe(false)
-  })
-
-  it('returns default role permissions when key is absent', async () => {
-    const db = makeMockDb([])
-    const result = await getSiteSettings(db)
-    expect(result.rolePermissions?.admin.canViewAdminPanel).toBe(true)
-    expect(result.rolePermissions?.user.canViewAdminPanel).toBe(false)
-  })
-
-  it('falls back to default role permissions on invalid JSON', async () => {
-    const db = makeMockDb([{ key: 'role_permissions', value: '{bad json' }])
-    const result = await getSiteSettings(db)
-    expect(result.rolePermissions?.admin.canViewAdminPanel).toBe(true)
-  })
-
   it('maps all social URLs including spotify playlists with theme and accent', async () => {
     const playlists = [
       { label: 'Mix A', uri: 'spotify:playlist:abc', theme: 'light', accentColor: '#ff0000' },

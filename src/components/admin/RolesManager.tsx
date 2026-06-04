@@ -1,25 +1,28 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useSiteSettings } from '@/hooks/useSiteSettings'
-import type { RolePermissions } from '@/types'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
+
+type DbRolePermissions = Database['public']['Tables']['role_permissions']['Row']
+type PermissionKey = Exclude<keyof DbRolePermissions, 'role' | 'updated_at' | 'updated_by'>
 
 const ROLES = ['admin', 'editor', 'journalist', 'artist', 'user'] as const
 type Role = typeof ROLES[number]
 
-const PERMISSION_LABELS: Record<keyof RolePermissions, string> = {
-  canViewAdminPanel: 'View Admin Panel',
-  canPublishNews: 'Publish News',
-  canEditNews: 'Edit News',
-  canManageArtists: 'Manage Artists',
-  canManageReleases: 'Manage Releases',
-  canManageVideos: 'Manage Videos',
+const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  can_view_admin_panel: 'View Admin Panel',
+  can_publish_news: 'Publish News',
+  can_edit_news: 'Edit News',
+  can_manage_artists: 'Manage Artists',
+  can_manage_releases: 'Manage Releases',
+  can_manage_videos: 'Manage Videos',
 }
 
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
@@ -30,65 +33,102 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
   user: 'Unassigned user with no special privileges.',
 }
 
+type PermissionsMap = Partial<Record<Role, DbRolePermissions>>
+
 export function RolesManager() {
-  const { settings, saveSettings, isLoading } = useSiteSettings()
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [serverData, setServerData] = useState<PermissionsMap>({})
+  const [local, setLocal] = useState<PermissionsMap>({})
 
-  const permissions = useMemo<Record<Role, RolePermissions>>(() => {
-    const stored = settings.rolePermissions ?? {}
-    const defaults: RolePermissions = {
-      canPublishNews: false,
-      canEditNews: false,
-      canManageArtists: false,
-      canManageReleases: false,
-      canManageVideos: false,
-      canViewAdminPanel: false,
+  const loadPermissions = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setIsLoading(false)
+        return
+      }
+      const res = await fetch('/api/admin/roles/permissions', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) throw new Error(`Failed to load permissions: ${res.statusText}`)
+      const rows = (await res.json()) as DbRolePermissions[]
+      const map: PermissionsMap = {}
+      for (const row of rows) {
+        map[row.role as Role] = row
+      }
+      setServerData(map)
+      setLocal(map)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load permissions')
+    } finally {
+      setIsLoading(false)
     }
-    const adminPerms: RolePermissions = {
-      canPublishNews: true,
-      canEditNews: true,
-      canManageArtists: true,
-      canManageReleases: true,
-      canManageVideos: true,
-      canViewAdminPanel: true,
-    }
-    const editorDefaults: RolePermissions = {
-      canPublishNews: true,
-      canEditNews: true,
-      canManageArtists: false,
-      canManageReleases: true,
-      canManageVideos: true,
-      canViewAdminPanel: true,
-    }
-    return {
-      admin: adminPerms,
-      editor: { ...editorDefaults, ...(stored['editor'] ?? {}) },
-      journalist: { ...defaults, ...(stored['journalist'] ?? {}) },
-      artist: { ...defaults, ...(stored['artist'] ?? {}) },
-      user: { ...defaults, ...(stored['user'] ?? {}) },
-    }
-  }, [settings.rolePermissions])
+  }, [supabase])
 
-  const [local, setLocal] = useState<Record<Role, RolePermissions>>(() => permissions)
+  useEffect(() => {
+    void loadPermissions()
+  }, [loadPermissions])
 
-  // Sync from settings when they load
-  useMemo(() => {
-    setLocal(permissions)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.rolePermissions])
-
-  const toggle = (role: Role, perm: keyof RolePermissions) => {
+  const toggle = (role: Role, perm: PermissionKey) => {
     if (role === 'admin') return // Admin is always full access
-    setLocal((prev) => ({
-      ...prev,
-      [role]: { ...prev[role], [perm]: !prev[role][perm] },
-    }))
+    setLocal((prev) => {
+      const current = prev[role]
+      if (!current) return prev
+      return { ...prev, [role]: { ...current, [perm]: !current[perm] } }
+    })
   }
 
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await saveSettings({ ...settings, rolePermissions: local })
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
+      // Save each non-admin role that has changed
+      const rolesToSave = (ROLES as readonly Role[]).filter((role) => {
+        if (role === 'admin') return false
+        const localRow = local[role]
+        const serverRow = serverData[role]
+        if (!localRow || !serverRow) return false
+        return (Object.keys(PERMISSION_LABELS) as PermissionKey[]).some(
+          (perm) => localRow[perm] !== serverRow[perm],
+        )
+      })
+
+      if (rolesToSave.length === 0) {
+        toast.info('No changes to save')
+        return
+      }
+
+      await Promise.all(
+        rolesToSave.map(async (role) => {
+          const localRow = local[role]
+          if (!localRow) return
+          const permissions: Partial<Record<PermissionKey, boolean>> = {}
+          for (const perm of Object.keys(PERMISSION_LABELS) as PermissionKey[]) {
+            permissions[perm] = localRow[perm]
+          }
+          const res = await fetch('/api/admin/roles/permissions', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ role, permissions }),
+          })
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string }
+            throw new Error(body.error ?? `Failed to save ${role} permissions`)
+          }
+          const updated = (await res.json()) as DbRolePermissions
+          setServerData((prev) => ({ ...prev, [role]: updated }))
+          setLocal((prev) => ({ ...prev, [role]: updated }))
+        }),
+      )
+
       toast.success('Role permissions saved')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
@@ -104,7 +144,7 @@ export function RolesManager() {
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
           Configure which permissions each role has. Admin always has full access and cannot be
-          restricted. Changes take effect after the next login.
+          restricted. Changes take effect immediately — no login required.
         </p>
       </div>
 
@@ -112,6 +152,8 @@ export function RolesManager() {
         {ROLES.map((role) => {
           const perms = local[role]
           const isAdmin = role === 'admin'
+          const updatedAt = serverData[role]?.updated_at
+          if (!perms) return null
           return (
             <Card key={role} className={isAdmin ? 'border-accent/50' : ''}>
               <CardHeader className="pb-3">
@@ -124,16 +166,21 @@ export function RolesManager() {
                   )}
                 </div>
                 <CardDescription className="text-xs">{ROLE_DESCRIPTIONS[role]}</CardDescription>
+                {updatedAt && !isAdmin && (
+                  <p className="text-[11px] text-muted-foreground/70 mt-1">
+                    Last updated: {new Date(updatedAt).toLocaleString()}
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
-                {(Object.keys(PERMISSION_LABELS) as (keyof RolePermissions)[]).map((perm) => (
+                {(Object.keys(PERMISSION_LABELS) as PermissionKey[]).map((perm) => (
                   <div key={perm} className="flex items-center justify-between gap-4">
                     <Label htmlFor={`${role}-${perm}`} className="text-sm cursor-pointer">
                       {PERMISSION_LABELS[perm]}
                     </Label>
                     <Switch
                       id={`${role}-${perm}`}
-                      checked={perms[perm]}
+                      checked={perms[perm] as boolean}
                       onCheckedChange={() => toggle(role, perm)}
                       disabled={isAdmin || isSaving}
                     />

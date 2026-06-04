@@ -106,7 +106,6 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     about_headline: s.aboutHeadline ?? '',
     about_subheading: s.aboutSubheading ?? '',
     about_body: s.aboutBody ?? '',
-    role_permissions: JSON.stringify(s.rolePermissions ?? {}),
     homepage_section_order: JSON.stringify(s.homepageSectionOrder ?? DEFAULT_SECTION_ORDER),
   }
 }

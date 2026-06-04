@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { batchDeleteAssets } from '@/lib/api/assets'
 import { deleteFolder, getFolders, moveFolder, renameFolder } from '@/lib/api/assetFolders'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { collectDescendantFolderIds, deleteR2Objects, getAssetsInFolders } from '../../_utils'
@@ -27,7 +27,7 @@ function isDescendant(targetId: string, folderId: string, folders: Awaited<Retur
 
 export const PATCH = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const id = extractId(request)
   if (!id) throw new ApiError(400, 'Missing folder id')
@@ -60,7 +60,7 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
 
 export const DELETE = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const id = extractId(request)
   if (!id) throw new ApiError(400, 'Missing folder id')

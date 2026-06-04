@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
 
 interface OEmbedResponse {
@@ -24,7 +24,7 @@ interface OEmbedResponse {
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_manage_videos')
 
   let youtubeUrl: string | undefined
   try {

@@ -72,6 +72,50 @@ export interface Database {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news: boolean
+          can_edit_news: boolean
+          can_manage_artists: boolean
+          can_manage_releases: boolean
+          can_manage_videos: boolean
+          can_view_admin_panel: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news?: boolean
+          can_edit_news?: boolean
+          can_manage_artists?: boolean
+          can_manage_releases?: boolean
+          can_manage_videos?: boolean
+          can_view_admin_panel?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news?: boolean
+          can_edit_news?: boolean
+          can_manage_artists?: boolean
+          can_manage_releases?: boolean
+          can_manage_videos?: boolean
+          can_view_admin_panel?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       artists: {
         Row: {
           id: string

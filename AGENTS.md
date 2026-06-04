@@ -136,7 +136,19 @@ Dialog Contracts: All modals must extend DialogProps (with open / onClose). No d
 Admin Route Auth Pattern
 All admin API routes MUST use the shared auth helpers from `src/lib/adminAuth.ts`:
   - `extractBearerToken(authHeader)` — extracts the JWT from `Authorization: Bearer <token>`, throws ApiError(401) if missing.
-  - `verifyAdminOrEditor(token)` — verifies the token with the Supabase service-role client and asserts `admin` or `editor` role. Throws ApiError(401) for invalid tokens, ApiError(403) for insufficient role.
+  - `verifyAdminOrEditor(token)` — verifies the token and asserts `admin` or `editor` role. Throws ApiError(401) for invalid tokens, ApiError(403) for insufficient role.
+  - `verifyAdmin(token)` — like `verifyAdminOrEditor` but requires the `admin` role specifically. Use for admin-only mutations (e.g. modifying role permissions).
+  - `verifyPermission(token, permission)` — verifies the token and checks a specific permission column in the `role_permissions` table. Admin role always passes. Use this instead of `verifyAdminOrEditor` for content-specific routes so granular permissions are enforced end-to-end.
+
+Available `RolePermissionKey` values: `can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`.
+
+Route → permission mapping:
+  - fetch-artist-image, prefill-artist*, enrich-artist-discogs → `can_manage_artists`
+  - resolve-release-smart-link → `can_manage_releases`
+  - fetch-youtube-info → `can_manage_videos`
+  - `/api/admin/assets/*`, `/api/admin/media/*` → `can_view_admin_panel`
+  - `/api/admin/roles/permissions` GET → `verifyAdminOrEditor`, PATCH → `verifyAdmin`
+
 Do NOT duplicate `verifyTokenAndRole` inline in individual route files — use the shared helper.
 Every admin route MUST be wrapped with `withErrorHandler` from `src/lib/errors.ts` for uniform error responses.
 

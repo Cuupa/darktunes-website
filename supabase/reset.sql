@@ -1066,6 +1066,67 @@ AS $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- TABLE: role_permissions
+-- Stores per-role boolean permission flags.
+-- Admin role always has full access (enforced in policies and verifyPermission).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  role                public.user_role PRIMARY KEY,
+  can_publish_news    BOOLEAN NOT NULL DEFAULT FALSE,
+  can_edit_news       BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_artists  BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_releases BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_videos   BOOLEAN NOT NULL DEFAULT FALSE,
+  can_view_admin_panel BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by          UUID REFERENCES auth.users(id)
+);
+
+-- Insert default permissions for all roles (idempotent)
+INSERT INTO public.role_permissions (role, can_publish_news, can_edit_news, can_manage_artists, can_manage_releases, can_manage_videos, can_view_admin_panel)
+VALUES
+  ('admin',      TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+  ('editor',     TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE),
+  ('journalist', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('artist',     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('user',       FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
+ON CONFLICT (role) DO NOTHING;
+
+DROP TRIGGER IF EXISTS role_permissions_updated_at ON public.role_permissions;
+CREATE TRIGGER role_permissions_updated_at
+  BEFORE UPDATE ON public.role_permissions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: permission check — looks up the calling user's role in profiles,
+-- joins role_permissions, and returns the boolean value for the given column.
+-- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE perm
+    WHEN 'can_publish_news'    THEN rp.can_publish_news
+    WHEN 'can_edit_news'       THEN rp.can_edit_news
+    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
+    WHEN 'can_manage_releases' THEN rp.can_manage_releases
+    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
+    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
+    ELSE FALSE
+  END
+  FROM public.profiles p
+  JOIN public.role_permissions rp ON rp.role = p.role
+  WHERE p.id = auth.uid()
+  LIMIT 1;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- RLS: profiles
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "profiles: own read"        ON public.profiles;
@@ -1092,14 +1153,31 @@ CREATE POLICY "profiles: admin update all" ON public.profiles
   WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
+-- RLS: role_permissions
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "role_permissions: authenticated read" ON public.role_permissions;
+DROP POLICY IF EXISTS "role_permissions: admin update"       ON public.role_permissions;
+
+-- Any authenticated user can read permissions (needed to check their own permissions)
+CREATE POLICY "role_permissions: authenticated read" ON public.role_permissions
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Only admins can modify role permissions
+CREATE POLICY "role_permissions: admin update" ON public.role_permissions
+  FOR UPDATE USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
 -- RLS: artists
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "artists: public read"         ON public.artists;
-DROP POLICY IF EXISTS "artists: public read visible" ON public.artists;
-DROP POLICY IF EXISTS "artists: editor+ insert"      ON public.artists;
-DROP POLICY IF EXISTS "artists: editor+ update"      ON public.artists;
-DROP POLICY IF EXISTS "artists: admin delete"        ON public.artists;
-DROP POLICY IF EXISTS "artists: own artist update"   ON public.artists;
+DROP POLICY IF EXISTS "artists: public read"                  ON public.artists;
+DROP POLICY IF EXISTS "artists: public read visible"          ON public.artists;
+DROP POLICY IF EXISTS "artists: editor+ insert"               ON public.artists;
+DROP POLICY IF EXISTS "artists: editor+ update"               ON public.artists;
+DROP POLICY IF EXISTS "artists: admin delete"                 ON public.artists;
+DROP POLICY IF EXISTS "artists: own artist update"            ON public.artists;
+DROP POLICY IF EXISTS "artists: can_manage_artists insert"    ON public.artists;
+DROP POLICY IF EXISTS "artists: can_manage_artists update"    ON public.artists;
 
 -- Anonymous users only see visible artists; admins/editors see all
 CREATE POLICY "artists: public read visible" ON public.artists
@@ -1108,11 +1186,18 @@ CREATE POLICY "artists: public read visible" ON public.artists
     OR public.get_my_role() IN ('admin', 'editor')
   );
 
-CREATE POLICY "artists: editor+ insert" ON public.artists
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_manage_artists permission (admin always bypasses)
+CREATE POLICY "artists: can_manage_artists insert" ON public.artists
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+  );
 
-CREATE POLICY "artists: editor+ update" ON public.artists
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+CREATE POLICY "artists: can_manage_artists update" ON public.artists
+  FOR UPDATE USING (
+    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+  );
 
 CREATE POLICY "artists: admin delete" ON public.artists
   FOR DELETE USING (public.get_my_role() = 'admin');
@@ -1124,11 +1209,13 @@ CREATE POLICY "artists: own artist update" ON public.artists
 -- ---------------------------------------------------------------------------
 -- RLS: releases
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "releases: public read"         ON public.releases;
-DROP POLICY IF EXISTS "releases: public read visible" ON public.releases;
-DROP POLICY IF EXISTS "releases: editor+ insert"      ON public.releases;
-DROP POLICY IF EXISTS "releases: editor+ update"      ON public.releases;
-DROP POLICY IF EXISTS "releases: admin delete"        ON public.releases;
+DROP POLICY IF EXISTS "releases: public read"                  ON public.releases;
+DROP POLICY IF EXISTS "releases: public read visible"          ON public.releases;
+DROP POLICY IF EXISTS "releases: editor+ insert"               ON public.releases;
+DROP POLICY IF EXISTS "releases: editor+ update"               ON public.releases;
+DROP POLICY IF EXISTS "releases: admin delete"                 ON public.releases;
+DROP POLICY IF EXISTS "releases: can_manage_releases insert"   ON public.releases;
+DROP POLICY IF EXISTS "releases: can_manage_releases update"   ON public.releases;
 
 -- Anonymous users only see visible releases whose artist is also visible;
 -- admins/editors see all releases regardless of visibility.
@@ -1147,13 +1234,18 @@ CREATE POLICY "releases: public read visible" ON public.releases
     OR public.get_my_role() IN ('admin', 'editor')
   );
 
--- Allows editors and admins to create releases
-CREATE POLICY "releases: editor+ insert" ON public.releases
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_manage_releases permission (admin always bypasses)
+CREATE POLICY "releases: can_manage_releases insert" ON public.releases
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+  );
 
--- Allows editors and admins to update releases
-CREATE POLICY "releases: editor+ update" ON public.releases
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+CREATE POLICY "releases: can_manage_releases update" ON public.releases
+  FOR UPDATE USING (
+    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+  );
 
 -- Allows only admins to delete releases
 CREATE POLICY "releases: admin delete" ON public.releases
@@ -1162,22 +1254,30 @@ CREATE POLICY "releases: admin delete" ON public.releases
 -- ---------------------------------------------------------------------------
 -- RLS: news_posts
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "news_posts: public read"    ON public.news_posts;
-DROP POLICY IF EXISTS "news_posts: editor+ insert" ON public.news_posts;
-DROP POLICY IF EXISTS "news_posts: editor+ update" ON public.news_posts;
-DROP POLICY IF EXISTS "news_posts: admin delete"   ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: public read"             ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: editor+ insert"          ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: editor+ update"          ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: admin delete"            ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: can_publish_news insert" ON public.news_posts;
+DROP POLICY IF EXISTS "news_posts: can_edit_news update"    ON public.news_posts;
 
 -- Allows public read access to all news posts
 CREATE POLICY "news_posts: public read" ON public.news_posts
   FOR SELECT USING (TRUE);
 
--- Allows editors and admins to create news posts
-CREATE POLICY "news_posts: editor+ insert" ON public.news_posts
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_publish_news permission (admin always bypasses)
+CREATE POLICY "news_posts: can_publish_news insert" ON public.news_posts
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_publish_news') OR public.get_my_role() = 'admin'
+  );
 
--- Allows editors and admins to update news posts
-CREATE POLICY "news_posts: editor+ update" ON public.news_posts
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_edit_news permission (admin always bypasses)
+CREATE POLICY "news_posts: can_edit_news update" ON public.news_posts
+  FOR UPDATE USING (
+    public.has_permission('can_edit_news') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_edit_news') OR public.get_my_role() = 'admin'
+  );
 
 -- Allows only admins to delete news posts
 CREATE POLICY "news_posts: admin delete" ON public.news_posts
@@ -1186,22 +1286,29 @@ CREATE POLICY "news_posts: admin delete" ON public.news_posts
 -- ---------------------------------------------------------------------------
 -- RLS: videos
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "videos: public read"    ON public.videos;
-DROP POLICY IF EXISTS "videos: editor+ insert" ON public.videos;
-DROP POLICY IF EXISTS "videos: editor+ update" ON public.videos;
-DROP POLICY IF EXISTS "videos: admin delete"   ON public.videos;
+DROP POLICY IF EXISTS "videos: public read"              ON public.videos;
+DROP POLICY IF EXISTS "videos: editor+ insert"           ON public.videos;
+DROP POLICY IF EXISTS "videos: editor+ update"           ON public.videos;
+DROP POLICY IF EXISTS "videos: admin delete"             ON public.videos;
+DROP POLICY IF EXISTS "videos: can_manage_videos insert" ON public.videos;
+DROP POLICY IF EXISTS "videos: can_manage_videos update" ON public.videos;
 
 -- Allows public read access to all videos
 CREATE POLICY "videos: public read" ON public.videos
   FOR SELECT USING (TRUE);
 
--- Allows editors and admins to upload videos
-CREATE POLICY "videos: editor+ insert" ON public.videos
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_manage_videos permission (admin always bypasses)
+CREATE POLICY "videos: can_manage_videos insert" ON public.videos
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+  );
 
--- Allows editors and admins to update videos
-CREATE POLICY "videos: editor+ update" ON public.videos
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+CREATE POLICY "videos: can_manage_videos update" ON public.videos
+  FOR UPDATE USING (
+    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+  );
 
 -- Allows only admins to delete videos
 CREATE POLICY "videos: admin delete" ON public.videos
@@ -1210,46 +1317,54 @@ CREATE POLICY "videos: admin delete" ON public.videos
 -- ---------------------------------------------------------------------------
 -- RLS: assets
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "assets: authenticated read" ON public.assets;
-DROP POLICY IF EXISTS "assets: editor+ insert"     ON public.assets;
-DROP POLICY IF EXISTS "assets: admin delete"       ON public.assets;
-DROP POLICY IF EXISTS "assets: editor+ update"     ON public.assets;
+DROP POLICY IF EXISTS "assets: authenticated read"          ON public.assets;
+DROP POLICY IF EXISTS "assets: editor+ insert"              ON public.assets;
+DROP POLICY IF EXISTS "assets: admin delete"                ON public.assets;
+DROP POLICY IF EXISTS "assets: editor+ update"              ON public.assets;
+DROP POLICY IF EXISTS "assets: can_view_admin_panel insert" ON public.assets;
+DROP POLICY IF EXISTS "assets: can_view_admin_panel update" ON public.assets;
 
 -- Allows any authenticated user to read assets
 CREATE POLICY "assets: authenticated read" ON public.assets
   FOR SELECT USING (auth.role() = 'authenticated');
 
--- Allows editors and admins to upload assets
-CREATE POLICY "assets: editor+ insert" ON public.assets
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+-- Requires can_view_admin_panel permission (admin always bypasses)
+CREATE POLICY "assets: can_view_admin_panel insert" ON public.assets
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  );
 
--- Allows editors and admins to update asset metadata
-CREATE POLICY "assets: editor+ update" ON public.assets
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+CREATE POLICY "assets: can_view_admin_panel update" ON public.assets
+  FOR UPDATE USING (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  );
 
 -- Allows only admins to delete assets
 CREATE POLICY "assets: admin delete" ON public.assets
   FOR DELETE USING (public.get_my_role() = 'admin');
 
 ALTER TABLE public.asset_folders ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "asset_folders: authenticated read" ON public.asset_folders;
-DROP POLICY IF EXISTS "asset_folders: editor+ write"     ON public.asset_folders;
-DROP POLICY IF EXISTS "asset_folders: admin delete"      ON public.asset_folders;
-DROP POLICY IF EXISTS "asset_folders: editor+ update"    ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: authenticated read"          ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: editor+ write"               ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: admin delete"                ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: editor+ update"              ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: can_view_admin_panel write"  ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: can_view_admin_panel update" ON public.asset_folders;
 -- Allows any authenticated user to browse asset folders
 CREATE POLICY "asset_folders: authenticated read" ON public.asset_folders FOR SELECT TO authenticated USING (true);
--- Allows editors and admins to create asset folders
-CREATE POLICY "asset_folders: editor+ write"      ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+-- Requires can_view_admin_panel permission
+CREATE POLICY "asset_folders: can_view_admin_panel write"  ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
 -- Allows only admins to delete asset folders
-CREATE POLICY "asset_folders: admin delete"       ON public.asset_folders FOR DELETE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+CREATE POLICY "asset_folders: admin delete"                ON public.asset_folders FOR DELETE TO authenticated USING (
+  public.get_my_role() = 'admin'
 );
--- Allows editors and admins to rename/move asset folders
-CREATE POLICY "asset_folders: editor+ update"     ON public.asset_folders FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+-- Requires can_view_admin_panel permission to rename/move asset folders
+CREATE POLICY "asset_folders: can_view_admin_panel update" ON public.asset_folders FOR UPDATE TO authenticated USING (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
 
 -- ---------------------------------------------------------------------------
@@ -1873,44 +1988,48 @@ ALTER TABLE public.media_files ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCE
 
 -- RLS: media_folders
 ALTER TABLE public.media_folders ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "media_folders: authenticated read" ON public.media_folders;
-DROP POLICY IF EXISTS "media_folders: editor+ write"     ON public.media_folders;
-DROP POLICY IF EXISTS "media_folders: admin delete"      ON public.media_folders;
-DROP POLICY IF EXISTS "media_folders: editor+ update"    ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: authenticated read"          ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: editor+ write"               ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: admin delete"                ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: editor+ update"              ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: can_view_admin_panel write"  ON public.media_folders;
+DROP POLICY IF EXISTS "media_folders: can_view_admin_panel update" ON public.media_folders;
 -- Allows any authenticated user to browse media folders
-CREATE POLICY "media_folders: authenticated read" ON public.media_folders FOR SELECT TO authenticated USING (true);
--- Allows editors and admins to create media folders
-CREATE POLICY "media_folders: editor+ write"      ON public.media_folders FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+CREATE POLICY "media_folders: authenticated read"          ON public.media_folders FOR SELECT TO authenticated USING (true);
+-- Requires can_view_admin_panel permission
+CREATE POLICY "media_folders: can_view_admin_panel write"  ON public.media_folders FOR INSERT TO authenticated WITH CHECK (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
 -- Allows only admins to delete media folders
-CREATE POLICY "media_folders: admin delete"       ON public.media_folders FOR DELETE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+CREATE POLICY "media_folders: admin delete"                ON public.media_folders FOR DELETE TO authenticated USING (
+  public.get_my_role() = 'admin'
 );
--- Allows editors and admins to rename/move media folders
-CREATE POLICY "media_folders: editor+ update"     ON public.media_folders FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+-- Requires can_view_admin_panel permission to rename/move media folders
+CREATE POLICY "media_folders: can_view_admin_panel update" ON public.media_folders FOR UPDATE TO authenticated USING (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
 
 -- RLS: media_files
 ALTER TABLE public.media_files ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "media_files: authenticated read" ON public.media_files;
-DROP POLICY IF EXISTS "media_files: editor+ write"     ON public.media_files;
-DROP POLICY IF EXISTS "media_files: editor+ update"    ON public.media_files;
-DROP POLICY IF EXISTS "media_files: admin delete"      ON public.media_files;
+DROP POLICY IF EXISTS "media_files: authenticated read"          ON public.media_files;
+DROP POLICY IF EXISTS "media_files: editor+ write"               ON public.media_files;
+DROP POLICY IF EXISTS "media_files: editor+ update"              ON public.media_files;
+DROP POLICY IF EXISTS "media_files: admin delete"                ON public.media_files;
+DROP POLICY IF EXISTS "media_files: can_view_admin_panel write"  ON public.media_files;
+DROP POLICY IF EXISTS "media_files: can_view_admin_panel update" ON public.media_files;
 -- Allows any authenticated user to browse media files
-CREATE POLICY "media_files: authenticated read" ON public.media_files FOR SELECT TO authenticated USING (true);
--- Allows editors and admins to upload media files
-CREATE POLICY "media_files: editor+ write"      ON public.media_files FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+CREATE POLICY "media_files: authenticated read"          ON public.media_files FOR SELECT TO authenticated USING (true);
+-- Requires can_view_admin_panel permission
+CREATE POLICY "media_files: can_view_admin_panel write"  ON public.media_files FOR INSERT TO authenticated WITH CHECK (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
--- Allows editors and admins to update media file metadata
-CREATE POLICY "media_files: editor+ update"     ON public.media_files FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+-- Requires can_view_admin_panel permission to update media file metadata
+CREATE POLICY "media_files: can_view_admin_panel update" ON public.media_files FOR UPDATE TO authenticated USING (
+  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
 );
 -- Allows only admins to delete media files
-CREATE POLICY "media_files: admin delete"       ON public.media_files FOR DELETE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+CREATE POLICY "media_files: admin delete"                ON public.media_files FOR DELETE TO authenticated USING (
+  public.get_my_role() = 'admin'
 );
 
 -- ============================================================

@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { fetchDiscogsArtistProfile } from '@/lib/sync/discogsApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { extractDiscogsArtistId } from '@/lib/parsers/platformUrlParser'
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ import { extractDiscogsArtistId } from '@/lib/parsers/platformUrlParser'
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate — admin or editor role required
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_manage_artists')
 
   // 2. Parse body
   let discogsId: string | undefined
