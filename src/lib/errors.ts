@@ -50,6 +50,35 @@ function buildErrorResponse(
 }
 
 // ---------------------------------------------------------------------------
+// DB error logger — writes to app_logs for visibility in the Admin Logs tab
+// ---------------------------------------------------------------------------
+
+async function persistErrorToDb(
+  source: string,
+  message: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceKey) return
+
+    // Use a fire-and-forget fetch so we never block the error response
+    const { createClient } = await import('@supabase/supabase-js')
+    const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+    await db.from('app_logs').insert({
+      source,
+      level: 'error',
+      message,
+      details,
+    })
+  } catch {
+    // Never throw from the error logger — silently ignore any DB failures
+  }
+}
+
+// ---------------------------------------------------------------------------
 // withErrorHandler — Higher-Order Function for Route Handlers
 // ---------------------------------------------------------------------------
 
@@ -62,6 +91,7 @@ type RouteHandler = (req: NextRequest) => Promise<NextResponse>
  *   - `ApiError`   → returns the error's status code and message as JSON
  *   - `ZodError`   → returns 400 with a human-readable validation message
  *   - Unknown errors → returns 500 Internal Server Error (sanitised message)
+ *                      and persists the error to the `app_logs` DB table
  */
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
   return async (req) => {
@@ -77,8 +107,17 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
         return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
       }
 
-      // Unknown error — log server-side, return sanitised message
+      // Unknown error — log server-side and persist to app_logs
       console.error('[withErrorHandler] Unhandled route error:', err)
+      const errMessage = err instanceof Error ? err.message : String(err)
+      const routePath = (() => {
+        try { return new URL(req.url).pathname } catch { return req.url }
+      })()
+      void persistErrorToDb('api', errMessage, {
+        path: routePath,
+        method: req.method,
+        stack: err instanceof Error ? (err.stack ?? null) : null,
+      })
       const message =
         process.env.NODE_ENV === 'development' && err instanceof Error
           ? err.message
