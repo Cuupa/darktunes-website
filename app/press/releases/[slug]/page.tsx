@@ -1,0 +1,28 @@
+export const dynamic = 'force-dynamic'
+
+import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getPressReleaseBySlug } from '@/lib/api/pressReleases'
+import { PressReleaseDetailClient } from './_components/PressReleaseDetailClient'
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createServerSupabaseClient()
+  const post = await getPressReleaseBySlug(supabase, slug).catch(() => null)
+  return { title: post?.title ?? 'Press Release' }
+}
+
+export default async function PressReleaseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const locale = await getLocale()
+  const supabase = await createServerSupabaseClient()
+  const [post, dict] = await Promise.all([
+    getPressReleaseBySlug(supabase, slug).catch(() => null),
+    getDictionary(locale),
+  ])
+  if (!post) notFound()
+
+  return <PressReleaseDetailClient post={post} dict={dict.pressReleases} />
+}

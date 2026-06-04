@@ -271,3 +271,6 @@ npm run dev
 # -> http://localhost:3000 (public site)
 # -> http://localhost:3000/admin (admin panel)
 ```
+
+
+- Press portal expanded with public label/artist EPK views, press release detail pages, journalist onboarding, profile/contact pages, embargo-aware DAL queries, and admin Press Portal tooling.

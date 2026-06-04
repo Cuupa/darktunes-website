@@ -121,6 +121,12 @@ export interface NewsPost {
    * - `archived`  — removed from public view, kept for record
    */
   status: 'draft' | 'published' | 'scheduled' | 'archived'
+  /** Optional embargo timestamp — content is hidden until this time passes */
+  embargoUntil?: string | null
+  /** Contact person/email for this press release */
+  mediaContact?: string | null
+  /** Category of press release, e.g. "album announcement", "tour", "label news" */
+  releaseCategory?: string | null
   /** Custom configuration for the primary CTA button in the Hero section. */
   heroPrimaryBtn?: HeroButton
   /** Custom configuration for the secondary CTA button in the Hero section. */

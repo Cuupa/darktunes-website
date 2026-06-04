@@ -15,17 +15,19 @@ export default async function PressDashboardLayout({ children }: { children: Rea
   const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
   const links = [
     { href: '/press/dashboard', label: 'Overview', enabled: true },
+    { href: '/press/dashboard/profile', label: 'Profile', enabled: true },
     { href: '/press/dashboard/promo-pool', label: 'Promo Pool', enabled: true },
     { href: '/press/dashboard/press-kit', label: 'Press Kit', enabled: true },
     { href: '/press/dashboard/press-releases', label: 'Press Releases', enabled: true },
     { href: '/press/dashboard/accreditation', label: 'Accreditation', enabled: flags['journalist.accreditation'] ?? true },
+    { href: '/press/dashboard/contact', label: 'Contact', enabled: flags['press.contact'] ?? true },
     { href: '/press/dashboard/download-history', label: 'Download History', enabled: true },
   ].filter((item) => item.enabled).map(({ href, label }) => ({ href, label }))
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background md:flex">
       <PressNav email={user.email ?? ''} links={links} />
-      <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 p-6 md:p-8">{children}</main>
     </div>
   )
 }

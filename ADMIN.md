@@ -154,3 +154,6 @@ To run the admin panel locally with Supabase:
 The admin panel is an integrated part of the Next.js App Router — it lives at the `/admin` route segment. All data is stored in Supabase and shared between the public site and admin panel.
 
 Admin pages are always dynamically rendered (`force-dynamic`) so auth cookies are always checked server-side on every request.
+
+
+- Press Portal tab: review journalist applications, upload press kit assets by category/artist, manage promo tracks with genre/BPM/key/NDA metadata, review accreditations, and monitor portal analytics.

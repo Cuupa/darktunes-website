@@ -294,10 +294,10 @@
     "bioCopied": "Kopiert!"
   },
   "promoPool": {
-    "heading": "Journalist Promo Pool",
+    "heading": "Promo Pool",
     "description": "Exklusive Vorab-Tracks für verifizierte Medienprofis.",
     "tracksHeading": "Vorab-Tracks",
-    "noTracks": "Noch keine Tracks verfügbar.",
+    "noTracks": "Keine Promo-Tracks verfügbar.",
     "streamTrack": "Anhören",
     "loading": "Sicherer Stream wird geladen…",
     "streamError": "Stream konnte nicht geladen werden. Bitte erneut versuchen.",
@@ -323,6 +323,25 @@
       "applySuccess": "Antrag gesendet! Wir prüfen ihn in Kürze.",
       "applyError": "Antrag konnte nicht gesendet werden. Bitte erneut versuchen.",
       "applyEmailPlaceholder": "deine@email.de"
+    },
+    "metadata": {
+      "genre": "Genre",
+      "bpm": "BPM",
+      "key": "Tonart",
+      "duration": "Länge",
+      "releaseDate": "Veröffentlichung"
+    },
+    "player": {
+      "preview": "Vorschau",
+      "download": "Download",
+      "preparing": "Wird vorbereitet…"
+    },
+    "nda": {
+      "title": "NDA erforderlich",
+      "description": "Dieser Track unterliegt einer Vertraulichkeitsvereinbarung. Mit dem Download erklärst du dich damit einverstanden, das Material vor dem offiziellen Release-Datum weder zu teilen noch zu veröffentlichen.",
+      "confirm": "Ich stimme den NDA-Bedingungen zu",
+      "proceed": "Download fortsetzen",
+      "cancel": "Abbrechen"
     }
   },
   "contact": {
@@ -369,5 +388,90 @@
     "statsHeading": "In Zahlen",
     "linksHeading": "Links & Social",
     "noContent": "Über uns – Inhalte folgen in Kürze."
+  },
+  "pressReleases": {
+    "heading": "Pressemitteilungen",
+    "detail": {
+      "backLink": "Zurück zu den Pressemitteilungen",
+      "mediaContact": "Pressekontakt",
+      "category": "Kategorie",
+      "embargo": "Embargo bis"
+    },
+    "categories": {
+      "albumAnnouncement": "Albumankündigung",
+      "tour": "Tour",
+      "labelNews": "Label-News",
+      "other": "Sonstiges"
+    },
+    "filterAll": "Alle",
+    "search": "Mitteilungen suchen…",
+    "noResults": "Keine Pressemitteilungen gefunden."
+  },
+  "pressKit": {
+    "heading": "Presse-Kit",
+    "tabs": {
+      "all": "Alle",
+      "photo": "Fotos",
+      "logo": "Logos",
+      "social": "Social",
+      "document": "Dokumente"
+    },
+    "downloadZip": "ZIP herunterladen",
+    "downloadZipAll": "Alle als ZIP herunterladen",
+    "preparingZip": "ZIP wird vorbereitet…",
+    "noAssets": "Keine Assets in dieser Kategorie verfügbar."
+  },
+  "apply": {
+    "heading": "Pressezugang beantragen",
+    "subheading": "Beantrage Zugang zum darkTunes Press Dashboard — Promo-Tracks, Presse-Kits und exklusive Releases.",
+    "fields": {
+      "name": "Vollständiger Name",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "publication": "Publikation / Medium",
+      "website": "Website (optional)",
+      "reason": "Warum beantragst du Pressezugang?"
+    },
+    "submit": "Bewerbung absenden",
+    "submitting": "Wird gesendet…",
+    "success": {
+      "heading": "Bewerbung eingereicht",
+      "message": "Vielen Dank! Wir prüfen deine Bewerbung und melden uns per E-Mail bei dir.",
+      "login": "Bereits freigeschaltet? Jetzt anmelden"
+    },
+    "errors": {
+      "emailInUse": "Für diese E-Mail existiert bereits ein Konto. Bitte melde dich an.",
+      "generic": "Senden fehlgeschlagen. Bitte versuche es erneut."
+    }
+  },
+  "pressProfile": {
+    "heading": "Mein Profil",
+    "publication": "Publikation",
+    "website": "Website",
+    "applicationStatus": "Bewerbungsstatus",
+    "downloadCount": "Downloads gesamt",
+    "changePassword": "Passwort ändern",
+    "currentPassword": "Aktuelles Passwort",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "saveProfile": "Profil speichern",
+    "savePassword": "Passwort aktualisieren",
+    "saving": "Speichern…",
+    "saved": "Änderungen gespeichert"
+  },
+  "pressContact": {
+    "heading": "Presseanfrage",
+    "subjectLabel": "Betreff",
+    "subjects": {
+      "interview": "Interview-Anfrage",
+      "reviewCopy": "Rezensionsexemplar",
+      "accreditation": "Event-Akkreditierung",
+      "general": "Allgemeine Anfrage"
+    },
+    "messagePlaceholder": "Schreibe deine Nachricht hier…",
+    "send": "Anfrage senden",
+    "sending": "Wird gesendet…",
+    "sent": "Deine Nachricht wurde gesendet.",
+    "backToInbox": "Zurück zum Posteingang"
   }
 }

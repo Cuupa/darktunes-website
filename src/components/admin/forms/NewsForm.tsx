@@ -30,6 +30,9 @@ export interface NewsFormData {
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   artistId: string
+  embargoUntil?: string
+  mediaContact?: string
+  releaseCategory?: string
   heroPrimaryBtnLabel: string
   heroPrimaryBtnAction: '' | 'link' | 'scroll' | 'none'
   heroPrimaryBtnHref: string
@@ -212,6 +215,23 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
         />
         <Label htmlFor="isPressOnly">Press-only</Label>
       </div>
+
+      {isPressOnly && (
+        <div className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="embargoUntil">Embargo Until</Label>
+            <Input id="embargoUntil" type="datetime-local" {...register('embargoUntil')} disabled={isLoading} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="releaseCategory">Release Category</Label>
+            <Input id="releaseCategory" {...register('releaseCategory')} disabled={isLoading} placeholder="album announcement" />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label htmlFor="mediaContact">Media Contact</Label>
+            <Input id="mediaContact" {...register('mediaContact')} disabled={isLoading} placeholder="press@darktunes.com" />
+          </div>
+        </div>
+      )}
 
       {/* ── Hero Buttons ── */}
       <div className="space-y-4 rounded-lg border border-border p-4">

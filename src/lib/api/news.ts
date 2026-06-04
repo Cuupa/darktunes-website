@@ -8,6 +8,11 @@ export type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
 export type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
 
 function rowToNewsPost(row: NewsRow): NewsPost {
+  const r = row as NewsRow & {
+    embargo_until?: string | null
+    media_contact?: string | null
+    release_category?: string | null
+  }
   const validStatuses = ['draft', 'published', 'scheduled', 'archived'] as const
   type NewsStatus = typeof validStatuses[number]
   const status: NewsStatus = (validStatuses as readonly string[]).includes(row.status)
@@ -24,6 +29,9 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
     status,
+    embargoUntil: r.embargo_until ?? undefined,
+    mediaContact: r.media_contact ?? undefined,
+    releaseCategory: r.release_category ?? undefined,
     heroPrimaryBtn: (row.hero_primary_btn_action || row.hero_primary_btn_label || row.hero_primary_btn_href)
       ? {
           label: row.hero_primary_btn_label ?? undefined,
@@ -82,13 +90,31 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
 }
 
 export async function getPressOnlyNewsPosts(db: DbClient): Promise<NewsPost[]> {
+  const now = new Date().toISOString()
   const { data, error } = await db
     .from('news_posts')
     .select('*')
     .eq('is_press_only', true)
+    .or(`embargo_until.is.null,embargo_until.lte.${now}`)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToNewsPost)
+}
+
+export async function getPressReleaseBySlug(db: DbClient, slug: string): Promise<NewsPost | null> {
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('news_posts')
+    .select('*')
+    .eq('slug', slug)
+    .eq('is_press_only', true)
+    .or(`embargo_until.is.null,embargo_until.lte.${now}`)
+    .single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+  return data ? rowToNewsPost(data) : null
 }
 
 export async function getNewsPostBySlug(db: DbClient, slug: string): Promise<NewsPost | null> {

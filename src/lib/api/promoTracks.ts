@@ -19,10 +19,6 @@ type DbClient = SupabaseClient<Database>
 type PromoTrackRow = Database['public']['Tables']['promo_tracks']['Row']
 type PromoTrackInsert = Database['public']['Tables']['promo_tracks']['Insert']
 
-// ---------------------------------------------------------------------------
-// Domain type
-// ---------------------------------------------------------------------------
-
 export interface PromoTrack {
   id: string
   title: string
@@ -32,29 +28,41 @@ export interface PromoTrack {
   fileSizeBytes: number | undefined
   durationSeconds: number | undefined
   displayOrder: number
+  genre: string | undefined
+  bpm: number | undefined
+  key: string | undefined
+  releaseDate: string | undefined
+  ndaRequired: boolean
+  embargoUntil: string | undefined
   createdAt: string
 }
 
-// ---------------------------------------------------------------------------
-// Row mapper
-// ---------------------------------------------------------------------------
-
 function rowToPromoTrack(row: PromoTrackRow): PromoTrack {
+  const r = row as PromoTrackRow & {
+    genre?: string | null
+    bpm?: number | null
+    key?: string | null
+    release_date?: string | null
+    nda_required?: boolean
+    embargo_until?: string | null
+  }
   return {
-    id: row.id,
-    title: row.title,
-    artistName: row.artist_name,
-    r2Key: row.r2_key,
-    fileSizeBytes: row.file_size_bytes ?? undefined,
-    durationSeconds: row.duration_seconds ?? undefined,
-    displayOrder: row.display_order,
-    createdAt: row.created_at,
+    id: r.id,
+    title: r.title,
+    artistName: r.artist_name,
+    r2Key: r.r2_key,
+    fileSizeBytes: r.file_size_bytes ?? undefined,
+    durationSeconds: r.duration_seconds ?? undefined,
+    displayOrder: r.display_order,
+    genre: r.genre ?? undefined,
+    bpm: r.bpm ?? undefined,
+    key: r.key ?? undefined,
+    releaseDate: r.release_date ?? undefined,
+    ndaRequired: r.nda_required ?? false,
+    embargoUntil: r.embargo_until ?? undefined,
+    createdAt: r.created_at,
   }
 }
-
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 
 /** Fetches all promo tracks ordered by display_order ascending. */
 export async function getPromoTracks(db: DbClient): Promise<PromoTrack[]> {
@@ -66,10 +74,6 @@ export async function getPromoTracks(db: DbClient): Promise<PromoTrack[]> {
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => rowToPromoTrack(row as PromoTrackRow))
 }
-
-// ---------------------------------------------------------------------------
-// Mutations
-// ---------------------------------------------------------------------------
 
 /**
  * Inserts a new promo track record.

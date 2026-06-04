@@ -47,6 +47,7 @@ const AccreditationsManager = lazy(() => import('./AccreditationsManager').then(
 const LogsManager = lazy(() => import('./LogsManager').then((m) => ({ default: m.LogsManager })))
 const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
 const StatementsManager = lazy(() => import('./StatementsManager').then((m) => ({ default: m.StatementsManager })))
+const PressManager = lazy(() => import('./PressManager').then((m) => ({ default: m.PressManager })))
 
 function TabFallback() {
   return (
@@ -66,7 +67,7 @@ function TabFallback() {
 type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'settings' | 'health' | 'media' | 'users' | 'features'
-  | 'feature-flags' | 'messages' | 'accreditations' | 'logs' | 'roles'
+  | 'feature-flags' | 'messages' | 'accreditations' | 'press' | 'logs' | 'roles'
   | 'statements'
 
 interface TabDef {
@@ -91,6 +92,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'feature-flags',  label: 'Feature Flags',      adminOnly: true,  icon: ToggleRight },
   { value: 'messages',       label: 'Messages',           adminOnly: true,  icon: Broadcast },
   { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
+  { value: 'press',          label: 'Press Portal',       adminOnly: true,  icon: Newspaper },
   { value: 'logs',           label: 'Logs',               adminOnly: true,  icon: ClipboardText },
   { value: 'roles',          label: 'Roles & Permissions',adminOnly: true,  icon: ShieldCheck },
   { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
@@ -494,6 +496,24 @@ export function AdminDashboard() {
                 <CardContent>
                   <Suspense fallback={<TabFallback />}>
                     <UsersManager />
+                  </Suspense>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canSeeTab('press') && (
+            <TabsContent value="press" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Press Portal</CardTitle>
+                  <CardDescription>
+                    Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<TabFallback />}>
+                    <PressManager />
                   </Suspense>
                 </CardContent>
               </Card>
