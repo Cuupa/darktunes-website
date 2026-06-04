@@ -40,6 +40,32 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://open.spotify.com https://www.youtube.com",
+              "frame-src https://open.spotify.com https://www.youtube.com",
+              "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://is*.mzstatic.com",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data:",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+              "media-src 'self' blob: https://*.r2.dev https://*.supabase.co",
+              "worker-src 'self' blob:",
+            ].join('; '),
+          },
+        ],
+      },
+    ]
+  },
   // Tailwind v4 + tw-animate-css use PostCSS features that require transpiling
   transpilePackages: [],
   experimental: {

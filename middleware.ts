@@ -66,6 +66,7 @@ export async function middleware(request: NextRequest) {
   const isPortalRoute = pathname.startsWith('/portal')
   const isPressLoginPage = pathname === '/press/login'
   const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
+  const isAccountRoute = pathname.startsWith('/account')
 
   // --- Admin route protection ---
 
@@ -227,6 +228,13 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(loginUrl)
     }
+  }
+
+  // --- Account route protection (/account/*) ---
+  if (isAccountRoute && !user) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/portal/login'
+    return NextResponse.redirect(loginUrl)
   }
 
   // -------------------------------------------------------------------------

@@ -48,6 +48,7 @@ export interface Database {
           provider: string
           created_at: string
           updated_at: string
+          deleted_at: string | null
         }
         Insert: {
           id: string
@@ -57,6 +58,7 @@ export interface Database {
           provider?: string
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
         }
         Update: {
           id?: string
@@ -66,6 +68,7 @@ export interface Database {
           provider?: string
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
         }
         Relationships: []
       }
@@ -826,8 +829,9 @@ export interface Database {
           email: string
           name: string | null
           source: string
-          status: 'pending' | 'subscribed'
+          status: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token: string | null
+          unsubscribe_token: string | null
           subscribed_at: string
         }
         Insert: {
@@ -835,8 +839,9 @@ export interface Database {
           email: string
           name?: string | null
           source?: string
-          status?: 'pending' | 'subscribed'
+          status?: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token?: string | null
+          unsubscribe_token?: string | null
           subscribed_at?: string
         }
         Update: {
@@ -844,8 +849,9 @@ export interface Database {
           email?: string
           name?: string | null
           source?: string
-          status?: 'pending' | 'subscribed'
+          status?: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token?: string | null
+          unsubscribe_token?: string | null
           subscribed_at?: string
         }
         Relationships: []
@@ -1335,6 +1341,69 @@ export interface Database {
           status?: string
           artist_reply?: string | null
           created_at?: string
+        }
+        Relationships: []
+      }
+      role_changes: {
+        Row: {
+          id: string
+          user_id: string
+          old_role: string
+          new_role: string
+          changed_by: string
+          changed_at: string
+          reason: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          old_role: string
+          new_role: string
+          changed_by: string
+          changed_at?: string
+          reason?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          old_role?: string
+          new_role?: string
+          changed_by?: string
+          changed_at?: string
+          reason?: string | null
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
+      ban_history: {
+        Row: {
+          id: string
+          user_id: string
+          banned: boolean
+          banned_until: string | null
+          changed_by: string
+          changed_at: string
+          reason: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          banned: boolean
+          banned_until?: string | null
+          changed_by: string
+          changed_at?: string
+          reason?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          banned?: boolean
+          banned_until?: string | null
+          changed_by?: string
+          changed_at?: string
+          reason?: string | null
         }
         Relationships: []
       }

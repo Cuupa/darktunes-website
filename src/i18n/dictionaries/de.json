@@ -469,6 +469,7 @@
     "messageLabel": "Nachricht",
     "messagePlaceholder": "Wie können wir dir helfen? (mind. 20 Zeichen)",
     "gdprConsent": "Ich stimme der Verarbeitung meiner personenbezogenen Daten zur Bearbeitung dieser Anfrage zu (DSGVO Art. 6 Abs. 1 lit. b).",
+    "spamDisclaimer": "Das Formular nutzt ein technisches Schutzfeld zur Spam-Erkennung.",
     "submit": "Nachricht senden",
     "submitting": "Senden…",
     "successTitle": "Nachricht gesendet!",

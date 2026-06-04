@@ -230,7 +230,6 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
-                  <SelectItem value="#artists">Artists</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
                   <SelectItem value="#concerts">Concerts</SelectItem>
                   <SelectItem value="#news">News</SelectItem>
@@ -297,7 +296,6 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
-                  <SelectItem value="#artists">Artists</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
                   <SelectItem value="#concerts">Concerts</SelectItem>
                   <SelectItem value="#news">News</SelectItem>

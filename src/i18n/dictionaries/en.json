@@ -469,6 +469,7 @@
     "messageLabel": "Message",
     "messagePlaceholder": "How can we help you? (min. 20 characters)",
     "gdprConsent": "I agree to the processing of my personal data to handle this inquiry (GDPR Art. 6 para. 1 lit. b).",
+    "spamDisclaimer": "This form uses a technical protection field for spam detection.",
     "submit": "Send Message",
     "submitting": "Sending…",
     "successTitle": "Message sent!",

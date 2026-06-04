@@ -94,12 +94,12 @@ export function useUsers() {
   )
 
   const toggleBan = useCallback(
-    async (userId: string, ban: boolean): Promise<void> => {
+    async (userId: string, ban: boolean, reason?: string): Promise<void> => {
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
           method: 'PATCH',
           headers: await authHeaders(),
-          body: JSON.stringify({ ban }),
+          body: JSON.stringify({ ban, ...(reason ? { reason } : {}) }),
         })
         if (!res.ok) {
           const err = (await res.json()) as { error?: string }

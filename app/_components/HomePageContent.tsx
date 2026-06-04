@@ -14,6 +14,7 @@ import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import { selectHeroItems } from '@/lib/heroItems'
 
 interface HomePageContentProps {
   releases: Release[]
@@ -44,31 +45,9 @@ export function HomePageContent({
   locale,
 }: HomePageContentProps) {
   const prefersReducedMotion = useReducedMotion()
-  const featuredReleases = useMemo(() => {
-    const featured = releases.filter((release) => release.featured)
-    if (featured.length > 0) return featured
-    return releases.length > 0 ? [releases[0]] : []
-  }, [releases])
-
-  const featuredNewsPost = useMemo(() => {
-    if (!news.length) return undefined
-    if (siteSettings.heroFeaturedId) {
-      return (
-        news.find(
-          (n) => n.slug === siteSettings.heroFeaturedId || n.id === siteSettings.heroFeaturedId,
-        ) ?? news[0]
-      )
-    }
-    return news[0]
-  }, [news, siteSettings.heroFeaturedId])
-
-  // Build a unified hero carousel combining featured releases and the latest
-  // news post so the hero can cycle through all types of content.
   const heroItems = useMemo<(Release | NewsPost)[]>(() => {
-    const items: (Release | NewsPost)[] = [...featuredReleases]
-    if (featuredNewsPost) items.push(featuredNewsPost)
-    return items
-  }, [featuredReleases, featuredNewsPost])
+    return selectHeroItems(releases, news, siteSettings)
+  }, [releases, news, siteSettings])
 
   const [heroIndex, setHeroIndex] = useState(0)
 
@@ -218,7 +197,7 @@ export function HomePageContent({
                   key={i}
                   type="button"
                   onClick={() => setHeroIndex(i)}
-                  aria-label={`Show release ${i + 1}`}
+                  aria-label={`Show hero item ${i + 1}`}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${i === heroIndex ? 'bg-accent scale-125' : 'bg-muted-foreground/50 hover:bg-muted-foreground'}`}
                 />
               ))}
