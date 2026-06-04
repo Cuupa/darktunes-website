@@ -11,7 +11,7 @@ import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
-import { getAssets } from '@/lib/api/assets'
+import { getAssetsByArtist } from '@/lib/api/assets'
 import { getArtistAssets } from '@/lib/api/artistAssets'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SmartLinks } from './_components/SmartLinks'
@@ -45,7 +45,7 @@ async function MarketingContent() {
   }
   const [assets, artistAssets] = artist
     ? await Promise.all([
-        getAssets(supabase).catch(() => []),
+        getAssetsByArtist(supabase, artist.id).catch(() => []),
         getArtistAssets(supabase, artist.id).catch(() => []),
       ])
     : [[], []]

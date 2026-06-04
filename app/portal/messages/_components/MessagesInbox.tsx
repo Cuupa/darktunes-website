@@ -174,7 +174,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
                     disabled={loadingId === message.id}
                     onClick={() => void handleRead(message.id)}
                   >
-                    Mark as read
+                    {dict.messages_mark_read}
                   </Button>
                 )}
               </div>
@@ -254,8 +254,8 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
           <div className="p-4">
             <PortalEmptyState
               icon={EnvelopeSimple}
-              heading="No messages yet."
-              description="You'll see new messages from the label here."
+              heading={dict.messages_no_messages}
+              description={dict.messages_no_messages_desc}
             />
           </div>
         )}

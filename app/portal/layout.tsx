@@ -38,7 +38,7 @@ function PortalLayoutSkeleton() {
   return (
     <div className="min-h-screen bg-background flex overflow-x-hidden">
       {/* Desktop sidebar skeleton */}
-      <div className="max-md:hidden flex flex-col w-64 border-r border-border bg-card p-6 space-y-4">
+      <div className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
         <div className="space-y-2">
           <Skeleton className="h-10 w-full" />
@@ -147,6 +147,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           .select('id', { count: 'exact', head: true })
           .eq('artist_id', artist.id)
           .eq('read', false)
+          .is('deleted_at', null)
       : Promise.resolve({ count: 0, error: null }),
   ])
   const unreadMessages = unreadMessagesResult.count ?? 0

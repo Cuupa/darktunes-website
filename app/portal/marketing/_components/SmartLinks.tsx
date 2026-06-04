@@ -123,8 +123,9 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
     <div className="space-y-8">
       <div className="space-y-3">
         <h1 className="text-3xl font-bold">{dict.marketing_heading}</h1>
+        <h2 className="text-2xl font-semibold">{dict.marketing_label_assets}</h2>
         {assets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{dict.marketing_noData}</p>
+          <p className="text-sm text-muted-foreground">{dict.marketing_label_assets_empty}</p>
         ) : (
           <div className="space-y-3">
             {assets.map((asset) => (
@@ -136,7 +137,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void download(asset.id)} disabled={loadingId === asset.id}>
                     {loadingId === asset.id ? <Spinner size={14} className="mr-1 animate-spin" aria-label="Loading" /> : <DownloadSimple size={14} className="mr-1" />}
-                    Download
+                    {dict.marketing_asset_download}
                   </Button>
                 </CardContent>
               </Card>

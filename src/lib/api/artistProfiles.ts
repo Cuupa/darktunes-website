@@ -39,6 +39,15 @@ export interface ArtistProfile {
   youtubeUrl: string | undefined
   bandcampUrl: string | undefined
   pressQuote: string | undefined
+  foundingYear: number | undefined
+  hometown: string | undefined
+  bookingContact: string | undefined
+  pressContact: string | undefined
+  spotifyUrl: string | undefined
+  appleMusicUrl: string | undefined
+  tiktokUrl: string | undefined
+  facebookUrl: string | undefined
+  soundcloudUrl: string | undefined
   createdAt: string
   updatedAt: string
 }
@@ -62,6 +71,15 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     youtubeUrl: row.youtube_url ?? undefined,
     bandcampUrl: row.bandcamp_url ?? undefined,
     pressQuote: row.press_quote ?? undefined,
+    foundingYear: row.founding_year ?? undefined,
+    hometown: row.hometown ?? undefined,
+    bookingContact: row.booking_contact ?? undefined,
+    pressContact: row.press_contact ?? undefined,
+    spotifyUrl: row.spotify_url ?? undefined,
+    appleMusicUrl: row.apple_music_url ?? undefined,
+    tiktokUrl: row.tiktok_url ?? undefined,
+    facebookUrl: row.facebook_url ?? undefined,
+    soundcloudUrl: row.soundcloud_url ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

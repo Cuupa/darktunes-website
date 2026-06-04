@@ -195,6 +195,15 @@ export interface Database {
           youtube_url: string | null
           bandcamp_url: string | null
           press_quote: string | null
+          founding_year: number | null
+          hometown: string | null
+          booking_contact: string | null
+          press_contact: string | null
+          spotify_url: string | null
+          apple_music_url: string | null
+          tiktok_url: string | null
+          facebook_url: string | null
+          soundcloud_url: string | null
           created_at: string
           updated_at: string
         }
@@ -212,6 +221,15 @@ export interface Database {
           youtube_url?: string | null
           bandcamp_url?: string | null
           press_quote?: string | null
+          founding_year?: number | null
+          hometown?: string | null
+          booking_contact?: string | null
+          press_contact?: string | null
+          spotify_url?: string | null
+          apple_music_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
+          soundcloud_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -229,6 +247,15 @@ export interface Database {
           youtube_url?: string | null
           bandcamp_url?: string | null
           press_quote?: string | null
+          founding_year?: number | null
+          hometown?: string | null
+          booking_contact?: string | null
+          press_contact?: string | null
+          spotify_url?: string | null
+          apple_music_url?: string | null
+          tiktok_url?: string | null
+          facebook_url?: string | null
+          soundcloud_url?: string | null
           created_at?: string
           updated_at?: string
         }
