@@ -2150,6 +2150,197 @@ CREATE POLICY "ban_history: admin insert" ON public.ban_history
   FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
 
 -- =============================================================================
+-- CUSTOM ROLES & PERMISSIONS (user-defined, supplemental to the system enum)
+-- =============================================================================
+
+-- TABLE: custom_permission_definitions
+-- User-defined permission keys that can be assigned to custom roles.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.custom_permission_definitions (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL UNIQUE,  -- machine key, e.g. 'can_export_data'
+  label       TEXT        NOT NULL,          -- display label
+  description TEXT,
+  created_by  UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS custom_permission_definitions_updated_at ON public.custom_permission_definitions;
+CREATE TRIGGER custom_permission_definitions_updated_at
+  BEFORE UPDATE ON public.custom_permission_definitions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.custom_permission_definitions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "custom_permission_definitions: admin read"   ON public.custom_permission_definitions;
+DROP POLICY IF EXISTS "custom_permission_definitions: admin write"  ON public.custom_permission_definitions;
+
+CREATE POLICY "custom_permission_definitions: admin read"  ON public.custom_permission_definitions
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "custom_permission_definitions: admin write" ON public.custom_permission_definitions
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- TABLE: custom_roles
+-- User-defined roles, supplementary to the system user_role enum.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.custom_roles (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL UNIQUE,  -- machine key, e.g. 'moderator'
+  label       TEXT        NOT NULL,          -- display name
+  description TEXT,
+  created_by  UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS custom_roles_updated_at ON public.custom_roles;
+CREATE TRIGGER custom_roles_updated_at
+  BEFORE UPDATE ON public.custom_roles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.custom_roles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "custom_roles: admin read"  ON public.custom_roles;
+DROP POLICY IF EXISTS "custom_roles: admin write" ON public.custom_roles;
+
+CREATE POLICY "custom_roles: admin read"  ON public.custom_roles
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "custom_roles: admin write" ON public.custom_roles
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- TABLE: custom_role_permissions
+-- Maps custom roles to permission names (both system and custom-defined keys).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.custom_role_permissions (
+  role_id         UUID NOT NULL REFERENCES public.custom_roles(id) ON DELETE CASCADE,
+  permission_name TEXT NOT NULL,
+  PRIMARY KEY (role_id, permission_name)
+);
+
+ALTER TABLE public.custom_role_permissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "custom_role_permissions: admin read"  ON public.custom_role_permissions;
+DROP POLICY IF EXISTS "custom_role_permissions: admin write" ON public.custom_role_permissions;
+
+CREATE POLICY "custom_role_permissions: admin read"  ON public.custom_role_permissions
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "custom_role_permissions: admin write" ON public.custom_role_permissions
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- TABLE: user_custom_roles
+-- Assigns custom roles to users (supplementary to profiles.role).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.user_custom_roles (
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role_id     UUID NOT NULL REFERENCES public.custom_roles(id) ON DELETE CASCADE,
+  assigned_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, role_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_custom_roles_user_id ON public.user_custom_roles (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_custom_roles_role_id ON public.user_custom_roles (role_id);
+
+ALTER TABLE public.user_custom_roles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_custom_roles: admin read"  ON public.user_custom_roles;
+DROP POLICY IF EXISTS "user_custom_roles: admin write" ON public.user_custom_roles;
+
+CREATE POLICY "user_custom_roles: admin read"  ON public.user_custom_roles
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "user_custom_roles: admin write" ON public.user_custom_roles
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
+-- RBAC AUDIT LOG
+-- Comprehensive, append-only log of all RBAC changes:
+--   - System role permission updates (trigger)
+--   - Custom role / custom permission CRUD (written by API)
+--   - User custom role assignments / revocations (written by API)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.rbac_audit_log (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  action      TEXT        NOT NULL,  -- e.g. 'permission_change', 'custom_role_created'
+  target_type TEXT        NOT NULL,  -- 'system_role' | 'custom_role' | 'custom_permission' | 'user_custom_role'
+  target_id   TEXT,                  -- role name, UUID, or user id
+  old_value   JSONB,
+  new_value   JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rbac_audit_log_created_at  ON public.rbac_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rbac_audit_log_actor_id    ON public.rbac_audit_log (actor_id);
+CREATE INDEX IF NOT EXISTS idx_rbac_audit_log_target_type ON public.rbac_audit_log (target_type);
+
+ALTER TABLE public.rbac_audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rbac_audit_log: admin read"   ON public.rbac_audit_log;
+DROP POLICY IF EXISTS "rbac_audit_log: admin insert" ON public.rbac_audit_log;
+
+CREATE POLICY "rbac_audit_log: admin read"   ON public.rbac_audit_log
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "rbac_audit_log: admin insert" ON public.rbac_audit_log
+  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+
+-- TRIGGER: auto-log every update to role_permissions into rbac_audit_log
+CREATE OR REPLACE FUNCTION public.log_permission_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.rbac_audit_log (actor_id, action, target_type, target_id, old_value, new_value)
+  VALUES (
+    COALESCE(NEW.updated_by, auth.uid()),
+    'permission_change',
+    'system_role',
+    NEW.role::TEXT,
+    (to_jsonb(OLD) - 'updated_at' - 'updated_by'),
+    (to_jsonb(NEW) - 'updated_at' - 'updated_by')
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_log_permission_change ON public.role_permissions;
+CREATE TRIGGER trg_log_permission_change
+  AFTER UPDATE ON public.role_permissions
+  FOR EACH ROW EXECUTE FUNCTION public.log_permission_change();
+
+-- =============================================================================
+-- ADMIN AUDIT LOG
+-- General-purpose, append-only log for all admin panel actions.
+-- Written by API routes; read by admin users only.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.admin_audit_log (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  action      TEXT        NOT NULL,   -- verb: 'created', 'updated', 'deleted', 'banned', etc.
+  resource    TEXT        NOT NULL,   -- table/domain: 'artists', 'releases', 'users', etc.
+  resource_id TEXT,                   -- PK of the affected row (if applicable)
+  details     JSONB,
+  ip_address  INET,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at  ON public.admin_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor_id    ON public.admin_audit_log (actor_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_resource    ON public.admin_audit_log (resource);
+
+ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "admin_audit_log: admin read"   ON public.admin_audit_log;
+DROP POLICY IF EXISTS "admin_audit_log: admin insert" ON public.admin_audit_log;
+
+CREATE POLICY "admin_audit_log: admin read"   ON public.admin_audit_log
+  FOR SELECT USING (public.get_my_role() = 'admin');
+CREATE POLICY "admin_audit_log: admin insert" ON public.admin_audit_log
+  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
 -- RESOURCE OWNERSHIP: artist-own-read RLS for releases and concerts
 -- Artists may read their own releases (including is_visible=false, pending review)
 -- and their own concerts regardless of the artist's is_visible status.
