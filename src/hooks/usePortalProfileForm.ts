@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { uploadArtistPhoto, saveArtistProfile } from '@/lib/api/portalProfile'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
+import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 
 // ---------------------------------------------------------------------------
@@ -55,12 +56,15 @@ export type ProfileFormValues = z.infer<typeof profileSchema>
 interface UsePortalProfileFormOptions {
   artistId: string
   initialProfile: ArtistProfile | null
+  /** Artist row from the `artists` table — used as fallback when no profile exists yet. */
+  artist?: Artist | null
   dict: Dictionary['portal']
 }
 
 export function usePortalProfileForm({
   artistId,
   initialProfile,
+  artist,
   dict,
 }: UsePortalProfileFormOptions) {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
@@ -71,24 +75,24 @@ export function usePortalProfileForm({
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      bio: initialProfile?.bio ?? '',
+      bio: initialProfile?.bio ?? artist?.bio ?? '',
       bio_short: initialProfile?.bioShort ?? '',
       bio_medium: initialProfile?.bioMedium ?? '',
       bio_long: initialProfile?.bioLong ?? '',
-      genres: initialProfile?.genres.join(', ') ?? '',
+      genres: (initialProfile?.genres.length ? initialProfile.genres : artist?.genres ?? []).join(', '),
       press_quote: initialProfile?.pressQuote ?? '',
-      founding_year: initialProfile?.foundingYear?.toString() ?? '',
+      founding_year: initialProfile?.foundingYear?.toString() ?? artist?.foundedYear?.toString() ?? '',
       hometown: initialProfile?.hometown ?? '',
       booking_contact: initialProfile?.bookingContact ?? '',
       press_contact: initialProfile?.pressContact ?? '',
-      website_url: initialProfile?.websiteUrl ?? '',
-      instagram_url: initialProfile?.instagramUrl ?? '',
-      youtube_url: initialProfile?.youtubeUrl ?? '',
-      bandcamp_url: initialProfile?.bandcampUrl ?? '',
-      spotify_url: initialProfile?.spotifyUrl ?? '',
-      apple_music_url: initialProfile?.appleMusicUrl ?? '',
-      tiktok_url: initialProfile?.tiktokUrl ?? '',
-      facebook_url: initialProfile?.facebookUrl ?? '',
+      website_url: initialProfile?.websiteUrl ?? artist?.websiteUrl ?? '',
+      instagram_url: initialProfile?.instagramUrl ?? artist?.instagramUrl ?? '',
+      youtube_url: initialProfile?.youtubeUrl ?? artist?.youtubeUrl ?? '',
+      bandcamp_url: initialProfile?.bandcampUrl ?? artist?.bandcampUrl ?? '',
+      spotify_url: initialProfile?.spotifyUrl ?? artist?.spotifyUrl ?? '',
+      apple_music_url: initialProfile?.appleMusicUrl ?? artist?.appleMusicUrl ?? '',
+      tiktok_url: initialProfile?.tiktokUrl ?? artist?.tiktokUrl ?? '',
+      facebook_url: initialProfile?.facebookUrl ?? artist?.facebookUrl ?? '',
       soundcloud_url: initialProfile?.soundcloudUrl ?? '',
     },
   })

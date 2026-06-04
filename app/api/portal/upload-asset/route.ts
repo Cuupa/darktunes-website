@@ -101,6 +101,18 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP, PDF, ZIP')
   }
 
+  // Enforce per-artist storage quota when one has been configured
+  if (artist.storageQuotaBytes != null && artist.storageQuotaBytes > 0) {
+    const { data: usageData } = await supabase
+      .from('assets')
+      .select('size_bytes')
+      .eq('artist_id', artist.id)
+    const usedBytes = (usageData ?? []).reduce((sum, row) => sum + (row.size_bytes ?? 0), 0)
+    if (usedBytes + file.size > artist.storageQuotaBytes) {
+      throw new ApiError(507, 'Storage quota exceeded. Please contact your label to increase your quota.')
+    }
+  }
+
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,

@@ -28,6 +28,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   if (!name) throw new ApiError(400, 'Folder name is required')
 
   const supabase = await createServerSupabaseClient()
-  const folder = await createFolder(supabase, name, body.parentId ?? null, body.artistId ?? null, userId)
-  return NextResponse.json({ folder }, { status: 201 })
+  try {
+    const folder = await createFolder(supabase, name, body.parentId ?? null, body.artistId ?? null, userId)
+    return NextResponse.json({ folder }, { status: 201 })
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('DUPLICATE_FOLDER:')) {
+      throw new ApiError(409, err.message.replace('DUPLICATE_FOLDER:', ''))
+    }
+    throw err
+  }
 })

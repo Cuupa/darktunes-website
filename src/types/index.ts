@@ -33,6 +33,8 @@ export interface Artist {
   isVisible: boolean
   /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */
   platformLinks?: Record<string, string>
+  /** Admin-configured storage quota in bytes. NULL = use system default (no limit). */
+  storageQuotaBytes?: number | null
 }
 
 export interface SyncLog {

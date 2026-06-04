@@ -270,6 +270,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS platform_links JSONB;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS storage_quota_bytes BIGINT DEFAULT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
@@ -297,6 +298,10 @@ CREATE TABLE IF NOT EXISTS public.asset_folders (
 );
 CREATE INDEX IF NOT EXISTS idx_asset_folders_parent_id ON public.asset_folders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_asset_folders_artist_id ON public.asset_folders(artist_id);
+-- Prevent duplicate folder names within the same directory (NULL parent = root).
+-- COALESCE converts NULL parent_id to '' so the unique index treats NULLs as equal.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_folders_name_parent
+  ON public.asset_folders (name, COALESCE(parent_id::text, ''));
 
 -- ---------------------------------------------------------------------------
 -- FUNCTION + TRIGGER: auto-create artist folder in asset_folders on artist insert

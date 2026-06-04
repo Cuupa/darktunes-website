@@ -101,7 +101,7 @@ export function FileList({
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="min-h-0 flex-1">
       <Table>
         <TableHeader>
           <TableRow>

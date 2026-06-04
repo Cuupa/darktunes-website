@@ -45,6 +45,21 @@ export async function createFolder(
   artistId: string | null,
   createdBy: string,
 ): Promise<AssetFolder> {
+  // Check for an existing folder with the same name in the same parent
+  const dupQuery = db
+    .from('asset_folders')
+    .select('id')
+    .eq('name', name)
+  if (parentId === null) {
+    dupQuery.is('parent_id', null)
+  } else {
+    dupQuery.eq('parent_id', parentId)
+  }
+  const { data: existing } = await dupQuery.maybeSingle()
+  if (existing) {
+    throw new Error(`DUPLICATE_FOLDER:A folder named "${name}" already exists here.`)
+  }
+
   const { data, error } = await db
     .from('asset_folders')
     .insert({ name, parent_id: parentId, artist_id: artistId, created_by: createdBy })

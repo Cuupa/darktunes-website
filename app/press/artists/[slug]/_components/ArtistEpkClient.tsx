@@ -51,6 +51,7 @@ const SOCIAL_LINKS = [
   { key: 'instagramUrl', label: 'Instagram', icon: InstagramLogo },
   { key: 'youtubeUrl', label: 'YouTube', icon: YoutubeLogo },
   { key: 'websiteUrl', label: 'Website', icon: Globe },
+  { key: 'bandcampUrl', label: 'Bandcamp', icon: MusicNotes },
 ] as const
 
 export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpkClientProps) {
@@ -117,7 +118,10 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
                   <CopyButton text={bio.text} label="Copy" />
                 </CardHeader>
                 <CardContent>
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{bio.text}</p>
+                  <div
+                    className="prose prose-invert prose-sm max-w-none text-muted-foreground"
+                    dangerouslySetInnerHTML={{ __html: bio.text }}
+                  />
                 </CardContent>
               </Card>
             ))}
@@ -203,32 +207,6 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
               ))}
             </div>
           )}
-        </section>
-
-        <section aria-labelledby="artist-links" className="space-y-4">
-          <h2 id="artist-links" className="text-2xl font-bold tracking-tight">Artist Links</h2>
-          <div className="flex flex-wrap gap-3">
-            {SOCIAL_LINKS.map(({ key, label, icon: Icon }) => {
-              const href = artist[key]
-              if (!href) return null
-              return (
-                <Button key={key} asChild variant="outline">
-                  <a href={href} target="_blank" rel="noopener noreferrer" className="gap-2">
-                    <Icon size={16} weight="bold" aria-hidden="true" />
-                    {label}
-                  </a>
-                </Button>
-              )
-            })}
-            {profile?.bandcampUrl && (
-              <Button asChild variant="outline">
-                <a href={profile.bandcampUrl} target="_blank" rel="noopener noreferrer" className="gap-2">
-                  <MusicNotes size={16} weight="bold" aria-hidden="true" />
-                  Bandcamp
-                </a>
-              </Button>
-            )}
-          </div>
         </section>
       </div>
     </div>
