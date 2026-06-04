@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -24,8 +24,10 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
   const handleSmoothScroll = useSmoothScrollToAnchor()
   const prefersReducedMotion = useReducedMotion()
+  const isHomePage = pathname === '/'
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,8 +41,10 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
   const navItems = buildNavItems(sectionOrder).map((item) => ({
     id: item.id,
     label: dict[item.labelKey],
-    href: item.href,
-    isLink: item.routeType !== 'anchor',
+    // On sub-pages convert anchor hrefs (e.g. #releases) to absolute homepage
+    // links (e.g. /#releases) so the navigation still works from any route.
+    href: !isHomePage && item.routeType === 'anchor' ? `/${item.href}` : item.href,
+    isLink: item.routeType !== 'anchor' || !isHomePage,
     external: item.routeType === 'external',
   }))
 

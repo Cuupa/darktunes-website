@@ -118,7 +118,7 @@ export async function fetchSpotifyArtistReleases(
   const artistId = extractSpotifyId(spotifyArtistId)
 
   const params = new URLSearchParams({
-    limit: '50',
+    limit: '20',
     include_groups: 'album,single,compilation',
   })
   const url = `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums?${params.toString()}`

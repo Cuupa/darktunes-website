@@ -84,9 +84,21 @@ export async function updateAsset(
   if ('tags' in updates) dbUpdates.tags = updates.tags ?? []
   if ('originalFilename' in updates) dbUpdates.original_filename = updates.originalFilename ?? ''
 
-  const { data, error } = await db.from('assets').update(dbUpdates).eq('id', id).select().single()
-  if (error) throw new Error(error.message)
-  if (!data) throw new Error('No data returned')
+  // When only junction-table fields (artistIds) are updated, dbUpdates is
+  // empty. Calling .update({}) throws "Nothing to update" in Supabase.
+  // Instead, fetch the current row so downstream code still has a `data` ref.
+  let data: AssetRow
+  if (Object.keys(dbUpdates).length === 0) {
+    const { data: fetched, error: fetchErr } = await db.from('assets').select('*').eq('id', id).single()
+    if (fetchErr) throw new Error(fetchErr.message)
+    if (!fetched) throw new Error('Asset not found')
+    data = fetched
+  } else {
+    const { data: updated, error } = await db.from('assets').update(dbUpdates).eq('id', id).select().single()
+    if (error) throw new Error(error.message)
+    if (!updated) throw new Error('No data returned')
+    data = updated
+  }
 
   // If artistIds explicitly provided, replace the asset_artists junction rows
   if ('artistIds' in updates && updates.artistIds !== undefined) {

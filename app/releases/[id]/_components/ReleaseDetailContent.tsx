@@ -92,9 +92,9 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
         </div>
 
-        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-8 pb-16">
+        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-36 pb-16">
           <Link
-            href="/#releases"
+            href="/releases"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
           >
             <ArrowLeft size={16} weight="bold" />
