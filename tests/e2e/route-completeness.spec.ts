@@ -9,11 +9,13 @@ function isProtectedPath(pathname: string) {
 }
 
 function normalizeInternalPath(href: string, baseURL: string): string | null {
-  if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) {
+  if (!href) {
     return null
   }
 
   const url = new URL(href, baseURL)
+  if (!['http:', 'https:'].includes(url.protocol)) return null
+
   const appOrigin = new URL(baseURL).origin
   if (url.origin !== appOrigin) return null
 
