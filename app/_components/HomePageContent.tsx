@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Header } from '@/components/Header'
 import { Hero } from '@/components/Hero'
 import { Releases } from '@/components/Releases'
@@ -8,7 +9,6 @@ import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
-import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -25,6 +25,14 @@ interface HomePageContentProps {
   dict: Dictionary
   locale: Locale
 }
+
+const SpotifyMultiPlayer = dynamic(
+  () => import('@/components/SpotifyMultiPlayer').then((module) => module.SpotifyMultiPlayer),
+  {
+    ssr: false,
+    loading: () => <div className="h-[352px] rounded-md bg-muted/40 animate-pulse" aria-hidden="true" />,
+  },
+)
 
 /**
  * Client Component that renders the full home page.
@@ -200,7 +208,7 @@ export function HomePageContent({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => setHeroIndex(i)}
+                  onClick={() => setHeroState({ key: heroItemsKey, index: i })}
                   aria-label={`Show hero item ${i + 1}`}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${i === heroIndex ? 'bg-accent scale-125' : 'bg-muted-foreground/50 hover:bg-muted-foreground'}`}
                 />
