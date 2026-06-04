@@ -1,22 +1,25 @@
 'use client'
 
 /**
- * app/_components/ConditionalSiteHeader.tsx
+ * app/_components/NavHidingWrapper.tsx
  *
- * Renders the public SiteHeader only on the public-facing website.
- * Suppresses it in the admin panel, artist portal, press dashboard,
- * and editor — which all have their own navigation.
+ * Client component that suppresses its children on non-public routes.
+ * This lets the SiteHeader (a Server Component) remain a Server Component
+ * while still being conditionally shown based on the current pathname.
+ *
+ * Usage in layout.tsx:
+ *   <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
  */
 
+import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
-import { SiteHeader } from './SiteHeader'
 
 /** Path prefixes where the public navbar must NOT be rendered. */
 const HIDDEN_PREFIXES = ['/admin', '/portal', '/press/dashboard', '/editor']
 
-export function ConditionalSiteHeader() {
+export function NavHidingWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const hidden = HIDDEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'))
   if (hidden) return null
-  return <SiteHeader />
+  return <>{children}</>
 }

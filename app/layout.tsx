@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
 import { Providers } from './_components/Providers'
-import { ConditionalSiteHeader } from './_components/ConditionalSiteHeader'
+import { NavHidingWrapper } from './_components/ConditionalSiteHeader'
+import { SiteHeader } from './_components/SiteHeader'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
@@ -106,7 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
         />
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
-        <ConditionalSiteHeader />
+        <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
         <Providers consentDict={dict.consent}>{children}</Providers>
       </body>
     </html>
