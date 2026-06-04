@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Dictionary } from '@/i18n/types'
 import type { JournalistApplication } from '@/lib/api/journalistApplications'
-import { updatePortalPassword } from '@/app/portal/settings/_actions/updatePassword'
+import { updatePortalPassword } from '../../../../portal/settings/_actions/updatePassword'
 
 interface ProfileClientProps {
   dict: Dictionary['pressProfile']
