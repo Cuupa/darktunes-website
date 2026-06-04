@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 
 interface ItunesLookupResult {
   wrapperType?: string
@@ -54,7 +54,7 @@ function getArtistImageUrl(artworkUrl100: string | undefined): string | null {
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate — admin or editor role required
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_manage_artists')
 
   let appleMusicUrl: string | undefined
   try {

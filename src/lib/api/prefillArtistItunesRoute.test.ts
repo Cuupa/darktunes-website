@@ -4,20 +4,29 @@ const ORIGINAL_ENV = { ...process.env }
 
 function mockSupabaseClient(opts: { role: 'admin' | 'editor' | 'user'; authError?: boolean }) {
   vi.doMock('@supabase/supabase-js', () => ({
-    createClient: vi.fn(() => ({
-      auth: {
-        getUser: vi.fn(async () =>
-          opts.authError
-            ? { data: { user: null }, error: new Error('Unauthorized') }
-            : { data: { user: { id: 'user-1' } }, error: null },
-        ),
-      },
-      from: vi.fn(() => ({
+    createClient: vi.fn(() => {
+      // verifyPermission makes two sequential from() calls:
+      //   1st: from('profiles').select('role').eq(...).maybeSingle()
+      //   2nd (non-admin only): from('role_permissions').select(perm).eq(...).maybeSingle()
+      const makeChain = (data: Record<string, unknown>) => ({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn(async () => ({ data: { role: opts.role }, error: null })),
-      })),
-    })),
+        maybeSingle: vi.fn(async () => ({ data, error: null })),
+      })
+      const fromMock = vi.fn()
+        .mockReturnValueOnce(makeChain({ role: opts.role }))
+        .mockReturnValue(makeChain({ can_manage_artists: opts.role === 'editor' }))
+      return {
+        auth: {
+          getUser: vi.fn(async () =>
+            opts.authError
+              ? { data: { user: null }, error: new Error('Unauthorized') }
+              : { data: { user: { id: 'user-1' } }, error: null },
+          ),
+        },
+        from: fromMock,
+      }
+    }),
   }))
 }
 
@@ -119,7 +128,7 @@ describe('POST /api/admin/prefill-artist-itunes', () => {
     )
 
     expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toMatchObject({ error: 'Forbidden' })
+    await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining('Forbidden') })
   })
 
   it('returns 401 when token is invalid', async () => {

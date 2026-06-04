@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, RolePermissions, HomepageSection } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 
@@ -9,15 +9,6 @@ type DbClient = SupabaseClient<Database>
 const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
   promoPool: true,
   editorTools: true,
-}
-
-/** Default permission sets per role. Admin has all permissions; others are restricted. */
-const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
-  admin: { canPublishNews: true, canEditNews: true, canManageArtists: true, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
-  editor: { canPublishNews: true, canEditNews: true, canManageArtists: false, canManageReleases: true, canManageVideos: true, canViewAdminPanel: true },
-  journalist: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
-  artist: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
-  user: { canPublishNews: false, canEditNews: false, canManageArtists: false, canManageReleases: false, canManageVideos: false, canViewAdminPanel: false },
 }
 
 /** Default values used when a key is missing from the database. */
@@ -84,7 +75,6 @@ const DEFAULTS: SiteSettings = {
   heroDefaultPrimaryBtnLabel: '',
   heroDefaultSecondaryBtnLabel: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
-  rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -201,15 +191,6 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
         }
       } catch { /* ignore */ }
       return DEFAULT_SECTION_ORDER
-    })(),
-    rolePermissions: (() => {
-      try {
-        const parsed = JSON.parse(map['role_permissions'] ?? '{}') as unknown
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return { ...DEFAULT_ROLE_PERMISSIONS, ...(parsed as Record<string, RolePermissions>) }
-        }
-      } catch { /* ignore */ }
-      return DEFAULT_ROLE_PERMISSIONS
     })(),
   }
 }

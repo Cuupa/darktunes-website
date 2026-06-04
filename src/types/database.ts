@@ -72,6 +72,50 @@ export interface Database {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news: boolean
+          can_edit_news: boolean
+          can_manage_artists: boolean
+          can_manage_releases: boolean
+          can_manage_videos: boolean
+          can_view_admin_panel: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news?: boolean
+          can_edit_news?: boolean
+          can_manage_artists?: boolean
+          can_manage_releases?: boolean
+          can_manage_videos?: boolean
+          can_view_admin_panel?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          can_publish_news?: boolean
+          can_edit_news?: boolean
+          can_manage_artists?: boolean
+          can_manage_releases?: boolean
+          can_manage_videos?: boolean
+          can_view_admin_panel?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       artists: {
         Row: {
           id: string
@@ -1410,6 +1454,171 @@ export interface Database {
           changed_by?: string
           changed_at?: string
           reason?: string | null
+        }
+        Relationships: []
+      }
+      custom_permission_definitions: {
+        Row: {
+          id: string
+          name: string
+          label: string
+          description: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          label: string
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          label?: string
+          description?: string | null
+          created_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      custom_roles: {
+        Row: {
+          id: string
+          name: string
+          label: string
+          description: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          label: string
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          label?: string
+          description?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      custom_role_permissions: {
+        Row: {
+          role_id: string
+          permission_name: string
+        }
+        Insert: {
+          role_id: string
+          permission_name: string
+        }
+        Update: {
+          role_id?: string
+          permission_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      user_custom_roles: {
+        Row: {
+          user_id: string
+          role_id: string
+          assigned_by: string | null
+          assigned_at: string
+        }
+        Insert: {
+          user_id: string
+          role_id: string
+          assigned_by?: string | null
+          assigned_at?: string
+        }
+        Update: {
+          user_id?: string
+          role_id?: string
+          assigned_by?: string | null
+          assigned_at?: string
+        }
+        Relationships: []
+      }
+      rbac_audit_log: {
+        Row: {
+          id: string
+          actor_id: string | null
+          action: string
+          target_type: string
+          target_id: string | null
+          old_value: Record<string, unknown> | null
+          new_value: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_id?: string | null
+          action: string
+          target_type: string
+          target_id?: string | null
+          old_value?: Record<string, unknown> | null
+          new_value?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          actor_id?: string | null
+          action?: string
+          target_type?: string
+          target_id?: string | null
+          old_value?: Record<string, unknown> | null
+          new_value?: Record<string, unknown> | null
+        }
+        Relationships: []
+      }
+      admin_audit_log: {
+        Row: {
+          id: string
+          actor_id: string | null
+          action: string
+          resource: string
+          resource_id: string | null
+          details: Record<string, unknown> | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_id?: string | null
+          action: string
+          resource: string
+          resource_id?: string | null
+          details?: Record<string, unknown> | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          actor_id?: string | null
+          action?: string
+          resource?: string
+          resource_id?: string | null
+          details?: Record<string, unknown> | null
+          ip_address?: string | null
         }
         Relationships: []
       }

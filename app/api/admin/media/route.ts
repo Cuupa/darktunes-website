@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMediaFilesByFolder, searchMediaFiles } from '@/lib/api/mediaFiles'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export const GET = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const supabase = await createServerSupabaseClient()
   const { searchParams } = new URL(request.url)

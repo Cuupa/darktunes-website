@@ -40,6 +40,7 @@ const mockPendingRow: SubscriberRow = {
   source: 'website',
   status: 'pending',
   verification_token: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  unsubscribe_token: null,
   subscribed_at: '2026-05-10T12:00:00Z',
 }
 
