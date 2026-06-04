@@ -141,10 +141,12 @@ const defaultTheme = {
   darkMode: ["selector", '[data-appearance="dark"]'],
 }
 
-export default {
+const config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: { ...defaultTheme, ...theme },
 };
+
+export default config;

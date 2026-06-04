@@ -96,7 +96,7 @@ function validateServerEnv(): ServerEnv {
   })
 
   if (!result.success) {
-    const lines = result.error.errors.map((e) => `  • ${String(e.path[0])}: ${e.message}`)
+    const lines = result.error.issues.map((e) => `  • ${String(e.path[0])}: ${e.message}`)
 
     const banner = [
       '',

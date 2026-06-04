@@ -16,6 +16,32 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
+  async function fetchProfile(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (error) throw error
+
+      const row = data as ProfileRow
+      setProfile({
+        id: row.id,
+        email: row.email,
+        role: row.role,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+      setProfile(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -42,32 +68,6 @@ export function useAuth() {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) throw error
-
-      const row = data as ProfileRow
-      setProfile({
-        id: row.id,
-        email: row.email,
-        role: row.role,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      })
-    } catch (error) {
-      console.error('Error fetching profile:', error)
-      setProfile(null)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const signIn = async (email: string, password: string): Promise<{ error: AuthError | null }> => {
     const { error } = await supabase.auth.signInWithPassword({

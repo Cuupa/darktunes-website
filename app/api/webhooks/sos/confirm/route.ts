@@ -77,7 +77,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   const parsed = bodySchema.safeParse(rawBody)
   if (!parsed.success) {
-    const message = parsed.error.errors.map((e) => e.message).join('; ')
+    const message = parsed.error.issues.map((e) => e.message).join('; ')
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 

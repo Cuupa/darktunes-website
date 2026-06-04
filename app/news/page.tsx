@@ -3,28 +3,10 @@
  */
 
 import type { Metadata } from 'next'
-import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
-import { getPublicNewsPosts } from '@/lib/api/news'
+import { getCachedPublicNews } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { NewsList } from './_components/NewsList'
-
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
-
-const getCachedPosts = unstable_cache(
-  async () => {
-    return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [])
-  },
-  ['news-posts'],
-  { revalidate: 60, tags: ['news'] },
-)
 
 export const metadata: Metadata = {
   title: 'News — darkTunes Music Group',
@@ -34,12 +16,12 @@ export const metadata: Metadata = {
 export default async function NewsPage() {
   const locale = await getLocale()
   const [posts, dict] = await Promise.all([
-    getCachedPosts(),
+    getCachedPublicNews(),
     getDictionary(locale),
   ])
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div id="main-content" className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 lg:px-8 py-24 max-w-7xl">
         <Link
           href="/"

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Header } from '@/components/Header'
 import { Hero } from '@/components/Hero'
 import { Releases } from '@/components/Releases'
@@ -8,7 +9,6 @@ import { News } from '@/components/News'
 import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
-import { SpotifyMultiPlayer } from '@/components/SpotifyMultiPlayer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -25,6 +25,14 @@ interface HomePageContentProps {
   dict: Dictionary
   locale: Locale
 }
+
+const SpotifyMultiPlayer = dynamic(
+  () => import('@/components/SpotifyMultiPlayer').then((module) => module.SpotifyMultiPlayer),
+  {
+    ssr: false,
+    loading: () => <div className="h-[352px] rounded-md bg-muted/40 animate-pulse" aria-hidden="true" />,
+  },
+)
 
 /**
  * Client Component that renders the full home page.
@@ -49,19 +57,23 @@ export function HomePageContent({
     return selectHeroItems(releases, news, siteSettings)
   }, [releases, news, siteSettings])
 
-  const [heroIndex, setHeroIndex] = useState(0)
-
-  useEffect(() => {
-    setHeroIndex(0)
-  }, [heroItems])
+  const heroItemsKey = useMemo(() => heroItems.map((item) => item.id).join('|'), [heroItems])
+  const [heroState, setHeroState] = useState<{ key: string; index: number }>({ key: '', index: 0 })
+  const heroIndex = heroState.key === heroItemsKey ? heroState.index : 0
 
   useEffect(() => {
     if (heroItems.length <= 1) return
     const intervalId = setInterval(() => {
-      setHeroIndex((previousIndex) => (previousIndex + 1) % heroItems.length)
+      setHeroState((previousState) => ({
+        key: heroItemsKey,
+        index:
+          previousState.key === heroItemsKey
+            ? (previousState.index + 1) % heroItems.length
+            : 1 % heroItems.length,
+      }))
     }, 6000)
     return () => clearInterval(intervalId)
-  }, [heroItems])
+  }, [heroItemsKey, heroItems.length])
 
   const currentHeroItem = heroItems[heroIndex] ?? heroItems[0]
   const playlists =
@@ -196,7 +208,7 @@ export function HomePageContent({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => setHeroIndex(i)}
+                  onClick={() => setHeroState({ key: heroItemsKey, index: i })}
                   aria-label={`Show hero item ${i + 1}`}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${i === heroIndex ? 'bg-accent scale-125' : 'bg-muted-foreground/50 hover:bg-muted-foreground'}`}
                 />

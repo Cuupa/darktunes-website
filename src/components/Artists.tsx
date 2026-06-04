@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useMemo, useDeferredValue } from 'react'
+import { useState, useMemo, useDeferredValue } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -63,18 +63,6 @@ function getVisibleArtists(artists: Artist[]): Artist[] {
 export function Artists({ artists, dict }: ArtistsProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const prefersReducedMotion = useReducedMotion()
-  const stableVisibleArtistsRef = useRef<{ idsKey: string; artists: Artist[] }>({
-    idsKey: '',
-    artists: [],
-  })
-
-  const idsKey = artists.map((artist) => artist.id).join('|')
-  if (stableVisibleArtistsRef.current.idsKey !== idsKey) {
-    stableVisibleArtistsRef.current = {
-      idsKey,
-      artists: getVisibleArtists(artists),
-    }
-  }
 
   // Defer search filtering so the input updates instantly while the heavier
   // filter+render work runs as a low-priority React update.
@@ -83,7 +71,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
   /** True while deferred search hasn't yet caught up with the current input. */
   const isFilterPending = deferredSearch !== searchQuery
 
-  const stableVisibleArtists = stableVisibleArtistsRef.current.artists
+  const stableVisibleArtists = useMemo(() => getVisibleArtists(artists), [artists])
 
   const normalisedQuery = useMemo(() => deferredSearch.trim().toLowerCase(), [deferredSearch])
 
@@ -163,7 +151,6 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                         style={{ transformOrigin: 'center' }}
                         sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"
-                        unoptimized
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                           const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null

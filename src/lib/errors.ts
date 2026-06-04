@@ -73,7 +73,7 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       }
 
       if (err instanceof ZodError) {
-        const message = err.errors.map((e) => e.message).join('; ')
+        const message = err.issues.map((e) => e.message).join('; ')
         return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
       }
 

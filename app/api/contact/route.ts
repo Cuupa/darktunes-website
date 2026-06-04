@@ -18,9 +18,7 @@ const contactSchema = z.object({
   email: z.string().email('Invalid email address'),
   topic: z.enum(SUBMITHUB_ALLOW),
   message: z.string().min(20, 'Message must be at least 20 characters'),
-  gdprConsent: z.literal(true, {
-    errorMap: () => ({ message: 'GDPR consent is required' }),
-  }),
+  gdprConsent: z.literal(true, { error: 'GDPR consent is required' }),
   website: z.string().max(0, 'Honeypot triggered').optional(),
 })
 
@@ -29,7 +27,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const parsed = contactSchema.safeParse(body)
 
   if (!parsed.success) {
-    const message = parsed.error.errors.map((e) => e.message).join('; ')
+    const message = parsed.error.issues.map((e) => e.message).join('; ')
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 

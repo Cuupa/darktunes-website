@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,8 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
   const lenis = useLenis()
   /** When true the iframe is interactive and the scroll-intercept overlay is hidden. */
   const [iframeInteractive, setIframeInteractive] = useState(false)
+  /** Click-to-load facade: defer Spotify iframe + third-party cookies until user intent. */
+  const [playerActivated, setPlayerActivated] = useState(false)
   const interactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
   }
 
   if (playlists.length === 0) return null
+  const activePlaylist = playlists[activeIndex] ?? playlists[0]
+  const activeTheme = activePlaylist.theme === 'light' ? '?theme=0' : ''
 
   return (
     <Card className="bg-card/80 backdrop-blur-md border-border p-6 shadow-xl">
@@ -46,53 +50,51 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
         transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
       >
         <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
-          <div className="relative h-[352px] rounded-md overflow-hidden">
-            {playlists.map((playlist, i) => {
-              const theme = playlist.theme === 'light' ? '?theme=0' : ''
-              return (
-                <div
-                  key={playlist.uri}
-                  className={`absolute inset-0 transition-opacity duration-300 ${
-                    i === activeIndex
-                      ? 'opacity-100 pointer-events-auto'
-                      : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <iframe
-                    src={`https://open.spotify.com/embed${getSpotifyEmbedPath(playlist.uri)}${theme}`}
-                    title={`Spotify playlist: ${playlist.label}`}
-                    width="100%"
-                    height="352"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    className="rounded-md border-0"
-                  />
-                </div>
-              )
-            })}
-
-            {/*
-              Transparent overlay that intercepts wheel events so Lenis can
-              scroll the page even when the cursor is over the Spotify iframe.
-              Clicking the overlay activates Spotify interaction mode for 5 s,
-              after which the overlay is restored.
-            */}
-            {!iframeInteractive && (
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 z-10 cursor-pointer"
-                onWheel={(e) => {
-                  lenis?.scrollTo(window.scrollY + e.deltaY, { immediate: false })
-                }}
-                onClick={handleOverlayClick}
-                title="Klicken, um den Spotify-Player zu bedienen"
+          {!playerActivated ? (
+            <button
+              type="button"
+              onClick={() => setPlayerActivated(true)}
+              className="relative h-[352px] w-full rounded-md border border-border bg-muted/30 text-sm font-medium text-foreground/85 transition-colors hover:bg-muted/40"
+            >
+              {loadLabel ?? 'Spotify laden'}
+            </button>
+          ) : (
+            <div className="relative h-[352px] rounded-md overflow-hidden">
+              <iframe
+                src={`https://open.spotify.com/embed${getSpotifyEmbedPath(activePlaylist.uri)}${activeTheme}`}
+                title={`Spotify playlist: ${activePlaylist.label}`}
+                width="100%"
+                height="352"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="rounded-md border-0"
               />
-            )}
-          </div>
+
+              {/*
+                Transparent overlay that intercepts wheel events so Lenis can
+                scroll the page even when the cursor is over the Spotify iframe.
+                Clicking the overlay activates Spotify interaction mode for 5 s,
+                after which the overlay is restored.
+              */}
+              {!iframeInteractive && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 z-10 cursor-pointer"
+                  onWheel={(e) => {
+                    lenis?.scrollTo(window.scrollY + e.deltaY, { immediate: false })
+                  }}
+                  onClick={handleOverlayClick}
+                  title="Klicken, um den Spotify-Player zu bedienen"
+                />
+              )}
+            </div>
+          )}
 
           {playlists.length > 1 && (
             <div className="flex flex-wrap gap-2 mt-4 justify-center">
               {playlists.map((playlist, i) => {
                 const isActive = i === activeIndex
+                // accentColor is a dynamic per-playlist value; inline style is intentional
                 const accentStyle =
                   playlist.accentColor && isActive
                     ? { backgroundColor: playlist.accentColor, borderColor: playlist.accentColor, color: '#fff' }
@@ -104,7 +106,10 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                     key={playlist.uri}
                     size="sm"
                     variant={isActive ? 'default' : 'outline'}
-                    onClick={() => setActiveIndex(i)}
+                    onClick={() => {
+                      setActiveIndex(i)
+                      setIframeInteractive(false)
+                    }}
                     aria-pressed={isActive}
                     className="text-xs"
                     type="button"

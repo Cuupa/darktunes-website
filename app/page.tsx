@@ -11,67 +11,24 @@
  */
 
 import { unstable_cache } from 'next/cache'
-import { createClient } from '@supabase/supabase-js'
 import { HomePageContent } from './_components/HomePageContent'
-import { getPublicReleases } from '@/lib/api/releases'
-import { getPublicNewsPosts } from '@/lib/api/news'
-import { getPublicVideos } from '@/lib/api/videos'
-import { getPublicConcerts } from '@/lib/api/concerts'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
-import type { Release, NewsPost, Video, SiteSettings, Concert } from '@/types'
-import type { Database } from '@/types/database'
+import {
+  getCachedPublicReleases,
+  getCachedPublicNews,
+  getCachedPublicVideos,
+  getCachedPublicConcerts,
+} from '@/lib/cache/publicQueries'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
+import type { SiteSettings } from '@/types'
 
 // ---------------------------------------------------------------------------
-// Public Supabase client — no cookies() dependency
-// Safe to use inside unstable_cache callbacks where Next.js Dynamic APIs
-// (cookies, headers) are unavailable. All data fetched here is publicly
-// readable (RLS: FOR SELECT USING (TRUE)).
+// Home page uses a richer fallback for site settings (non-nullable SiteSettings)
+// because HomePageContent requires the full object.
+// For other RSC pages the nullable getCachedSiteSettings from publicQueries.ts
+// is sufficient — those components use optional chaining on every field.
 // ---------------------------------------------------------------------------
-
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Cached data-fetching helpers
-// Next.js 15: explicit caching with tags for on-demand revalidation
-// ---------------------------------------------------------------------------
-
-const getCachedReleases = unstable_cache(
-  async (): Promise<Release[]> => {
-    return getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[])
-  },
-  ['releases'],
-  { revalidate: 60, tags: ['releases'] },
-)
-
-const getCachedNews = unstable_cache(
-  async (): Promise<NewsPost[]> => {
-    return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[])
-  },
-  ['news'],
-  { revalidate: 60, tags: ['news'] },
-)
-
-const getCachedVideos = unstable_cache(
-  async (): Promise<Video[]> => {
-    return getPublicVideos(createPublicSupabaseClient()).catch(() => [] as Video[])
-  },
-  ['videos'],
-  { revalidate: 60, tags: ['videos'] },
-)
-
-const getCachedConcerts = unstable_cache(
-  async (): Promise<Concert[]> => {
-    return getPublicConcerts(createPublicSupabaseClient()).catch(() => [] as Concert[])
-  },
-  ['concerts'],
-  { revalidate: 60, tags: ['concerts'] },
-)
 
 const getCachedSiteSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
@@ -88,6 +45,7 @@ const getCachedSiteSettings = unstable_cache(
         spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
         spotifyPlaylists: [],
         heroBadge: '⚡ New Release',
+        heroNewsBadge: '📰 News',
         heroDescription:
           'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
         seoTitle: 'darkTunes Music Group',
@@ -129,10 +87,10 @@ const getCachedSiteSettings = unstable_cache(
 export default async function HomePage() {
   // Fetch all data in parallel on the server
   const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
-    getCachedReleases(),
-    getCachedNews(),
-    getCachedVideos(),
-    getCachedConcerts(),
+    getCachedPublicReleases(),
+    getCachedPublicNews(),
+    getCachedPublicVideos(),
+    getCachedPublicConcerts(),
     getCachedSiteSettings(),
     getLocale(),
   ])

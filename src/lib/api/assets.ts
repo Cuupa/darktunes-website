@@ -110,47 +110,108 @@ export async function updateAsset(
 }
 
 async function ensureCollabsFolders(db: DbClient, assetId: string, artistIds: string[]): Promise<void> {
-  for (const artistId of artistIds) {
-    // Find the artist's root folder
-    const { data: artistFolders } = await db
-      .from('asset_folders')
-      .select('id')
-      .eq('artist_id', artistId)
-      .is('parent_id', null)
-    // The artist may have a non-root parent folder; find the folder linked directly to this artist
-    const { data: anyArtistFolder } = await db
-      .from('asset_folders')
-      .select('id')
-      .eq('artist_id', artistId)
-      .limit(1)
-    const parentId = artistFolders?.[0]?.id ?? anyArtistFolder?.[0]?.id ?? null
-    if (!parentId) continue
+  if (artistIds.length === 0) return
 
-    // Find or create "collabs" subfolder
-    let collabsFolderId: string | null = null
-    const { data: existing } = await db
+  // Batch-fetch root folders for all artists in one query
+  const { data: rootFolders } = await db
+    .from('asset_folders')
+    .select('id, artist_id')
+    .in('artist_id', artistIds)
+    .is('parent_id', null)
+
+  // Filter out null artist_id values BEFORE creating Set
+  const validRootFolders = (rootFolders ?? []).filter(
+    (f): f is { id: string; artist_id: string } => f.artist_id !== null
+  )
+
+  // For artists without a root folder, fall back to any folder linked to that artist
+  const artistsWithRoot = new Set(validRootFolders.map((f) => f.artist_id))
+  const artistsWithoutRoot = artistIds.filter((id) => !artistsWithRoot.has(id))
+
+  let fallbackFolders: { id: string; artist_id: string }[] = []
+  if (artistsWithoutRoot.length > 0) {
+    // Fetch the first folder for each artist that lacks a root folder
+    const { data: fb } = await db
       .from('asset_folders')
-      .select('id')
-      .eq('parent_id', parentId)
-      .ilike('name', 'collabs')
-      .maybeSingle()
-    if (existing) {
-      collabsFolderId = existing.id
-    } else {
-      const { data: created } = await db
-        .from('asset_folders')
-        .insert({ name: 'collabs', parent_id: parentId, artist_id: artistId })
-        .select('id')
-        .single()
-      collabsFolderId = created?.id ?? null
+      .select('id, artist_id')
+      .in('artist_id', artistsWithoutRoot)
+    
+    // Filter out null artist_id values
+    const validFallbackFolders = (fb ?? []).filter(
+      (f): f is { id: string; artist_id: string } => f.artist_id !== null
+    )
+    
+    // Keep only one folder per artist (the first found)
+    const seen = new Set<string>()
+    fallbackFolders = validFallbackFolders.filter((f) => {
+      if (seen.has(f.artist_id)) return false
+      seen.add(f.artist_id)
+      return true
+    })
+  }
+
+  // Build parentId map: artistId → folderId
+  const parentIdByArtist = new Map<string, string>()
+  for (const f of [...validRootFolders, ...fallbackFolders]) {
+    if (!parentIdByArtist.has(f.artist_id)) {
+      parentIdByArtist.set(f.artist_id, f.id)
     }
+  }
 
-    // If the asset is not already in this artist's folder hierarchy, also set folder_id
-    // (non-destructive: only set if asset currently has no folder or is in a different artist tree)
-    if (collabsFolderId) {
-      const { data: assetRow } = await db.from('assets').select('folder_id').eq('id', assetId).single()
-      if (!assetRow?.folder_id) {
-        await db.from('assets').update({ folder_id: collabsFolderId }).eq('id', assetId)
+  // Batch-fetch existing "collabs" subfolders for all parent folders
+  const parentIds = [...parentIdByArtist.values()]
+  const { data: existingCollabs } = await db
+    .from('asset_folders')
+    .select('id, parent_id')
+    .in('parent_id', parentIds)
+    .ilike('name', 'collabs')
+
+  // Filter out null parent_id values before creating Map
+  const validCollabs = (existingCollabs ?? []).filter(
+    (f): f is { id: string; parent_id: string } => f.parent_id !== null
+  )
+
+  const collabsByParent = new Map<string, string>(
+    validCollabs.map((f) => [f.parent_id, f.id])
+  )
+
+  // Batch-insert missing "collabs" folders
+  const toInsert = artistIds
+    .map((artistId) => {
+      const parentId = parentIdByArtist.get(artistId)
+      if (!parentId || collabsByParent.has(parentId)) return null
+      return { name: 'collabs', parent_id: parentId, artist_id: artistId }
+    })
+    .filter((row): row is { name: string; parent_id: string; artist_id: string } => row !== null)
+
+  if (toInsert.length > 0) {
+    const { data: created } = await db
+      .from('asset_folders')
+      .upsert(toInsert, { onConflict: 'parent_id,name', ignoreDuplicates: false })
+      .select('id, parent_id')
+    
+    // Filter out null parent_id values before using in Map
+    const validCreated = (created ?? []).filter(
+      (row): row is { id: string; parent_id: string } => row.parent_id !== null
+    )
+    
+    for (const row of validCreated) {
+      collabsByParent.set(row.parent_id, row.id)
+    }
+  }
+
+  // Set the asset's folder_id if it has none (non-destructive, use the first artist's collabs folder)
+  const { data: assetRow } = await db.from('assets').select('folder_id').eq('id', assetId).single()
+  if (!assetRow?.folder_id) {
+    // Pick the collabs folder of the first artist that has one
+    for (const artistId of artistIds) {
+      const parentId = parentIdByArtist.get(artistId)
+      if (parentId) {
+        const collabsFolderId = collabsByParent.get(parentId)
+        if (collabsFolderId) {
+          await db.from('assets').update({ folder_id: collabsFolderId }).eq('id', assetId)
+          break
+        }
       }
     }
   }

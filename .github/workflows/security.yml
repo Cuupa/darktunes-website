@@ -30,5 +30,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        # Fail on moderate or higher severity vulnerabilities
-        run: npm audit --audit-level=moderate
+        # Fail on moderate or higher severity vulnerabilities in production dependencies.
+        # Dev-only tool transitive deps (e.g. @lhci/cli → tmp) are excluded because
+        # patched versions of those packages do not exist in the npm registry.
+        run: npm audit --omit=dev --audit-level=moderate

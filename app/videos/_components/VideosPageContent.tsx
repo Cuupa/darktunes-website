@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -9,10 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
-import { VideoModal } from '@/components/VideoModal'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Video } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+
+const VideoModal = lazy(() =>
+  import('@/components/VideoModal').then((m) => ({ default: m.VideoModal }))
+)
 
 interface VideosPageContentProps {
   videos: Video[]
@@ -208,13 +211,15 @@ export function VideosPageContent({
         )}
       </div>
 
-      <VideoModal
-        video={selectedVideo}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        placeholderUrl={placeholderUrl}
-        youtubeLabel={consentDict.loadYouTube}
-      />
+      <Suspense>
+        <VideoModal
+          video={selectedVideo}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          placeholderUrl={placeholderUrl}
+          youtubeLabel={consentDict.loadYouTube}
+        />
+      </Suspense>
     </div>
   )
 }

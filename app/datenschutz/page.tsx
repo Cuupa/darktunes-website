@@ -191,6 +191,7 @@ export default async function DatenschutzPage() {
         spotifyPlaylistUri: '',
         spotifyPlaylists: [],
         heroBadge: '',
+        heroNewsBadge: '📰 News',
         heroDescription: '',
         seoTitle: '',
         seoDescription: '',

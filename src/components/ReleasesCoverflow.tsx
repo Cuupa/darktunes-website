@@ -423,7 +423,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               }`}
                               sizes="(max-width: 640px) 60vw, 320px"
                               draggable={false}
-                              priority={isActive}
+                              loading="lazy"
                               onLoad={() => markImageLoaded(release.id)}
                               unoptimized
                             />
@@ -489,12 +489,12 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           </button>
 
           {/* Dot indicators — max 12 to keep the row tidy */}
-          <div className="flex gap-1.5" role="tablist" aria-label="Release dots">
+          <div className="flex gap-1.5" role="group" aria-label="Release dots">
             {releases.slice(0, 12).map((r, i) => (
               <button
                 key={r.id}
-                role="tab"
-                aria-selected={i === selectedIndex}
+                type="button"
+                aria-pressed={i === selectedIndex}
                 aria-label={`Go to release ${i + 1}: ${r.title}`}
                 onClick={() => emblaApi?.scrollTo(i)}
                 className={`h-2 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${

@@ -962,7 +962,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   )}
                 />
                 <p className="text-xs text-muted-foreground">
-                  "Latest Release" auto-selects the most recent release. "News Post" shows a specific news post.
+                  &quot;Latest Release&quot; auto-selects the most recent release. &quot;News Post&quot; shows a specific news post.
                 </p>
               </div>
 
@@ -1050,14 +1050,14 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               <Field id="heroBadge" label="Hero Badge Text (Releases) *" error={errors.heroBadge?.message}>
                 <Input id="heroBadge" {...register('heroBadge')} disabled={isSubmitting} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Short label shown on the hero badge pill for releases, e.g. "⚡ New Release".
+                  Short label shown on the hero badge pill for releases, e.g. &quot;⚡ New Release&quot;.
                 </p>
               </Field>
 
               <Field id="heroNewsBadge" label="Hero Badge Text (News)" error={errors.heroNewsBadge?.message}>
                 <Input id="heroNewsBadge" placeholder="e.g. 📰 News" {...register('heroNewsBadge')} disabled={isSubmitting} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Short label shown on the hero badge pill for news articles, e.g. "📰 News".
+                  Short label shown on the hero badge pill for news articles, e.g. &quot;📰 News&quot;.
                 </p>
               </Field>
 

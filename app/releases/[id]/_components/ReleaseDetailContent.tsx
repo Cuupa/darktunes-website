@@ -8,14 +8,11 @@ import { Button } from '@/components/ui/button'
 import {
   Calendar,
   ArrowLeft,
-  SpotifyLogo,
-  AppleLogo,
-  YoutubeLogo,
   LinkSimple,
-  MusicNote,
   Globe,
 } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -24,39 +21,6 @@ interface ReleaseDetailContentProps {
   dict: Dictionary['releaseDetail']
   locale: Locale
 }
-
-/**
- * Visual config for each Odesli platform key.
- * Keys match what the Odesli API returns in `linksByPlatform`.
- */
-const PLATFORM_CONFIG: Record<
-  string,
-  { label: string; bg: string; textColor: string; icon: React.ElementType }
-> = {
-  spotify:      { label: 'Spotify',       bg: '#1DB954', textColor: 'text-black',  icon: SpotifyLogo },
-  appleMusic:   { label: 'Apple Music',   bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo },
-  youtube:      { label: 'YouTube',       bg: '#FF0000', textColor: 'text-white',  icon: YoutubeLogo },
-  youtubeMusic: { label: 'YT Music',      bg: '#FF0033', textColor: 'text-white',  icon: MusicNote },
-  deezer:       { label: 'Deezer',        bg: '#A238FF', textColor: 'text-white',  icon: MusicNote },
-  tidal:        { label: 'Tidal',         bg: '#000000', textColor: 'text-white',  icon: MusicNote },
-  amazonMusic:  { label: 'Amazon Music',  bg: '#25D1DA', textColor: 'text-black',  icon: MusicNote },
-  pandora:      { label: 'Pandora',       bg: '#005483', textColor: 'text-white',  icon: MusicNote },
-  soundcloud:   { label: 'SoundCloud',    bg: '#FF5500', textColor: 'text-white',  icon: MusicNote },
-  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: MusicNote },
-  napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote },
-  audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote },
-  anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote },
-}
-
-/**
- * Ordered list of Odesli platform keys for deterministic display order.
- * Platforms appearing in platformLinks but NOT in this list are shown at the end.
- */
-const PLATFORM_ORDER = [
-  'spotify', 'appleMusic', 'youtube', 'youtubeMusic',
-  'deezer', 'tidal', 'amazonMusic', 'soundcloud',
-  'bandcamp', 'pandora', 'napster', 'audiomack', 'anghami',
-]
 
 /**
  * Client component for the release detail page.
@@ -93,9 +57,9 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
   const platformEntries: Array<{ key: string; url: string }> = (() => {
     if (release.platformLinks && Object.keys(release.platformLinks).length > 0) {
       // Sort by PLATFORM_ORDER, then append any unknown keys alphabetically
-      const known = PLATFORM_ORDER.filter((k) => release.platformLinks![k])
+      const known = ODESLI_PLATFORM_ORDER.filter((k) => release.platformLinks![k])
       const unknown = Object.keys(release.platformLinks)
-        .filter((k) => !PLATFORM_ORDER.includes(k))
+        .filter((k) => !ODESLI_PLATFORM_ORDER.includes(k))
         .sort()
       return [...known, ...unknown].map((k) => ({ key: k, url: release.platformLinks![k] }))
     }
@@ -124,7 +88,6 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
             alt=""
             fill
             className="object-cover opacity-20 blur-2xl scale-110"
-            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
         </div>
@@ -150,7 +113,6 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
                 width={480}
                 height={480}
                 className="w-full aspect-square object-cover"
-                unoptimized
               />
             </motion.div>
 
@@ -205,7 +167,7 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
                 {platformEntries.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {platformEntries.map(({ key, url }) => {
-                      const cfg = PLATFORM_CONFIG[key]
+                      const cfg = ODESLI_PLATFORM_CONFIG[key]
                       const Icon = cfg?.icon ?? Globe
                       const label = cfg?.label ?? key
                       const bg = cfg?.bg ?? undefined

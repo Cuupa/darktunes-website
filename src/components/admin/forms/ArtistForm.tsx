@@ -19,7 +19,7 @@ import {
   Briefcase,
   Database,
   FloppyDisk,
-  Image,
+  Image as ImageIcon,
 } from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 import { AssetPicker } from '../file-explorer/AssetPicker'
@@ -343,7 +343,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
             Social Media
           </TabsTrigger>
           <TabsTrigger value="assets" className="gap-1.5">
-            <Image size={14} aria-hidden="true" />
+            <ImageIcon size={14} aria-hidden="true" />
             Assets
           </TabsTrigger>
           {mode === 'admin' && (
