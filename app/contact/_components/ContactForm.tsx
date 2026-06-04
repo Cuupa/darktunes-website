@@ -183,6 +183,8 @@ export function ContactForm({ dict }: ContactFormProps) {
       >
         {status === 'submitting' ? dict.submitting : dict.submit}
       </Button>
+
+      <p className="text-xs text-muted-foreground/60 text-center">{dict.spamDisclaimer}</p>
     </form>
   )
 }

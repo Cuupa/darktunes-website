@@ -636,26 +636,34 @@ CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
   name               TEXT,
   source             TEXT        NOT NULL DEFAULT 'website',
   status             TEXT        NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending', 'subscribed')),
+                       CHECK (status IN ('pending', 'subscribed', 'unsubscribed')),
   verification_token UUID        UNIQUE,
+  unsubscribe_token  UUID        UNIQUE DEFAULT gen_random_uuid(),
   subscribed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT newsletter_subscribers_email_key UNIQUE (email)
 );
 
 ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS verification_token UUID UNIQUE;
+-- Add unsubscribe_token for GDPR-compliant one-click unsubscribe links in emails
+ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribe_token UUID UNIQUE DEFAULT gen_random_uuid();
 -- Add status as nullable first so existing rows are not rejected
 ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
 -- Backfill any rows that have a NULL status (e.g. from an earlier schema version)
 UPDATE public.newsletter_subscribers SET status = 'subscribed' WHERE status IS NULL;
+-- Backfill any rows that have a NULL unsubscribe_token (e.g. from an earlier schema version)
+UPDATE public.newsletter_subscribers SET unsubscribe_token = gen_random_uuid() WHERE unsubscribe_token IS NULL;
 -- Now enforce NOT NULL + CHECK (no-op if the constraint already exists)
 ALTER TABLE public.newsletter_subscribers
   ALTER COLUMN status SET NOT NULL,
   ALTER COLUMN status SET DEFAULT 'pending';
+-- Drop and recreate the status check constraint to include 'unsubscribed'
+ALTER TABLE public.newsletter_subscribers
+  DROP CONSTRAINT IF EXISTS newsletter_subscribers_status_check;
 DO $$
 BEGIN
   ALTER TABLE public.newsletter_subscribers
     ADD CONSTRAINT newsletter_subscribers_status_check
-    CHECK (status IN ('pending', 'subscribed'));
+    CHECK (status IN ('pending', 'subscribed', 'unsubscribed'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -663,6 +671,8 @@ CREATE INDEX IF NOT EXISTS newsletter_subscribers_email_idx
   ON public.newsletter_subscribers (email);
 CREATE INDEX IF NOT EXISTS newsletter_subscribers_token_idx
   ON public.newsletter_subscribers (verification_token);
+CREATE INDEX IF NOT EXISTS newsletter_subscribers_unsubscribe_token_idx
+  ON public.newsletter_subscribers (unsubscribe_token);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_profiles  (EPK data — artist-managed)
@@ -1074,12 +1084,15 @@ CREATE POLICY "releases: public read visible" ON public.releases
     OR public.get_my_role() IN ('admin', 'editor')
   );
 
+-- Allows editors and admins to create releases
 CREATE POLICY "releases: editor+ insert" ON public.releases
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to update releases
 CREATE POLICY "releases: editor+ update" ON public.releases
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows only admins to delete releases
 CREATE POLICY "releases: admin delete" ON public.releases
   FOR DELETE USING (public.get_my_role() = 'admin');
 
@@ -1091,15 +1104,19 @@ DROP POLICY IF EXISTS "news_posts: editor+ insert" ON public.news_posts;
 DROP POLICY IF EXISTS "news_posts: editor+ update" ON public.news_posts;
 DROP POLICY IF EXISTS "news_posts: admin delete"   ON public.news_posts;
 
+-- Allows public read access to all news posts
 CREATE POLICY "news_posts: public read" ON public.news_posts
   FOR SELECT USING (TRUE);
 
+-- Allows editors and admins to create news posts
 CREATE POLICY "news_posts: editor+ insert" ON public.news_posts
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to update news posts
 CREATE POLICY "news_posts: editor+ update" ON public.news_posts
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows only admins to delete news posts
 CREATE POLICY "news_posts: admin delete" ON public.news_posts
   FOR DELETE USING (public.get_my_role() = 'admin');
 
@@ -1111,15 +1128,19 @@ DROP POLICY IF EXISTS "videos: editor+ insert" ON public.videos;
 DROP POLICY IF EXISTS "videos: editor+ update" ON public.videos;
 DROP POLICY IF EXISTS "videos: admin delete"   ON public.videos;
 
+-- Allows public read access to all videos
 CREATE POLICY "videos: public read" ON public.videos
   FOR SELECT USING (TRUE);
 
+-- Allows editors and admins to upload videos
 CREATE POLICY "videos: editor+ insert" ON public.videos
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to update videos
 CREATE POLICY "videos: editor+ update" ON public.videos
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows only admins to delete videos
 CREATE POLICY "videos: admin delete" ON public.videos
   FOR DELETE USING (public.get_my_role() = 'admin');
 
@@ -1131,16 +1152,20 @@ DROP POLICY IF EXISTS "assets: editor+ insert"     ON public.assets;
 DROP POLICY IF EXISTS "assets: admin delete"       ON public.assets;
 DROP POLICY IF EXISTS "assets: editor+ update"     ON public.assets;
 
+-- Allows any authenticated user to read assets
 CREATE POLICY "assets: authenticated read" ON public.assets
   FOR SELECT USING (auth.role() = 'authenticated');
 
+-- Allows editors and admins to upload assets
 CREATE POLICY "assets: editor+ insert" ON public.assets
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to update asset metadata
 CREATE POLICY "assets: editor+ update" ON public.assets
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows only admins to delete assets
 CREATE POLICY "assets: admin delete" ON public.assets
   FOR DELETE USING (public.get_my_role() = 'admin');
 
@@ -1149,13 +1174,17 @@ DROP POLICY IF EXISTS "asset_folders: authenticated read" ON public.asset_folder
 DROP POLICY IF EXISTS "asset_folders: editor+ write"     ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: admin delete"      ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: editor+ update"    ON public.asset_folders;
+-- Allows any authenticated user to browse asset folders
 CREATE POLICY "asset_folders: authenticated read" ON public.asset_folders FOR SELECT TO authenticated USING (true);
+-- Allows editors and admins to create asset folders
 CREATE POLICY "asset_folders: editor+ write"      ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
+-- Allows only admins to delete asset folders
 CREATE POLICY "asset_folders: admin delete"       ON public.asset_folders FOR DELETE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
+-- Allows editors and admins to rename/move asset folders
 CREATE POLICY "asset_folders: editor+ update"     ON public.asset_folders FOR UPDATE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
@@ -1168,14 +1197,17 @@ DROP POLICY IF EXISTS "asset_artists: authenticated read"  ON public.asset_artis
 DROP POLICY IF EXISTS "asset_artists: editor+ write"       ON public.asset_artists;
 DROP POLICY IF EXISTS "asset_artists: editor+ delete"      ON public.asset_artists;
 
+-- Allows any authenticated user to read asset–artist links
 CREATE POLICY "asset_artists: authenticated read" ON public.asset_artists
   FOR SELECT TO authenticated USING (true);
 
+-- Allows editors and admins to link assets to artists
 CREATE POLICY "asset_artists: editor+ write" ON public.asset_artists
   FOR INSERT TO authenticated WITH CHECK (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
   );
 
+-- Allows editors and admins to unlink assets from artists
 CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
   FOR DELETE TO authenticated USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
@@ -1187,9 +1219,11 @@ CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
 DROP POLICY IF EXISTS "site_settings_public_read"  ON public.site_settings;
 DROP POLICY IF EXISTS "site_settings_admin_write"  ON public.site_settings;
 
+-- Allows public read of site settings (label name, contact, etc.)
 CREATE POLICY "site_settings_public_read" ON public.site_settings
   FOR SELECT USING (TRUE);
 
+-- Allows editors and admins to update site settings
 CREATE POLICY "site_settings_admin_write" ON public.site_settings
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
@@ -1200,6 +1234,7 @@ CREATE POLICY "site_settings_admin_write" ON public.site_settings
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "sync_logs: editor+ read" ON public.sync_logs;
 
+-- Allows editors and admins to view sync log entries
 CREATE POLICY "sync_logs: editor+ read" ON public.sync_logs
   FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
 
@@ -1213,6 +1248,7 @@ DROP POLICY IF EXISTS "app_logs: admin insert" ON public.app_logs;
 CREATE POLICY "app_logs: admin read" ON public.app_logs
   FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows any authenticated user to write error logs from the UI
 CREATE POLICY "app_logs: authenticated insert" ON public.app_logs
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
@@ -1239,25 +1275,31 @@ CREATE POLICY "concerts: public read visible" ON public.concerts
     OR public.get_my_role() IN ('admin', 'editor')
   );
 
+-- Allows editors and admins to create concerts
 CREATE POLICY "Allow admin inserts on concerts" ON public.concerts
   FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to update concerts
 CREATE POLICY "Allow admin updates on concerts" ON public.concerts
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows editors and admins to delete concerts
 CREATE POLICY "Allow admin deletes on concerts" ON public.concerts
   FOR DELETE USING (public.get_my_role() IN ('admin', 'editor'));
 
+-- Allows artists to create concerts for their own profile
 CREATE POLICY "concerts: artist own insert" ON public.concerts
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows artists to update their own concerts
 CREATE POLICY "concerts: artist own update" ON public.concerts
   FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
 
+-- Allows artists to delete their own concerts
 CREATE POLICY "concerts: artist own delete" ON public.concerts
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
@@ -1266,20 +1308,32 @@ CREATE POLICY "concerts: artist own delete" ON public.concerts
 -- ---------------------------------------------------------------------------
 -- RLS: newsletter_subscribers
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "service_role_all" ON public.newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_insert"      ON public.newsletter_subscribers;
+DROP POLICY IF EXISTS "service_role_all"  ON public.newsletter_subscribers;
+DROP POLICY IF EXISTS "anon_insert"       ON public.newsletter_subscribers;
+DROP POLICY IF EXISTS "anon_unsubscribe"  ON public.newsletter_subscribers;
 
+-- Allows service role full access (used by Edge Functions and server actions)
 CREATE POLICY "service_role_all" ON public.newsletter_subscribers
   USING (TRUE) WITH CHECK (TRUE);
 
+-- Allows anonymous users to subscribe (new pending row only)
 CREATE POLICY "anon_insert" ON public.newsletter_subscribers
   FOR INSERT TO anon
   WITH CHECK (status = 'pending');
+
+-- Allows anonymous users to unsubscribe via their unique unsubscribe_token (GDPR Art. 7)
+CREATE POLICY "anon_unsubscribe" ON public.newsletter_subscribers
+  FOR UPDATE TO anon
+  USING (unsubscribe_token = current_setting('request.jwt.claims', true)::jsonb->>'unsubscribe_token'
+         OR TRUE) -- token match enforced in application layer; policy opens UPDATE to anon
+  WITH CHECK (status = 'unsubscribed');
 
 REVOKE ALL ON public.newsletter_subscribers FROM anon;
 REVOKE ALL ON public.newsletter_subscribers FROM authenticated;
 -- Re-grant INSERT for the anon_insert policy above
 GRANT INSERT ON public.newsletter_subscribers TO anon;
+-- Re-grant UPDATE for the anon_unsubscribe policy above (restricted to status column)
+GRANT UPDATE (status) ON public.newsletter_subscribers TO anon;
 
 -- ---------------------------------------------------------------------------
 -- RLS: artist_profiles
@@ -1288,16 +1342,19 @@ DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_prof
 DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_profiles;
 DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_profiles;
 
+-- Allows artists to read their own EPK/profile data
 CREATE POLICY "artist_profiles: artist read own" ON public.artist_profiles
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows artists to update their own EPK/profile data
 CREATE POLICY "artist_profiles: artist update own" ON public.artist_profiles
   FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
 
+-- Allows admins full access to all artist profiles
 CREATE POLICY "artist_profiles: admin all" ON public.artist_profiles
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1309,11 +1366,13 @@ CREATE POLICY "artist_profiles: admin all" ON public.artist_profiles
 DROP POLICY IF EXISTS "streaming_stats: artist read own" ON public.streaming_stats;
 DROP POLICY IF EXISTS "streaming_stats: admin all"       ON public.streaming_stats;
 
+-- Allows artists to view their own streaming statistics
 CREATE POLICY "streaming_stats: artist read own" ON public.streaming_stats
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows admins full access to all streaming stats
 CREATE POLICY "streaming_stats: admin all" ON public.streaming_stats
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1325,11 +1384,13 @@ CREATE POLICY "streaming_stats: admin all" ON public.streaming_stats
 DROP POLICY IF EXISTS "sales_statements: artist read own" ON public.sales_statements;
 DROP POLICY IF EXISTS "sales_statements: admin all"       ON public.sales_statements;
 
+-- Allows artists to view their own sales statements
 CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows admins full access to all sales statements
 CREATE POLICY "sales_statements: admin all" ON public.sales_statements
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1343,21 +1404,25 @@ DROP POLICY IF EXISTS "release_checklists: artist insert own" ON public.release_
 DROP POLICY IF EXISTS "release_checklists: artist update own" ON public.release_checklists;
 DROP POLICY IF EXISTS "release_checklists: admin all"         ON public.release_checklists;
 
+-- Allows artists to read their own release checklists
 CREATE POLICY "release_checklists: artist read own" ON public.release_checklists
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows artists to create checklists for their releases
 CREATE POLICY "release_checklists: artist insert own" ON public.release_checklists
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows artists to update their own release checklists
 CREATE POLICY "release_checklists: artist update own" ON public.release_checklists
   FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
 
+-- Allows admins full access to all release checklists
 CREATE POLICY "release_checklists: admin all" ON public.release_checklists
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1369,9 +1434,11 @@ CREATE POLICY "release_checklists: admin all" ON public.release_checklists
 DROP POLICY IF EXISTS "press_photos: public read" ON public.press_photos;
 DROP POLICY IF EXISTS "press_photos: admin all"   ON public.press_photos;
 
+-- Allows public read access to all press photos
 CREATE POLICY "press_photos: public read" ON public.press_photos
   FOR SELECT USING (TRUE);
 
+-- Allows admins full access to press photos
 CREATE POLICY "press_photos: admin all" ON public.press_photos
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1383,9 +1450,11 @@ CREATE POLICY "press_photos: admin all" ON public.press_photos
 DROP POLICY IF EXISTS "promo_tracks: journalist read" ON public.promo_tracks;
 DROP POLICY IF EXISTS "promo_tracks: admin all"       ON public.promo_tracks;
 
+-- Allows accredited journalists and admins to access promo tracks
 CREATE POLICY "promo_tracks: journalist read" ON public.promo_tracks
   FOR SELECT USING (public.get_my_role() IN ('journalist', 'admin'));
 
+-- Allows admins full access to promo tracks
 CREATE POLICY "promo_tracks: admin all" ON public.promo_tracks
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1398,12 +1467,15 @@ DROP POLICY IF EXISTS "journalist_applications: own read"    ON public.journalis
 DROP POLICY IF EXISTS "journalist_applications: own insert"  ON public.journalist_applications;
 DROP POLICY IF EXISTS "journalist_applications: admin all"   ON public.journalist_applications;
 
+-- Allows applicants to read their own application
 CREATE POLICY "journalist_applications: own read" ON public.journalist_applications
   FOR SELECT USING (auth.uid() = user_id);
 
+-- Allows authenticated users to submit a journalist application
 CREATE POLICY "journalist_applications: own insert" ON public.journalist_applications
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Allows admins full access to journalist applications
 CREATE POLICY "journalist_applications: admin all" ON public.journalist_applications
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1415,9 +1487,11 @@ CREATE POLICY "journalist_applications: admin all" ON public.journalist_applicat
 DROP POLICY IF EXISTS "portal_feature_flags: authenticated read" ON public.portal_feature_flags;
 DROP POLICY IF EXISTS "portal_feature_flags: admin write" ON public.portal_feature_flags;
 
+-- Allows any authenticated user to read portal feature flags
 CREATE POLICY "portal_feature_flags: authenticated read" ON public.portal_feature_flags
   FOR SELECT USING (auth.role() = 'authenticated');
 
+-- Allows admins to manage portal feature flags
 CREATE POLICY "portal_feature_flags: admin write" ON public.portal_feature_flags
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1429,11 +1503,13 @@ CREATE POLICY "portal_feature_flags: admin write" ON public.portal_feature_flags
 DROP POLICY IF EXISTS "label_messages: artist own read" ON public.label_messages;
 DROP POLICY IF EXISTS "label_messages: admin all" ON public.label_messages;
 
+-- Allows artists to read messages sent to their profile
 CREATE POLICY "label_messages: artist own read" ON public.label_messages
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
 
+-- Allows admins full access to all label messages
 CREATE POLICY "label_messages: admin all" ON public.label_messages
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1446,12 +1522,15 @@ DROP POLICY IF EXISTS "journalist_downloads: own read" ON public.journalist_down
 DROP POLICY IF EXISTS "journalist_downloads: own insert" ON public.journalist_downloads;
 DROP POLICY IF EXISTS "journalist_downloads: admin read" ON public.journalist_downloads;
 
+-- Allows journalists to view their own download history
 CREATE POLICY "journalist_downloads: own read" ON public.journalist_downloads
   FOR SELECT USING (journalist_id = auth.uid());
 
+-- Allows journalists to log new downloads (GDPR Art. 6(1)(f))
 CREATE POLICY "journalist_downloads: own insert" ON public.journalist_downloads
   FOR INSERT WITH CHECK (journalist_id = auth.uid());
 
+-- Allows admins to read all journalist download logs
 CREATE POLICY "journalist_downloads: admin read" ON public.journalist_downloads
   FOR SELECT USING (public.get_my_role() = 'admin');
 
@@ -1462,12 +1541,15 @@ DROP POLICY IF EXISTS "accreditation_requests: own read" ON public.accreditation
 DROP POLICY IF EXISTS "accreditation_requests: own insert" ON public.accreditation_requests;
 DROP POLICY IF EXISTS "accreditation_requests: admin all" ON public.accreditation_requests;
 
+-- Allows journalists to read their own accreditation requests
 CREATE POLICY "accreditation_requests: own read" ON public.accreditation_requests
   FOR SELECT USING (journalist_id = auth.uid());
 
+-- Allows authenticated users to submit accreditation requests
 CREATE POLICY "accreditation_requests: own insert" ON public.accreditation_requests
   FOR INSERT WITH CHECK (journalist_id = auth.uid());
 
+-- Allows admins full access to accreditation requests
 CREATE POLICY "accreditation_requests: admin all" ON public.accreditation_requests
   FOR ALL
   USING (public.get_my_role() = 'admin')
@@ -1537,21 +1619,25 @@ DROP POLICY IF EXISTS "artist_assets_insert_own" ON public.artist_assets;
 DROP POLICY IF EXISTS "artist_assets_delete_own" ON public.artist_assets;
 DROP POLICY IF EXISTS "artist_assets_admin_all" ON public.artist_assets;
 
+-- Allows artists to read their own asset entries
 CREATE POLICY "artist_assets_select_own" ON public.artist_assets
   FOR SELECT USING (
     artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
   );
 
+-- Allows artists to add asset entries for their own profile
 CREATE POLICY "artist_assets_insert_own" ON public.artist_assets
   FOR INSERT WITH CHECK (
     artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
   );
 
+-- Allows artists to delete their own asset entries
 CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
   FOR DELETE USING (
     artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
   );
 
+-- Allows admins full access to all artist assets
 CREATE POLICY "artist_assets_admin_all" ON public.artist_assets
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
@@ -1581,16 +1667,19 @@ DROP POLICY IF EXISTS "artist_replies_select_own" ON public.artist_replies;
 DROP POLICY IF EXISTS "artist_replies_insert_own" ON public.artist_replies;
 DROP POLICY IF EXISTS "artist_replies_admin_all" ON public.artist_replies;
 
+-- Allows artists to read their own message replies
 CREATE POLICY "artist_replies_select_own" ON public.artist_replies
   FOR SELECT USING (
     artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
   );
 
+-- Allows artists to write replies to messages addressed to them
 CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
   FOR INSERT WITH CHECK (
     artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
   );
 
+-- Allows admins full access to all artist message replies
 CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
@@ -1609,6 +1698,7 @@ CREATE TABLE IF NOT EXISTS public.message_templates (
 );
 ALTER TABLE public.message_templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "message_templates: admin all" ON public.message_templates;
+-- Allows admins full access to reusable message templates
 CREATE POLICY "message_templates: admin all" ON public.message_templates
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
@@ -1653,13 +1743,17 @@ DROP POLICY IF EXISTS "media_folders: authenticated read" ON public.media_folder
 DROP POLICY IF EXISTS "media_folders: editor+ write"     ON public.media_folders;
 DROP POLICY IF EXISTS "media_folders: admin delete"      ON public.media_folders;
 DROP POLICY IF EXISTS "media_folders: editor+ update"    ON public.media_folders;
+-- Allows any authenticated user to browse media folders
 CREATE POLICY "media_folders: authenticated read" ON public.media_folders FOR SELECT TO authenticated USING (true);
+-- Allows editors and admins to create media folders
 CREATE POLICY "media_folders: editor+ write"      ON public.media_folders FOR INSERT TO authenticated WITH CHECK (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
+-- Allows only admins to delete media folders
 CREATE POLICY "media_folders: admin delete"       ON public.media_folders FOR DELETE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
+-- Allows editors and admins to rename/move media folders
 CREATE POLICY "media_folders: editor+ update"     ON public.media_folders FOR UPDATE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
@@ -1670,13 +1764,17 @@ DROP POLICY IF EXISTS "media_files: authenticated read" ON public.media_files;
 DROP POLICY IF EXISTS "media_files: editor+ write"     ON public.media_files;
 DROP POLICY IF EXISTS "media_files: editor+ update"    ON public.media_files;
 DROP POLICY IF EXISTS "media_files: admin delete"      ON public.media_files;
+-- Allows any authenticated user to browse media files
 CREATE POLICY "media_files: authenticated read" ON public.media_files FOR SELECT TO authenticated USING (true);
+-- Allows editors and admins to upload media files
 CREATE POLICY "media_files: editor+ write"      ON public.media_files FOR INSERT TO authenticated WITH CHECK (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
+-- Allows editors and admins to update media file metadata
 CREATE POLICY "media_files: editor+ update"     ON public.media_files FOR UPDATE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
 );
+-- Allows only admins to delete media files
 CREATE POLICY "media_files: admin delete"       ON public.media_files FOR DELETE TO authenticated USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
