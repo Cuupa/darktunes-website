@@ -5,16 +5,18 @@
  *
  * EPK profile editor. Receives all data as props (IoC).
  * Uses react-hook-form + zod for validation.
- * Photo upload goes via the /api/portal/upload-photo Route Handler (not directly
- * to R2) to avoid CORS issues and keep credentials server-side only.
+ * Photo upload goes via the /api/portal/upload-photo Route Handler.
+ * Bio fields use TiptapEditor for rich HTML content.
  *
- * Organized into 2 tabs:
- *  1. Bio & Press — photo, bio variants, genres, press quote
- *  2. Links       — website, Instagram, YouTube, Bandcamp
+ * Organised into 4 tabs:
+ *  1. Bio & Press  — photo, rich-text bios, genres, press quote
+ *  2. Artist Info  — founding year, hometown, booking/press contacts
+ *  3. Links        — all social / streaming links
+ *  4. EPK Preview  — live preview of the press kit
  */
 
 import { useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -27,27 +29,48 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Camera, FloppyDisk, Eye, TextAlignLeft, LinkSimple } from '@phosphor-icons/react'
+import {
+  Camera,
+  FloppyDisk,
+  Eye,
+  TextAlignLeft,
+  LinkSimple,
+  Info,
+  Newspaper,
+} from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Dictionary } from '@/i18n/types'
 import { EPKPreview } from './EPKPreview'
+import type { EPKData } from './EPKPreview'
 
 // ---------------------------------------------------------------------------
 // Zod schema
 // ---------------------------------------------------------------------------
 
+const optionalUrl = z.string().url('Must be a valid URL').optional().or(z.literal(''))
+
 const profileSchema = z.object({
-  bio: z.string().max(2000, 'Max 2000 characters').optional(),
-  bio_short: z.string().max(600, 'Max 600 characters').optional(),
-  bio_medium: z.string().max(1800, 'Max 1800 characters').optional(),
-  bio_long: z.string().max(6000, 'Max 6000 characters').optional(),
+  bio: z.string().max(2000).optional(),
+  bio_short: z.string().max(6000).optional(),
+  bio_medium: z.string().max(12000).optional(),
+  bio_long: z.string().max(30000).optional(),
   genres: z.string().optional(),
-  website_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  instagram_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  youtube_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  bandcamp_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  press_quote: z.string().max(500, 'Max 500 characters').optional(),
+  press_quote: z.string().max(1000).optional(),
+  founding_year: z.string().optional(),
+  hometown: z.string().max(200).optional(),
+  booking_contact: z.string().max(500).optional(),
+  press_contact: z.string().max(500).optional(),
+  website_url: optionalUrl,
+  instagram_url: optionalUrl,
+  youtube_url: optionalUrl,
+  bandcamp_url: optionalUrl,
+  spotify_url: optionalUrl,
+  apple_music_url: optionalUrl,
+  tiktok_url: optionalUrl,
+  facebook_url: optionalUrl,
+  soundcloud_url: optionalUrl,
 })
 
 type ProfileFormValues = z.infer<typeof profileSchema>
@@ -82,11 +105,20 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
       bio_medium: initialProfile?.bioMedium ?? '',
       bio_long: initialProfile?.bioLong ?? '',
       genres: initialProfile?.genres.join(', ') ?? '',
+      press_quote: initialProfile?.pressQuote ?? '',
+      founding_year: initialProfile?.foundingYear?.toString() ?? '',
+      hometown: initialProfile?.hometown ?? '',
+      booking_contact: initialProfile?.bookingContact ?? '',
+      press_contact: initialProfile?.pressContact ?? '',
       website_url: initialProfile?.websiteUrl ?? '',
       instagram_url: initialProfile?.instagramUrl ?? '',
       youtube_url: initialProfile?.youtubeUrl ?? '',
       bandcamp_url: initialProfile?.bandcampUrl ?? '',
-      press_quote: initialProfile?.pressQuote ?? '',
+      spotify_url: initialProfile?.spotifyUrl ?? '',
+      apple_music_url: initialProfile?.appleMusicUrl ?? '',
+      tiktok_url: initialProfile?.tiktokUrl ?? '',
+      facebook_url: initialProfile?.facebookUrl ?? '',
+      soundcloud_url: initialProfile?.soundcloudUrl ?? '',
     },
   })
 
@@ -101,8 +133,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
   }
 
   // ---------------------------------------------------------------------------
-  // Photo upload — sends to Next.js Route Handler to avoid CORS
-  // Uses XHR for real upload progress feedback.
+  // Photo upload
   // ---------------------------------------------------------------------------
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,7 +198,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
   }
 
   // ---------------------------------------------------------------------------
-  // Form submission — upserts via Server Action proxy (API route)
+  // Form submission
   // ---------------------------------------------------------------------------
 
   const onSubmit = async (values: ProfileFormValues) => {
@@ -180,6 +211,10 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
         return
       }
 
+      const foundingYearNum = values.founding_year
+        ? parseInt(values.founding_year, 10)
+        : null
+
       const payload = {
         artist_id: artistId,
         bio: values.bio ?? null,
@@ -190,11 +225,20 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
         genres: values.genres
           ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
           : [],
+        press_quote: values.press_quote ?? null,
+        founding_year: foundingYearNum && !isNaN(foundingYearNum) ? foundingYearNum : null,
+        hometown: values.hometown || null,
+        booking_contact: values.booking_contact || null,
+        press_contact: values.press_contact || null,
         website_url: values.website_url || null,
         instagram_url: values.instagram_url || null,
         youtube_url: values.youtube_url || null,
         bandcamp_url: values.bandcamp_url || null,
-        press_quote: values.press_quote ?? null,
+        spotify_url: values.spotify_url || null,
+        apple_music_url: values.apple_music_url || null,
+        tiktok_url: values.tiktok_url || null,
+        facebook_url: values.facebook_url || null,
+        soundcloud_url: values.soundcloud_url || null,
       }
 
       const res = await fetch('/api/portal/profile', {
@@ -216,6 +260,51 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
       toast.error(dict.profile_error)
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Build live EPK data from form watch
+  // ---------------------------------------------------------------------------
+
+  const watched = form.watch()
+
+  const epkData: EPKData = {
+    artistName: artistName ?? 'Artist',
+    photoUrl,
+    bioShort: watched.bio_short,
+    bioMedium: watched.bio_medium,
+    bioLong: watched.bio_long,
+    pressQuote: watched.press_quote,
+    genres: watched.genres,
+    foundingYear: watched.founding_year ? parseInt(watched.founding_year, 10) : undefined,
+    hometown: watched.hometown,
+    bookingContact: watched.booking_contact,
+    pressContact: watched.press_contact,
+    websiteUrl: watched.website_url,
+    instagramUrl: watched.instagram_url,
+    youtubeUrl: watched.youtube_url,
+    bandcampUrl: watched.bandcamp_url,
+    spotifyUrl: watched.spotify_url,
+    appleMusicUrl: watched.apple_music_url,
+    tiktokUrl: watched.tiktok_url,
+    facebookUrl: watched.facebook_url,
+    soundcloudUrl: watched.soundcloud_url,
+  }
+
+  // ---------------------------------------------------------------------------
+  // URL fields config
+  // ---------------------------------------------------------------------------
+
+  const linkFields = [
+    { field: 'website_url',     label: dict.profile_website      },
+    { field: 'spotify_url',     label: dict.profile_spotify      },
+    { field: 'apple_music_url', label: dict.profile_apple_music  },
+    { field: 'instagram_url',   label: dict.profile_instagram    },
+    { field: 'youtube_url',     label: dict.profile_youtube      },
+    { field: 'tiktok_url',      label: dict.profile_tiktok       },
+    { field: 'facebook_url',    label: dict.profile_facebook     },
+    { field: 'soundcloud_url',  label: dict.profile_soundcloud   },
+    { field: 'bandcamp_url',    label: dict.profile_bandcamp     },
+  ] as const
 
   return (
     <div className="space-y-6">
@@ -258,9 +347,17 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
               <TextAlignLeft size={14} aria-hidden="true" />
               {dict.profile_tab_bio}
             </TabsTrigger>
+            <TabsTrigger value="info" className="gap-1.5">
+              <Info size={14} aria-hidden="true" />
+              {dict.profile_tab_info}
+            </TabsTrigger>
             <TabsTrigger value="links" className="gap-1.5">
               <LinkSimple size={14} aria-hidden="true" />
               {dict.profile_tab_links}
+            </TabsTrigger>
+            <TabsTrigger value="epk" className="gap-1.5">
+              <Newspaper size={14} aria-hidden="true" />
+              {dict.profile_tab_epk}
             </TabsTrigger>
           </TabsList>
 
@@ -305,67 +402,6 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
               </CardContent>
             </Card>
 
-            {/* Bios */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_biography}</CardTitle>
-                <CardDescription>{dict.profile_biography_description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bio">{dict.profile_bio}</Label>
-                  <Textarea
-                    id="bio"
-                    rows={5}
-                    className="bg-muted border-border resize-none"
-                    {...form.register('bio')}
-                  />
-                  {form.formState.errors.bio && (
-                    <p className="text-sm text-destructive">{form.formState.errors.bio.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio_short">{dict.profile_bio_short}</Label>
-                  <Textarea
-                    id="bio_short"
-                    rows={3}
-                    className="bg-muted border-border resize-none"
-                    {...form.register('bio_short')}
-                  />
-                  {form.formState.errors.bio_short && (
-                    <p className="text-sm text-destructive">{form.formState.errors.bio_short.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio_medium">{dict.profile_bio_medium}</Label>
-                  <Textarea
-                    id="bio_medium"
-                    rows={6}
-                    className="bg-muted border-border resize-none"
-                    {...form.register('bio_medium')}
-                  />
-                  {form.formState.errors.bio_medium && (
-                    <p className="text-sm text-destructive">{form.formState.errors.bio_medium.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio_long">{dict.profile_bio_long}</Label>
-                  <Textarea
-                    id="bio_long"
-                    rows={10}
-                    className="bg-muted border-border resize-none"
-                    {...form.register('bio_long')}
-                  />
-                  {form.formState.errors.bio_long && (
-                    <p className="text-sm text-destructive">{form.formState.errors.bio_long.message}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Genres & Press Quote */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
@@ -398,9 +434,121 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
                 </div>
               </CardContent>
             </Card>
+
+            {/* Bios using TiptapEditor */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{dict.profile_biography}</CardTitle>
+                <CardDescription>{dict.profile_biography_description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>{dict.profile_bio_short}</Label>
+                  <p className="text-xs text-muted-foreground">{dict.profile_bio_short_desc}</p>
+                  <Controller
+                    control={form.control}
+                    name="bio_short"
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder={dict.profile_bio_short}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{dict.profile_bio_medium}</Label>
+                  <p className="text-xs text-muted-foreground">{dict.profile_bio_medium_desc}</p>
+                  <Controller
+                    control={form.control}
+                    name="bio_medium"
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder={dict.profile_bio_medium}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{dict.profile_bio_long}</Label>
+                  <p className="text-xs text-muted-foreground">{dict.profile_bio_long_desc}</p>
+                  <Controller
+                    control={form.control}
+                    name="bio_long"
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        placeholder={dict.profile_bio_long}
+                      />
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          {/* ── Tab 2: Links ─────────────────────────────────────────────── */}
+          {/* ── Tab 2: Artist Info ────────────────────────────────────────── */}
+          <TabsContent value="info" className="space-y-4 mt-0">
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{dict.profile_info_heading}</CardTitle>
+                <CardDescription>{dict.profile_info_description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="founding_year">{dict.profile_founding_year}</Label>
+                    <Input
+                      id="founding_year"
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      className="bg-muted border-border"
+                      placeholder="e.g. 2015"
+                      {...form.register('founding_year')}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hometown">{dict.profile_hometown}</Label>
+                    <Input
+                      id="hometown"
+                      className="bg-muted border-border"
+                      placeholder="e.g. Berlin, Germany"
+                      {...form.register('hometown')}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="booking_contact">{dict.profile_booking_contact}</Label>
+                  <Input
+                    id="booking_contact"
+                    className="bg-muted border-border"
+                    placeholder={dict.profile_contact_placeholder}
+                    {...form.register('booking_contact')}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="press_contact">{dict.profile_press_contact}</Label>
+                  <Input
+                    id="press_contact"
+                    className="bg-muted border-border"
+                    placeholder={dict.profile_contact_placeholder}
+                    {...form.register('press_contact')}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── Tab 3: Links ─────────────────────────────────────────────── */}
           <TabsContent value="links" className="space-y-4 mt-0">
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
@@ -409,14 +557,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(
-                    [
-                      ['website_url', dict.profile_website],
-                      ['instagram_url', dict.profile_instagram],
-                      ['youtube_url', dict.profile_youtube],
-                      ['bandcamp_url', dict.profile_bandcamp],
-                    ] as const
-                  ).map(([field, label]) => (
+                  {linkFields.map(({ field, label }) => (
                     <div key={field} className="space-y-2">
                       <Label htmlFor={field}>{label}</Label>
                       <Input
@@ -437,6 +578,15 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ── Tab 4: EPK Preview ───────────────────────────────────────── */}
+          <TabsContent value="epk" className="mt-0">
+            <EPKPreview
+              dict={dict}
+              data={epkData}
+              artistSlug={artistSlug}
+            />
+          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end pt-2 border-t border-border">
@@ -450,21 +600,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
           </Button>
         </div>
       </form>
-
-      <EPKPreview
-        dict={dict}
-        artistName={artistName ?? 'Artist'}
-        photoUrl={photoUrl}
-        bioShort={form.watch('bio_short')}
-        bioMedium={form.watch('bio_medium')}
-        bioLong={form.watch('bio_long')}
-        pressQuote={form.watch('press_quote')}
-        genres={form.watch('genres')}
-        websiteUrl={form.watch('website_url')}
-        instagramUrl={form.watch('instagram_url')}
-        youtubeUrl={form.watch('youtube_url')}
-        bandcampUrl={form.watch('bandcamp_url')}
-      />
     </div>
   )
 }
+
