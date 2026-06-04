@@ -1,30 +1,19 @@
 import type { NewsPost, Release, SiteSettings } from '@/types'
 
-function selectFeaturedReleases(releases: Release[]): Release[] {
-  const featured = releases.filter((release) => release.featured)
-  if (featured.length > 0) return featured
-  return releases.length > 0 ? [releases[0]] : []
-}
-
-function selectFeaturedNews(news: NewsPost[], heroFeaturedId?: string): NewsPost | undefined {
-  if (!news.length) return undefined
-  if (!heroFeaturedId) return news[0]
-  return news.find((post) => post.slug === heroFeaturedId || post.id === heroFeaturedId) ?? news[0]
-}
-
 export function selectHeroItems(
   releases: Release[],
   news: NewsPost[],
-  siteSettings: Pick<SiteSettings, 'heroContentType' | 'heroFeaturedId'>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _siteSettings?: Pick<SiteSettings, 'heroContentType' | 'heroFeaturedId'>,
 ): (Release | NewsPost)[] {
-  const featuredReleases = selectFeaturedReleases(releases)
-  const featuredNews = selectFeaturedNews(news, siteSettings.heroFeaturedId)
+  const featuredReleases = releases.filter((r) => r.featured && r.isVisible && !r.isPromo)
+  const featuredNews = news.filter((n) => n.featured && n.status === 'published')
 
-  if (siteSettings.heroContentType === 'news') {
-    if (featuredNews) return [featuredNews]
-    return featuredReleases
-  }
+  const allFeatured = [...featuredReleases, ...featuredNews].sort((a, b) => {
+    const dateA = 'releaseDate' in a ? a.releaseDate : a.publishedAt
+    const dateB = 'releaseDate' in b ? b.releaseDate : b.publishedAt
+    return new Date(dateB).getTime() - new Date(dateA).getTime()
+  })
 
-  return featuredReleases
+  return allFeatured
 }
-

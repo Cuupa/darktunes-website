@@ -107,6 +107,7 @@ export interface NewsPost {
   publishedAt: string
   imageUrl?: string
   slug: string
+  featured: boolean
   isPressOnly: boolean
   /**
    * Optional artist association. When set, this news post is shown only on that
@@ -401,9 +402,9 @@ export interface SiteSettings {
   /** Override for the Releases section subheading. Falls back to i18n default when empty. */
   releasesSectionSubheading?: string
   // ── Hero Section ──────────────────────────────────────────────────────────
-  /** What the hero section features. 'release' = latest/featured release, 'news' = latest news post. Default: 'release'. */
+  /** @deprecated No longer used. Featured items are determined by the featured flag on releases/news. */
   heroContentType?: 'release' | 'news'
-  /** ID of the specific release or news post to feature. Empty = auto-pick the latest featured item. */
+  /** @deprecated No longer used. Featured items are determined by the featured flag on releases/news. */
   heroFeaturedId?: string
   /** R2 URL of a custom hero background image that overrides the release/news cover art. */
   heroCustomBgUrl?: string
