@@ -208,17 +208,18 @@ export async function verifyPermission(
     return userData.user.id
   }
 
+  type UserRole = Database['public']['Tables']['role_permissions']['Row']['role']
   const { data: perms, error: permsErr } = await adminClient
     .from('role_permissions')
     .select(permission)
-    .eq('role', role)
+    .eq('role', role as UserRole)
     .maybeSingle()
 
   if (permsErr) {
     throw new ApiError(500, permsErr.message)
   }
 
-  const hasPermission = perms?.[permission] === true
+  const hasPermission = (perms as Record<string, unknown> | null)?.[permission] === true
   if (!hasPermission) {
     throw new ApiError(403, `Forbidden: missing permission '${permission}'`)
   }

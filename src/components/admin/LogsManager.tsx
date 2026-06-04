@@ -520,7 +520,7 @@ function RbacAuditPanel() {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const headers = session?.access_token
+      const headers: HeadersInit = session?.access_token
         ? { Authorization: 'Bearer ' + session.access_token }
         : {}
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })

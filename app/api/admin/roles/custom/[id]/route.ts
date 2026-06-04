@@ -68,7 +68,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   if (!existing) throw new ApiError(404, 'Custom role not found')
 
   // Update role metadata if provided
-  const metaUpdate: Record<string, unknown> = {}
+  const metaUpdate: { label?: string; description?: string | null } = {}
   if (updates.label !== undefined) metaUpdate.label = updates.label
   if (updates.description !== undefined) metaUpdate.description = updates.description
 
