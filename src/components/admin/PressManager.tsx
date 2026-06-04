@@ -63,7 +63,7 @@ export function PressManager() {
         getPromoTracks(supabase).catch(() => []),
         getArtists(supabase).catch(() => []),
         listRequests(supabase).catch(() => []),
-        supabase.from('journalist_downloads').select('id', { count: 'exact', head: false }).then(({ data }) => data ?? []).catch(() => []),
+        supabase.from('journalist_downloads').select('id', { count: 'exact', head: false }).then(({ data }) => data ?? [], () => []),
       ])
       setApplications(appsRes.applications ?? [])
       setPhotos(photoRows)
