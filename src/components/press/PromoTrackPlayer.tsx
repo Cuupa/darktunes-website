@@ -15,8 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { getPromoStreamUrl } from '@/app/press/dashboard/promo-pool/_actions/stream'
-import { getJournalistDownloadUrl } from '@/app/press/dashboard/_actions/download'
+import { getPromoStreamUrl } from '../../../app/press/dashboard/promo-pool/_actions/stream'
+import { getJournalistDownloadUrl } from '../../../app/press/dashboard/_actions/download'
 import type { PromoTrack } from '@/lib/api/promoTracks'
 
 interface PromoTrackPlayerProps {
