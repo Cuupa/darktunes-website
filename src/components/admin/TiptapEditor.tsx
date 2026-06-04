@@ -34,13 +34,17 @@ import {
 interface TiptapEditorProps {
   value: string
   onChange: (html: string) => void
+  /** Also receive the plain-text content (used by compact / messaging mode) */
+  onChangeWithText?: (html: string, text: string) => void
   disabled?: boolean
   placeholder?: string
+  /** Compact mode hides alignment, image, and color controls */
+  compact?: boolean
 }
 
 const HEADING_LEVELS = [1, 2, 3] as const
 
-export function TiptapEditor({ value, onChange, disabled, placeholder }: TiptapEditorProps) {
+export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -65,7 +69,9 @@ export function TiptapEditor({ value, onChange, disabled, placeholder }: TiptapE
       },
     },
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      const html = editor.getHTML()
+      onChange(html)
+      onChangeWithText?.(html, editor.getText())
     },
   })
 
@@ -236,35 +242,40 @@ export function TiptapEditor({ value, onChange, disabled, placeholder }: TiptapE
 
         <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
-        {/* Alignment */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          active={editor.isActive({ textAlign: 'left' })}
-          title="Align Left"
-        >
-          <TextAlignLeft className="w-3.5 h-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          active={editor.isActive({ textAlign: 'center' })}
-          title="Align Center"
-        >
-          <TextAlignCenter className="w-3.5 h-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          active={editor.isActive({ textAlign: 'right' })}
-          title="Align Right"
-        >
-          <TextAlignRight className="w-3.5 h-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-          active={editor.isActive({ textAlign: 'justify' })}
-          title="Justify"
-        >
-          <TextAlignJustify className="w-3.5 h-3.5" />
-        </ToolbarButton>
+        {/* Alignment — hidden in compact mode */}
+        {!compact && (
+          <>
+            <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              active={editor.isActive({ textAlign: 'left' })}
+              title="Align Left"
+            >
+              <TextAlignLeft className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              active={editor.isActive({ textAlign: 'center' })}
+              title="Align Center"
+            >
+              <TextAlignCenter className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              active={editor.isActive({ textAlign: 'right' })}
+              title="Align Right"
+            >
+              <TextAlignRight className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+              active={editor.isActive({ textAlign: 'justify' })}
+              title="Justify"
+            >
+              <TextAlignJustify className="w-3.5 h-3.5" />
+            </ToolbarButton>
+          </>
+        )}
 
         <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
@@ -272,9 +283,12 @@ export function TiptapEditor({ value, onChange, disabled, placeholder }: TiptapE
         <ToolbarButton onClick={setLink} active={editor.isActive('link')} title="Insert / Edit Link">
           <LinkIcon className="w-3.5 h-3.5" />
         </ToolbarButton>
-        <ToolbarButton onClick={insertImage} title="Insert Image">
-          <ImageIcon className="w-3.5 h-3.5" />
-        </ToolbarButton>
+        {/* Image insert — hidden in compact mode */}
+        {!compact && (
+          <ToolbarButton onClick={insertImage} title="Insert Image">
+            <ImageIcon className="w-3.5 h-3.5" />
+          </ToolbarButton>
+        )}
       </div>
 
       {/* Editor area */}

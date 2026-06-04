@@ -368,6 +368,16 @@
     "teamHeading": "Team",
     "statsHeading": "By the Numbers",
     "linksHeading": "Links & Social",
-    "noContent": "About page content coming soon."
+    "noContent": "About page content coming soon.",
+    "backToHome": "← HOME"
+  },
+  "datenschutz": {
+    "metaTitle": "Privacy Policy — darkTunes Music Group",
+    "heading": "Privacy Policy",
+    "dateLabel": "Last updated:"
+  },
+  "impressum": {
+    "metaTitle": "Legal Notice — darkTunes Music Group",
+    "heading": "Legal Notice (Impressum)"
   }
 }

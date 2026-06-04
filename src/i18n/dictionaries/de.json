@@ -368,6 +368,16 @@
     "teamHeading": "Team",
     "statsHeading": "In Zahlen",
     "linksHeading": "Links & Social",
-    "noContent": "Über uns – Inhalte folgen in Kürze."
+    "noContent": "Über uns – Inhalte folgen in Kürze.",
+    "backToHome": "← HOME"
+  },
+  "datenschutz": {
+    "metaTitle": "Datenschutzerklärung — darkTunes Music Group",
+    "heading": "Datenschutzerklärung",
+    "dateLabel": "Stand:"
+  },
+  "impressum": {
+    "metaTitle": "Impressum — darkTunes Music Group",
+    "heading": "Impressum"
   }
 }

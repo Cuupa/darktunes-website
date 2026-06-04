@@ -140,6 +140,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     impressumPhone: map['impressum_phone'] ?? DEFAULTS.impressumPhone,
     impressumEmail: map['impressum_email'] ?? DEFAULTS.impressumEmail,
     datenschutzContent: map['datenschutz_content'] ?? DEFAULTS.datenschutzContent,
+    datenschutzContentEn: map['datenschutz_content_en'] ?? '',
     consentPlaceholderUrl: map['consent_placeholder_url'] ?? DEFAULTS.consentPlaceholderUrl,
     noiseOpacity: parseFloat(map['noise_opacity'] ?? '') || DEFAULTS.noiseOpacity,
     crtScanlinesEnabled:

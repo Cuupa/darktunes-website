@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { SiteSettings, HomepageSection } from '@/types'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 
@@ -84,6 +85,7 @@ const schema = z.object({
   impressumPhone: z.string().optional().default(''),
   impressumEmail: z.string().email('Must be a valid email').or(z.literal('')),
   datenschutzContent: z.string().optional().default(''),
+  datenschutzContentEn: z.string().optional().default(''),
   consentPlaceholderUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   noiseOpacity: z.number().min(0).max(1).default(0.04),
   crtScanlinesEnabled: z.boolean().default(true),
@@ -462,19 +464,19 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 />
               </Field>
 
-              <Field id="aboutBody" label="Body Text (Markdown)">
-                <Textarea
-                  id="aboutBody"
-                  rows={16}
-                  placeholder={`## Our Story\n\nWe are darkTunes Music Group...\n\n## Mission\n\nPushing boundaries in alternative music.`}
-                  {...register('aboutBody')}
-                  disabled={isSubmitting}
-                  className="font-mono text-xs"
+              <Field id="aboutBody" label="Body Text (Rich Text)">
+                <Controller
+                  name="aboutBody"
+                  control={control}
+                  render={({ field }) => (
+                    <TiptapEditor
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      placeholder="Tell the story of the label — history, mission, team…"
+                    />
+                  )}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Supports: ## headings, **bold**, *italic*, [links](url), - list items, {'>'} blockquotes.
-                  Bare YouTube URLs on their own line embed as videos.
-                </p>
               </Field>
             </CardContent>
           </Card>
@@ -1088,23 +1090,46 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               <CardHeader>
                 <CardTitle>Datenschutzerklärung</CardTitle>
                 <CardDescription>
-                  Volltext der Datenschutzerklärung in Markdown. Erscheint auf /datenschutz.
+                  Volltext der Datenschutzerklärung. Erscheint auf /datenschutz.
                   Leer lassen für Standard-Boilerplate.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Field
                   id="datenschutzContent"
-                  label="Datenschutztext (Markdown)"
+                  label="Datenschutztext (Deutsch)"
                   error={errors.datenschutzContent?.message}
                 >
-                  <Textarea
-                    id="datenschutzContent"
-                    rows={12}
-                    placeholder="## 1. Datenschutz auf einen Blick&#10;..."
-                    {...register('datenschutzContent')}
-                    disabled={isSubmitting}
-                    className="font-mono text-xs"
+                  <Controller
+                    name="datenschutzContent"
+                    control={control}
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        disabled={isSubmitting}
+                        placeholder="Hier den deutschen Datenschutztext einfügen…"
+                      />
+                    )}
+                  />
+                </Field>
+
+                <Field
+                  id="datenschutzContentEn"
+                  label="Privacy Policy (English)"
+                  error={errors.datenschutzContentEn?.message}
+                >
+                  <Controller
+                    name="datenschutzContentEn"
+                    control={control}
+                    render={({ field }) => (
+                      <TiptapEditor
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        disabled={isSubmitting}
+                        placeholder="Enter the English privacy policy text here…"
+                      />
+                    )}
                   />
                 </Field>
 

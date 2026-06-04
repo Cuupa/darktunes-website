@@ -7,12 +7,20 @@ interface DatenschutzContentProps {
   content: string
 }
 
+/** Returns true when content looks like HTML rather than Markdown. */
+function isHtml(str: string) {
+  return /^\s*<[a-z]/i.test(str)
+}
+
 /**
- * Renders Markdown privacy policy content as safe HTML.
+ * Renders the privacy policy content as safe HTML.
+ * Supports both HTML (produced by TiptapEditor) and legacy Markdown.
  * Isolated as a minimal 'use client' leaf so the parent RSC stays server-rendered.
  */
 export function DatenschutzContent({ content }: DatenschutzContentProps) {
   const html = useMemo(() => {
+    if (!content) return ''
+    if (isHtml(content)) return content
     const result = marked.parse(content, { async: false })
     return typeof result === 'string' ? result : ''
   }, [content])

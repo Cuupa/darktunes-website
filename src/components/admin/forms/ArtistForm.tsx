@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { AdminPanelProps } from '@/lib/component-contracts'
@@ -24,6 +24,7 @@ import {
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 import { AssetPicker } from '../file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
+import { TiptapEditor } from '@/components/admin/TiptapEditor'
 
 /** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
 function classifyDiscogsUrl(url: string): keyof ArtistFormData | null {
@@ -119,7 +120,7 @@ type PrefillItunesResponse = {
 
 export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistId }: Props) {
   const supabase = createBrowserSupabaseClient()
-  const { register, handleSubmit, watch, setValue, reset, getValues } = useForm<ArtistFormData>({
+  const { register, handleSubmit, watch, setValue, reset, getValues, control } = useForm<ArtistFormData>({
     defaultValues: value,
   })
   const [isFetchingImage, setIsFetchingImage] = useState(false)
@@ -387,7 +388,18 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
 
           <div className="space-y-1">
             <Label htmlFor="bio">Bio</Label>
-            <Textarea id="bio" {...register('bio')} rows={4} disabled={isLoading} />
+            <Controller
+              name="bio"
+              control={control}
+              render={({ field }) => (
+                <TiptapEditor
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  disabled={isLoading}
+                  placeholder="Describe this artist…"
+                />
+              )}
+            />
           </div>
 
           <div className="space-y-1">

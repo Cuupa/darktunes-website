@@ -32,9 +32,13 @@ const getCachedSettings = unstable_cache(
   { revalidate: 60, tags: ['site-settings'] },
 )
 
-export const metadata: Metadata = {
-  title: 'Impressum — darkTunes Music Group',
-  robots: { index: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
+  return {
+    title: dict.impressum.metaTitle,
+    robots: { index: false },
+  }
 }
 
 export default async function ImpressumPage() {
@@ -94,7 +98,7 @@ export default async function ImpressumPage() {
         </Link>
 
         <h1 className="text-4xl lg:text-5xl font-bold mb-10 tracking-tight uppercase">
-          Impressum
+          {dict.impressum.heading}
         </h1>
 
         <div className="space-y-8 text-sm text-foreground/90 leading-relaxed">
