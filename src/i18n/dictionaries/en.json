@@ -274,7 +274,21 @@
     "oauth_google": "Continue with Google",
     "oauth_spotify": "Continue with Spotify",
     "oauth_error": "OAuth sign-in failed. Please try again.",
-    "login_no_artist": "Your account is not linked to an artist profile yet. Please contact the label administrator to get access."
+    "login_no_artist": "Your account is not linked to an artist profile yet. Please contact the label administrator to get access.",
+    "profile_tab_bio": "Bio & Press",
+    "profile_tab_links": "Links",
+    "profile_photo_description": "Upload a profile photo for your EPK.",
+    "profile_biography": "Biography",
+    "profile_biography_description": "Provide bios of different lengths for various press uses.",
+    "profile_genres_press": "Genres & Press",
+    "profile_online_presence": "Online Presence",
+    "profile_links_description": "Links shown on your public profile and EPK.",
+    "profile_preview_public": "Preview Public Profile",
+    "messages_mark_read": "Mark as read",
+    "messages_no_messages": "No messages yet.",
+    "messages_no_messages_desc": "You'll see new messages from the label here.",
+    "marketing_label_assets": "Label Assets",
+    "marketing_label_assets_empty": "No label assets available yet."
   },
   "press": {
     "title": "Press & Media",

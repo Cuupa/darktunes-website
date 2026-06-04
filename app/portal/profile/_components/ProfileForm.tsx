@@ -245,7 +245,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
               aria-label="Preview your public artist profile in a new tab"
             >
               <Eye size={15} aria-hidden="true" />
-              Preview Public Profile
+              {dict.profile_preview_public}
             </Link>
           )}
         </div>
@@ -256,11 +256,11 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
           <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
             <TabsTrigger value="bio" className="gap-1.5">
               <TextAlignLeft size={14} aria-hidden="true" />
-              Bio &amp; Press
+              {dict.profile_tab_bio}
             </TabsTrigger>
             <TabsTrigger value="links" className="gap-1.5">
               <LinkSimple size={14} aria-hidden="true" />
-              Links
+              {dict.profile_tab_links}
             </TabsTrigger>
           </TabsList>
 
@@ -270,7 +270,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{dict.profile_photo}</CardTitle>
-                <CardDescription>Upload a profile photo for your EPK.</CardDescription>
+                <CardDescription>{dict.profile_photo_description}</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center gap-6">
                 <Avatar className="w-24 h-24">
@@ -308,8 +308,8 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
             {/* Bios */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Biography</CardTitle>
-                <CardDescription>Provide bios of different lengths for various press uses.</CardDescription>
+                <CardTitle className="text-base">{dict.profile_biography}</CardTitle>
+                <CardDescription>{dict.profile_biography_description}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -369,7 +369,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
             {/* Genres & Press Quote */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Genres &amp; Press</CardTitle>
+                <CardTitle className="text-base">{dict.profile_genres_press}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -404,8 +404,8 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
           <TabsContent value="links" className="space-y-4 mt-0">
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Online Presence</CardTitle>
-                <CardDescription>Links shown on your public profile and EPK.</CardDescription>
+                <CardTitle className="text-base">{dict.profile_online_presence}</CardTitle>
+                <CardDescription>{dict.profile_links_description}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
