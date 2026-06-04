@@ -40,3 +40,6 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Image caching** — external cover art images are downloaded server-side and uploaded to Cloudflare R2. The browser only ever loads images from R2 (via wsrv.nl proxy). External image URLs are never stored in the database or sent to the browser.
 - **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content, but every client-side render path sanitizes the HTML with DOMPurify before using `dangerouslySetInnerHTML`, reducing XSS risk in the admin inbox and artist portal.
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
+
+
+- Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

@@ -341,10 +341,10 @@
     "bioCopied": "Copied!"
   },
   "promoPool": {
-    "heading": "Journalist Promo Pool",
+    "heading": "Promo Pool",
     "description": "Exclusive pre-release tracks for verified media professionals.",
     "tracksHeading": "Pre-Release Tracks",
-    "noTracks": "No tracks available yet.",
+    "noTracks": "No promo tracks available.",
     "streamTrack": "Stream",
     "loading": "Loading secure stream…",
     "streamError": "Failed to load stream. Please try again.",
@@ -370,6 +370,25 @@
       "applySuccess": "Application submitted! We'll review it soon.",
       "applyError": "Failed to submit application. Please try again.",
       "applyEmailPlaceholder": "your@email.com"
+    },
+    "metadata": {
+      "genre": "Genre",
+      "bpm": "BPM",
+      "key": "Key",
+      "duration": "Duration",
+      "releaseDate": "Release Date"
+    },
+    "player": {
+      "preview": "Preview",
+      "download": "Download",
+      "preparing": "Preparing…"
+    },
+    "nda": {
+      "title": "NDA Required",
+      "description": "This track is subject to a non-disclosure agreement. By downloading you agree not to share or publish this material before the official release date.",
+      "confirm": "I agree to the NDA terms",
+      "proceed": "Proceed with Download",
+      "cancel": "Cancel"
     }
   },
   "contact": {
@@ -426,5 +445,90 @@
   "impressum": {
     "metaTitle": "Legal Notice — darkTunes Music Group",
     "heading": "Legal Notice (Impressum)"
+  },
+  "pressReleases": {
+    "heading": "Press Releases",
+    "detail": {
+      "backLink": "Back to Press Releases",
+      "mediaContact": "Media Contact",
+      "category": "Category",
+      "embargo": "Embargoed until"
+    },
+    "categories": {
+      "albumAnnouncement": "Album Announcement",
+      "tour": "Tour",
+      "labelNews": "Label News",
+      "other": "Other"
+    },
+    "filterAll": "All",
+    "search": "Search releases…",
+    "noResults": "No press releases found."
+  },
+  "pressKit": {
+    "heading": "Press Kit",
+    "tabs": {
+      "all": "All",
+      "photo": "Photos",
+      "logo": "Logos",
+      "social": "Social",
+      "document": "Documents"
+    },
+    "downloadZip": "Download ZIP",
+    "downloadZipAll": "Download All as ZIP",
+    "preparingZip": "Preparing ZIP…",
+    "noAssets": "No assets available in this category."
+  },
+  "apply": {
+    "heading": "Apply for Press Access",
+    "subheading": "Request access to the darkTunes press dashboard — promo tracks, press kits, and exclusive releases.",
+    "fields": {
+      "name": "Full Name",
+      "email": "Email Address",
+      "password": "Password",
+      "publication": "Publication / Outlet",
+      "website": "Website (optional)",
+      "reason": "Why are you requesting press access?"
+    },
+    "submit": "Submit Application",
+    "submitting": "Submitting…",
+    "success": {
+      "heading": "Application Submitted",
+      "message": "Thank you! We'll review your application and get back to you by email.",
+      "login": "Already approved? Sign in"
+    },
+    "errors": {
+      "emailInUse": "An account with this email already exists. Please sign in.",
+      "generic": "Submission failed. Please try again."
+    }
+  },
+  "pressProfile": {
+    "heading": "My Profile",
+    "publication": "Publication",
+    "website": "Website",
+    "applicationStatus": "Application Status",
+    "downloadCount": "Total Downloads",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "saveProfile": "Save Profile",
+    "savePassword": "Update Password",
+    "saving": "Saving…",
+    "saved": "Changes saved"
+  },
+  "pressContact": {
+    "heading": "Press Inquiry",
+    "subjectLabel": "Subject",
+    "subjects": {
+      "interview": "Interview Request",
+      "reviewCopy": "Review Copy",
+      "accreditation": "Event Accreditation",
+      "general": "General Inquiry"
+    },
+    "messagePlaceholder": "Write your message here…",
+    "send": "Send Inquiry",
+    "sending": "Sending…",
+    "sent": "Your message has been sent.",
+    "backToInbox": "Back to Inbox"
   }
 }

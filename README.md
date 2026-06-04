@@ -256,3 +256,6 @@ scripts/
 ## 📄 License
 
 Proprietary — All Rights Reserved. See [LICENSE](./LICENSE).
+
+
+- Press portal: public label press landing, artist EPK pages, embargo-aware press releases, dashboard profile/contact tools, upgraded press kit downloads, and promo-track preview/download flows.

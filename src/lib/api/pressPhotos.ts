@@ -18,10 +18,6 @@ type DbClient = SupabaseClient<Database>
 type PressPhotoRow = Database['public']['Tables']['press_photos']['Row']
 type PressPhotoInsert = Database['public']['Tables']['press_photos']['Insert']
 
-// ---------------------------------------------------------------------------
-// Domain type
-// ---------------------------------------------------------------------------
-
 export interface PressPhoto {
   id: string
   title: string
@@ -29,28 +25,25 @@ export interface PressPhoto {
   r2Key: string
   publicUrl: string
   displayOrder: number
+  category: string
+  artistId: string | undefined
   createdAt: string
 }
 
-// ---------------------------------------------------------------------------
-// Row mapper
-// ---------------------------------------------------------------------------
-
 function rowToPressPhoto(row: PressPhotoRow): PressPhoto {
+  const r = row as PressPhotoRow & { category?: string; artist_id?: string | null }
   return {
-    id: row.id,
-    title: row.title,
-    altText: row.alt_text ?? undefined,
-    r2Key: row.r2_key,
-    publicUrl: row.public_url,
-    displayOrder: row.display_order,
-    createdAt: row.created_at,
+    id: r.id,
+    title: r.title,
+    altText: r.alt_text ?? undefined,
+    r2Key: r.r2_key,
+    publicUrl: r.public_url,
+    displayOrder: r.display_order,
+    category: r.category ?? 'photo',
+    artistId: r.artist_id ?? undefined,
+    createdAt: r.created_at,
   }
 }
-
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 
 /** Fetches all press photos ordered by display_order ascending. */
 export async function getPressPhotos(db: DbClient): Promise<PressPhoto[]> {
@@ -62,10 +55,6 @@ export async function getPressPhotos(db: DbClient): Promise<PressPhoto[]> {
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => rowToPressPhoto(row as PressPhotoRow))
 }
-
-// ---------------------------------------------------------------------------
-// Mutations
-// ---------------------------------------------------------------------------
 
 /**
  * Inserts a new press photo record.

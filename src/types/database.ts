@@ -491,6 +491,9 @@ export interface Database {
           created_at: string
           updated_at: string
           artist_id: string | null
+          embargo_until: string | null
+          media_contact: string | null
+          release_category: string | null
           hero_primary_btn_label: string | null
           hero_primary_btn_action: string | null
           hero_primary_btn_href: string | null
@@ -511,6 +514,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          embargo_until?: string | null
+          media_contact?: string | null
+          release_category?: string | null
           hero_primary_btn_label?: string | null
           hero_primary_btn_action?: string | null
           hero_primary_btn_href?: string | null
@@ -531,6 +537,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          embargo_until?: string | null
+          media_contact?: string | null
+          release_category?: string | null
           hero_primary_btn_label?: string | null
           hero_primary_btn_action?: string | null
           hero_primary_btn_href?: string | null
@@ -870,6 +879,8 @@ export interface Database {
           r2_key: string
           public_url: string
           display_order: number
+          category: string
+          artist_id: string | null
           created_at: string
         }
         Insert: {
@@ -879,6 +890,8 @@ export interface Database {
           r2_key: string
           public_url: string
           display_order?: number
+          category?: string
+          artist_id?: string | null
           created_at?: string
         }
         Update: {
@@ -888,6 +901,8 @@ export interface Database {
           r2_key?: string
           public_url?: string
           display_order?: number
+          category?: string
+          artist_id?: string | null
           created_at?: string
         }
         Relationships: []
@@ -901,6 +916,12 @@ export interface Database {
           file_size_bytes: number | null
           duration_seconds: number | null
           display_order: number
+          genre: string | null
+          bpm: number | null
+          key: string | null
+          release_date: string | null
+          nda_required: boolean
+          embargo_until: string | null
           created_at: string
         }
         Insert: {
@@ -911,6 +932,12 @@ export interface Database {
           file_size_bytes?: number | null
           duration_seconds?: number | null
           display_order?: number
+          genre?: string | null
+          bpm?: number | null
+          key?: string | null
+          release_date?: string | null
+          nda_required?: boolean
+          embargo_until?: string | null
           created_at?: string
         }
         Update: {
@@ -921,6 +948,12 @@ export interface Database {
           file_size_bytes?: number | null
           duration_seconds?: number | null
           display_order?: number
+          genre?: string | null
+          bpm?: number | null
+          key?: string | null
+          release_date?: string | null
+          nda_required?: boolean
+          embargo_until?: string | null
           created_at?: string
         }
         Relationships: []

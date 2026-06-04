@@ -1,23 +1,17 @@
 export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getPressOnlyNewsPosts } from '@/lib/api/news'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
+import { PressReleasesClient } from './_components/PressReleasesClient'
 
 export default async function PressReleasesPage() {
+  const locale = await getLocale()
   const supabase = await createServerSupabaseClient()
-  const posts = await getPressOnlyNewsPosts(supabase).catch(() => [])
+  const [posts, dict] = await Promise.all([
+    getPressOnlyNewsPosts(supabase).catch(() => []),
+    getDictionary(locale),
+  ])
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-3xl font-bold">Press Releases</h1>
-      {posts.map((post) => (
-        <article key={post.id} className="rounded-lg border border-border p-4">
-          <h2 className="font-semibold">{post.title}</h2>
-          <p className="text-sm text-muted-foreground">{new Date(post.publishedAt).toLocaleDateString()}</p>
-          <p className="mt-2 text-sm whitespace-pre-wrap">{post.excerpt || post.content}</p>
-        </article>
-      ))}
-      {posts.length === 0 && <p className="text-sm text-muted-foreground">No press-only news posts available.</p>}
-    </div>
-  )
+  return <PressReleasesClient posts={posts} dict={dict.pressReleases} />
 }

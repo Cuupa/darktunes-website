@@ -223,3 +223,6 @@ npm update
 # Deploy updates
 vercel --prod
 ```
+
+
+- No additional environment variables are required for the press portal expansion; existing Supabase/R2/Resend variables continue to power press logins, secure asset delivery, and optional email workflows.

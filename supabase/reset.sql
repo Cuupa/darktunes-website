@@ -450,6 +450,9 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   is_press_only BOOLEAN    NOT NULL DEFAULT FALSE,
   status       TEXT        NOT NULL DEFAULT 'published',
   artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  embargo_until TIMESTAMPTZ,
+  media_contact TEXT,
+  release_category TEXT,
   published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -457,6 +460,9 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS embargo_until    TIMESTAMPTZ;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS media_contact    TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS release_category TEXT;
 -- Hero button overrides (primary + secondary)
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
@@ -763,8 +769,13 @@ CREATE TABLE IF NOT EXISTS public.press_photos (
   r2_key         TEXT        NOT NULL UNIQUE,
   public_url     TEXT        NOT NULL,
   display_order  INTEGER     NOT NULL DEFAULT 0,
+  category       TEXT        NOT NULL DEFAULT 'photo',
+  artist_id      UUID        REFERENCES public.artists(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.press_photos ADD COLUMN IF NOT EXISTS category  TEXT NOT NULL DEFAULT 'photo';
+ALTER TABLE public.press_photos ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_press_photos_display_order
   ON public.press_photos (display_order ASC);
@@ -780,8 +791,21 @@ CREATE TABLE IF NOT EXISTS public.promo_tracks (
   file_size_bytes  BIGINT,
   duration_seconds INTEGER,
   display_order    INTEGER     NOT NULL DEFAULT 0,
+  genre            TEXT,
+  bpm              SMALLINT,
+  key              TEXT,
+  release_date     DATE,
+  nda_required     BOOLEAN     NOT NULL DEFAULT FALSE,
+  embargo_until    TIMESTAMPTZ,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS genre          TEXT;
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS bpm            SMALLINT;
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS key            TEXT;
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS release_date   DATE;
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS nda_required   BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS embargo_until  TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_promo_tracks_display_order
   ON public.promo_tracks (display_order ASC);
@@ -1480,6 +1504,14 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.statements', 'Artist Statements', TRUE, 'artist'),
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
+  ('press.applications',  'Press Portal Applications',          TRUE, 'journalist'),
+  ('press.promo_tracks',  'Press Promo Pool Access',            TRUE, 'journalist'),
+  ('press.zip_download',  'Press Kit ZIP Download',             TRUE, 'journalist'),
+  ('press.audio_preview', 'Promo Track In-Browser Preview',     TRUE, 'journalist'),
+  ('press.contact',       'Press Inquiry Form',                 TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================

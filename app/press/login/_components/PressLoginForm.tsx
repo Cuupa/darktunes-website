@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -35,8 +36,8 @@ export function PressLoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-card border-border">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md border-border bg-card">
         <CardHeader>
           <CardTitle>Press Dashboard Login</CardTitle>
           <CardDescription>Sign in as journalist/admin to access press tools.</CardDescription>
@@ -59,6 +60,14 @@ export function PressLoginForm() {
               {loading ? 'Signing in…' : 'Sign In'}
             </Button>
           </form>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              <Link href="/press/apply" className="text-primary hover:underline">Apply for press access</Link>
+            </p>
+            <p>
+              Forgot password? Email <a className="text-primary hover:underline" href="mailto:info@darktunes.com?subject=Press%20Portal%20Password%20Reset">info@darktunes.com</a>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

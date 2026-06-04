@@ -36,6 +36,12 @@ const mockTrackRow: PromoTrackRow = {
   file_size_bytes: 52428800,
   duration_seconds: 210,
   display_order: 0,
+  genre: 'darkwave',
+  bpm: 128,
+  key: 'Am',
+  release_date: '2024-08-01',
+  nda_required: true,
+  embargo_until: '2024-07-01T12:00:00Z',
   created_at: '2024-06-01T00:00:00Z',
 }
 
@@ -56,6 +62,12 @@ describe('getPromoTracks', () => {
     expect(result[0].r2Key).toBe('promo-tracks/track-uuid-1.wav')
     expect(result[0].fileSizeBytes).toBe(52428800)
     expect(result[0].durationSeconds).toBe(210)
+    expect(result[0].genre).toBe('darkwave')
+    expect(result[0].bpm).toBe(128)
+    expect(result[0].key).toBe('Am')
+    expect(result[0].releaseDate).toBe('2024-08-01')
+    expect(result[0].ndaRequired).toBe(true)
+    expect(result[0].embargoUntil).toBe('2024-07-01T12:00:00Z')
   })
 
   it('maps null optional fields to undefined', async () => {
@@ -63,11 +75,23 @@ describe('getPromoTracks', () => {
       ...mockTrackRow,
       file_size_bytes: null,
       duration_seconds: null,
+      genre: null,
+      bpm: null,
+      key: null,
+      release_date: null,
+      nda_required: false,
+      embargo_until: null,
     }
     const db = makeMockDb([rowWithNulls])
     const result = await getPromoTracks(db)
     expect(result[0].fileSizeBytes).toBeUndefined()
     expect(result[0].durationSeconds).toBeUndefined()
+    expect(result[0].genre).toBeUndefined()
+    expect(result[0].bpm).toBeUndefined()
+    expect(result[0].key).toBeUndefined()
+    expect(result[0].releaseDate).toBeUndefined()
+    expect(result[0].ndaRequired).toBe(false)
+    expect(result[0].embargoUntil).toBeUndefined()
   })
 
   it('throws on database error', async () => {

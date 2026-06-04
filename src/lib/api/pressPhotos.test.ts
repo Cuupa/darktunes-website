@@ -35,6 +35,8 @@ const mockPhotoRow: PressPhotoRow = {
   r2_key: 'press-photos/photo-uuid-1.jpg',
   public_url: 'https://cdn.darktunes.com/press-photos/photo-uuid-1.jpg',
   display_order: 0,
+  category: 'photo',
+  artist_id: null,
   created_at: '2024-06-01T00:00:00Z',
 }
 
@@ -55,6 +57,8 @@ describe('getPressPhotos', () => {
     expect(result[0].r2Key).toBe('press-photos/photo-uuid-1.jpg')
     expect(result[0].publicUrl).toBe('https://cdn.darktunes.com/press-photos/photo-uuid-1.jpg')
     expect(result[0].displayOrder).toBe(0)
+    expect(result[0].category).toBe('photo')
+    expect(result[0].artistId).toBeUndefined()
   })
 
   it('maps null alt_text to undefined', async () => {
