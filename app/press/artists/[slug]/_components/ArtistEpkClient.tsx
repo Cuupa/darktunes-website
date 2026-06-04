@@ -134,7 +134,6 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
                   <div
                     className="text-sm leading-relaxed text-muted-foreground [&_p]:mb-2 [&_p:last-child]:mb-0"
                     // bio HTML is admin-authored content sanitized via DOMPurify
-                    // eslint-disable-next-line react/no-danger
                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
                   />
                 </CardContent>
