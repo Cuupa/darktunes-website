@@ -56,12 +56,11 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
               onClick={() => setPlayerActivated(true)}
               className="relative h-[352px] w-full rounded-md border border-border bg-muted/30 transition-colors hover:bg-muted/40 flex flex-col items-center justify-center gap-3"
             >
-              <span className="text-4xl" aria-hidden="true">🎵</span>
               <span className="text-base font-semibold text-foreground">
-                {playlists.length === 1 ? playlists[0].label : loadLabel ?? 'Spotify laden'}
+                {loadLabel ?? 'Klicken zum Laden'}
               </span>
               <span className="text-sm text-muted-foreground">
-                {loadLabel ?? 'Spotify laden'}
+                {playlists.length === 1 ? playlists[0].label : (playlists.length > 1 ? `${playlists.length} Playlists` : '')}
               </span>
             </button>
           ) : (

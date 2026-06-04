@@ -108,10 +108,15 @@ export async function updateAsset(
       const { error: insertError } = await db.from('asset_artists').insert(rows)
       if (insertError) throw new Error(insertError.message)
     }
-    // Auto-assign to collabs subfolder for each artist folder when 2+ artists
-    if (updates.artistIds.length >= 2) {
-      await ensureCollabsFolders(db, id, updates.artistIds)
-    }
+    // Keep the direct artist_id column in sync with the first assigned artist
+    const primaryArtistId = updates.artistIds[0] ?? null
+    const { error: syncErr } = await db
+      .from('assets')
+      .update({ artist_id: primaryArtistId })
+      .eq('id', id)
+    if (syncErr) throw new Error(syncErr.message)
+    // Auto-assign to artist folder (single) or collabs subfolder (multi)
+    await ensureCollabsFolders(db, id, updates.artistIds)
   }
 
   const asset = rowToAsset(data)
