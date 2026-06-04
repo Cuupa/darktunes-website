@@ -415,7 +415,7 @@ export function ArtistDetailContent({
                 >
                   <Image
                     src={asset.publicUrl}
-                    alt={asset.fileName ?? `${artist.name} photo`}
+                    alt={asset.filename ?? `${artist.name} photo`}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                     unoptimized
