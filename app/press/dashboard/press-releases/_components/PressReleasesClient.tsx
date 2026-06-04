@@ -27,6 +27,7 @@ function categoryKey(category?: string | null): keyof Dictionary['pressReleases'
 export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<'all' | keyof Dictionary['pressReleases']['categories']>('all')
+  const [currentTimestamp] = useState(() => Date.now())
 
   const categories = useMemo(() => {
     return Array.from(new Set(posts.map((post) => categoryKey(post.releaseCategory))))
@@ -77,7 +78,7 @@ export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {filteredPosts.map((post) => {
-            const embargoFuture = post.embargoUntil ? new Date(post.embargoUntil).getTime() > Date.now() : false
+            const embargoFuture = post.embargoUntil ? new Date(post.embargoUntil).getTime() > currentTimestamp : false
             const category = categoryKey(post.releaseCategory)
             return (
               <Card key={post.id} className="overflow-hidden border-border bg-card/70">

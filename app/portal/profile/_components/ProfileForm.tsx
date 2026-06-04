@@ -16,7 +16,7 @@
  */
 
 import { useRef, useState } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -121,6 +121,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
       soundcloud_url: initialProfile?.soundcloudUrl ?? '',
     },
   })
+  const watched = useWatch({ control: form.control })
 
   if (!artistId) {
     return (
@@ -264,8 +265,6 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
   // ---------------------------------------------------------------------------
   // Build live EPK data from form watch
   // ---------------------------------------------------------------------------
-
-  const watched = form.watch()
 
   const epkData: EPKData = {
     artistName: artistName ?? 'Artist',

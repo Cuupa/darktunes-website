@@ -29,7 +29,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const parsed = contactSchema.safeParse(body)
 
   if (!parsed.success) {
-    const message = parsed.error.errors.map((e) => e.message).join('; ')
+    const message = parsed.error.issues.map((e) => e.message).join('; ')
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 

@@ -56,7 +56,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   const body: unknown = await req.json()
   const parsed = profileBodySchema.safeParse(body)
   if (!parsed.success) {
-    throw new ApiError(400, parsed.error.errors.map((e) => e.message).join('; '))
+    throw new ApiError(400, parsed.error.issues.map((e) => e.message).join('; '))
   }
 
   // 3. Confirm the artist_id in the body belongs to the authenticated user
