@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as newsApi from '@/lib/api/news'
+import { logEditorActivity } from '@/lib/editorActivityLogger'
 import type { NewsPost } from '@/types'
 import type { Database } from '@/types/database'
 
@@ -33,17 +34,45 @@ export function useNews() {
   }, [supabase])
 
   const createNewsPost = async (data: NewsInsert): Promise<void> => {
-    await newsApi.createNewsPost(supabase, data)
+    const created = await newsApi.createNewsPost(supabase, data)
+    await logEditorActivity(supabase, {
+      action: 'create',
+      entityType: 'news_post',
+      entityId: created.id,
+      entityName: created.title,
+      changes: data,
+    })
     await load()
   }
 
   const updateNewsPost = async (id: string, data: NewsUpdate): Promise<void> => {
-    await newsApi.updateNewsPost(supabase, id, data)
+    const payload: NewsUpdate = { ...data }
+    if (data.status === 'published') {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) payload.reviewed_by = user.id
+    }
+    const updated = await newsApi.updateNewsPost(supabase, id, payload)
+    await logEditorActivity(supabase, {
+      action: 'update',
+      entityType: 'news_post',
+      entityId: id,
+      entityName: updated.title,
+      changes: payload,
+    })
     await load()
   }
 
   const deleteNewsPost = async (id: string): Promise<void> => {
+    const target = news.find((item) => item.id === id)
     await newsApi.deleteNewsPost(supabase, id)
+    await logEditorActivity(supabase, {
+      action: 'delete',
+      entityType: 'news_post',
+      entityId: id,
+      entityName: target?.title,
+    })
     await load()
   }
 

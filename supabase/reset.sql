@@ -451,6 +451,7 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   is_press_only BOOLEAN    NOT NULL DEFAULT FALSE,
   status       TEXT        NOT NULL DEFAULT 'published',
   artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  reviewed_by  UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
   embargo_until TIMESTAMPTZ,
   media_contact TEXT,
   release_category TEXT,
@@ -461,6 +462,7 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS reviewed_by   UUID    REFERENCES auth.users (id) ON DELETE SET NULL;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS embargo_until    TIMESTAMPTZ;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS media_contact    TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS release_category TEXT;
@@ -614,14 +616,71 @@ CREATE TABLE IF NOT EXISTS public.concerts (
   songkick_id     TEXT        UNIQUE,
   bandsintown_id  TEXT        UNIQUE,
   status          TEXT        NOT NULL DEFAULT 'ok',
+  created_by      UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  source          TEXT        NOT NULL DEFAULT 'admin',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS bandsintown_id TEXT UNIQUE;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'admin';
 
 CREATE INDEX IF NOT EXISTS idx_concerts_artist_id    ON public.concerts (artist_id);
 CREATE INDEX IF NOT EXISTS idx_concerts_concert_date ON public.concerts (concert_date ASC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: editor_activity_log
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.editor_activity_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  editor_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id UUID NOT NULL,
+  entity_name TEXT,
+  changes JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_editor_activity_log_editor_id ON public.editor_activity_log(editor_id);
+CREATE INDEX IF NOT EXISTS idx_editor_activity_log_created_at ON public.editor_activity_log(created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: editor_notifications
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.editor_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id UUID NOT NULL,
+  entity_name TEXT,
+  sender_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_editor_notifications_recipient
+  ON public.editor_notifications(recipient_id, read);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: interview_requests
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.interview_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  journalist_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  preferred_date TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  artist_reply TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_interview_requests_journalist ON public.interview_requests(journalist_id);
+CREATE INDEX IF NOT EXISTS idx_interview_requests_artist ON public.interview_requests(artist_id);
 
 DROP TRIGGER IF EXISTS trg_concerts_updated_at ON public.concerts;
 CREATE TRIGGER trg_concerts_updated_at
@@ -987,6 +1046,9 @@ ALTER TABLE public.portal_feature_flags  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
@@ -1264,6 +1326,7 @@ DROP POLICY IF EXISTS "concerts: public read visible"         ON public.concerts
 DROP POLICY IF EXISTS "concerts: artist own insert"           ON public.concerts;
 DROP POLICY IF EXISTS "concerts: artist own update"           ON public.concerts;
 DROP POLICY IF EXISTS "concerts: artist own delete"           ON public.concerts;
+DROP POLICY IF EXISTS "concerts: artist manage own"           ON public.concerts;
 
 -- Anonymous users only see concerts for visible artists; admins/editors see all
 CREATE POLICY "concerts: public read visible" ON public.concerts
@@ -1305,6 +1368,74 @@ CREATE POLICY "concerts: artist own delete" ON public.concerts
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
   );
+
+CREATE POLICY "concerts: artist manage own" ON public.concerts
+  FOR ALL USING (
+    artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid())
+  );
+
+-- ---------------------------------------------------------------------------
+-- RLS: editor_activity_log
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "editor_activity_log: admin read" ON public.editor_activity_log;
+DROP POLICY IF EXISTS "editor_activity_log: editor read own" ON public.editor_activity_log;
+DROP POLICY IF EXISTS "editor_activity_log: editor insert own" ON public.editor_activity_log;
+
+CREATE POLICY "editor_activity_log: admin read" ON public.editor_activity_log
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE POLICY "editor_activity_log: editor read own" ON public.editor_activity_log
+  FOR SELECT USING (public.get_my_role() = 'editor' AND editor_id = auth.uid());
+
+CREATE POLICY "editor_activity_log: editor insert own" ON public.editor_activity_log
+  FOR INSERT WITH CHECK (
+    public.get_my_role() = 'editor' AND editor_id = auth.uid()
+  );
+
+-- ---------------------------------------------------------------------------
+-- RLS: editor_notifications
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "editor_notifications: editor read own" ON public.editor_notifications;
+DROP POLICY IF EXISTS "editor_notifications: editor update own" ON public.editor_notifications;
+DROP POLICY IF EXISTS "editor_notifications: admin manage" ON public.editor_notifications;
+
+CREATE POLICY "editor_notifications: editor read own" ON public.editor_notifications
+  FOR SELECT USING (
+    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+  );
+
+CREATE POLICY "editor_notifications: editor update own" ON public.editor_notifications
+  FOR UPDATE USING (
+    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+  )
+  WITH CHECK (
+    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+  );
+
+CREATE POLICY "editor_notifications: admin manage" ON public.editor_notifications
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: interview_requests
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "interview_requests: journalist manage own" ON public.interview_requests;
+DROP POLICY IF EXISTS "interview_requests: artist read own" ON public.interview_requests;
+DROP POLICY IF EXISTS "interview_requests: artist update own" ON public.interview_requests;
+
+CREATE POLICY "interview_requests: journalist manage own" ON public.interview_requests
+  FOR ALL USING (journalist_id = auth.uid())
+  WITH CHECK (journalist_id = auth.uid());
+
+CREATE POLICY "interview_requests: artist read own" ON public.interview_requests
+  FOR SELECT USING (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()));
+
+CREATE POLICY "interview_requests: artist update own" ON public.interview_requests
+  FOR UPDATE USING (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()))
+  WITH CHECK (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()));
 
 -- ---------------------------------------------------------------------------
 -- RLS: newsletter_subscribers

@@ -28,6 +28,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { EditorNotificationBell } from './EditorNotificationBell'
 
 // Heavy manager panels are lazy-loaded so each tab's JS bundle is fetched only
 // when the user first opens that tab, keeping the initial admin page lightweight.
@@ -125,7 +126,11 @@ function loadTabOrder(): TabValue[] {
 // Component
 // ---------------------------------------------------------------------------
 
-export function AdminDashboard() {
+interface AdminDashboardProps {
+  contentOnly?: boolean
+}
+
+export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
   const { user, profile, signOut, session } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -183,6 +188,7 @@ export function AdminDashboard() {
   const canSeeTab = (tab: TabValue) => {
     const def = TAB_DEFS.find((t) => t.value === tab)
     if (!def) return false
+    if (contentOnly) return !def.adminOnly
     if (isAdmin) return true
     if (isEditor) return !def.adminOnly
     return false
@@ -236,10 +242,13 @@ export function AdminDashboard() {
       <header className="border-b border-border bg-card sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">darkTunes Admin</h1>
-            <p className="text-sm text-muted-foreground">Content Management System</p>
+            <h1 className="text-2xl font-bold">{contentOnly ? 'darkTunes Editor' : 'darkTunes Admin'}</h1>
+            <p className="text-sm text-muted-foreground">
+              {contentOnly ? 'Editor Dashboard' : 'Content Management System'}
+            </p>
           </div>
           <div className="flex items-center gap-4">
+            {contentOnly && user?.id && <EditorNotificationBell userId={user.id} />}
             <div className="text-right">
               <p className="text-sm font-medium">{user?.email}</p>
               <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
@@ -270,7 +279,7 @@ export function AdminDashboard() {
                     </TabsTrigger>
                   ))}
                 </TabsList>
-                {isAdmin && (
+                {isAdmin && !contentOnly && (
                   <Button
                     variant="ghost"
                     size="sm"

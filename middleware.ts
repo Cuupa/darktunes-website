@@ -60,6 +60,7 @@ export async function middleware(request: NextRequest) {
 
   const isAdminLoginPage = pathname === '/admin/login'
   const isAdminRoute = pathname.startsWith('/admin')
+  const isEditorRoute = pathname.startsWith('/editor')
 
   const isPortalLoginPage = pathname === '/portal/login'
   const isPortalRoute = pathname.startsWith('/portal')
@@ -69,15 +70,15 @@ export async function middleware(request: NextRequest) {
 
   // --- Admin route protection ---
 
-  // Redirect unauthenticated users away from protected admin routes
-  if (isAdminRoute && !isAdminLoginPage && !user) {
+  // Redirect unauthenticated users away from protected admin/editor routes
+  if ((isAdminRoute && !isAdminLoginPage && !user) || (isEditorRoute && !user)) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/admin/login'
     return NextResponse.redirect(loginUrl)
   }
 
-  // For authenticated users on admin routes (or the login page), fetch the role
-  if (isAdminRoute && user) {
+  // For authenticated users on admin/editor routes (or the admin login page), fetch the role
+  if ((isAdminRoute || isEditorRoute) && user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -87,14 +88,23 @@ export async function middleware(request: NextRequest) {
     const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
 
     if (isAdminLoginPage) {
-      // Redirect users WITH admin access away from the login page
-      if (hasAdminAccess) {
+      if (profile?.role === 'admin') {
         const adminUrl = request.nextUrl.clone()
         adminUrl.pathname = '/admin'
         return NextResponse.redirect(adminUrl)
       }
+      if (profile?.role === 'editor') {
+        const editorUrl = request.nextUrl.clone()
+        editorUrl.pathname = '/editor'
+        return NextResponse.redirect(editorUrl)
+      }
       // Users without admin access may stay on the login page (already rejected above via no-session path)
-    } else {
+    } else if (isAdminRoute) {
+      if (profile?.role === 'editor') {
+        const editorUrl = request.nextUrl.clone()
+        editorUrl.pathname = '/editor'
+        return NextResponse.redirect(editorUrl)
+      }
       // Protect all other /admin/* routes — deny non-admin/editor roles
       if (!hasAdminAccess) {
         const loginUrl = request.nextUrl.clone()
@@ -102,6 +112,11 @@ export async function middleware(request: NextRequest) {
         loginUrl.searchParams.set('error', 'unauthorized')
         return NextResponse.redirect(loginUrl)
       }
+    } else if (isEditorRoute && !hasAdminAccess) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/admin/login'
+      loginUrl.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(loginUrl)
     }
   }
 
@@ -252,4 +267,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

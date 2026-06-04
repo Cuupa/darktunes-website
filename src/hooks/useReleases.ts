@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as releasesApi from '@/lib/api/releases'
+import { logEditorActivity } from '@/lib/editorActivityLogger'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
 import type { SyncAllResult } from '@/lib/sync/syncAll'
@@ -36,19 +37,40 @@ export function useReleases() {
   }, [supabase])
 
   const createRelease = async (data: ReleaseInsert): Promise<void> => {
-    await releasesApi.createRelease(supabase, data)
+    const created = await releasesApi.createRelease(supabase, data)
+    await logEditorActivity(supabase, {
+      action: 'create',
+      entityType: 'release',
+      entityId: created.id,
+      entityName: created.title,
+      changes: data,
+    })
     await load()
     void revalidateContentCache(['releases'])
   }
 
   const updateRelease = async (id: string, data: ReleaseUpdate): Promise<void> => {
-    await releasesApi.updateRelease(supabase, id, data)
+    const updated = await releasesApi.updateRelease(supabase, id, data)
+    await logEditorActivity(supabase, {
+      action: 'update',
+      entityType: 'release',
+      entityId: id,
+      entityName: updated.title,
+      changes: data,
+    })
     await load()
     void revalidateContentCache(['releases'])
   }
 
   const deleteRelease = async (id: string): Promise<void> => {
+    const target = releases.find((release) => release.id === id)
     await releasesApi.deleteRelease(supabase, id)
+    await logEditorActivity(supabase, {
+      action: 'delete',
+      entityType: 'release',
+      entityId: id,
+      entityName: target?.title,
+    })
     await load()
     void revalidateContentCache(['releases'])
   }

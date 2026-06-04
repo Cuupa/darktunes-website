@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   ChartBar,
   ChatCircleText,
+  Chats,
   Eye,
   FileText,
   List,
@@ -40,6 +41,7 @@ const baseNavItems = [
   { href: '/portal/tour', label: 'tour', icon: MapPin },
   { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
   { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
+  { href: '/portal/interviews', label: 'interviews', icon: Chats },
   { href: '/portal/settings', label: 'settings', icon: Gear },
 ] as const
 
