@@ -530,9 +530,9 @@ export function UsersManager() {
             }
           }}
         >
-          <DialogContent aria-describedby={undefined}>
+          <DialogContent aria-describedby={undefined} aria-labelledby="users-link-dialog-title">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle id="users-link-dialog-title">
                 <div className="flex items-center gap-2">
                   <Users size={18} aria-hidden="true" />
                   Link Band to User
@@ -582,9 +582,9 @@ export function UsersManager() {
           open={!!historyTarget}
           onOpenChange={(open) => !open && setHistoryTarget(null)}
         >
-          <DialogContent aria-describedby={undefined}>
+          <DialogContent aria-describedby={undefined} aria-labelledby="users-history-dialog-title">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle id="users-history-dialog-title">
                 <div className="flex items-center gap-2">
                   <ClockCounterClockwise size={18} aria-hidden="true" />
                   Audit History — {historyTarget?.email}

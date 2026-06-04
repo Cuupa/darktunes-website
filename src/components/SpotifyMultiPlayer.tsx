@@ -93,6 +93,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
             <div className="flex flex-wrap gap-2 mt-4 justify-center">
               {playlists.map((playlist, i) => {
                 const isActive = i === activeIndex
+                // accentColor is a dynamic per-playlist value; inline style is intentional
                 const accentStyle =
                   playlist.accentColor && isActive
                     ? { backgroundColor: playlist.accentColor, borderColor: playlist.accentColor, color: '#fff' }

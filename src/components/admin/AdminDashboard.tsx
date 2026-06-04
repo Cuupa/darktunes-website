@@ -102,6 +102,27 @@ const TAB_DEFS: TabDef[] = [
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
 const LS_KEY = 'admin-tab-order'
 
+// Static card titles and descriptions for each tab panel
+const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> = {
+  artists:         { title: 'Artists Management',                description: 'Manage label artists, their information, and social links' },
+  releases:        { title: 'Releases Management',               description: 'Manage music releases, albums, EPs, and singles' },
+  news:            { title: 'News Management',                   description: 'Create and manage news posts and announcements' },
+  videos:          { title: 'Videos Management',                 description: 'Manage music videos and YouTube content' },
+  assets:          { title: 'Assets Management',                 description: 'Upload and manage images, covers, and media files' },
+  settings:        { title: 'Site Settings',                     description: 'Manage global site content: social links, hero text, SEO metadata, and more' },
+  health:          { title: 'System Health & API Status',        description: 'Monitor external API synchronisation status and trigger a manual sync' },
+  media:           { title: 'Press & Media',                     description: 'Manage journalist applications, press photos (EPK), and private promo tracks' },
+  users:           { title: 'User Management',                   description: 'Manage registered users: assign roles, ban/unban accounts, link artists, or delete users' },
+  features:        { title: 'Feature Toggles',                   description: 'Enable or disable portal modules globally. Disabled features disappear from their dashboards and routes are secured.' },
+  'feature-flags': { title: 'Portal & Journalist Feature Flags', description: 'Enable or disable sections for artist and journalist dashboards.' },
+  messages:        { title: 'Artist Messages',                   description: 'Send inbox messages to artists and track read status.' },
+  accreditations:  { title: 'Accreditations',                    description: 'Review journalist accreditation requests and approve or reject them.' },
+  press:           { title: 'Press Portal',                      description: 'Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.' },
+  logs:            { title: 'Logs',                              description: 'Audit log of all sync runs and error log for failed or partial syncs.' },
+  roles:           { title: 'Roles & Permissions',               description: 'Configure what each user role is allowed to do. Admin always has full access.' },
+  statements:      { title: 'Statements',                        description: 'Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.' },
+}
+
 function isValidTab(value: string | null): value is TabValue {
   return ALL_TAB_VALUES.includes(value as TabValue)
 }
@@ -311,7 +332,7 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 min-w-[44px] min-h-[44px]"
                       disabled={idx === 0}
                       onClick={() => moveTab(value, 'up')}
                       aria-label={`Move ${label} up`}
@@ -321,7 +342,7 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-6 w-6 min-w-[44px] min-h-[44px]"
                       disabled={idx === visibleTabs.length - 1}
                       onClick={() => moveTab(value, 'down')}
                       aria-label={`Move ${label} down`}
@@ -334,308 +355,57 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
             )}
           </div>
 
-          {/* Tab content panels — each manager is lazy-loaded on first tab visit */}
-          <TabsContent value="artists" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Artists Management</CardTitle>
-                <CardDescription>
-                  Manage label artists, their information, and social links
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<TabFallback />}>
-                  <ArtistsManager />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {/* Tab content panels — each manager is lazy-loaded on first tab visit.
+              Panel components for tabs with special props are defined here as a
+              Record so the renderer below stays declarative and DRY. */}
+          {(() => {
+            const tabPanelContent: Partial<Record<TabValue, React.ReactNode>> = {
+              artists:         <ArtistsManager />,
+              releases:        <ReleasesManager />,
+              news:            <NewsManager />,
+              videos:          <VideosManager />,
+              assets:          <AssetsManager />,
+              settings:        <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />,
+              health:          <SystemHealthWidget bearerToken={session?.access_token ?? ''} />,
+              media:           <MediaManager />,
+              users:           <UsersManager />,
+              features:        (
+                <FeatureTogglesManager
+                  value={siteSettings.featureToggles ?? { promoPool: true, editorTools: true }}
+                  onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
+                  isLoading={siteSettingsLoading}
+                />
+              ),
+              'feature-flags': <FeatureFlagsManager />,
+              messages:        <MessagesManager />,
+              accreditations:  <AccreditationsManager />,
+              press:           <PressManager />,
+              logs:            <LogsManager />,
+              roles:           <RolesManager />,
+              statements:      <StatementsManager />,
+            }
 
-          <TabsContent value="releases" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Releases Management</CardTitle>
-                <CardDescription>
-                  Manage music releases, albums, EPs, and singles
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<TabFallback />}>
-                  <ReleasesManager />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="news" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>News Management</CardTitle>
-                <CardDescription>
-                  Create and manage news posts and announcements
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<TabFallback />}>
-                  <NewsManager />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="videos" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Videos Management</CardTitle>
-                <CardDescription>
-                  Manage music videos and YouTube content
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<TabFallback />}>
-                  <VideosManager />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {canSeeTab('assets') && (
-            <TabsContent value="assets" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Assets Management</CardTitle>
-                  <CardDescription>
-                    Upload and manage images, covers, and media files
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <AssetsManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('settings') && (
-            <TabsContent value="settings" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Site Settings</CardTitle>
-                  <CardDescription>
-                    Manage global site content: social links, hero text, SEO metadata, and more
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('health') && (
-            <TabsContent value="health" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Health &amp; API Status</CardTitle>
-                  <CardDescription>
-                    Monitor external API synchronisation status and trigger a manual sync
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('media') && (
-            <TabsContent value="media" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Press &amp; Media</CardTitle>
-                  <CardDescription>
-                    Manage journalist applications, press photos (EPK), and private promo tracks
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <MediaManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('features') && (
-            <TabsContent value="features" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Feature Toggles</CardTitle>
-                  <CardDescription>
-                    Enable or disable portal modules globally. Disabled features disappear from their dashboards and routes are secured.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <FeatureTogglesManager
-                      value={siteSettings.featureToggles ?? { promoPool: true, editorTools: true }}
-                      onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
-                      isLoading={siteSettingsLoading}
-                    />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('users') && (
-            <TabsContent value="users" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Management</CardTitle>
-                  <CardDescription>
-                    Manage registered users: assign roles, ban/unban accounts, link artists, or delete users
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <UsersManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('press') && (
-            <TabsContent value="press" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Press Portal</CardTitle>
-                  <CardDescription>
-                    Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <PressManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('feature-flags') && (
-            <TabsContent value="feature-flags" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Portal &amp; Journalist Feature Flags</CardTitle>
-                  <CardDescription>
-                    Enable or disable sections for artist and journalist dashboards.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <FeatureFlagsManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('messages') && (
-            <TabsContent value="messages" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Artist Messages</CardTitle>
-                  <CardDescription>
-                    Send inbox messages to artists and track read status.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <MessagesManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('accreditations') && (
-            <TabsContent value="accreditations" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Accreditations</CardTitle>
-                  <CardDescription>
-                    Review journalist accreditation requests and approve or reject them.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <AccreditationsManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('logs') && (
-            <TabsContent value="logs" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Logs</CardTitle>
-                  <CardDescription>
-                    Audit log of all sync runs and error log for failed or partial syncs.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <LogsManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('roles') && (
-            <TabsContent value="roles" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Roles &amp; Permissions</CardTitle>
-                  <CardDescription>
-                    Configure what each user role is allowed to do. Admin always has full access.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <RolesManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {canSeeTab('statements') && (
-            <TabsContent value="statements" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Statements</CardTitle>
-                  <CardDescription>
-                    Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={<TabFallback />}>
-                    <StatementsManager />
-                  </Suspense>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
+            return TAB_DEFS.map(({ value, adminOnly }) => {
+              if (adminOnly && !canSeeTab(value)) return null
+              const meta = TAB_PANEL_META[value]
+              const content = tabPanelContent[value]
+              return (
+                <TabsContent key={value} value={value} className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{meta.title}</CardTitle>
+                      <CardDescription>{meta.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Suspense fallback={<TabFallback />}>
+                        {content}
+                      </Suspense>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )
+            })
+          })()}
         </Tabs>
       </main>
     </div>

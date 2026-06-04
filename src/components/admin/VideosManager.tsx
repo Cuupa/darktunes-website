@@ -251,17 +251,18 @@ export function VideosManager() {
                 <TableCell>{video.publishedAt.split('T')[0]}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(video)} title="Edit">
-                      <PencilSimple size={16} />
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(video)} title="Edit" aria-label={`Edit ${video.title}`}>
+                      <PencilSimple size={16} aria-hidden="true" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => setDeleteTarget(video)}
                       title="Delete"
+                      aria-label={`Delete ${video.title}`}
                       className="text-destructive hover:text-destructive"
                     >
-                      <Trash size={16} />
+                      <Trash size={16} aria-hidden="true" />
                     </Button>
                   </div>
                 </TableCell>
@@ -272,9 +273,9 @@ export function VideosManager() {
       </Table>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="videos-form-dialog-title" className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingVideo ? 'Edit Video' : 'New Video'}</DialogTitle>
+            <DialogTitle id="videos-form-dialog-title">{editingVideo ? 'Edit Video' : 'New Video'}</DialogTitle>
           </DialogHeader>
           <VideoForm value={formValue} onChange={handleSave} isLoading={isMutating} artists={artists} />
         </DialogContent>

@@ -131,9 +131,11 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
       className={`h-7 w-7 ${active ? 'bg-accent text-accent-foreground' : ''}`}
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       disabled={disabled}
     >
-      {children}
+      <span aria-hidden="true">{children}</span>
     </Button>
   )
 

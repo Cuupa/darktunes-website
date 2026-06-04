@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag } from '@phosphor-icons/react'
-import { useLenis } from '@/components/animations/LenisProvider'
+import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 
@@ -13,22 +13,7 @@ interface FooterProps {
 }
 
 export function Footer({ siteSettings, dict }: FooterProps) {
-  const lenis = useLenis()
-
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault()
-    if (lenis) {
-      lenis.scrollTo(href, { offset: -140 })
-    } else {
-      const target = document.querySelector(href)
-      if (target) {
-        const headerOffset = 140
-        const elementPosition = target.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.scrollY - headerOffset
-        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
-      }
-    }
-  }
+  const handleSmoothScroll = useSmoothScrollToAnchor()
 
   return (
     <footer className="border-t border-border bg-card/50 backdrop-blur-sm overflow-x-hidden">

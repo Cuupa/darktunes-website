@@ -15,11 +15,7 @@
  *  4. EPK Preview  — live preview of the press kit
  */
 
-import { useRef, useState } from 'react'
-import { useForm, Controller, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { toast } from 'sonner'
+import { Controller } from 'react-hook-form'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,42 +34,12 @@ import {
   Info,
   Newspaper,
 } from '@phosphor-icons/react'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Dictionary } from '@/i18n/types'
 import { EPKPreview } from './EPKPreview'
 import type { EPKData } from './EPKPreview'
-
-// ---------------------------------------------------------------------------
-// Zod schema
-// ---------------------------------------------------------------------------
-
-const optionalUrl = z.string().url('Must be a valid URL').optional().or(z.literal(''))
-
-const profileSchema = z.object({
-  bio: z.string().max(2000).optional(),
-  bio_short: z.string().max(6000).optional(),
-  bio_medium: z.string().max(12000).optional(),
-  bio_long: z.string().max(30000).optional(),
-  genres: z.string().optional(),
-  press_quote: z.string().max(1000).optional(),
-  founding_year: z.string().optional(),
-  hometown: z.string().max(200).optional(),
-  booking_contact: z.string().max(500).optional(),
-  press_contact: z.string().max(500).optional(),
-  website_url: optionalUrl,
-  instagram_url: optionalUrl,
-  youtube_url: optionalUrl,
-  bandcamp_url: optionalUrl,
-  spotify_url: optionalUrl,
-  apple_music_url: optionalUrl,
-  tiktok_url: optionalUrl,
-  facebook_url: optionalUrl,
-  soundcloud_url: optionalUrl,
-})
-
-type ProfileFormValues = z.infer<typeof profileSchema>
+import { usePortalProfileForm } from '@/hooks/usePortalProfileForm'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -92,37 +58,6 @@ interface ProfileFormProps {
 // ---------------------------------------------------------------------------
 
 export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormProps) {
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
-  const isUploading = uploadProgress !== null && uploadProgress < 100
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      bio: initialProfile?.bio ?? '',
-      bio_short: initialProfile?.bioShort ?? '',
-      bio_medium: initialProfile?.bioMedium ?? '',
-      bio_long: initialProfile?.bioLong ?? '',
-      genres: initialProfile?.genres.join(', ') ?? '',
-      press_quote: initialProfile?.pressQuote ?? '',
-      founding_year: initialProfile?.foundingYear?.toString() ?? '',
-      hometown: initialProfile?.hometown ?? '',
-      booking_contact: initialProfile?.bookingContact ?? '',
-      press_contact: initialProfile?.pressContact ?? '',
-      website_url: initialProfile?.websiteUrl ?? '',
-      instagram_url: initialProfile?.instagramUrl ?? '',
-      youtube_url: initialProfile?.youtubeUrl ?? '',
-      bandcamp_url: initialProfile?.bandcampUrl ?? '',
-      spotify_url: initialProfile?.spotifyUrl ?? '',
-      apple_music_url: initialProfile?.appleMusicUrl ?? '',
-      tiktok_url: initialProfile?.tiktokUrl ?? '',
-      facebook_url: initialProfile?.facebookUrl ?? '',
-      soundcloud_url: initialProfile?.soundcloudUrl ?? '',
-    },
-  })
-  const watched = useWatch({ control: form.control })
-
   if (!artistId) {
     return (
       <Card className="bg-card border-border">
@@ -133,134 +68,24 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
     )
   }
 
-  // ---------------------------------------------------------------------------
-  // Photo upload
-  // ---------------------------------------------------------------------------
+  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} />
+}
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
+  artistId: string
+}
 
-    setUploadProgress(0)
-    try {
-      const supabase = createBrowserSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        toast.error(dict.profile_photoError)
-        return
-      }
-
-      const body = new FormData()
-      body.append('file', file)
-      body.append('artistId', artistId)
-      const token = session.access_token
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-
-        xhr.upload.addEventListener('progress', (ev) => {
-          if (ev.lengthComputable) {
-            setUploadProgress(Math.round((ev.loaded / ev.total) * 100))
-          }
-        })
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText) as { url?: string }
-              if (data.url) {
-                setPhotoUrl(data.url)
-                setUploadProgress(100)
-                resolve()
-              } else {
-                reject(new Error('No URL in response'))
-              }
-            } catch {
-              reject(new Error('Invalid server response'))
-            }
-          } else {
-            reject(new Error(`Upload failed (${xhr.status})`))
-          }
-        })
-
-        xhr.addEventListener('error', () => reject(new Error('Network error')))
-        xhr.open('POST', '/api/portal/upload-photo')
-        xhr.setRequestHeader('Authorization', 'Bearer ' + token)
-        xhr.send(body)
-      })
-
-      toast.success(dict.profile_photoUploaded)
-    } catch {
-      toast.error(dict.profile_photoError)
-    } finally {
-      setTimeout(() => setUploadProgress(null), 800)
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Form submission
-  // ---------------------------------------------------------------------------
-
-  const onSubmit = async (values: ProfileFormValues) => {
-    try {
-      const supabase = createBrowserSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        toast.error(dict.profile_error)
-        return
-      }
-
-      const foundingYearNum = values.founding_year
-        ? parseInt(values.founding_year, 10)
-        : null
-
-      const payload = {
-        artist_id: artistId,
-        bio: values.bio ?? null,
-        bio_short: values.bio_short ?? null,
-        bio_medium: values.bio_medium ?? null,
-        bio_long: values.bio_long ?? null,
-        photo_url: photoUrl ?? null,
-        genres: values.genres
-          ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
-          : [],
-        press_quote: values.press_quote ?? null,
-        founding_year: foundingYearNum && !isNaN(foundingYearNum) ? foundingYearNum : null,
-        hometown: values.hometown || null,
-        booking_contact: values.booking_contact || null,
-        press_contact: values.press_contact || null,
-        website_url: values.website_url || null,
-        instagram_url: values.instagram_url || null,
-        youtube_url: values.youtube_url || null,
-        bandcamp_url: values.bandcamp_url || null,
-        spotify_url: values.spotify_url || null,
-        apple_music_url: values.apple_music_url || null,
-        tiktok_url: values.tiktok_url || null,
-        facebook_url: values.facebook_url || null,
-        soundcloud_url: values.soundcloud_url || null,
-      }
-
-      const res = await fetch('/api/portal/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + session.access_token,
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        toast.error(dict.profile_error)
-        return
-      }
-
-      toast.success(dict.profile_saved)
-    } catch {
-      toast.error(dict.profile_error)
-    }
-  }
+function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormInnerProps) {
+  const {
+    form,
+    photoUrl,
+    uploadProgress,
+    isUploading,
+    fileInputRef,
+    watched,
+    handlePhotoChange,
+    onSubmit,
+  } = usePortalProfileForm({ artistId, initialProfile, dict })
 
   // ---------------------------------------------------------------------------
   // Build live EPK data from form watch
@@ -339,7 +164,7 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
         </div>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-6">
         <Tabs defaultValue="bio" className="w-full">
           <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
             <TabsTrigger value="bio" className="gap-1.5">

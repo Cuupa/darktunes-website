@@ -10,7 +10,6 @@ import { Card } from '@/components/ui/card'
 import {
   ArrowLeft,
   SpotifyLogo,
-  AppleLogo,
   InstagramLogo,
   YoutubeLogo,
   Globe,
@@ -29,6 +28,7 @@ import {
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
+import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import type { Artist, Release, Concert, Video, NewsPost } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -49,35 +49,6 @@ function extractYouTubeId(url: string): string | null {
   )
   return match?.[1] ?? null
 }
-
-/**
- * Visual config for each Odesli platform key.
- * Keys match what the Odesli API returns in `linksByPlatform`.
- */
-const PLATFORM_CONFIG: Record<
-  string,
-  { label: string; bg: string; textColor: string; icon: React.ElementType }
-> = {
-  spotify:      { label: 'Spotify',       bg: '#1DB954', textColor: 'text-black',  icon: SpotifyLogo },
-  appleMusic:   { label: 'Apple Music',   bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo },
-  youtube:      { label: 'YouTube',       bg: '#FF0000', textColor: 'text-white',  icon: YoutubeLogo },
-  youtubeMusic: { label: 'YT Music',      bg: '#FF0033', textColor: 'text-white',  icon: MusicNote },
-  deezer:       { label: 'Deezer',        bg: '#A238FF', textColor: 'text-white',  icon: MusicNote },
-  tidal:        { label: 'Tidal',         bg: '#000000', textColor: 'text-white',  icon: MusicNote },
-  amazonMusic:  { label: 'Amazon Music',  bg: '#25D1DA', textColor: 'text-black',  icon: MusicNote },
-  pandora:      { label: 'Pandora',       bg: '#005483', textColor: 'text-white',  icon: MusicNote },
-  soundcloud:   { label: 'SoundCloud',    bg: '#FF5500', textColor: 'text-white',  icon: MusicNote },
-  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: MusicNote },
-  napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote },
-  audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote },
-  anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote },
-}
-
-const PLATFORM_ORDER = [
-  'spotify', 'appleMusic', 'youtube', 'youtubeMusic',
-  'deezer', 'tidal', 'amazonMusic', 'soundcloud',
-  'bandcamp', 'pandora', 'napster', 'audiomack', 'anghami',
-]
 
 /** Collapsible section header with animated chevron. */
 function SectionHeader({
@@ -278,9 +249,9 @@ export function ArtistDetailContent({
                   const platformLinks = artist.platformLinks
                   const platformEntries: Array<{ key: string; url: string }> = (() => {
                     if (platformLinks && Object.keys(platformLinks).length > 0) {
-                      const known = PLATFORM_ORDER.filter((k) => platformLinks[k])
+                      const known = ODESLI_PLATFORM_ORDER.filter((k) => platformLinks[k])
                       const unknown = Object.keys(platformLinks)
-                        .filter((k) => !PLATFORM_ORDER.includes(k))
+                        .filter((k) => !ODESLI_PLATFORM_ORDER.includes(k))
                         .sort()
                       return [...known, ...unknown].map((k) => ({ key: k, url: platformLinks[k] }))
                     }
@@ -296,7 +267,7 @@ export function ArtistDetailContent({
                   return (
                     <div className="flex flex-wrap gap-2">
                       {platformEntries.map(({ key, url }) => {
-                        const cfg = PLATFORM_CONFIG[key]
+                        const cfg = ODESLI_PLATFORM_CONFIG[key]
                         const Icon = cfg?.icon ?? Globe
                         const label = cfg?.label ?? key
                         const bg = cfg?.bg ?? undefined

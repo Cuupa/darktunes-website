@@ -151,7 +151,6 @@ export function Artists({ artists, dict }: ArtistsProps) {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                         style={{ transformOrigin: 'center' }}
                         sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"
-                        unoptimized
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                           const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null

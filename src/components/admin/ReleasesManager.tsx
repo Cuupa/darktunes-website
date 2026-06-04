@@ -486,24 +486,27 @@ export function ReleasesManager() {
                       onClick={() => void handleResolveSmartLink(release)}
                       disabled={resolvingSmartLinkId === release.id || (!release.spotifyUrl && !release.appleMusicUrl)}
                       title={release.smartUrl ? 'Re-resolve Odesli smart link' : 'Resolve Odesli smart link'}
+                      aria-label={release.smartUrl ? `Re-resolve Odesli smart link for ${release.title}` : `Resolve Odesli smart link for ${release.title}`}
                     >
                       <LinkSimple
                         size={16}
+                        aria-hidden="true"
                         className={resolvingSmartLinkId === release.id ? 'animate-pulse' : ''}
                         weight={release.smartUrl ? 'fill' : 'regular'}
                       />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(release)} title="Edit">
-                      <PencilSimple size={16} />
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(release)} title="Edit" aria-label={`Edit ${release.title}`}>
+                      <PencilSimple size={16} aria-hidden="true" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => setDeleteTarget(release)}
                       title="Delete"
+                      aria-label={`Delete ${release.title}`}
                       className="text-destructive hover:text-destructive"
                     >
-                      <Trash size={16} />
+                      <Trash size={16} aria-hidden="true" />
                     </Button>
                   </div>
                 </TableCell>
@@ -531,9 +534,9 @@ export function ReleasesManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="releases-form-dialog-title" className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingRelease ? 'Edit Release' : 'New Release'}</DialogTitle>
+            <DialogTitle id="releases-form-dialog-title">{editingRelease ? 'Edit Release' : 'New Release'}</DialogTitle>
           </DialogHeader>
           <ReleaseForm value={formValue} onChange={handleSave} isLoading={isMutating} />
         </DialogContent>
@@ -563,9 +566,9 @@ export function ReleasesManager() {
 
       {/* Sync error details dialog */}
       <Dialog open={!!syncResult && syncResult.totalErrors > 0} onOpenChange={(open) => !open && setSyncResult(null)}>
-        <DialogContent className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent aria-labelledby="releases-sync-errors-title" className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Sync Errors ({syncResult?.totalErrors ?? 0})</DialogTitle>
+            <DialogTitle id="releases-sync-errors-title">Sync Errors ({syncResult?.totalErrors ?? 0})</DialogTitle>
             <DialogDescription>
               The following errors occurred during the last sync run. Successful items were still saved.
             </DialogDescription>
