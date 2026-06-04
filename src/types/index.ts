@@ -369,6 +369,10 @@ export interface SiteSettings {
   heroFeaturedId?: string
   /** R2 URL of a custom hero background image that overrides the release/news cover art. */
   heroCustomBgUrl?: string
+  /** Global fallback label for the hero primary button when item-level label is not set. */
+  heroDefaultPrimaryBtnLabel?: string
+  /** Global fallback label for the hero secondary button when item-level label is not set. */
+  heroDefaultSecondaryBtnLabel?: string
   // ── Homepage Section Order ────────────────────────────────────────────────
   /**
    * Order in which the reorderable sections appear on the homepage.
