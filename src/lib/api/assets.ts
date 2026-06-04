@@ -119,8 +119,13 @@ async function ensureCollabsFolders(db: DbClient, assetId: string, artistIds: st
     .in('artist_id', artistIds)
     .is('parent_id', null)
 
+  // Filter out null artist_id values BEFORE creating Set
+  const validRootFolders = (rootFolders ?? []).filter(
+    (f): f is { id: string; artist_id: string } => f.artist_id !== null
+  )
+
   // For artists without a root folder, fall back to any folder linked to that artist
-  const artistsWithRoot = new Set((rootFolders ?? []).map((f) => f.artist_id))
+  const artistsWithRoot = new Set(validRootFolders.map((f) => f.artist_id))
   const artistsWithoutRoot = artistIds.filter((id) => !artistsWithRoot.has(id))
 
   let fallbackFolders: { id: string; artist_id: string }[] = []
@@ -130,9 +135,15 @@ async function ensureCollabsFolders(db: DbClient, assetId: string, artistIds: st
       .from('asset_folders')
       .select('id, artist_id')
       .in('artist_id', artistsWithoutRoot)
+    
+    // Filter out null artist_id values
+    const validFallbackFolders = (fb ?? []).filter(
+      (f): f is { id: string; artist_id: string } => f.artist_id !== null
+    )
+    
     // Keep only one folder per artist (the first found)
     const seen = new Set<string>()
-    fallbackFolders = (fb ?? []).filter((f) => {
+    fallbackFolders = validFallbackFolders.filter((f) => {
       if (seen.has(f.artist_id)) return false
       seen.add(f.artist_id)
       return true
@@ -141,7 +152,7 @@ async function ensureCollabsFolders(db: DbClient, assetId: string, artistIds: st
 
   // Build parentId map: artistId → folderId
   const parentIdByArtist = new Map<string, string>()
-  for (const f of [...(rootFolders ?? []), ...fallbackFolders]) {
+  for (const f of [...validRootFolders, ...fallbackFolders]) {
     if (!parentIdByArtist.has(f.artist_id)) {
       parentIdByArtist.set(f.artist_id, f.id)
     }
