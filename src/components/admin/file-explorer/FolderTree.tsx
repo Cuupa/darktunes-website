@@ -43,6 +43,9 @@ function FolderTreeNode({ folder, currentFolderId, expanded, onToggle, onNavigat
           {folder.artistId ? <MusicNote size={16} className="text-secondary" aria-hidden="true" /> : null}
           {isActive ? <FolderOpen size={18} className="text-primary" aria-hidden="true" /> : <FolderSimple size={18} className="text-primary" aria-hidden="true" />}
           <span className="truncate">{folder.name}</span>
+          {hasChildren ? (
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">({folder.children?.length})</span>
+          ) : null}
         </button>
       </div>
       {hasChildren && isExpanded && (
@@ -90,7 +93,7 @@ export function FolderTree({ folders, currentFolderId, onNavigate, onCreateRootF
           <Plus size={18} aria-hidden="true" />
         </Button>
       </div>
-      <ScrollArea className="flex-1 px-2 py-3">
+      <ScrollArea className="min-h-0 flex-1 px-2 py-3">
         <div className="space-y-2">
           <button type="button" className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted', currentFolderId === null && 'bg-primary/10 text-primary')} onClick={() => onNavigate(null)}>
             <FolderSimple size={18} className="text-primary" aria-hidden="true" />

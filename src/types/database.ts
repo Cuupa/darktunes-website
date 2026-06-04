@@ -150,6 +150,7 @@ export interface Database {
           is_visible: boolean
           logo_url: string | null
           platform_links: Record<string, string> | null
+          storage_quota_bytes: number | null
           created_at: string
           updated_at: string
         }
@@ -186,6 +187,7 @@ export interface Database {
           is_visible?: boolean
           logo_url?: string | null
           platform_links?: Record<string, string> | null
+          storage_quota_bytes?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -222,6 +224,7 @@ export interface Database {
           is_visible?: boolean
           logo_url?: string | null
           platform_links?: Record<string, string> | null
+          storage_quota_bytes?: number | null
           created_at?: string
           updated_at?: string
         }

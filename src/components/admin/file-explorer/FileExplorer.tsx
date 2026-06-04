@@ -144,6 +144,72 @@ export function FileExplorer({ className }: { className?: string }) {
     }
   }, [explorer])
 
+  // ---------------------------------------------------------------------------
+  // Multi-selection helpers for context-menu operations
+  // When right-clicking an item that is already selected, the operation runs
+  // on ALL selected items of the same kind. Otherwise it runs only on that
+  // single item (matching the single-click, single-select behaviour).
+  // ---------------------------------------------------------------------------
+
+  /** Returns the asset IDs to act on: all selected files when `assetId` is selected, else just `assetId`. */
+  const resolveAssetTargets = useCallback((assetId: string): string[] => {
+    if (explorer.selectedIds.has(assetId)) {
+      return [...explorer.selectedIds].filter((id) => !id.startsWith('folder:'))
+    }
+    return [assetId]
+  }, [explorer.selectedIds])
+
+  /** Returns the folder IDs to act on: all selected folders when `folderId` is selected, else just `folderId`. */
+  const resolveFolderTargets = useCallback((folderId: string): string[] => {
+    if (explorer.selectedIds.has(`folder:${folderId}`)) {
+      return [...explorer.selectedIds]
+        .filter((id) => id.startsWith('folder:'))
+        .map((id) => id.replace('folder:', ''))
+    }
+    return [folderId]
+  }, [explorer.selectedIds])
+
+  const handleContextAssetDelete = useCallback((assetId: string) => {
+    const ids = resolveAssetTargets(assetId)
+    const deleteAll = async () => {
+      if (ids.length === 1) await explorer.deleteAsset(ids[0])
+      else await explorer.batchDelete(ids)
+      explorer.clearSelection()
+      toast.success(ids.length > 1 ? `${ids.length} files deleted` : 'File deleted')
+    }
+    void deleteAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
+  }, [explorer, resolveAssetTargets])
+
+  const handleContextAssetMove = useCallback((assetId: string, folderId: string | null) => {
+    const ids = resolveAssetTargets(assetId)
+    const moveAll = async () => {
+      await Promise.all(ids.map((id) => explorer.moveAsset(id, folderId)))
+      explorer.clearSelection()
+      toast.success(ids.length > 1 ? `${ids.length} files moved` : 'File moved')
+    }
+    void moveAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))
+  }, [explorer, resolveAssetTargets])
+
+  const handleContextFolderDelete = useCallback((folderId: string) => {
+    const ids = resolveFolderTargets(folderId)
+    const deleteAll = async () => {
+      await Promise.all(ids.map((id) => explorer.deleteFolder(id)))
+      explorer.clearSelection()
+      toast.success(ids.length > 1 ? `${ids.length} folders deleted` : 'Folder deleted')
+    }
+    void deleteAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
+  }, [explorer, resolveFolderTargets])
+
+  const handleContextFolderMove = useCallback((folderId: string, parentId: string | null) => {
+    const ids = resolveFolderTargets(folderId)
+    const moveAll = async () => {
+      await Promise.all(ids.map((id) => explorer.moveFolder(id, parentId)))
+      explorer.clearSelection()
+      toast.success(ids.length > 1 ? `${ids.length} folders moved` : 'Folder moved')
+    }
+    void moveAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed'))
+  }, [explorer, resolveFolderTargets])
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Delete' && explorer.selectedIds.size > 0) {
@@ -181,15 +247,15 @@ export function FileExplorer({ className }: { className?: string }) {
     onFolderNavigate: navigate,
     onFolderRenameStart: (currentFolderId: string) => setRenaming({ type: 'folder', id: currentFolderId }),
     onFolderRenameCommit: (currentFolderId: string, name: string) => void renameFolder(currentFolderId, name),
-    onFolderDelete: (currentFolderId: string) => void explorer.deleteFolder(currentFolderId).then(() => toast.success('Folder deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed')),
+    onFolderDelete: (currentFolderId: string) => handleContextFolderDelete(currentFolderId),
     onFolderCreate: (parentId: string | null) => void createFolder(parentId),
-    onFolderMove: (currentFolderId: string, parentId: string | null) => void explorer.moveFolder(currentFolderId, parentId).then(() => toast.success('Folder moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed')),
+    onFolderMove: (currentFolderId: string, parentId: string | null) => handleContextFolderMove(currentFolderId, parentId),
     onFolderFilesDropped: (files: File[], currentFolderId: string) => void uploadRef.current?.uploadToFolder(files, currentFolderId),
     onAssetSelect: (assetId: string, multi: boolean) => explorer.toggleSelect(assetId, multi),
     onAssetRenameStart: (assetId: string) => setRenaming({ type: 'file', id: assetId }),
     onAssetRenameCommit: (assetId: string, name: string) => void renameAsset(assetId, name),
-    onAssetDelete: (assetId: string) => void explorer.deleteAsset(assetId).then(() => toast.success('File deleted')).catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed')),
-    onAssetMove: (assetId: string, currentFolderId: string | null) => void explorer.moveAsset(assetId, currentFolderId).then(() => toast.success('File moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed')),
+    onAssetDelete: (assetId: string) => handleContextAssetDelete(assetId),
+    onAssetMove: (assetId: string, currentFolderId: string | null) => handleContextAssetMove(assetId, currentFolderId),
     onAssetCopyUrl: (asset: Asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied')),
     onAssetDownload: (asset: Asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer'),
     onAssetAssignArtists: (assetId: string, artistIds: string[]) => void handleAssignArtists(assetId, artistIds),
@@ -226,6 +292,7 @@ export function FileExplorer({ className }: { className?: string }) {
               onCreateFolder={() => void createFolder(explorer.currentFolderId)}
               onDeleteSelected={() => void deleteSelected()}
               onUpload={() => uploadRef.current?.openPicker()}
+              authToken={explorer.token}
             />
             <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
             <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>

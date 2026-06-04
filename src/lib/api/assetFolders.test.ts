@@ -24,6 +24,7 @@ function makeBuilder(result: QueryResult) {
     update: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockImplementation(() => createThenable(result)),
     ...createThenable(result),
@@ -49,7 +50,8 @@ const folderRow: Database['public']['Tables']['asset_folders']['Row'] = {
 
 describe('assetFolders DAL', () => {
   it('creates and maps a folder', async () => {
-    const db = makeMockDb([{ data: folderRow, error: null }])
+    // First call: duplicate-check → no existing folder; second call: insert → returns new row
+    const db = makeMockDb([{ data: null, error: null }, { data: folderRow, error: null }])
     const folder = await createFolder(db, 'Press Kit', null, 'artist-1', 'user-1')
     expect(folder.name).toBe('Press Kit')
     expect(folder.artistId).toBe('artist-1')

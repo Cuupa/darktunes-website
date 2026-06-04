@@ -14,6 +14,9 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
+import type { Database } from '@/types/database'
+
+type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
 const profileBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -67,6 +70,23 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   // 4. Upsert profile
   const profile = await upsertArtistProfile(supabase, parsed.data)
+
+  // 5. Sync shared fields back to the artists table so both tables stay in sync
+  const d = parsed.data
+  const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
+  if (d.bio !== undefined) artistUpdate.bio = d.bio ?? ''
+  if (d.genres !== undefined) artistUpdate.genres = d.genres
+  if (d.website_url !== undefined) artistUpdate.website_url = d.website_url
+  if (d.instagram_url !== undefined) artistUpdate.instagram_url = d.instagram_url
+  if (d.youtube_url !== undefined) artistUpdate.youtube_url = d.youtube_url
+  if (d.bandcamp_url !== undefined) artistUpdate.bandcamp_url = d.bandcamp_url
+  if (d.spotify_url !== undefined) artistUpdate.spotify_url = d.spotify_url
+  if (d.apple_music_url !== undefined) artistUpdate.apple_music_url = d.apple_music_url
+  if (d.tiktok_url !== undefined) artistUpdate.tiktok_url = d.tiktok_url
+  if (d.facebook_url !== undefined) artistUpdate.facebook_url = d.facebook_url
+  if (d.founding_year !== undefined) artistUpdate.founded_year = d.founding_year
+
+  await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
 
   return NextResponse.json({ profile })
 })

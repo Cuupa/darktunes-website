@@ -74,7 +74,10 @@ export function PressPageClient({ dict, photos, concerts, profile, artistName }:
                   <BioCopyButton text={bio.text} dict={t} />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-foreground leading-relaxed whitespace-pre-line">{bio.text}</p>
+                  <div
+                    className="prose prose-invert prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: bio.text }}
+                  />
                 </CardContent>
               </Card>
             ))}

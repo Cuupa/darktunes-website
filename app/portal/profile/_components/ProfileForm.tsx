@@ -36,6 +36,7 @@ import {
 } from '@phosphor-icons/react'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
+import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import { EPKPreview } from './EPKPreview'
 import type { EPKData } from './EPKPreview'
@@ -51,13 +52,15 @@ interface ProfileFormProps {
   artistName: string | null
   artistSlug: string | null
   initialProfile: ArtistProfile | null
+  /** Full artist row — used to pre-fill fields when no EPK profile exists yet. */
+  artist?: Artist | null
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormProps) {
+export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormProps) {
   if (!artistId) {
     return (
       <Card className="bg-card border-border">
@@ -68,14 +71,14 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
     )
   }
 
-  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} />
+  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} />
 }
 
 interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
   artistId: string
 }
 
-function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile }: ProfileFormInnerProps) {
+function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormInnerProps) {
   const {
     form,
     photoUrl,
@@ -85,7 +88,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     watched,
     handlePhotoChange,
     onSubmit,
-  } = usePortalProfileForm({ artistId, initialProfile, dict })
+  } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
 
   // ---------------------------------------------------------------------------
   // Build live EPK data from form watch

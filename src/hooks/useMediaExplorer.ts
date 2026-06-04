@@ -257,7 +257,15 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
       },
       body: JSON.stringify({ name, parentId }),
     })
-    if (!response.ok) throw new Error(await response.text())
+    if (!response.ok) {
+      const text = await response.text()
+      try {
+        const json = JSON.parse(text) as { error?: string }
+        throw new Error(json.error ?? text)
+      } catch {
+        throw new Error(text)
+      }
+    }
     const json = (await response.json()) as { folder: AssetFolder }
     await fetchFolderContents(currentFolderId)
     return json.folder

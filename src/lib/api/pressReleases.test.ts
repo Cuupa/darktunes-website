@@ -32,6 +32,7 @@ const mockRow: NewsRow = {
   excerpt: 'Excerpt',
   content: 'Body',
   image_url: null,
+  featured: false,
   is_press_only: true,
   status: 'published',
   published_at: '2024-06-01T00:00:00Z',
@@ -48,6 +49,7 @@ const mockRow: NewsRow = {
   hero_secondary_btn_label: null,
   hero_secondary_btn_action: null,
   hero_secondary_btn_href: null,
+  hero_bg_url: null,
 }
 
 describe('pressReleases DAL', () => {

@@ -1,9 +1,10 @@
 'use client'
 
-import { type RefObject } from 'react'
+import { type RefObject, useCallback, useEffect, useState } from 'react'
 import { ListBullets, MagnifyingGlass, SquaresFour, Trash, UploadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -12,6 +13,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { SortDir, SortField, ViewMode } from '@/hooks/useFileExplorer'
+
+const R2_FREE_TIER_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
 
 interface ExplorerToolbarProps {
   searchQuery: string
@@ -27,6 +37,8 @@ interface ExplorerToolbarProps {
   onCreateFolder: () => void
   onDeleteSelected: () => void
   onUpload: () => void
+  /** ****** used to authenticate the storage-stats API call. */
+  authToken?: string | null
 }
 
 export function ExplorerToolbar({
@@ -43,7 +55,30 @@ export function ExplorerToolbar({
   onCreateFolder,
   onDeleteSelected,
   onUpload,
+  authToken,
 }: ExplorerToolbarProps) {
+  const [usedBytes, setUsedBytes] = useState<number | null>(null)
+
+  const fetchStats = useCallback(() => {
+    if (!authToken) return
+    void fetch('/api/admin/assets/storage-stats', {
+      headers: { Authorization: 'Bearer ' + authToken },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => {
+        if (json && typeof json === 'object' && 'usedBytes' in json) {
+          setUsedBytes(json.usedBytes as number)
+        }
+      })
+      .catch(() => undefined)
+  }, [authToken])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
+
+  const usedPct = usedBytes !== null ? Math.min(100, (usedBytes / R2_FREE_TIER_BYTES) * 100) : null
+
   return (
     <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
@@ -78,6 +113,15 @@ export function ExplorerToolbar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {usedPct !== null && (
+          <div className="flex min-w-40 flex-col gap-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>R2 Storage</span>
+              <span>{formatBytes(usedBytes!)} / 10 GB</span>
+            </div>
+            <Progress value={usedPct} className="h-1.5" aria-label="R2 storage usage" />
+          </div>
+        )}
         <span className="text-sm text-muted-foreground">{itemCount} item(s)</span>
         <div className="flex items-center gap-1 rounded-md border border-border p-1">
           <Button type="button" variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => onViewModeChange('list')} aria-label="List view">

@@ -60,7 +60,7 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
   const handleSignOut = async () => {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
-    toast.success('Signed out')
+    toast.success(dict.signOut)
     router.push('/portal/login')
     router.refresh()
   }
@@ -107,7 +107,7 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
           aria-label={`Preview public profile for ${artistName}`}
         >
           <Eye size={13} aria-hidden="true" />
-          Preview Public Profile
+          {dict.profile_preview_public}
         </Link>
       )}
     </div>
