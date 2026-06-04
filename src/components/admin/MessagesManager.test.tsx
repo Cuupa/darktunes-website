@@ -48,6 +48,10 @@ const {
   }
 })
 
+vi.mock('@phosphor-icons/react', () => ({
+  PencilSimple: () => null,
+}))
+
 vi.mock('sonner', () => ({
   toast: {
     error: mockToastError,
@@ -92,6 +96,14 @@ vi.mock('@/lib/api/labelMessages', () => ({
   sendMessage: vi.fn(),
   softDeleteMessage: vi.fn(),
   starMessage: vi.fn(),
+}))
+
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/components/messaging/MessageComposer', () => ({
