@@ -1456,7 +1456,7 @@ CREATE POLICY "anon_insert" ON public.newsletter_subscribers
 -- Allows anonymous users to unsubscribe via their unique unsubscribe_token (GDPR Art. 7)
 CREATE POLICY "anon_unsubscribe" ON public.newsletter_subscribers
   FOR UPDATE TO anon
-  USING (unsubscribe_token = current_setting('request.jwt.claims', true)::jsonb->>'unsubscribe_token'
+  USING (unsubscribe_token::text = (current_setting('request.jwt.claims', true)::jsonb->>'unsubscribe_token')
          OR TRUE) -- token match enforced in application layer; policy opens UPDATE to anon
   WITH CHECK (status = 'unsubscribed');
 
