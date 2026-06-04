@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.supabase.co',
       },
+      {
+        protocol: 'https',
+        hostname: '*.bcbits.com',
+      },
     ],
   },
   async headers() {
@@ -54,7 +58,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://open.spotify.com https://www.youtube.com",
               "frame-src https://open.spotify.com https://www.youtube.com",
-              "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://*.mzstatic.com",
+              "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://*.mzstatic.com https://*.bcbits.com",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.r2.dev",
