@@ -11,7 +11,7 @@ import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import { selectHeroItems } from '@/lib/heroItems'
@@ -201,7 +201,17 @@ export function HomePageContent({
       <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} sectionOrder={sectionOrder} />
       <main id="main-content">
         <div className="relative">
-          <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentHeroItem?.id ?? 'hero'}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeInOut' }}
+            >
+              <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />
+            </motion.div>
+          </AnimatePresence>
           {heroItems.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
               {heroItems.map((_, i) => (
