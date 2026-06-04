@@ -46,7 +46,8 @@
     "subheading": "Die neuesten Musikvideos und Visualizer",
     "loadMore": "Mehr laden",
     "noVideos": "Noch keine Videos verfügbar.",
-    "viewAll": "Alle Videos anzeigen"
+    "viewAll": "Alle Videos anzeigen",
+    "searchPlaceholder": "Videos nach Titel oder Artist suchen…"
   },
   "concerts": {
     "heading": "TOUR",

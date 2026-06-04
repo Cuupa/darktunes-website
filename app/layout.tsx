@@ -61,7 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
     'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
   const ogTitle = settings?.ogTitle ?? title
   const ogDescription = settings?.ogDescription ?? description
-  const faviconUrl = settings?.faviconUrl || '/icons/icon-192.png'
+  const customFaviconUrl = settings?.faviconUrl || ''
 
   return {
     title,
@@ -73,12 +73,15 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: faviconUrl, sizes: '192x192', type: 'image/png' },
+        // SVG favicon — modern browsers prefer this; shows custom "DT" logo
         { url: '/favicon.svg', type: 'image/svg+xml' },
+        // Custom favicon from admin settings (PNG, higher specificity via order)
+        ...(customFaviconUrl ? [{ url: customFaviconUrl, type: 'image/png' }] : []),
+        // ICO fallback for legacy browsers
         { url: '/favicon.ico', sizes: '32x32' },
       ],
       shortcut: '/favicon.ico',
-      apple: { url: faviconUrl, sizes: '192x192' },
+      apple: { url: customFaviconUrl || '/icons/icon-192.png', sizes: '192x192' },
     },
   }
 }
@@ -102,6 +105,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="darkTunes" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        {/*
+          Explicit <link> tags for favicon — these appear after Next.js-generated
+          links from generateMetadata() and take precedence in the browser.
+          Logo (settings.logoUrl) and favicon (settings.faviconUrl) are independent:
+          the logo is used in the header/footer; the favicon in the browser tab.
+        */}
+        {settings?.faviconUrl ? (
+          <link rel="icon" href={settings.faviconUrl} />
+        ) : (
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        )}
       </head>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>
         <a

@@ -94,11 +94,11 @@ export function VideosPageContent({
             />
             <Input
               type="search"
-              placeholder={locale === 'de' ? 'Nach Titel oder Künstler suchen…' : 'Search by title or artist…'}
+              placeholder={dict.searchPlaceholder}
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               className="pl-10"
-              aria-label="Search videos"
+              aria-label={dict.searchPlaceholder}
             />
           </div>
         </div>
