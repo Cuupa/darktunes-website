@@ -288,6 +288,7 @@ export interface SiteSettings {
   /** Multiple playlists for the multi-player. Falls back to spotifyPlaylistUri when empty. */
   spotifyPlaylists: SpotifyPlaylistEntry[]
   heroBadge: string
+  heroNewsBadge: string
   heroDescription: string
   seoTitle: string
   seoDescription: string

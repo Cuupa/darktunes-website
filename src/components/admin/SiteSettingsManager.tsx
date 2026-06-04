@@ -67,6 +67,7 @@ const schema = z.object({
     { message: 'Playlist URIs must be unique' },
   ),
   heroBadge: z.string().min(1, 'Hero badge text is required'),
+  heroNewsBadge: z.string().optional().default('📰 News'),
   heroDescription: z.string().min(1, 'Hero description is required'),
   heroContentType: z.enum(['release', 'news']).default('release'),
   heroFeaturedId: z.string().optional().default(''),
@@ -574,11 +575,20 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field id="heroBadge" label="Hero Badge Text *" error={errors.heroBadge?.message}>
+              <Field id="heroBadge" label="Hero Badge Text (Releases) *" error={errors.heroBadge?.message}>
                 <Input
                   id="heroBadge"
                   placeholder="e.g. ⚡ New Release"
                   {...register('heroBadge')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="heroNewsBadge" label="Hero Badge Text (News)" error={errors.heroNewsBadge?.message}>
+                <Input
+                  id="heroNewsBadge"
+                  placeholder="e.g. 📰 News"
+                  {...register('heroNewsBadge')}
                   disabled={isSubmitting}
                 />
               </Field>
@@ -1037,10 +1047,17 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 </Field>
               </div>
 
-              <Field id="heroBadge" label="Hero Badge Text *" error={errors.heroBadge?.message}>
+              <Field id="heroBadge" label="Hero Badge Text (Releases) *" error={errors.heroBadge?.message}>
                 <Input id="heroBadge" {...register('heroBadge')} disabled={isSubmitting} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Short label shown on the hero badge pill, e.g. "⚡ New Release".
+                  Short label shown on the hero badge pill for releases, e.g. "⚡ New Release".
+                </p>
+              </Field>
+
+              <Field id="heroNewsBadge" label="Hero Badge Text (News)" error={errors.heroNewsBadge?.message}>
+                <Input id="heroNewsBadge" placeholder="e.g. 📰 News" {...register('heroNewsBadge')} disabled={isSubmitting} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Short label shown on the hero badge pill for news articles, e.g. "📰 News".
                 </p>
               </Field>
 

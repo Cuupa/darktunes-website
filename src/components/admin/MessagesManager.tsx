@@ -13,6 +13,7 @@ import {
   sendMessage,
   softDeleteMessage,
   starMessage,
+  markMessageRead,
 } from '@/lib/api/labelMessages'
 import type { ArtistReply, LabelMessage, MessageTemplate } from '@/types'
 import type { Database } from '@/types/database'
@@ -272,6 +273,18 @@ export function MessagesManager() {
     [messages, repliesByMessageId],
   )
 
+  const handleMarkRead = useCallback(
+    async (id: string) => {
+      try {
+        const updated = await markMessageRead(supabase, id)
+        setMessages((current) => current.map((message) => (message.id === id ? updated : message)))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to mark message as read')
+      }
+    },
+    [supabase],
+  )
+
   const toggleSelected = (id: string) => {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -333,6 +346,7 @@ export function MessagesManager() {
         onStar={handleStar}
         onDelete={handleDelete}
         onExport={handleExport}
+        onMarkRead={handleMarkRead}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelected}
       />

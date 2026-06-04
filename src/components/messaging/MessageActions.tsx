@@ -1,19 +1,21 @@
 'use client'
 
-import { DotsThreeOutlineVertical, Export, Star, StarFour, Trash } from '@phosphor-icons/react'
+import { CheckCircle, DotsThreeOutlineVertical, Export, Star, StarFour, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 interface MessageActionsProps {
   messageId: string
   starred: boolean
+  read: boolean
   deletedAt: string | null
   onStar: (id: string, starred: boolean) => void
   onDelete: (id: string) => void
   onExport: (id: string) => void
+  onMarkRead?: (id: string) => void
 }
 
-export function MessageActions({ messageId, starred, deletedAt, onStar, onDelete, onExport }: MessageActionsProps) {
+export function MessageActions({ messageId, starred, read, deletedAt, onStar, onDelete, onExport, onMarkRead }: MessageActionsProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -23,6 +25,17 @@ export function MessageActions({ messageId, starred, deletedAt, onStar, onDelete
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 p-2">
         <div className="space-y-1">
+          {onMarkRead && !read && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-[44px] w-full justify-start gap-2"
+              onClick={() => onMarkRead(messageId)}
+            >
+              <CheckCircle size={18} aria-hidden="true" />
+              Mark as read
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
