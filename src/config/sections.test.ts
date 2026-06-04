@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SECTION_ORDER, buildNavItems } from '@/config/sections'
 
 describe('buildNavItems', () => {
-  it('returns home first, configured sections in order, then contact and shop', () => {
+  it('returns home first, configured sections in order, then artists, contact and shop', () => {
     const items = buildNavItems(['news', 'spotify', 'videos'])
 
-    expect(items.map((item) => item.id)).toEqual(['home', 'news', 'spotify', 'videos', 'contact', 'shop'])
+    expect(items.map((item) => item.id)).toEqual(['home', 'news', 'spotify', 'videos', 'artists', 'contact', 'shop'])
     expect(items[2]).toMatchObject({ labelKey: 'spotify', href: '#spotify-player', routeType: 'anchor' })
   })
 
@@ -13,6 +13,7 @@ describe('buildNavItems', () => {
     expect(buildNavItems().map((item) => item.id)).toEqual([
       'home',
       ...DEFAULT_SECTION_ORDER,
+      'artists',
       'contact',
       'shop',
     ])
@@ -23,6 +24,7 @@ describe('buildNavItems', () => {
       'home',
       'news',
       'videos',
+      'artists',
       'contact',
       'shop',
     ])

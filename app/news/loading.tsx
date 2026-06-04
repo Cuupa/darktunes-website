@@ -5,7 +5,7 @@ const skeletonCards = Array.from({ length: 6 }, (_, index) => index)
 export default function NewsLoading() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto max-w-7xl px-4 py-24 lg:px-8">
+      <div className="container mx-auto max-w-7xl px-4 pt-36 pb-24 lg:px-8">
         <Skeleton className="mb-8 h-4 w-24" />
 
         <div className="mb-12 space-y-4">

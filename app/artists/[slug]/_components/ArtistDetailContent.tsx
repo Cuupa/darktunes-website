@@ -24,12 +24,13 @@ import {
   Play,
   CaretDown,
   CaretUp,
+  Images,
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
-import type { Artist, Release, Concert, Video, NewsPost } from '@/types'
+import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ArtistDetailContentProps {
@@ -38,6 +39,7 @@ interface ArtistDetailContentProps {
   concerts: Concert[]
   videos: Video[]
   news: NewsPost[]
+  assets: ArtistAsset[]
   dict: Dictionary['artistDetail']
   consentDict: Dictionary['consent']
   locale: Locale
@@ -88,6 +90,7 @@ export function ArtistDetailContent({
   concerts,
   videos,
   news,
+  assets,
   dict,
   consentDict,
   locale,
@@ -158,7 +161,7 @@ export function ArtistDetailContent({
           <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/80 to-background" />
         </div>
 
-        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-8 pb-16">
+        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-36 pb-16">
           <Link
             href="/artists"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
@@ -167,14 +170,14 @@ export function ArtistDetailContent({
             {dict.backToArtists}
           </Link>
 
-          {/* Three-column hero on desktop: photo | metadata | spotify player */}
-          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-10 lg:gap-12 items-start">
+          {/* Two-column hero on desktop: photo | metadata */}
+          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-12 items-start">
             {/* Artist photo */}
             <motion.div
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-              className="w-full max-w-xs lg:w-72 shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
+              className="w-full max-w-xs lg:w-64 xl:w-72 shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               {getSquareThumbnail(artist.imageUrl, 600) ? (
                 <Image
@@ -227,7 +230,7 @@ export function ArtistDetailContent({
               )}
 
               <div>
-                <h1 className="text-5xl lg:text-7xl font-bold tracking-tight leading-none mb-3">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight leading-none mb-3 break-words hyphens-auto">
                   {artist.name}
                 </h1>
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -329,30 +332,6 @@ export function ArtistDetailContent({
                 )}
               </div>
             </motion.div>
-
-            {/* Spotify preview player — fills the empty space on desktop */}
-            {artist.spotifyId && (
-              <motion.div
-                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: prefersReducedMotion ? 0 : 0.35, duration: prefersReducedMotion ? 0 : 0.5 }}
-                className="w-full lg:w-80 xl:w-96 shrink-0"
-              >
-                <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
-                  <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60" style={{ height: 352 }}>
-                    <iframe
-                      src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
-                      width="100%"
-                      height="352"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      className="border-0 block"
-                      title={`${artist.name} on Spotify`}
-                    />
-                  </div>
-                </ConsentGate>
-              </motion.div>
-            )}
           </div>
         </div>
       </div>
@@ -362,27 +341,89 @@ export function ArtistDetailContent({
       {/* ------------------------------------------------------------------ */}
       <div className="container mx-auto px-4 lg:px-8 pb-24 space-y-16">
 
-        {/* Biography */}
-        {artist.bio && (
+        {/* Biography + Spotify side-by-side */}
+        {(artist.bio || artist.spotifyId) && (
+          <motion.section
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+            className="grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-10 items-start"
+          >
+            {/* Biography */}
+            {artist.bio && (
+              <div>
+                <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
+                {/^\s*<[a-z]/i.test(artist.bio) ? (
+                  <div
+                    className="prose prose-invert max-w-none text-foreground/80 leading-relaxed font-serif
+                      [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
+                      [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
+                    dangerouslySetInnerHTML={{ __html: artist.bio }}
+                  />
+                ) : (
+                  <p className="text-foreground/80 leading-relaxed font-serif text-base whitespace-pre-line">
+                    {artist.bio}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Spotify embedded player */}
+            {artist.spotifyId && (
+              <div className="lg:sticky lg:top-36">
+                <h2 className="text-xl font-bold mb-4 tracking-tight text-foreground flex items-center gap-2">
+                  <SpotifyLogo size={22} weight="fill" className="text-[#1DB954]" aria-hidden="true" />
+                  {dict.listenOn}
+                </h2>
+                <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
+                  <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60">
+                    <iframe
+                      src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}
+                      width="100%"
+                      height="500"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      className="border-0 block"
+                      title={`${artist.name} on Spotify`}
+                    />
+                  </div>
+                </ConsentGate>
+              </div>
+            )}
+          </motion.section>
+        )}
+
+        {/* Band Photos */}
+        {assets.length > 0 && (
           <motion.section
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
-            {/^\s*<[a-z]/i.test(artist.bio) ? (
-              <div
-                className="prose prose-invert max-w-3xl text-foreground/80 leading-relaxed font-serif
-                  [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
-                  [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
-                dangerouslySetInnerHTML={{ __html: artist.bio }}
-              />
-            ) : (
-              <p className="text-foreground/80 leading-relaxed font-serif text-base max-w-3xl whitespace-pre-line">
-                {artist.bio}
-              </p>
-            )}
+            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground flex items-center gap-2">
+              <Images size={28} weight="duotone" aria-hidden="true" />
+              {dict.bandPhotos}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {assets.map((asset) => (
+                <motion.div
+                  key={asset.id}
+                  whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
+                  className="relative aspect-square rounded-lg overflow-hidden bg-card border border-border cursor-pointer group"
+                >
+                  <Image
+                    src={asset.publicUrl}
+                    alt={asset.fileName ?? `${artist.name} photo`}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
+                </motion.div>
+              ))}
+            </div>
           </motion.section>
         )}
 

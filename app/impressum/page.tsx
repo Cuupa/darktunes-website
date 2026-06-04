@@ -90,7 +90,7 @@ export default async function ImpressumPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 lg:px-8 py-24 max-w-3xl">
+      <div className="container mx-auto px-4 lg:px-8 pt-36 pb-24 max-w-3xl">
         <Link
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
