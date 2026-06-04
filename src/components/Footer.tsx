@@ -20,7 +20,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
       <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center mb-4">
               {siteSettings.logoUrl || siteSettings.faviconUrl ? (
                 <Image
                   src={siteSettings.logoUrl || siteSettings.faviconUrl!}
@@ -36,10 +36,6 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   <span className="text-white font-bold text-lg">dT</span>
                 </div>
               )}
-              <div>
-                <h3 className="text-lg font-bold tracking-tight uppercase">{siteSettings.labelName}</h3>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">{dict.musicGroup}</p>
-              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {siteSettings.labelTagline}
