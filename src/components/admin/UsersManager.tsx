@@ -24,6 +24,7 @@ import {
   CheckCircle,
   Trash,
   MagnifyingGlass,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { useUsers } from '@/hooks/useUsers'
 import { useArtists } from '@/hooks/useArtists'
@@ -31,7 +32,9 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { RoleChangeHistory } from '@/components/admin/RoleChangeHistory'
 import {
   Select,
   SelectContent,
@@ -121,11 +124,15 @@ export function UsersManager() {
 
   // Confirmation dialogs
   const [banTarget, setBanTarget] = useState<UserWithProfile | null>(null)
+  const [banReason, setBanReason] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<UserWithProfile | null>(null)
 
   // Artist link dialog
   const [linkTarget, setLinkTarget] = useState<UserWithProfile | null>(null)
   const [selectedArtistId, setSelectedArtistId] = useState<string>('')
+
+  // History dialog
+  const [historyTarget, setHistoryTarget] = useState<UserWithProfile | null>(null)
 
   const [isMutating, setIsMutating] = useState(false)
 
@@ -164,10 +171,11 @@ export function UsersManager() {
     if (!banTarget) return
     setIsMutating(true)
     try {
-      await toggleBan(banTarget.id, !banTarget.banned_until)
+      await toggleBan(banTarget.id, !banTarget.banned_until, banReason || undefined)
     } finally {
       setIsMutating(false)
       setBanTarget(null)
+      setBanReason('')
     }
   }
 
@@ -339,6 +347,22 @@ export function UsersManager() {
                         </Tooltip>
                       ) : (
                         <div className="flex justify-end gap-1">
+                          {/* View History */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setHistoryTarget(u)}
+                                disabled={isMutating}
+                                aria-label={`View history for ${u.email}`}
+                              >
+                                <ClockCounterClockwise size={15} aria-hidden="true" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>View audit history</TooltipContent>
+                          </Tooltip>
+
                           {/* Link / Unlink artist */}
                           {u.linked_artist ? (
                             <Tooltip>
@@ -427,7 +451,15 @@ export function UsersManager() {
         </Table>
 
         {/* Ban confirmation dialog */}
-        <AlertDialog open={!!banTarget} onOpenChange={(open) => !open && setBanTarget(null)}>
+        <AlertDialog
+          open={!!banTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setBanTarget(null)
+              setBanReason('')
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
@@ -439,6 +471,15 @@ export function UsersManager() {
                   : `Ban ${banTarget?.email}? They will not be able to sign in until unbanned.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="px-1 pb-2">
+              <Textarea
+                placeholder="Reason (optional)…"
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                rows={2}
+                className="text-sm resize-none"
+              />
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isMutating}>Cancel</AlertDialogCancel>
               <AlertDialogAction
@@ -534,6 +575,25 @@ export function UsersManager() {
                 Link Band
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+        {/* History dialog */}
+        <Dialog
+          open={!!historyTarget}
+          onOpenChange={(open) => !open && setHistoryTarget(null)}
+        >
+          <DialogContent aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle>
+                <div className="flex items-center gap-2">
+                  <ClockCounterClockwise size={18} aria-hidden="true" />
+                  Audit History — {historyTarget?.email}
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            {historyTarget && (
+              <RoleChangeHistory userId={historyTarget.id} />
+            )}
           </DialogContent>
         </Dialog>
       </div>
