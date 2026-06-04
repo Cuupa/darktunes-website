@@ -15,7 +15,7 @@ import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 
 /** Path prefixes where the public navbar must NOT be rendered. */
-const HIDDEN_PREFIXES = ['/admin', '/portal', '/press/dashboard', '/editor']
+const HIDDEN_PREFIXES = ['/admin', '/portal', '/press', '/editor']
 
 export function NavHidingWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname()
