@@ -90,6 +90,41 @@ npm run dev
 - **Bundle budget enforcement**: `scripts/check-bundle-budget.js` + `.github/workflows/performance-budget.yml`
 
 ---
+## ✅ Quality Assurance
+
+### Local QA commands
+
+```bash
+npm run lint
+npm run test
+npm run test:e2e
+npm run perf:test
+npm run test -- tests/unit/ci-colors.spec.ts
+```
+
+### QA CI pipeline
+
+The dedicated QA workflow (`.github/workflows/qa.yml`) runs five jobs:
+- `lint-and-unit-tests` — ESLint + Vitest
+- `e2e-tests` — Playwright route/security/feature checks
+- `security-audit` — npm audit (high severity gate)
+- `performance-tests` — Playwright performance assertions
+- `ci-validation` — CI color policy enforcement
+
+### Performance budgets
+
+- Homepage LCP target: `< 2500ms` in local/prod-like runs (CI uses relaxed budget)
+- Shared `rootMainFiles` bundle budget: `< 500KB` uncompressed
+
+### Security validation procedures
+
+- Verify unauthenticated access is blocked on protected UI routes
+- Verify protected API endpoints reject missing/invalid JWTs
+- Verify `SUPABASE_SERVICE_ROLE_KEY` is never leaked in browser-rendered HTML
+- Verify RLS is enabled for sensitive Supabase tables
+
+---
+
 
 ## 🔑 Environment Variables
 

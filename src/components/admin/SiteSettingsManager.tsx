@@ -690,7 +690,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                             Tab Accent Color (hex, optional)
                           </Label>
                           <Input
-                            placeholder="#1db954"
+                            placeholder="#7e1e37"
                             {...register(`spotifyPlaylists.${index}.accentColor` as const)}
                             disabled={isSubmitting}
                           />

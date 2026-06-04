@@ -104,7 +104,7 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
                       href={release.spotifyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/30 hover:bg-[#1DB954]/20 transition-colors"
+                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary/10 text-secondary border border-secondary/30 hover:bg-secondary/20 transition-colors"
                     >
                       <SpotifyLogo size={12} weight="fill" />
                       Spotify
