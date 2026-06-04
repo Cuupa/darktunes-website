@@ -468,6 +468,8 @@ ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS reviewed_by   UUID    REF
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS embargo_until    TIMESTAMPTZ;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS media_contact    TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS release_category TEXT;
+-- Hero background image (separate from cover image_url)
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_bg_url TEXT;
 -- Hero button overrides (primary + secondary)
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
