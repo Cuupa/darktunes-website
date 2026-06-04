@@ -27,6 +27,7 @@ export interface NewsFormData {
   imageUrl: string
   publishedAt: string
   scheduledAt: string
+  featured: boolean
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   artistId: string
@@ -94,6 +95,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
   }, [title, slugValue, setValue])
 
   const isPressOnly = watch('isPressOnly')
+  const featured = watch('featured')
   const heroPrimaryBtnAction = watch('heroPrimaryBtnAction')
   const heroSecondaryBtnAction = watch('heroSecondaryBtnAction')
 
@@ -222,6 +224,16 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           disabled={isLoading}
         />
         <Label htmlFor="isPressOnly">Press-only</Label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="featured"
+          checked={featured}
+          onCheckedChange={(val) => setValue('featured', val)}
+          disabled={isLoading}
+        />
+        <Label htmlFor="featured">Featured (show in hero carousel)</Label>
       </div>
 
       {isPressOnly && (

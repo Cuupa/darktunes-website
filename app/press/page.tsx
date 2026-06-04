@@ -20,11 +20,13 @@ export default async function PressPage() {
 
   const [artists, pressReleases, siteSettings] = await Promise.all([
     getPublicArtists(supabase).catch(() => []),
-    getPressOnlyNewsPosts(supabase).then((posts) => posts.slice(0, 3)).catch(() => []),
+    getPressOnlyNewsPosts(supabase).then((posts) => posts.slice(0, 6)).catch(() => []),
     getSiteSettings(supabase).catch(() => ({
       labelName: 'darkTunes Music Group',
       labelTagline: '',
       contactEmail: 'info@darktunes.com',
+      impressumPhone: '',
+      impressumEmail: 'info@darktunes.com',
     })),
   ])
 
@@ -33,8 +35,7 @@ export default async function PressPage() {
       artists={artists}
       pressReleases={pressReleases}
       siteSettings={siteSettings}
-      pressDict={dict.press}
-      releasesDict={dict.pressReleases}
+      dict={dict}
     />
   )
 }

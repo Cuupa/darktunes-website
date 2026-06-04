@@ -590,6 +590,47 @@
     "send": "Anfrage senden",
     "sending": "Wird gesendet…",
     "sent": "Deine Nachricht wurde gesendet.",
-    "backToInbox": "Zurück zum Posteingang"
+    "backToInbox": "Zurück zum Posteingang",
+    "messageLabel": "Nachricht"
+  },
+  "pressLanding": {
+    "tabs": {
+      "roster": "Künstler-Roster",
+      "releases": "Pressemitteilungen",
+      "contact": "Kontakt"
+    },
+    "heroBadge": "Presse & Medien",
+    "heroDescription": "Redaktionelle Anfragen, Interviews, Rezensionsexemplare und hochauflösende Materialien für den darkTunes Roster.",
+    "rosterSearch": "Künstler suchen…",
+    "rosterSort": {
+      "label": "Sortieren nach",
+      "nameAsc": "Name A–Z",
+      "nameDesc": "Name Z–A",
+      "genreAsc": "Genre A–Z"
+    },
+    "noResults": "Keine Künstler gefunden.",
+    "contact": {
+      "title": "Pressekontakt",
+      "description": "Für Interviewanfragen, Rezensionsexemplare, Veranstaltungsakkreditierungen oder individuelle Pressemappen direkt melden.",
+      "emailLabel": "E-Mail",
+      "phoneLabel": "Telefon",
+      "applyButton": "Pressezugang beantragen",
+      "dashboardButton": "Press-Dashboard öffnen"
+    },
+    "releasesButton": "Dashboard öffnen",
+    "readRelease": "Mitteilung lesen",
+    "artistRoster": "Künstler-Roster"
+  },
+  "pressLogin": {
+    "title": "Press-Dashboard Login",
+    "description": "Als Journalist oder Admin anmelden, um die Presse-Tools zu nutzen.",
+    "emailLabel": "E-Mail",
+    "passwordLabel": "Passwort",
+    "signIn": "Anmelden",
+    "signingIn": "Anmeldung läuft…",
+    "errorInvalid": "Ungültige E-Mail oder Passwort.",
+    "errorUnauthorized": "Dein Konto ist nicht für das Press-Dashboard freigeschaltet.",
+    "applyLink": "Pressezugang beantragen",
+    "forgotPassword": "Passwort vergessen? E-Mail an"
   }
 }

@@ -494,7 +494,8 @@ export interface Database {
           excerpt: string | null
           content: string
           image_url: string | null
-          is_press_only: boolean
+         featured: boolean
+         is_press_only: boolean
           status: string
           published_at: string
           created_at: string
@@ -518,6 +519,7 @@ export interface Database {
           excerpt?: string | null
           content: string
           image_url?: string | null
+          featured?: boolean
           is_press_only?: boolean
           status?: string
           published_at?: string
@@ -542,6 +544,7 @@ export interface Database {
           excerpt?: string | null
           content?: string
           image_url?: string | null
+          featured?: boolean
           is_press_only?: boolean
           status?: string
           published_at?: string

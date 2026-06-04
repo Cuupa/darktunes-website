@@ -448,6 +448,7 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   excerpt      TEXT,
   content      TEXT        NOT NULL,
   image_url    TEXT,
+  featured     BOOLEAN     NOT NULL DEFAULT FALSE,
   is_press_only BOOLEAN    NOT NULL DEFAULT FALSE,
   status       TEXT        NOT NULL DEFAULT 'published',
   artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
@@ -459,6 +460,7 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS featured       BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;

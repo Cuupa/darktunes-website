@@ -27,6 +27,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     content: row.content,
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
+    featured: row.featured,
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
     status,

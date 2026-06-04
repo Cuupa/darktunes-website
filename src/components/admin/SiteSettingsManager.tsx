@@ -166,7 +166,6 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
 
   const logoUrl = watch('logoUrl')
   const faviconUrl = watch('faviconUrl')
-  const heroContentType = watch('heroContentType')
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingFavicon, setIsUploadingFavicon] = useState(false)
@@ -938,51 +937,11 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             <CardHeader>
               <CardTitle>Hero Section</CardTitle>
               <CardDescription>
-                Configure what is featured on the homepage hero. Choose between showcasing the
-                latest release or a highlighted news post, and optionally set a custom background image.
+                Featured releases and news posts will automatically appear in the hero carousel.
+                Mark items as featured in their respective forms.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Content type toggle */}
-              <div className="space-y-2">
-                <Label>Featured Content Type</Label>
-                <Controller
-                  name="heroContentType"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="release">Latest Release</SelectItem>
-                        <SelectItem value="news">News Post</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <p className="text-xs text-muted-foreground">
-                  &quot;Latest Release&quot; auto-selects the most recent release. &quot;News Post&quot; shows a specific news post.
-                </p>
-              </div>
-
-              {/* Featured news ID — only shown when heroContentType === 'news' */}
-              {heroContentType === 'news' && (
-                <Field id="heroFeaturedId" label="News Post Slug or ID">
-                  <Input
-                    id="heroFeaturedId"
-                    placeholder="my-news-post-slug"
-                    {...register('heroFeaturedId')}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter the slug of the news post to feature. Leave blank to auto-select the latest
-                    published news post.
-                  </p>
-                </Field>
-              )}
-
-              {/* Custom background */}
               <div className="space-y-2">
                 <Label>Custom Background Image</Label>
                 <div className="flex gap-2">
