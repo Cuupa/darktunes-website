@@ -245,16 +245,20 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.youtubeChannelId).toBe('')
   })
 
-  it('maps hero section fields (heroContentType, heroFeaturedId, heroCustomBgUrl)', async () => {
+  it('maps hero section fields (content, featured ID, background, default button labels)', async () => {
     const db = makeMockDb([
       { key: 'hero_content_type', value: 'news' },
       { key: 'hero_featured_id', value: 'my-slug' },
       { key: 'hero_custom_bg_url', value: 'https://cdn.example.com/bg.webp' },
+      { key: 'hero_default_primary_btn_label', value: 'Start Listening' },
+      { key: 'hero_default_secondary_btn_label', value: 'Explore Catalog' },
     ])
     const result = await getSiteSettings(db)
     expect(result.heroContentType).toBe('news')
     expect(result.heroFeaturedId).toBe('my-slug')
     expect(result.heroCustomBgUrl).toBe('https://cdn.example.com/bg.webp')
+    expect(result.heroDefaultPrimaryBtnLabel).toBe('Start Listening')
+    expect(result.heroDefaultSecondaryBtnLabel).toBe('Explore Catalog')
   })
 
   it('defaults heroContentType to "release" when key is absent', async () => {
@@ -263,6 +267,8 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.heroContentType).toBe('release')
     expect(result.heroFeaturedId).toBe('')
     expect(result.heroCustomBgUrl).toBe('')
+    expect(result.heroDefaultPrimaryBtnLabel).toBe('')
+    expect(result.heroDefaultSecondaryBtnLabel).toBe('')
   })
 
   it('maps branding fields (logoUrl, faviconUrl)', async () => {

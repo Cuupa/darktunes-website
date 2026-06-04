@@ -12,7 +12,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { Skeleton } from '@/components/ui/skeleton'
-import { TourList } from './_components/TourList'
+import { TourManager } from './_components/TourManager'
 
 function TourSkeleton() {
   return (
@@ -37,7 +37,7 @@ async function TourContent() {
   const concerts = artist
     ? await getConcertsByArtistId(supabase, artist.id).catch(() => [])
     : []
-  return <TourList dict={dict.portal} concerts={concerts} artistId={artist?.id ?? null} />
+  return <TourManager dict={dict.portal} concerts={concerts} artistId={artist?.id ?? null} />
 }
 
 export default function TourPage() {

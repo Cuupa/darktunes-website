@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as artistsApi from '@/lib/api/artists'
+import { logEditorActivity } from '@/lib/editorActivityLogger'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
 
@@ -34,19 +35,40 @@ export function useArtists() {
 
   const createArtist = async (data: ArtistInsert): Promise<Artist> => {
     const createdArtist = await artistsApi.createArtist(supabase, data)
+    await logEditorActivity(supabase, {
+      action: 'create',
+      entityType: 'artist',
+      entityId: createdArtist.id,
+      entityName: createdArtist.name,
+      changes: data,
+    })
     await load()
     void revalidateContentCache(['artists'])
     return createdArtist
   }
 
   const updateArtist = async (id: string, data: ArtistUpdate): Promise<void> => {
-    await artistsApi.updateArtist(supabase, id, data)
+    const updated = await artistsApi.updateArtist(supabase, id, data)
+    await logEditorActivity(supabase, {
+      action: 'update',
+      entityType: 'artist',
+      entityId: id,
+      entityName: updated.name,
+      changes: data,
+    })
     await load()
     void revalidateContentCache(['artists'])
   }
 
   const deleteArtist = async (id: string): Promise<void> => {
+    const target = artists.find((artist) => artist.id === id)
     await artistsApi.deleteArtist(supabase, id)
+    await logEditorActivity(supabase, {
+      action: 'delete',
+      entityType: 'artist',
+      entityId: id,
+      entityName: target?.name,
+    })
     await load()
     void revalidateContentCache(['artists'])
   }

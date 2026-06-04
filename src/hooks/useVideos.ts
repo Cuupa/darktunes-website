@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as videosApi from '@/lib/api/videos'
+import { logEditorActivity } from '@/lib/editorActivityLogger'
 import type { Video } from '@/types'
 import type { Database } from '@/types/database'
 
@@ -33,7 +34,14 @@ export function useVideos() {
   }, [supabase])
 
   const createVideo = async (data: VideoInsert): Promise<void> => {
-    await videosApi.createVideo(supabase, data)
+    const created = await videosApi.createVideo(supabase, data)
+    await logEditorActivity(supabase, {
+      action: 'create',
+      entityType: 'video',
+      entityId: created.id,
+      entityName: created.title,
+      changes: data,
+    })
     await load()
   }
 
@@ -55,7 +63,14 @@ export function useVideos() {
       }),
     )
     try {
-      await videosApi.updateVideo(supabase, id, data)
+      const updated = await videosApi.updateVideo(supabase, id, data)
+      await logEditorActivity(supabase, {
+        action: 'update',
+        entityType: 'video',
+        entityId: id,
+        entityName: updated.title,
+        changes: data,
+      })
     } catch (err) {
       // Rollback on error
       await load()
@@ -64,7 +79,14 @@ export function useVideos() {
   }
 
   const deleteVideo = async (id: string): Promise<void> => {
+    const target = videos.find((video) => video.id === id)
     await videosApi.deleteVideo(supabase, id)
+    await logEditorActivity(supabase, {
+      action: 'delete',
+      entityType: 'video',
+      entityId: id,
+      entityName: target?.title,
+    })
     await load()
   }
 

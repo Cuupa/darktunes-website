@@ -33,6 +33,7 @@ const DEFAULTS: SiteSettings = {
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
   spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
+  heroNewsBadge: '📰 News',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
   seoTitle: 'darkTunes Music Group',
@@ -80,6 +81,8 @@ const DEFAULTS: SiteSettings = {
   heroContentType: 'release',
   heroFeaturedId: '',
   heroCustomBgUrl: '',
+  heroDefaultPrimaryBtnLabel: '',
+  heroDefaultSecondaryBtnLabel: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
 }
@@ -137,6 +140,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     spotifyPlaylistUri: map['spotify_playlist_uri'] ?? DEFAULTS.spotifyPlaylistUri,
     spotifyPlaylists,
     heroBadge: map['hero_badge'] ?? DEFAULTS.heroBadge,
+    heroNewsBadge: map['hero_news_badge'] ?? DEFAULTS.heroNewsBadge,
     heroDescription: map['hero_description'] ?? DEFAULTS.heroDescription,
     seoTitle: map['seo_title'] ?? DEFAULTS.seoTitle,
     seoDescription: map['seo_description'] ?? DEFAULTS.seoDescription,
@@ -186,6 +190,8 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     heroContentType: (map['hero_content_type'] === 'news' ? 'news' : 'release') as 'release' | 'news',
     heroFeaturedId: map['hero_featured_id'] ?? '',
     heroCustomBgUrl: map['hero_custom_bg_url'] ?? '',
+    heroDefaultPrimaryBtnLabel: map['hero_default_primary_btn_label'] ?? '',
+    heroDefaultSecondaryBtnLabel: map['hero_default_secondary_btn_label'] ?? '',
     homepageSectionOrder: (() => {
       try {
         const parsed = JSON.parse(map['homepage_section_order'] ?? '[]') as unknown

@@ -43,6 +43,7 @@ const mockNewsRow: NewsRow = {
   created_at: '2024-04-24T00:00:00Z',
   updated_at: '2024-04-24T00:00:00Z',
   artist_id: null,
+  reviewed_by: null,
   embargo_until: null,
   media_contact: null,
   release_category: null,

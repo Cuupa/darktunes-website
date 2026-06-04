@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
   spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
+  heroNewsBadge: '📰 News',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
   seoTitle: 'darkTunes Music Group',
@@ -50,6 +51,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   aboutSubheading: '',
   aboutBody: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
+  heroDefaultPrimaryBtnLabel: '',
+  heroDefaultSecondaryBtnLabel: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -66,10 +69,13 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     spotify_playlist_uri: s.spotifyPlaylistUri,
     spotify_playlists: JSON.stringify(s.spotifyPlaylists ?? []),
     hero_badge: s.heroBadge,
+    hero_news_badge: s.heroNewsBadge,
     hero_description: s.heroDescription,
     hero_content_type: s.heroContentType ?? 'release',
     hero_featured_id: s.heroFeaturedId ?? '',
     hero_custom_bg_url: s.heroCustomBgUrl ?? '',
+    hero_default_primary_btn_label: s.heroDefaultPrimaryBtnLabel ?? '',
+    hero_default_secondary_btn_label: s.heroDefaultSecondaryBtnLabel ?? '',
     seo_title: s.seoTitle,
     seo_description: s.seoDescription,
     og_title: s.ogTitle,

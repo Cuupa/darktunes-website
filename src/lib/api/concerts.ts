@@ -4,6 +4,8 @@ import type { Concert } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
+export type ConcertInsert = Database['public']['Tables']['concerts']['Insert']
+export type ConcertUpdate = Database['public']['Tables']['concerts']['Update']
 
 function rowToConcert(row: ConcertRow): Concert {
   return {
@@ -54,6 +56,34 @@ export async function getConcerts(db: DbClient): Promise<Concert[]> {
       if (aPriority !== bPriority) return aPriority - bPriority
       return new Date(a.concertDate).getTime() - new Date(b.concertDate).getTime()
     })
+}
+
+export async function createConcert(db: DbClient, concertData: ConcertInsert): Promise<Concert> {
+  const { data, error } = await db.from('concerts').insert(concertData).select('*').single()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('No data returned from createConcert')
+  return rowToConcert(data)
+}
+
+export async function updateConcert(
+  db: DbClient,
+  id: string,
+  concertData: ConcertUpdate,
+): Promise<Concert> {
+  const { data, error } = await db
+    .from('concerts')
+    .update(concertData)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('No data returned from updateConcert')
+  return rowToConcert(data)
+}
+
+export async function deleteConcert(db: DbClient, id: string): Promise<void> {
+  const { error } = await db.from('concerts').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 /**

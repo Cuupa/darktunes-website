@@ -48,6 +48,7 @@ export interface Database {
           provider: string
           created_at: string
           updated_at: string
+          deleted_at: string | null
         }
         Insert: {
           id: string
@@ -57,6 +58,7 @@ export interface Database {
           provider?: string
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
         }
         Update: {
           id?: string
@@ -66,6 +68,7 @@ export interface Database {
           provider?: string
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
         }
         Relationships: []
       }
@@ -440,6 +443,8 @@ export interface Database {
           songkick_id: string | null
           bandsintown_id: string | null
           status: string
+          created_by: string | null
+          source: string
           created_at: string
           updated_at: string
         }
@@ -456,6 +461,8 @@ export interface Database {
           songkick_id?: string | null
           bandsintown_id?: string | null
           status?: string
+          created_by?: string | null
+          source?: string
           created_at?: string
           updated_at?: string
         }
@@ -472,6 +479,8 @@ export interface Database {
           songkick_id?: string | null
           bandsintown_id?: string | null
           status?: string
+          created_by?: string | null
+          source?: string
           created_at?: string
           updated_at?: string
         }
@@ -491,6 +500,7 @@ export interface Database {
           created_at: string
           updated_at: string
           artist_id: string | null
+          reviewed_by: string | null
           embargo_until: string | null
           media_contact: string | null
           release_category: string | null
@@ -514,6 +524,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          reviewed_by?: string | null
           embargo_until?: string | null
           media_contact?: string | null
           release_category?: string | null
@@ -537,6 +548,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           artist_id?: string | null
+          reviewed_by?: string | null
           embargo_until?: string | null
           media_contact?: string | null
           release_category?: string | null
@@ -724,6 +736,7 @@ export interface Database {
           uploaded_by: string | null
           created_at: string
           folder_id: string | null
+          artist_id: string | null
           tags: string[]
           sha256_hash: string | null
         }
@@ -738,6 +751,7 @@ export interface Database {
           uploaded_by?: string | null
           created_at?: string
           folder_id?: string | null
+          artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
         }
@@ -752,6 +766,7 @@ export interface Database {
           uploaded_by?: string | null
           created_at?: string
           folder_id?: string | null
+          artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
         }
@@ -817,8 +832,9 @@ export interface Database {
           email: string
           name: string | null
           source: string
-          status: 'pending' | 'subscribed'
+          status: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token: string | null
+          unsubscribe_token: string | null
           subscribed_at: string
         }
         Insert: {
@@ -826,8 +842,9 @@ export interface Database {
           email: string
           name?: string | null
           source?: string
-          status?: 'pending' | 'subscribed'
+          status?: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token?: string | null
+          unsubscribe_token?: string | null
           subscribed_at?: string
         }
         Update: {
@@ -835,8 +852,9 @@ export interface Database {
           email?: string
           name?: string | null
           source?: string
-          status?: 'pending' | 'subscribed'
+          status?: 'pending' | 'subscribed' | 'unsubscribed'
           verification_token?: string | null
+          unsubscribe_token?: string | null
           subscribed_at?: string
         }
         Relationships: []
@@ -1221,6 +1239,174 @@ export interface Database {
           admin_note?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      editor_activity_log: {
+        Row: {
+          id: string
+          editor_id: string
+          action: string
+          entity_type: string
+          entity_id: string
+          entity_name: string | null
+          changes: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          editor_id: string
+          action: string
+          entity_type: string
+          entity_id: string
+          entity_name?: string | null
+          changes?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          editor_id?: string
+          action?: string
+          entity_type?: string
+          entity_id?: string
+          entity_name?: string | null
+          changes?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      editor_notifications: {
+        Row: {
+          id: string
+          recipient_id: string
+          type: string
+          entity_type: string
+          entity_id: string
+          entity_name: string | null
+          sender_id: string | null
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_id: string
+          type: string
+          entity_type: string
+          entity_id: string
+          entity_name?: string | null
+          sender_id?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recipient_id?: string
+          type?: string
+          entity_type?: string
+          entity_id?: string
+          entity_name?: string | null
+          sender_id?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      interview_requests: {
+        Row: {
+          id: string
+          journalist_id: string
+          artist_id: string
+          subject: string
+          message: string
+          preferred_date: string | null
+          status: string
+          artist_reply: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          journalist_id: string
+          artist_id: string
+          subject: string
+          message: string
+          preferred_date?: string | null
+          status?: string
+          artist_reply?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          journalist_id?: string
+          artist_id?: string
+          subject?: string
+          message?: string
+          preferred_date?: string | null
+          status?: string
+          artist_reply?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      role_changes: {
+        Row: {
+          id: string
+          user_id: string
+          old_role: string
+          new_role: string
+          changed_by: string
+          changed_at: string
+          reason: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          old_role: string
+          new_role: string
+          changed_by: string
+          changed_at?: string
+          reason?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          old_role?: string
+          new_role?: string
+          changed_by?: string
+          changed_at?: string
+          reason?: string | null
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
+      ban_history: {
+        Row: {
+          id: string
+          user_id: string
+          banned: boolean
+          banned_until: string | null
+          changed_by: string
+          changed_at: string
+          reason: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          banned: boolean
+          banned_until?: string | null
+          changed_by: string
+          changed_at?: string
+          reason?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          banned?: boolean
+          banned_until?: string | null
+          changed_by?: string
+          changed_at?: string
+          reason?: string | null
         }
         Relationships: []
       }

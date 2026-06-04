@@ -43,10 +43,18 @@ export interface NewsFormData {
 
 function toSlug(text: string): string {
   return text
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/Ä/g, 'ae')
+    .replace(/Ö/g, 'oe')
+    .replace(/Ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
 }
 
 type Props = AdminPanelProps<NewsFormData>
@@ -303,7 +311,6 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
-                  <SelectItem value="#artists">Artists</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
                   <SelectItem value="#concerts">Concerts</SelectItem>
                   <SelectItem value="#news">News</SelectItem>
@@ -376,7 +383,6 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
-                  <SelectItem value="#artists">Artists</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
                   <SelectItem value="#concerts">Concerts</SelectItem>
                   <SelectItem value="#news">News</SelectItem>

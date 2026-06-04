@@ -131,6 +131,8 @@ export interface NewsPost {
   heroPrimaryBtn?: HeroButton
   /** Custom configuration for the secondary CTA button in the Hero section. */
   heroSecondaryBtn?: HeroButton
+  /** Reviewer (editor/admin) that approved the post for publication. */
+  reviewedBy?: string | null
 }
 
 export interface PortalFeatureFlag {
@@ -191,6 +193,41 @@ export interface AccreditationRequest {
   adminNote?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface EditorActivityLogEntry {
+  id: string
+  editorId: string
+  action: string
+  entityType: string
+  entityId: string
+  entityName?: string
+  changes?: unknown
+  createdAt: string
+}
+
+export interface EditorNotification {
+  id: string
+  recipientId: string
+  type: string
+  entityType: string
+  entityId: string
+  entityName?: string
+  senderId?: string | null
+  read: boolean
+  createdAt: string
+}
+
+export interface InterviewRequest {
+  id: string
+  journalistId: string
+  artistId: string
+  subject: string
+  message: string
+  preferredDate?: string
+  status: string
+  artistReply?: string
+  createdAt: string
 }
 
 export interface Video {
@@ -288,6 +325,7 @@ export interface SiteSettings {
   /** Multiple playlists for the multi-player. Falls back to spotifyPlaylistUri when empty. */
   spotifyPlaylists: SpotifyPlaylistEntry[]
   heroBadge: string
+  heroNewsBadge: string
   heroDescription: string
   seoTitle: string
   seoDescription: string
@@ -369,6 +407,10 @@ export interface SiteSettings {
   heroFeaturedId?: string
   /** R2 URL of a custom hero background image that overrides the release/news cover art. */
   heroCustomBgUrl?: string
+  /** Global fallback label for the hero primary button when item-level label is not set. */
+  heroDefaultPrimaryBtnLabel?: string
+  /** Global fallback label for the hero secondary button when item-level label is not set. */
+  heroDefaultSecondaryBtnLabel?: string
   // ── Homepage Section Order ────────────────────────────────────────────────
   /**
    * Order in which the reorderable sections appear on the homepage.

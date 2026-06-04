@@ -48,51 +48,49 @@ export function News({ news, dict, locale }: NewsProps) {
           </Button>
         </motion.div>
 
-        <ul className="space-y-8 list-none">
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none">
           {sneakPeek.map((post, index) => (
             <motion.li
               key={post.id}
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.1 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.5, delay: prefersReducedMotion ? 0 : index * 0.08 }}
             >
-              <Link href={`/news/${post.slug}`} className="block">
-              <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300">
-                <div className="grid lg:grid-cols-[320px_1fr] gap-0">
-                  {post.imageUrl && (
-                    <div className="relative aspect-[16/9] lg:aspect-auto overflow-hidden">
-                      <Image
-                        src={getOptimizedImageUrl(post.imageUrl, 800)}
-                        alt={post.title}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/20" />
-                    </div>
-                  )}
-                  <div className="p-6 lg:p-8 flex flex-col justify-center">
-                    <Badge className="self-start mb-4 bg-primary/20 text-primary-foreground border-primary/30 uppercase font-mono text-xs tracking-widest flex items-center gap-2">
-                      <Calendar size={12} weight="bold" />
-                      {new Date(post.publishedAt).toLocaleDateString(dateLocale, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </Badge>
-                    <h3 className="text-2xl lg:text-3xl font-bold mb-4 group-hover:text-accent transition-colors leading-tight">
-                      {post.title}
-                    </h3>
-                    <p className="text-muted-foreground mb-6 font-serif leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                    <span
-                      className="self-start group/btn flex items-center text-accent px-0 uppercase tracking-wider font-bold text-sm"
-                    >
-                      {dict.readFullStory}
-                      <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" weight="bold" />
-                    </span>
+              <Link href={`/news/${post.slug}`} className="block h-full">
+              <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 h-full flex flex-col">
+                {post.imageUrl && (
+                  <div className="relative aspect-[16/9] overflow-hidden flex-shrink-0">
+                    <Image
+                      src={getOptimizedImageUrl(post.imageUrl, 800)}
+                      alt={post.title}
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
                   </div>
+                )}
+                <div className="p-5 flex flex-col flex-1">
+                  <Badge className="self-start mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase font-mono text-xs tracking-widest flex items-center gap-2">
+                    <Calendar size={12} weight="bold" />
+                    {new Date(post.publishedAt).toLocaleDateString(dateLocale, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Badge>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-accent transition-colors leading-tight line-clamp-2">
+                    {post.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-4 font-serif leading-relaxed text-sm line-clamp-3 flex-1">
+                    {post.excerpt}
+                  </p>
+                  <span
+                    className="self-start group/btn flex items-center text-accent px-0 uppercase tracking-wider font-bold text-xs mt-auto"
+                  >
+                    {dict.readFullStory}
+                    <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" weight="bold" />
+                  </span>
                 </div>
               </Card>
               </Link>

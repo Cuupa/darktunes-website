@@ -38,6 +38,7 @@ const mockRow: NewsRow = {
   created_at: '2024-06-01T00:00:00Z',
   updated_at: '2024-06-01T00:00:00Z',
   artist_id: null,
+  reviewed_by: null,
   embargo_until: null,
   media_contact: 'press@darktunes.com',
   release_category: 'label news',

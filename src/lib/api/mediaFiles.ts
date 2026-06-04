@@ -18,8 +18,8 @@ function rowToMediaFile(row: MediaFileRow): Asset {
     uploadedBy: row.uploaded_by ?? undefined,
     createdAt: row.created_at,
     folderId: row.folder_id ?? undefined,
-    artistId: undefined,
-    artistIds: [],
+    artistId: row.artist_id ?? undefined,
+    artistIds: row.artist_id ? [row.artist_id] : [],
     releaseId: undefined,
     tags: row.tags ?? [],
     sha256Hash: row.sha256_hash ?? undefined,
@@ -61,12 +61,14 @@ export async function updateMediaFile(
   id: string,
   updates: {
     folderId?: string | null
+    artistId?: string | null
     tags?: string[]
     originalFilename?: string
   },
 ): Promise<Asset> {
   const dbUpdates: Database['public']['Tables']['media_files']['Update'] = {}
   if ('folderId' in updates) dbUpdates.folder_id = updates.folderId ?? null
+  if ('artistId' in updates) dbUpdates.artist_id = updates.artistId ?? null
   if ('tags' in updates) dbUpdates.tags = updates.tags ?? []
   if ('originalFilename' in updates) dbUpdates.original_filename = updates.originalFilename ?? ''
 

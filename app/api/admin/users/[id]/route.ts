@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { updateUserRole, banUser, deleteUser } from '@/lib/api/users'
+import { updateUserRole, banUser, deleteUser, logBanAction } from '@/lib/api/users'
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -22,6 +22,7 @@ import { updateUserRole, banUser, deleteUser } from '@/lib/api/users'
 const patchSchema = z.object({
   role: z.enum(['admin', 'artist', 'editor', 'journalist', 'user']).optional(),
   ban: z.boolean().optional(),
+  reason: z.string().optional(),
 })
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 
-  const { role, ban } = parsed.data
+  const { role, ban, reason } = parsed.data
 
   if (role !== undefined) {
     await updateUserRole(adminClient, targetId, role)
@@ -84,6 +85,13 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 
   if (ban !== undefined) {
     await banUser(adminClient, targetId, ban)
+    await logBanAction(adminClient, {
+      userId: targetId,
+      banned: ban,
+      bannedUntil: ban ? new Date(Date.now() + 876000 * 60 * 60 * 1000).toISOString() : null,
+      changedBy: currentUserId,
+      reason: reason ?? null,
+    })
   }
 
   return NextResponse.json({ success: true })
