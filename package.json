@@ -134,6 +134,14 @@
     "lodash": "4.18.0",
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
+    },
+    "smol-toml": "1.6.1",
+    "postcss": "^8.5.15",
+    "@vercel/node": {
+      "undici": "6.24.1"
+    },
+    "@vercel/python-analysis": {
+      "minimatch": "10.2.5"
     }
   },
   "license": "UNLICENSED"

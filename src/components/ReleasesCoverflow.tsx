@@ -423,7 +423,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               }`}
                               sizes="(max-width: 640px) 60vw, 320px"
                               draggable={false}
-                              priority={isActive}
+                              loading="lazy"
                               onLoad={() => markImageLoaded(release.id)}
                               unoptimized
                             />

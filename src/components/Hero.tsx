@@ -111,6 +111,7 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
             className="object-cover object-center"
             sizes="100vw"
             priority
+            fetchPriority="high"
             unoptimized
           />
         )}

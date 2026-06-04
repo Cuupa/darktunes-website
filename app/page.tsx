@@ -45,6 +45,7 @@ const getCachedSiteSettings = unstable_cache(
         spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
         spotifyPlaylists: [],
         heroBadge: '⚡ New Release',
+        heroNewsBadge: '📰 News',
         heroDescription:
           'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
         seoTitle: 'darkTunes Music Group',
