@@ -56,7 +56,7 @@ function VideoCard({
 
   return (
     <Card
-      className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 transition-all duration-300 cursor-pointer flex flex-col w-full"
+      className="glow-card group overflow-hidden bg-card border-border hover:border-accent/50 hover:shadow-[0_0_30px_rgba(73,54,135,0.3)] transition-all duration-300 cursor-pointer flex flex-col w-full"
       onClick={() => onPlay(video)}
     >
       <div className="relative aspect-video overflow-hidden shrink-0">
@@ -76,7 +76,7 @@ function VideoCard({
           <Button
             size="lg"
             aria-label={`Play ${video.title}`}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full w-16 h-16 p-0 hover:scale-110 transition-transform"
+            className="bg-gradient-to-br from-primary to-secondary text-white rounded-full w-16 h-16 p-0 hover:scale-110 hover:shadow-[0_0_20px_rgba(73,54,135,0.7)] transition-all duration-300"
             tabIndex={-1}
           >
             <Play size={28} weight="fill" aria-hidden="true" />
@@ -84,7 +84,7 @@ function VideoCard({
         </div>
       </div>
       <div className="p-6 flex flex-col flex-1">
-        <Badge className="mb-3 bg-primary/20 text-primary-foreground border-primary/30 uppercase tracking-wider font-mono text-xs self-start">
+        <Badge className="mb-3 bg-secondary/20 text-secondary-foreground border-secondary/40 uppercase tracking-wider font-mono text-xs self-start">
           {video.artistName}
         </Badge>
         <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors flex-1">
