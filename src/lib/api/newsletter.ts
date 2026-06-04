@@ -8,6 +8,8 @@
  *      unique verification_token (UUID).
  *   2. verifySubscriberToken   — finds a pending row by token and flips its
  *      status to 'subscribed', returning the subscriber's email.
+ *   3. unsubscribeByToken      — finds a subscribed row by unsubscribe_token
+ *      and flips its status to 'unsubscribed' (GDPR one-click unsubscribe).
  *
  * Every function accepts a SupabaseClient as its first argument (IoC / DAL
  * pattern). Callers MUST pass a service-role client so that writes bypass RLS.
@@ -17,7 +19,8 @@
  *   - On duplicate email (createPendingSubscriber): throws Error with code
  *     '23505' in the message so callers can detect it without depending on
  *     Postgres error codes directly.
- *   - verifySubscriberToken returns null when the token is unknown / already used.
+ *   - verifySubscriberToken / unsubscribeByToken return null when the token
+ *     is unknown, already consumed, or belongs to a non-matching subscriber.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -35,8 +38,9 @@ export interface NewsletterSubscriber {
   email: string
   name: string | undefined
   source: string
-  status: 'pending' | 'subscribed'
+  status: 'pending' | 'subscribed' | 'unsubscribed'
   verificationToken: string | undefined
+  unsubscribeToken: string | undefined
   subscribedAt: string
 }
 
@@ -50,8 +54,9 @@ function rowToSubscriber(row: SubscriberRow): NewsletterSubscriber {
     email: row.email,
     name: row.name ?? undefined,
     source: row.source,
-    status: row.status,
+    status: row.status as 'pending' | 'subscribed' | 'unsubscribed',
     verificationToken: row.verification_token ?? undefined,
+    unsubscribeToken: row.unsubscribe_token ?? undefined,
     subscribedAt: row.subscribed_at,
   }
 }
@@ -112,6 +117,32 @@ export async function verifySubscriberToken(
 
   if (error) {
     // PGRST116 = "No rows found" — token is invalid or already used.
+    if ((error as { code?: string }).code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+
+  return row ? rowToSubscriber(row as SubscriberRow) : null
+}
+
+/**
+ * Looks up a subscriber by their unsubscribe_token and marks them as
+ * 'unsubscribed'. The unsubscribe_token is permanent (never cleared) so the
+ * link in newsletter emails remains valid indefinitely.
+ *
+ * Returns the subscriber (with updated status) or null if the token is unknown.
+ */
+export async function unsubscribeByToken(
+  db: DbClient,
+  token: string,
+): Promise<NewsletterSubscriber | null> {
+  const { data: row, error } = await db
+    .from('newsletter_subscribers')
+    .update({ status: 'unsubscribed' })
+    .eq('unsubscribe_token', token)
+    .select()
+    .single()
+
+  if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
     throw new Error(error.message)
   }

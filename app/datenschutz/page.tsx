@@ -53,11 +53,13 @@ Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren 
 
 ### Datenerfassung auf dieser Website
 **Wer ist verantwortlich für die Datenerfassung auf dieser Website?**
-Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten können Sie dem Impressum dieser Website entnehmen.
+Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Dessen Kontaktdaten können Sie dem [Impressum](/impressum) dieser Website entnehmen.
 
 ## 2. Hosting
 
 Diese Website wird bei einem externen Dienstleister gehostet (Hoster). Die personenbezogenen Daten, die auf dieser Website erfasst werden, werden auf den Servern des Hosters gespeichert. Hierbei kann es sich v. a. um IP-Adressen, Kontaktanfragen, Meta- und Kommunikationsdaten, Vertragsdaten, Kontaktdaten, Namen, Websitezugriffe und sonstige Daten, die über eine Website generiert werden, handeln.
+
+Unsere Anwendung nutzt Supabase (Supabase Inc., USA) für Datenbank und Realtime-Updates. Dabei werden WebSocket-Verbindungen hergestellt, die Ihre IP-Adresse übertragen. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Datenschutzerklärung: https://supabase.com/privacy
 
 ## 3. Allgemeine Hinweise und Pflichtinformationen
 
@@ -91,9 +93,17 @@ Diese Website kann externe Inhalte von Drittanbietern einbetten (z.B. Spotify, Y
 
 Wenn Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind. Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten verwenden wir ausschließlich für den Versand der angeforderten Informationen und geben diese nicht an Dritte weiter.
 
-Sie können Ihre Einwilligung jederzeit widerrufen, indem Sie uns eine E-Mail an ${settings.impressumEmail} senden.
+Sie können Ihre Einwilligung jederzeit widerrufen, indem Sie uns eine E-Mail an ${settings.impressumEmail} senden oder den Abmelde-Link in jeder Newsletter-E-Mail nutzen.
 
-## 6. Plugins und Tools
+## 6. CDN / Bildauslieferung
+
+Diese Website nutzt wsrv.nl (Images.weserv.nl) für die Optimierung von Bildern. Dabei können Ihre IP-Adresse und Anfrage-Metadaten an die Betreiber übermittelt werden. Weitere Informationen: https://images.weserv.nl/privacy
+
+## 7. Presse-Portal
+
+Akkreditierte Journalisten können Pressefotos und Promo-Tracks herunterladen. Wir speichern Download-Statistiken (Zeitpunkt, Datei, Journalist-ID) zu Analysezwecken. Rechtsgrundlage: Berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO).
+
+## 8. Plugins und Tools
 
 ### Schriftarten (Google Fonts)
 Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Web Fonts, die von Google bereitgestellt werden. Die Google Fonts sind lokal eingebunden, sodass keine Verbindung zu Servern von Google stattfindet.
@@ -109,11 +119,13 @@ The following notes provide a simple overview of what happens to your personal d
 
 ### Data Collection on This Website
 **Who is responsible for data collection on this website?**
-Data processing on this website is carried out by the website operator. You can find their contact details in the legal notice (Impressum) of this website.
+Data processing on this website is carried out by the website operator. You can find their contact details in the [legal notice (Impressum)](/impressum) of this website.
 
 ## 2. Hosting
 
 This website is hosted by an external service provider (host). Personal data collected on this website is stored on the host's servers. This may include IP addresses, contact requests, metadata and communications data, contract data, contact details, names, website access data, and other data generated through a website.
+
+Our application uses Supabase (Supabase Inc., USA) for database storage and real-time updates. This involves establishing WebSocket connections that transmit your IP address. Legal basis: Art. 6(1)(b) GDPR (performance of contract). Privacy policy: https://supabase.com/privacy
 
 ## 3. General Information and Mandatory Disclosures
 
@@ -147,9 +159,17 @@ This website may embed external content from third-party providers (e.g. Spotify
 
 If you would like to receive the newsletter offered on the website, we require an email address from you as well as information that allows us to verify that you are the owner of the email address provided and that you agree to receive the newsletter. Further data will not be collected or only on a voluntary basis. We use this data exclusively for sending the requested information and do not pass it on to third parties.
 
-You can revoke your consent at any time by sending us an email to ${settings.impressumEmail}.
+You can revoke your consent at any time by sending us an email to ${settings.impressumEmail} or by using the unsubscribe link included in every newsletter email.
 
-## 6. Plugins and Tools
+## 6. CDN / Image Delivery
+
+This website uses wsrv.nl (Images.weserv.nl) to optimise images. In doing so, your IP address and request metadata may be transmitted to the service operator. More information: https://images.weserv.nl/privacy
+
+## 7. Press Portal
+
+Accredited journalists may download press photos and promo tracks. We store download statistics (timestamp, file, journalist ID) for analytical purposes. Legal basis: Legitimate interest (Art. 6(1)(f) GDPR).
+
+## 8. Plugins and Tools
 
 ### Web Fonts
 This website uses web fonts for uniform font rendering. The fonts are hosted locally, so no connection to Google's servers takes place.

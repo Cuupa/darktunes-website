@@ -37,6 +37,7 @@ interface SubscriberRecord {
   name: string | null
   status: 'pending' | 'subscribed'
   verification_token: string | null
+  unsubscribe_token: string | null
   subscribed_at: string
 }
 
@@ -55,9 +56,13 @@ interface WebhookPayload {
 function buildConfirmationEmail(
   email: string,
   verificationToken: string,
+  unsubscribeToken: string | null,
   siteUrl: string,
 ): { subject: string; html: string; text: string } {
   const confirmUrl = `${siteUrl}/api/newsletter/verify?token=${verificationToken}`
+  const unsubscribeUrl = unsubscribeToken
+    ? `${siteUrl}/api/newsletter/unsubscribe?token=${unsubscribeToken}`
+    : null
   const year = new Date().getFullYear()
 
   const subject = 'Please confirm your darkTunes newsletter subscription'
@@ -104,11 +109,18 @@ function buildConfirmationEmail(
         <p style="margin:0;color:#555555;font-size:12px;">
           &copy; ${year} darkTunes Music Group. All rights reserved.
         </p>
+        ${unsubscribeUrl ? `<p style="margin:8px 0 0;font-size:11px;color:#444444;">
+          <a href="${unsubscribeUrl}" style="color:#444444;">Unsubscribe</a>
+        </p>` : ''}
       </td>
     </tr>
   </table>
 </body>
 </html>`
+
+  const unsubscribeFooter = unsubscribeUrl
+    ? `\n\nTo unsubscribe at any time, visit: ${unsubscribeUrl}`
+    : ''
 
   const text = `darkTunes Newsletter — Confirm your subscription
 
@@ -116,7 +128,7 @@ Thanks for signing up! Please click the link below to confirm your subscription:
 
 ${confirmUrl}
 
-This link expires in 7 days. If you didn't sign up, you can safely ignore this email.
+This link expires in 7 days. If you didn't sign up, you can safely ignore this email.${unsubscribeFooter}
 
 — darkTunes Music Group`
 
@@ -165,6 +177,7 @@ serve(async (req: Request) => {
   const { subject, html, text } = buildConfirmationEmail(
     record.email,
     record.verification_token,
+    record.unsubscribe_token,
     siteUrl,
   )
 
