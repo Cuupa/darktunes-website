@@ -419,22 +419,6 @@ export interface SiteSettings {
    * Defaults to ['releases','spotify','videos','concerts','news','newsletter'].
    */
   homepageSectionOrder?: HomepageSection[]
-  // ── Role Permissions ──────────────────────────────────────────────────────
-  /**
-   * Per-role permission map. Keys are role names ('admin','editor','journalist','user','artist').
-   * Stored as JSON in site_settings under key 'role_permissions'.
-   */
-  rolePermissions?: Record<string, RolePermissions>
-}
-
-/** Granular permission flags configurable per role. */
-export interface RolePermissions {
-  canPublishNews: boolean
-  canEditNews: boolean
-  canManageArtists: boolean
-  canManageReleases: boolean
-  canManageVideos: boolean
-  canViewAdminPanel: boolean
 }
 
 export interface Concert {

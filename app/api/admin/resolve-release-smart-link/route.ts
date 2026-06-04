@@ -22,7 +22,7 @@ import type { Database } from '@/types/database'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { resolveOdesliSmartLink } from '@/lib/sync/odesliApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -31,7 +31,7 @@ import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate — admin or editor role required
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_manage_releases')
 
   // 2. Parse body
   let releaseId: string | undefined

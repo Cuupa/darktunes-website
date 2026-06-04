@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { deleteMediaFileRecord, updateMediaFile } from '@/lib/api/mediaFiles'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { deleteR2MediaObjects, getMediaFilesForDeletion } from '../_utils'
@@ -19,7 +19,7 @@ function extractId(req: NextRequest): string {
 
 export const PATCH = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const id = extractId(request)
   if (!id) throw new ApiError(400, 'Missing media file id')
@@ -40,7 +40,7 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
 
 export const DELETE = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyPermission(token, 'can_view_admin_panel')
 
   const id = extractId(request)
   if (!id) throw new ApiError(400, 'Missing media file id')
