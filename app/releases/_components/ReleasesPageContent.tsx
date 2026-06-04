@@ -16,7 +16,7 @@ interface ReleasesPageContentProps {
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.05 } },
+  visible: { transition: { staggerChildren: 0.03 } },
 }
 
 const itemVariants = {
