@@ -41,10 +41,12 @@ export interface UseMediaExplorerState {
   updateAsset: (assetId: string, updates: {
     tags?: string[]
     folderId?: string | null
+    artistId?: string | null
     originalFilename?: string
   }) => Promise<void>
   reload: () => void
   token: string | null
+  totalStorageBytes: number
 }
 
 type MediaFolderRow = Database['public']['Tables']['media_folders']['Row']
@@ -111,6 +113,7 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
   const [isSearching, setIsSearching] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [token, setToken] = useState<string | null>(null)
+  const [totalStorageBytes, setTotalStorageBytes] = useState<number>(0)
 
   useEffect(() => {
     setCurrentFolderId(initialFolderId)
@@ -166,12 +169,17 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
         uploadedBy: row.uploaded_by ?? undefined,
         createdAt: row.created_at,
         folderId: row.folder_id ?? undefined,
-        artistId: undefined,
-        artistIds: [],
+        artistId: row.artist_id ?? undefined,
+        artistIds: row.artist_id ? [row.artist_id] : [],
         releaseId: undefined,
         tags: row.tags ?? [],
         sha256Hash: row.sha256_hash ?? undefined,
       })))
+
+      // Compute total storage across all files
+      const { data: allFiles } = await supabase.from('media_files').select('size_bytes')
+      const total = (allFiles ?? []).reduce((sum, f) => sum + (f.size_bytes ?? 0), 0)
+      setTotalStorageBytes(total)
     } finally {
       setIsLoading(false)
     }
@@ -341,6 +349,7 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
     updates: {
       tags?: string[]
       folderId?: string | null
+      artistId?: string | null
       originalFilename?: string
     },
   ): Promise<void> => {
@@ -348,6 +357,7 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
     const body: Record<string, string | string[] | null> = {}
     if ('tags' in updates) body.tags = updates.tags ?? []
     if ('folderId' in updates) body.folderId = updates.folderId ?? null
+    if ('artistId' in updates) body.artistId = updates.artistId ?? null
     if ('originalFilename' in updates) body.originalFilename = updates.originalFilename ?? ''
 
     const response = await fetch(`/api/admin/media/${assetId}`, {
@@ -393,5 +403,6 @@ export function useMediaExplorer(initialFolderId: string | null = null): UseMedi
     updateAsset: updateAssetMutation,
     reload: () => void fetchFolderContents(currentFolderId),
     token,
+    totalStorageBytes,
   }
 }

@@ -736,6 +736,7 @@ export interface Database {
           uploaded_by: string | null
           created_at: string
           folder_id: string | null
+          artist_id: string | null
           tags: string[]
           sha256_hash: string | null
         }
@@ -750,6 +751,7 @@ export interface Database {
           uploaded_by?: string | null
           created_at?: string
           folder_id?: string | null
+          artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
         }
@@ -764,6 +766,7 @@ export interface Database {
           uploaded_by?: string | null
           created_at?: string
           folder_id?: string | null
+          artist_id?: string | null
           tags?: string[]
           sha256_hash?: string | null
         }

@@ -33,6 +33,7 @@ const DEFAULTS: SiteSettings = {
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
   spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
+  heroNewsBadge: '📰 News',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
   seoTitle: 'darkTunes Music Group',
@@ -139,6 +140,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     spotifyPlaylistUri: map['spotify_playlist_uri'] ?? DEFAULTS.spotifyPlaylistUri,
     spotifyPlaylists,
     heroBadge: map['hero_badge'] ?? DEFAULTS.heroBadge,
+    heroNewsBadge: map['hero_news_badge'] ?? DEFAULTS.heroNewsBadge,
     heroDescription: map['hero_description'] ?? DEFAULTS.heroDescription,
     seoTitle: map['seo_title'] ?? DEFAULTS.seoTitle,
     seoDescription: map['seo_description'] ?? DEFAULTS.seoDescription,

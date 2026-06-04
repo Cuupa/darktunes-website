@@ -7,6 +7,7 @@ import { deleteR2MediaObjects, getMediaFilesForDeletion } from '../_utils'
 
 interface PatchMediaFileBody {
   folderId?: string | null
+  artistId?: string | null
   tags?: string[]
   originalFilename?: string
 }
@@ -26,6 +27,7 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
   const body = (await request.json()) as PatchMediaFileBody
   const updates: PatchMediaFileBody = {}
   if ('folderId' in body) updates.folderId = body.folderId ?? null
+  if ('artistId' in body) updates.artistId = body.artistId ?? null
   if ('tags' in body) updates.tags = body.tags ?? []
   if ('originalFilename' in body) updates.originalFilename = body.originalFilename?.trim() ?? ''
   if (Object.keys(updates).length === 0) throw new ApiError(400, 'No changes provided')

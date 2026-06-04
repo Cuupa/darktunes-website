@@ -17,6 +17,7 @@ interface ThreadViewProps {
   onStar: (id: string, starred: boolean) => void
   onDelete: (id: string) => void
   onExport: (id: string) => void
+  onMarkRead?: (id: string) => void
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
 }
@@ -33,11 +34,20 @@ export function ThreadView({
   onStar,
   onDelete,
   onExport,
+  onMarkRead,
   selectedIds,
   onToggleSelect,
 }: ThreadViewProps) {
   const prefersReducedMotion = useReducedMotion()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const toggleExpand = (message: LabelMessage) => {
+    const willExpand = expandedId !== message.id
+    setExpandedId(willExpand ? message.id : null)
+    if (willExpand && !message.read && onMarkRead) {
+      onMarkRead(message.id)
+    }
+  }
 
   const artistNameById = useMemo(() => new Map(artists.map((artist) => [artist.id, artist.name])), [artists])
 
@@ -85,7 +95,8 @@ export function ThreadView({
                   initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-                  className={`rounded-lg border border-border p-4 ${isDeleted ? 'bg-muted/20 opacity-60' : 'bg-card/40'}`}
+                  className={`rounded-lg border border-border p-4 cursor-pointer ${isDeleted ? 'bg-muted/20 opacity-60' : 'bg-card/40'}`}
+                  onClick={() => toggleExpand(message)}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-3">
@@ -99,7 +110,7 @@ export function ThreadView({
                       <button
                         type="button"
                         className="space-y-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={() => setExpandedId((current) => (current === message.id ? null : message.id))}
+                        onClick={(e) => { e.stopPropagation(); toggleExpand(message) }}
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{message.subject}</span>
@@ -119,10 +130,12 @@ export function ThreadView({
                       <MessageActions
                         messageId={message.id}
                         starred={Boolean(message.starred)}
+                        read={Boolean(message.read)}
                         deletedAt={message.deletedAt ?? null}
                         onStar={onStar}
                         onDelete={onDelete}
                         onExport={onExport}
+                        onMarkRead={onMarkRead}
                       />
                     </div>
                   </div>

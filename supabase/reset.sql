@@ -1861,6 +1861,7 @@ CREATE TABLE IF NOT EXISTS public.media_files (
   public_url        TEXT    NOT NULL,
   uploaded_by       UUID    REFERENCES public.profiles(id) ON DELETE SET NULL,
   folder_id         UUID    REFERENCES public.media_folders(id) ON DELETE SET NULL,
+  artist_id         UUID    REFERENCES public.artists(id) ON DELETE SET NULL,
   tags              TEXT[]  NOT NULL DEFAULT '{}',
   sha256_hash       TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1868,6 +1869,7 @@ CREATE TABLE IF NOT EXISTS public.media_files (
 CREATE INDEX IF NOT EXISTS idx_media_files_folder_id   ON public.media_files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_media_files_created_at  ON public.media_files(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_media_files_sha256_hash ON public.media_files(sha256_hash);
+ALTER TABLE public.media_files ADD COLUMN IF NOT EXISTS artist_id UUID REFERENCES public.artists(id) ON DELETE SET NULL;
 
 -- RLS: media_folders
 ALTER TABLE public.media_folders ENABLE ROW LEVEL SECURITY;

@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { useArtists } from '@/hooks/useArtists'
 import { useMediaExplorer } from '@/hooks/useMediaExplorer'
 import { cn } from '@/lib/utils'
 import type { Asset } from '@/types'
@@ -27,11 +28,17 @@ export function MediaFileExplorer({ className }: { className?: string }) {
   const searchParams = useSearchParams()
   const folderId = searchParams.get('mediafolder') ?? null
   const explorer = useMediaExplorer(folderId)
+  const { artists } = useArtists()
   const uploadRef = useRef<UploadDropZoneRef>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
   const [tagsAsset, setTagsAsset] = useState<Asset | null>(null)
+
+  const artistNames = useMemo(
+    () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
+    [artists],
+  )
 
   const navigate = useCallback((id: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -140,15 +147,33 @@ export function MediaFileExplorer({ className }: { className?: string }) {
   const displayedFolders = explorer.searchQuery.trim() ? [] : explorer.folders
   const displayedAssets = explorer.searchQuery.trim() ? explorer.searchResults : explorer.assets
 
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+
+  const handleAssignArtists = useCallback(async (assetId: string, newArtistIds: string[]) => {
+    try {
+      // media_files supports a single artist_id; take the first value (or null to unassign)
+      const artistId = newArtistIds.length > 0 ? newArtistIds[0] : null
+      await explorer.updateAsset(assetId, { artistId })
+      toast.success(artistId ? 'Artist assigned' : 'Artist removed')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Assign failed')
+    }
+  }, [explorer])
+
   const sharedGridListProps = {
     folders: displayedFolders,
     assets: displayedAssets,
     allFolders: explorer.allFolders,
-    artists: [],
+    artists,
     releases: [],
     selectedIds: explorer.selectedIds,
     renaming,
-    artistNames: {},
+    artistNames,
     onSelectionReplace: replaceSelection,
     onFolderSelect: (currentFolderId: string, multi: boolean) => explorer.toggleSelect(`folder:${currentFolderId}`, multi),
     onFolderNavigate: navigate,
@@ -165,7 +190,7 @@ export function MediaFileExplorer({ className }: { className?: string }) {
     onAssetMove: (assetId: string, currentFolderId: string | null) => void explorer.moveAsset(assetId, currentFolderId).then(() => toast.success('File moved')).catch((error) => toast.error(error instanceof Error ? error.message : 'Move failed')),
     onAssetCopyUrl: (asset: Asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied')),
     onAssetDownload: (asset: Asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer'),
-    onAssetAssignArtists: () => undefined,
+    onAssetAssignArtists: (assetId: string, newArtistIds: string[]) => void handleAssignArtists(assetId, newArtistIds),
     onAssetAssignRelease: () => undefined,
     onAssetEditTags: (asset: Asset) => handleAssetTags(asset),
     onAssetPreview: (asset: Asset) => setPreviewAsset(asset),
@@ -201,6 +226,9 @@ export function MediaFileExplorer({ className }: { className?: string }) {
               onUpload={() => uploadRef.current?.openPicker()}
             />
             <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+            <div className="flex items-center gap-2 border-b border-border px-4 py-1.5 text-xs text-muted-foreground">
+              <span>Storage used: <span className="font-medium text-foreground">{formatBytes(explorer.totalStorageBytes)}</span></span>
+            </div>
             <UploadDropZone
               ref={uploadRef}
               folderId={explorer.currentFolderId}
