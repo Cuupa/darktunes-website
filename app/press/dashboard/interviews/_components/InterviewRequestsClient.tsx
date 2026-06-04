@@ -43,6 +43,13 @@ export function InterviewRequestsClient({
   const [preferredDate, setPreferredDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  const getStatusLabel = (status: string) => {
+    if (status === 'pending') return labels.pending
+    if (status === 'accepted') return labels.accepted
+    if (status === 'rejected') return labels.rejected
+    return status
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!artistId) return
@@ -134,9 +141,3 @@ export function InterviewRequestsClient({
     </div>
   )
 }
-  const getStatusLabel = (status: string) => {
-    if (status === 'pending') return labels.pending
-    if (status === 'accepted') return labels.accepted
-    if (status === 'rejected') return labels.rejected
-    return status
-  }
