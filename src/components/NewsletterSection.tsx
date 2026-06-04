@@ -59,7 +59,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
   }
 
   return (
-    <section id="newsletter" className="py-24 px-4 lg:px-16 bg-muted/20">
+    <section id="newsletter" className="py-24 px-4 lg:px-16 bg-gradient-to-b from-muted/20 to-primary/5">
       <div className="container mx-auto max-w-2xl">
         <motion.div
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
@@ -68,7 +68,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
           transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
           className="text-center mb-10"
         >
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/20 mb-5">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 ring-1 ring-primary/20 mb-5 shadow-[0_0_20px_rgba(73,54,135,0.3)]">
             <Envelope size={28} weight="fill" className="text-primary" />
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight uppercase">{dict.heading}</h2>
@@ -118,7 +118,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                  className="shrink-0 bg-gradient-to-r from-primary to-secondary hover:opacity-90 hover:shadow-[0_0_20px_rgba(73,54,135,0.5)] text-white font-semibold transition-all duration-300"
                 >
                   {isSubmitting ? dict.submitting : (
                     <>

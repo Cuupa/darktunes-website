@@ -114,7 +114,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.statsHeading}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
             {stats.map((stat) => (
-              <Card key={stat.label} className="bg-card border-border p-6 text-center">
+              <Card key={stat.label} className="glow-card bg-card border-border p-6 text-center hover:border-accent/50 hover:shadow-[0_0_20px_rgba(73,54,135,0.3)] transition-all duration-300">
                 <p className="text-4xl font-bold text-accent">{stat.value}</p>
                 <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider mt-2">{stat.label}</p>
               </Card>
