@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { createRelease } from '@/lib/api/releases'
 
@@ -46,6 +46,26 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     is_visible: false,
     featured: false,
   })
+
+  const serviceRole = await createServiceRoleSupabaseClient()
+  const { data: editorProfiles } = await serviceRole
+    .from('profiles')
+    .select('id')
+    .eq('role', 'editor')
+
+  const recipients = (editorProfiles ?? []).map((profile) => ({
+    recipient_id: profile.id,
+    type: 'artist_release_submission',
+    entity_type: 'release',
+    entity_id: release.id,
+    entity_name: release.title,
+    sender_id: user.id,
+    read: false,
+  }))
+
+  if (recipients.length > 0) {
+    await serviceRole.from('editor_notifications').insert(recipients)
+  }
 
   return NextResponse.json({ releaseId: release.id })
 })

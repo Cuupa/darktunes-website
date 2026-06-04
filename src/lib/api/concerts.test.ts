@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getConcerts, getConcertsByArtistId } from './concerts'
+import {
+  getConcerts,
+  getConcertsByArtistId,
+  createConcert,
+  updateConcert,
+  deleteConcert,
+} from './concerts'
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
@@ -14,6 +20,10 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     eq: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -38,6 +48,8 @@ const mockConcerts: ConcertRow[] = [
     songkick_id: 'sk-1',
     bandsintown_id: null,
     status: 'cancelled',
+    created_by: null,
+    source: 'admin',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },
@@ -54,6 +66,8 @@ const mockConcerts: ConcertRow[] = [
     songkick_id: 'sk-2',
     bandsintown_id: null,
     status: 'ok',
+    created_by: null,
+    source: 'admin',
     created_at: '2026-01-02T00:00:00Z',
     updated_at: '2026-01-02T00:00:00Z',
   },
@@ -98,5 +112,32 @@ describe('getConcertsByArtistId', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Artist concert query failed', code: 'PGRST001' })
     await expect(getConcertsByArtistId(db, 'artist-1')).rejects.toThrow('Artist concert query failed')
+  })
+})
+
+describe('createConcert', () => {
+  it('creates and maps a concert row', async () => {
+    const db = makeMockDb(mockConcerts[0])
+    const result = await createConcert(db, {
+      artist_name: 'Artist A',
+      event_name: 'Cancelled Show',
+      concert_date: '2026-08-10',
+    })
+    expect(result.id).toBe('concert-cancelled')
+  })
+})
+
+describe('updateConcert', () => {
+  it('updates and maps a concert row', async () => {
+    const db = makeMockDb({ ...mockConcerts[0], event_name: 'Updated Show' })
+    const result = await updateConcert(db, 'concert-cancelled', { event_name: 'Updated Show' })
+    expect(result.eventName).toBe('Updated Show')
+  })
+})
+
+describe('deleteConcert', () => {
+  it('deletes a concert row', async () => {
+    const db = makeMockDb(null)
+    await expect(deleteConcert(db, 'concert-id')).resolves.toBeUndefined()
   })
 })

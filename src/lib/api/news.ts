@@ -12,6 +12,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     embargo_until?: string | null
     media_contact?: string | null
     release_category?: string | null
+    reviewed_by?: string | null
   }
   const validStatuses = ['draft', 'published', 'scheduled', 'archived'] as const
   type NewsStatus = typeof validStatuses[number]
@@ -46,6 +47,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
           href: row.hero_secondary_btn_href ?? undefined,
         }
       : undefined,
+    reviewedBy: r.reviewed_by ?? undefined,
   }
 }
 

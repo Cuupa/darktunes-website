@@ -3,9 +3,12 @@ export const dynamic = 'force-dynamic'
 import type { ReactNode } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { PressNav } from './_components/PressNav'
 
 export default async function PressDashboardLayout({ children }: { children: ReactNode }) {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -14,14 +17,15 @@ export default async function PressDashboardLayout({ children }: { children: Rea
 
   const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
   const links = [
-    { href: '/press/dashboard', label: 'Overview', enabled: true },
-    { href: '/press/dashboard/profile', label: 'Profile', enabled: true },
-    { href: '/press/dashboard/promo-pool', label: 'Promo Pool', enabled: true },
-    { href: '/press/dashboard/press-kit', label: 'Press Kit', enabled: true },
-    { href: '/press/dashboard/press-releases', label: 'Press Releases', enabled: true },
-    { href: '/press/dashboard/accreditation', label: 'Accreditation', enabled: flags['journalist.accreditation'] ?? true },
-    { href: '/press/dashboard/contact', label: 'Contact', enabled: flags['press.contact'] ?? true },
-    { href: '/press/dashboard/download-history', label: 'Download History', enabled: true },
+    { href: '/press/dashboard', label: dict.pressDashboard.overview, enabled: true },
+    { href: '/press/dashboard/profile', label: dict.pressDashboard.profile, enabled: true },
+    { href: '/press/dashboard/promo-pool', label: dict.pressDashboard.promoPool, enabled: true },
+    { href: '/press/dashboard/press-kit', label: dict.pressDashboard.pressKit, enabled: true },
+    { href: '/press/dashboard/press-releases', label: dict.pressDashboard.pressReleases, enabled: true },
+    { href: '/press/dashboard/interviews', label: dict.pressDashboard.interviews, enabled: true },
+    { href: '/press/dashboard/accreditation', label: dict.pressDashboard.accreditation, enabled: flags['journalist.accreditation'] ?? true },
+    { href: '/press/dashboard/contact', label: dict.pressDashboard.contact, enabled: flags['press.contact'] ?? true },
+    { href: '/press/dashboard/download-history', label: dict.pressDashboard.downloadHistory, enabled: true },
   ].filter((item) => item.enabled).map(({ href, label }) => ({ href, label }))
 
   return (
