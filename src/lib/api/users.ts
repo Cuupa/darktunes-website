@@ -314,6 +314,3 @@ export async function unlinkArtistFromUser(db: DbClient, artistId: string): Prom
 
   if (error) throw new Error(error.message)
 }
-
-
-type DbClient = SupabaseClient<Database>
