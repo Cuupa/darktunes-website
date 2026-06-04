@@ -46,7 +46,7 @@ describe('SpotifyMultiPlayer', () => {
 
     expect(screen.queryByTitle(/Spotify playlist:/i)).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load Spotify' }))
+    fireEvent.click(screen.getByRole('button', { name: /Load Spotify/i }))
 
     const iframe = screen.getByTitle('Spotify playlist: Label Playlist')
     expect(iframe).toBeInTheDocument()
@@ -64,7 +64,7 @@ describe('SpotifyMultiPlayer', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load Spotify' }))
+    fireEvent.click(screen.getByRole('button', { name: /Load Spotify/i }))
 
     let iframes = screen.getAllByTitle(/Spotify playlist:/i)
     expect(iframes).toHaveLength(1)

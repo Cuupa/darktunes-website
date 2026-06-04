@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Header } from '@/components/Header'
 import { Hero } from '@/components/Hero'
 import { Releases } from '@/components/Releases'
 import { News } from '@/components/News'
@@ -198,7 +197,6 @@ export function HomePageContent({
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <Header dict={dict.navigation} locale={locale} logoUrl={siteSettings.logoUrl} sectionOrder={sectionOrder} />
       <main id="main-content">
         <div className="relative">
           <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />

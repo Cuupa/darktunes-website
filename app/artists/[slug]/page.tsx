@@ -27,6 +27,7 @@ import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
 import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
+import { getArtistAssets } from '@/lib/api/artistAssets'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 
@@ -62,13 +63,14 @@ async function getArtistData(slug: string) {
   // treats it as a server error (5xx) rather than caching it as a 404.
   const artist = await getArtistBySlug(client, slug)
   if (!artist) return null
-  const [releases, concerts, videos, news] = await Promise.all([
+  const [releases, concerts, videos, news, assets] = await Promise.all([
     getReleasesByArtistId(client, artist.id),
     getConcertsByArtistId(client, artist.id),
     getVideosByArtistId(client, artist.id),
     getPublicNewsPostsByArtistId(client, artist.id).then((posts) => posts.slice(0, 3)),
+    getArtistAssets(client, artist.id).catch(() => []),
   ])
-  return { artist, releases, concerts, videos, news }
+  return { artist, releases, concerts, videos, news, assets }
 }
 
 export async function generateStaticParams() {
@@ -109,7 +111,7 @@ export default async function ArtistDetailPage({ params }: Props) {
   ])
   if (!data) notFound()
   const dict = await getDictionary(locale)
-  const { artist, releases, concerts, videos, news } = data
+  const { artist, releases, concerts, videos, news, assets } = data
   return (
     <ArtistDetailContent
       artist={artist}
@@ -117,6 +119,7 @@ export default async function ArtistDetailPage({ params }: Props) {
       concerts={concerts}
       videos={videos}
       news={news}
+      assets={assets}
       dict={dict.artistDetail}
       consentDict={dict.consent}
       locale={locale}

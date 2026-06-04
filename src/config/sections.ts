@@ -1,7 +1,7 @@
 import type { Dictionary } from '@/i18n/types'
 import type { HomepageSection } from '@/types'
 
-export type SectionId = HomepageSection | 'home' | 'contact' | 'shop'
+export type SectionId = HomepageSection | 'home' | 'artists' | 'contact' | 'shop'
 export type SectionRouteType = 'anchor' | 'internal' | 'external'
 
 export interface SectionConfig {
@@ -28,6 +28,7 @@ export const SECTION_CONFIG: SectionConfig[] = [
   { id: 'concerts', labelKey: 'tour', href: '#concerts', routeType: 'anchor' },
   { id: 'news', labelKey: 'news', href: '#news', routeType: 'anchor' },
   { id: 'newsletter', labelKey: 'newsletter', href: '#newsletter', routeType: 'anchor' },
+  { id: 'artists', labelKey: 'artists', href: '/artists', routeType: 'internal' },
   { id: 'contact', labelKey: 'contact', href: '/contact', routeType: 'internal' },
   { id: 'shop', labelKey: 'shop', href: 'https://darkmerch.com/', routeType: 'external' },
 ]
@@ -46,6 +47,7 @@ export function buildNavItems(sectionOrder: HomepageSection[] = DEFAULT_SECTION_
   return [
     SECTION_CONFIG_BY_ID.get('home'),
     ...orderedSectionIds.map((section) => SECTION_CONFIG_BY_ID.get(section)),
+    SECTION_CONFIG_BY_ID.get('artists'),
     SECTION_CONFIG_BY_ID.get('contact'),
     SECTION_CONFIG_BY_ID.get('shop'),
   ].filter((section): section is SectionConfig => Boolean(section))

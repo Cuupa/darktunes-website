@@ -8,7 +8,7 @@
     "news": "NEWS",
     "videos": "VIDEOS",
     "spotify": "SPOTIFY",
-    "newsletter": "Newsletter",
+    "newsletter": "NEWSLETTER",
     "switchLocale": "EN",
     "contact": "CONTACT",
     "shop": "SHOP"
@@ -108,7 +108,7 @@
     "gateText": "This content is provided by an external provider. By loading it, you agree to the transfer of data.",
     "loadExternal": "Load external content",
     "loadExternalAlt": "External content — click to load",
-    "loadSpotify": "Load Spotify",
+    "loadSpotify": "Stream on Spotify",
     "loadYouTube": "Load YouTube"
   },
   "releaseDetail": {
@@ -125,6 +125,8 @@
     "shopMerch": "Shop Merch",
     "listenEverywhere": "Listen Everywhere",
     "since": "Since",
+    "listenOn": "Listen on Spotify",
+    "bandPhotos": "Band Photos",
     "latestVideo": "Latest Video",
     "getTickets": "Tickets",
     "fullProfile": "Full Profile →",

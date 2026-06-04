@@ -22,7 +22,7 @@ export default async function NewsPage() {
 
   return (
     <div id="main-content" className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 lg:px-8 py-24 max-w-7xl">
+      <div className="container mx-auto px-4 lg:px-8 pt-36 pb-24 max-w-7xl">
         <Link
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
