@@ -210,9 +210,23 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPressLoginPage && user) {
-    const pressUrl = request.nextUrl.clone()
-    pressUrl.pathname = '/press/dashboard'
-    return NextResponse.redirect(pressUrl)
+    // Only redirect to dashboard if the user actually has press access.
+    // Without this check an authenticated user without a journalist/admin role
+    // would be bounced between /press/login and /press/dashboard indefinitely
+    // (ERR_TOO_MANY_REDIRECTS).
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile && ['journalist', 'admin'].includes(profile.role)) {
+      const pressUrl = request.nextUrl.clone()
+      pressUrl.pathname = '/press/dashboard'
+      return NextResponse.redirect(pressUrl)
+    }
+    // User is authenticated but lacks press access — stay on login page so the
+    // "unauthorized" error message is visible.
   }
 
   if (isPressDashboardRoute && user) {

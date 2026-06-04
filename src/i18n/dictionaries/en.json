@@ -590,6 +590,47 @@
     "send": "Send Inquiry",
     "sending": "Sending…",
     "sent": "Your message has been sent.",
-    "backToInbox": "Back to Inbox"
+    "backToInbox": "Back to Inbox",
+    "messageLabel": "Message"
+  },
+  "pressLanding": {
+    "tabs": {
+      "roster": "Artist Roster",
+      "releases": "Press Releases",
+      "contact": "Contact"
+    },
+    "heroBadge": "Press & Media",
+    "heroDescription": "Editorial requests, interviews, review copies, and high-resolution assets for the darkTunes roster.",
+    "rosterSearch": "Search artists…",
+    "rosterSort": {
+      "label": "Sort by",
+      "nameAsc": "Name A–Z",
+      "nameDesc": "Name Z–A",
+      "genreAsc": "Genre A–Z"
+    },
+    "noResults": "No artists match your search.",
+    "contact": {
+      "title": "Press Contact",
+      "description": "For interview requests, review copies, event accreditation, or bespoke press kits, reach out directly.",
+      "emailLabel": "E-Mail",
+      "phoneLabel": "Phone",
+      "applyButton": "Apply for press access",
+      "dashboardButton": "Open press dashboard"
+    },
+    "releasesButton": "Open dashboard",
+    "readRelease": "Read release",
+    "artistRoster": "Artist Roster"
+  },
+  "pressLogin": {
+    "title": "Press Dashboard Login",
+    "description": "Sign in as journalist or admin to access press tools.",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in…",
+    "errorInvalid": "Invalid email or password.",
+    "errorUnauthorized": "Your account is not authorized for the press dashboard.",
+    "applyLink": "Apply for press access",
+    "forgotPassword": "Forgot password? Email"
   }
 }

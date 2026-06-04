@@ -63,7 +63,7 @@ export function ContactClient({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="press-contact-message">Message</Label>
+              <Label htmlFor="press-contact-message">{dict.messageLabel}</Label>
               <Textarea
                 id="press-contact-message"
                 rows={8}
