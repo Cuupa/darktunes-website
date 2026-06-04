@@ -130,6 +130,8 @@ export interface NewsPost {
   mediaContact?: string | null
   /** Category of press release, e.g. "album announcement", "tour", "label news" */
   releaseCategory?: string | null
+  /** Optional hero background image URL, separate from the cover imageUrl. */
+  heroBgUrl?: string
   /** Custom configuration for the primary CTA button in the Hero section. */
   heroPrimaryBtn?: HeroButton
   /** Custom configuration for the secondary CTA button in the Hero section. */

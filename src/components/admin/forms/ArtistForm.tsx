@@ -437,7 +437,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('imageUrl')}>
                   Open Asset Picker
                 </Button>
-                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('imageUrl', url)} artistId={artistId} />
                 {mode === 'admin' && (
                   <Button
                     type="button"
@@ -463,7 +463,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('logoUrl')}>
                   Open Asset Picker
                 </Button>
-                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} />
+                <ImageUploadButton label="Upload" onUploaded={(url) => setValue('logoUrl', url)} artistId={artistId} />
               </div>
             </div>
           </div>

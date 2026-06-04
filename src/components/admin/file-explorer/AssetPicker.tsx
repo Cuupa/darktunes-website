@@ -221,7 +221,7 @@ export function AssetPicker({ open, onClose, onSelect, mimeTypeFilter, artistId 
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="sm:max-w-5xl" aria-labelledby="asset-picker-title">
+      <DialogContent className="sm:max-w-5xl" aria-labelledby="asset-picker-title" hideCloseButton>
         <DialogHeader>
           <DialogTitle id="asset-picker-title">Select Asset</DialogTitle>
           <DialogDescription>

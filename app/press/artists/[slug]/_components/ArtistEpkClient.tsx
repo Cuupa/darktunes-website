@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import DOMPurify from 'dompurify'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -29,11 +30,23 @@ interface ArtistEpkClientProps {
   concerts: Concert[]
 }
 
+function sanitizeHtml(html: string): string {
+  if (typeof window === 'undefined') return html
+  return DOMPurify.sanitize(html)
+}
+
+function stripHtmlTags(html: string): string {
+  if (typeof window === 'undefined') return html.replace(/<[^>]*>/g, '')
+  const tmp = document.createElement('div')
+  tmp.innerHTML = DOMPurify.sanitize(html)
+  return tmp.textContent ?? tmp.innerText ?? ''
+}
+
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = async () => {
-    await navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(stripHtmlTags(text))
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)
   }
@@ -110,7 +123,7 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
 
         <section aria-labelledby="artist-bios" className="space-y-4">
           <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">Bios</h2>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className={`grid grid-cols-1 gap-4 ${bios.length === 2 ? 'lg:grid-cols-2' : bios.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
             {bios.map((bio) => (
               <Card key={bio.label} className="border-border bg-card/70">
                 <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
@@ -119,8 +132,10 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
                 </CardHeader>
                 <CardContent>
                   <div
-                    className="prose prose-invert prose-sm max-w-none text-muted-foreground"
-                    dangerouslySetInnerHTML={{ __html: bio.text }}
+                    className="text-sm leading-relaxed text-muted-foreground [&_p]:mb-2 [&_p:last-child]:mb-0"
+                    // bio HTML is admin-authored content sanitized via DOMPurify
+                    // eslint-disable-next-line react/no-danger
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
                   />
                 </CardContent>
               </Card>

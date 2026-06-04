@@ -48,6 +48,19 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const sha256Hash = createHash('sha256').update(buffer).digest('hex')
   const supabase = await createServerSupabaseClient()
 
+  // When uploading from an artist context (e.g. artist edit form), auto-resolve
+  // the artist's root folder so the asset lands in the right place immediately.
+  let resolvedFolderId = folderId
+  if (artistId && !folderId) {
+    const { data: rootFolder } = await supabase
+      .from('asset_folders')
+      .select('id')
+      .eq('artist_id', artistId)
+      .is('parent_id', null)
+      .maybeSingle()
+    if (rootFolder?.id) resolvedFolderId = rootFolder.id
+  }
+
   const existingAsset = await getAssetByHash(supabase, sha256Hash)
   if (existingAsset) {
     return NextResponse.json({
@@ -91,7 +104,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     r2_key: r2Key,
     public_url: publicUrl,
     uploaded_by: userId,
-    folder_id: folderId,
+    folder_id: resolvedFolderId,
     artist_id: artistId,
     tags: [],
     sha256_hash: sha256Hash,

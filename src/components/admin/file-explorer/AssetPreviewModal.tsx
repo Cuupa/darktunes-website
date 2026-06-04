@@ -115,6 +115,7 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
       <DialogContent
         className="flex max-h-[90vh] max-w-[calc(100%-2rem)] sm:max-w-5xl flex-col gap-0 overflow-hidden p-0"
         aria-labelledby="preview-title"
+        hideCloseButton
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">

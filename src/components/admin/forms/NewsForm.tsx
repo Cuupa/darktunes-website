@@ -25,6 +25,7 @@ export interface NewsFormData {
   excerpt: string
   content: string
   imageUrl: string
+  heroBgUrl: string
   publishedAt: string
   scheduledAt: string
   featured: boolean
@@ -206,12 +207,23 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="imageUrl">Image URL</Label>
+        <Label htmlFor="imageUrl">Cover Image URL</Label>
         <div className="flex gap-2">
           <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
           <ImageUploadButton
             label="Upload"
             onUploaded={(url) => setValue('imageUrl', url)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="heroBgUrl">Hero Background Image (optional, overrides cover in Hero)</Label>
+        <div className="flex gap-2">
+          <Input id="heroBgUrl" {...register('heroBgUrl')} disabled={isLoading} placeholder="Leave empty to use cover image" className="flex-1" />
+          <ImageUploadButton
+            label="Upload"
+            onUploaded={(url) => setValue('heroBgUrl', url)}
           />
         </div>
       </div>

@@ -552,6 +552,7 @@ export interface Database {
           embargo_until: string | null
           media_contact: string | null
           release_category: string | null
+          hero_bg_url: string | null
           hero_primary_btn_label: string | null
           hero_primary_btn_action: string | null
           hero_primary_btn_href: string | null
@@ -577,6 +578,7 @@ export interface Database {
           embargo_until?: string | null
           media_contact?: string | null
           release_category?: string | null
+          hero_bg_url?: string | null
           hero_primary_btn_label?: string | null
           hero_primary_btn_action?: string | null
           hero_primary_btn_href?: string | null
@@ -602,6 +604,7 @@ export interface Database {
           embargo_until?: string | null
           media_contact?: string | null
           release_category?: string | null
+          hero_bg_url?: string | null
           hero_primary_btn_label?: string | null
           hero_primary_btn_action?: string | null
           hero_primary_btn_href?: string | null
