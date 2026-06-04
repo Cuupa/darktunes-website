@@ -64,7 +64,12 @@ export function ThreadView({
         artistId,
         artistName: artistNameById.get(artistId) ?? 'Unknown Artist',
         unreadCount: items.filter((item) => !item.read && !item.deletedAt).length,
-        items: [...items].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()),
+        items: [...items].sort((a, b) => {
+          const aUnread = !a.read && !a.deletedAt ? 0 : 1
+          const bUnread = !b.read && !b.deletedAt ? 0 : 1
+          if (aUnread !== bUnread) return aUnread - bUnread
+          return new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+        }),
       }))
       .sort((a, b) => a.artistName.localeCompare(b.artistName))
   }, [artistNameById, messages])
@@ -88,6 +93,7 @@ export function ThreadView({
               const replies = repliesByMessageId[message.id] ?? []
               const isExpanded = expandedId === message.id
               const isDeleted = Boolean(message.deletedAt)
+              const isUnread = !message.read && !isDeleted
 
               return (
                 <motion.div
@@ -95,7 +101,14 @@ export function ThreadView({
                   initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-                  className={`rounded-lg border border-border p-4 cursor-pointer ${isDeleted ? 'bg-muted/20 opacity-60' : 'bg-card/40'}`}
+                  className={[
+                    'rounded-lg border p-4 cursor-pointer transition-colors',
+                    isDeleted
+                      ? 'border-border bg-muted/20 opacity-60'
+                      : isUnread
+                        ? 'border-border border-l-[3px] border-l-primary bg-primary/5'
+                        : 'border-border bg-card/40',
+                  ].join(' ')}
                   onClick={() => toggleExpand(message)}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -113,14 +126,14 @@ export function ThreadView({
                         onClick={(e) => { e.stopPropagation(); toggleExpand(message) }}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{message.subject}</span>
+                          <span className={isUnread ? 'font-bold' : 'font-semibold'}>{message.subject}</span>
                           {message.starred && (
                             <Badge variant="secondary" className="gap-1">
                               <StarFour size={14} style={{ color: 'var(--primary)' }} aria-hidden="true" />
                               Starred
                             </Badge>
                           )}
-                          <Badge variant={message.read ? 'secondary' : 'default'}>{message.read ? 'Read' : 'Unread'}</Badge>
+                          {isUnread && <Badge>Unread</Badge>}
                           {isDeleted && <Badge variant="outline">Deleted</Badge>}
                         </div>
                         <p className="text-sm text-muted-foreground">{new Date(message.sentAt).toLocaleString()}</p>

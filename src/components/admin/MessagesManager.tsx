@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PencilSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -19,6 +20,7 @@ import type { ArtistReply, LabelMessage, MessageTemplate } from '@/types'
 import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { MessageComposer } from '@/components/messaging/MessageComposer'
 import { MessageSearch } from '@/components/messaging/MessageSearch'
 import { ThreadView } from '@/components/messaging/ThreadView'
@@ -91,6 +93,7 @@ export function MessagesManager() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isLoadingArtists, setIsLoadingArtists] = useState(true)
   const [artistLoadError, setArtistLoadError] = useState<string | null>(null)
+  const [composeOpen, setComposeOpen] = useState(false)
 
   const refreshMessages = useCallback(
     async (state: SearchState) => {
@@ -313,21 +316,38 @@ export function MessagesManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl font-semibold">Artist Messages</h2>
-        <Badge>{unreadCount} unread</Badge>
+    <div className="space-y-4">
+      {/* Header: title + unread badge + compose trigger */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold">Artist Messages</h2>
+          {unreadCount > 0 && <Badge>{unreadCount} unread</Badge>}
+        </div>
+        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+          <DialogTrigger asChild>
+            <Button type="button" className="min-h-[44px] gap-2">
+              <PencilSimple size={18} aria-hidden="true" />
+              Compose
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>New Message</DialogTitle>
+            </DialogHeader>
+            <MessageComposer
+              artists={artists}
+              templates={templates}
+              isSending={isSending}
+              isArtistsLoading={isLoadingArtists}
+              artistLoadError={artistLoadError}
+              onSend={handleSend}
+              onClose={() => setComposeOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <MessageComposer
-        artists={artists}
-        templates={templates}
-        isSending={isSending}
-        isArtistsLoading={isLoadingArtists}
-        artistLoadError={artistLoadError}
-        onSend={handleSend}
-      />
-
+      {/* Bulk delete bar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-card/40 p-4">
           <p className="text-sm text-muted-foreground">{selectedIds.size} message{selectedIds.size === 1 ? '' : 's'} selected</p>
@@ -337,8 +357,10 @@ export function MessagesManager() {
         </div>
       )}
 
+      {/* Filters / search */}
       <MessageSearch artists={artists} onSearch={handleSearch} />
 
+      {/* Inbox */}
       <ThreadView
         messages={messages}
         repliesByMessageId={repliesByMessageId}

@@ -17,6 +17,7 @@ interface MessageComposerProps {
   isArtistsLoading?: boolean
   artistLoadError?: string | null
   templates?: MessageTemplate[]
+  onClose?: () => void
 }
 
 interface DraftState {
@@ -45,6 +46,7 @@ export function MessageComposer({
   isArtistsLoading = false,
   artistLoadError = null,
   templates = [],
+  onClose,
 }: MessageComposerProps) {
   const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([])
   const [subject, setSubject] = useState('')
@@ -140,11 +142,12 @@ export function MessageComposer({
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY)
     }
+    onClose?.()
   }
 
   return (
     <div
-      className="space-y-4 rounded-lg border border-border p-4"
+      className="space-y-4"
       onKeyDown={(event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
           event.preventDefault()
