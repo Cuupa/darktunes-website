@@ -53,6 +53,7 @@ const mockNewsRow: NewsRow = {
   hero_secondary_btn_label: null,
   hero_secondary_btn_href: null,
   hero_secondary_btn_action: null,
+  hero_bg_url: null,
 }
 
 describe('getNewsPosts', () => {
