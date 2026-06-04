@@ -1,14 +1,15 @@
 'use client'
 
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Play, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
+import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Video } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -107,15 +108,29 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [page, setPage] = useState(1)
+  const [query, setQuery] = useState('')
   const listRef = useRef<HTMLUListElement>(null)
   const prefersReducedMotion = useReducedMotion()
 
+  const filteredVideos = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return videos
+    return videos.filter(
+      (v) =>
+        v.title.toLowerCase().includes(q) ||
+        (v.artistName?.toLowerCase().includes(q) ?? false),
+    )
+  }, [videos, query])
+
   const perPage = Math.max(1, videosPerPage)
-  const totalPages = Math.ceil(videos.length / perPage)
+  const totalPages = Math.ceil(filteredVideos.length / perPage)
   // When videosLinkToPage is true, only show the first page
   const effectiveTotalPages = videosLinkToPage ? 1 : totalPages
-  const currentPage = Math.min(page, effectiveTotalPages)
-  const pageVideos = videos.slice((currentPage - 1) * perPage, currentPage * perPage)
+  const currentPage = Math.min(page, Math.max(1, effectiveTotalPages))
+  const pageVideos = filteredVideos.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  // Reset to first page when the search query changes
+  useEffect(() => { setPage(1) }, [query])
 
   useEffect(() => {
     listRef.current?.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior })
@@ -141,7 +156,24 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
           </motion.div>
 
-          {videos.length === 0 && (
+          {/* Search input */}
+          <div className="relative mb-8 max-w-sm">
+            <MagnifyingGlass
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              aria-hidden="true"
+            />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={dict.searchPlaceholder}
+              className="pl-9"
+              aria-label={dict.searchPlaceholder}
+            />
+          </div>
+
+          {filteredVideos.length === 0 && (
             <p className="text-center text-muted-foreground font-mono py-12">
               {dict.noVideos}
             </p>
@@ -198,7 +230,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
                   </Button>
                 </>
               )}
-              {videosLinkToPage && videos.length > perPage && (
+              {videosLinkToPage && filteredVideos.length > perPage && (
                 <Button asChild variant="outline" size="lg" className="min-w-[160px]">
                   <Link href="/videos">{dict.viewAll ?? 'View all videos'}</Link>
                 </Button>

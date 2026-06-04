@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConsentGate } from '@/components/ConsentGate'
+import { useLenis } from '@/components/animations/LenisProvider'
 import type { SpotifyPlaylistEntry } from '@/types'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 
@@ -17,6 +18,23 @@ interface SpotifyMultiPlayerProps {
 export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: SpotifyMultiPlayerProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const prefersReducedMotion = useReducedMotion()
+  const lenis = useLenis()
+  /** When true the iframe is interactive and the scroll-intercept overlay is hidden. */
+  const [iframeInteractive, setIframeInteractive] = useState(false)
+  const interactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (interactTimerRef.current) clearTimeout(interactTimerRef.current)
+    }
+  }, [])
+
+  const handleOverlayClick = () => {
+    setIframeInteractive(true)
+    if (interactTimerRef.current) clearTimeout(interactTimerRef.current)
+    // Automatically restore the overlay after 5 s of Spotify interaction
+    interactTimerRef.current = setTimeout(() => setIframeInteractive(false), 5000)
+  }
 
   if (playlists.length === 0) return null
 
@@ -51,6 +69,24 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
                 </div>
               )
             })}
+
+            {/*
+              Transparent overlay that intercepts wheel events so Lenis can
+              scroll the page even when the cursor is over the Spotify iframe.
+              Clicking the overlay activates Spotify interaction mode for 5 s,
+              after which the overlay is restored.
+            */}
+            {!iframeInteractive && (
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 z-10 cursor-pointer"
+                onWheel={(e) => {
+                  lenis?.scrollTo(window.scrollY + e.deltaY, { immediate: false })
+                }}
+                onClick={handleOverlayClick}
+                title="Klicken, um den Spotify-Player zu bedienen"
+              />
+            )}
           </div>
 
           {playlists.length > 1 && (
