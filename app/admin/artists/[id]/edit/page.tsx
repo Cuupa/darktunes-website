@@ -46,10 +46,14 @@ function artistToFormData(artist: Artist): ArtistFormData {
     discogsId: artist.discogsId ?? '',
     songkickId: artist.songkickId ?? '',
     bandsintownId: artist.bandsintownId ?? '',
+    storageQuotaMb: artist.storageQuotaBytes != null
+      ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
+      : '',
   }
 }
 
 function formDataToInsert(data: ArtistFormData): ArtistInsert {
+  const quotaMb = data.storageQuotaMb ? parseInt(data.storageQuotaMb, 10) : null
   return {
     name: data.name,
     slug: data.slug,
@@ -79,6 +83,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     discogs_id: data.discogsId || null,
     songkick_id: data.songkickId || null,
     bandsintown_id: data.bandsintownId || null,
+    storage_quota_bytes: quotaMb != null && !Number.isNaN(quotaMb) ? quotaMb * 1024 * 1024 : null,
   }
 }
 

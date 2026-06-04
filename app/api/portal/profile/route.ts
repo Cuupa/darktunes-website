@@ -14,6 +14,9 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
+import type { Database } from '@/types/database'
+
+type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
 const profileBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -70,7 +73,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   // 5. Sync shared fields back to the artists table so both tables stay in sync
   const d = parsed.data
-  const artistUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
   if (d.bio !== undefined) artistUpdate.bio = d.bio ?? ''
   if (d.genres !== undefined) artistUpdate.genres = d.genres
   if (d.website_url !== undefined) artistUpdate.website_url = d.website_url
