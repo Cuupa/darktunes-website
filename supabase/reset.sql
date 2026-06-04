@@ -121,8 +121,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- Idempotent guards for columns added after initial schema creation
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS provider   TEXT NOT NULL DEFAULT 'email';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url  TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS provider    TEXT NOT NULL DEFAULT 'email';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
@@ -1696,3 +1697,133 @@ SELECT cron.schedule(
       AND published_at <= NOW();
   $$
 );
+
+-- =============================================================================
+-- AUDIT TABLES: role_changes & ban_history
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- HELPER: get_linked_artist_id — returns the artist.id linked to a given user
+-- Used in RLS policies and server-side queries.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_linked_artist_id(p_user_id UUID)
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT id FROM public.artists WHERE user_id = p_user_id LIMIT 1;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: role_changes
+-- Immutable audit log: every change to profiles.role is recorded here.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.role_changes (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  old_role    TEXT        NOT NULL,
+  new_role    TEXT        NOT NULL,
+  changed_by  UUID        NOT NULL REFERENCES auth.users(id),
+  changed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reason      TEXT,
+  ip_address  INET
+);
+
+CREATE INDEX IF NOT EXISTS idx_role_changes_user_id    ON public.role_changes (user_id);
+CREATE INDEX IF NOT EXISTS idx_role_changes_changed_at ON public.role_changes (changed_at DESC);
+
+ALTER TABLE public.role_changes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "role_changes: admin read" ON public.role_changes;
+DROP POLICY IF EXISTS "role_changes: admin insert" ON public.role_changes;
+
+CREATE POLICY "role_changes: admin read" ON public.role_changes
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE POLICY "role_changes: admin insert" ON public.role_changes
+  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- TRIGGER: auto-log every profiles.role update into role_changes
+-- Uses auth.uid() to capture the acting admin; falls back to user_id itself
+-- when the update runs in a SECURITY DEFINER context without a session user.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.log_role_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_changed_by UUID;
+BEGIN
+  IF OLD.role IS DISTINCT FROM NEW.role THEN
+    v_changed_by := COALESCE(auth.uid(), NEW.id);
+    INSERT INTO public.role_changes (user_id, old_role, new_role, changed_by)
+    VALUES (NEW.id, OLD.role::TEXT, NEW.role::TEXT, v_changed_by);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_log_role_change ON public.profiles;
+CREATE TRIGGER trg_log_role_change
+  AFTER UPDATE OF role ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.log_role_change();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: ban_history
+-- Immutable audit log: every ban/unban action is recorded here.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.ban_history (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  banned       BOOLEAN     NOT NULL,
+  banned_until TIMESTAMPTZ,
+  changed_by   UUID        NOT NULL REFERENCES auth.users(id),
+  changed_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reason       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ban_history_user_id    ON public.ban_history (user_id);
+CREATE INDEX IF NOT EXISTS idx_ban_history_changed_at ON public.ban_history (changed_at DESC);
+
+ALTER TABLE public.ban_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ban_history: admin read"   ON public.ban_history;
+DROP POLICY IF EXISTS "ban_history: admin insert" ON public.ban_history;
+
+CREATE POLICY "ban_history: admin read" ON public.ban_history
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE POLICY "ban_history: admin insert" ON public.ban_history
+  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
+-- RESOURCE OWNERSHIP: artist-own-read RLS for releases and concerts
+-- Artists may read their own releases (including is_visible=false, pending review)
+-- and their own concerts regardless of the artist's is_visible status.
+-- Admins/editors bypass this via the existing "editor+ read all" policies.
+-- =============================================================================
+
+-- releases: artist own read (must be dropped/re-created idempotently)
+DROP POLICY IF EXISTS "releases: artist own read" ON public.releases;
+CREATE POLICY "releases: artist own read" ON public.releases
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id
+        AND a.user_id = auth.uid()
+    )
+  );
+
+-- concerts: artist own read (supplements the existing public-read-visible policy)
+DROP POLICY IF EXISTS "concerts: artist own read" ON public.concerts;
+CREATE POLICY "concerts: artist own read" ON public.concerts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id
+        AND a.user_id = auth.uid()
+    )
+  );
