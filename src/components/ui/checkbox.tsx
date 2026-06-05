@@ -2,7 +2,7 @@
 
 import { ComponentProps } from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Check as CheckIcon } from "lucide-react"
+import { Check as CheckIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

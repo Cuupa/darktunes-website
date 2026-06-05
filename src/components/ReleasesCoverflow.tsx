@@ -273,13 +273,15 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     if (!emblaApi) return
     const onPointerDown = () => { isDragging.current = false }
     const onSettle = () => { setTimeout(() => { isDragging.current = false }, 50) }
+    // Embla doesn't have a dedicated dragStart event, so we detect via scroll
+    const onDragScroll = () => { isDragging.current = true }
     emblaApi.on('pointerDown', onPointerDown)
     emblaApi.on('settle', onSettle)
-    // Embla doesn't have a dedicated dragStart event, so we detect via scroll
-    emblaApi.on('scroll', () => { isDragging.current = true })
+    emblaApi.on('scroll', onDragScroll)
     return () => {
       emblaApi.off('pointerDown', onPointerDown)
       emblaApi.off('settle', onSettle)
+      emblaApi.off('scroll', onDragScroll)
     }
   }, [emblaApi])
 

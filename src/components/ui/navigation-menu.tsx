@@ -1,7 +1,7 @@
 import { ComponentProps } from "react"
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"
 import { cva } from "class-variance-authority"
-import { ChevronDown as ChevronDownIcon } from "lucide-react"
+import { CaretDown as ChevronDownIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

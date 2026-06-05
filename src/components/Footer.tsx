@@ -87,7 +87,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                 </li>
                 <li>
                   <a
-                    href="https://www.submithub.com/playlister/darktunes-music-group"
+                    href={siteSettings.submitHubUrl || 'https://www.submithub.com/playlister/darktunes-music-group'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"

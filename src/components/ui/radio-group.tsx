@@ -2,7 +2,7 @@
 
 import { ComponentProps } from "react"
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"
-import { Circle as CircleIcon } from "lucide-react"
+import { Circle as CircleIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

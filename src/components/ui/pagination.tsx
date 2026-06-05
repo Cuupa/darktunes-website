@@ -1,7 +1,7 @@
 import { ComponentProps } from "react"
-import { ChevronLeft as ChevronLeftIcon } from "lucide-react"
-import { ChevronRight as ChevronRightIcon } from "lucide-react"
-import { MoreHorizontal as MoreHorizontalIcon } from "lucide-react"
+import { CaretLeft as ChevronLeftIcon } from "@phosphor-icons/react"
+import { CaretRight as ChevronRightIcon } from "@phosphor-icons/react"
+import { DotsThree as MoreHorizontalIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
