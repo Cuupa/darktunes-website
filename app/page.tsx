@@ -22,6 +22,11 @@ import {
 } from '@/lib/cache/publicQueries'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import type { SiteSettings } from '@/types'
+import {
+  buildOrganizationSchema,
+  buildWebSiteSchema,
+  serializeJsonLd,
+} from '@/lib/seo/jsonld'
 
 // ---------------------------------------------------------------------------
 // Home page uses a richer fallback for site settings (non-nullable SiteSettings)
@@ -98,14 +103,24 @@ export default async function HomePage() {
   const dict = await getDictionary(locale)
 
   return (
-    <HomePageContent
-      releases={releases}
-      news={news}
-      videos={videos}
-      concerts={concerts}
-      siteSettings={siteSettings}
-      dict={dict}
-      locale={locale}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildOrganizationSchema({ siteSettings })) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildWebSiteSchema(siteSettings.labelName)) }}
+      />
+      <HomePageContent
+        releases={releases}
+        news={news}
+        videos={videos}
+        concerts={concerts}
+        siteSettings={siteSettings}
+        dict={dict}
+        locale={locale}
+      />
+    </>
   )
 }
