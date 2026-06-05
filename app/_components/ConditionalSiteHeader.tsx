@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * app/_components/NavHidingWrapper.tsx
+ * app/_components/ConditionalSiteHeader.tsx
  *
  * Client component that suppresses its children on non-public routes.
  * This lets the SiteHeader (a Server Component) remain a Server Component

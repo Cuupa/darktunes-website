@@ -40,6 +40,9 @@ const profileBodySchema = z.object({
   tiktok_url: z.string().url().nullable().optional(),
   facebook_url: z.string().url().nullable().optional(),
   soundcloud_url: z.string().url().nullable().optional(),
+  rider_stage_plot_url: z.string().url().nullable().optional(),
+  rider_technical_url: z.string().url().nullable().optional(),
+  rider_hospitality_url: z.string().url().nullable().optional(),
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {

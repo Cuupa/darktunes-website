@@ -32,6 +32,8 @@ import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import { ShareButton } from './ShareButton'
+import { RelatedArtists } from './RelatedArtists'
 
 interface ArtistDetailContentProps {
   artist: Artist
@@ -40,6 +42,7 @@ interface ArtistDetailContentProps {
   videos: Video[]
   news: NewsPost[]
   assets: ArtistAsset[]
+  relatedArtists?: Artist[]
   dict: Dictionary['artistDetail']
   consentDict: Dictionary['consent']
   locale: Locale
@@ -91,6 +94,7 @@ export function ArtistDetailContent({
   videos,
   news,
   assets,
+  relatedArtists = [],
   dict,
   consentDict,
   locale,
@@ -330,6 +334,20 @@ export function ArtistDetailContent({
                     BIT
                   </a>
                 )}
+              </div>
+
+              {/* Share button */}
+              <div className="pt-1">
+                <ShareButton
+                  title={artist.name}
+                  text={artist.bio ? artist.bio.slice(0, 120) : undefined}
+                  labels={{
+                    share: dict.share,
+                    shareSuccess: dict.shareSuccess,
+                    shareLinkCopied: dict.shareLinkCopied,
+                    shareError: dict.shareError,
+                  }}
+                />
               </div>
             </motion.div>
           </div>
@@ -733,6 +751,11 @@ export function ArtistDetailContent({
             )}
           </AnimatePresence>
         </motion.section>
+
+        {/* Related Artists */}
+        {relatedArtists.length > 0 && (
+          <RelatedArtists artists={relatedArtists} heading={dict.relatedArtists} />
+        )}
       </div>
       <VideoModal
         video={selectedVideo}

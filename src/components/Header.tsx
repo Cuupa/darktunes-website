@@ -58,24 +58,41 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border transition-all duration-300">
       <div className="container mx-auto px-4 lg:px-16">
         <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? 'h-20' : 'h-28 md:h-32'}`}>
-          <motion.a 
-            href="#hero"
-            onClick={(e) => handleSmoothScroll(e, '#hero')}
-            className="flex items-center flex-shrink-0"
-          >
-            {/* Wrapper div controls the height; Image fills it while preserving aspect ratio */}
-            <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
-              <Image 
-                src={logoUrl || logoImage.src} 
-                alt="darkTunes Music Group" 
-                width={200}
-                height={80}
-                className="h-full w-auto"
-                style={{ width: 'auto', height: '100%' }}
-                unoptimized
-              />
-            </div>
-          </motion.a>
+          {isHomePage ? (
+            <motion.a
+              href="#hero"
+              onClick={(e) => handleSmoothScroll(e, '#hero')}
+              className="flex items-center flex-shrink-0"
+            >
+              {/* Wrapper div controls the height; Image fills it while preserving aspect ratio */}
+              <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
+                <Image
+                  src={logoUrl || logoImage.src}
+                  alt="darkTunes Music Group"
+                  width={200}
+                  height={80}
+                  className="h-full w-auto"
+                  style={{ width: 'auto', height: '100%' }}
+                  unoptimized
+                />
+              </div>
+            </motion.a>
+          ) : (
+            <Link href="/" className="flex items-center flex-shrink-0">
+              {/* Wrapper div controls the height; Image fills it while preserving aspect ratio */}
+              <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
+                <Image
+                  src={logoUrl || logoImage.src}
+                  alt="darkTunes Music Group"
+                  width={200}
+                  height={80}
+                  className="h-full w-auto"
+                  style={{ width: 'auto', height: '100%' }}
+                  unoptimized
+                />
+              </div>
+            </Link>
+          )}
 
           <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
             {navItems.map((item) => (

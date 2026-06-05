@@ -65,6 +65,9 @@ export interface EPKData {
   tiktokUrl?: string
   facebookUrl?: string
   soundcloudUrl?: string
+  riderStagePlotUrl?: string
+  riderTechnicalUrl?: string
+  riderHospitalityUrl?: string
 }
 
 interface EPKPreviewProps {
@@ -261,6 +264,56 @@ function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData
                   </div>
                 )}
               </dl>
+            </section>
+          </>
+        )}
+
+        {/* ── Rider Documents ─────────────────────────────────────────── */}
+        {(data.riderStagePlotUrl || data.riderTechnicalUrl || data.riderHospitalityUrl) && (
+          <>
+            <Separator className="bg-border" />
+            <section aria-label={dict.profile_epk_riders_section}>
+              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
+                {dict.profile_epk_riders_section}
+              </h2>
+              <ul className="flex flex-wrap gap-3" role="list">
+                {data.riderStagePlotUrl && (
+                  <li>
+                    <a
+                      href={data.riderStagePlotUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <span>{dict.profile_rider_stage_plot}</span>
+                    </a>
+                  </li>
+                )}
+                {data.riderTechnicalUrl && (
+                  <li>
+                    <a
+                      href={data.riderTechnicalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <span>{dict.profile_rider_technical}</span>
+                    </a>
+                  </li>
+                )}
+                {data.riderHospitalityUrl && (
+                  <li>
+                    <a
+                      href={data.riderHospitalityUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <span>{dict.profile_rider_hospitality}</span>
+                    </a>
+                  </li>
+                )}
+              </ul>
             </section>
           </>
         )}

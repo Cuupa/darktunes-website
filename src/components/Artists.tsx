@@ -43,25 +43,18 @@ const itemVariants = {
   visible: { opacity: 1, scale: 1, transition: { duration: 0.6 } },
 }
 
-function shuffleArtists<T>(items: T[]): T[] {
-  const shuffled = [...items]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const randomIndex = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]]
-  }
-  return shuffled
-}
-
-function getVisibleArtists(artists: Artist[]): Artist[] {
-  const featuredArtists = artists.filter((artist) => artist.featured).slice(0, MAX_VISIBLE)
-  const nonFeaturedArtists = artists.filter((artist) => !artist.featured)
-  const remainingSlots = Math.max(0, MAX_VISIBLE - featuredArtists.length)
-  const randomNonFeatured = shuffleArtists(nonFeaturedArtists).slice(0, remainingSlots)
-  return shuffleArtists([...featuredArtists, ...randomNonFeatured])
+/** Deterministic sort: featured first, then alphabetically by name. */
+function sortArtists(items: Artist[]): Artist[] {
+  return [...items].sort((a, b) => {
+    if (a.featured && !b.featured) return -1
+    if (!a.featured && b.featured) return 1
+    return a.name.localeCompare(b.name)
+  })
 }
 
 export function Artists({ artists, dict }: ArtistsProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const prefersReducedMotion = useReducedMotion()
 
   // Defer search filtering so the input updates instantly while the heavier
@@ -71,18 +64,22 @@ export function Artists({ artists, dict }: ArtistsProps) {
   /** True while deferred search hasn't yet caught up with the current input. */
   const isFilterPending = deferredSearch !== searchQuery
 
-  const stableVisibleArtists = useMemo(() => getVisibleArtists(artists), [artists])
+  const sortedArtists = useMemo(() => sortArtists(artists), [artists])
 
   const normalisedQuery = useMemo(() => deferredSearch.trim().toLowerCase(), [deferredSearch])
 
   const filteredArtists = useMemo(() => {
-    if (!normalisedQuery) return stableVisibleArtists
-    return artists.filter(
-      (artist) =>
-        artist.name.toLowerCase().includes(normalisedQuery) ||
-        artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
-    )
-  }, [normalisedQuery, artists, stableVisibleArtists])
+    if (normalisedQuery) {
+      return artists.filter(
+        (artist) =>
+          artist.name.toLowerCase().includes(normalisedQuery) ||
+          artist.genres.some((genre) => genre.toLowerCase().includes(normalisedQuery)),
+      )
+    }
+    return showAll ? sortedArtists : sortedArtists.slice(0, MAX_VISIBLE)
+  }, [normalisedQuery, artists, sortedArtists, showAll])
+
+  const hasMore = !normalisedQuery && artists.length > MAX_VISIBLE
 
   return (
     <>
@@ -289,6 +286,18 @@ export function Artists({ artists, dict }: ArtistsProps) {
               )
             })}
           </motion.ul>
+        )}
+        {hasMore && (
+          <div className="mt-10 text-center">
+            <button
+              onClick={() => setShowAll((prev) => !prev)}
+              className="px-6 py-2.5 rounded-md border border-border text-sm font-medium tracking-wider text-muted-foreground hover:text-foreground hover:border-accent/50 transition-colors"
+            >
+              {showAll
+                ? dict.showLess
+                : dict.showAll.replace('{total}', String(artists.length))}
+            </button>
+          </div>
         )}
       </div>
     </section>

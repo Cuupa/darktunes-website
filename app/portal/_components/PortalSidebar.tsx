@@ -31,13 +31,13 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
 import type { Artist } from '@/types'
+import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalSidebarProps {
   dict: Dictionary['portal']
   artists: Artist[]
   userId: string | null
   featureFlags: Record<string, boolean>
-  unreadMessages: number
 }
 
 const baseNavItems = [
@@ -56,10 +56,11 @@ const baseNavItems = [
 
 const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
 
-export function PortalSidebar({ dict, artists, featureFlags, unreadMessages }: PortalSidebarProps) {
+export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { unreadCount } = useUnreadMessages()
   // Track which artist is active in the sidebar for display purposes.
   // Defaults to the first artist; multi-artist users can switch via the dropdown.
   const [activeArtistIndex, setActiveArtistIndex] = useState(0)
@@ -97,9 +98,9 @@ export function PortalSidebar({ dict, artists, featureFlags, unreadMessages }: P
           >
             <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
             {dict[label as keyof typeof dict]}
-            {href === '/portal/messages' && unreadMessages > 0 && (
+            {href === '/portal/messages' && unreadCount > 0 && (
               <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-                {unreadMessages}
+                {unreadCount}
               </span>
             )}
           </Link>

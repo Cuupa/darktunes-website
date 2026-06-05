@@ -2,7 +2,7 @@
 
 import { ComponentProps, useContext } from "react"
 import { OTPInput, OTPInputContext } from "input-otp"
-import { Minus as MinusIcon } from "lucide-react"
+import { Minus as MinusIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

@@ -1,8 +1,8 @@
 import { ComponentProps } from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check as CheckIcon } from "lucide-react"
-import { ChevronDown as ChevronDownIcon } from "lucide-react"
-import { ChevronUp as ChevronUpIcon } from "lucide-react"
+import { Check as CheckIcon } from "@phosphor-icons/react"
+import { CaretDown as ChevronDownIcon } from "@phosphor-icons/react"
+import { CaretUp as ChevronUpIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

@@ -9,6 +9,33 @@ export type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
 export { rowToArtist }
 
+/**
+ * Returns up to `limit` visible artists that share at least one genre with
+ * the given artist, excluding the current artist itself.
+ *
+ * Uses PostgREST's `ov` (array-overlap) filter which maps to the PostgreSQL
+ * `&&` operator so only a single indexed query is needed.
+ *
+ * Returns an empty array when `genres` is empty or on any error.
+ */
+export async function getRelatedArtists(
+  db: DbClient,
+  currentArtistId: string,
+  genres: string[],
+  limit = 6,
+): Promise<Artist[]> {
+  if (!genres.length) return []
+  const { data, error } = await db
+    .from('artists')
+    .select('*')
+    .eq('is_visible', true)
+    .neq('id', currentArtistId)
+    .filter('genres', 'ov', `{${genres.join(',')}}`)
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToArtist)
+}
+
 export async function getArtists(db: DbClient): Promise<Artist[]> {
   const { data, error } = await db
     .from('artists')

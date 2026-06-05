@@ -20,12 +20,14 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistsByUserId } from '@/lib/api/artistProfiles'
+import { getArtistsByUserId, getArtistProfileByArtistId, isProfileComplete } from '@/lib/api/artistProfiles'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalAccessGate } from './_components/PortalAccessGate'
+import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -144,7 +146,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   // Use the first artist as the active artist for single-artist sidebar display
   const artist = artists[0] ?? null
 
-  const [featureFlags, unreadMessagesResult] = await Promise.all([
+  const [featureFlags, unreadMessagesResult, artistProfile] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
     artist
       ? supabase
@@ -154,19 +156,44 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           .eq('read', false)
           .is('deleted_at', null)
       : Promise.resolve({ count: 0, error: null }),
+    artist
+      ? getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
+      : Promise.resolve(null),
   ])
   const unreadMessages = unreadMessagesResult.count ?? 0
 
+  // Redirect to onboarding if the artist profile is incomplete and the wizard
+  // has not been completed/skipped yet.  We skip the redirect when the user is
+  // already on the /portal/onboarding route to avoid a redirect loop.
+  const { headers } = await import('next/headers')
+  const headersList = await headers()
+  const currentPath = headersList.get('x-pathname') ?? ''
+  const isOnOnboarding = currentPath.startsWith('/portal/onboarding')
+
+  if (
+    artist &&
+    !isOnOnboarding &&
+    artistProfile !== null &&
+    !artistProfile.onboardingCompleted &&
+    !isProfileComplete(artistProfile)
+  ) {
+    redirect('/portal/onboarding')
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
-      <PortalSidebar
-        dict={dict.portal}
-        artists={artists}
-        userId={user?.id ?? null}
-        featureFlags={featureFlags}
-        unreadMessages={unreadMessages}
-      />
-      <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">{children}</main>
+      <PortalNotificationProvider
+        artistId={artist?.id ?? null}
+        initialUnreadCount={unreadMessages}
+      >
+        <PortalSidebar
+          dict={dict.portal}
+          artists={artists}
+          userId={user?.id ?? null}
+          featureFlags={featureFlags}
+        />
+        <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">{children}</main>
+      </PortalNotificationProvider>
     </div>
   )
 }

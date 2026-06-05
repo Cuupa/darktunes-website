@@ -10,6 +10,7 @@ import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCirc
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Dictionary } from '@/i18n/types'
+import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalOverviewProps {
   dict: Dictionary['portal']
@@ -19,7 +20,6 @@ interface PortalOverviewProps {
   releaseCount: number
   upcomingShowCount: number
   openChecklistCount: number
-  unreadMessageCount: number
   statementCount: number
   assetCount: number
   featureFlags: Record<string, boolean>
@@ -33,12 +33,12 @@ export function PortalOverview({
   releaseCount,
   upcomingShowCount,
   openChecklistCount,
-  unreadMessageCount,
   statementCount,
   assetCount,
   featureFlags,
 }: PortalOverviewProps) {
   const isEnabled = (id: string) => featureFlags[id] ?? true
+  const { unreadCount } = useUnreadMessages()
   const initials = artistName
     ? artistName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
     : '?'
@@ -162,7 +162,7 @@ export function PortalOverview({
               <ChatCircleText size={18} className="text-primary" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{unreadMessageCount}</p>
+              <p className="text-2xl font-bold">{unreadCount}</p>
               <p className="text-xs text-muted-foreground mt-1">unread messages</p>
             </CardContent>
           </Card>

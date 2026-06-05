@@ -48,6 +48,10 @@ export interface ArtistProfile {
   tiktokUrl: string | undefined
   facebookUrl: string | undefined
   soundcloudUrl: string | undefined
+  riderStagePlotUrl: string | undefined
+  riderTechnicalUrl: string | undefined
+  riderHospitalityUrl: string | undefined
+  onboardingCompleted: boolean
   createdAt: string
   updatedAt: string
 }
@@ -80,9 +84,33 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     tiktokUrl: row.tiktok_url ?? undefined,
     facebookUrl: row.facebook_url ?? undefined,
     soundcloudUrl: row.soundcloud_url ?? undefined,
+    riderStagePlotUrl: row.rider_stage_plot_url ?? undefined,
+    riderTechnicalUrl: row.rider_technical_url ?? undefined,
+    riderHospitalityUrl: row.rider_hospitality_url ?? undefined,
+    onboardingCompleted: row.onboarding_completed ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+/**
+ * Returns true when the artist has completed the minimum required profile fields:
+ * a photo, at least one bio, and at least one social/streaming link.
+ * Used to decide whether to show the onboarding wizard.
+ */
+export function isProfileComplete(profile: ArtistProfile | null): boolean {
+  if (!profile) return false
+  const hasPhoto = Boolean(profile.photoUrl)
+  const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong || profile.bio)
+  const hasLink = Boolean(
+    profile.spotifyUrl ||
+      profile.instagramUrl ||
+      profile.websiteUrl ||
+      profile.youtubeUrl ||
+      profile.appleMusicUrl ||
+      profile.soundcloudUrl,
+  )
+  return hasPhoto && hasBio && hasLink
 }
 
 // ---------------------------------------------------------------------------

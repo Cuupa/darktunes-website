@@ -107,8 +107,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
         />
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
-        <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
-        <Providers consentDict={dict.consent}>{children}</Providers>
+        <Providers consentDict={dict.consent}>
+          <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
+          {children}
+        </Providers>
       </body>
     </html>
   )
