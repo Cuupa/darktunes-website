@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 
 /**
  * Dynamic PWA Web App Manifest
@@ -8,10 +9,33 @@ import type { MetadataRoute } from 'next'
  * native standalone app — no browser chrome, correct splash colours, and
  * properly shaped adaptive icons.
  *
- * Icon paths reference placeholder files in /public/icons/.
- * Replace them with real darkTunes brand assets before going to production.
+ * Icons are kept in sync with the active favicon: if a custom faviconUrl is
+ * configured in admin settings, it is added as the primary app icon so that
+ * the installed PWA always shows the same logo as the browser tab.
  */
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const settings = await getCachedSiteSettings().catch(() => null)
+  const customFaviconUrl = settings?.faviconUrl || ''
+
+  const icons: MetadataRoute.Manifest['icons'] = [
+    // SVG favicon — listed first so modern browsers and OS installers
+    // prefer the vector source, which always matches the <link rel="icon">.
+    { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+    // Standard raster icons (PNG, used for notifications / splash screens)
+    { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    // Maskable icons — the OS can safely crop these into any shape (circle,
+    // squircle, etc.) without adding an ugly white background box.
+    // The artwork must have ~10 % safe-zone padding around the main icon.
+    { src: '/icons/icon-192-maskable.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    // Custom favicon from admin settings — overrides static PNGs when set so
+    // the installed app icon matches whatever is shown in the browser tab.
+    ...(customFaviconUrl
+      ? [{ src: customFaviconUrl, sizes: 'any', type: 'image/png', purpose: 'any' as const }]
+      : []),
+  ]
+
   return {
     name: 'darkTunes Music Group',
     short_name: 'darkTunes',
@@ -27,34 +51,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#101010',
     lang: 'de',
     categories: ['music', 'entertainment'],
-    icons: [
-      // Standard icons (PNG, referenced by the OS for notifications / splash)
-      {
-        src: '/icons/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        src: '/icons/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-      },
-      // Maskable icons — the OS can safely crop these into any shape (circle,
-      // squircle, etc.) without adding an ugly white background box.
-      // The artwork must have ~10 % safe-zone padding around the main icon.
-      {
-        src: '/icons/icon-192-maskable.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-      {
-        src: '/icons/icon-512-maskable.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-    ],
+    icons,
     screenshots: [
       {
         src: '/icons/screenshot-desktop.png',

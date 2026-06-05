@@ -58,6 +58,7 @@ type SortDir = 'asc' | 'desc'
 const EMPTY_FORM: ReleaseFormData = {
   title: '',
   artistName: '',
+  artistIds: [],
   releaseDate: '',
   type: 'single',
   coverArt: '',
@@ -81,6 +82,7 @@ function releaseToFormData(release: Release): ReleaseFormData {
   return {
     title: release.title,
     artistName: release.artistName,
+    artistIds: release.artists?.map((a) => a.id) ?? (release.artistId ? [release.artistId] : []),
     releaseDate: release.releaseDate,
     type: release.type,
     coverArt: release.coverArt ?? '',
@@ -195,9 +197,40 @@ export function ReleasesManager() {
     try {
       if (editingRelease) {
         await updateRelease(editingRelease.id, formDataToInsert(data))
+        // Update junction table: replace all entries for this release
+        await supabase
+          .from('release_artists' as const)
+          .delete()
+          .eq('release_id', editingRelease.id)
+        if ((data.artistIds ?? []).length > 0) {
+          const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+            release_id: editingRelease.id,
+            artist_id: artistId,
+            sort_order: i,
+          }))
+          await supabase.from('release_artists' as const).insert(inserts)
+        }
         toast.success(`Updated "${data.title}"`)
       } else {
         await createRelease(formDataToInsert(data))
+        // Save junction table entries for newly created release
+        if ((data.artistIds ?? []).length > 0) {
+          const { data: row } = await supabase
+            .from('releases')
+            .select('id')
+            .eq('title', data.title)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+          if (row) {
+            const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+              release_id: row.id,
+              artist_id: artistId,
+              sort_order: i,
+            }))
+            await supabase.from('release_artists' as const).insert(inserts)
+          }
+        }
         toast.success(`Created "${data.title}"`)
       }
       setDialogOpen(false)

@@ -468,7 +468,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             {activeRelease.title}
           </h3>
           <p className="text-sm text-muted-foreground font-medium">
-            {activeRelease.artistName}
+            {activeRelease.artists && activeRelease.artists.length > 0
+              ? activeRelease.artists.map((a) => a.name).join(', ')
+              : activeRelease.artistName}
           </p>
           <p className="text-xs text-muted-foreground font-mono flex items-center justify-center gap-1.5">
             <Calendar size={12} weight="bold" aria-hidden="true" />

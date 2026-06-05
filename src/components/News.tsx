@@ -16,16 +16,19 @@ interface NewsProps extends SectionProps {
   news: NewsPost[]
   dict: Dictionary['news']
   locale: Locale
+  /** Number of news items shown as a sneak peek. Defaults to 3. */
+  sneakPeekCount?: number
 }
 
 /** Number of news items shown as a sneak peek on the homepage. */
-const SNEAK_PEEK_COUNT = 3
+const DEFAULT_SNEAK_PEEK_COUNT = 3
 
-export function News({ news, dict, locale }: NewsProps) {
+export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
-  const sneakPeek = news.slice(0, SNEAK_PEEK_COUNT)
-  const hasMore = news.length > SNEAK_PEEK_COUNT
+  const count = sneakPeekCount && sneakPeekCount > 0 ? sneakPeekCount : DEFAULT_SNEAK_PEEK_COUNT
+  const sneakPeek = news.slice(0, count)
+  const hasMore = news.length > count
   return (
     <section id="news" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">

@@ -238,3 +238,44 @@
   50%  { transform: translateX(0%)    scaleX(0.8); }
   100% { transform: translateX(100%)  scaleX(0.5); }
 }
+
+/* ── Tiptap image float / caption styles ────────────────────────────────────
+   Applied by ResizableImageExtension both inside the editor and in the
+   rendered HTML on the public news article page. */
+.tiptap-image-figure {
+  max-width: 100%;
+  margin-bottom: 1rem;
+}
+.tiptap-image-figure.float-left {
+  float: left;
+  margin: 0 1rem 1rem 0;
+  max-width: 50%;
+}
+.tiptap-image-figure.float-right {
+  float: right;
+  margin: 0 0 1rem 1rem;
+  max-width: 50%;
+}
+.tiptap-image-figure.float-center {
+  float: none;
+  display: block;
+  margin: 0 auto 1rem;
+  text-align: center;
+}
+.tiptap-image-figure.float-none {
+  float: none;
+  display: block;
+  width: 100%;
+}
+.tiptap-image-figure figcaption {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  text-align: center;
+  margin-top: 0.4rem;
+  font-style: italic;
+}
+/* Selection highlight in editor */
+.tiptap-image-selected {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

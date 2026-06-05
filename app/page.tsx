@@ -19,9 +19,15 @@ import {
   getCachedPublicNews,
   getCachedPublicVideos,
   getCachedPublicConcerts,
+  getCachedPublicArtists,
 } from '@/lib/cache/publicQueries'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import type { SiteSettings } from '@/types'
+import {
+  buildOrganizationSchema,
+  buildWebSiteSchema,
+  serializeJsonLd,
+} from '@/lib/seo/jsonld'
 
 // ---------------------------------------------------------------------------
 // Home page uses a richer fallback for site settings (non-nullable SiteSettings)
@@ -72,6 +78,7 @@ const getCachedSiteSettings = unstable_cache(
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
+        homepageNewsCount: 3,
         featureToggles: { promoPool: true, editorTools: true },
       }),
     )
@@ -86,26 +93,38 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
+  const [releases, news, videos, concerts, siteSettings, artists, locale] = await Promise.all([
     getCachedPublicReleases(),
     getCachedPublicNews(),
     getCachedPublicVideos(),
     getCachedPublicConcerts(),
     getCachedSiteSettings(),
+    getCachedPublicArtists(),
     getLocale(),
   ])
 
   const dict = await getDictionary(locale)
 
   return (
-    <HomePageContent
-      releases={releases}
-      news={news}
-      videos={videos}
-      concerts={concerts}
-      siteSettings={siteSettings}
-      dict={dict}
-      locale={locale}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildOrganizationSchema({ siteSettings })) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildWebSiteSchema(siteSettings.labelName)) }}
+      />
+      <HomePageContent
+        releases={releases}
+        news={news}
+        videos={videos}
+        concerts={concerts}
+        siteSettings={siteSettings}
+        artists={artists}
+        dict={dict}
+        locale={locale}
+      />
+    </>
   )
 }

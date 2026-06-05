@@ -6,6 +6,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { ContactForm } from './_components/ContactForm'
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 const SUBMITHUB_URL = 'https://www.submithub.com/playlister/darktunes-music-group'
 
 export default async function ContactPage() {
-  const locale = await getLocale()
+  const [locale, settings] = await Promise.all([getLocale(), getCachedSiteSettings().catch(() => null)])
   const dict = await getDictionary(locale)
   const c = dict.contact
 
@@ -39,7 +40,7 @@ export default async function ContactPage() {
 
         {/* Contact form */}
         <section className="mb-14 rounded-xl border border-border bg-card/40 p-8">
-          <ContactForm dict={c} />
+          <ContactForm dict={c} locale={locale} contactTopics={settings?.contactTopics ?? []} />
         </section>
 
         {/* Submit Music section */}

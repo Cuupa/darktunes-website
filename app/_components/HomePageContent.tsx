@@ -11,7 +11,7 @@ import { Footer } from '@/components/Footer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
+import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection, Artist } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import { selectHeroItems } from '@/lib/heroItems'
 
@@ -21,6 +21,7 @@ interface HomePageContentProps {
   videos: Video[]
   concerts: Concert[]
   siteSettings: SiteSettings
+  artists?: Artist[]
   dict: Dictionary
   locale: Locale
 }
@@ -48,6 +49,7 @@ export function HomePageContent({
   videos,
   concerts,
   siteSettings,
+  artists,
   dict,
   locale,
 }: HomePageContentProps) {
@@ -75,6 +77,15 @@ export function HomePageContent({
   }, [heroItemsKey, heroItems.length])
 
   const currentHeroItem = heroItems[heroIndex] ?? heroItems[0]
+
+  // Resolve the artist slug for the "Explore Artist" secondary hero button.
+  // Looks up the artist by artistId from the pre-fetched artists list so no
+  // additional network request is needed at render time.
+  const heroArtistSlug = useMemo<string | undefined>(() => {
+    const artistId = currentHeroItem && 'artistId' in currentHeroItem ? currentHeroItem.artistId : undefined
+    if (!artistId || !artists?.length) return undefined
+    return artists.find((a) => a.id === artistId)?.slug
+  }, [currentHeroItem, artists])
   const playlists =
     siteSettings.spotifyPlaylists?.length
       ? siteSettings.spotifyPlaylists
@@ -175,6 +186,7 @@ export function HomePageContent({
                 ...(siteSettings.newsSectionSubheading && { subheading: siteSettings.newsSectionSubheading }),
               }}
               locale={locale}
+              sneakPeekCount={siteSettings.homepageNewsCount}
             />
           </div>
         )
@@ -207,7 +219,7 @@ export function HomePageContent({
               exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
               transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeInOut' }}
             >
-              <Hero heroItem={currentHeroItem} siteSettings={siteSettings} dict={dict.hero} />
+              <Hero heroItem={currentHeroItem} siteSettings={siteSettings} artistSlug={heroArtistSlug} dict={dict.hero} />
             </motion.div>
           </AnimatePresence>
           {heroItems.length > 1 && (

@@ -147,7 +147,11 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
                   <h3 className="text-2xl font-bold line-clamp-1 hover:text-accent transition-colors">
                     {release.title}
                   </h3>
-                  <p className="text-muted-foreground font-medium">{release.artistName}</p>
+                  <p className="text-muted-foreground font-medium">
+                    {release.artists && release.artists.length > 0
+                      ? release.artists.map((a) => a.name).join(', ')
+                      : release.artistName}
+                  </p>
                   <p className="text-sm text-muted-foreground font-mono flex items-center gap-2">
                     <Calendar size={16} weight="bold" aria-hidden="true" />
                     {new Date(release.releaseDate).toLocaleDateString(dateLocale, {

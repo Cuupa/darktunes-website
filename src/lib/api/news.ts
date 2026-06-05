@@ -7,6 +7,14 @@ type NewsRow = Database['public']['Tables']['news_posts']['Row']
 export type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
 export type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
 
+/** Compact artist shape returned from the junction table join. */
+interface JunctionArtist {
+  news_post_id: string
+  artist_id: string
+  sort_order: number
+  artists: { id: string; name: string; slug: string } | null
+}
+
 function rowToNewsPost(row: NewsRow): NewsPost {
   const r = row as NewsRow & {
     embargo_until?: string | null
@@ -53,13 +61,48 @@ function rowToNewsPost(row: NewsRow): NewsPost {
   }
 }
 
+/**
+ * Attach the full artist list from the news_post_artists junction table.
+ * Falls back gracefully when the junction table doesn't exist yet (PGRST200/42P01).
+ */
+async function attachNewsArtists(db: DbClient, posts: NewsPost[]): Promise<NewsPost[]> {
+  if (posts.length === 0) return posts
+  const ids = posts.map((p) => p.id)
+
+  try {
+    const { data, error } = await (db as DbClient)
+      .from('news_post_artists' as const)
+      .select('news_post_id, sort_order, artists(id, name, slug)')
+      .in('news_post_id', ids)
+      .order('sort_order', { ascending: true })
+
+    // Gracefully ignore missing table (migration not yet applied)
+    if (error) return posts
+
+    const byPost = new Map<string, { id: string; name: string; slug: string }[]>()
+    for (const row of (data ?? []) as unknown as JunctionArtist[]) {
+      if (!row.artists) continue
+      if (!byPost.has(row.news_post_id)) byPost.set(row.news_post_id, [])
+      byPost.get(row.news_post_id)!.push(row.artists)
+    }
+
+    return posts.map((p) => ({
+      ...p,
+      artists: byPost.get(p.id) ?? undefined,
+    }))
+  } catch {
+    return posts
+  }
+}
+
 export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const { data, error } = await db
     .from('news_posts')
     .select('*')
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToNewsPost)
+  const posts = (data ?? []).map(rowToNewsPost)
+  return attachNewsArtists(db, posts)
 }
 
 /**
@@ -74,14 +117,18 @@ export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
     .lte('published_at', now)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToNewsPost)
+  const posts = (data ?? []).map(rowToNewsPost)
+  return attachNewsArtists(db, posts)
 }
 
 /**
  * Public-facing: returns published posts associated with a specific artist.
+ * Checks both the legacy artist_id column and the many-to-many junction table.
  */
 export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: string): Promise<NewsPost[]> {
   const now = new Date().toISOString()
+
+  // Primary query: the legacy artist_id column (preserves error behaviour for callers)
   const { data, error } = await db
     .from('news_posts')
     .select('*')
@@ -90,7 +137,43 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
     .lte('published_at', now)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToNewsPost)
+
+  const legacyPosts = (data ?? []).map(rowToNewsPost)
+  const legacyIds = new Set(legacyPosts.map((p) => p.id))
+
+  // Secondary: also collect posts linked via the many-to-many junction table
+  try {
+    const { data: junctionRows } = await (db as DbClient)
+      .from('news_post_artists' as const)
+      .select('news_post_id')
+      .eq('artist_id', artistId)
+
+    const extraIds = ((junctionRows ?? []) as { news_post_id: string }[])
+      .map((r) => r.news_post_id)
+      .filter((id) => id && !legacyIds.has(id))
+
+    if (extraIds.length > 0) {
+      const { data: extra } = await db
+        .from('news_posts')
+        .select('*')
+        .in('id', extraIds)
+        .in('status', ['published', 'scheduled'])
+        .lte('published_at', now)
+        .order('published_at', { ascending: false })
+
+      if (extra && extra.length > 0) {
+        const merged = [
+          ...legacyPosts,
+          ...extra.map(rowToNewsPost),
+        ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        return attachNewsArtists(db, merged)
+      }
+    }
+  } catch {
+    // Junction table not available — fall through to legacy results
+  }
+
+  return attachNewsArtists(db, legacyPosts)
 }
 
 export async function getPressOnlyNewsPosts(db: DbClient): Promise<NewsPost[]> {

@@ -30,6 +30,7 @@ import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
 import { getArtistAssets } from '@/lib/api/artistAssets'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
+import { buildMusicGroupSchema, serializeJsonLd } from '@/lib/seo/jsonld'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -114,17 +115,25 @@ export default async function ArtistDetailPage({ params }: Props) {
   const dict = await getDictionary(locale)
   const { artist, releases, concerts, videos, news, assets, relatedArtists } = data
   return (
-    <ArtistDetailContent
-      artist={artist}
-      releases={releases}
-      concerts={concerts}
-      videos={videos}
-      news={news}
-      assets={assets}
-      relatedArtists={relatedArtists}
-      dict={dict.artistDetail}
-      consentDict={dict.consent}
-      locale={locale}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(buildMusicGroupSchema({ artist, releases })),
+        }}
+      />
+      <ArtistDetailContent
+        artist={artist}
+        releases={releases}
+        concerts={concerts}
+        videos={videos}
+        news={news}
+        assets={assets}
+        relatedArtists={relatedArtists}
+        dict={dict.artistDetail}
+        consentDict={dict.consent}
+        locale={locale}
+      />
+    </>
   )
 }

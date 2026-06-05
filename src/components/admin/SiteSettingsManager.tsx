@@ -5,7 +5,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ArrowUp, ArrowDown, Globe,
+import { ArrowUp, ArrowDown, Plus, Trash, Globe,
   InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo, TiktokLogo,
   BandcampLogo, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
 } from '@phosphor-icons/react'
@@ -99,6 +99,7 @@ const schema = z.object({
   carouselAutoplayMs: z.number().int().min(0).default(0),
   videosPerPage: z.number().int().min(1).max(50).default(9),
   videosLinkToPage: z.boolean().default(false),
+  homepageNewsCount: z.number().int().min(1).max(12).default(3),
   logoUrl: z.string().optional().default(''),
   faviconUrl: z.string().optional().default(''),
   aboutHeadline: z.string().optional().default(''),
@@ -119,6 +120,13 @@ const schema = z.object({
   releasesSectionSubheading: z.string().optional().default(''),
   shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   youtubeChannelId: z.string().optional().default(''),
+  contactTopics: z.array(
+    z.object({
+      value: z.string().min(1, 'Value required'),
+      label_de: z.string().min(1, 'German label required'),
+      label_en: z.string().min(1, 'English label required'),
+    }),
+  ).default([]),
   customSocialLinks: z.array(
     z.object({
       id: z.string(),
@@ -197,6 +205,10 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'spotifyPlaylists',
+  })
+  const { fields: topicFields, append: appendTopic, remove: removeTopic } = useFieldArray({
+    control,
+    name: 'contactTopics',
   })
   const { fields: socialFields, append: appendSocial, remove: removeSocial, move: moveSocial } = useFieldArray({
     control,
@@ -319,6 +331,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <TabsTrigger value="about">About Page</TabsTrigger>
           <TabsTrigger value="social">Social Links</TabsTrigger>
           <TabsTrigger value="homepage">Homepage</TabsTrigger>
+          <TabsTrigger value="contact">Contact Form</TabsTrigger>
           <TabsTrigger value="sections">Section Texts</TabsTrigger>
           <TabsTrigger value="hero">Hero Section</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
@@ -942,6 +955,21 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                 </p>
               </Field>
 
+              <Field id="homepageNewsCount" label="News items on homepage">
+                <Input
+                  id="homepageNewsCount"
+                  type="number"
+                  min={1}
+                  max={12}
+                  step={1}
+                  {...register('homepageNewsCount', { valueAsNumber: true })}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  How many news posts are shown in the news preview section on the homepage (1–12). Default: 3.
+                </p>
+              </Field>
+
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="videosLinkToPage">Link videos grid to /videos page</Label>
@@ -1009,6 +1037,93 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   ))}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Contact Form                                                         */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="contact">
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact Form Topics</CardTitle>
+              <CardDescription>
+                Define the topics shown in the contact form dropdown. Each topic needs a unique
+                internal value and bilingual labels (DE / EN). Leave the list empty to use the
+                four built-in topics (Label, Shop, Booking, Other).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {topicFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start">
+                    <div className="space-y-1">
+                      {index === 0 && <Label className="text-xs text-muted-foreground">Value (internal)</Label>}
+                      <Input
+                        {...register(`contactTopics.${index}.value`)}
+                        placeholder="e.g. booking"
+                        disabled={isSubmitting}
+                      />
+                      {errors.contactTopics?.[index]?.value && (
+                        <p className="text-xs text-destructive">{errors.contactTopics[index].value?.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {index === 0 && <Label className="text-xs text-muted-foreground">Label (DE)</Label>}
+                      <Input
+                        {...register(`contactTopics.${index}.label_de`)}
+                        placeholder="Buchung"
+                        disabled={isSubmitting}
+                      />
+                      {errors.contactTopics?.[index]?.label_de && (
+                        <p className="text-xs text-destructive">{errors.contactTopics[index].label_de?.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {index === 0 && <Label className="text-xs text-muted-foreground">Label (EN)</Label>}
+                      <Input
+                        {...register(`contactTopics.${index}.label_en`)}
+                        placeholder="Booking"
+                        disabled={isSubmitting}
+                      />
+                      {errors.contactTopics?.[index]?.label_en && (
+                        <p className="text-xs text-destructive">{errors.contactTopics[index].label_en?.message}</p>
+                      )}
+                    </div>
+                    <div className={index === 0 ? 'pt-5' : ''}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeTopic(index)}
+                        disabled={isSubmitting}
+                        title="Remove topic"
+                      >
+                        <Trash className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => appendTopic({ value: '', label_de: '', label_en: '' })}
+                disabled={isSubmitting}
+              >
+                <Plus className="w-4 h-4" />
+                Add Topic
+              </Button>
+
+              {topicFields.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No custom topics defined. The form will show the default built-in topics.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

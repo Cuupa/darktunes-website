@@ -3,17 +3,25 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { createRelease } from '@/lib/api/releases'
+import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
+import { getFormSchema } from '@/lib/api/submissionFormSchema'
 
 const bodySchema = z.object({
   title: z.string().min(1),
-  releaseDate: z.string().min(1),
-  type: z.enum(['album', 'ep', 'single']),
-  coverArt: z.string().url().nullable().optional(),
+  audioDownloadUrl: z.string().url(),
+  coverArtUrl: z.string().url(),
+  coverArtVerified: z.boolean().optional().default(false),
+  releaseDate: z.string().nullable().optional(),
+  type: z.enum(['album', 'ep', 'single']).nullable().optional(),
+  genre: z.string().nullable().optional(),
+  catalogNumber: z.string().nullable().optional(),
+  isrc: z.string().nullable().optional(),
+  labelCopy: z.string().nullable().optional(),
   spotifyUrl: z.string().url().nullable().optional(),
   appleMusicUrl: z.string().url().nullable().optional(),
   youtubeUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
+  formData: z.record(z.unknown()).nullable().optional(),
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -25,7 +33,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser(token)
-
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   const body = bodySchema.parse(await req.json())
@@ -33,20 +40,46 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const artist = await getArtistByUserId(supabase, user.id)
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const release = await createRelease(supabase, {
-    title: body.title,
+  // Validate required fields from dynamic schema
+  const schemaFields = await getFormSchema(supabase, 'release')
+  for (const field of schemaFields) {
+    if (!field.isRequired) continue
+    const val = (body as Record<string, unknown>)[
+      field.fieldKey === 'audio_download_url' ? 'audioDownloadUrl'
+      : field.fieldKey === 'cover_art_url' ? 'coverArtUrl'
+      : field.fieldKey === 'release_date' ? 'releaseDate'
+      : field.fieldKey === 'catalog_number' ? 'catalogNumber'
+      : field.fieldKey === 'label_copy' ? 'labelCopy'
+      : field.fieldKey === 'apple_music_url' ? 'appleMusicUrl'
+      : field.fieldKey === 'spotify_url' ? 'spotifyUrl'
+      : field.fieldKey === 'youtube_url' ? 'youtubeUrl'
+      : field.fieldKey
+    ]
+    if (val === undefined || val === null || val === '') {
+      throw new ApiError(400, `Required field missing: ${field.fieldKey}`)
+    }
+  }
+
+  const submission = await createReleaseSubmission(supabase, {
     artist_id: artist.id,
-    artist_name: artist.name,
-    release_date: body.releaseDate,
-    type: body.type,
-    cover_art: body.coverArt ?? null,
+    title: body.title,
+    audio_download_url: body.audioDownloadUrl,
+    cover_art_url: body.coverArtUrl,
+    cover_art_verified: body.coverArtVerified ?? false,
+    release_date: body.releaseDate ?? null,
+    type: body.type ?? null,
+    genre: body.genre ?? null,
+    catalog_number: body.catalogNumber ?? null,
+    isrc: body.isrc ?? null,
+    label_copy: body.labelCopy ?? null,
     spotify_url: body.spotifyUrl ?? null,
     apple_music_url: body.appleMusicUrl ?? null,
     youtube_url: body.youtubeUrl ?? null,
-    is_visible: false,
-    featured: false,
+    notes: body.notes ?? null,
+    form_data: body.formData ?? null,
   })
 
+  // Notify editors
   const serviceRole = await createServiceRoleSupabaseClient()
   const { data: editorProfiles } = await serviceRole
     .from('profiles')
@@ -56,9 +89,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const recipients = (editorProfiles ?? []).map((profile) => ({
     recipient_id: profile.id,
     type: 'artist_release_submission',
-    entity_type: 'release',
-    entity_id: release.id,
-    entity_name: release.title,
+    entity_type: 'release_submission',
+    entity_id: submission.id,
+    entity_name: submission.title,
     sender_id: user.id,
     read: false,
   }))
@@ -67,5 +100,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await serviceRole.from('editor_notifications').insert(recipients)
   }
 
-  return NextResponse.json({ releaseId: release.id })
+  return NextResponse.json({ submissionId: submission.id })
 })

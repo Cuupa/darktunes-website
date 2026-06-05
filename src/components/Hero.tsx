@@ -16,6 +16,9 @@ import type { SectionProps } from '@/lib/component-contracts'
 interface HeroProps extends SectionProps {
   heroItem?: Release | NewsPost
   siteSettings: SiteSettings
+  /** Slug of the artist associated with the current hero item. When present,
+   *  the secondary "Explore Artist" button links to /artists/[artistSlug]. */
+  artistSlug?: string
   dict: Dictionary['hero']
 }
 
@@ -23,7 +26,7 @@ function isRelease(item: Release | NewsPost): item is Release {
   return 'artistName' in item
 }
 
-export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
+export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
   // Stop the bounce animation as soon as the hero scrolls out of view so the
@@ -95,7 +98,11 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
 
   // Title / subtitle / description
   const heroTitle = heroItem.title
-  const heroSubtitle = itemIsRelease ? heroItem.artistName : undefined
+  const heroSubtitle = itemIsRelease
+    ? (heroItem.artists && heroItem.artists.length > 0
+        ? heroItem.artists.map((a) => a.name).join(', ')
+        : heroItem.artistName)
+    : undefined
   const heroDescription = itemIsRelease
     ? (heroItem.promoText || siteSettings.heroDescription)
     : (heroItem.excerpt || siteSettings.heroDescription)
@@ -124,8 +131,14 @@ export function Hero({ heroItem, siteSettings, dict }: HeroProps) {
     rawSecondary?.label ||
     siteSettings.heroDefaultSecondaryBtnLabel ||
     dict.exploreArtist
-  const secondaryAction = rawSecondary?.action || 'scroll'
-  const secondaryHref = rawSecondary?.href || (!itemIsRelease ? '#news' : '#releases')
+  // Default action: navigate to the artist page when a slug is known,
+  // otherwise fall back to scrolling the relevant section.
+  const defaultSecondaryAction = artistSlug ? 'link' : 'scroll'
+  const defaultSecondaryHref = artistSlug
+    ? `/artists/${artistSlug}`
+    : (!itemIsRelease ? '#news' : '#releases')
+  const secondaryAction = rawSecondary?.action || defaultSecondaryAction
+  const secondaryHref = rawSecondary?.href || defaultSecondaryHref
 
   return (
     <section id="hero" ref={sectionRef} className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-16">

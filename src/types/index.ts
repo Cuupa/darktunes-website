@@ -99,6 +99,12 @@ export interface Release {
   heroPrimaryBtn?: HeroButton
   /** Custom configuration for the secondary CTA button in the Hero section. */
   heroSecondaryBtn?: HeroButton
+  /**
+   * All artists credited on this release (from the release_artists junction table).
+   * Ordered by sort_order. Falls back to the primary artist when the junction table
+   * has no entries (backwards compatibility).
+   */
+  artists?: { id: string; name: string; slug: string }[]
 }
 
 export interface NewsPost {
@@ -138,6 +144,11 @@ export interface NewsPost {
   heroSecondaryBtn?: HeroButton
   /** Reviewer (editor/admin) that approved the post for publication. */
   reviewedBy?: string | null
+  /**
+   * All artists associated with this news post (from the news_post_artists junction table).
+   * Ordered by sort_order. Falls back to the single artistId when no junction rows exist.
+   */
+  artists?: { id: string; name: string; slug: string }[]
 }
 
 export interface PortalFeatureFlag {
@@ -308,6 +319,19 @@ export interface SpotifyPlaylistEntry {
 }
 
 /**
+ * A single selectable topic in the contact form.
+ * Stored as a JSON array in site_settings under the key `contact_topics`.
+ */
+export interface ContactTopicConfig {
+  /** Internal value sent with the form submission (must be unique). */
+  value: string
+  /** German label shown in the topic dropdown. */
+  label_de: string
+  /** English label shown in the topic dropdown. */
+  label_en: string
+}
+
+/**
  * A custom social/web link that appears in the footer social icons row.
  * Allows any URL + a phosphor-icons logo name (e.g. "InstagramLogo") or a
  * generic "Globe" fallback.
@@ -442,6 +466,14 @@ export interface SiteSettings {
    * Defaults to ['releases','spotify','videos','concerts','news','newsletter'].
    */
   homepageSectionOrder?: HomepageSection[]
+  /** Number of news items shown as a sneak peek on the homepage. Default: 3, max: 12. */
+  homepageNewsCount?: number
+  /**
+   * Configurable topics for the contact form.
+   * When empty, the form falls back to the four built-in topics
+   * (label, shop, booking, other).
+   */
+  contactTopics?: ContactTopicConfig[]
   // ── Custom Social Links ───────────────────────────────────────────────────
   /**
    * Arbitrary social / web links rendered in the footer alongside the built-in
@@ -473,4 +505,66 @@ export interface NewsletterSubscriber {
   name: string | null
   subscribedAt: string
   source: string
+}
+
+export type SubmissionStatus = 'received' | 'reviewed' | 'accepted' | 'rejected'
+
+export interface ReleaseSubmission {
+  id: string
+  artistId: string
+  status: SubmissionStatus
+  title: string
+  releaseDate: string | null
+  type: 'album' | 'ep' | 'single' | null
+  genre: string | null
+  catalogNumber: string | null
+  isrc: string | null
+  labelCopy: string | null
+  audioDownloadUrl: string
+  coverArtUrl: string
+  coverArtVerified: boolean
+  spotifyUrl: string | null
+  appleMusicUrl: string | null
+  youtubeUrl: string | null
+  notes: string | null
+  formData: Record<string, unknown> | null
+  adminReply: string | null
+  adminReplyAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VideoSubmission {
+  id: string
+  artistId: string
+  status: SubmissionStatus
+  title: string
+  description: string | null
+  downloadUrl: string
+  thumbnailUrl: string | null
+  youtubeTitle: string | null
+  youtubeDescription: string | null
+  youtubeTags: string[]
+  youtubeCategory: string | null
+  targetPublishDate: string | null
+  notes: string | null
+  adminReply: string | null
+  adminReplyAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SubmissionFormField {
+  id: string
+  formType: 'release' | 'video'
+  fieldKey: string
+  fieldLabelEn: string
+  fieldLabelDe: string
+  fieldType: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+  fieldOptions: Record<string, unknown> | null
+  isRequired: boolean
+  isVisible: boolean
+  displayOrder: number
+  placeholderEn: string | null
+  placeholderDe: string | null
 }

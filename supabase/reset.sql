@@ -494,6 +494,52 @@ CREATE TRIGGER trg_news_posts_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: release_artists  (many-to-many: releases ↔ artists)
+-- Allows multiple artists to be credited on a single release (featurings, etc.)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.release_artists (
+  release_id UUID NOT NULL REFERENCES public.releases (id) ON DELETE CASCADE,
+  artist_id  UUID NOT NULL REFERENCES public.artists  (id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (release_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_artists_release_id ON public.release_artists (release_id);
+CREATE INDEX IF NOT EXISTS idx_release_artists_artist_id  ON public.release_artists (artist_id);
+
+-- RLS for release_artists
+ALTER TABLE public.release_artists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "release_artists: public read"              ON public.release_artists;
+DROP POLICY IF EXISTS "release_artists: can_manage_releases write" ON public.release_artists;
+CREATE POLICY "release_artists: public read" ON public.release_artists
+  FOR SELECT USING (true);
+CREATE POLICY "release_artists: can_manage_releases write" ON public.release_artists
+  FOR ALL USING (public.has_permission(auth.uid(), 'can_manage_releases'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: news_post_artists  (many-to-many: news_posts ↔ artists)
+-- Allows a news post to be associated with multiple artists (featurings, etc.)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.news_post_artists (
+  news_post_id UUID NOT NULL REFERENCES public.news_posts (id) ON DELETE CASCADE,
+  artist_id    UUID NOT NULL REFERENCES public.artists    (id) ON DELETE CASCADE,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (news_post_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_post_artists_news_post_id ON public.news_post_artists (news_post_id);
+CREATE INDEX IF NOT EXISTS idx_news_post_artists_artist_id    ON public.news_post_artists (artist_id);
+
+-- RLS for news_post_artists
+ALTER TABLE public.news_post_artists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "news_post_artists: public read"           ON public.news_post_artists;
+DROP POLICY IF EXISTS "news_post_artists: can_publish_news write" ON public.news_post_artists;
+CREATE POLICY "news_post_artists: public read" ON public.news_post_artists
+  FOR SELECT USING (true);
+CREATE POLICY "news_post_artists: can_publish_news write" ON public.news_post_artists
+  FOR ALL USING (public.has_permission(auth.uid(), 'can_publish_news'));
+
+-- ---------------------------------------------------------------------------
 -- TABLE: videos
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.videos (
@@ -2377,3 +2423,203 @@ CREATE POLICY "concerts: artist own read" ON public.concerts
         AND a.user_id = auth.uid()
     )
   );
+
+-- =============================================================================
+-- SUBMISSION SYSTEM (release submissions, video submissions, form schema)
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- ENUM: submission_status
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  CREATE TYPE public.submission_status AS ENUM ('received', 'reviewed', 'accepted', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: release_submissions
+-- Artist-submitted release drafts for label review. Separate from the public
+-- releases catalog — the label decides when to promote a submission to a release.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.release_submissions (
+  id                  UUID                      PRIMARY KEY DEFAULT uuid_generate_v4(),
+  artist_id           UUID                      NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  status              public.submission_status  NOT NULL DEFAULT 'received',
+  title               TEXT                      NOT NULL,
+  release_date        DATE,
+  type                public.release_type,
+  genre               TEXT,
+  catalog_number      TEXT,
+  isrc                TEXT,
+  label_copy          TEXT,
+  audio_download_url  TEXT                      NOT NULL,
+  cover_art_url       TEXT                      NOT NULL,
+  cover_art_verified  BOOLEAN                   NOT NULL DEFAULT FALSE,
+  spotify_url         TEXT,
+  apple_music_url     TEXT,
+  youtube_url         TEXT,
+  notes               TEXT,
+  form_data           JSONB,
+  admin_reply         TEXT,
+  admin_reply_at      TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_submissions_artist_id ON public.release_submissions (artist_id);
+CREATE INDEX IF NOT EXISTS idx_release_submissions_status    ON public.release_submissions (status);
+CREATE INDEX IF NOT EXISTS idx_release_submissions_created   ON public.release_submissions (created_at DESC);
+
+DROP TRIGGER IF EXISTS trg_release_submissions_updated_at ON public.release_submissions;
+CREATE TRIGGER trg_release_submissions_updated_at
+  BEFORE UPDATE ON public.release_submissions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: video_submissions
+-- Artist-submitted music video drafts for label/YouTube processing.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.video_submissions (
+  id                    UUID                      PRIMARY KEY DEFAULT uuid_generate_v4(),
+  artist_id             UUID                      NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  status                public.submission_status  NOT NULL DEFAULT 'received',
+  title                 TEXT                      NOT NULL,
+  description           TEXT,
+  download_url          TEXT                      NOT NULL,
+  thumbnail_url         TEXT,
+  youtube_title         TEXT,
+  youtube_description   TEXT,
+  youtube_tags          TEXT[]                    NOT NULL DEFAULT '{}',
+  youtube_category      TEXT,
+  target_publish_date   DATE,
+  notes                 TEXT,
+  admin_reply           TEXT,
+  admin_reply_at        TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ               NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_submissions_artist_id ON public.video_submissions (artist_id);
+CREATE INDEX IF NOT EXISTS idx_video_submissions_status    ON public.video_submissions (status);
+CREATE INDEX IF NOT EXISTS idx_video_submissions_created   ON public.video_submissions (created_at DESC);
+
+DROP TRIGGER IF EXISTS trg_video_submissions_updated_at ON public.video_submissions;
+CREATE TRIGGER trg_video_submissions_updated_at
+  BEFORE UPDATE ON public.video_submissions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: submission_form_schema
+-- Admin-configurable field definitions for the release and video submission forms.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.submission_form_schema (
+  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  form_type        TEXT        NOT NULL CHECK (form_type IN ('release', 'video')),
+  field_key        TEXT        NOT NULL,
+  field_label_en   TEXT        NOT NULL,
+  field_label_de   TEXT        NOT NULL,
+  field_type       TEXT        NOT NULL CHECK (field_type IN ('text', 'url', 'date', 'select', 'textarea', 'boolean')),
+  field_options    JSONB,
+  is_required      BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
+  display_order    INTEGER     NOT NULL DEFAULT 0,
+  placeholder_en   TEXT,
+  placeholder_de   TEXT,
+  UNIQUE (form_type, field_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_submission_form_schema_type  ON public.submission_form_schema (form_type);
+CREATE INDEX IF NOT EXISTS idx_submission_form_schema_order ON public.submission_form_schema (form_type, display_order);
+
+-- Seed default schema for release form
+INSERT INTO public.submission_form_schema
+  (form_type, field_key, field_label_en, field_label_de, field_type, is_required, is_visible, display_order, placeholder_en, placeholder_de)
+VALUES
+  ('release', 'title',             'Release Title',       'Release-Titel',        'text',     TRUE,  TRUE, 10, 'My New Album', 'Mein neues Album'),
+  ('release', 'release_date',      'Release Date',        'Veröffentlichungsdatum','date',    TRUE,  TRUE, 20, NULL, NULL),
+  ('release', 'type',              'Release Type',        'Release-Typ',          'select',   TRUE,  TRUE, 30, NULL, NULL),
+  ('release', 'genre',             'Genre',               'Genre',                'text',     FALSE, TRUE, 40, 'e.g. Techno, House', 'z.B. Techno, House'),
+  ('release', 'audio_download_url','Audio Download Link', 'Audio-Download-Link',  'url',      TRUE,  TRUE, 50, 'https://drive.google.com/...', 'https://drive.google.com/...'),
+  ('release', 'cover_art_url',     'Cover Art URL',       'Cover-Art-URL',        'url',      TRUE,  TRUE, 60, 'https://drive.google.com/...', 'https://drive.google.com/...'),
+  ('release', 'catalog_number',    'Catalog Number',      'Katalognummer',        'text',     FALSE, TRUE, 70, 'DT-001', 'DT-001'),
+  ('release', 'isrc',              'ISRC',                'ISRC',                 'text',     FALSE, TRUE, 80, 'DEXX12345678', 'DEXX12345678'),
+  ('release', 'label_copy',        'Label Copy / Credits','Label-Text / Credits', 'textarea', FALSE, TRUE, 90, NULL, NULL),
+  ('release', 'spotify_url',       'Spotify Link',        'Spotify-Link',         'url',      FALSE, TRUE,100, NULL, NULL),
+  ('release', 'apple_music_url',   'Apple Music Link',    'Apple Music-Link',     'url',      FALSE, TRUE,110, NULL, NULL),
+  ('release', 'youtube_url',       'YouTube Link',        'YouTube-Link',         'url',      FALSE, TRUE,120, NULL, NULL),
+  ('release', 'notes',             'Additional Notes',    'Zusätzliche Hinweise', 'textarea', FALSE, TRUE,130, NULL, NULL)
+ON CONFLICT (form_type, field_key) DO NOTHING;
+
+-- Seed default schema for video form
+INSERT INTO public.submission_form_schema
+  (form_type, field_key, field_label_en, field_label_de, field_type, is_required, is_visible, display_order, placeholder_en, placeholder_de)
+VALUES
+  ('video', 'title',               'Video Title',             'Video-Titel',              'text',     TRUE,  TRUE, 10, 'My Music Video', 'Mein Musikvideo'),
+  ('video', 'download_url',        'Video Download Link',     'Video-Download-Link',      'url',      TRUE,  TRUE, 20, 'https://drive.google.com/...', 'https://drive.google.com/...'),
+  ('video', 'thumbnail_url',       'Thumbnail URL',           'Thumbnail-URL',            'url',      FALSE, TRUE, 30, NULL, NULL),
+  ('video', 'youtube_title',       'YouTube Title',           'YouTube-Titel',            'text',     FALSE, TRUE, 40, NULL, NULL),
+  ('video', 'youtube_description', 'YouTube Description',     'YouTube-Beschreibung',     'textarea', FALSE, TRUE, 50, NULL, NULL),
+  ('video', 'youtube_tags',        'YouTube Tags',            'YouTube-Tags',             'text',     FALSE, TRUE, 60, 'techno, club, dj', 'techno, club, dj'),
+  ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',        'select',   FALSE, TRUE, 70, NULL, NULL),
+  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',FALSE, TRUE, 80, NULL, NULL),
+  ('video', 'description',         'Video Description',       'Video-Beschreibung',       'textarea', FALSE, TRUE, 90, NULL, NULL),
+  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',     'textarea', FALSE, TRUE,100, NULL, NULL)
+ON CONFLICT (form_type, field_key) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- RLS for submission tables
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.release_submissions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.video_submissions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submission_form_schema ENABLE ROW LEVEL SECURITY;
+
+-- release_submissions: artist can insert/read own rows
+DROP POLICY IF EXISTS "release_submissions: artist insert own" ON public.release_submissions;
+CREATE POLICY "release_submissions: artist insert own" ON public.release_submissions
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "release_submissions: artist read own" ON public.release_submissions;
+CREATE POLICY "release_submissions: artist read own" ON public.release_submissions
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "release_submissions: editor+ read all" ON public.release_submissions;
+CREATE POLICY "release_submissions: editor+ read all" ON public.release_submissions
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "release_submissions: editor+ update" ON public.release_submissions;
+CREATE POLICY "release_submissions: editor+ update" ON public.release_submissions
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+
+-- video_submissions: same pattern
+DROP POLICY IF EXISTS "video_submissions: artist insert own" ON public.video_submissions;
+CREATE POLICY "video_submissions: artist insert own" ON public.video_submissions
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "video_submissions: artist read own" ON public.video_submissions;
+CREATE POLICY "video_submissions: artist read own" ON public.video_submissions
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "video_submissions: editor+ read all" ON public.video_submissions;
+CREATE POLICY "video_submissions: editor+ read all" ON public.video_submissions
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "video_submissions: editor+ update" ON public.video_submissions;
+CREATE POLICY "video_submissions: editor+ update" ON public.video_submissions
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+
+-- submission_form_schema: public read, editor+ write
+DROP POLICY IF EXISTS "submission_form_schema: public read" ON public.submission_form_schema;
+CREATE POLICY "submission_form_schema: public read" ON public.submission_form_schema
+  FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "submission_form_schema: editor+ write" ON public.submission_form_schema;
+CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_schema
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
