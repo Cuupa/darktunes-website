@@ -254,6 +254,10 @@ export interface Database {
           tiktok_url: string | null
           facebook_url: string | null
           soundcloud_url: string | null
+          rider_stage_plot_url: string | null
+          rider_technical_url: string | null
+          rider_hospitality_url: string | null
+          onboarding_completed: boolean
           created_at: string
           updated_at: string
         }
@@ -280,6 +284,10 @@ export interface Database {
           tiktok_url?: string | null
           facebook_url?: string | null
           soundcloud_url?: string | null
+          rider_stage_plot_url?: string | null
+          rider_technical_url?: string | null
+          rider_hospitality_url?: string | null
+          onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -306,6 +314,10 @@ export interface Database {
           tiktok_url?: string | null
           facebook_url?: string | null
           soundcloud_url?: string | null
+          rider_stage_plot_url?: string | null
+          rider_technical_url?: string | null
+          rider_hospitality_url?: string | null
+          onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
         }

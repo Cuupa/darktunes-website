@@ -22,7 +22,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getArtistBySlug, getPublicArtists } from '@/lib/api/artists'
+import { getArtistBySlug, getPublicArtists, getRelatedArtists } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
@@ -63,14 +63,15 @@ async function getArtistData(slug: string) {
   // treats it as a server error (5xx) rather than caching it as a 404.
   const artist = await getArtistBySlug(client, slug)
   if (!artist) return null
-  const [releases, concerts, videos, news, assets] = await Promise.all([
+  const [releases, concerts, videos, news, assets, relatedArtists] = await Promise.all([
     getReleasesByArtistId(client, artist.id),
     getConcertsByArtistId(client, artist.id),
     getVideosByArtistId(client, artist.id),
     getPublicNewsPostsByArtistId(client, artist.id).then((posts) => posts.slice(0, 3)),
     getArtistAssets(client, artist.id).catch(() => []),
+    getRelatedArtists(client, artist.id, artist.genres).catch(() => []),
   ])
-  return { artist, releases, concerts, videos, news, assets }
+  return { artist, releases, concerts, videos, news, assets, relatedArtists }
 }
 
 export async function generateStaticParams() {
@@ -111,7 +112,7 @@ export default async function ArtistDetailPage({ params }: Props) {
   ])
   if (!data) notFound()
   const dict = await getDictionary(locale)
-  const { artist, releases, concerts, videos, news, assets } = data
+  const { artist, releases, concerts, videos, news, assets, relatedArtists } = data
   return (
     <ArtistDetailContent
       artist={artist}
@@ -120,6 +121,7 @@ export default async function ArtistDetailPage({ params }: Props) {
       videos={videos}
       news={news}
       assets={assets}
+      relatedArtists={relatedArtists}
       dict={dict.artistDetail}
       consentDict={dict.consent}
       locale={locale}

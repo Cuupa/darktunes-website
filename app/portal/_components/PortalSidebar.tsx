@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
+import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalSidebarProps {
   dict: Dictionary['portal']
@@ -30,7 +31,6 @@ interface PortalSidebarProps {
   userId: string | null
   artistSlug: string | null
   featureFlags: Record<string, boolean>
-  unreadMessages: number
 }
 
 const baseNavItems = [
@@ -47,10 +47,11 @@ const baseNavItems = [
 
 const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
 
-export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unreadMessages }: PortalSidebarProps) {
+export function PortalSidebar({ dict, artistName, artistSlug, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { unreadCount } = useUnreadMessages()
 
   const navItems = useMemo(
     () => [...baseNavItems, statementsNavItem].filter((item) => !('flag' in item) || (featureFlags[item.flag] ?? true)),
@@ -83,9 +84,9 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
           >
             <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
             {dict[label as keyof typeof dict]}
-            {href === '/portal/messages' && unreadMessages > 0 && (
+            {href === '/portal/messages' && unreadCount > 0 && (
               <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-                {unreadMessages}
+                {unreadCount}
               </span>
             )}
           </Link>
