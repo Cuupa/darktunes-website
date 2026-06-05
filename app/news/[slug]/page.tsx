@@ -11,6 +11,7 @@ import type { Database } from '@/types/database'
 import { getNewsPostBySlug } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -57,6 +58,10 @@ export default async function NewsDetailPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildNewsArticleSchema({ post })) }}
+      />
       <div className="container mx-auto px-4 lg:px-8 pt-36 pb-24 max-w-3xl">
         <Link
           href="/news"
