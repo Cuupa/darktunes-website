@@ -266,6 +266,11 @@ export async function middleware(request: NextRequest) {
     })
   }
 
+  // Forward the current pathname as a request header so Server Components
+  // (e.g. app/portal/layout.tsx) can read it without importing next/headers
+  // in a way that requires a client context.
+  supabaseResponse.headers.set('x-pathname', pathname)
+
   return supabaseResponse
 }
 

@@ -33,6 +33,8 @@ import {
   LinkSimple,
   Info,
   Newspaper,
+  FilePdf,
+  Trash,
 } from '@phosphor-icons/react'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
@@ -86,7 +88,11 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     isUploading,
     fileInputRef,
     watched,
+    riderUrls,
+    riderUploading,
     handlePhotoChange,
+    handleRiderUpload,
+    handleRiderDelete,
     onSubmit,
   } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
 
@@ -115,6 +121,9 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     tiktokUrl: watched.tiktok_url,
     facebookUrl: watched.facebook_url,
     soundcloudUrl: watched.soundcloud_url,
+    riderStagePlotUrl: riderUrls.stage_plot,
+    riderTechnicalUrl: riderUrls.technical,
+    riderHospitalityUrl: riderUrls.hospitality,
   }
 
   // ---------------------------------------------------------------------------
@@ -181,6 +190,10 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
             <TabsTrigger value="links" className="gap-1.5">
               <LinkSimple size={14} aria-hidden="true" />
               {dict.profile_tab_links}
+            </TabsTrigger>
+            <TabsTrigger value="riders" className="gap-1.5">
+              <FilePdf size={14} aria-hidden="true" />
+              {dict.profile_tab_riders}
             </TabsTrigger>
             <TabsTrigger value="epk" className="gap-1.5">
               <Newspaper size={14} aria-hidden="true" />
@@ -406,7 +419,73 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
             </Card>
           </TabsContent>
 
-          {/* ── Tab 4: EPK Preview ───────────────────────────────────────── */}
+          {/* ── Tab 4: Riders & Documents ────────────────────────────────── */}
+          <TabsContent value="riders" className="space-y-4 mt-0">
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{dict.profile_tab_riders}</CardTitle>
+                <CardDescription>{dict.profile_riders_desc}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {(
+                  [
+                    { type: 'stage_plot',   label: dict.profile_rider_stage_plot,   key: 'riderStagePlotUrl'  },
+                    { type: 'technical',    label: dict.profile_rider_technical,    key: 'riderTechnicalUrl'  },
+                    { type: 'hospitality',  label: dict.profile_rider_hospitality,  key: 'riderHospitalityUrl' },
+                  ] as const
+                ).map(({ type, label }) => (
+                  <div key={type} className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-sm font-medium">{label}</Label>
+                      {riderUrls[type] ? (
+                        <a
+                          href={riderUrls[type]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-xs text-primary hover:text-primary/80 mt-1 truncate"
+                        >
+                          {dict.profile_rider_download}
+                        </a>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">{dict.profile_rider_no_file}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <label
+                        htmlFor={`rider-${type}`}
+                        className="cursor-pointer inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+                      >
+                        <FilePdf size={14} aria-hidden="true" />
+                        {riderUploading === type ? dict.profile_rider_uploading : dict.profile_rider_upload}
+                      </label>
+                      <input
+                        id={`rider-${type}`}
+                        type="file"
+                        accept="application/pdf"
+                        className="sr-only"
+                        disabled={riderUploading === type}
+                        onChange={(e) => handleRiderUpload(e, type)}
+                      />
+                      {riderUrls[type] && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive/80 px-2"
+                          onClick={() => handleRiderDelete(type)}
+                          aria-label={`${dict.profile_rider_delete} ${label}`}
+                        >
+                          <Trash size={14} aria-hidden="true" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── Tab 5: EPK Preview ───────────────────────────────────────── */}
           <TabsContent value="epk" className="mt-0">
             <EPKPreview
               dict={dict}

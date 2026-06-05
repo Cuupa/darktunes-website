@@ -27,6 +27,38 @@ export interface ArtistProfilePayload {
   tiktok_url: string | null
   facebook_url: string | null
   soundcloud_url: string | null
+  rider_stage_plot_url: string | null
+  rider_technical_url: string | null
+  rider_hospitality_url: string | null
+}
+
+export type RiderType = 'stage_plot' | 'technical' | 'hospitality'
+
+/**
+ * Upload a rider PDF via the /api/portal/upload-rider Route Handler.
+ * Returns the public CDN URL of the uploaded document.
+ */
+export async function uploadRiderDocument(
+  file: File,
+  riderType: RiderType,
+  token: string,
+): Promise<string> {
+  const body = new FormData()
+  body.append('file', file)
+
+  const res = await fetch(`/api/portal/upload-rider?type=${encodeURIComponent(riderType)}`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body,
+  })
+
+  if (!res.ok) {
+    throw new Error(`Upload failed (${res.status})`)
+  }
+
+  const data = (await res.json()) as { url?: string }
+  if (!data.url) throw new Error('No URL in response')
+  return data.url
 }
 
 /**

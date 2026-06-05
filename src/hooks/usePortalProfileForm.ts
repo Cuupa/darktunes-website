@@ -14,7 +14,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { uploadArtistPhoto, saveArtistProfile } from '@/lib/api/portalProfile'
+import { uploadArtistPhoto, uploadRiderDocument, saveArtistProfile } from '@/lib/api/portalProfile'
+import type { RiderType } from '@/lib/api/portalProfile'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
@@ -72,6 +73,14 @@ export function usePortalProfileForm({
   const isUploading = uploadProgress !== null && uploadProgress < 100
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Rider document URLs (managed separately from the main form)
+  const [riderUrls, setRiderUrls] = useState<Record<RiderType, string | undefined>>({
+    stage_plot: initialProfile?.riderStagePlotUrl,
+    technical: initialProfile?.riderTechnicalUrl,
+    hospitality: initialProfile?.riderHospitalityUrl,
+  })
+  const [riderUploading, setRiderUploading] = useState<RiderType | null>(null)
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -128,7 +137,37 @@ export function usePortalProfileForm({
   }
 
   // -------------------------------------------------------------------------
-  // Form submission
+  // Rider document upload / delete
+  // -------------------------------------------------------------------------
+
+  const handleRiderUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    riderType: RiderType,
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setRiderUploading(riderType)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { toast.error(dict.profile_rider_upload_error); return }
+      const url = await uploadRiderDocument(file, riderType, session.access_token)
+      setRiderUrls((prev) => ({ ...prev, [riderType]: url }))
+      toast.success(dict.profile_rider_uploaded)
+    } catch {
+      toast.error(dict.profile_rider_upload_error)
+    } finally {
+      setRiderUploading(null)
+    }
+  }
+
+  const handleRiderDelete = async (riderType: RiderType) => {
+    setRiderUrls((prev) => ({ ...prev, [riderType]: undefined }))
+    toast.success(dict.profile_rider_deleted)
+  }
+
+  // -------------------------------------------------------------------------
+  // Form submission (includes rider URLs)
   // -------------------------------------------------------------------------
 
   const onSubmit = async (values: ProfileFormValues) => {
@@ -170,6 +209,9 @@ export function usePortalProfileForm({
           tiktok_url: values.tiktok_url || null,
           facebook_url: values.facebook_url || null,
           soundcloud_url: values.soundcloud_url || null,
+          rider_stage_plot_url: riderUrls.stage_plot ?? null,
+          rider_technical_url: riderUrls.technical ?? null,
+          rider_hospitality_url: riderUrls.hospitality ?? null,
         },
         session.access_token,
       )
@@ -188,7 +230,11 @@ export function usePortalProfileForm({
     isUploading,
     fileInputRef,
     watched,
+    riderUrls,
+    riderUploading,
     handlePhotoChange,
+    handleRiderUpload,
+    handleRiderDelete,
     onSubmit: form.handleSubmit(onSubmit),
   }
 }

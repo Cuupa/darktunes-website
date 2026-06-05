@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getArtists, getPublicArtists, createArtist, updateArtist, deleteArtist, getArtistById, getArtistBySlug } from './artists'
+import { getArtists, getPublicArtists, createArtist, updateArtist, deleteArtist, getArtistById, getArtistBySlug, getRelatedArtists } from './artists'
 
 type DbClient = SupabaseClient<Database>
 type ArtistRow = Database['public']['Tables']['artists']['Row']
@@ -17,7 +17,10 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
+    filter: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
@@ -264,5 +267,42 @@ describe('deleteArtist', () => {
     expect(db.from).toHaveBeenCalledWith('artists')
     expect(builder.delete).toHaveBeenCalled()
     expect(builder.eq).toHaveBeenCalledWith('id', 'abc-123')
+  })
+})
+
+describe('getRelatedArtists', () => {
+  const relatedRow: ArtistRow = {
+    ...mockArtistRow,
+    id: 'related-1',
+    name: 'Related Artist',
+    slug: 'related-artist',
+    genres: ['Darkpop'],
+  }
+
+  it('returns related artists matching the genres', async () => {
+    const db = makeMockDb([relatedRow])
+    const result = await getRelatedArtists(db, mockArtistRow.id, ['Darkpop'])
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe('Related Artist')
+  })
+
+  it('returns empty array when genres is empty (no query)', async () => {
+    const db = makeMockDb([relatedRow])
+    const result = await getRelatedArtists(db, mockArtistRow.id, [])
+    expect(result).toHaveLength(0)
+    // Supabase should not be called
+    expect((db as { from: ReturnType<typeof vi.fn> }).from).not.toHaveBeenCalled()
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'DB error', code: 'PGRST001' })
+    await expect(getRelatedArtists(db, 'id-1', ['Rock'])).rejects.toThrow('DB error')
+  })
+
+  it('uses filter with ov operator to find genre overlap', async () => {
+    const builder = makeBuilder([relatedRow], null)
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    await getRelatedArtists(db, 'id-1', ['Darkpop', 'EBM'])
+    expect(builder.filter).toHaveBeenCalledWith('genres', 'ov', '{Darkpop,EBM}')
   })
 })
