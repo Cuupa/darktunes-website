@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createVideoSubmission } from '@/lib/api/videoSubmissions'
 
 const bodySchema = z.object({
@@ -31,7 +31,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const body = bodySchema.parse(await req.json())
 
-  const artist = await getArtistByUserId(supabase, user.id)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  let artist
+  try {
+    artist = await resolvePortalArtist(supabase, user.id, artistId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  }
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const submission = await createVideoSubmission(supabase, {

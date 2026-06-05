@@ -9,6 +9,48 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      artist_members: {
+        Row: {
+          id: string
+          user_id: string
+          artist_id: string
+          member_role: 'owner' | 'member' | 'guest'
+          invited_by: string | null
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          artist_id: string
+          member_role?: 'owner' | 'member' | 'guest'
+          invited_by?: string | null
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          artist_id?: string
+          member_role?: 'owner' | 'member' | 'guest'
+          invited_by?: string | null
+          joined_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_members_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       app_logs: {
         Row: {
           id: string

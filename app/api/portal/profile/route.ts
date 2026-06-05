@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
 import type { Database } from '@/types/database'
 
@@ -63,10 +63,15 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   }
 
   // 3. Confirm the artist_id in the body belongs to the authenticated user
-  const artist = await getArtistByUserId(supabase, user.id)
-  if (!artist || artist.id !== parsed.data.artist_id) {
-    throw new ApiError(403, 'You do not have permission to update this profile')
+  let artist
+  try {
+    artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'You do not have permission to update this profile')
+    throw err
   }
+  if (!artist) throw new ApiError(403, 'You do not have permission to update this profile')
 
   // 4. Upsert profile
   const profile = await upsertArtistProfile(supabase, parsed.data)

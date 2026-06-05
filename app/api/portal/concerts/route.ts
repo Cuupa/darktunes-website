@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createConcert, updateConcert, deleteConcert } from '@/lib/api/concerts'
 
 const createSchema = z.object({
@@ -37,7 +37,15 @@ async function getRequestArtist(request: NextRequest) {
   } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
-  const artist = await getArtistByUserId(supabase, user.id)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  let artist
+  try {
+    artist = await resolvePortalArtist(supabase, user.id, artistId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  }
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   return { supabase, artist, user }

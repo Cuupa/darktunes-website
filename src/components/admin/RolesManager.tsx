@@ -73,7 +73,7 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: 'Full access — cannot be restricted.',
   editor: 'Can manage content but not users or system settings.',
   journalist: 'Press portal user with limited write access.',
-  artist: 'Artist portal user with their own content only.',
+  artist: 'Artist portal access is now membership-based (artist_members table). This role is legacy.',
   user: 'Unassigned user with no special privileges.',
 }
 
