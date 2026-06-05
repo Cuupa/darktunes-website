@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  CaretUpDown,
   ChartBar,
   ChatCircleText,
   Chats,
@@ -20,16 +21,22 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
+import type { Artist } from '@/types'
 import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalSidebarProps {
   dict: Dictionary['portal']
-  artistName: string | null
+  artists: Artist[]
   userId: string | null
-  artistSlug: string | null
   featureFlags: Record<string, boolean>
 }
 
@@ -49,11 +56,16 @@ const baseNavItems = [
 
 const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
 
-export function PortalSidebar({ dict, artistName, artistSlug, featureFlags }: PortalSidebarProps) {
+export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unreadCount } = useUnreadMessages()
+  // Track which artist is active in the sidebar for display purposes.
+  // Defaults to the first artist; multi-artist users can switch via the dropdown.
+  const [activeArtistIndex, setActiveArtistIndex] = useState(0)
+
+  const activeArtist = artists[activeArtistIndex] ?? null
 
   const navItems = useMemo(
     () => [...baseNavItems, statementsNavItem].filter((item) => !('flag' in item) || (featureFlags[item.flag] ?? true)),
@@ -97,17 +109,43 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags }: Po
     </nav>
   )
 
-  const artistBlock = artistName ? (
+  const artistBlock = activeArtist ? (
     <div className="px-6 py-4">
       <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">{dict.title}</p>
-      <p className="mb-2 truncate font-semibold">{artistName}</p>
-      {artistSlug && (
+      {artists.length > 1 ? (
+        // Multi-artist selector — dropdown to switch active artist
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex w-full items-center justify-between gap-2 truncate font-semibold hover:text-primary transition-colors mb-2"
+              aria-label="Switch active artist"
+            >
+              <span className="truncate">{activeArtist.name}</span>
+              <CaretUpDown size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {artists.map((a, idx) => (
+              <DropdownMenuItem
+                key={a.id}
+                onSelect={() => setActiveArtistIndex(idx)}
+                className={idx === activeArtistIndex ? 'font-semibold text-primary' : ''}
+              >
+                {a.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <p className="mb-2 truncate font-semibold">{activeArtist.name}</p>
+      )}
+      {activeArtist.slug && (
         <Link
-          href={`/artists/${artistSlug}`}
+          href={`/artists/${activeArtist.slug}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs text-primary transition-colors hover:text-primary/80"
-          aria-label={`Preview public profile for ${artistName}`}
+          aria-label={`Preview public profile for ${activeArtist.name}`}
         >
           <Eye size={13} aria-hidden="true" />
           {dict.profile_preview_public}

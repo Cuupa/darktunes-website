@@ -199,7 +199,11 @@ BEGIN
 
     IF v_artist_id IS NOT NULL THEN
       UPDATE public.artists SET user_id = NEW.id WHERE id = v_artist_id;
-      UPDATE public.profiles SET role = 'artist' WHERE id = NEW.id;
+      -- Insert into artist_members instead of overwriting the user's editorial role.
+      -- ON CONFLICT DO NOTHING keeps this idempotent on repeated OAuth logins.
+      INSERT INTO public.artist_members (user_id, artist_id, member_role)
+      VALUES (NEW.id, v_artist_id, 'owner')
+      ON CONFLICT (user_id, artist_id) DO NOTHING;
     END IF;
   END IF;
 
@@ -275,13 +279,56 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS storage_quota_bytes BIGINT D
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
 CREATE INDEX IF NOT EXISTS idx_artists_visible  ON public.artists (is_visible);
-CREATE UNIQUE INDEX IF NOT EXISTS artists_user_id_key
-  ON public.artists (user_id) WHERE user_id IS NOT NULL;
+-- DEPRECATED: artists_user_id_key was a 1:1 constraint. Replaced by artist_members.
+-- Kept as a DROP to remove the index from any existing database that still has it.
+DROP INDEX IF EXISTS public.artists_user_id_key;
 
 DROP TRIGGER IF EXISTS trg_artists_updated_at ON public.artists;
 CREATE TRIGGER trg_artists_updated_at
   BEFORE UPDATE ON public.artists
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_members
+-- Junction table for the many-to-many relationship between users and artists.
+-- Replaces the 1:1 artists.user_id constraint to support:
+--   • Bands with multiple members (each member gets portal access)
+--   • Producers / artists active under several project names
+--   • Editors who are also signed artists (role is independent of membership)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_members (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES auth.users(id)   ON DELETE CASCADE,
+  artist_id   UUID        NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  member_role TEXT        NOT NULL DEFAULT 'member', -- 'owner' | 'member' | 'guest'
+  invited_by  UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, artist_id)  -- one row per (user, artist) pair; no limit on how many
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_members_user_id   ON public.artist_members (user_id);
+CREATE INDEX IF NOT EXISTS idx_artist_members_artist_id ON public.artist_members (artist_id);
+
+-- Backfill: migrate existing artists.user_id links → artist_members rows.
+-- Runs on every reset; ON CONFLICT DO NOTHING makes it idempotent.
+INSERT INTO public.artist_members (user_id, artist_id, member_role)
+SELECT user_id, id, 'owner'
+FROM   public.artists
+WHERE  user_id IS NOT NULL
+ON CONFLICT (user_id, artist_id) DO NOTHING;
+
+ALTER TABLE public.artist_members ENABLE ROW LEVEL SECURITY;
+
+-- Members can read their own membership rows
+DROP POLICY IF EXISTS "artist_members: own read"   ON public.artist_members;
+CREATE POLICY "artist_members: own read" ON public.artist_members
+  FOR SELECT USING (user_id = auth.uid());
+
+-- Admins can manage all memberships
+DROP POLICY IF EXISTS "artist_members: admin all"  ON public.artist_members;
+CREATE POLICY "artist_members: admin all" ON public.artist_members
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: asset_folders
@@ -1259,7 +1306,15 @@ CREATE POLICY "artists: admin delete" ON public.artists
 
 -- Artists can update their own row via user_id (Artist Portal)
 CREATE POLICY "artists: own artist update" ON public.artists
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM public.artist_members am
+            WHERE am.artist_id = id AND am.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am
+            WHERE am.artist_id = id AND am.user_id = auth.uid())
+  );
 
 -- ---------------------------------------------------------------------------
 -- RLS: releases
@@ -1524,27 +1579,27 @@ CREATE POLICY "Allow admin deletes on concerts" ON public.concerts
 -- Allows artists to create concerts for their own profile
 CREATE POLICY "concerts: artist own insert" ON public.concerts
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to update their own concerts
 CREATE POLICY "concerts: artist own update" ON public.concerts
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows artists to delete their own concerts
 CREATE POLICY "concerts: artist own delete" ON public.concerts
   FOR DELETE USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 CREATE POLICY "concerts: artist manage own" ON public.concerts
   FOR ALL USING (
-    artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   )
   WITH CHECK (
-    artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- ---------------------------------------------------------------------------
@@ -1601,11 +1656,11 @@ CREATE POLICY "interview_requests: journalist manage own" ON public.interview_re
   WITH CHECK (journalist_id = auth.uid());
 
 CREATE POLICY "interview_requests: artist read own" ON public.interview_requests
-  FOR SELECT USING (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()));
+  FOR SELECT USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
 CREATE POLICY "interview_requests: artist update own" ON public.interview_requests
-  FOR UPDATE USING (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()))
-  WITH CHECK (artist_id IN (SELECT id FROM public.artists WHERE user_id = auth.uid()));
+  FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
+  WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
 -- ---------------------------------------------------------------------------
 -- RLS: newsletter_subscribers
@@ -1647,14 +1702,14 @@ DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_prof
 -- Allows artists to read their own EPK/profile data
 CREATE POLICY "artist_profiles: artist read own" ON public.artist_profiles
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to update their own EPK/profile data
 CREATE POLICY "artist_profiles: artist update own" ON public.artist_profiles
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows admins full access to all artist profiles
 CREATE POLICY "artist_profiles: admin all" ON public.artist_profiles
@@ -1671,7 +1726,7 @@ DROP POLICY IF EXISTS "streaming_stats: admin all"       ON public.streaming_sta
 -- Allows artists to view their own streaming statistics
 CREATE POLICY "streaming_stats: artist read own" ON public.streaming_stats
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows admins full access to all streaming stats
@@ -1689,7 +1744,7 @@ DROP POLICY IF EXISTS "sales_statements: admin all"       ON public.sales_statem
 -- Allows artists to view their own sales statements
 CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows admins full access to all sales statements
@@ -1709,20 +1764,20 @@ DROP POLICY IF EXISTS "release_checklists: admin all"         ON public.release_
 -- Allows artists to read their own release checklists
 CREATE POLICY "release_checklists: artist read own" ON public.release_checklists
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to create checklists for their releases
 CREATE POLICY "release_checklists: artist insert own" ON public.release_checklists
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to update their own release checklists
 CREATE POLICY "release_checklists: artist update own" ON public.release_checklists
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows admins full access to all release checklists
 CREATE POLICY "release_checklists: admin all" ON public.release_checklists
@@ -1808,7 +1863,7 @@ DROP POLICY IF EXISTS "label_messages: admin all" ON public.label_messages;
 -- Allows artists to read messages sent to their profile
 CREATE POLICY "label_messages: artist own read" ON public.label_messages
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows admins full access to all label messages
@@ -1924,19 +1979,19 @@ DROP POLICY IF EXISTS "artist_assets_admin_all" ON public.artist_assets;
 -- Allows artists to read their own asset entries
 CREATE POLICY "artist_assets_select_own" ON public.artist_assets
   FOR SELECT USING (
-    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- Allows artists to add asset entries for their own profile
 CREATE POLICY "artist_assets_insert_own" ON public.artist_assets
   FOR INSERT WITH CHECK (
-    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- Allows artists to delete their own asset entries
 CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
   FOR DELETE USING (
-    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- Allows admins full access to all artist assets
@@ -1972,13 +2027,13 @@ DROP POLICY IF EXISTS "artist_replies_admin_all" ON public.artist_replies;
 -- Allows artists to read their own message replies
 CREATE POLICY "artist_replies_select_own" ON public.artist_replies
   FOR SELECT USING (
-    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- Allows artists to write replies to messages addressed to them
 CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
   FOR INSERT WITH CHECK (
-    artist_id = (SELECT id FROM public.artists WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
   );
 
 -- Allows admins full access to all artist message replies
@@ -2108,8 +2163,9 @@ SELECT cron.schedule(
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- HELPER: get_linked_artist_id — returns the artist.id linked to a given user
--- Used in RLS policies and server-side queries.
+-- HELPER: get_linked_artist_id — returns one artist.id for a given user
+-- DEPRECATED: use get_linked_artist_ids() for multi-artist support.
+-- Kept for backward compatibility with existing callers.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_linked_artist_id(p_user_id UUID)
 RETURNS UUID
@@ -2118,7 +2174,35 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT id FROM public.artists WHERE user_id = p_user_id LIMIT 1;
+  SELECT artist_id FROM public.artist_members WHERE user_id = p_user_id LIMIT 1;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: get_linked_artist_ids — returns ALL artist IDs for a given user
+-- Supports the many-to-many artist_members relationship.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_linked_artist_ids(p_user_id UUID)
+RETURNS SETOF UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT artist_id FROM public.artist_members WHERE user_id = p_user_id;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: is_artist_member — true if the user has at least one artist membership
+-- Used in RLS policies to grant portal access independently of profiles.role.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_artist_member(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (SELECT 1 FROM public.artist_members WHERE user_id = p_user_id);
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -2407,9 +2491,9 @@ DROP POLICY IF EXISTS "releases: artist own read" ON public.releases;
 CREATE POLICY "releases: artist own read" ON public.releases
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.artists a
-      WHERE a.id = artist_id
-        AND a.user_id = auth.uid()
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = artist_id
+        AND am.user_id = auth.uid()
     )
   );
 
@@ -2418,9 +2502,9 @@ DROP POLICY IF EXISTS "concerts: artist own read" ON public.concerts;
 CREATE POLICY "concerts: artist own read" ON public.concerts
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.artists a
-      WHERE a.id = artist_id
-        AND a.user_id = auth.uid()
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = artist_id
+        AND am.user_id = auth.uid()
     )
   );
 
@@ -2576,13 +2660,13 @@ ALTER TABLE public.submission_form_schema ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "release_submissions: artist insert own" ON public.release_submissions;
 CREATE POLICY "release_submissions: artist insert own" ON public.release_submissions
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS "release_submissions: artist read own" ON public.release_submissions;
 CREATE POLICY "release_submissions: artist read own" ON public.release_submissions
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS "release_submissions: editor+ read all" ON public.release_submissions;
@@ -2597,13 +2681,13 @@ CREATE POLICY "release_submissions: editor+ update" ON public.release_submission
 DROP POLICY IF EXISTS "video_submissions: artist insert own" ON public.video_submissions;
 CREATE POLICY "video_submissions: artist insert own" ON public.video_submissions
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS "video_submissions: artist read own" ON public.video_submissions;
 CREATE POLICY "video_submissions: artist read own" ON public.video_submissions
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artists a WHERE a.id = artist_id AND a.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS "video_submissions: editor+ read all" ON public.video_submissions;

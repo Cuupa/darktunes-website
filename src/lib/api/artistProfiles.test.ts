@@ -5,11 +5,46 @@ import {
   getArtistProfileByArtistId,
   upsertArtistProfile,
   getArtistByUserId,
+  getArtistsByUserId,
+  resolvePortalArtist,
 } from './artistProfiles'
 
 type DbClient = SupabaseClient<Database>
 type ArtistProfileRow = Database['public']['Tables']['artist_profiles']['Row']
 type ArtistRow = Database['public']['Tables']['artists']['Row']
+
+// Builder that returns different data per table call
+function makeSequentialDb(calls: Array<{ data: unknown; error: unknown }>): DbClient {
+  let callIndex = 0
+  const makeBuilder = (data: unknown, error: unknown) => {
+    const result = { data, error }
+    const p = Promise.resolve(result)
+    return {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      upsert: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockReturnThis(),
+      then: p.then.bind(p),
+      catch: p.catch.bind(p),
+      finally: p.finally.bind(p),
+    }
+  }
+  return {
+    from: vi.fn().mockImplementation(() => {
+      const call = calls[callIndex] ?? { data: null, error: null }
+      callIndex++
+      return makeBuilder(call.data, call.error)
+    }),
+  } as unknown as DbClient
+}
 
 function makeBuilder(data: unknown = null, error: unknown = null) {
   const result = { data, error }
@@ -22,7 +57,11 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -148,22 +187,91 @@ describe('upsertArtistProfile', () => {
 })
 
 describe('getArtistByUserId', () => {
-  it('returns mapped artist for matching user', async () => {
-    const db = makeMockDb(mockArtistRow)
+  it('returns mapped artist when user has an artist_members membership', async () => {
+    // Call 1: artist_members query → returns membership row
+    // Call 2: artists query → returns artist row
+    const db = makeSequentialDb([
+      { data: { artist_id: 'artist-uuid' }, error: null },
+      { data: mockArtistRow, error: null },
+    ])
     const result = await getArtistByUserId(db, 'auth-user-uuid')
     expect(result).not.toBeNull()
     expect(result?.id).toBe('artist-uuid')
     expect(result?.name).toBe('C Z A R I N A')
   })
 
-  it('returns null when user has no linked artist (PGRST116)', async () => {
-    const db = makeMockDb(null, { message: 'Not found', code: 'PGRST116' })
+  it('returns null when user has no artist memberships', async () => {
+    // Call 1: artist_members query → no membership
+    const db = makeSequentialDb([{ data: null, error: null }])
     const result = await getArtistByUserId(db, 'unlinked-user')
     expect(result).toBeNull()
   })
 
-  it('throws for other DB errors', async () => {
-    const db = makeMockDb(null, { message: 'DB failure', code: 'PGRST001' })
+  it('throws for DB errors on artist_members query', async () => {
+    const db = makeSequentialDb([{ data: null, error: { message: 'DB failure', code: 'PGRST001' } }])
     await expect(getArtistByUserId(db, 'user-id')).rejects.toThrow('DB failure')
+  })
+})
+
+describe('getArtistsByUserId', () => {
+  it('returns all artists for a user with multiple memberships', async () => {
+    const artistRow2: ArtistRow = { ...mockArtistRow, id: 'artist-uuid-2', name: 'Band B', slug: 'band-b' }
+    // Call 1: artist_members → two memberships
+    // Call 2: artists .in() → two artist rows
+    const db = makeSequentialDb([
+      { data: [{ artist_id: 'artist-uuid' }, { artist_id: 'artist-uuid-2' }], error: null },
+      { data: [mockArtistRow, artistRow2], error: null },
+    ])
+    const result = await getArtistsByUserId(db, 'auth-user-uuid')
+    expect(result).toHaveLength(2)
+    expect(result[0].id).toBe('artist-uuid')
+    expect(result[1].id).toBe('artist-uuid-2')
+  })
+
+  it('returns empty array when user has no memberships', async () => {
+    const db = makeSequentialDb([{ data: [], error: null }])
+    const result = await getArtistsByUserId(db, 'no-artist-user')
+    expect(result).toEqual([])
+  })
+
+  it('throws for DB errors on artist_members query', async () => {
+    const db = makeSequentialDb([{ data: null, error: { message: 'DB failure', code: 'PGRST001' } }])
+    await expect(getArtistsByUserId(db, 'user-id')).rejects.toThrow('DB failure')
+  })
+})
+
+describe('resolvePortalArtist', () => {
+  it('returns artist when explicit artistId matches membership', async () => {
+    // Call 1: artist_members with eq('artist_id') → found
+    // Call 2: artists → artist row
+    const db = makeSequentialDb([
+      { data: { artist_id: 'artist-uuid' }, error: null },
+      { data: mockArtistRow, error: null },
+    ])
+    const result = await resolvePortalArtist(db, 'auth-user-uuid', 'artist-uuid')
+    expect(result?.id).toBe('artist-uuid')
+  })
+
+  it('throws FORBIDDEN when artistId does not match any membership', async () => {
+    // Call 1: artist_members with eq('artist_id') → not found
+    const db = makeSequentialDb([{ data: null, error: null }])
+    await expect(resolvePortalArtist(db, 'auth-user-uuid', 'wrong-artist-uuid')).rejects.toThrow('FORBIDDEN')
+  })
+
+  it('falls back to first membership when no artistId provided', async () => {
+    // Delegates to getArtistByUserId — Call 1: artist_members, Call 2: artists
+    const db = makeSequentialDb([
+      { data: { artist_id: 'artist-uuid' }, error: null },
+      { data: mockArtistRow, error: null },
+    ])
+    const result = await resolvePortalArtist(db, 'auth-user-uuid')
+    expect(result?.id).toBe('artist-uuid')
+  })
+
+  it('returns null when user has no memberships and no artistId', async () => {
+    // Delegates to getArtistByUserId — no membership
+    const db = makeSequentialDb([{ data: null, error: null }])
+    const result = await resolvePortalArtist(db, 'no-artist-user')
+    expect(result).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 import { ComponentProps } from "react"
 import { Slot } from "@radix-ui/react-slot"
-import { ChevronRight } from "lucide-react"
-import { MoreHorizontal } from "lucide-react"
+import { CaretRight as ChevronRight } from "@phosphor-icons/react"
+import { DotsThree as MoreHorizontal } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

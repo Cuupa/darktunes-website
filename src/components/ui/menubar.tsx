@@ -1,8 +1,8 @@
 import { ComponentProps } from "react"
 import * as MenubarPrimitive from "@radix-ui/react-menubar"
-import { Check as CheckIcon } from "lucide-react"
-import { ChevronRight as ChevronRightIcon } from "lucide-react"
-import { Circle as CircleIcon } from "lucide-react"
+import { Check as CheckIcon } from "@phosphor-icons/react"
+import { CaretRight as ChevronRightIcon } from "@phosphor-icons/react"
+import { Circle as CircleIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 

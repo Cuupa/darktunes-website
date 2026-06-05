@@ -183,3 +183,40 @@ Admin pages are always dynamically rendered (`force-dynamic`) so auth cookies ar
 
 
 - Press Portal tab: review journalist applications, upload press kit assets by category/artist, manage promo tracks with genre/BPM/key/NDA metadata, review accreditations, and monitor portal analytics.
+
+## Press Portal (Admin)
+
+The Press Portal admin features are in the Admin Dashboard under the **Press** tab
+(admin-only). This tab provides:
+- **Press Photos**: Upload/manage photos by category (live, promo, artwork) and artist
+- **Promo Tracks**: Manage promo audio with metadata (genre, BPM, key, NDA required flag)
+- **Journalist Applications**: Review and approve/reject journalist accreditation requests
+- **Accreditations**: Grant/revoke journalist portal access
+
+## Statements (Admin-only tab)
+
+`StatementsManager` is a read-only table listing all `sales_statements` rows across
+all artists. Admins can verify which statements have been uploaded by the SOS generator.
+Statements are delivered via the SOS webhook — do NOT upload PDFs manually here.
+
+## Monitoring Cron Jobs
+
+Daily cron jobs run automatically via Vercel. To verify they ran:
+1. Vercel Dashboard → Project → Cron Jobs → view last execution time and status
+2. Admin Panel → Logs tab → Audit Log → filter by `api_source`
+
+If a cron fails: check Admin → Logs → Error Log for the failed sync_logs entry.
+
+## Creating a Journalist Account
+
+1. Have the journalist sign up at `/press/login` (or create via Supabase Dashboard → Auth)
+2. Admin → **Users** tab → find the user row
+3. Change role to `journalist`
+4. The journalist can now access `/press/dashboard/*`
+
+## Manual ISR Cache Invalidation
+
+If a public page shows stale data after an admin save:
+- Admin → Settings → any save triggers automatic revalidation of site-settings cache
+- To manually bust artist/release caches: use the "Force Sync All" button in Admin → Health tab
+- Or call: `POST /api/revalidate` with `Authorization: ******

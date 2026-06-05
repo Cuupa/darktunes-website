@@ -69,6 +69,22 @@ export async function middleware(request: NextRequest) {
   const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
   const isAccountRoute = pathname.startsWith('/account')
 
+  // Fetch the user's role once for all route sections that need it.
+  // This avoids repeated round-trips to the profiles table within the same
+  // middleware invocation when a request touches multiple guarded areas.
+  let profile: { role: string } | null = null
+  if (
+    user &&
+    (isAdminRoute || isEditorRoute || isPortalRoute || isPressLoginPage || isPressDashboardRoute)
+  ) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+    profile = data
+  }
+
   // --- Admin route protection ---
 
   // Redirect unauthenticated users away from protected admin/editor routes
@@ -78,14 +94,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // For authenticated users on admin/editor routes (or the admin login page), fetch the role
+  // For authenticated users on admin/editor routes (or the admin login page), check the role
   if ((isAdminRoute || isEditorRoute) && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
 
     if (isAdminLoginPage) {
@@ -131,12 +141,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPortalRoute && !isPortalLoginPage && !isPortalAcceptInvitePage && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     // Admins can access the portal without a linked artist
     const isAdmin = profile?.role === 'admin'
 
@@ -159,12 +163,6 @@ export async function middleware(request: NextRequest) {
 
   // Redirect already-authenticated portal users away from the login page
   if (isPortalLoginPage && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     const isAdmin = profile?.role === 'admin'
 
     if (isAdmin) {
@@ -215,12 +213,6 @@ export async function middleware(request: NextRequest) {
     // Without this check an authenticated user without a journalist/admin role
     // would be bounced between /press/login and /press/dashboard indefinitely
     // (ERR_TOO_MANY_REDIRECTS).
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     if (profile && ['journalist', 'admin'].includes(profile.role)) {
       const pressUrl = request.nextUrl.clone()
       pressUrl.pathname = '/press/dashboard'
@@ -231,12 +223,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPressDashboardRoute && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     if (!profile || !['journalist', 'admin'].includes(profile.role)) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/press/login'

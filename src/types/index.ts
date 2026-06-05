@@ -482,6 +482,11 @@ export interface SiteSettings {
    * Instagram / YouTube / Spotify icons.  Stored as a JSON array.
    */
   customSocialLinks?: CustomSocialLink[]
+  /**
+   * SubmitHub playlister URL for music submissions. Falls back to the
+   * hardcoded darkTunes SubmitHub link when empty.
+   */
+  submitHubUrl?: string
 }
 
 export interface Concert {

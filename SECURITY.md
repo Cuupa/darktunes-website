@@ -41,5 +41,31 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content, but every client-side render path sanitizes the HTML with DOMPurify before using `dangerouslySetInnerHTML`, reducing XSS risk in the admin inbox and artist portal.
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
 
+## CSRF Protection
+
+CSRF protection is NOT needed for Route Handlers that verify a ******
+(admin/portal routes). For Server Actions, Next.js App Router enforces
+same-origin checking automatically via the `Origin` header.
+Do NOT add manual CSRF token middleware — it would conflict with Server Actions.
+
+## Rate Limiting on Public Endpoints
+
+The following public endpoints have no rate limiting beyond application-layer
+guards — they are protected by:
+- `/api/newsletter`: silent success on duplicate email (anti-enumeration)
+- `/api/contact`: honeypot field (`_gotcha`) in the form; Zod validates input
+- `/api/journalist-applications`: no rate limit — consider adding IP-based limiting
+
+TODO: Add Vercel Edge Rate Limiting or Upstash Redis rate limiting to these routes.
+
+## Upload Size Limits (enforced in Route Handlers)
+
+| Route | Max Size |
+|---|---|
+| `/api/upload` (admin assets) | 50 MB |
+| `/api/portal/upload-photo` | 5 MB |
+| `/api/portal/upload-release-cover` | 10 MB |
+| `/api/portal/upload-asset` | 50 MB |
+
 
 - Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

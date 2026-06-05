@@ -3,7 +3,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 
 const MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024
@@ -46,7 +46,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
-  const artist = await getArtistByUserId(supabase, user.id)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  let artist
+  try {
+    artist = await resolvePortalArtist(supabase, user.id, artistId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  }
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const formData = await req.formData()

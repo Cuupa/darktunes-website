@@ -6,6 +6,11 @@ import type { UserProfile } from '@/types'
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row']
 
+export interface ArtistMembership {
+  artistId: string
+  memberRole: 'owner' | 'member' | 'guest'
+}
+
 // Singleton browser client — uses @supabase/ssr cookie-based sessions
 // so the Next.js middleware can read the auth state from cookies.
 const supabase = createBrowserSupabaseClient()
@@ -15,18 +20,21 @@ export function useAuth() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [artistMemberships, setArtistMemberships] = useState<ArtistMembership[]>([])
 
   async function fetchProfile(userId: string) {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const [profileResult, membershipsResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase
+          .from('artist_members')
+          .select('artist_id, member_role')
+          .eq('user_id', userId),
+      ])
 
-      if (error) throw error
+      if (profileResult.error) throw profileResult.error
 
-      const row = data as ProfileRow
+      const row = profileResult.data as ProfileRow
       setProfile({
         id: row.id,
         email: row.email,
@@ -34,9 +42,16 @@ export function useAuth() {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       })
+
+      const memberships: ArtistMembership[] = (membershipsResult.data ?? []).map((m) => ({
+        artistId: m.artist_id,
+        memberRole: m.member_role as ArtistMembership['memberRole'],
+      }))
+      setArtistMemberships(memberships)
     } catch (error) {
       console.error('Error fetching profile:', error)
       setProfile(null)
+      setArtistMemberships([])
     } finally {
       setLoading(false)
     }
@@ -62,6 +77,7 @@ export function useAuth() {
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
+        setArtistMemberships([])
         setLoading(false)
       }
     })
@@ -103,7 +119,9 @@ export function useAuth() {
 
   const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor' || profile?.role === 'admin'
-  const isArtist = profile?.role === 'artist' || profile?.role === 'admin'
+  // isArtist is now derived from artist_members, not profiles.role.
+  // This allows a user to be both an editor and an artist simultaneously.
+  const isArtist = artistMemberships.length > 0 || profile?.role === 'admin'
 
   return {
     user,
@@ -118,5 +136,6 @@ export function useAuth() {
     isEditor,
     isArtist,
     isAuthenticated: !!user,
+    artistMemberships,
   }
 }

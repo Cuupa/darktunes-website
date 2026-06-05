@@ -3,7 +3,7 @@
 import { CSSProperties, ComponentProps, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft as PanelLeftIcon } from "lucide-react"
+import { SidebarSimple as PanelLeftIcon } from "@phosphor-icons/react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"

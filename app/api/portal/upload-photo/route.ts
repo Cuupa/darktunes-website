@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
@@ -62,7 +62,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   // 2. Confirm artist ownership
-  const artist = await getArtistByUserId(supabase, user.id)
+  const artistId = new URL(req.url).searchParams.get('artistId')
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   // 3. Parse multipart form

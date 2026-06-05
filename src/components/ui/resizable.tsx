@@ -1,5 +1,5 @@
 import { ComponentProps } from "react"
-import { GripVertical as GripVerticalIcon } from "lucide-react"
+import { DotsSixVertical as GripVerticalIcon } from "@phosphor-icons/react"
 import * as ResizablePrimitive from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"

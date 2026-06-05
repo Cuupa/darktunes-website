@@ -119,6 +119,7 @@ const schema = z.object({
   releasesSectionHeading: z.string().optional().default(''),
   releasesSectionSubheading: z.string().optional().default(''),
   shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+  submitHubUrl: z.string().url('Must be a valid URL').or(z.literal('')).optional().default(''),
   youtubeChannelId: z.string().optional().default(''),
   contactTopics: z.array(
     z.object({
@@ -598,6 +599,15 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   id="shopifyStoreUrl"
                   placeholder="https://your-store.myshopify.com"
                   {...register('shopifyStoreUrl')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="submitHubUrl" label="SubmitHub Playlister URL" error={errors.submitHubUrl?.message}>
+                <Input
+                  id="submitHubUrl"
+                  placeholder="https://www.submithub.com/playlister/your-profile"
+                  {...register('submitHubUrl')}
                   disabled={isSubmitting}
                 />
               </Field>
