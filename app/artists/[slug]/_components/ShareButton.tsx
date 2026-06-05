@@ -47,7 +47,7 @@ export function ShareButton({ title, text, labels }: ShareButtonProps) {
     } else {
       // Clipboard fallback
       try {
-        await navigator.clipboard.writeText(url)
+        await (navigator as Navigator).clipboard.writeText(url)
         setShared(true)
         toast.success(labels.shareLinkCopied)
         setTimeout(() => setShared(false), 2000)

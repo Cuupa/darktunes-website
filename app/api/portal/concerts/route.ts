@@ -37,7 +37,7 @@ async function getRequestArtist(request: NextRequest) {
   } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const artistId = request.nextUrl?.searchParams.get('artistId') ?? new URL(request.url).searchParams.get('artistId')
   let artist
   try {
     artist = await resolvePortalArtist(supabase, user.id, artistId)

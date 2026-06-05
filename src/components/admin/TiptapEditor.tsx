@@ -16,6 +16,7 @@ import {
   TextStrikethrough,
   Code,
   Image as ImageIcon,
+  YoutubeLogo,
   ListBullets,
   ListNumbers,
   Quotes,
@@ -32,6 +33,8 @@ import { ResizableImageExtension } from '@/components/admin/tiptap/ResizableImag
 import { ImageInsertDialog } from '@/components/admin/tiptap/ImageInsertDialog'
 import { ImageBubbleMenu } from '@/components/admin/tiptap/ImageBubbleMenu'
 import { LinkPopover } from '@/components/admin/tiptap/LinkPopover'
+import { YouTubeEmbedExtension } from '@/components/admin/tiptap/YouTubeEmbedExtension'
+import { VideoInsertDialog } from '@/components/admin/tiptap/VideoInsertDialog'
 
 interface TiptapEditorProps {
   value: string
@@ -48,6 +51,7 @@ const HEADING_LEVELS = [1, 2, 3] as const
 
 export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -59,6 +63,7 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
       }),
       ResizableImageExtension,
+      YouTubeEmbedExtension,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Underline,
       TextStyle,
@@ -282,6 +287,21 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
             <span aria-hidden="true"><ImageIcon className="w-3.5 h-3.5" /></span>
           </Button>
         )}
+        {/* Video insert — hidden in compact mode */}
+        {!compact && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setVideoDialogOpen(true)}
+            title="Insert Video"
+            aria-label="Insert Video"
+            disabled={disabled}
+          >
+            <span aria-hidden="true"><YoutubeLogo className="w-3.5 h-3.5" /></span>
+          </Button>
+        )}
       </div>
 
       {/* Editor area */}
@@ -296,6 +316,15 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
           editor={editor}
           open={imageDialogOpen}
           onClose={() => setImageDialogOpen(false)}
+        />
+      )}
+
+      {/* Video insert dialog */}
+      {!compact && (
+        <VideoInsertDialog
+          editor={editor}
+          open={videoDialogOpen}
+          onClose={() => setVideoDialogOpen(false)}
         />
       )}
     </div>
