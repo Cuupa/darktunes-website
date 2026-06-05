@@ -439,7 +439,29 @@
     "profile_rider_delete_error": "Entfernen fehlgeschlagen.",
     "profile_rider_download": "Herunterladen",
     "profile_rider_no_file": "Noch keine Datei hochgeladen.",
-    "profile_epk_riders_section": "Technische Dokumente"
+    "profile_epk_riders_section": "Technische Dokumente",
+
+    "acceptInvite_title": "Willkommen bei darkTunes!",
+    "acceptInvite_subtitle": "Lege ein Passwort fest, um dein Artist-Konto zu aktivieren.",
+    "acceptInvite_password": "Neues Passwort",
+    "acceptInvite_confirm": "Passwort bestätigen",
+    "acceptInvite_submit": "Konto aktivieren",
+    "acceptInvite_mismatch": "Passwörter stimmen nicht überein.",
+    "acceptInvite_success": "Konto aktiviert! Profil wird eingerichtet…",
+    "acceptInvite_error": "Aktivierung fehlgeschlagen. Der Einladungslink ist möglicherweise abgelaufen.",
+
+    "completion_title": "Profil-Vollständigkeit",
+    "completion_cta": "Profil vervollständigen",
+    "completion_field_photo": "Profilfoto",
+    "completion_field_bio": "Kurz-Bio",
+    "completion_field_genres": "Genres",
+    "completion_field_spotify": "Spotify-Link",
+    "completion_field_instagram": "Instagram-Link",
+    "completion_field_website": "Website",
+    "completion_field_country": "Land",
+
+    "welcome_message_subject": "Willkommen bei darkTunes! 🎵",
+    "welcome_message_body": "<p>Wir freuen uns, dich bei uns zu haben. Dein Artist-Profil ist jetzt auf der darkTunes-Plattform aktiv.</p><p>Nutze dieses Portal, um deine Releases, Tourdaten, Pressematerialien und mehr zu verwalten. Wenn du Fragen hast, antworte einfach auf diese Nachricht – wir helfen gerne.</p><p>Willkommen in der Familie! 🎶</p>"
   },
   "press": {
     "title": "Presse & Medien",

@@ -439,7 +439,29 @@
     "profile_rider_delete_error": "Failed to remove document.",
     "profile_rider_download": "Download",
     "profile_rider_no_file": "No file uploaded yet.",
-    "profile_epk_riders_section": "Technical Documents"
+    "profile_epk_riders_section": "Technical Documents",
+
+    "acceptInvite_title": "Welcome to darkTunes!",
+    "acceptInvite_subtitle": "Set a password to activate your artist account.",
+    "acceptInvite_password": "New Password",
+    "acceptInvite_confirm": "Confirm Password",
+    "acceptInvite_submit": "Activate Account",
+    "acceptInvite_mismatch": "Passwords do not match.",
+    "acceptInvite_success": "Account activated! Setting up your profile…",
+    "acceptInvite_error": "Failed to activate account. The invite link may have expired.",
+
+    "completion_title": "Profile Completion",
+    "completion_cta": "Complete your profile",
+    "completion_field_photo": "Profile photo",
+    "completion_field_bio": "Short bio",
+    "completion_field_genres": "Genres",
+    "completion_field_spotify": "Spotify link",
+    "completion_field_instagram": "Instagram link",
+    "completion_field_website": "Website",
+    "completion_field_country": "Country",
+
+    "welcome_message_subject": "Welcome to darkTunes! 🎵",
+    "welcome_message_body": "<p>We're thrilled to have you on board. Your artist profile is now active on the darkTunes platform.</p><p>Use this portal to manage your releases, tour dates, press materials, and more. If you have any questions, just reply to this message — we're here to help.</p><p>Welcome to the family! 🎶</p>"
   },
   "press": {
     "title": "Press & Media",

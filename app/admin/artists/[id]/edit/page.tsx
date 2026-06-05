@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { ArrowLeft } from '@phosphor-icons/react'
+import { ArrowLeft, Envelope } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -94,6 +94,7 @@ export default function ArtistEditPage() {
 
   const { artists, isLoading, updateArtist } = useArtists()
   const [isSaving, setIsSaving] = useState(false)
+  const [isInviting, setIsInviting] = useState(false)
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const artist = useMemo(() => artists.find((a) => a.id === artistId), [artists, artistId])
@@ -106,6 +107,24 @@ export default function ArtistEditPage() {
       router.push('/admin')
     }
   }, [isLoading, artists.length, artist, router])
+
+  const handleInvite = async () => {
+    if (!artist) return
+    setIsInviting(true)
+    try {
+      const res = await fetch(`/api/admin/artists/${artist.id}/invite`, { method: 'POST' })
+      const json = (await res.json()) as { ok: boolean; email?: string; error?: string }
+      if (!res.ok || !json.ok) {
+        toast.error(json.error ?? 'Failed to send invite')
+      } else {
+        toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
+      }
+    } catch {
+      toast.error('Failed to send invite')
+    } finally {
+      setIsInviting(false)
+    }
+  }
 
   const handleSave = async (data: ArtistFormData) => {
     if (!artist) return
@@ -164,8 +183,20 @@ export default function ArtistEditPage() {
 
         {!isLoading && formValue && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>Artist Details</CardTitle>
+              {artist?.email && !artist.userId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleInvite()}
+                  disabled={isInviting}
+                  className="gap-2"
+                >
+                  <Envelope size={16} aria-hidden="true" />
+                  {isInviting ? 'Sending…' : 'Send Portal Invite'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <ArtistForm value={formValue} onChange={handleSave} isLoading={isSaving} />

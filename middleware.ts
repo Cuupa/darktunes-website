@@ -63,6 +63,7 @@ export async function middleware(request: NextRequest) {
   const isEditorRoute = pathname.startsWith('/editor')
 
   const isPortalLoginPage = pathname === '/portal/login'
+  const isPortalAcceptInvitePage = pathname === '/portal/accept-invite'
   const isPortalRoute = pathname.startsWith('/portal')
   const isPressLoginPage = pathname === '/press/login'
   const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
@@ -133,13 +134,13 @@ export async function middleware(request: NextRequest) {
   // --- Portal route protection ---
 
   // Redirect unauthenticated users away from the artist portal
-  if (isPortalRoute && !isPortalLoginPage && !user) {
+  if (isPortalRoute && !isPortalLoginPage && !isPortalAcceptInvitePage && !user) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/portal/login'
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isPortalRoute && !isPortalLoginPage && user) {
+  if (isPortalRoute && !isPortalLoginPage && !isPortalAcceptInvitePage && user) {
     // Admins can access the portal without a linked artist
     const isAdmin = profile?.role === 'admin'
 
