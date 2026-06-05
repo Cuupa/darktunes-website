@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag } from '@phosphor-icons/react'
+import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@phosphor-icons/react'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+import { SOCIAL_ICON_MAP } from '@/components/admin/SiteSettingsManager'
 
 interface FooterProps {
   siteSettings: SiteSettings
@@ -147,6 +148,21 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   <SpotifyLogo size={24} weight="fill" aria-hidden="true" />
                 </a>
               )}
+              {(siteSettings.customSocialLinks ?? []).map((link) => {
+                const IconComponent = SOCIAL_ICON_MAP[link.icon] ?? Globe
+                return (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.label}
+                    className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                  >
+                    <IconComponent size={24} weight="fill" aria-hidden="true" />
+                  </a>
+                )
+              })}
             </div>
           </div>
         </div>

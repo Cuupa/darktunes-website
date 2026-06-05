@@ -1,11 +1,13 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, ArrowUp, ArrowDown } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, ArrowUp, ArrowDown, CheckSquare } from '@phosphor-icons/react'
 import { useReleases } from '@/hooks/useReleases'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
+import { getOrCreateReleaseChecklist, toggleChecklistItem, type ReleaseChecklist } from '@/lib/api/releaseChecklists'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -135,6 +137,11 @@ export function ReleasesManager() {
   const [resolvingSmartLinkId, setResolvingSmartLinkId] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
   const [isCleaningUp, setIsCleaningUp] = useState(false)
+
+  // Checklist dialog
+  const [checklistRelease, setChecklistRelease] = useState<Release | null>(null)
+  const [checklistItems, setChecklistItems] = useState<ReleaseChecklist[]>([])
+  const [checklistLoading, setChecklistLoading] = useState(false)
 
   // Search / sort / pagination
   const [search, setSearch] = useState('')
@@ -348,6 +355,46 @@ export function ReleasesManager() {
     }
   }
 
+  const openChecklist = async (release: Release) => {
+    setChecklistRelease(release)
+    setChecklistLoading(true)
+    setChecklistItems([])
+    try {
+      const items = await getOrCreateReleaseChecklist(supabase, release.artistId, release.id)
+      setChecklistItems(items)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load checklist')
+    } finally {
+      setChecklistLoading(false)
+    }
+  }
+
+  const handleToggleChecklistItem = async (item: ReleaseChecklist) => {
+    try {
+      const updated = await toggleChecklistItem(supabase, item.id, !item.isCompleted)
+      setChecklistItems((prev) => prev.map((i) => i.id === updated.id ? updated : i))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update checklist')
+    }
+  }
+
+  const handleMarkAllDone = async () => {
+    const pending = checklistItems.filter((i) => !i.isCompleted)
+    if (pending.length === 0) return
+    try {
+      const updated = await Promise.all(pending.map((i) => toggleChecklistItem(supabase, i.id, true)))
+      setChecklistItems((prev) =>
+        prev.map((i) => {
+          const found = updated.find((u) => u.id === i.id)
+          return found ?? i
+        }),
+      )
+      toast.success('All checklist items marked as done')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark all done')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card">
@@ -528,6 +575,15 @@ export function ReleasesManager() {
                         weight={release.smartUrl ? 'fill' : 'regular'}
                       />
                     </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => void openChecklist(release)}
+                      title="Release checklist"
+                      aria-label={`Release checklist for ${release.title}`}
+                    >
+                      <CheckSquare size={16} aria-hidden="true" />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(release)} title="Edit" aria-label={`Edit ${release.title}`}>
                       <PencilSimple size={16} aria-hidden="true" />
                     </Button>
@@ -622,6 +678,62 @@ export function ReleasesManager() {
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Release Checklist Dialog */}
+      <Dialog open={!!checklistRelease} onOpenChange={(open) => !open && setChecklistRelease(null)}>
+        <DialogContent aria-labelledby="checklist-dialog-title" className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle id="checklist-dialog-title">
+              Release Checklist — {checklistRelease?.title}
+            </DialogTitle>
+            <DialogDescription>
+              Track the completion of release tasks. Check off items as they are done.
+            </DialogDescription>
+          </DialogHeader>
+          {checklistLoading ? (
+            <div className="space-y-2 py-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-8 rounded bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3 py-2">
+              {checklistItems.map((item) => (
+                <div key={item.id} className="flex items-start gap-3">
+                  <Checkbox
+                    id={`checklist-${item.id}`}
+                    checked={item.isCompleted}
+                    onCheckedChange={() => void handleToggleChecklistItem(item)}
+                    className="mt-0.5"
+                  />
+                  <label
+                    htmlFor={`checklist-${item.id}`}
+                    className={`text-sm leading-snug cursor-pointer ${item.isCompleted ? 'line-through text-muted-foreground' : ''}`}
+                  >
+                    {item.task}
+                  </label>
+                </div>
+              ))}
+              {checklistItems.length === 0 && (
+                <p className="text-sm text-muted-foreground">No checklist items found.</p>
+              )}
+              {checklistItems.some((i) => !i.isCompleted) && (
+                <div className="pt-2 border-t border-border">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleMarkAllDone()}
+                    className="gap-2"
+                  >
+                    <CheckSquare size={14} aria-hidden="true" />
+                    Mark all as done
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

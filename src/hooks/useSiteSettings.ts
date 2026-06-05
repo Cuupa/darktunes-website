@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   heroDefaultSecondaryBtnLabel: '',
   homepageNewsCount: 3,
   contactTopics: [],
+  customSocialLinks: [],
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -111,6 +112,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     homepage_section_order: JSON.stringify(s.homepageSectionOrder ?? DEFAULT_SECTION_ORDER),
     homepage_news_count: String(s.homepageNewsCount ?? 3),
     contact_topics: JSON.stringify((s.contactTopics ?? []) as ContactTopicConfig[]),
+    custom_social_links: JSON.stringify(s.customSocialLinks ?? []),
   }
 }
 

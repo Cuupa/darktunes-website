@@ -331,6 +331,25 @@ export interface ContactTopicConfig {
   label_en: string
 }
 
+/**
+ * A custom social/web link that appears in the footer social icons row.
+ * Allows any URL + a phosphor-icons logo name (e.g. "InstagramLogo") or a
+ * generic "Globe" fallback.
+ */
+export interface CustomSocialLink {
+  /** Unique stable id (uuid or nanoid). */
+  id: string
+  /** Display label used as aria-label and tooltip. */
+  label: string
+  /** Target URL (https://…). */
+  url: string
+  /**
+   * Phosphor icon component name. Must be a key of SOCIAL_ICON_MAP in Footer.tsx.
+   * Defaults to "Globe" when the name is not recognised.
+   */
+  icon: string
+}
+
 export interface FeatureToggles {
   /** Enable/disable the journalist Promo Pool area. Default: true */
   promoPool: boolean
@@ -455,6 +474,12 @@ export interface SiteSettings {
    * (label, shop, booking, other).
    */
   contactTopics?: ContactTopicConfig[]
+  // ── Custom Social Links ───────────────────────────────────────────────────
+  /**
+   * Arbitrary social / web links rendered in the footer alongside the built-in
+   * Instagram / YouTube / Spotify icons.  Stored as a JSON array.
+   */
+  customSocialLinks?: CustomSocialLink[]
 }
 
 export interface Concert {

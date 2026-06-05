@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig, CustomSocialLink } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 
@@ -77,6 +77,7 @@ const DEFAULTS: SiteSettings = {
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
   homepageNewsCount: 3,
   contactTopics: [],
+  customSocialLinks: [],
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -210,6 +211,18 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     })(),
     homepageNewsCount: parseInt(map['homepage_news_count'] ?? '') || DEFAULTS.homepageNewsCount,
     contactTopics,
+    customSocialLinks: (() => {
+      try {
+        const parsed = JSON.parse(map['custom_social_links'] ?? '[]') as unknown
+        if (!Array.isArray(parsed)) return []
+        return parsed.filter((entry): entry is CustomSocialLink => {
+          if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
+          const c = entry as Record<string, unknown>
+          return typeof c['id'] === 'string' && typeof c['label'] === 'string' && typeof c['url'] === 'string' && typeof c['icon'] === 'string'
+        })
+      } catch { /* ignore */ }
+      return []
+    })(),
   }
 }
 

@@ -27,6 +27,7 @@ import type { Database } from '@/types/database'
 import { getReleaseById } from '@/lib/api/releases'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ReleaseDetailContent } from './_components/ReleaseDetailContent'
+import { buildMusicAlbumSchema, serializeJsonLd } from '@/lib/seo/jsonld'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -80,5 +81,13 @@ export default async function ReleaseDetailPage({ params }: Props) {
   ])
   if (!release) notFound()
   const dict = await getDictionary(locale)
-  return <ReleaseDetailContent release={release} dict={dict.releaseDetail} locale={locale} />
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildMusicAlbumSchema({ release })) }}
+      />
+      <ReleaseDetailContent release={release} dict={dict.releaseDetail} locale={locale} />
+    </>
+  )
 }
