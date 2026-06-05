@@ -49,6 +49,9 @@ const LogsManager = lazy(() => import('./LogsManager').then((m) => ({ default: m
 const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
 const StatementsManager = lazy(() => import('./StatementsManager').then((m) => ({ default: m.StatementsManager })))
 const PressManager = lazy(() => import('./PressManager').then((m) => ({ default: m.PressManager })))
+const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager').then((m) => ({ default: m.ReleaseSubmissionsManager })))
+const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
+const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
 
 function TabFallback() {
   return (
@@ -69,7 +72,7 @@ type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'settings' | 'health' | 'media' | 'users' | 'features'
   | 'feature-flags' | 'messages' | 'accreditations' | 'press' | 'logs' | 'roles'
-  | 'statements'
+  | 'statements' | 'release-submissions' | 'video-submissions' | 'submission-form'
 
 interface TabDef {
   value: TabValue
@@ -97,6 +100,9 @@ const TAB_DEFS: TabDef[] = [
   { value: 'logs',           label: 'Logs',               adminOnly: true,  icon: ClipboardText },
   { value: 'roles',          label: 'Roles & Permissions',adminOnly: true,  icon: ShieldCheck },
   { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
+  { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
+  { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
+  { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
 ]
 
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
@@ -121,6 +127,9 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   logs:            { title: 'Logs',                              description: 'Audit log of all sync runs and error log for failed or partial syncs.' },
   roles:           { title: 'Roles & Permissions',               description: 'Configure what each user role is allowed to do. Admin always has full access.' },
   statements:      { title: 'Statements',                        description: 'Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.' },
+  'release-submissions': { title: 'Release Submissions',          description: 'Review and manage artist release submissions.' },
+  'video-submissions':   { title: 'Video Submissions',            description: 'Review and manage artist music video submissions.' },
+  'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
 }
 
 function isValidTab(value: string | null): value is TabValue {
@@ -383,6 +392,9 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
               logs:            <LogsManager />,
               roles:           <RolesManager />,
               statements:      <StatementsManager />,
+              'release-submissions': <ReleaseSubmissionsManager />,
+              'video-submissions':   <VideoSubmissionsManager />,
+              'submission-form':     <SubmissionFormManager />,
             }
 
             return TAB_DEFS.map(({ value, adminOnly }) => {

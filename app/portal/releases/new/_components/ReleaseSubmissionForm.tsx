@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -15,79 +15,102 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Dictionary } from '@/i18n/types'
+import type { Artist, SubmissionFormField } from '@/types'
 
 interface ReleaseSubmissionFormProps {
   dict: Dictionary['portal']
+  artist: Artist | null
+  formSchema: SubmissionFormField[]
 }
 
 type ReleaseType = 'album' | 'ep' | 'single'
 
-export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
+function DynamicField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SubmissionFormField
+  value: string
+  onChange: (v: string) => void
+}) {
+  const label = field.fieldLabelEn
+  const placeholder = field.placeholderEn ?? ''
+  const id = `dynamic-${field.fieldKey}`
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>
+        {label}
+        {field.isRequired && <span className="text-destructive ml-1">*</span>}
+      </Label>
+      {field.fieldType === 'textarea' ? (
+        <Textarea
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={field.isRequired}
+        />
+      ) : (
+        <Input
+          id={id}
+          type={field.fieldType === 'url' ? 'url' : field.fieldType === 'date' ? 'date' : 'text'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={field.isRequired}
+        />
+      )}
+    </div>
+  )
+}
+
+export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmissionFormProps) {
   const router = useRouter()
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(artist?.name ?? '')
   const [releaseDate, setReleaseDate] = useState('')
   const [type, setType] = useState<ReleaseType>('single')
-  const [spotifyUrl, setSpotifyUrl] = useState('')
-  const [appleMusicUrl, setAppleMusicUrl] = useState('')
-  const [youtubeUrl, setYoutubeUrl] = useState('')
-  const [notes, setNotes] = useState('')
+  const [audioDownloadUrl, setAudioDownloadUrl] = useState('')
   const [coverArtUrl, setCoverArtUrl] = useState('')
+  const [coverArtVerified, setCoverArtVerified] = useState(false)
+  const [genre, setGenre] = useState(artist?.genres?.[0] ?? '')
+  const [catalogNumber, setCatalogNumber] = useState('')
+  const [isrc, setIsrc] = useState('')
+  const [labelCopy, setLabelCopy] = useState('')
+  const [spotifyUrl, setSpotifyUrl] = useState(artist?.spotifyUrl ?? '')
+  const [appleMusicUrl, setAppleMusicUrl] = useState(artist?.appleMusicUrl ?? '')
+  const [youtubeUrl, setYoutubeUrl] = useState(artist?.youtubeUrl ?? '')
+  const [notes, setNotes] = useState('')
+  const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [uploadingCover, setUploadingCover] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const uploadCover = async (file: File) => {
-    setUploadingCover(true)
-    try {
-      const supabase = createBrowserSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+  const FIXED_KEYS = new Set([
+    'title', 'release_date', 'type', 'audio_download_url', 'cover_art_url',
+    'genre', 'catalog_number', 'isrc', 'label_copy', 'spotify_url',
+    'apple_music_url', 'youtube_url', 'notes',
+  ])
+  const extraFields = formSchema.filter((f) => f.isVisible && !FIXED_KEYS.has(f.fieldKey))
 
-      if (!session) {
-        toast.error(dict.releases_submit_error)
-        return
-      }
-
-      const body = new FormData()
-      body.append('file', file)
-
-      const res = await fetch('/api/portal/upload-release-cover', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body,
-      })
-
-      if (!res.ok) {
-        toast.error(dict.releases_submit_error)
-        return
-      }
-
-      const payload = (await res.json()) as { url: string }
-      setCoverArtUrl(payload.url)
-    } catch {
-      toast.error(dict.releases_submit_error)
-    } finally {
-      setUploadingCover(false)
-    }
-  }
+  const handleCoverArtVerified = useCallback((verified: boolean) => {
+    setCoverArtVerified(verified)
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!title.trim() || !releaseDate || !type) {
-      toast.error(dict.releases_submit_error)
+    if (!coverArtVerified) {
+      toast.error(dict.releases_submit_cover_check_required)
       return
     }
 
     setSubmitting(true)
     try {
       const supabase = createBrowserSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
         toast.error(dict.releases_submit_error)
@@ -97,18 +120,25 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
       const res = await fetch('/api/portal/submit-release', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           title: title.trim(),
-          releaseDate,
+          releaseDate: releaseDate || null,
           type,
-          coverArt: coverArtUrl || null,
+          audioDownloadUrl,
+          coverArtUrl,
+          coverArtVerified,
+          genre: genre || null,
+          catalogNumber: catalogNumber || null,
+          isrc: isrc || null,
+          labelCopy: labelCopy || null,
           spotifyUrl: spotifyUrl || null,
           appleMusicUrl: appleMusicUrl || null,
           youtubeUrl: youtubeUrl || null,
           notes: notes || null,
+          formData: Object.keys(dynamicValues).length > 0 ? dynamicValues : null,
         }),
       })
 
@@ -118,7 +148,7 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
       }
 
       toast.success(dict.releases_submit_success)
-      router.push('/portal/releases')
+      router.push('/portal/releases/submissions')
       router.refresh()
     } catch {
       toast.error(dict.releases_submit_error)
@@ -137,19 +167,25 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
           <CardTitle>{dict.releases_submit_heading}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={submit}>
+          <form className="space-y-4" onSubmit={(e) => void submit(e)}>
             <div className="space-y-2">
-              <Label htmlFor="release-title">{dict.releases_submit_title}</Label>
+              <Label htmlFor="release-title">
+                {dict.releases_submit_title}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
               <Input id="release-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="release-date">{dict.releases_submit_date}</Label>
-                <Input id="release-date" type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} required />
+                <Input id="release-date" type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>{dict.releases_submit_type}</Label>
+                <Label>
+                  {dict.releases_submit_type}
+                  <span className="text-destructive ml-1">*</span>
+                </Label>
                 <Select value={type} onValueChange={(val) => setType(val as ReleaseType)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -164,36 +200,68 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="release-cover-file">{dict.releases_submit_cover}</Label>
-              <input
-                id="release-cover-file"
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void uploadCover(file)
-                }}
+              <Label htmlFor="audio-url">
+                {dict.releases_submit_audio_url}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="audio-url"
+                type="url"
+                value={audioDownloadUrl}
+                onChange={(e) => setAudioDownloadUrl(e.target.value)}
+                placeholder="https://drive.google.com/…"
+                required
               />
-              <div className="flex items-center gap-3">
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadingCover}>
-                  {uploadingCover ? dict.releases_submit_saving : dict.releases_submit_cover}
-                </Button>
-                {coverArtUrl && <span className="text-xs text-muted-foreground truncate">{coverArtUrl}</span>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cover-art-url">
+                {dict.releases_submit_cover_url}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="cover-art-url"
+                type="url"
+                value={coverArtUrl}
+                onChange={(e) => {
+                  setCoverArtUrl(e.target.value)
+                  setCoverArtVerified(false)
+                }}
+                placeholder="https://drive.google.com/…"
+                required
+              />
+              <CoverArtAnalyzer url={coverArtUrl} dict={dict} onVerified={handleCoverArtVerified} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="genre">{dict.releases_submit_genre}</Label>
+              <Input id="genre" value={genre} onChange={(e) => setGenre(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="catalog-number">{dict.releases_submit_catalog_number}</Label>
+                <Input id="catalog-number" value={catalogNumber} onChange={(e) => setCatalogNumber(e.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="isrc">{dict.releases_submit_isrc}</Label>
+                <Input id="isrc" value={isrc} onChange={(e) => setIsrc(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="label-copy">{dict.releases_submit_label_copy}</Label>
+              <Input id="label-copy" value={labelCopy} onChange={(e) => setLabelCopy(e.target.value)} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="spotify-url">{dict.releases_submit_spotify}</Label>
               <Input id="spotify-url" type="url" value={spotifyUrl} onChange={(e) => setSpotifyUrl(e.target.value)} />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="apple-url">{dict.releases_submit_apple}</Label>
               <Input id="apple-url" type="url" value={appleMusicUrl} onChange={(e) => setAppleMusicUrl(e.target.value)} />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="youtube-url">{dict.releases_submit_youtube}</Label>
               <Input id="youtube-url" type="url" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
@@ -204,7 +272,20 @@ export function ReleaseSubmissionForm({ dict }: ReleaseSubmissionFormProps) {
               <Textarea id="release-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            <Button type="submit" disabled={submitting || uploadingCover}>
+            {extraFields.map((field) => (
+              <DynamicField
+                key={field.id}
+                field={field}
+                value={dynamicValues[field.fieldKey] ?? ''}
+                onChange={(v) => setDynamicValues((prev) => ({ ...prev, [field.fieldKey]: v }))}
+              />
+            ))}
+
+            <Button
+              type="submit"
+              disabled={submitting || !coverArtVerified}
+              title={!coverArtVerified ? dict.releases_submit_cover_check_required : undefined}
+            >
               {submitting ? dict.releases_submit_saving : dict.releases_submit_save}
             </Button>
           </form>

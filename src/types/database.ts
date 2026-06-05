@@ -1628,12 +1628,193 @@ export interface Database {
         }
         Relationships: []
       }
+      release_submissions: {
+        Row: {
+          id: string
+          artist_id: string
+          status: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title: string
+          release_date: string | null
+          type: 'album' | 'ep' | 'single' | null
+          genre: string | null
+          catalog_number: string | null
+          isrc: string | null
+          label_copy: string | null
+          audio_download_url: string
+          cover_art_url: string
+          cover_art_verified: boolean
+          spotify_url: string | null
+          apple_music_url: string | null
+          youtube_url: string | null
+          notes: string | null
+          form_data: Record<string, unknown> | null
+          admin_reply: string | null
+          admin_reply_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title: string
+          release_date?: string | null
+          type?: 'album' | 'ep' | 'single' | null
+          genre?: string | null
+          catalog_number?: string | null
+          isrc?: string | null
+          label_copy?: string | null
+          audio_download_url: string
+          cover_art_url: string
+          cover_art_verified?: boolean
+          spotify_url?: string | null
+          apple_music_url?: string | null
+          youtube_url?: string | null
+          notes?: string | null
+          form_data?: Record<string, unknown> | null
+          admin_reply?: string | null
+          admin_reply_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title?: string
+          release_date?: string | null
+          type?: 'album' | 'ep' | 'single' | null
+          genre?: string | null
+          catalog_number?: string | null
+          isrc?: string | null
+          label_copy?: string | null
+          audio_download_url?: string
+          cover_art_url?: string
+          cover_art_verified?: boolean
+          spotify_url?: string | null
+          apple_music_url?: string | null
+          youtube_url?: string | null
+          notes?: string | null
+          form_data?: Record<string, unknown> | null
+          admin_reply?: string | null
+          admin_reply_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      video_submissions: {
+        Row: {
+          id: string
+          artist_id: string
+          status: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title: string
+          description: string | null
+          download_url: string
+          thumbnail_url: string | null
+          youtube_title: string | null
+          youtube_description: string | null
+          youtube_tags: string[] | null
+          youtube_category: string | null
+          target_publish_date: string | null
+          notes: string | null
+          admin_reply: string | null
+          admin_reply_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title: string
+          description?: string | null
+          download_url: string
+          thumbnail_url?: string | null
+          youtube_title?: string | null
+          youtube_description?: string | null
+          youtube_tags?: string[] | null
+          youtube_category?: string | null
+          target_publish_date?: string | null
+          notes?: string | null
+          admin_reply?: string | null
+          admin_reply_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
+          title?: string
+          description?: string | null
+          download_url?: string
+          thumbnail_url?: string | null
+          youtube_title?: string | null
+          youtube_description?: string | null
+          youtube_tags?: string[] | null
+          youtube_category?: string | null
+          target_publish_date?: string | null
+          notes?: string | null
+          admin_reply?: string | null
+          admin_reply_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      submission_form_schema: {
+        Row: {
+          id: string
+          form_type: 'release' | 'video'
+          field_key: string
+          field_label_en: string
+          field_label_de: string
+          field_type: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_options: Record<string, unknown> | null
+          is_required: boolean
+          is_visible: boolean
+          display_order: number
+          placeholder_en: string | null
+          placeholder_de: string | null
+        }
+        Insert: {
+          id?: string
+          form_type: 'release' | 'video'
+          field_key: string
+          field_label_en: string
+          field_label_de: string
+          field_type: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_options?: Record<string, unknown> | null
+          is_required?: boolean
+          is_visible?: boolean
+          display_order?: number
+          placeholder_en?: string | null
+          placeholder_de?: string | null
+        }
+        Update: {
+          id?: string
+          form_type?: 'release' | 'video'
+          field_key?: string
+          field_label_en?: string
+          field_label_de?: string
+          field_type?: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_options?: Record<string, unknown> | null
+          is_required?: boolean
+          is_visible?: boolean
+          display_order?: number
+          placeholder_en?: string | null
+          placeholder_de?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
     Enums: {
       sync_status: 'success' | 'partial' | 'error'
       sync_api_source: 'itunes' | 'spotify' | 'discogs' | 'songkick' | 'odesli' | 'all'
+      submission_status: 'received' | 'reviewed' | 'accepted' | 'rejected'
     }
   }
 }

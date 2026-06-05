@@ -38,6 +38,8 @@ const baseNavItems = [
   { href: '/portal/profile', label: 'profile', icon: User },
   { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
   { href: '/portal/releases', label: 'releases', icon: MusicNotes },
+  { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
+  { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
   { href: '/portal/tour', label: 'tour', icon: MapPin },
   { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
   { href: '/portal/messages', label: 'messages', icon: ChatCircleText },

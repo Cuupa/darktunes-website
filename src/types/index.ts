@@ -449,3 +449,65 @@ export interface NewsletterSubscriber {
   subscribedAt: string
   source: string
 }
+
+export type SubmissionStatus = 'received' | 'reviewed' | 'accepted' | 'rejected'
+
+export interface ReleaseSubmission {
+  id: string
+  artistId: string
+  status: SubmissionStatus
+  title: string
+  releaseDate: string | null
+  type: 'album' | 'ep' | 'single' | null
+  genre: string | null
+  catalogNumber: string | null
+  isrc: string | null
+  labelCopy: string | null
+  audioDownloadUrl: string
+  coverArtUrl: string
+  coverArtVerified: boolean
+  spotifyUrl: string | null
+  appleMusicUrl: string | null
+  youtubeUrl: string | null
+  notes: string | null
+  formData: Record<string, unknown> | null
+  adminReply: string | null
+  adminReplyAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VideoSubmission {
+  id: string
+  artistId: string
+  status: SubmissionStatus
+  title: string
+  description: string | null
+  downloadUrl: string
+  thumbnailUrl: string | null
+  youtubeTitle: string | null
+  youtubeDescription: string | null
+  youtubeTags: string[]
+  youtubeCategory: string | null
+  targetPublishDate: string | null
+  notes: string | null
+  adminReply: string | null
+  adminReplyAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SubmissionFormField {
+  id: string
+  formType: 'release' | 'video'
+  fieldKey: string
+  fieldLabelEn: string
+  fieldLabelDe: string
+  fieldType: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+  fieldOptions: Record<string, unknown> | null
+  isRequired: boolean
+  isVisible: boolean
+  displayOrder: number
+  placeholderEn: string | null
+  placeholderDe: string | null
+}
