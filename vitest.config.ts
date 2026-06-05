@@ -10,6 +10,11 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src'),
     },
   },
+  esbuild: {
+    // Ensure React is in scope for JSX transforms in test files and their
+    // dependencies (e.g. shadcn/ui components that omit the React import).
+    jsxInject: `import React from 'react'`,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

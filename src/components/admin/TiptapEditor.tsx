@@ -3,12 +3,11 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
-import Image from '@tiptap/extension-image'
 import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
-import { useEffect, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   TextB,
@@ -16,7 +15,6 @@ import {
   TextUnderline,
   TextStrikethrough,
   Code,
-  Link as LinkIcon,
   Image as ImageIcon,
   ListBullets,
   ListNumbers,
@@ -30,6 +28,10 @@ import {
   ArrowClockwise,
   Minus,
 } from '@phosphor-icons/react'
+import { ResizableImageExtension } from '@/components/admin/tiptap/ResizableImageExtension'
+import { ImageInsertDialog } from '@/components/admin/tiptap/ImageInsertDialog'
+import { ImageBubbleMenu } from '@/components/admin/tiptap/ImageBubbleMenu'
+import { LinkPopover } from '@/components/admin/tiptap/LinkPopover'
 
 interface TiptapEditorProps {
   value: string
@@ -45,6 +47,8 @@ interface TiptapEditorProps {
 const HEADING_LEVELS = [1, 2, 3] as const
 
 export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -54,7 +58,7 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
         openOnClick: false,
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
       }),
-      Image,
+      ResizableImageExtension,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Underline,
       TextStyle,
@@ -90,26 +94,6 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     if (!editor) return
     editor.setEditable(!disabled)
   }, [editor, disabled])
-
-  const setLink = useCallback(() => {
-    if (!editor) return
-    const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('URL', prev ?? '')
-    if (url === null) return
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-    } else {
-      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-    }
-  }, [editor])
-
-  const insertImage = useCallback(() => {
-    if (!editor) return
-    const url = window.prompt('Image URL')
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run()
-    }
-  }, [editor])
 
   if (!editor) return null
 
@@ -282,19 +266,38 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
         <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
         {/* Link & Image */}
-        <ToolbarButton onClick={setLink} active={editor.isActive('link')} title="Insert / Edit Link">
-          <LinkIcon className="w-3.5 h-3.5" />
-        </ToolbarButton>
+        <LinkPopover editor={editor} disabled={disabled} />
         {/* Image insert — hidden in compact mode */}
         {!compact && (
-          <ToolbarButton onClick={insertImage} title="Insert Image">
-            <ImageIcon className="w-3.5 h-3.5" />
-          </ToolbarButton>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setImageDialogOpen(true)}
+            title="Insert Image"
+            aria-label="Insert Image"
+            disabled={disabled}
+          >
+            <span aria-hidden="true"><ImageIcon className="w-3.5 h-3.5" /></span>
+          </Button>
         )}
       </div>
 
       {/* Editor area */}
       <EditorContent editor={editor} />
+
+      {/* Bubble menu for selected images */}
+      {!compact && <ImageBubbleMenu editor={editor} />}
+
+      {/* Image insert dialog */}
+      {!compact && (
+        <ImageInsertDialog
+          editor={editor}
+          open={imageDialogOpen}
+          onClose={() => setImageDialogOpen(false)}
+        />
+      )}
     </div>
   )
 }
