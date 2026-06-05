@@ -21,7 +21,7 @@ const bodySchema = z.object({
   appleMusicUrl: z.string().url().nullable().optional(),
   youtubeUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
-  formData: z.record(z.unknown()).nullable().optional(),
+  formData: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {

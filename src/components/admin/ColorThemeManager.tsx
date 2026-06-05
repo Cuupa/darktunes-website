@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { RotateCcw, FloppyDisk, X, Warning } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, FloppyDisk, X, Warning } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -278,7 +278,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
                 aria-label={`Reset ${label} to default`}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
-                <RotateCcw size={15} aria-hidden="true" />
+                <ArrowCounterClockwise size={15} aria-hidden="true" />
               </Button>
             </div>
           )

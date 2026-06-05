@@ -12,7 +12,7 @@ const upsertSchema = z.object({
   field_label_en: z.string().min(1),
   field_label_de: z.string().min(1),
   field_type: z.enum(['text', 'url', 'date', 'select', 'textarea', 'boolean']),
-  field_options: z.record(z.unknown()).nullable().optional(),
+  field_options: z.record(z.string(), z.unknown()).nullable().optional(),
   is_required: z.boolean().optional(),
   is_visible: z.boolean().optional(),
   display_order: z.number().optional(),
