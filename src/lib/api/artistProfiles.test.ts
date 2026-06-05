@@ -95,6 +95,10 @@ const mockProfileRow: ArtistProfileRow = {
   tiktok_url: null,
   facebook_url: null,
   soundcloud_url: null,
+  rider_stage_plot_url: null,
+  rider_technical_url: null,
+  rider_hospitality_url: null,
+  onboarding_completed: false,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

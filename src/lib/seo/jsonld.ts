@@ -48,10 +48,10 @@ function compact(items: (string | undefined | null)[]): string[] {
 // ---------------------------------------------------------------------------
 
 export interface OrganizationSchemaInput {
-  siteSettings: Pick<
-    SiteSettings,
-    'labelName' | 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl' | 'contactEmail'
-  > & { logoUrl?: string }
+  siteSettings: Pick<SiteSettings, 'labelName' | 'contactEmail'> &
+    Partial<Pick<SiteSettings, 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl'>> & {
+      logoUrl?: string
+    }
 }
 
 export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInput) {

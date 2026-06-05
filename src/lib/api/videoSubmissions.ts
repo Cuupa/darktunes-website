@@ -17,7 +17,7 @@ function rowToSubmission(row: Row): VideoSubmission {
     thumbnailUrl: row.thumbnail_url,
     youtubeTitle: row.youtube_title,
     youtubeDescription: row.youtube_description,
-    youtubeTags: row.youtube_tags,
+    youtubeTags: row.youtube_tags ?? [],
     youtubeCategory: row.youtube_category,
     targetPublishDate: row.target_publish_date,
     notes: row.notes,

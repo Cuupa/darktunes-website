@@ -9,6 +9,7 @@ import { ArrowUp, ArrowDown, Plus, Trash, Globe,
   InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo, TiktokLogo,
   MusicNote, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
 } from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -144,7 +145,7 @@ type FormData = z.input<typeof schema>
 // Icon map for custom social links
 // ---------------------------------------------------------------------------
 
-type IconComponent = React.ComponentType<{ size?: number; weight?: string; 'aria-hidden'?: string | boolean }>
+type IconComponent = Icon
 
 export const SOCIAL_ICON_MAP: Record<string, IconComponent> = {
   InstagramLogo,

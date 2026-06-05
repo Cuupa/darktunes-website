@@ -291,7 +291,7 @@ describe('getRelatedArtists', () => {
     const result = await getRelatedArtists(db, mockArtistRow.id, [])
     expect(result).toHaveLength(0)
     // Supabase should not be called
-    expect((db as { from: ReturnType<typeof vi.fn> }).from).not.toHaveBeenCalled()
+    expect((db as unknown as { from: ReturnType<typeof vi.fn> }).from).not.toHaveBeenCalled()
   })
 
   it('throws on database error', async () => {

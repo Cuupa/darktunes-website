@@ -64,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // ── Dynamic news post pages ──────────────────────────────────────────────
   const newsRoutes: MetadataRoute.Sitemap = news.map((post) => ({
     url: `${baseUrl}/news/${post.slug}`,
-    lastModified: post.updatedAt ? new Date(post.updatedAt) : now,
+    lastModified: post.publishedAt ? new Date(post.publishedAt) : now,
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }))
@@ -72,7 +72,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // ── Dynamic release pages ────────────────────────────────────────────────
   const releaseRoutes: MetadataRoute.Sitemap = releases.map((release) => ({
     url: `${baseUrl}/releases/${release.id}`,
-    lastModified: release.updatedAt ? new Date(release.updatedAt) : now,
+    lastModified: release.releaseDate ? new Date(release.releaseDate) : now,
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }))

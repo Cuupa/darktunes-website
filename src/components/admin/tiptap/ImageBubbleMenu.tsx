@@ -78,7 +78,7 @@ export function ImageBubbleMenu({ editor }: Props) {
     <BubbleMenu
       editor={editor}
       shouldShow={({ editor: e }) => e.isActive('resizableImage')}
-      tippyOptions={{ duration: 100, placement: 'top' }}
+      options={{ placement: 'top' }}
     >
       <div className="flex items-center gap-0.5 rounded-md border border-border bg-popover p-1 shadow-md">
         {/* Float buttons */}
