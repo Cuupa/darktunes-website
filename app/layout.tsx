@@ -81,7 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="darkTunes" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href={settings?.faviconUrl || '/icons/icon-192.png'} />
         {/*
           Explicit <link> tags for favicon — these appear after Next.js-generated
           links from generateMetadata() and take precedence in the browser.

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 
@@ -75,6 +75,8 @@ const DEFAULTS: SiteSettings = {
   heroDefaultPrimaryBtnLabel: '',
   heroDefaultSecondaryBtnLabel: '',
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
+  homepageNewsCount: 3,
+  contactTopics: [],
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -116,6 +118,20 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     }
   } catch {
     featureToggles = { ...DEFAULT_FEATURE_TOGGLES }
+  }
+
+  let contactTopics: ContactTopicConfig[] = []
+  try {
+    const parsed = JSON.parse(map['contact_topics'] ?? '[]') as unknown
+    if (Array.isArray(parsed)) {
+      contactTopics = parsed.filter((entry): entry is ContactTopicConfig => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
+        const c = entry as Record<string, unknown>
+        return typeof c['value'] === 'string' && typeof c['label_de'] === 'string' && typeof c['label_en'] === 'string'
+      })
+    }
+  } catch {
+    contactTopics = []
   }
 
   return {
@@ -192,6 +208,8 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
       } catch { /* ignore */ }
       return DEFAULT_SECTION_ORDER
     })(),
+    homepageNewsCount: parseInt(map['homepage_news_count'] ?? '') || DEFAULTS.homepageNewsCount,
+    contactTopics,
   }
 }
 

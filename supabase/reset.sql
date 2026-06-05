@@ -494,6 +494,52 @@ CREATE TRIGGER trg_news_posts_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: release_artists  (many-to-many: releases ↔ artists)
+-- Allows multiple artists to be credited on a single release (featurings, etc.)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.release_artists (
+  release_id UUID NOT NULL REFERENCES public.releases (id) ON DELETE CASCADE,
+  artist_id  UUID NOT NULL REFERENCES public.artists  (id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (release_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_artists_release_id ON public.release_artists (release_id);
+CREATE INDEX IF NOT EXISTS idx_release_artists_artist_id  ON public.release_artists (artist_id);
+
+-- RLS for release_artists
+ALTER TABLE public.release_artists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "release_artists: public read"              ON public.release_artists;
+DROP POLICY IF EXISTS "release_artists: can_manage_releases write" ON public.release_artists;
+CREATE POLICY "release_artists: public read" ON public.release_artists
+  FOR SELECT USING (true);
+CREATE POLICY "release_artists: can_manage_releases write" ON public.release_artists
+  FOR ALL USING (public.has_permission(auth.uid(), 'can_manage_releases'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: news_post_artists  (many-to-many: news_posts ↔ artists)
+-- Allows a news post to be associated with multiple artists (featurings, etc.)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.news_post_artists (
+  news_post_id UUID NOT NULL REFERENCES public.news_posts (id) ON DELETE CASCADE,
+  artist_id    UUID NOT NULL REFERENCES public.artists    (id) ON DELETE CASCADE,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (news_post_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_post_artists_news_post_id ON public.news_post_artists (news_post_id);
+CREATE INDEX IF NOT EXISTS idx_news_post_artists_artist_id    ON public.news_post_artists (artist_id);
+
+-- RLS for news_post_artists
+ALTER TABLE public.news_post_artists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "news_post_artists: public read"           ON public.news_post_artists;
+DROP POLICY IF EXISTS "news_post_artists: can_publish_news write" ON public.news_post_artists;
+CREATE POLICY "news_post_artists: public read" ON public.news_post_artists
+  FOR SELECT USING (true);
+CREATE POLICY "news_post_artists: can_publish_news write" ON public.news_post_artists
+  FOR ALL USING (public.has_permission(auth.uid(), 'can_publish_news'));
+
+-- ---------------------------------------------------------------------------
 -- TABLE: videos
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.videos (

@@ -32,6 +32,8 @@ export interface NewsFormData {
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   artistId: string
+  /** IDs of all associated artists (many-to-many via junction table). */
+  artistIds: string[]
   embargoUntil?: string
   mediaContact?: string
   releaseCategory?: string
@@ -132,34 +134,45 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
       </div>
 
       {/* Artist association */}
-      <div className="space-y-1">
-        <Label htmlFor="artistId">Artist (optional)</Label>
-        <Controller
-          name="artistId"
-          control={control}
-          render={({ field }) => (
-            <Select
-              value={field.value ?? ''}
-              onValueChange={(val) => field.onChange(val === '__none__' ? '' : val)}
-              disabled={isLoading}
-            >
-              <SelectTrigger id="artistId">
-                <SelectValue placeholder="General news (not tied to an artist)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">General news (no artist)</SelectItem>
-                {artists.map((artist) => (
-                  <SelectItem key={artist.id} value={artist.id}>
-                    {artist.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
+      <div className="space-y-3">
+        <Label>Artists</Label>
         <p className="text-xs text-muted-foreground">
-          If selected, this news post appears only on that artist&apos;s profile page.
+          Associate one or more artists with this news post (e.g. for featurings). The first selected artist is the primary artist.
         </p>
+        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto rounded border border-border p-3">
+          {artists.length === 0 && (
+            <p className="text-xs text-muted-foreground">No artists found.</p>
+          )}
+          {artists.map((artist) => {
+            const checked = (watch('artistIds') ?? []).includes(artist.id)
+            return (
+              <label key={artist.id} className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={isLoading}
+                  onChange={(e) => {
+                    const current = watch('artistIds') ?? []
+                    if (e.target.checked) {
+                      const next = [...current, artist.id]
+                      setValue('artistIds', next)
+                      if (next.length === 1) setValue('artistId', artist.id)
+                    } else {
+                      const next = current.filter((id) => id !== artist.id)
+                      setValue('artistIds', next)
+                      if (watch('artistId') === artist.id) setValue('artistId', next[0] ?? '')
+                    }
+                  }}
+                  className="accent-primary"
+                />
+                {artist.name}
+                {watch('artistId') === artist.id && (
+                  <span className="ml-1 text-xs text-muted-foreground">(primary)</span>
+                )}
+              </label>
+            )
+          })}
+        </div>
       </div>
 
       {/* Status + scheduling */}

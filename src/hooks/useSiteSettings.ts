@@ -3,7 +3,7 @@ import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import { getSiteSettings, upsertSiteSettings } from '@/lib/api/siteSettings'
-import type { SiteSettings } from '@/types'
+import type { SiteSettings, ContactTopicConfig } from '@/types'
 
 const DEFAULT_SETTINGS: SiteSettings = {
   labelName: 'darkTunes Music Group',
@@ -53,6 +53,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
   heroDefaultPrimaryBtnLabel: '',
   heroDefaultSecondaryBtnLabel: '',
+  homepageNewsCount: 3,
+  contactTopics: [],
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -107,6 +109,8 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     about_subheading: s.aboutSubheading ?? '',
     about_body: s.aboutBody ?? '',
     homepage_section_order: JSON.stringify(s.homepageSectionOrder ?? DEFAULT_SECTION_ORDER),
+    homepage_news_count: String(s.homepageNewsCount ?? 3),
+    contact_topics: JSON.stringify((s.contactTopics ?? []) as ContactTopicConfig[]),
   }
 }
 

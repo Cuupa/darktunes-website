@@ -7,13 +7,21 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { Dictionary } from '@/i18n/types'
+import type { ContactTopicConfig } from '@/types'
+import type { Locale } from '@/i18n/types'
 
-type ContactTopic = 'label' | 'shop' | 'booking' | 'other'
+/** Built-in fallback topics used when no custom topics are configured. */
+const DEFAULT_TOPICS: ContactTopicConfig[] = [
+  { value: 'label', label_de: 'Label', label_en: 'Label' },
+  { value: 'shop', label_de: 'Shop', label_en: 'Shop' },
+  { value: 'booking', label_de: 'Booking', label_en: 'Booking' },
+  { value: 'other', label_de: 'Sonstiges', label_en: 'Other' },
+]
 
 interface FormState {
   name: string
   email: string
-  topic: ContactTopic
+  topic: string
   message: string
   gdprConsent: boolean
   website: string
@@ -23,13 +31,16 @@ type Status = 'idle' | 'submitting' | 'success' | 'error'
 
 interface ContactFormProps {
   dict: Dictionary['contact']
+  locale: Locale
+  contactTopics: ContactTopicConfig[]
 }
 
-export function ContactForm({ dict }: ContactFormProps) {
+export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
+  const topics = contactTopics.length > 0 ? contactTopics : DEFAULT_TOPICS
   const [form, setForm] = useState<FormState>({
     name: '',
     email: '',
-    topic: 'other',
+    topic: topics[0]?.value ?? 'other',
     message: '',
     gdprConsent: false,
     website: '',
@@ -129,13 +140,14 @@ export function ContactForm({ dict }: ContactFormProps) {
         <select
           id="contact-topic"
           value={form.topic}
-          onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value as ContactTopic }))}
+          onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
-          <option value="label">{dict.topicLabel_label}</option>
-          <option value="shop">{dict.topicLabel_shop}</option>
-          <option value="booking">{dict.topicLabel_booking}</option>
-          <option value="other">{dict.topicLabel_other}</option>
+          {topics.map((t) => (
+            <option key={t.value} value={t.value}>
+              {locale === 'de' ? t.label_de : t.label_en}
+            </option>
+          ))}
         </select>
       </div>
 

@@ -7,6 +7,13 @@ type ReleaseRow = Database['public']['Tables']['releases']['Row']
 export type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 export type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
 
+/** Compact artist shape returned from the junction table join. */
+interface JunctionArtist {
+  artist_id: string
+  sort_order: number
+  artists: { id: string; name: string; slug: string } | null
+}
+
 function rowToRelease(row: ReleaseRow): Release {
   return {
     id: row.id,
@@ -51,14 +58,84 @@ function rowToRelease(row: ReleaseRow): Release {
   }
 }
 
+/**
+ * Attach the full artist list from the release_artists junction table.
+ * Falls back gracefully when the junction table doesn't exist yet (PGRST200/42P01).
+ */
+async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<Release[]> {
+  if (releases.length === 0) return releases
+  const ids = releases.map((r) => r.id)
+
+  try {
+    const { data, error } = await (db as DbClient)
+      .from('release_artists' as const)
+      .select('release_id, sort_order, artists(id, name, slug)')
+      .in('release_id', ids)
+      .order('sort_order', { ascending: true })
+
+    // Gracefully ignore missing table (migration not yet applied)
+    if (error) return releases
+
+    const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
+    for (const row of (data ?? []) as unknown as (JunctionArtist & { release_id: string })[]) {
+      if (!row.artists) continue
+      if (!byRelease.has(row.release_id)) byRelease.set(row.release_id, [])
+      byRelease.get(row.release_id)!.push(row.artists)
+    }
+
+    return releases.map((r) => ({
+      ...r,
+      artists: byRelease.get(r.id) ?? undefined,
+    }))
+  } catch {
+    return releases
+  }
+}
+
 export async function getReleasesByArtistId(db: DbClient, artistId: string): Promise<Release[]> {
+  // Primary query: the legacy artist_id column (preserves error behaviour for callers)
   const { data, error } = await db
     .from('releases')
     .select('*')
     .eq('artist_id', artistId)
     .order('release_date', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToRelease)
+
+  const legacyReleases = (data ?? []).map(rowToRelease)
+  const legacyIds = new Set(legacyReleases.map((r) => r.id))
+
+  // Secondary: also collect releases linked via the many-to-many junction table
+  // (gracefully degraded — no error thrown if table is absent or query fails)
+  try {
+    const { data: junctionRows } = await (db as DbClient)
+      .from('release_artists' as const)
+      .select('release_id')
+      .eq('artist_id', artistId)
+
+    const extraIds = ((junctionRows ?? []) as { release_id: string }[])
+      .map((r) => r.release_id)
+      .filter((id) => id && !legacyIds.has(id))
+
+    if (extraIds.length > 0) {
+      const { data: extra } = await db
+        .from('releases')
+        .select('*')
+        .in('id', extraIds)
+        .order('release_date', { ascending: false })
+
+      if (extra && extra.length > 0) {
+        const merged = [
+          ...legacyReleases,
+          ...extra.map(rowToRelease),
+        ].sort((a, b) => b.releaseDate.localeCompare(a.releaseDate))
+        return attachReleaseArtists(db, merged)
+      }
+    }
+  } catch {
+    // Junction table not available — fall through to legacy results
+  }
+
+  return attachReleaseArtists(db, legacyReleases)
 }
 
 export async function getReleases(db: DbClient): Promise<Release[]> {
@@ -67,7 +144,8 @@ export async function getReleases(db: DbClient): Promise<Release[]> {
     .select('*')
     .order('release_date', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToRelease)
+  const releases = (data ?? []).map(rowToRelease)
+  return attachReleaseArtists(db, releases)
 }
 
 export async function getPromoReleases(db: DbClient): Promise<Release[]> {
@@ -77,7 +155,8 @@ export async function getPromoReleases(db: DbClient): Promise<Release[]> {
     .eq('is_promo', true)
     .order('release_date', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToRelease)
+  const releases = (data ?? []).map(rowToRelease)
+  return attachReleaseArtists(db, releases)
 }
 
 /**
@@ -108,7 +187,8 @@ export async function getPublicReleases(db: DbClient): Promise<Release[]> {
 
   const { data, error } = await builder
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToRelease)
+  const releases = (data ?? []).map(rowToRelease)
+  return attachReleaseArtists(db, releases)
 }
 
 export async function getReleaseById(db: DbClient, id: string): Promise<Release | null> {
