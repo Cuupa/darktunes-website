@@ -3,6 +3,7 @@ import {
   Serwist,
   CacheFirst,
   NetworkFirst,
+  NetworkOnly,
   ExpirationPlugin,
 } from 'serwist'
 
@@ -42,31 +43,13 @@ const serwist = new Serwist({
         ],
       }),
     },
-    // --- wsrv.nl image proxy (cover art, artist photos) ---
+    // --- Next.js image optimisation — always go to network.
+    //     Caching opaque cross-origin responses here causes ERR_FAILED on
+    //     hard refresh (F5) because Chrome rejects opaque (status 0) responses
+    //     returned by the service worker for image requests.
     {
-      matcher: /^https:\/\/wsrv\.nl\//,
-      handler: new CacheFirst({
-        cacheName: 'wsrv-images',
-        plugins: [
-          new ExpirationPlugin({
-            maxEntries: 500,
-            maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-          }),
-        ],
-      }),
-    },
-    // --- Cloudflare R2 public assets ---
-    {
-      matcher: /^https:\/\/.*\.r2\.dev\//,
-      handler: new CacheFirst({
-        cacheName: 'r2-assets',
-        plugins: [
-          new ExpirationPlugin({
-            maxEntries: 200,
-            maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year (immutable UUID keys)
-          }),
-        ],
-      }),
+      matcher: /\/_next\/image/,
+      handler: new NetworkOnly(),
     },
     // --- Google Fonts ---
     {
