@@ -53,6 +53,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   homepageSectionOrder: DEFAULT_SECTION_ORDER,
   heroDefaultPrimaryBtnLabel: '',
   heroDefaultSecondaryBtnLabel: '',
+  customSocialLinks: [],
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -107,6 +108,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     about_subheading: s.aboutSubheading ?? '',
     about_body: s.aboutBody ?? '',
     homepage_section_order: JSON.stringify(s.homepageSectionOrder ?? DEFAULT_SECTION_ORDER),
+    custom_social_links: JSON.stringify(s.customSocialLinks ?? []),
   }
 }
 
