@@ -156,7 +156,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 - `SPOTIFY_CLIENT_SECRET`: Spotify app client secret
 - `DISCOGS_TOKEN`: Discogs personal access token (https://www.discogs.com/settings/developers)
 - `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
-- `BANDSINTOWN_API_KEY`: Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access)
+- `BANDSINTOWN_API_KEY`: Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access) — used by `src/lib/sync/bandsintownApi.ts` for concert sync
 
 ### SOS Webhook (optional — Statement of Sales PDF upload from external generator)
 - `SOS_WEBHOOK_SECRET`: A random, high-entropy string shared between this app and the SOS PDF generator service. Used to authenticate server-to-server calls to `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm`. Generate with `openssl rand -hex 32`.
@@ -179,6 +179,12 @@ These variables are shared between the **Supabase Edge Function** (`newsletter-c
 After DOI confirmation, verified subscribers are pushed to MailerLite server-to-server via `GET /api/newsletter/verify`. Both vars are optional — omit to store subscribers in Supabase only.
 - `MAILERLITE_API_KEY`: MailerLite API key from https://app.mailerlite.com/integrations/api/
 - `MAILERLITE_GROUP_ID`: MailerLite group/segment ID to add subscribers to.
+  - To find your Group ID: log in at https://app.mailerlite.com → Subscribers → Groups → click the group → the ID appears in the URL (`/groups/{id}/...`).
+
+### ISR Webhook Revalidation (optional — Supabase-triggered cache busting)
+- `REVALIDATE_SECRET`: A random, high-entropy ****** checked by `POST /api/revalidate`. Required when you configure Supabase webhooks to call this endpoint after DB writes so the ISR cache is busted automatically. Generate with `openssl rand -hex 32`. Share this value with the Supabase webhook configuration (Authorization header value).
+
+> ⚠️ **SOS Generator secret sharing**: `SOS_WEBHOOK_SECRET` must be shared with the external SOS PDF generator service at https://sos-generator-for-mu.vercel.app/ — configure it in that service's settings alongside your app's domain URL so it can authenticate server-to-server calls.
 
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
@@ -202,6 +208,60 @@ After DOI confirmation, verified subscribers are pushed to MailerLite server-to-
 - [ ] Check sync_logs table for any errors
 - [ ] Test iTunes sync
 - [ ] Verify all sections load correctly
+
+---
+
+## 🧩 Supabase Edge Function Deployment
+
+The newsletter DOI confirmation email is sent by a Supabase Edge Function (Deno runtime).
+This function MUST be deployed separately from the Next.js app — it does NOT deploy
+automatically with Vercel.
+
+```bash
+# Install Supabase CLI (if not already installed)
+npm install -g supabase
+
+# Log in to Supabase CLI
+supabase login
+
+# Deploy the Edge Function
+supabase functions deploy newsletter-confirm --project-ref <your-project-ref>
+```
+
+> Your project ref is in the Supabase Dashboard URL: `https://app.supabase.com/project/<project-ref>`
+
+### Edge Function Secrets (Supabase — separate from Vercel)
+
+These secrets power the Deno runtime inside Supabase Edge Functions. They are
+**completely separate from Vercel environment variables** — setting them in Vercel
+does NOT make them available to Edge Functions.
+
+Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
+- `RESEND_API_KEY` — same value as your Vercel `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` — same value as your Vercel `RESEND_FROM_EMAIL`
+- `NEXT_PUBLIC_SITE_URL` — your production URL (e.g. `https://darktunes.com`)
+
+Without these secrets, the `newsletter-confirm` Edge Function will fail silently
+and DOI confirmation emails will never be delivered.
+
+---
+
+## 👤 Creating the First Journalist Account
+
+1. Have the journalist sign up at `/press/login` (or invite them via Supabase Dashboard → Authentication → Users → Invite user).
+2. In the Admin Panel → **Users** tab, find the user row.
+3. Change their role from `user` to `journalist`.
+4. The journalist can now log in at `/press/login` and access `/press/dashboard/*`.
+
+---
+
+## ✅ Vercel Cron Job Validation
+
+After deployment, verify that Vercel cron jobs are active:
+1. Vercel Dashboard → Project → **Cron Jobs** tab.
+2. Confirm both cron entries appear: `/api/sync-youtube` (daily 06:00 UTC) and `/api/sync` (daily 03:00 UTC).
+3. Check **Last execution** timestamp and status after 24 hours.
+4. If a cron fails: Admin Panel → **Logs** tab → **Error Log** → filter by `api_source`.
 
 ---
 

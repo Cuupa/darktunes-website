@@ -55,3 +55,52 @@
 - [ ] Run E2E tests (`npm run test:e2e`)
 - [ ] Run performance tests (`npm run perf:test`)
 - [ ] Review visual regression outputs when relevant
+
+## GDPR & Consent
+- [ ] Cookie consent banner appears on first visit
+- [ ] Spotify and YouTube iframes are blocked until consent is given
+- [ ] Accepting consent loads embedded players
+- [ ] Declining keeps embeds blocked indefinitely (until browser storage cleared)
+
+## Internationalisation (i18n)
+- [ ] Language switch EN↔DE in header works and persists via NEXT_LOCALE cookie
+- [ ] All UI strings use dictionary keys (no hard-coded EN strings visible in DE mode)
+- [ ] Locale-specific legal pages (/impressum, /datenschutz) reflect correct language
+
+## PWA
+- [ ] /manifest.webmanifest is accessible and valid
+- [ ] Service worker registers without errors (DevTools → Application → Service Workers)
+- [ ] Offline page /offline is served when network is unavailable
+- [ ] PWA install prompt appears on Android/Chrome after 3 seconds (no errors in console)
+
+## Newsletter DOI Flow
+- [ ] Subscribe form submits → success message shown (no error)
+- [ ] Pending row created in newsletter_subscribers table with status='pending'
+- [ ] DOI email arrives within 2 minutes (check Resend dashboard)
+- [ ] Clicking confirmation link flips status to 'subscribed'
+- [ ] Re-submitting same email shows silent success (anti-enumeration)
+
+## Artist Portal
+- [ ] Artist user can log in at /portal
+- [ ] PortalAccessGate shown for unlinked users (role=user)
+- [ ] Profile edit saves bio, photo uploads to R2
+- [ ] Feature-flagged modules hidden when flag is disabled
+
+## Journalist Dashboard
+- [ ] /press/login accessible, /press/dashboard/* redirects to login when unauthenticated
+- [ ] Role=journalist can access dashboard, role=user cannot
+- [ ] Promo track stream URL expires after 5 minutes
+
+## Schema Parity
+- [ ] Every column in supabase/reset.sql exists in src/types/database.ts
+- [ ] Every table in database.ts has a corresponding CREATE TABLE in reset.sql
+
+## Security
+- [ ] Open DevTools Network tab — confirm SUPABASE_SERVICE_ROLE_KEY is never in any response
+- [ ] /admin redirects to /admin/login for unauthenticated requests
+- [ ] /portal/* redirects to /portal/login for unauthenticated requests
+- [ ] /promo-pool/* requires journalist or admin role
+
+## Edge Function
+- [ ] Supabase Edge Function 'newsletter-confirm' is deployed and active
+- [ ] Edge Function appears in Supabase Dashboard → Edge Functions
