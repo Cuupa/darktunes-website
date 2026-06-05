@@ -19,6 +19,7 @@ import {
   getCachedPublicNews,
   getCachedPublicVideos,
   getCachedPublicConcerts,
+  getCachedPublicArtists,
 } from '@/lib/cache/publicQueries'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import type { SiteSettings } from '@/types'
@@ -77,6 +78,7 @@ const getCachedSiteSettings = unstable_cache(
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
+        homepageNewsCount: 3,
         featureToggles: { promoPool: true, editorTools: true },
       }),
     )
@@ -91,12 +93,13 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, news, videos, concerts, siteSettings, locale] = await Promise.all([
+  const [releases, news, videos, concerts, siteSettings, artists, locale] = await Promise.all([
     getCachedPublicReleases(),
     getCachedPublicNews(),
     getCachedPublicVideos(),
     getCachedPublicConcerts(),
     getCachedSiteSettings(),
+    getCachedPublicArtists(),
     getLocale(),
   ])
 
@@ -118,6 +121,7 @@ export default async function HomePage() {
         videos={videos}
         concerts={concerts}
         siteSettings={siteSettings}
+        artists={artists}
         dict={dict}
         locale={locale}
       />

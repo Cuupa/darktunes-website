@@ -1,6 +1,8 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { getArtists } from '@/lib/api/artists'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +21,8 @@ import { ImageUploadButton } from './ImageUploadButton'
 export interface ReleaseFormData {
   title: string
   artistName: string
+  /** IDs of all associated artists (many-to-many via junction table). */
+  artistIds: string[]
   releaseDate: string
   type: 'album' | 'ep' | 'single'
   coverArt: string
@@ -45,9 +49,18 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
     defaultValues: value,
   })
 
+  const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
+
   useEffect(() => {
     reset(value)
   }, [value, reset])
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    getArtists(supabase).then((rows) =>
+      setArtists(rows.map((a) => ({ id: a.id, name: a.name })))
+    ).catch(() => {})
+  }, [])
 
   const featured = watch('featured')
   const isVisible = watch('isVisible')
@@ -66,6 +79,41 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
         <div className="space-y-1">
           <Label htmlFor="artistName">Artist Name *</Label>
           <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
+        </div>
+      </div>
+
+      {/* Multi-artist selection */}
+      <div className="space-y-3">
+        <Label>Artists (for featurings / collaborations)</Label>
+        <p className="text-xs text-muted-foreground">
+          Associate one or more label artists. The first selected artist is the primary one. The Artist Name above overrides the display name.
+        </p>
+        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto rounded border border-border p-3">
+          {artists.length === 0 && (
+            <p className="text-xs text-muted-foreground">No label artists found.</p>
+          )}
+          {artists.map((artist) => {
+            const checked = (watch('artistIds') ?? []).includes(artist.id)
+            return (
+              <label key={artist.id} className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={isLoading}
+                  onChange={(e) => {
+                    const current = watch('artistIds') ?? []
+                    if (e.target.checked) {
+                      setValue('artistIds', [...current, artist.id])
+                    } else {
+                      setValue('artistIds', current.filter((id) => id !== artist.id))
+                    }
+                  }}
+                  className="accent-primary"
+                />
+                {artist.name}
+              </label>
+            )
+          })}
         </div>
       </div>
 

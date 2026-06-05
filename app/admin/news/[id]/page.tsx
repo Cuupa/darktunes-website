@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { NewsPost } from '@/types'
 
 function newsPostToFormData(post: NewsPost): NewsFormData {
@@ -31,6 +32,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
     artistId: post.artistId ?? '',
+    artistIds: post.artists?.map((a) => a.id) ?? (post.artistId ? [post.artistId] : []),
     embargoUntil: post.embargoUntil ? new Date(post.embargoUntil).toISOString().slice(0, 16) : '',
     mediaContact: post.mediaContact ?? '',
     releaseCategory: post.releaseCategory ?? '',
@@ -80,6 +82,20 @@ export default function NewsEditPage() {
         hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
         hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
       })
+      // Update junction table: replace all entries for this post
+      const supabase = createBrowserSupabaseClient()
+      await supabase
+        .from('news_post_artists' as const)
+        .delete()
+        .eq('news_post_id', post.id)
+      if ((data.artistIds ?? []).length > 0) {
+        const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+          news_post_id: post.id,
+          artist_id: artistId,
+          sort_order: i,
+        }))
+        await supabase.from('news_post_artists' as const).insert(inserts)
+      }
       toast.success('News post saved')
       router.push('/admin?tab=news')
     } catch (err) {

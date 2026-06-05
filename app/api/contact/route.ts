@@ -11,12 +11,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 
-const SUBMITHUB_ALLOW = ['label', 'shop', 'booking', 'other'] as const
-
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  topic: z.enum(SUBMITHUB_ALLOW),
+  // Accept any non-empty string so custom admin-configured topics work.
+  // The honeypot check below handles spam; topic is informational only.
+  topic: z.string().min(1, 'Topic is required').max(100),
   message: z.string().min(20, 'Message must be at least 20 characters'),
   gdprConsent: z.literal(true, { error: 'GDPR consent is required' }),
   website: z.string().max(0, 'Honeypot triggered').optional(),

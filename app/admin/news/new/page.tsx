@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 const EMPTY_FORM: NewsFormData = {
   title: '',
@@ -23,6 +24,7 @@ const EMPTY_FORM: NewsFormData = {
   isPressOnly: false,
   status: 'draft',
   artistId: '',
+  artistIds: [],
   embargoUntil: '',
   mediaContact: '',
   releaseCategory: '',
@@ -64,6 +66,24 @@ export default function NewsNewPage() {
         hero_secondary_btn_action: data.heroSecondaryBtnAction || null,
         hero_secondary_btn_href: data.heroSecondaryBtnHref || null,
       })
+      // Save junction table entries if artistIds were provided.
+      // We fetch the newly created post by slug to get its id.
+      if ((data.artistIds ?? []).length > 0) {
+        const supabase = createBrowserSupabaseClient()
+        const { data: row } = await supabase
+          .from('news_posts')
+          .select('id')
+          .eq('slug', data.slug)
+          .single()
+        if (row) {
+          const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+            news_post_id: row.id,
+            artist_id: artistId,
+            sort_order: i,
+          }))
+          await supabase.from('news_post_artists' as const).insert(inserts)
+        }
+      }
       toast.success(`Created "${data.title}"`)
       router.push('/admin?tab=news')
     } catch (err) {

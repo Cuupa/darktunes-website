@@ -614,6 +614,72 @@ export interface Database {
         }
         Relationships: []
       }
+      release_artists: {
+        Row: {
+          release_id: string
+          artist_id: string
+          sort_order: number
+        }
+        Insert: {
+          release_id: string
+          artist_id: string
+          sort_order?: number
+        }
+        Update: {
+          release_id?: string
+          artist_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'release_artists_release_id_fkey'
+            columns: ['release_id']
+            isOneToOne: false
+            referencedRelation: 'releases'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'release_artists_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      news_post_artists: {
+        Row: {
+          news_post_id: string
+          artist_id: string
+          sort_order: number
+        }
+        Insert: {
+          news_post_id: string
+          artist_id: string
+          sort_order?: number
+        }
+        Update: {
+          news_post_id?: string
+          artist_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'news_post_artists_news_post_id_fkey'
+            columns: ['news_post_id']
+            isOneToOne: false
+            referencedRelation: 'news_posts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'news_post_artists_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       videos: {
         Row: {
           id: string
