@@ -78,6 +78,7 @@ const DEFAULTS: SiteSettings = {
   homepageNewsCount: 3,
   contactTopics: [],
   customSocialLinks: [],
+  submitHubUrl: '',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -223,6 +224,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
       } catch { /* ignore */ }
       return []
     })(),
+    submitHubUrl: map['submit_hub_url'] ?? '',
   }
 }
 
