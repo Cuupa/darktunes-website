@@ -6,10 +6,13 @@ import {
   AvatarFallback,
   AvatarImage,
 } from '@/components/ui/avatar'
-import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCircleText } from '@phosphor-icons/react'
+import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCircleText, ArrowRight } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Dictionary } from '@/i18n/types'
+import type { CompletionField } from '@/lib/portal/profileCompletion'
 import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalOverviewProps {
@@ -23,6 +26,8 @@ interface PortalOverviewProps {
   statementCount: number
   assetCount: number
   featureFlags: Record<string, boolean>
+  completionScore: number
+  missingFields: CompletionField[]
 }
 
 export function PortalOverview({
@@ -36,6 +41,8 @@ export function PortalOverview({
   statementCount,
   assetCount,
   featureFlags,
+  completionScore,
+  missingFields,
 }: PortalOverviewProps) {
   const isEnabled = (id: string) => featureFlags[id] ?? true
   const { unreadCount } = useUnreadMessages()
@@ -61,6 +68,47 @@ export function PortalOverview({
           <p className="mt-2 text-muted-foreground">{dict.notLinked}</p>
         )}
       </div>
+
+      {/* Profile Completion Card — hidden when 100% complete */}
+      {completionScore < 100 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {dict.completion_title}
+            </CardTitle>
+            <span className="text-sm font-bold text-primary">{completionScore}%</span>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Progress
+              value={completionScore}
+              className="h-2"
+              aria-label={`${dict.completion_title}: ${completionScore}%`}
+            />
+            {missingFields.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {missingFields.slice(0, 3).map((field) => (
+                  <Link key={field.key} href="/portal/profile">
+                    <Badge
+                      variant="outline"
+                      className="text-xs cursor-pointer hover:border-primary/50 hover:text-primary transition-colors gap-1"
+                    >
+                      {dict[field.labelKey] as string}
+                      <ArrowRight size={10} aria-hidden="true" />
+                    </Badge>
+                  </Link>
+                ))}
+                {missingFields.length > 3 && (
+                  <Link href="/portal/profile">
+                    <Badge variant="outline" className="text-xs cursor-pointer hover:border-primary/50">
+                      +{missingFields.length - 3} {dict.completion_cta}
+                    </Badge>
+                  </Link>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/portal/profile">

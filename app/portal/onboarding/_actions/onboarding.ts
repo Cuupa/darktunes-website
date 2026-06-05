@@ -6,12 +6,14 @@
  * Server Actions for the Artist Onboarding Wizard.
  *
  * saveOnboardingStep  — persists partial profile data for a single step.
- * completeOnboarding  — marks onboarding_completed = true (also persists final data).
+ * completeOnboarding  — marks onboarding_completed = true (also persists final data)
+ *                       and sends an automatic welcome message to the artist inbox.
  * skipOnboarding      — marks onboarding_completed = true without saving profile data.
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -59,6 +61,7 @@ export async function saveOnboardingStep(data: {
 
 /**
  * Marks the onboarding as completed and saves any final data.
+ * Also inserts a welcome message into the artist's label inbox.
  */
 export async function completeOnboarding(data?: {
   bio_short?: string | null
@@ -73,6 +76,18 @@ export async function completeOnboarding(data?: {
       ...data,
       onboarding_completed: true,
     })
+
+    // Send an automatic welcome message to the artist's inbox
+    const locale = await getLocale()
+    const dict = await getDictionary(locale)
+    await supabase.from('label_messages').insert({
+      artist_id: artist.id,
+      subject: dict.portal.welcome_message_subject,
+      body: dict.portal.welcome_message_body,
+      body_html: dict.portal.welcome_message_body,
+      read: false,
+    })
+
     return { ok: true }
   } catch (err) {
     console.error('[completeOnboarding]', err)

@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic'
 
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { getArtistByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { calcProfileCompletion } from '@/lib/portal/profileCompletion'
 import { PortalOverview } from './_components/PortalOverview'
 
 export default async function PortalPage() {
@@ -29,7 +30,7 @@ export default async function PortalPage() {
 
   const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
 
-  const [stats, releases, concerts, openChecklistCountResult, featureFlags, profileResult, statementCountResult, assetCountResult] = artist
+  const [stats, releases, concerts, openChecklistCountResult, featureFlags, artistProfile, statementCountResult, assetCountResult] = artist
     ? await Promise.all([
         getStreamingStatsByArtistId(supabase, artist.id).catch(() => []),
         getReleasesByArtistId(supabase, artist.id).catch(() => []),
@@ -40,27 +41,27 @@ export default async function PortalPage() {
           .eq('artist_id', artist.id)
           .eq('is_completed', false),
         getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
-        supabase
-          .from('artist_profiles')
-          .select('photo_url')
-          .eq('artist_id', artist.id)
-          .maybeSingle(),
+        getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
         supabase
           .from('sales_statements')
           .select('id', { count: 'exact', head: true })
           .eq('artist_id', artist.id),
         supabase.from('assets').select('id', { count: 'exact', head: true }),
       ])
-    : [[], [], [], { count: 0, error: null }, {}, { data: null, error: null }, { count: 0, error: null }, { count: 0, error: null }, { count: 0, error: null }]
+    : [[], [], [], { count: 0, error: null }, {}, null, { count: 0, error: null }, { count: 0, error: null }]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
+
+  const { score: completionScore, missing: missingFields } = artist
+    ? calcProfileCompletion(artist, artistProfile)
+    : { score: 0, missing: [] }
 
   return (
     <PortalOverview
       dict={dict.portal}
       artistName={artist?.name ?? null}
-      profileImageUrl={profileResult.data?.photo_url ?? artist?.imageUrl ?? null}
+      profileImageUrl={artistProfile?.photoUrl ?? artist?.imageUrl ?? null}
       totalStreams={totalStreams}
       releaseCount={releases.length}
       upcomingShowCount={concerts.length}
@@ -68,6 +69,8 @@ export default async function PortalPage() {
       statementCount={statementCountResult.count ?? 0}
       assetCount={assetCountResult.count ?? 0}
       featureFlags={featureFlags}
+      completionScore={completionScore}
+      missingFields={missingFields}
     />
   )
 }

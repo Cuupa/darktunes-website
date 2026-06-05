@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, ArrowUp, ArrowDown } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, ArrowUp, ArrowDown, Envelope } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
@@ -191,6 +191,7 @@ export function ArtistsManager() {
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [invitingId, setInvitingId] = useState<string | null>(null)
 
   // Search / sort / pagination
   const [search, setSearch] = useState('')
@@ -325,6 +326,23 @@ export function ArtistsManager() {
     }
   }
 
+  const handleInvite = async (artist: Artist) => {
+    setInvitingId(artist.id)
+    try {
+      const res = await fetch(`/api/admin/artists/${artist.id}/invite`, { method: 'POST' })
+      const json = (await res.json()) as { ok: boolean; email?: string; error?: string }
+      if (!res.ok || !json.ok) {
+        toast.error(json.error ?? 'Failed to send invite')
+      } else {
+        toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
+      }
+    } catch {
+      toast.error('Failed to send invite')
+    } finally {
+      setInvitingId(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -429,6 +447,19 @@ export function ArtistsManager() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    {artist.email && !artist.userId && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => void handleInvite(artist)}
+                        disabled={invitingId === artist.id}
+                        title="Send Portal Invite"
+                        aria-label={`Invite ${artist.name} to the portal`}
+                        className="text-primary hover:text-primary"
+                      >
+                        <Envelope size={16} aria-hidden="true" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"

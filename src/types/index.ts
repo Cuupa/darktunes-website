@@ -35,6 +35,8 @@ export interface Artist {
   platformLinks?: Record<string, string>
   /** Admin-configured storage quota in bytes. NULL = use system default (no limit). */
   storageQuotaBytes?: number | null
+  /** Supabase Auth user ID linked to this artist (null if not yet invited/linked). */
+  userId?: string | null
 }
 
 export interface SyncLog {
