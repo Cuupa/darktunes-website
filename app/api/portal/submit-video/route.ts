@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { createVideoSubmission } from '@/lib/api/videoSubmissions'
+
+const bodySchema = z.object({
+  title: z.string().min(1),
+  downloadUrl: z.string().url(),
+  description: z.string().nullable().optional(),
+  thumbnailUrl: z.string().url().nullable().optional(),
+  youtubeTitle: z.string().nullable().optional(),
+  youtubeDescription: z.string().nullable().optional(),
+  youtubeTags: z.array(z.string()).optional().default([]),
+  youtubeCategory: z.string().nullable().optional(),
+  targetPublishDate: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+})
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const token = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) throw new ApiError(401, 'Missing authorization token')
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
+  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+
+  const body = bodySchema.parse(await req.json())
+
+  const artist = await getArtistByUserId(supabase, user.id)
+  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+
+  const submission = await createVideoSubmission(supabase, {
+    artist_id: artist.id,
+    title: body.title,
+    download_url: body.downloadUrl,
+    description: body.description ?? null,
+    thumbnail_url: body.thumbnailUrl ?? null,
+    youtube_title: body.youtubeTitle ?? null,
+    youtube_description: body.youtubeDescription ?? null,
+    youtube_tags: body.youtubeTags,
+    youtube_category: body.youtubeCategory ?? null,
+    target_publish_date: body.targetPublishDate ?? null,
+    notes: body.notes ?? null,
+  })
+
+  // Notify editors
+  const serviceRole = await createServiceRoleSupabaseClient()
+  const { data: editorProfiles } = await serviceRole
+    .from('profiles')
+    .select('id')
+    .eq('role', 'editor')
+
+  const recipients = (editorProfiles ?? []).map((profile) => ({
+    recipient_id: profile.id,
+    type: 'artist_video_submission',
+    entity_type: 'video_submission',
+    entity_id: submission.id,
+    entity_name: submission.title,
+    sender_id: user.id,
+    read: false,
+  }))
+
+  if (recipients.length > 0) {
+    await serviceRole.from('editor_notifications').insert(recipients)
+  }
+
+  return NextResponse.json({ submissionId: submission.id })
+})
