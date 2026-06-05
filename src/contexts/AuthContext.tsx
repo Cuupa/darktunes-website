@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, type ArtistMembership } from '@/hooks/useAuth'
 import type { User, Session } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 
@@ -18,6 +18,7 @@ interface AuthContextType {
   isEditor: boolean
   isArtist: boolean
   isAuthenticated: boolean
+  artistMemberships: ArtistMembership[]
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)

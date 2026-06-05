@@ -3,12 +3,13 @@
  *
  * Wraps all /portal/* routes (except /portal/login which renders standalone).
  * Auth is enforced by middleware.ts before this layout renders.
- * Fetches the current user and their linked artist for the sidebar.
+ * Fetches the current user and their linked artists for the sidebar.
  *
  * Access rule:
- *   - Role 'artist' or 'admin': full portal access (must also have linked artist)
+ *   - Has at least one row in artist_members: full portal access
+ *   - Role 'admin': full portal access (overrides membership check)
  *   - Role 'user' (unassigned): blocked — shows "Pending Approval" page
- *   - Other roles (editor, journalist): no portal access
+ *   - Other roles (editor, journalist) without membership: no portal access
  */
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId, getArtistProfileByArtistId, isProfileComplete } from '@/lib/api/artistProfiles'
+import { getArtistsByUserId, getArtistProfileByArtistId, isProfileComplete } from '@/lib/api/artistProfiles'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalAccessGate } from './_components/PortalAccessGate'
@@ -98,25 +99,26 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
 
   const role = profile?.role ?? 'user'
 
-  // Only 'artist' and 'admin' roles may access the portal
-  const hasPortalAccess = role === 'artist' || role === 'admin'
-
-  if (!hasPortalAccess) {
-    return <PortalAccessGate role={role} />
-  }
-
-  let artist = null
-  let artistError = null
+  // Fetch all artist memberships for this user
+  let artists: Awaited<ReturnType<typeof getArtistsByUserId>> = []
+  let artistError: string | null = null
 
   try {
-    artist = await getArtistByUserId(supabase, user.id)
+    artists = await getArtistsByUserId(supabase, user.id)
   } catch (error) {
     console.error('[PortalLayout] Failed to fetch artist data:', error)
     artistError = error instanceof Error ? error.message : 'Unknown database error'
   }
 
+  // Admins always get in; everyone else needs at least one artist membership
+  const hasPortalAccess = role === 'admin' || artists.length > 0
+
+  if (!hasPortalAccess) {
+    return <PortalAccessGate role={role} />
+  }
+
   // If artist fetch failed and we have an error, show a recovery page
-  if (artistError && !artist) {
+  if (artistError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-md text-center space-y-4">
@@ -140,6 +142,9 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
       </div>
     )
   }
+
+  // Use the first artist as the active artist for single-artist sidebar display
+  const artist = artists[0] ?? null
 
   const [featureFlags, unreadMessagesResult, artistProfile] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
@@ -183,9 +188,8 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
       >
         <PortalSidebar
           dict={dict.portal}
-          artistName={artist?.name ?? null}
+          artists={artists}
           userId={user?.id ?? null}
-          artistSlug={artist?.slug ?? null}
           featureFlags={featureFlags}
         />
         <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">{children}</main>

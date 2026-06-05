@@ -2,11 +2,11 @@
  * app/api/admin/users/[id]/link-artist/route.ts
  *
  * PATCH /api/admin/users/:id/link-artist
- * Links (or unlinks) an Auth user to an artist row.
+ * Adds or removes an artist membership for an Auth user via artist_members.
  *
  * Body:
- *   { artistId: string }          — link artist to user
- *   { artistId: null }            — unlink (clears artists.user_id)
+ *   { artistId: string }          — add membership (idempotent)
+ *   { artistId: null }            — remove all memberships for this user
  *
  * Security: only users with role = 'admin' may call this endpoint.
  */
@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { linkArtistToUser, unlinkArtistFromUser } from '@/lib/api/users'
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -23,6 +22,7 @@ import { linkArtistToUser, unlinkArtistFromUser } from '@/lib/api/users'
 
 const patchSchema = z.object({
   artistId: z.string().uuid().nullable(),
+  memberRole: z.enum(['owner', 'member', 'guest']).optional().default('owner'),
 })
 
 // ---------------------------------------------------------------------------
@@ -67,51 +67,35 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   }
 
   const userId = extractUserId(req)
-  const { artistId } = parsed.data
+  const { artistId, memberRole } = parsed.data
 
   const adminClient = await createServiceRoleSupabaseClient()
 
   if (artistId === null) {
-    // Unlink: find the artist currently linked to this user and clear it
-    const { data: linkedArtist, error: lookupErr } = await adminClient
-      .from('artists')
-      .select('id')
+    // Unlink: remove ALL artist memberships for this user
+    const { error: deleteErr } = await adminClient
+      .from('artist_members')
+      .delete()
       .eq('user_id', userId)
-      .maybeSingle()
 
-    if (lookupErr) throw new ApiError(500, lookupErr.message)
-
-    if (linkedArtist) {
-      await unlinkArtistFromUser(adminClient, linkedArtist.id)
-    }
+    if (deleteErr) throw new ApiError(500, deleteErr.message)
   } else {
-    // Check target artist isn't already linked to a different user
+    // Verify artist exists
     const { data: targetArtist, error: lookupErr } = await adminClient
       .from('artists')
-      .select('id, user_id')
+      .select('id')
       .eq('id', artistId)
       .maybeSingle()
 
     if (lookupErr) throw new ApiError(500, lookupErr.message)
     if (!targetArtist) throw new ApiError(404, 'Artist not found')
-    if (targetArtist.user_id && targetArtist.user_id !== userId) {
-      throw new ApiError(409, 'This artist is already linked to another user')
-    }
 
-    // Check the user isn't already linked to a different artist
-    const { data: existingArtist, error: existingErr } = await adminClient
-      .from('artists')
-      .select('id')
-      .eq('user_id', userId)
-      .neq('id', artistId)
-      .maybeSingle()
+    // Add membership — ON CONFLICT updates the member_role if the row already exists
+    const { error: upsertErr } = await adminClient
+      .from('artist_members')
+      .upsert({ user_id: userId, artist_id: artistId, member_role: memberRole }, { onConflict: 'user_id,artist_id' })
 
-    if (existingErr) throw new ApiError(500, existingErr.message)
-    if (existingArtist) {
-      throw new ApiError(409, 'This user is already linked to another artist')
-    }
-
-    await linkArtistToUser(adminClient, artistId, userId)
+    if (upsertErr) throw new ApiError(500, upsertErr.message)
   }
 
   return NextResponse.json({ success: true })

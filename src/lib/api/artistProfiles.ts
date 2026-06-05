@@ -161,16 +161,54 @@ export async function upsertArtistProfile(
 }
 
 /**
- * Looks up the artist record linked to a Supabase Auth user ID.
- * Returns `null` if the user is not linked to any artist.
+ * Looks up ALL artist records linked to a Supabase Auth user via artist_members.
+ * Returns an empty array if the user has no memberships.
  *
- * Used in the portal to identify which artist the logged-in user belongs to.
+ * Use this instead of getArtistByUserId when supporting multi-artist contexts.
+ */
+export async function getArtistsByUserId(db: DbClient, userId: string): Promise<Artist[]> {
+  // Step 1: get all artist IDs the user belongs to
+  const { data: memberships, error: memberErr } = await db
+    .from('artist_members')
+    .select('artist_id')
+    .eq('user_id', userId)
+
+  if (memberErr) throw new Error(memberErr.message)
+  if (!memberships || memberships.length === 0) return []
+
+  const artistIds = memberships.map((m) => m.artist_id)
+
+  // Step 2: load all artist rows in one query
+  const { data, error } = await db.from('artists').select('*').in('id', artistIds)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => rowToArtist(row as ArtistRow))
+}
+
+/**
+ * Looks up the artist record linked to a Supabase Auth user ID.
+ * Returns the first artist found via artist_members, or `null` if none.
+ *
+ * @deprecated Prefer getArtistsByUserId() which supports multi-artist memberships.
+ * Kept as a shim so existing single-artist portal routes continue to work
+ * without changes during the migration period.
  */
 export async function getArtistByUserId(db: DbClient, userId: string): Promise<Artist | null> {
+  // Look up via artist_members (respects the new many-to-many model)
+  const { data: membership, error: memberErr } = await db
+    .from('artist_members')
+    .select('artist_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+
+  if (memberErr) throw new Error(memberErr.message)
+  if (!membership) return null
+
   const { data, error } = await db
     .from('artists')
     .select('*')
-    .eq('user_id', userId)
+    .eq('id', membership.artist_id)
     .single()
 
   if (error) {
@@ -179,4 +217,43 @@ export async function getArtistByUserId(db: DbClient, userId: string): Promise<A
   }
 
   return data ? rowToArtist(data as ArtistRow) : null
+}
+
+/**
+ * Resolves the active artist for a portal request.
+ *
+ * - If `artistId` is provided: validates the user is a member of that artist
+ *   and returns it (throws 403 if not a member).
+ * - If `artistId` is omitted and the user has exactly one membership: returns it.
+ * - If `artistId` is omitted and the user has multiple memberships: returns the
+ *   first artist (callers that want multi-artist selection should pass `artistId`).
+ * - Returns `null` if the user has no artist memberships.
+ *
+ * Throws `Error` with an HTTP-hint message for security rejections so that
+ * route handlers can map them to the appropriate ApiError.
+ */
+export async function resolvePortalArtist(
+  db: DbClient,
+  userId: string,
+  artistId?: string | null,
+): Promise<Artist | null> {
+  if (artistId) {
+    // Validate membership for the requested artistId
+    const { data: membership, error: memberErr } = await db
+      .from('artist_members')
+      .select('artist_id')
+      .eq('user_id', userId)
+      .eq('artist_id', artistId)
+      .maybeSingle()
+
+    if (memberErr) throw new Error(memberErr.message)
+    if (!membership) throw new Error('FORBIDDEN: not a member of this artist')
+
+    const { data, error } = await db.from('artists').select('*').eq('id', artistId).single()
+    if (error) throw new Error(error.message)
+    return data ? rowToArtist(data as ArtistRow) : null
+  }
+
+  // No artistId specified — fall back to first membership
+  return getArtistByUserId(db, userId)
 }
