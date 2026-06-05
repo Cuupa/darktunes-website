@@ -132,6 +132,17 @@ export function PortalSidebar({ dict, artistName, artistSlug, featureFlags, unre
               <Separator className="bg-border" />
               {artistBlock}
               {renderNav(() => setMobileOpen(false))}
+              <Separator className="bg-border" />
+              <div className="p-4">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+                  onClick={handleSignOut}
+                >
+                  <SignOut size={18} aria-hidden="true" />
+                  {dict.signOut}
+                </Button>
+              </div>
             </div>
           </SheetContent>
         </Sheet>

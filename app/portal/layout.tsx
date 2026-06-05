@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 
 function PortalLayoutSkeleton() {
   return (
-    <div className="min-h-screen bg-background flex overflow-x-hidden">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
       {/* Desktop sidebar skeleton */}
       <div className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -153,7 +153,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   const unreadMessages = unreadMessagesResult.count ?? 0
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-hidden">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
       <PortalSidebar
         dict={dict.portal}
         artistName={artist?.name ?? null}
@@ -162,7 +162,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
         featureFlags={featureFlags}
         unreadMessages={unreadMessages}
       />
-      <main className="flex-1 overflow-y-auto p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">{children}</main>
+      <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">{children}</main>
     </div>
   )
 }
