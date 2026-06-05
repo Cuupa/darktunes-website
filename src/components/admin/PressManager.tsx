@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { CloudArrowUp, DownloadSimple, Headphones, Image as ImageIcon, Newspaper, TrendUp, Users } from '@phosphor-icons/react'
+import { CloudArrowUp, DownloadSimple, Headphones, Image as ImageIcon, Newspaper, TrendUp, Users, FolderOpen } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getArtists } from '@/lib/api/artists'
 import { getPressPhotos, createPressPhoto, deletePressPhoto } from '@/lib/api/pressPhotos'
@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 
 const AccreditationsManager = lazy(() => import('./AccreditationsManager').then((m) => ({ default: m.AccreditationsManager })))
+const MediaFileExplorer = lazy(() => import('./media-explorer/MediaFileExplorer').then((m) => ({ default: m.MediaFileExplorer })))
 
 function PanelFallback() {
   return <Skeleton className="h-40 w-full" />
@@ -184,6 +185,7 @@ export function PressManager() {
         <TabsTrigger value="applications" className="gap-2"><Users size={16} weight="bold" aria-hidden="true" />Applications</TabsTrigger>
         <TabsTrigger value="photos" className="gap-2"><ImageIcon size={16} weight="bold" aria-hidden="true" />Press Photos</TabsTrigger>
         <TabsTrigger value="tracks" className="gap-2"><Headphones size={16} weight="bold" aria-hidden="true" />Promo Tracks</TabsTrigger>
+        <TabsTrigger value="media" className="gap-2"><FolderOpen size={16} weight="bold" aria-hidden="true" />Media</TabsTrigger>
         <TabsTrigger value="accreditations" className="gap-2"><Newspaper size={16} weight="bold" aria-hidden="true" />Accreditations</TabsTrigger>
         <TabsTrigger value="analytics" className="gap-2"><TrendUp size={16} weight="bold" aria-hidden="true" />Analytics</TabsTrigger>
       </TabsList>
@@ -307,6 +309,12 @@ export function PressManager() {
       <TabsContent value="accreditations">
         <Suspense fallback={<PanelFallback />}>
           <AccreditationsManager />
+        </Suspense>
+      </TabsContent>
+
+      <TabsContent value="media">
+        <Suspense fallback={<PanelFallback />}>
+          <MediaFileExplorer className="min-h-[500px]" />
         </Suspense>
       </TabsContent>
 

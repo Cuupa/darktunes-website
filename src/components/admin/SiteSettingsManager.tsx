@@ -5,7 +5,10 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
+import { ArrowUp, ArrowDown, Globe,
+  InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo, TiktokLogo,
+  BandcampLogo, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
+} from '@phosphor-icons/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -116,9 +119,41 @@ const schema = z.object({
   releasesSectionSubheading: z.string().optional().default(''),
   shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   youtubeChannelId: z.string().optional().default(''),
+  customSocialLinks: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string().min(1, 'Label required'),
+      url: z.string().url('Must be a valid URL'),
+      icon: z.string().min(1, 'Icon required'),
+    }),
+  ).default([]),
 })
 
 type FormData = z.input<typeof schema>
+
+// ---------------------------------------------------------------------------
+// Icon map for custom social links
+// ---------------------------------------------------------------------------
+
+type IconComponent = React.ComponentType<{ size?: number; weight?: string; 'aria-hidden'?: string | boolean }>
+
+export const SOCIAL_ICON_MAP: Record<string, IconComponent> = {
+  InstagramLogo,
+  YoutubeLogo,
+  SpotifyLogo,
+  FacebookLogo,
+  TwitterLogo,
+  TiktokLogo,
+  BandcampLogo,
+  DiscordLogo,
+  TelegramLogo,
+  LinkedinLogo,
+  GithubLogo,
+  SoundcloudLogo,
+  Globe,
+}
+
+export const SOCIAL_ICON_OPTIONS = Object.keys(SOCIAL_ICON_MAP)
 
 // ---------------------------------------------------------------------------
 // Sub-sections
@@ -162,6 +197,10 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'spotifyPlaylists',
+  })
+  const { fields: socialFields, append: appendSocial, remove: removeSocial, move: moveSocial } = useFieldArray({
+    control,
+    name: 'customSocialLinks',
   })
 
   const logoUrl = watch('logoUrl')
@@ -558,6 +597,115 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   disabled={isSubmitting}
                 />
               </Field>
+
+              {/* Custom additional social links */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label>Additional Social / Web Links</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Extra links shown in the footer alongside the built-in icons. Choose an icon and provide a URL.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => appendSocial({ id: crypto.randomUUID(), label: '', url: '', icon: 'Globe' })}
+                    disabled={isSubmitting}
+                  >
+                    + Add link
+                  </Button>
+                </div>
+
+                {socialFields.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No additional links configured.</p>
+                )}
+
+                <div className="space-y-3">
+                  {socialFields.map((field, index) => {
+                    const IconPreview = SOCIAL_ICON_MAP[watch(`customSocialLinks.${index}.icon` as const) ?? ''] ?? Globe
+                    return (
+                      <div key={field.id} className="border rounded-md p-3 space-y-2">
+                        <div className="grid gap-2 md:grid-cols-[140px_1fr_1fr] items-start">
+                          {/* Icon selector */}
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Icon</Label>
+                            <div className="flex items-center gap-2">
+                              <IconPreview size={20} weight="fill" aria-hidden="true" />
+                              <Controller
+                                name={`customSocialLinks.${index}.icon` as const}
+                                control={control}
+                                render={({ field: f }) => (
+                                  <Select value={f.value} onValueChange={f.onChange} disabled={isSubmitting}>
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue placeholder="Icon" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SOCIAL_ICON_OPTIONS.map((name) => (
+                                        <SelectItem key={name} value={name}>{name.replace('Logo', '')}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                          </div>
+                          {/* Label */}
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Label (aria)</Label>
+                            <Input
+                              placeholder="e.g. darkTunes on Bandcamp"
+                              {...register(`customSocialLinks.${index}.label` as const)}
+                              disabled={isSubmitting}
+                            />
+                            {errors.customSocialLinks?.[index]?.label?.message && (
+                              <p className="text-xs text-destructive">{errors.customSocialLinks[index]?.label?.message}</p>
+                            )}
+                          </div>
+                          {/* URL */}
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">URL</Label>
+                            <Input
+                              placeholder="https://..."
+                              {...register(`customSocialLinks.${index}.url` as const)}
+                              disabled={isSubmitting}
+                            />
+                            {errors.customSocialLinks?.[index]?.url?.message && (
+                              <p className="text-xs text-destructive">{errors.customSocialLinks[index]?.url?.message}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button" variant="ghost" size="icon"
+                            onClick={() => moveSocial(index, index - 1)}
+                            disabled={isSubmitting || index === 0}
+                            title="Move up"
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button" variant="ghost" size="icon"
+                            onClick={() => moveSocial(index, index + 1)}
+                            disabled={isSubmitting || index === socialFields.length - 1}
+                            title="Move down"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button" variant="ghost" size="sm"
+                            onClick={() => removeSocial(index)}
+                            disabled={isSubmitting}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -698,12 +846,30 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">
-                            Tab Accent Color (hex, optional)
+                            Tab Accent Color (optional)
                           </Label>
-                          <Input
-                            placeholder="#7e1e37"
-                            {...register(`spotifyPlaylists.${index}.accentColor` as const)}
-                            disabled={isSubmitting}
+                          <Controller
+                            name={`spotifyPlaylists.${index}.accentColor` as const}
+                            control={control}
+                            render={({ field: f }) => (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={f.value || '#7e1e37'}
+                                  onChange={(e) => f.onChange(e.target.value)}
+                                  disabled={isSubmitting}
+                                  className="h-9 w-10 cursor-pointer rounded border border-input bg-background p-1 disabled:opacity-50"
+                                  aria-label="Pick accent color"
+                                />
+                                <Input
+                                  placeholder="#7e1e37"
+                                  value={f.value ?? ''}
+                                  onChange={f.onChange}
+                                  disabled={isSubmitting}
+                                  className="flex-1"
+                                />
+                              </div>
+                            )}
                           />
                         </div>
                         <div className="flex gap-1 pb-0.5">
