@@ -79,6 +79,14 @@ const DEFAULTS: SiteSettings = {
   contactTopics: [],
   customSocialLinks: [],
   submitHubUrl: '',
+  themePrimary: '',
+  themeSecondary: '',
+  themeBackground: '',
+  themeForeground: '',
+  themeCard: '',
+  themeMuted: '',
+  themeAccent: '',
+  themeBorder: '',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -225,6 +233,14 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
       return []
     })(),
     submitHubUrl: map['submit_hub_url'] ?? '',
+    themePrimary: map['theme_primary'] ?? '',
+    themeSecondary: map['theme_secondary'] ?? '',
+    themeBackground: map['theme_background'] ?? '',
+    themeForeground: map['theme_foreground'] ?? '',
+    themeCard: map['theme_card'] ?? '',
+    themeMuted: map['theme_muted'] ?? '',
+    themeAccent: map['theme_accent'] ?? '',
+    themeBorder: map['theme_border'] ?? '',
   }
 }
 

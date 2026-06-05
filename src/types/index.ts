@@ -487,6 +487,29 @@ export interface SiteSettings {
    * hardcoded darkTunes SubmitHub link when empty.
    */
   submitHubUrl?: string
+  // ── Color Theme Tokens ────────────────────────────────────────────────────
+  /**
+   * CSS color overrides for the site's design tokens. Each value is a valid
+   * CSS color string (hex, oklch, rgb, etc.).  An empty string means "use the
+   * default from globals.css".  All tokens correspond directly to CSS custom
+   * properties (`--primary`, `--secondary`, etc.) defined in globals.css.
+   */
+  /** Override for the `--primary` CSS custom property. */
+  themePrimary?: string
+  /** Override for the `--secondary` CSS custom property. */
+  themeSecondary?: string
+  /** Override for the `--background` CSS custom property. */
+  themeBackground?: string
+  /** Override for the `--foreground` CSS custom property. */
+  themeForeground?: string
+  /** Override for the `--card` CSS custom property. */
+  themeCard?: string
+  /** Override for the `--muted` CSS custom property. */
+  themeMuted?: string
+  /** Override for the `--accent` CSS custom property. */
+  themeAccent?: string
+  /** Override for the `--border` CSS custom property. */
+  themeBorder?: string
 }
 
 export interface Concert {

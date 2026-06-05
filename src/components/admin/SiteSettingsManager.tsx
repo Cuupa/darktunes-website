@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ArrowUp, ArrowDown, Plus, Trash, Globe,
   InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo, TiktokLogo,
-  BandcampLogo, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
+  MusicNote, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
 } from '@phosphor-icons/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -153,7 +153,7 @@ export const SOCIAL_ICON_MAP: Record<string, IconComponent> = {
   FacebookLogo,
   TwitterLogo,
   TiktokLogo,
-  BandcampLogo,
+  BandcampLogo: MusicNote,
   DiscordLogo,
   TelegramLogo,
   LinkedinLogo,

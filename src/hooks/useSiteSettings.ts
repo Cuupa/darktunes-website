@@ -57,6 +57,14 @@ const DEFAULT_SETTINGS: SiteSettings = {
   homepageNewsCount: 3,
   contactTopics: [],
   customSocialLinks: [],
+  themePrimary: '',
+  themeSecondary: '',
+  themeBackground: '',
+  themeForeground: '',
+  themeCard: '',
+  themeMuted: '',
+  themeAccent: '',
+  themeBorder: '',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -115,6 +123,14 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     homepage_news_count: String(s.homepageNewsCount ?? 3),
     contact_topics: JSON.stringify((s.contactTopics ?? []) as ContactTopicConfig[]),
     custom_social_links: JSON.stringify(s.customSocialLinks ?? []),
+    theme_primary: s.themePrimary ?? '',
+    theme_secondary: s.themeSecondary ?? '',
+    theme_background: s.themeBackground ?? '',
+    theme_foreground: s.themeForeground ?? '',
+    theme_card: s.themeCard ?? '',
+    theme_muted: s.themeMuted ?? '',
+    theme_accent: s.themeAccent ?? '',
+    theme_border: s.themeBorder ?? '',
   }
 }
 
