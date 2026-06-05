@@ -4,6 +4,7 @@ import { Providers } from './_components/Providers'
 import { NavHidingWrapper } from './_components/ConditionalSiteHeader'
 import { SiteHeader } from './_components/SiteHeader'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
+import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { WebVitals } from './web-vitals'
@@ -93,6 +94,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         ) : (
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         )}
+        {/* Inject admin-configured color token overrides before first paint */}
+        <ThemeStyleInjector
+          themePrimary={settings?.themePrimary}
+          themeSecondary={settings?.themeSecondary}
+          themeBackground={settings?.themeBackground}
+          themeForeground={settings?.themeForeground}
+          themeCard={settings?.themeCard}
+          themeMuted={settings?.themeMuted}
+          themeAccent={settings?.themeAccent}
+          themeBorder={settings?.themeBorder}
+        />
       </head>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>
         <a

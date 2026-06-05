@@ -404,4 +404,39 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.datenschutzContent).toBe('## Datenschutz\nText here.')
     expect(result.consentPlaceholderUrl).toBe('https://cdn.example.com/placeholder.jpg')
   })
+
+  it('maps color theme tokens when set', async () => {
+    const db = makeMockDb([
+      { key: 'theme_primary',    value: '#ff0000' },
+      { key: 'theme_secondary',  value: '#00ff00' },
+      { key: 'theme_background', value: '#000000' },
+      { key: 'theme_foreground', value: '#ffffff' },
+      { key: 'theme_card',       value: '#111111' },
+      { key: 'theme_muted',      value: '#222222' },
+      { key: 'theme_accent',     value: '#0000ff' },
+      { key: 'theme_border',     value: '#333333' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.themePrimary).toBe('#ff0000')
+    expect(result.themeSecondary).toBe('#00ff00')
+    expect(result.themeBackground).toBe('#000000')
+    expect(result.themeForeground).toBe('#ffffff')
+    expect(result.themeCard).toBe('#111111')
+    expect(result.themeMuted).toBe('#222222')
+    expect(result.themeAccent).toBe('#0000ff')
+    expect(result.themeBorder).toBe('#333333')
+  })
+
+  it('returns empty strings for color theme tokens when not set', async () => {
+    const db = makeMockDb([{ key: 'label_name', value: 'Test' }])
+    const result = await getSiteSettings(db)
+    expect(result.themePrimary).toBe('')
+    expect(result.themeSecondary).toBe('')
+    expect(result.themeBackground).toBe('')
+    expect(result.themeForeground).toBe('')
+    expect(result.themeCard).toBe('')
+    expect(result.themeMuted).toBe('')
+    expect(result.themeAccent).toBe('')
+    expect(result.themeBorder).toBe('')
+  })
 })

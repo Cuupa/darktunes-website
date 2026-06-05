@@ -1,0 +1,244 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import React from 'react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { ColorThemeManager } from './ColorThemeManager'
+import type { SiteSettings } from '@/types'
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: mockToastSuccess, error: mockToastError },
+}))
+
+// Silence missing Radix UI / shadcn peers in jsdom
+vi.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
+    <button onClick={onClick} disabled={disabled} {...props}>{children}</button>
+  ),
+}))
+vi.mock('@/components/ui/input', () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+}))
+vi.mock('@/components/ui/label', () => ({
+  Label: ({ children, htmlFor }: { children?: React.ReactNode; htmlFor?: string }) => <label htmlFor={htmlFor}>{children}</label>,
+}))
+vi.mock('@/components/ui/separator', () => ({
+  Separator: () => <hr />,
+}))
+vi.mock('@/components/ui/badge', () => ({
+  Badge: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
+}))
+vi.mock('@phosphor-icons/react', () => ({
+  RotateCcw: () => null,
+  FloppyDisk: () => null,
+  X: () => null,
+  Warning: () => null,
+}))
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+function makeSettings(overrides: Partial<SiteSettings> = {}): SiteSettings {
+  return {
+    labelName: 'Test Label',
+    labelTagline: 'Tagline',
+    contactEmail: 'a@b.com',
+    privacyPolicyUrl: '/privacy',
+    termsUrl: '/terms',
+    instagramUrl: '',
+    youtubeUrl: '',
+    spotifyUrl: '',
+    spotifyPlaylistUri: '',
+    spotifyPlaylists: [],
+    heroBadge: '',
+    heroNewsBadge: '',
+    heroDescription: '',
+    seoTitle: '',
+    seoDescription: '',
+    ogTitle: '',
+    ogDescription: '',
+    impressumCompanyName: '',
+    impressumLegalForm: '',
+    impressumRepresentative: '',
+    impressumAddress: '',
+    impressumVatId: '',
+    impressumRegisterCourt: '',
+    impressumRegisterNumber: '',
+    impressumPhone: '',
+    impressumEmail: '',
+    datenschutzContent: '',
+    consentPlaceholderUrl: '',
+    noiseOpacity: 0.04,
+    crtScanlinesEnabled: true,
+    vignetteIntensity: 0.5,
+    shopifyStoreUrl: '',
+    youtubeChannelId: '',
+    videosPerPage: 9,
+    videosLinkToPage: false,
+    carouselAutoplayMs: 0,
+    featureToggles: { promoPool: true, editorTools: true },
+    homepageSectionOrder: [],
+    homepageNewsCount: 3,
+    contactTopics: [],
+    customSocialLinks: [],
+    themePrimary:    '',
+    themeSecondary:  '',
+    themeBackground: '',
+    themeForeground: '',
+    themeCard:       '',
+    themeMuted:      '',
+    themeAccent:     '',
+    themeBorder:     '',
+    ...overrides,
+  } as SiteSettings
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('ColorThemeManager', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders 8 color hex inputs', () => {
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={vi.fn()}
+      />,
+    )
+    // Each token has a hex text input with aria-label "<Token> hex value"
+    const labels = [
+      'Primary hex value',
+      'Secondary hex value',
+      'Background hex value',
+      'Foreground hex value',
+      'Card hex value',
+      'Muted hex value',
+      'Accent hex value',
+      'Border hex value',
+    ]
+    for (const label of labels) {
+      expect(screen.getByRole('textbox', { name: label })).toBeDefined()
+    }
+  })
+
+  it('calls onChange with updated color value on save', async () => {
+    const handleChange = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={handleChange}
+      />,
+    )
+    // Change the Primary hex input to the brand primary
+    const primaryInput = screen.getByRole('textbox', { name: 'Primary hex value' })
+    fireEvent.change(primaryInput, { target: { value: '#493687' } })
+
+    // Click Save
+    const saveButton = screen.getByRole('button', { name: /save theme/i })
+    fireEvent.click(saveButton)
+
+    await waitFor(() => {
+      expect(handleChange).toHaveBeenCalledTimes(1)
+      const calledWith = handleChange.mock.calls[0][0] as SiteSettings
+      expect(calledWith.themePrimary).toBe('#493687')
+    })
+  })
+
+  it('shows toast success after successful save', async () => {
+    const handleChange = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={handleChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
+    await waitFor(() => expect(mockToastSuccess).toHaveBeenCalledWith('Color theme saved'))
+  })
+
+  it('shows toast error when save fails', async () => {
+    const handleChange = vi.fn().mockRejectedValue(new Error('DB error'))
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={handleChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to save color theme'))
+  })
+
+  it('reset button clears a single field back to empty string', async () => {
+    const handleChange = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ColorThemeManager
+        value={makeSettings({ themePrimary: '#493687' })}
+        onChange={handleChange}
+      />,
+    )
+    // The Primary hex input should show the preset value
+    const primaryInput = screen.getByRole('textbox', { name: 'Primary hex value' }) as HTMLInputElement
+    expect(primaryInput.value).toBe('#493687')
+
+    // Click the reset button for Primary
+    fireEvent.click(screen.getByRole('button', { name: /reset primary to default/i }))
+
+    // Input should now be empty
+    expect(primaryInput.value).toBe('')
+  })
+
+  it('disables all inputs when isLoading is true', () => {
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={vi.fn()}
+        isLoading
+      />,
+    )
+    const inputs = screen.getAllByRole('textbox')
+    for (const input of inputs) {
+      expect((input as HTMLInputElement).disabled).toBe(true)
+    }
+  })
+
+  it('renders preset buttons', () => {
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /darkTunes Default/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Purple Night/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Red Ember/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Midnight Blue/i })).toBeDefined()
+  })
+
+  it('shows WCAG warning when contrast ratio is below 4.5:1', () => {
+    // #292929 vs #383838 produces ~1.2:1 contrast — well below AA
+    render(
+      <ColorThemeManager
+        value={makeSettings({ themeBackground: '#292929', themeForeground: '#383838' })}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/below the WCAG AA minimum/i)).toBeDefined()
+  })
+
+  it('does not show WCAG warning for high-contrast colors', () => {
+    // #101010 vs #ffffff produces ~19:1 contrast — well above AA
+    render(
+      <ColorThemeManager
+        value={makeSettings({ themeBackground: '#101010', themeForeground: '#ffffff' })}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText(/below the WCAG AA minimum/i)).toBeNull()
+  })
+})

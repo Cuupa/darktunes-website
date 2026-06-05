@@ -25,6 +25,7 @@ import {
   ArrowsDownUp,
   CheckCircle,
   FileText,
+  Palette,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -52,6 +53,7 @@ const PressManager = lazy(() => import('./PressManager').then((m) => ({ default:
 const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager').then((m) => ({ default: m.ReleaseSubmissionsManager })))
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
+const ColorThemeManager = lazy(() => import('./ColorThemeManager').then((m) => ({ default: m.ColorThemeManager })))
 
 function TabFallback() {
   return (
@@ -73,6 +75,7 @@ type TabValue =
   | 'settings' | 'health' | 'media' | 'users' | 'features'
   | 'feature-flags' | 'messages' | 'accreditations' | 'press' | 'logs' | 'roles'
   | 'statements' | 'release-submissions' | 'video-submissions' | 'submission-form'
+  | 'color-theme'
 
 interface TabDef {
   value: TabValue
@@ -103,6 +106,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
   { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
   { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
+  { value: 'color-theme',         label: 'Color Theme',         adminOnly: true,  icon: Palette },
 ]
 
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
@@ -130,6 +134,7 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   'release-submissions': { title: 'Release Submissions',          description: 'Review and manage artist release submissions.' },
   'video-submissions':   { title: 'Video Submissions',            description: 'Review and manage artist music video submissions.' },
   'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
+  'color-theme':         { title: 'Color Theme Editor',           description: 'Customise the site-wide color palette by overriding CSS design tokens. Changes are applied live without a deploy.' },
 }
 
 function isValidTab(value: string | null): value is TabValue {
@@ -395,6 +400,13 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
               'release-submissions': <ReleaseSubmissionsManager />,
               'video-submissions':   <VideoSubmissionsManager />,
               'submission-form':     <SubmissionFormManager />,
+              'color-theme':         (
+                <ColorThemeManager
+                  value={siteSettings}
+                  onChange={saveSettings}
+                  isLoading={siteSettingsLoading}
+                />
+              ),
             }
 
             return TAB_DEFS.map(({ value, adminOnly }) => {
