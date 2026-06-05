@@ -8,6 +8,7 @@
     "kill": "fuser -k 3000/tcp",
     "build": "next build",
     "lint": "eslint .",
+    "ci": "npm run lint && npx tsc --noEmit && npm test && npm run build",
     "preview": "next start",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",

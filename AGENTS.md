@@ -267,6 +267,26 @@ When adding new user-facing strings: add the English key to `en.json`, add the G
 Agent Workflow Requirements
 These rules apply specifically to AI agent runs on this project:
 Update AGENTS.md: AGENTS.md is the living specification of this project and serves as a dedicated, predictable place for context. If new conventions, patterns, or architectural decisions were introduced, add or update the relevant section in this file after every run.
+Iterative CI Self-Healing — MANDATORY: After every code change, the agent MUST run
+the full local check suite and iterate until ALL commands exit with code 0.
+Never open a pull request while any check is still failing.
+
+Check sequence (run ALL in order after every fix, then restart from step 1):
+  1. `npm run lint`       — ESLint: read ALL errors before fixing any. Fix all, then re-run.
+  2. `npx tsc --noEmit`  — TypeScript strict check: fix all type errors. No `any` shortcuts.
+  3. `npm test`           — Vitest: all unit tests must pass green.
+  4. `npm run build`      — Next.js production build: fix all build errors.
+
+Iteration rules:
+  - After EVERY individual fix, re-run the FULL sequence from step 1 — never just the one
+    step that previously failed.
+  - Read ALL errors output by a command in one pass, then fix ALL of them before re-running.
+    Do not fix one error, re-run, fix the next — batch the fixes per command.
+  - A PR MUST NOT be opened until all four commands exit with code 0 in a single clean run.
+  - If fixing one check introduces a regression in a previously passing check, resolve the
+    regression before continuing.
+  - Suppression shortcuts (`as any`, `@ts-ignore`, `// eslint-disable`) added purely to
+    silence a failing check are FORBIDDEN — always fix the root cause.
 Review & Update All Docs and Scripts: At the END of EVERY agent session, review each of the following files for accuracy and update any section that is stale or inconsistent with the actual codebase:
   - README.md (quick start, scripts table, env-var table, project structure)
   - DEPLOYMENT.md (env-var names must match .env.example and scripts/vercel-install.sh exactly)
