@@ -10,7 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { UserRole, UserWithProfile, RoleChangeRecord, BanRecord } from '@/types/users'
+import type { UserRole, UserWithProfile, RoleChangeRecord, BanRecord, LinkedArtist } from '@/types/users'
 
 type DbClient = SupabaseClient<Database>
 
@@ -19,8 +19,9 @@ type DbClient = SupabaseClient<Database>
 // ---------------------------------------------------------------------------
 
 /**
- * Lists all auth users enriched with their `profiles` role and any linked
- * artist name.  Requires a service-role client (Supabase Admin API).
+ * Lists all auth users enriched with their `profiles` role, all roles from
+ * `user_roles`, and all linked artists from `artist_members`.
+ * Requires a service-role client (Supabase Admin API).
  */
 export async function listUsersWithProfiles(adminClient: DbClient): Promise<UserWithProfile[]> {
   // 1. Fetch all auth users via Admin API
@@ -43,7 +44,7 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
 
   const users = authData.users
 
-  // 2. Fetch all profiles (role)
+  // 2. Fetch primary roles from profiles
   const { data: profiles, error: profilesError } = await adminClient
     .from('profiles')
     .select('id, role')
@@ -55,35 +56,55 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
     profileMap.set(p.id, p.role as UserRole)
   }
 
-  // 3. Fetch artist memberships — join artist_members → artists to get
-  //    (user_id, artist_id, artist_name, artist_slug).
-  //    This reflects the current many-to-many model used by the link-artist API.
+  // 3. Fetch all user_roles rows for the full multi-role list
+  const { data: userRolesData } = await adminClient
+    .from('user_roles')
+    .select('user_id, role')
+
+  const userRolesMap = new Map<string, UserRole[]>()
+  for (const ur of userRolesData ?? []) {
+    const list = userRolesMap.get(ur.user_id) ?? []
+    list.push(ur.role as UserRole)
+    userRolesMap.set(ur.user_id, list)
+  }
+
+  // 4. Fetch artist memberships — join artist_members → artists
   const { data: memberships, error: membershipsError } = await adminClient
     .from('artist_members')
-    .select('user_id, artists!inner(id, name, slug)')
+    .select('user_id, member_role, artists!inner(id, name, slug)')
 
   if (membershipsError) throw new Error(membershipsError.message)
 
-  // Build a map keyed by user_id.  For users with multiple memberships we
-  // keep the first one (display purposes only).
-  const artistMap = new Map<string, { id: string; name: string; slug: string }>()
+  // Build a map keyed by user_id → all artist memberships
+  const artistsMap = new Map<string, LinkedArtist[]>()
   for (const m of memberships ?? []) {
-    if (!artistMap.has(m.user_id)) {
-      const a = (m as unknown as { artists: { id: string; name: string; slug: string } }).artists
-      if (a) artistMap.set(m.user_id, { id: a.id, name: a.name, slug: a.slug })
+    const a = (m as unknown as { artists: { id: string; name: string; slug: string } }).artists
+    if (a) {
+      const list = artistsMap.get(m.user_id) ?? []
+      list.push({ id: a.id, name: a.name, slug: a.slug, member_role: m.member_role })
+      artistsMap.set(m.user_id, list)
     }
   }
 
-  // 4. Merge
-  return users.map((u) => ({
-    id: u.id,
-    email: u.email ?? '',
-    role: profileMap.get(u.id) ?? 'user',
-    created_at: u.created_at,
-    last_sign_in_at: u.last_sign_in_at ?? null,
-    banned_until: u.banned_until ?? null,
-    linked_artist: artistMap.get(u.id) ?? null,
-  }))
+  // 5. Merge
+  return users.map((u) => {
+    const primaryRole = profileMap.get(u.id) ?? 'user'
+    const roles = userRolesMap.get(u.id) ?? [primaryRole]
+    const linkedArtists = artistsMap.get(u.id) ?? []
+    return {
+      id: u.id,
+      email: u.email ?? '',
+      role: primaryRole,
+      roles,
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at ?? null,
+      banned_until: u.banned_until ?? null,
+      linked_artist: linkedArtists[0]
+        ? { id: linkedArtists[0].id, name: linkedArtists[0].name, slug: linkedArtists[0].slug }
+        : null,
+      linked_artists: linkedArtists,
+    }
+  })
 }
 
 /**
@@ -175,8 +196,45 @@ export async function getBanHistory(
 // ---------------------------------------------------------------------------
 
 /**
+ * Adds a role to a user in the `user_roles` junction table.
+ * The trigger `trg_sync_primary_role` automatically updates `profiles.role`.
+ */
+export async function addUserRole(
+  adminClient: DbClient,
+  userId: string,
+  role: UserRole,
+  grantedBy: string,
+): Promise<void> {
+  const { error } = await adminClient
+    .from('user_roles')
+    .upsert({ user_id: userId, role, granted_by: grantedBy }, { onConflict: 'user_id,role' })
+
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Removes a role from a user in the `user_roles` junction table.
+ * The trigger `trg_sync_primary_role` automatically updates `profiles.role`.
+ */
+export async function removeUserRole(
+  adminClient: DbClient,
+  userId: string,
+  role: UserRole,
+): Promise<void> {
+  const { error } = await adminClient
+    .from('user_roles')
+    .delete()
+    .eq('user_id', userId)
+    .eq('role', role)
+
+  if (error) throw new Error(error.message)
+}
+
+/**
  * Updates the `role` column in `profiles` for the given user.
+ * Also ensures a matching row exists in `user_roles`.
  * Requires service-role client (bypasses RLS).
+ * @deprecated Prefer addUserRole / removeUserRole for multi-role support.
  */
 export async function updateUserRole(
   adminClient: DbClient,
@@ -318,3 +376,4 @@ export async function unlinkArtistFromUser(db: DbClient, artistId: string): Prom
 
   if (error) throw new Error(error.message)
 }
+

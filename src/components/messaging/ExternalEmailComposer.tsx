@@ -21,6 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 interface ExternalEmailComposerProps {
   /** Pre-fill the recipient address (e.g. when forwarding). */
@@ -39,6 +42,7 @@ export function ExternalEmailComposer({
   defaultHtml = '',
   onSent,
 }: ExternalEmailComposerProps) {
+  const dict = useDict()
   const [open, setOpen] = useState(false)
   const [to, setTo] = useState(defaultTo)
   const [subject, setSubject] = useState(defaultSubject)
@@ -59,12 +63,12 @@ export function ExternalEmailComposer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: to.trim(), subject: subject.trim(), html, replyTo: replyTo.trim() || undefined }),
       })
-      const data = await res.json() as { ok?: boolean; error?: string; hint?: string }
+      const data = await res.json() as ApiErrorResponse & { ok?: boolean; hint?: string }
       if (!res.ok) {
         if (res.status === 501) {
-          setError(`SMTP not configured on the server. ${data.hint ?? ''}`)
+          setError(dict.errors.EMAIL_NOT_CONFIGURED)
         } else {
-          setError(data.error ?? 'Failed to send email')
+          setError(getErrorMessage(data, dict))
         }
         return
       }
@@ -76,11 +80,11 @@ export function ExternalEmailComposer({
       setReplyTo('')
       onSent?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error')
+      setError(e instanceof Error ? e.message : dict.errors.SERVER_ERROR)
     } finally {
       setSending(false)
     }
-  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent])
+  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent, dict])
 
   return (
     <Dialog

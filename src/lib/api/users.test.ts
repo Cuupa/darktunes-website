@@ -54,7 +54,10 @@ function makeAdminClient(opts: {
   listUsersError?: unknown
   profilesData?: unknown
   profilesError?: unknown
-  /** Data returned for the artist_members join query (second .from() call). */
+  /** Data returned for the user_roles query (multi-role). */
+  userRolesData?: unknown
+  userRolesError?: unknown
+  /** Data returned for the artist_members join query. */
   membershipsData?: unknown
   membershipsError?: unknown
   updateUserError?: unknown
@@ -67,6 +70,8 @@ function makeAdminClient(opts: {
     listUsersError = null,
     profilesData = [],
     profilesError = null,
+    userRolesData = [],
+    userRolesError = null,
     membershipsData = [],
     membershipsError = null,
     updateUserError = null,
@@ -75,10 +80,12 @@ function makeAdminClient(opts: {
     fromError = null,
   } = opts
 
-  // Each call to .from() gets a fresh builder with the appropriate data
+  // Each call to .from() gets a fresh builder with the appropriate data.
+  // Order matches listUsersWithProfiles: profiles → user_roles → artist_members → …
   let callCount = 0
   const responses = [
     { data: profilesData, error: profilesError },
+    { data: userRolesData, error: userRolesError },
     { data: membershipsData, error: membershipsError },
     { data: fromData, error: fromError },
   ]
@@ -144,9 +151,9 @@ describe('listUsersWithProfiles', () => {
         },
       ],
       profilesData: [{ id: 'user-1', role: 'user' }],
-      // artist_members join shape: { user_id, artists: { id, name, slug } }
+      // artist_members join shape: { user_id, member_role, artists: { id, name, slug } }
       membershipsData: [
-        { user_id: 'user-1', artists: { id: 'artist-1', name: 'Dark Band', slug: 'dark-band' } },
+        { user_id: 'user-1', member_role: 'owner', artists: { id: 'artist-1', name: 'Dark Band', slug: 'dark-band' } },
       ],
     })
 

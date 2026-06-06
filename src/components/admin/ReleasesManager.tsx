@@ -44,6 +44,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
 import type { SyncAllResult } from '@/lib/sync/syncAll'
@@ -128,6 +131,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
 }
 
 export function ReleasesManager() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -235,7 +239,7 @@ export function ReleasesManager() {
       }
       setDialogOpen(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsMutating(false)
     }
@@ -249,7 +253,7 @@ export function ReleasesManager() {
       toast.success(`Deleted "${deleteTarget.title}"`)
       setDeleteTarget(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Delete failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsMutating(false)
     }
@@ -276,7 +280,7 @@ export function ReleasesManager() {
         )
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Sync failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 
@@ -286,7 +290,7 @@ export function ReleasesManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
+      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
 
       const res = await fetch('/api/admin/cleanup-orphaned-releases', {
         method: 'POST',
@@ -296,8 +300,8 @@ export function ReleasesManager() {
       })
 
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
 
       const { deleted } = (await res.json()) as { deleted: number }
@@ -307,7 +311,7 @@ export function ReleasesManager() {
         toast.info('No orphaned releases found')
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Cleanup failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsCleaningUp(false)
     }
@@ -319,7 +323,7 @@ export function ReleasesManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
+      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
 
       const res = await fetch('/api/admin/resolve-release-smart-link', {
         method: 'POST',
@@ -331,8 +335,8 @@ export function ReleasesManager() {
       })
 
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
 
       const { smartUrl } = (await res.json()) as { smartUrl: string }
@@ -340,7 +344,7 @@ export function ReleasesManager() {
         `Smart link resolved for "${release.title}": ${smartUrl.slice(0, 50)}…`,
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to resolve smart link')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setResolvingSmartLinkId(null)
     }
@@ -351,7 +355,7 @@ export function ReleasesManager() {
       await updateRelease(release.id, { is_visible: !release.isVisible })
       toast.success(`"${release.title}" is now ${!release.isVisible ? 'visible' : 'hidden'}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Update failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 
@@ -363,7 +367,7 @@ export function ReleasesManager() {
       const items = await getOrCreateReleaseChecklist(supabase, release.artistId, release.id)
       setChecklistItems(items)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load checklist')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setChecklistLoading(false)
     }
@@ -374,7 +378,7 @@ export function ReleasesManager() {
       const updated = await toggleChecklistItem(supabase, item.id, !item.isCompleted)
       setChecklistItems((prev) => prev.map((i) => i.id === updated.id ? updated : i))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update checklist')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 
@@ -391,7 +395,7 @@ export function ReleasesManager() {
       )
       toast.success('All checklist items marked as done')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to mark all done')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 

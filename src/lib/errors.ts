@@ -11,10 +11,15 @@
  *
  * Any unhandled error is caught, logged, and returned as a standardised
  * JSON error response with the correct HTTP status code.
+ *
+ * Prefer `buildApiError` over `new ApiError` when the error maps to a
+ * well-known code in errorCodes.ts — this guarantees that the safe English
+ * fallback message never diverges from the dictionary.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
+import { type ErrorCode, ERROR_MESSAGES } from './errorCodes'
 
 // ---------------------------------------------------------------------------
 // ApiError — structured error thrown inside route handlers
@@ -29,6 +34,19 @@ export class ApiError extends Error {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+/**
+ * Factory that creates an ApiError from a typed ErrorCode.
+ * The human-readable message is drawn from ERROR_MESSAGES so it is always
+ * safe (no internal details) and consistent with the i18n dictionary.
+ *
+ * @example
+ *   throw buildApiError('UPLOAD_TOO_LARGE', 413)
+ *   throw buildApiError('CONFIG_ERROR', 500)
+ */
+export function buildApiError(code: ErrorCode, status: number): ApiError {
+  return new ApiError(status, ERROR_MESSAGES[code], code)
 }
 
 // ---------------------------------------------------------------------------
@@ -118,11 +136,8 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
         method: req.method,
         stack: err instanceof Error ? (err.stack ?? null) : null,
       })
-      const message =
-        process.env.NODE_ENV === 'development' && err instanceof Error
-          ? err.message
-          : 'An unexpected server error occurred. Please try again later.'
-      return buildErrorResponse(message, 500, 'INTERNAL_SERVER_ERROR')
+      // Never expose internal error details — always return a safe generic message
+      return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
     }
   }
 }

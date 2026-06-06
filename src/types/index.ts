@@ -662,3 +662,47 @@ export interface SubmissionFormField {
   placeholderEn: string | null
   placeholderDe: string | null
 }
+
+// ---------------------------------------------------------------------------
+// Portal Messages — artist-to-artist / artist-to-label messaging
+// ---------------------------------------------------------------------------
+
+export interface PortalMessage {
+  id: string
+  fromArtistId: string
+  toArtistId: string | null
+  toLabel: boolean
+  subject: string
+  body: string
+  bodyHtml: string | null
+  sentAt: string
+  readAt: string | null
+  starred: boolean
+  deletedAt: string | null
+  folderId: string | null
+  hasAttachments: boolean
+  /** Populated by the API layer — sender artist name */
+  fromArtistName?: string
+  /** Populated by the API layer — recipient artist name */
+  toArtistName?: string
+}
+
+export interface PortalMessageFolder {
+  id: string
+  artistId: string
+  name: string
+  color: string | null
+  icon: string | null
+  position: number
+  createdAt: string
+}
+
+export interface PortalMessageAttachment {
+  id: string
+  messageId: string
+  fileUrl: string
+  fileName: string
+  fileSize: number | null
+  mimeType: string | null
+  createdAt: string
+}

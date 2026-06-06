@@ -18,7 +18,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import Image from 'next/image'
 import DOMPurify from 'dompurify'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,7 +38,7 @@ import {
   Envelope,
   MapPin,
   Calendar,
-  Printer,
+  FilePdf,
   X,
   Link as LinkIcon,
   Eye,
@@ -89,6 +88,10 @@ export interface EPKData {
   // password protection
   epkPasswordSections?: string[]
   epkPasswordHash?: string
+  /** Label name shown in the EPK footer — sourced from site settings. */
+  labelName?: string
+  /** Label logo URL shown in the EPK footer — sourced from site settings. */
+  labelLogoUrl?: string
 }
 
 interface EPKPreviewProps {
@@ -416,9 +419,19 @@ function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData
         {bodyNodes}
       </div>
       <div style={theme.footer}>
-        <p style={theme.footerText}>darkTunes Records</p>
-        <p style={theme.footerText}>{new Date().getFullYear()}</p>
-      </div>
+        {data.labelLogoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={data.labelLogoUrl}
+            alt={data.labelName ?? 'Label logo'}
+            style={{ height: '1.25rem', width: 'auto', objectFit: 'contain' }}
+          />
+        ) : (
+          <p style={theme.footerText}>
+            {data.labelName ?? 'Electronic Press Kit'}
+          </p>
+        )}
+        <p style={theme.footerText}>{new Date().getFullYear()}</p>      </div>
     </article>
   )
 }
@@ -436,8 +449,19 @@ interface EPKModalProps {
 
 export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
   const titleId = useId()
+  const [downloading, setDownloading] = useState(false)
 
-  const handlePrint = useCallback(() => { window.print() }, [])
+  const handleDownloadPdf = useCallback(async () => {
+    setDownloading(true)
+    try {
+      const { generateEpkPdf } = await import('./epkPdf')
+      await generateEpkPdf(data)
+    } catch {
+      toast.error(dict.profile_error)
+    } finally {
+      setDownloading(false)
+    }
+  }, [data, dict.profile_error])
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(window.location.href).then(() => {
@@ -461,9 +485,15 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
               <LinkIcon size={13} aria-hidden="true" />
               {dict.profile_epk_copy_link}
             </Button>
-            <Button size="sm" variant="outline" onClick={handlePrint} className="gap-1.5 text-xs">
-              <Printer size={13} aria-hidden="true" />
-              {dict.profile_download_epk}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleDownloadPdf()}
+              disabled={downloading}
+              className="gap-1.5 text-xs"
+            >
+              <FilePdf size={13} aria-hidden="true" />
+              {downloading ? '…' : dict.profile_download_epk}
             </Button>
             <Button size="icon" variant="ghost" onClick={onClose} className="h-8 w-8" aria-label={dict.profile_epk_close_preview}>
               <X size={16} aria-hidden="true" />

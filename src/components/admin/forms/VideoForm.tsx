@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/select'
 import type { Artist } from '@/types'
 import { ImageUploadButton } from './ImageUploadButton'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 export interface VideoFormData {
   title: string
@@ -37,6 +40,7 @@ type Props = AdminPanelProps<VideoFormData> & { artists?: Artist[] }
 const localExtractYouTubeId = extractYouTubeVideoId
 
 export function VideoForm({ value, onChange, isLoading, artists }: Props) {
+  const dict = useDict()
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset } = useForm<VideoFormData>({
     defaultValues: value,
@@ -101,8 +105,8 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
       })
 
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
 
       const info = (await res.json()) as {
@@ -118,7 +122,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
       if (info.thumbnailUrl) setValue('thumbnailUrl', info.thumbnailUrl)
       toast.success('Video info fetched from YouTube')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to fetch YouTube info')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsFetchingInfo(false)
     }

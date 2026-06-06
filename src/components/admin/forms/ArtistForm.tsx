@@ -25,6 +25,9 @@ import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 import { AssetPicker } from '../file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 /** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
 function classifyDiscogsUrl(url: string): keyof ArtistFormData | null {
@@ -127,6 +130,7 @@ type PrefillItunesResponse = {
 }
 
 export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistId }: Props) {
+  const dict = useDict()
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset, getValues, control } = useForm<ArtistFormData>({
     defaultValues: value,
@@ -191,14 +195,14 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         body: JSON.stringify({ spotifyId: spotifyId || undefined, discogsId: discogsId || undefined }),
       })
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
       const { imageUrl } = (await res.json()) as { imageUrl: string }
       setValue('imageUrl', imageUrl)
       toast.success('Image fetched successfully')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to fetch image')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsFetchingImage(false)
     }
@@ -222,8 +226,8 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         body: JSON.stringify({ spotifyUrl: source }),
       })
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
       const profile = (await res.json()) as {
         spotifyId: string; name: string; imageUrl: string | null; genres: string[]; spotifyUrl: string
@@ -236,7 +240,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       setValue('spotifyUrl', profile.spotifyUrl)
       toast.success('Artist data prefilled from Spotify')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to prefill from Spotify')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsPrefillingSpotify(false)
     }
@@ -258,8 +262,8 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         body: JSON.stringify({ discogsId: discogsIdInput }),
       })
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
       const profile = (await res.json()) as { name: string; bio: string | null; imageUrl: string | null; urls: string[] }
       const current = getValues()
@@ -284,7 +288,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         : `Discogs enrichment applied for "${profile.name}"`
       toast.success(msg)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to enrich from Discogs')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsEnrichingDiscogs(false)
     }
@@ -306,8 +310,8 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         body: JSON.stringify({ appleMusicUrl: appleMusicUrlInput }),
       })
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? `HTTP ${res.status}`)
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
       const profile: PrefillItunesResponse = await res.json()
       const current = getValues()
@@ -317,7 +321,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       setValue('appleMusicUrl', profile.appleMusicUrl)
       toast.success('Artist data prefilled from Apple Music')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to prefill from Apple Music')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsPrefillingItunes(false)
     }

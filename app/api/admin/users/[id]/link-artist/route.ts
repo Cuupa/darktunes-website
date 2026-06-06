@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -23,6 +23,8 @@ import { ApiError, withErrorHandler } from '@/lib/errors'
 const patchSchema = z.object({
   artistId: z.string().uuid().nullable(),
   memberRole: z.enum(['owner', 'member', 'guest']).optional().default('owner'),
+  /** When true and artistId is provided, removes that specific membership instead of adding */
+  remove: z.boolean().optional().default(false),
 })
 
 // ---------------------------------------------------------------------------
@@ -67,7 +69,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   }
 
   const userId = extractUserId(req)
-  const { artistId, memberRole } = parsed.data
+  const { artistId, memberRole, remove } = parsed.data
 
   const adminClient = await createServiceRoleSupabaseClient()
 
@@ -78,7 +80,16 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       .delete()
       .eq('user_id', userId)
 
-    if (deleteErr) throw new ApiError(500, deleteErr.message)
+    if (deleteErr) throw buildApiError('DB_ERROR', 500)
+  } else if (remove === true) {
+    // Remove a specific artist membership
+    const { error: deleteErr } = await adminClient
+      .from('artist_members')
+      .delete()
+      .eq('user_id', userId)
+      .eq('artist_id', artistId)
+
+    if (deleteErr) throw buildApiError('DB_ERROR', 500)
   } else {
     // Verify artist exists
     const { data: targetArtist, error: lookupErr } = await adminClient
@@ -87,15 +98,15 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       .eq('id', artistId)
       .maybeSingle()
 
-    if (lookupErr) throw new ApiError(500, lookupErr.message)
-    if (!targetArtist) throw new ApiError(404, 'Artist not found')
+    if (lookupErr) throw buildApiError('DB_ERROR', 500)
+    if (!targetArtist) throw buildApiError('NOT_FOUND', 404)
 
     // Add membership — ON CONFLICT updates the member_role if the row already exists
     const { error: upsertErr } = await adminClient
       .from('artist_members')
       .upsert({ user_id: userId, artist_id: artistId, member_role: memberRole }, { onConflict: 'user_id,artist_id' })
 
-    if (upsertErr) throw new ApiError(500, upsertErr.message)
+    if (upsertErr) throw buildApiError('DB_ERROR', 500)
   }
 
   return NextResponse.json({ success: true })

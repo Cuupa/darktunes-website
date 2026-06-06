@@ -65,9 +65,16 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unreadCount } = useUnreadMessages()
-  // Track which artist is active in the sidebar for display purposes.
-  // Defaults to the first artist; multi-artist users can switch via the dropdown.
-  const [activeArtistIndex, setActiveArtistIndex] = useState(0)
+
+  // Determine active artist from URL ?artistId param, falling back to first artist.
+  const searchParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams()
+  const activeArtistIdFromUrl = searchParams.get('artistId')
+  const defaultIndex = activeArtistIdFromUrl
+    ? Math.max(0, artists.findIndex((a) => a.id === activeArtistIdFromUrl))
+    : 0
+  const [activeArtistIndex, setActiveArtistIndex] = useState(defaultIndex)
 
   const activeArtist = artists[activeArtistIndex] ?? null
 
@@ -81,6 +88,16 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
     await supabase.auth.signOut()
     toast.success(dict.signOut)
     router.push('/portal/login')
+    router.refresh()
+  }
+
+  /** Switch active artist — updates index and reloads the page with ?artistId */
+  const handleArtistSwitch = (idx: number) => {
+    setActiveArtistIndex(idx)
+    const artist = artists[idx]
+    if (!artist) return
+    // Navigate to same pathname with new artistId so all server components reload
+    router.push(`${pathname}?artistId=${artist.id}`)
     router.refresh()
   }
 
@@ -132,7 +149,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
             {artists.map((a, idx) => (
               <DropdownMenuItem
                 key={a.id}
-                onSelect={() => setActiveArtistIndex(idx)}
+                onSelect={() => handleArtistSwitch(idx)}
                 className={idx === activeArtistIndex ? 'font-semibold text-primary' : ''}
               >
                 {a.name}

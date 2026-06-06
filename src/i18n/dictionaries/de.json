@@ -846,5 +846,29 @@
     "submission_status": "Status",
     "submission_no_reply": "Noch keine Antwort",
     "submission_details": "Details"
+  },
+  "errors": {
+    "AUTH_REQUIRED": "Bitte melde dich an, um fortzufahren.",
+    "AUTH_TOKEN_INVALID": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    "AUTH_TOKEN_MISSING": "Anmeldung erforderlich. Bitte melde dich an.",
+    "FORBIDDEN": "Du hast keine Berechtigung dafür.",
+    "FORBIDDEN_ADMIN_ONLY": "Admin-Zugang erforderlich.",
+    "FORBIDDEN_NO_ARTIST": "Dein Konto ist noch mit keinem Künstlerprofil verknüpft.",
+    "FORBIDDEN_JOURNALIST_ONLY": "Diese Aktion ist nur für Journalisten verfügbar.",
+    "NOT_FOUND": "Der gesuchte Eintrag wurde nicht gefunden.",
+    "CONFLICT": "Ein doppelter Eintrag existiert bereits.",
+    "UPLOAD_TOO_LARGE": "Die Datei ist zu groß. Bitte wähle eine kleinere Datei.",
+    "UPLOAD_WRONG_TYPE": "Dieses Dateiformat wird nicht unterstützt.",
+    "UPLOAD_NO_FILE": "Es wurde keine Datei übermittelt. Bitte wähle eine Datei aus.",
+    "UPLOAD_PARSE_FAILED": "Die Datei konnte nicht gelesen werden. Bitte versuche es erneut.",
+    "STORAGE_QUOTA_EXCEEDED": "Das Speicherkontingent ist erschöpft. Bitte wende dich an den Support.",
+    "VALIDATION_ERROR": "Einige Felder enthalten ungültige Werte. Bitte überprüfe das Formular.",
+    "RATE_LIMITED": "Zu viele Anfragen. Bitte warte kurz und versuche es erneut.",
+    "EMAIL_SEND_FAILED": "Deine Nachricht konnte nicht gesendet werden. Bitte versuche es später erneut.",
+    "EMAIL_NOT_CONFIGURED": "Der E-Mail-Dienst ist derzeit nicht verfügbar.",
+    "EXTERNAL_API_ERROR": "Ein externer Dienst ist momentan nicht verfügbar. Bitte versuche es später erneut.",
+    "SERVER_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
+    "CONFIG_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
+    "DB_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut."
   }
 }

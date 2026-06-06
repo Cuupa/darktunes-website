@@ -259,6 +259,8 @@ export async function middleware(request: NextRequest) {
   // (e.g. app/portal/layout.tsx) can read it without importing next/headers
   // in a way that requires a client context.
   supabaseResponse.headers.set('x-pathname', pathname)
+  // Forward the full URL (including query string) so portal layout can extract ?artistId
+  supabaseResponse.headers.set('x-url', request.url)
 
   return supabaseResponse
 }

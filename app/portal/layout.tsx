@@ -143,8 +143,23 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     )
   }
 
-  // Use the first artist as the active artist for single-artist sidebar display
-  const artist = artists[0] ?? null
+  // Determine the active artist from the ?artistId query param (read from request URL via headers),
+  // falling back to the first artist.
+  const { headers } = await import('next/headers')
+  const headersList = await headers()
+  const currentPath = headersList.get('x-pathname') ?? ''
+  const requestUrl = headersList.get('x-url') ?? ''
+  let requestedArtistId: string | null = null
+  try {
+    if (requestUrl) {
+      requestedArtistId = new URL(requestUrl).searchParams.get('artistId')
+    }
+  } catch {
+    // ignore malformed URL
+  }
+  const artist = (requestedArtistId
+    ? artists.find((a) => a.id === requestedArtistId)
+    : null) ?? artists[0] ?? null
 
   const [featureFlags, unreadMessagesResult, artistProfile] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
@@ -165,9 +180,6 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   // Redirect to onboarding if the artist profile is incomplete and the wizard
   // has not been completed/skipped yet.  We skip the redirect when the user is
   // already on the /portal/onboarding route to avoid a redirect loop.
-  const { headers } = await import('next/headers')
-  const headersList = await headers()
-  const currentPath = headersList.get('x-pathname') ?? ''
   const isOnOnboarding = currentPath.startsWith('/portal/onboarding')
 
   if (
