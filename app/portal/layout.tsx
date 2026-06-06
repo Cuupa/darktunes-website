@@ -21,7 +21,6 @@ import type { ReactNode } from 'react'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistsByUserId, getArtistProfileByArtistId, isProfileComplete } from '@/lib/api/artistProfiles'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
@@ -31,6 +30,7 @@ import { PortalNotificationProvider } from './_components/PortalNotificationProv
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 export const metadata: Metadata = {
   title: 'Artist Portal — darkTunes Music Group',
@@ -77,8 +77,7 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 }
 
 async function PortalLayoutContent({ children }: { children: ReactNode }) {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const dict = await getPortalDictionary()
 
   const supabase = await createServerSupabaseClient()
   const {

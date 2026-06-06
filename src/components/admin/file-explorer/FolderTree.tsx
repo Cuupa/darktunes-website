@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CaretDown, CaretRight, FolderOpen, FolderSimple, MusicNote, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { AssetFolder } from '@/types'
 import { buildFolderTree } from './utils'
@@ -93,7 +92,7 @@ export function FolderTree({ folders, currentFolderId, onNavigate, onCreateRootF
           <Plus size={18} aria-hidden="true" />
         </Button>
       </div>
-      <ScrollArea className="min-h-0 flex-1 px-2 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
         <div className="space-y-2">
           <button type="button" className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted', currentFolderId === null && 'bg-primary/10 text-primary')} onClick={() => onNavigate(null)}>
             <FolderSimple size={18} className="text-primary" aria-hidden="true" />
@@ -117,7 +116,7 @@ export function FolderTree({ folders, currentFolderId, onNavigate, onCreateRootF
             ))}
           </ul>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

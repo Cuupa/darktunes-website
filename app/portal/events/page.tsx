@@ -7,14 +7,14 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getNewsPosts } from '@/lib/api/news'
 import { getArtists } from '@/lib/api/artists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EventManager } from './_components/EventManager'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function EventsSkeleton() {
   return (
@@ -27,16 +27,16 @@ function EventsSkeleton() {
   )
 }
 
-async function EventsContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function EventsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const [concerts, allArtists, newsPosts] = await Promise.all([
     artist ? getConcertsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
     getArtists(supabase).catch(() => []),
@@ -54,10 +54,10 @@ async function EventsContent() {
   )
 }
 
-export default function EventsPage() {
+export default function EventsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<EventsSkeleton />}>
-      <EventsContent />
+      <EventsContent searchParams={searchParams} />
     </Suspense>
   )
 }

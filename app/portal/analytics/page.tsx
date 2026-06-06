@@ -8,15 +8,15 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import {
   getStreamingStatsByArtistId,
   getAggregatedStreamsByPlatform,
 } from '@/lib/api/streamingStats'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StreamingChart } from './_components/StreamingChart'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function AnalyticsSkeleton() {
   return (
@@ -31,9 +31,9 @@ function AnalyticsSkeleton() {
   )
 }
 
-async function AnalyticsContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function AnalyticsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -42,7 +42,7 @@ async function AnalyticsContent() {
 
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const stats = artist
     ? await getStreamingStatsByArtistId(supabase, artist.id).catch(() => [])
     : []
@@ -52,10 +52,10 @@ async function AnalyticsContent() {
   return <StreamingChart dict={dict.portal} stats={stats} aggregates={aggregates} />
 }
 
-export default function AnalyticsPage() {
+export default function AnalyticsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<AnalyticsSkeleton />}>
-      <AnalyticsContent />
+      <AnalyticsContent searchParams={searchParams} />
     </Suspense>
   )
 }

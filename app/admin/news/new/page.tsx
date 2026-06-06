@@ -85,9 +85,7 @@ export default function NewsNewPage() {
         }
       }
       toast.success(`Created "${data.title}"`)
-      router.push('/admin?tab=news')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Create failed')
+      router.push('/admin/content?tab=news')
     } finally {
       setIsSaving(false)
     }

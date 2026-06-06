@@ -6,6 +6,8 @@
  *  2. The `Accept-Language` request header (browser default)
  *  3. Falls back to German (`de`) as the site's primary language.
  *
+ * The Artist Portal uses `getPortalLocale()` which defaults to English (`en`).
+ *
  * IMPORTANT: This module uses `cookies()` and `headers()` from `next/headers`,
  * which are only available in Server Components and Route Handlers.
  * Never call this from a Client Component.
@@ -16,6 +18,7 @@ import type { Dictionary, Locale } from './types'
 
 const SUPPORTED_LOCALES: Locale[] = ['en', 'de']
 const DEFAULT_LOCALE: Locale = 'de'
+const PORTAL_DEFAULT_LOCALE: Locale = 'en'
 
 /** Dynamically load a locale's dictionary JSON. */
 const loaders: Record<Locale, () => Promise<Dictionary>> = {
@@ -57,6 +60,31 @@ export async function getLocale(): Promise<Locale> {
 }
 
 /**
+ * Resolve the active locale for the Artist Portal.
+ * Same logic as getLocale() but defaults to English when no explicit preference is set.
+ */
+export async function getPortalLocale(): Promise<Locale> {
+  try {
+    // 1. Cookie preference (highest priority)
+    const cookieStore = await cookies()
+    const cookieLocale = cookieStore.get('NEXT_LOCALE')?.value
+    if (cookieLocale && (SUPPORTED_LOCALES as string[]).includes(cookieLocale)) {
+      return cookieLocale as Locale
+    }
+
+    // 2. Accept-Language header
+    const headerStore = await headers()
+    const acceptLanguage = headerStore.get('accept-language') ?? ''
+    const fromHeader = parseAcceptLanguage(acceptLanguage)
+    if (fromHeader) return fromHeader
+  } catch {
+    // Outside a request context (e.g., during static build)
+  }
+
+  return PORTAL_DEFAULT_LOCALE
+}
+
+/**
  * Load the dictionary for the current locale.
  * Falls back to English if the locale dictionary fails to load.
  */
@@ -67,6 +95,20 @@ export async function getDictionary(locale?: Locale): Promise<Dictionary> {
     return await load()
   } catch {
     // Graceful fallback to English
+    return loaders.en()
+  }
+}
+
+/**
+ * Load the dictionary for the Artist Portal.
+ * Uses getPortalLocale() which defaults to English.
+ */
+export async function getPortalDictionary(): Promise<Dictionary> {
+  const locale = await getPortalLocale()
+  const load = loaders[locale] ?? loaders[PORTAL_DEFAULT_LOCALE]
+  try {
+    return await load()
+  } catch {
     return loaders.en()
   }
 }

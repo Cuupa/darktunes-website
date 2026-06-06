@@ -73,7 +73,7 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none min-h-[300px] p-4 focus:outline-none',
+        class: 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto p-4 focus:outline-none',
         ...(placeholder ? { 'data-placeholder': placeholder } : {}),
       },
     },

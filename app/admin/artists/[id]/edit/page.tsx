@@ -104,7 +104,7 @@ export default function ArtistEditPage() {
   useEffect(() => {
     if (!isLoading && artists.length > 0 && !artist) {
       toast.error('Artist not found')
-      router.push('/admin')
+      router.push('/admin/content?tab=artists')
     }
   }, [isLoading, artists.length, artist, router])
 
@@ -148,7 +148,7 @@ export default function ArtistEditPage() {
         }
       }
 
-      router.push('/admin')
+      router.push('/admin/content?tab=artists')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -161,9 +161,9 @@ export default function ArtistEditPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin">
+            <Link href="/admin/content?tab=artists">
               <ArrowLeft className="mr-2 w-4 h-4" />
-              Back to Admin
+              Back to Artists
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">
