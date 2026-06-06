@@ -56,6 +56,23 @@ export function LenisProvider({ children }: LenisProviderProps) {
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         touchMultiplier: 1.5,
         infinite: false,
+        // Yield to native scroll when the cursor is over an element that can
+        // scroll on its own (overflow-y: auto/scroll with scrollable content).
+        prevent: (node: Element) => {
+          let el: Element | null = node
+          while (el && el !== document.documentElement) {
+            const style = window.getComputedStyle(el)
+            const overflow = style.overflowY
+            if (
+              (overflow === 'auto' || overflow === 'scroll') &&
+              el.scrollHeight > el.clientHeight
+            ) {
+              return true
+            }
+            el = el.parentElement
+          }
+          return false
+        },
       }}
     >
       <ScrollLockObserver />

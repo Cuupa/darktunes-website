@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   CaretUpDown,
   ChartBar,
@@ -109,20 +109,23 @@ const NAV_GROUPS: NavGroup[] = [
 export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unreadCount } = useUnreadMessages()
 
-  // Determine active artist from URL ?artistId param, falling back to first artist.
-  const searchParams = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams()
-  const activeArtistIdFromUrl = searchParams.get('artistId')
-  const defaultIndex = activeArtistIdFromUrl
-    ? Math.max(0, artists.findIndex((a) => a.id === activeArtistIdFromUrl))
-    : 0
-  const [activeArtistIndex, setActiveArtistIndex] = useState(defaultIndex)
+  // Derive active artist directly from URL — no stale local state
+  const activeArtistId = searchParams.get('artistId')
+  const activeArtist = useMemo(
+    () =>
+      (activeArtistId ? artists.find((a) => a.id === activeArtistId) : null) ??
+      artists[0] ??
+      null,
+    [activeArtistId, artists],
+  )
 
-  const activeArtist = artists[activeArtistIndex] ?? null
+  /** Append artistId to nav links so server components always get the correct artist */
+  const navHref = (base: string) =>
+    artists.length > 1 && activeArtistId ? `${base}?artistId=${activeArtistId}` : base
 
   const navGroups = useMemo(
     () =>
@@ -141,12 +144,8 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
     router.refresh()
   }
 
-  /** Switch active artist — updates index and reloads the page with ?artistId */
-  const handleArtistSwitch = (idx: number) => {
-    setActiveArtistIndex(idx)
-    const artist = artists[idx]
-    if (!artist) return
-    // Navigate to same pathname with new artistId so all server components reload
+  /** Switch active artist — URL is the single source of truth */
+  const handleArtistSwitch = (artist: Artist) => {
     router.push(`${pathname}?artistId=${artist.id}`)
     router.refresh()
   }
@@ -164,7 +163,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
               return (
                 <Link
                   key={href}
-                  href={href}
+                  href={navHref(href)}
                   onClick={onNavigate}
                   className={[
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -205,11 +204,11 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            {artists.map((a, idx) => (
+            {artists.map((a) => (
               <DropdownMenuItem
                 key={a.id}
-                onSelect={() => handleArtistSwitch(idx)}
-                className={idx === activeArtistIndex ? 'font-semibold text-primary' : ''}
+                onSelect={() => handleArtistSwitch(a)}
+                className={a.id === activeArtist?.id ? 'font-semibold text-primary' : ''}
               >
                 {a.name}
               </DropdownMenuItem>
