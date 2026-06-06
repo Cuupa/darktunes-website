@@ -106,6 +106,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           themeMuted={settings?.themeMuted}
           themeAccent={settings?.themeAccent}
           themeBorder={settings?.themeBorder}
+          themeGradientHeroFrom={settings?.themeGradientHeroFrom}
+          themeGradientHeroTo={settings?.themeGradientHeroTo}
+          themeGradientHeroDir={settings?.themeGradientHeroDir}
+          themeGradientAccentFrom={settings?.themeGradientAccentFrom}
+          themeGradientAccentTo={settings?.themeGradientAccentTo}
+          themeGradientAccentDir={settings?.themeGradientAccentDir}
         />
       </head>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>

@@ -87,6 +87,12 @@ const DEFAULTS: SiteSettings = {
   themeMuted: '',
   themeAccent: '',
   themeBorder: '',
+  themeGradientHeroFrom: '',
+  themeGradientHeroTo: '',
+  themeGradientHeroDir: '135deg',
+  themeGradientAccentFrom: '',
+  themeGradientAccentTo: '',
+  themeGradientAccentDir: '135deg',
 }
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
@@ -241,6 +247,12 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     themeMuted: map['theme_muted'] ?? '',
     themeAccent: map['theme_accent'] ?? '',
     themeBorder: map['theme_border'] ?? '',
+    themeGradientHeroFrom: map['theme_gradient_hero_from'] ?? '',
+    themeGradientHeroTo: map['theme_gradient_hero_to'] ?? '',
+    themeGradientHeroDir: map['theme_gradient_hero_dir'] ?? '135deg',
+    themeGradientAccentFrom: map['theme_gradient_accent_from'] ?? '',
+    themeGradientAccentTo: map['theme_gradient_accent_to'] ?? '',
+    themeGradientAccentDir: map['theme_gradient_accent_dir'] ?? '135deg',
   }
 }
 

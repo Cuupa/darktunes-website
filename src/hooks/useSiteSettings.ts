@@ -65,6 +65,12 @@ const DEFAULT_SETTINGS: SiteSettings = {
   themeMuted: '',
   themeAccent: '',
   themeBorder: '',
+  themeGradientHeroFrom: '',
+  themeGradientHeroTo: '',
+  themeGradientHeroDir: '135deg',
+  themeGradientAccentFrom: '',
+  themeGradientAccentTo: '',
+  themeGradientAccentDir: '135deg',
 }
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
@@ -131,6 +137,12 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     theme_muted: s.themeMuted ?? '',
     theme_accent: s.themeAccent ?? '',
     theme_border: s.themeBorder ?? '',
+    theme_gradient_hero_from: s.themeGradientHeroFrom ?? '',
+    theme_gradient_hero_to: s.themeGradientHeroTo ?? '',
+    theme_gradient_hero_dir: s.themeGradientHeroDir ?? '135deg',
+    theme_gradient_accent_from: s.themeGradientAccentFrom ?? '',
+    theme_gradient_accent_to: s.themeGradientAccentTo ?? '',
+    theme_gradient_accent_dir: s.themeGradientAccentDir ?? '135deg',
   }
 }
 

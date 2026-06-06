@@ -33,11 +33,43 @@ vi.mock('@/components/ui/separator', () => ({
 vi.mock('@/components/ui/badge', () => ({
   Badge: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
 }))
+// Render all tab panels always so tests can inspect any panel without simulating clicks
+vi.mock('@/components/ui/tabs', () => ({
+  Tabs: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  TabsList: ({ children }: { children?: React.ReactNode }) => <div role="tablist">{children}</div>,
+  TabsTrigger: ({ children, value }: { children?: React.ReactNode; value?: string }) => (
+    <button role="tab" data-value={value}>{children}</button>
+  ),
+  TabsContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+}))
+vi.mock('@/components/ui/slider', () => ({
+  Slider: ({ value, onValueChange, min, max, step, disabled, ...props }: { value?: number[]; onValueChange?: (v: number[]) => void; min?: number; max?: number; step?: number; disabled?: boolean; [key: string]: unknown }) => (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      value={value?.[0] ?? 0}
+      onChange={(e) => onValueChange?.([parseFloat(e.target.value)])}
+      {...props}
+    />
+  ),
+}))
+vi.mock('@/components/ui/switch', () => ({
+  Switch: ({ checked, onCheckedChange, disabled }: { checked?: boolean; onCheckedChange?: (v: boolean) => void; disabled?: boolean }) => (
+    <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onCheckedChange?.(e.target.checked)} />
+  ),
+}))
 vi.mock('@phosphor-icons/react', () => ({
   ArrowCounterClockwise: () => null,
   FloppyDisk: () => null,
   X: () => null,
   Warning: () => null,
+  CheckCircle: () => null,
+  Eye: () => null,
+  FilmStrip: () => null,
+  Sun: () => null,
 }))
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -228,14 +260,23 @@ describe('ColorThemeManager', () => {
         onChange={vi.fn()}
       />,
     )
-    expect(screen.getByText(/below the WCAG AA minimum/i)).toBeDefined()
+    expect(screen.getAllByText(/below the WCAG AA minimum/i).length).toBeGreaterThan(0)
   })
 
   it('does not show WCAG warning for high-contrast colors', () => {
-    // #101010 vs #ffffff produces ~19:1 contrast — well above AA
+    // White background with all dark foreground tokens → all pairs pass ≥4.5:1
     render(
       <ColorThemeManager
-        value={makeSettings({ themeBackground: '#101010', themeForeground: '#ffffff' })}
+        value={makeSettings({
+          themeBackground: '#ffffff',
+          themeForeground: '#101010',
+          themeCard:       '#ffffff',
+          themeMuted:      '#383838',
+          themePrimary:    '#493687',
+          themeSecondary:  '#7e1e37',
+          themeAccent:     '#493687',
+          themeBorder:     '#292929',
+        })}
         onChange={vi.fn()}
       />,
     )

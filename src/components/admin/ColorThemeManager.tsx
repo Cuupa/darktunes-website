@@ -5,24 +5,31 @@
  *
  * Admin panel for customising the site's design-token color palette.
  *
- * Features:
- *  - 8 color rows, one per CSS custom property token
- *  - Native <input type="color"> picker + hex text input kept in sync
- *  - Per-row "Reset" button that clears the override (falls back to globals.css)
- *  - Live preview: changes are applied immediately to document.documentElement
- *    so the admin sees the site re-skin in real time
- *  - On cancel, original CSS property values are restored
- *  - 4 built-in palette presets for quick theming
- *  - WCAG contrast warning when background/foreground contrast < 4.5:1
+ * Tabs:
+ *  - Colors    : 8 CSS token rows + WCAG contrast check table for all key pairs
+ *  - Effects   : Noise opacity, CRT scanlines, vignette intensity
+ *  - Gradients : Hero & Accent gradients (from/to/direction + live preview)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ArrowCounterClockwise, FloppyDisk, X, Warning } from '@phosphor-icons/react'
+import {
+  ArrowCounterClockwise,
+  FloppyDisk,
+  X,
+  Warning,
+  CheckCircle,
+  Eye,
+  FilmStrip,
+  Sun,
+} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { SiteSettings } from '@/types'
 import { COLOR_PRESETS } from '@/config/colorPresets'
 import type { ThemePresetColors } from '@/config/colorPresets'
@@ -35,7 +42,6 @@ export interface ColorThemeManagerProps {
   isLoading?: boolean
 }
 
-// Use the shared ThemePresetColors type (also matches what TOKEN_ROWS keys need)
 type ThemeColors = ThemePresetColors
 
 interface TokenRow {
@@ -47,34 +53,56 @@ interface TokenRow {
 
 // ── Token definitions ────────────────────────────────────────────────────────
 
-/** Defaults from globals.css — shown as placeholder hints */
 const TOKEN_ROWS: TokenRow[] = [
   { key: 'themePrimary',    cssVar: '--primary',    label: 'Primary',    defaultHint: '#493687' },
   { key: 'themeSecondary',  cssVar: '--secondary',  label: 'Secondary',  defaultHint: '#7e1e37' },
   { key: 'themeBackground', cssVar: '--background', label: 'Background', defaultHint: '#101010' },
   { key: 'themeForeground', cssVar: '--foreground', label: 'Foreground', defaultHint: '#ffffff' },
-  { key: 'themeCard',       cssVar: '--card',       label: 'Card',       defaultHint: '#292929' },
+  { key: 'themeCard',       cssVar: '--card',       label: 'Card',       defaultHint: '#101010' },
   { key: 'themeMuted',      cssVar: '--muted',      label: 'Muted',      defaultHint: '#292929' },
   { key: 'themeAccent',     cssVar: '--accent',     label: 'Accent',     defaultHint: '#493687' },
-  { key: 'themeBorder',     cssVar: '--border',     label: 'Border',     defaultHint: '#383838' },
+  { key: 'themeBorder',     cssVar: '--border',     label: 'Border',     defaultHint: '#101010' },
+]
+
+/** Contrast pair definitions: [label, fgKey/hint, bgKey/hint] */
+const CONTRAST_PAIRS: Array<{ label: string; fg: string; bg: string; fgHint: string; bgHint: string }> = [
+  { label: 'Text on Background',    fg: 'themeForeground', bg: 'themeBackground', fgHint: '#ffffff', bgHint: '#101010' },
+  { label: 'Text on Card',          fg: 'themeForeground', bg: 'themeCard',       fgHint: '#ffffff', bgHint: '#101010' },
+  { label: 'Primary on Background', fg: 'themePrimary',    bg: 'themeBackground', fgHint: '#493687', bgHint: '#101010' },
+  { label: 'Secondary on Background',fg: 'themeSecondary', bg: 'themeBackground', fgHint: '#7e1e37', bgHint: '#101010' },
+  { label: 'Accent on Background',  fg: 'themeAccent',     bg: 'themeBackground', fgHint: '#493687', bgHint: '#101010' },
+  { label: 'Primary on Card',       fg: 'themePrimary',    bg: 'themeCard',       fgHint: '#493687', bgHint: '#101010' },
+  { label: 'Muted on Background',   fg: 'themeMuted',      bg: 'themeBackground', fgHint: '#292929', bgHint: '#101010' },
+]
+
+const GRADIENT_DIRECTIONS = [
+  { value: 'to right',       label: '→ To Right' },
+  { value: 'to left',        label: '← To Left' },
+  { value: 'to bottom',      label: '↓ To Bottom' },
+  { value: 'to top',         label: '↑ To Top' },
+  { value: '135deg',         label: '↘ 135°' },
+  { value: '45deg',          label: '↗ 45°' },
+  { value: '180deg',         label: '↓ 180°' },
+  { value: '90deg',          label: '→ 90°' },
 ]
 
 // ── WCAG contrast helpers ────────────────────────────────────────────────────
 
-/** Parse a 3- or 6-digit hex string to [r, g, b] in 0–255 range. */
 function hexToRgb(hex: string): [number, number, number] | null {
   const clean = hex.replace('#', '')
   if (clean.length === 3) {
-    const r = parseInt(clean[0] + clean[0], 16)
-    const g = parseInt(clean[1] + clean[1], 16)
-    const b = parseInt(clean[2] + clean[2], 16)
-    return [r, g, b]
+    return [
+      parseInt(clean[0] + clean[0], 16),
+      parseInt(clean[1] + clean[1], 16),
+      parseInt(clean[2] + clean[2], 16),
+    ]
   }
   if (clean.length === 6) {
-    const r = parseInt(clean.slice(0, 2), 16)
-    const g = parseInt(clean.slice(2, 4), 16)
-    const b = parseInt(clean.slice(4, 6), 16)
-    return [r, g, b]
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ]
   }
   return null
 }
@@ -113,21 +141,29 @@ function extractColors(s: SiteSettings): ThemeColors {
   }
 }
 
-/** Apply a ThemeColors object as live CSS custom properties on <html>. */
 function applyLive(colors: ThemeColors) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   TOKEN_ROWS.forEach(({ key, cssVar, defaultHint }) => {
-    const v = colors[key]
-    root.style.setProperty(cssVar, v || defaultHint)
+    root.style.setProperty(cssVar, colors[key] || defaultHint)
   })
 }
 
-/** Remove inline overrides, letting globals.css take over. */
 function removeLive() {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   TOKEN_ROWS.forEach(({ cssVar }) => root.style.removeProperty(cssVar))
+}
+
+function applyGradientLive(heroFrom: string, heroTo: string, heroDir: string, accentFrom: string, accentTo: string, accentDir: string) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  if (heroFrom && heroTo) {
+    root.style.setProperty('--gradient-hero', `linear-gradient(${heroDir || '135deg'}, ${heroFrom}, ${heroTo})`)
+  }
+  if (accentFrom && accentTo) {
+    root.style.setProperty('--gradient-accent', `linear-gradient(${accentDir || '135deg'}, ${accentFrom}, ${accentTo})`)
+  }
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -135,23 +171,49 @@ function removeLive() {
 export function ColorThemeManager({ value, onChange, isLoading = false }: ColorThemeManagerProps) {
   const [colors, setColors] = useState<ThemeColors>(() => extractColors(value))
   const [isSaving, setIsSaving] = useState(false)
-  // Snapshot taken on mount so we can restore on cancel
   const originalColors = useRef<ThemeColors>(extractColors(value))
 
-  // Keep local state in sync if parent re-fetches settings
+  // Effects state
+  const [noiseOpacity, setNoiseOpacity] = useState(() => value.noiseOpacity ?? 0.04)
+  const [crtEnabled, setCrtEnabled] = useState(() => value.crtScanlinesEnabled ?? true)
+  const [vignetteIntensity, setVignetteIntensity] = useState(() => value.vignetteIntensity ?? 0.5)
+  const originalEffects = useRef({ noiseOpacity: value.noiseOpacity ?? 0.04, crtEnabled: value.crtScanlinesEnabled ?? true, vignetteIntensity: value.vignetteIntensity ?? 0.5 })
+
+  // Gradient state
+  const [gradientHeroFrom, setGradientHeroFrom] = useState(() => value.themeGradientHeroFrom ?? '')
+  const [gradientHeroTo, setGradientHeroTo] = useState(() => value.themeGradientHeroTo ?? '')
+  const [gradientHeroDir, setGradientHeroDir] = useState(() => value.themeGradientHeroDir ?? '135deg')
+  const [gradientAccentFrom, setGradientAccentFrom] = useState(() => value.themeGradientAccentFrom ?? '')
+  const [gradientAccentTo, setGradientAccentTo] = useState(() => value.themeGradientAccentTo ?? '')
+  const [gradientAccentDir, setGradientAccentDir] = useState(() => value.themeGradientAccentDir ?? '135deg')
+  const originalGradients = useRef({ gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' })
+
   useEffect(() => {
     const fresh = extractColors(value)
     setColors(fresh)
     originalColors.current = fresh
+    const e = { noiseOpacity: value.noiseOpacity ?? 0.04, crtEnabled: value.crtScanlinesEnabled ?? true, vignetteIntensity: value.vignetteIntensity ?? 0.5 }
+    setNoiseOpacity(e.noiseOpacity)
+    setCrtEnabled(e.crtEnabled)
+    setVignetteIntensity(e.vignetteIntensity)
+    originalEffects.current = e
+    const g = { gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' }
+    setGradientHeroFrom(g.gradientHeroFrom)
+    setGradientHeroTo(g.gradientHeroTo)
+    setGradientHeroDir(g.gradientHeroDir)
+    setGradientAccentFrom(g.gradientAccentFrom)
+    setGradientAccentTo(g.gradientAccentTo)
+    setGradientAccentDir(g.gradientAccentDir)
+    originalGradients.current = g
   }, [value])
 
-  // Apply live preview whenever colors change
+  useEffect(() => { applyLive(colors) }, [colors])
   useEffect(() => {
-    applyLive(colors)
-  }, [colors])
+    applyGradientLive(gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir)
+  }, [gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
 
-  const handleColorChange = useCallback((key: keyof ThemeColors, newValue: string) => {
-    setColors((prev) => ({ ...prev, [key]: newValue }))
+  const handleColorChange = useCallback((key: keyof ThemeColors, v: string) => {
+    setColors((prev) => ({ ...prev, [key]: v }))
   }, [])
 
   const handleReset = useCallback((key: keyof ThemeColors) => {
@@ -165,144 +227,421 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
   const handleCancel = useCallback(() => {
     setColors(originalColors.current)
     applyLive(originalColors.current)
-    // If all originals are empty, remove inline overrides so globals.css wins
-    const allEmpty = Object.values(originalColors.current).every((v) => v === '')
-    if (allEmpty) removeLive()
+    if (Object.values(originalColors.current).every((v) => v === '')) removeLive()
+    setNoiseOpacity(originalEffects.current.noiseOpacity)
+    setCrtEnabled(originalEffects.current.crtEnabled)
+    setVignetteIntensity(originalEffects.current.vignetteIntensity)
+    const g = originalGradients.current
+    setGradientHeroFrom(g.gradientHeroFrom)
+    setGradientHeroTo(g.gradientHeroTo)
+    setGradientHeroDir(g.gradientHeroDir)
+    setGradientAccentFrom(g.gradientAccentFrom)
+    setGradientAccentTo(g.gradientAccentTo)
+    setGradientAccentDir(g.gradientAccentDir)
   }, [])
 
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
-      await onChange({ ...value, ...colors })
+      await onChange({
+        ...value,
+        ...colors,
+        noiseOpacity,
+        crtScanlinesEnabled: crtEnabled,
+        vignetteIntensity,
+        themeGradientHeroFrom: gradientHeroFrom,
+        themeGradientHeroTo: gradientHeroTo,
+        themeGradientHeroDir: gradientHeroDir,
+        themeGradientAccentFrom: gradientAccentFrom,
+        themeGradientAccentTo: gradientAccentTo,
+        themeGradientAccentDir: gradientAccentDir,
+      })
       originalColors.current = { ...colors }
+      originalEffects.current = { noiseOpacity, crtEnabled, vignetteIntensity }
+      originalGradients.current = { gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir }
       toast.success('Color theme saved')
     } catch {
       toast.error('Failed to save color theme')
     } finally {
       setIsSaving(false)
     }
-  }, [onChange, value, colors])
+  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
 
-  // WCAG contrast check
-  const bg = colors.themeBackground || '#101010'
-  const fg = colors.themeForeground || '#ffffff'
-  const ratio = contrastRatio(bg, fg)
-  const contrastFail = ratio !== null && ratio < 4.5
+  const disabled = isLoading || isSaving
 
   return (
     <div className="space-y-6">
-      {/* Preset palette buttons */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Quick Presets</p>
-        <div className="flex flex-wrap gap-2">
-          {COLOR_PRESETS.map((preset) => (
-            <Button
-              key={preset.name}
-              variant="outline"
-              size="sm"
-              onClick={() => handlePreset(preset)}
-              disabled={isLoading || isSaving}
-            >
-              {preset.name}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <Tabs defaultValue="colors">
+        <TabsList className="mb-4">
+          <TabsTrigger value="colors">Colors</TabsTrigger>
+          <TabsTrigger value="effects">Effects</TabsTrigger>
+          <TabsTrigger value="gradients">Gradients</TabsTrigger>
+          <TabsTrigger value="contrast">Contrast Check</TabsTrigger>
+        </TabsList>
 
-      <Separator />
-
-      {/* WCAG contrast warning */}
-      {contrastFail && (
-        <div className="flex items-center gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-400">
-          <Warning size={16} aria-hidden="true" className="shrink-0" />
-          <span>
-            Background / Foreground contrast ratio is{' '}
-            <strong>{ratio!.toFixed(2)}:1</strong> — below the WCAG AA minimum
-            of 4.5:1 for normal text.
-          </span>
-        </div>
-      )}
-
-      {/* Color token rows */}
-      <div className="space-y-4">
-        {TOKEN_ROWS.map(({ key, cssVar, label, defaultHint }) => {
-          const currentValue = colors[key]
-          const pickerValue = currentValue || defaultHint
-          return (
-            <div key={key} className="flex items-center gap-3">
-              {/* Color swatch + native picker */}
-              <div className="relative shrink-0">
-                <div
-                  className="h-9 w-9 rounded border border-border shadow-sm"
-                  style={{ backgroundColor: pickerValue }}
-                  aria-hidden="true"
-                />
-                <input
-                  type="color"
-                  id={`color-picker-${key}`}
-                  value={pickerValue}
-                  onChange={(e) => handleColorChange(key, e.target.value)}
-                  disabled={isLoading || isSaving}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label={`${label} color picker`}
-                />
-              </div>
-
-              {/* Label + CSS var hint */}
-              <div className="w-28 shrink-0">
-                <Label htmlFor={`color-hex-${key}`} className="text-sm font-medium">
-                  {label}
-                </Label>
-                <p className="text-xs text-muted-foreground">{cssVar}</p>
-              </div>
-
-              {/* Hex text input */}
-              <Input
-                id={`color-hex-${key}`}
-                type="text"
-                value={currentValue}
-                onChange={(e) => handleColorChange(key, e.target.value)}
-                placeholder={defaultHint}
-                disabled={isLoading || isSaving}
-                className="max-w-[140px] font-mono text-sm"
-                aria-label={`${label} hex value`}
-              />
-
-              {/* Reset button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleReset(key)}
-                disabled={isLoading || isSaving || currentValue === ''}
-                title={`Reset ${label} to default`}
-                aria-label={`Reset ${label} to default`}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <ArrowCounterClockwise size={15} aria-hidden="true" />
-              </Button>
+        {/* ── Colors Tab ──────────────────────────────────────────── */}
+        <TabsContent value="colors" className="space-y-6">
+          {/* Presets */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Quick Presets</p>
+            <div className="flex flex-wrap gap-2">
+              {COLOR_PRESETS.map((preset) => (
+                <Button key={preset.name} variant="outline" size="sm" onClick={() => handlePreset(preset)} disabled={disabled}>
+                  {preset.name}
+                </Button>
+              ))}
             </div>
-          )
-        })}
-      </div>
+          </div>
+
+          <Separator />
+
+          {/* Token rows */}
+          <div className="space-y-4">
+            {TOKEN_ROWS.map(({ key, cssVar, label, defaultHint }) => {
+              const current = colors[key]
+              const picker = current || defaultHint
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <div className="h-9 w-9 rounded border border-border shadow-sm" style={{ backgroundColor: picker }} aria-hidden="true" />
+                    <input
+                      type="color"
+                      id={`color-picker-${key}`}
+                      value={picker}
+                      onChange={(e) => handleColorChange(key, e.target.value)}
+                      disabled={disabled}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      aria-label={`${label} color picker`}
+                    />
+                  </div>
+                  <div className="w-28 shrink-0">
+                    <Label htmlFor={`color-hex-${key}`} className="text-sm font-medium">{label}</Label>
+                    <p className="text-xs text-muted-foreground">{cssVar}</p>
+                  </div>
+                  <Input
+                    id={`color-hex-${key}`}
+                    type="text"
+                    value={current}
+                    onChange={(e) => handleColorChange(key, e.target.value)}
+                    placeholder={defaultHint}
+                    disabled={disabled}
+                    className="max-w-[140px] font-mono text-sm"
+                    aria-label={`${label} hex value`}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleReset(key)}
+                    disabled={disabled || current === ''}
+                    title={`Reset ${label} to default`}
+                    aria-label={`Reset ${label} to default`}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowCounterClockwise size={15} aria-hidden="true" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </TabsContent>
+
+        {/* ── Effects Tab ─────────────────────────────────────────── */}
+        <TabsContent value="effects" className="space-y-8">
+          <p className="text-sm text-muted-foreground">Visual overlay effects applied site-wide. Changes are reflected immediately.</p>
+
+          {/* Noise / Film Grain */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FilmStrip size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Film Grain / Noise</Label>
+            </div>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={0} max={0.15} step={0.005}
+                value={[noiseOpacity]}
+                onValueChange={([v]) => setNoiseOpacity(v)}
+                disabled={disabled}
+                className="flex-1"
+                aria-label="Noise opacity"
+              />
+              <span className="w-12 text-right font-mono text-sm text-muted-foreground">{noiseOpacity.toFixed(3)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">0 = no grain, 0.15 = heavy grain. Default: 0.04</p>
+          </div>
+
+          <Separator />
+
+          {/* CRT Scanlines */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Eye size={16} className="text-muted-foreground" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium">CRT Scanlines</p>
+                <p className="text-xs text-muted-foreground">Animated horizontal scanline overlay — retro CRT monitor effect.</p>
+              </div>
+            </div>
+            <Switch
+              id="crt-scanlines"
+              checked={crtEnabled}
+              onCheckedChange={setCrtEnabled}
+              disabled={disabled}
+              aria-label="Toggle CRT scanlines"
+            />
+          </div>
+
+          <Separator />
+
+          {/* Vignette */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sun size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Vignette Intensity</Label>
+            </div>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={0} max={1} step={0.05}
+                value={[vignetteIntensity]}
+                onValueChange={([v]) => setVignetteIntensity(v)}
+                disabled={disabled}
+                className="flex-1"
+                aria-label="Vignette intensity"
+              />
+              <span className="w-12 text-right font-mono text-sm text-muted-foreground">{vignetteIntensity.toFixed(2)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">0 = no vignette, 1 = strong darkened edges. Default: 0.50</p>
+          </div>
+        </TabsContent>
+
+        {/* ── Gradients Tab ───────────────────────────────────────── */}
+        <TabsContent value="gradients" className="space-y-8">
+          <p className="text-sm text-muted-foreground">
+            Define gradient CSS variables (<code className="text-xs font-mono">--gradient-hero</code>, <code className="text-xs font-mono">--gradient-accent</code>)
+            that can be referenced anywhere in the site via <code className="text-xs font-mono">var(--gradient-hero)</code>.
+          </p>
+
+          {/* Hero Gradient */}
+          <div className="space-y-4">
+            <p className="text-sm font-semibold">Hero Gradient <code className="text-xs font-mono text-muted-foreground">--gradient-hero</code></p>
+            <GradientEditor
+              from={gradientHeroFrom} to={gradientHeroTo} dir={gradientHeroDir}
+              onFrom={setGradientHeroFrom} onTo={setGradientHeroTo} onDir={setGradientHeroDir}
+              disabled={disabled}
+              directions={GRADIENT_DIRECTIONS}
+              label="hero"
+            />
+          </div>
+
+          <Separator />
+
+          {/* Accent Gradient */}
+          <div className="space-y-4">
+            <p className="text-sm font-semibold">Accent Gradient <code className="text-xs font-mono text-muted-foreground">--gradient-accent</code></p>
+            <GradientEditor
+              from={gradientAccentFrom} to={gradientAccentTo} dir={gradientAccentDir}
+              onFrom={setGradientAccentFrom} onTo={setGradientAccentTo} onDir={setGradientAccentDir}
+              disabled={disabled}
+              directions={GRADIENT_DIRECTIONS}
+              label="accent"
+            />
+          </div>
+        </TabsContent>
+
+        {/* ── Contrast Check Tab ───────────────────────────────────── */}
+        <TabsContent value="contrast" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            WCAG 2.1 contrast ratios for all key color pairs. AA requires ≥ 4.5:1 for normal text, ≥ 3:1 for large text / UI components.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">Pair</th>
+                  <th className="py-2 pr-4 font-medium">Ratio</th>
+                  <th className="py-2 pr-4 font-medium">AA Normal</th>
+                  <th className="py-2 font-medium">AA Large / UI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CONTRAST_PAIRS.map(({ label, fg, bg, fgHint, bgHint }) => {
+                  const fgColor = (colors[fg as keyof ThemeColors] || fgHint)
+                  const bgColor = (colors[bg as keyof ThemeColors] || bgHint)
+                  const ratio = contrastRatio(fgColor, bgColor)
+                  const aaPass = ratio !== null && ratio >= 4.5
+                  const aaBigPass = ratio !== null && ratio >= 3
+                  return (
+                    <tr key={label} className="border-b border-border/50">
+                      <td className="py-2 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex h-5 w-10 rounded border border-border overflow-hidden shrink-0"
+                            aria-hidden="true"
+                          >
+                            <span className="flex-1" style={{ background: bgColor }} />
+                            <span className="flex-1" style={{ background: fgColor }} />
+                          </span>
+                          {label}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-4 font-mono">{ratio !== null ? `${ratio.toFixed(2)}:1` : '—'}</td>
+                      <td className="py-2 pr-4">
+                        {ratio !== null ? (
+                          aaPass
+                            ? <span className="flex items-center gap-1 text-emerald-400"><CheckCircle size={14} aria-hidden="true" />Pass</span>
+                            : <span className="flex items-center gap-1 text-yellow-400"><Warning size={14} aria-hidden="true" />Fail<span className="sr-only"> — below the WCAG AA minimum</span></span>
+                        ) : '—'}
+                      </td>
+                      <td className="py-2">
+                        {ratio !== null ? (
+                          aaBigPass
+                            ? <span className="flex items-center gap-1 text-emerald-400"><CheckCircle size={14} aria-hidden="true" />Pass</span>
+                            : <span className="flex items-center gap-1 text-yellow-400"><Warning size={14} aria-hidden="true" />Fail</span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Separator />
 
-      {/* Action buttons */}
+      {/* Action buttons — shared across all tabs */}
       <div className="flex items-center gap-3">
-        <Button
-          onClick={() => void handleSave()}
-          disabled={isLoading || isSaving}
-        >
+        <Button onClick={() => void handleSave()} disabled={disabled}>
           <FloppyDisk size={16} className="mr-2" aria-hidden="true" />
           {isSaving ? 'Saving…' : 'Save Theme'}
         </Button>
-        <Button
-          variant="outline"
-          onClick={handleCancel}
-          disabled={isLoading || isSaving}
-        >
+        <Button variant="outline" onClick={handleCancel} disabled={disabled}>
           <X size={16} className="mr-2" aria-hidden="true" />
           Cancel
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Gradient Editor sub-component ────────────────────────────────────────────
+
+interface GradientEditorProps {
+  from: string
+  to: string
+  dir: string
+  onFrom: (v: string) => void
+  onTo: (v: string) => void
+  onDir: (v: string) => void
+  disabled: boolean
+  directions: { value: string; label: string }[]
+  label: string
+}
+
+function GradientEditor({ from, to, dir, onFrom, onTo, onDir, disabled, directions, label }: GradientEditorProps) {
+  const previewStyle = from && to
+    ? { background: `linear-gradient(${dir || '135deg'}, ${from}, ${to})` }
+    : { background: 'transparent', border: '1px dashed var(--border)' }
+
+  return (
+    <div className="space-y-3">
+      {/* Live preview swatch */}
+      <div
+        className="h-12 w-full rounded-md"
+        style={previewStyle}
+        aria-label={`${label} gradient preview`}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">From color</Label>
+          <div className="flex items-center gap-2">
+            <div className="relative shrink-0">
+              <div className="h-8 w-8 rounded border border-border" style={{ backgroundColor: from || '#101010' }} aria-hidden="true" />
+              <input
+                type="color"
+                value={from || '#101010'}
+                onChange={(e) => onFrom(e.target.value)}
+                disabled={disabled}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                aria-label={`${label} gradient from color`}
+              />
+            </div>
+            <Input
+              type="text"
+              value={from}
+              onChange={(e) => onFrom(e.target.value)}
+              placeholder="#101010"
+              disabled={disabled}
+              className="font-mono text-sm"
+              aria-label={`${label} gradient from hex`}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">To color</Label>
+          <div className="flex items-center gap-2">
+            <div className="relative shrink-0">
+              <div className="h-8 w-8 rounded border border-border" style={{ backgroundColor: to || '#ffffff' }} aria-hidden="true" />
+              <input
+                type="color"
+                value={to || '#ffffff'}
+                onChange={(e) => onTo(e.target.value)}
+                disabled={disabled}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                aria-label={`${label} gradient to color`}
+              />
+            </div>
+            <Input
+              type="text"
+              value={to}
+              onChange={(e) => onTo(e.target.value)}
+              placeholder="#ffffff"
+              disabled={disabled}
+              className="font-mono text-sm"
+              aria-label={`${label} gradient to hex`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Direction</Label>
+        <select
+          value={dir}
+          onChange={(e) => onDir(e.target.value)}
+          disabled={disabled}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label={`${label} gradient direction`}
+        >
+          {directions.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+          <option value="custom">Custom angle…</option>
+        </select>
+        {!directions.some((d) => d.value === dir) && (
+          <Input
+            type="text"
+            value={dir}
+            onChange={(e) => onDir(e.target.value)}
+            placeholder="e.g. 45deg or to bottom right"
+            disabled={disabled}
+            className="font-mono text-sm mt-1"
+            aria-label={`${label} gradient custom direction`}
+          />
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => { onFrom(''); onTo(''); onDir('135deg') }}
+          disabled={disabled || (!from && !to)}
+          className="text-muted-foreground"
+        >
+          <ArrowCounterClockwise size={14} className="mr-1" aria-hidden="true" />
+          Clear gradient
         </Button>
       </div>
     </div>

@@ -1212,45 +1212,6 @@ export interface Database {
         }
         Relationships: []
       }
-      label_messages: {
-        Row: {
-          id: string
-          artist_id: string
-          subject: string
-          body: string
-          body_html: string | null
-          read: boolean
-          read_at: string | null
-          starred: boolean
-          deleted_at: string | null
-          sent_at: string
-        }
-        Insert: {
-          id?: string
-          artist_id: string
-          subject: string
-          body: string
-          body_html?: string | null
-          read?: boolean
-          read_at?: string | null
-          starred?: boolean
-          deleted_at?: string | null
-          sent_at?: string
-        }
-        Update: {
-          id?: string
-          artist_id?: string
-          subject?: string
-          body?: string
-          body_html?: string | null
-          read?: boolean
-          read_at?: string | null
-          starred?: boolean
-          deleted_at?: string | null
-          sent_at?: string
-        }
-        Relationships: []
-      }
       message_templates: {
         Row: {
           id: string
@@ -1302,6 +1263,150 @@ export interface Database {
           body_html?: string | null
           deleted_at?: string | null
           sent_at?: string
+        }
+        Relationships: []
+      }
+      message_folders: {
+        Row: {
+          id: string
+          name: string
+          icon: string | null
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          icon?: string | null
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          icon?: string | null
+          color?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      message_rules: {
+        Row: {
+          id: string
+          name: string
+          condition_field: string
+          condition_operator: string
+          condition_value: string
+          action_type: string
+          action_target: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          condition_field: string
+          condition_operator: string
+          condition_value: string
+          action_type: string
+          action_target?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          condition_field?: string
+          condition_operator?: string
+          condition_value?: string
+          action_type?: string
+          action_target?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      message_attachments: {
+        Row: {
+          id: string
+          message_id: string
+          filename: string
+          url: string
+          mime_type: string
+          size: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          filename: string
+          url: string
+          mime_type: string
+          size?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          filename?: string
+          url?: string
+          mime_type?: string
+          size?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      label_messages: {
+        Row: {
+          id: string
+          artist_id: string
+          subject: string
+          body: string
+          body_html: string | null
+          read: boolean
+          read_at: string | null
+          starred: boolean
+          deleted_at: string | null
+          sent_at: string
+          folder_id: string | null
+          sender_email: string | null
+          is_external: boolean
+          forwarded_from: string | null
+          has_attachments: boolean
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          subject: string
+          body: string
+          body_html?: string | null
+          read?: boolean
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
+          sent_at?: string
+          folder_id?: string | null
+          sender_email?: string | null
+          is_external?: boolean
+          forwarded_from?: string | null
+          has_attachments?: boolean
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          subject?: string
+          body?: string
+          body_html?: string | null
+          read?: boolean
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
+          sent_at?: string
+          folder_id?: string | null
+          sender_email?: string | null
+          is_external?: boolean
+          forwarded_from?: string | null
+          has_attachments?: boolean
         }
         Relationships: []
       }

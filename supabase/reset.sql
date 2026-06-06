@@ -1138,6 +1138,55 @@ CREATE INDEX IF NOT EXISTS idx_label_messages_artist_id_sent_at
 CREATE INDEX IF NOT EXISTS idx_label_messages_search ON public.label_messages USING GIN(search_vector);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: message_folders (must be before the FK on label_messages)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_folders (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  icon       TEXT,
+  color      TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- New columns for full email-client support
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS folder_id       UUID        REFERENCES public.message_folders (id) ON DELETE SET NULL;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS sender_email    TEXT;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS is_external     BOOLEAN     NOT NULL DEFAULT FALSE;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS forwarded_from  UUID        REFERENCES public.label_messages (id) ON DELETE SET NULL;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN     NOT NULL DEFAULT FALSE;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_rules
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_rules (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name               TEXT        NOT NULL,
+  condition_field    TEXT        NOT NULL,
+  condition_operator TEXT        NOT NULL,
+  condition_value    TEXT        NOT NULL,
+  action_type        TEXT        NOT NULL,
+  action_target      TEXT,
+  active             BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_attachments
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_attachments (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id UUID        NOT NULL REFERENCES public.label_messages (id) ON DELETE CASCADE,
+  filename   TEXT        NOT NULL,
+  url        TEXT        NOT NULL,
+  mime_type  TEXT        NOT NULL,
+  size       BIGINT      NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_attachments_message_id
+  ON public.message_attachments (message_id);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: journalist_downloads
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.journalist_downloads (
