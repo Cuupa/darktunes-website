@@ -20,7 +20,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   }, [error])
 
   return (
-    <html lang="de">
+    <html lang="en">
       <body
         style={{
           margin: 0,
@@ -49,6 +49,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
           style={{
             marginTop: '0.5rem',
             padding: '0.5rem 1.5rem',
+            /* Brand accent — CSS custom properties unavailable in global-error boundary */
             backgroundColor: '#493687',
             color: '#ffffff',
             border: 'none',

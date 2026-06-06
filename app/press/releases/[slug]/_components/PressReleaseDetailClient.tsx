@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import DOMPurify from 'dompurify'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -78,7 +79,7 @@ export function PressReleaseDetailClient({ post, dict }: PressReleaseDetailClien
 
         <article className="rounded-3xl border border-border bg-card/60 p-6">
           {post.content.trimStart().startsWith('<') ? (
-            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }} />
           ) : (
             <MarkdownContent content={post.content} className="max-w-none" />
           )}

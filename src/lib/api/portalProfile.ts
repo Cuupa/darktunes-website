@@ -5,31 +5,42 @@
  * Keeps XHR/fetch calls out of the UI component (SRP).
  */
 
-export interface ArtistProfilePayload {
+import type { Database } from '@/types/database'
+
+/**
+ * Payload for saving an artist profile via /api/portal/profile.
+ * Derived from the DB Insert type to prevent type drift (TS-2).
+ * Only the fields that the portal form surfaces are included.
+ */
+export type ArtistProfilePayload = Pick<
+  Database['public']['Tables']['artist_profiles']['Insert'],
+  | 'artist_id'
+  | 'bio'
+  | 'bio_short'
+  | 'bio_medium'
+  | 'bio_long'
+  | 'photo_url'
+  | 'genres'
+  | 'press_quote'
+  | 'founding_year'
+  | 'hometown'
+  | 'booking_contact'
+  | 'press_contact'
+  | 'website_url'
+  | 'instagram_url'
+  | 'youtube_url'
+  | 'bandcamp_url'
+  | 'spotify_url'
+  | 'apple_music_url'
+  | 'tiktok_url'
+  | 'facebook_url'
+  | 'soundcloud_url'
+  | 'rider_stage_plot_url'
+  | 'rider_technical_url'
+  | 'rider_hospitality_url'
+> & {
+  // artist_id is required (not optional like in Insert)
   artist_id: string
-  bio: string | null
-  bio_short: string | null
-  bio_medium: string | null
-  bio_long: string | null
-  photo_url: string | null
-  genres: string[]
-  press_quote: string | null
-  founding_year: number | null
-  hometown: string | null
-  booking_contact: string | null
-  press_contact: string | null
-  website_url: string | null
-  instagram_url: string | null
-  youtube_url: string | null
-  bandcamp_url: string | null
-  spotify_url: string | null
-  apple_music_url: string | null
-  tiktok_url: string | null
-  facebook_url: string | null
-  soundcloud_url: string | null
-  rider_stage_plot_url: string | null
-  rider_technical_url: string | null
-  rider_hospitality_url: string | null
 }
 
 export type RiderType = 'stage_plot' | 'technical' | 'hospitality'

@@ -1,10 +1,16 @@
 export const dynamic = 'force-dynamic'
 
+import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { PressNav } from './_components/PressNav'
+
+export const metadata: Metadata = {
+  title: 'Press Dashboard — darkTunes Music Group',
+  robots: { index: false, follow: false },
+}
 
 export default async function PressDashboardLayout({ children }: { children: ReactNode }) {
   const locale = await getLocale()

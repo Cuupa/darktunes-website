@@ -34,6 +34,7 @@ import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/t
 import type { Dictionary, Locale } from '@/i18n/types'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
+import DOMPurify from 'dompurify'
 
 interface ArtistDetailContentProps {
   artist: Artist
@@ -155,6 +156,7 @@ export function ArtistDetailContent({
           <Image
             src={getOptimizedImageUrl(artist.imageUrl, 1400)}
             alt=""
+            aria-hidden="true"
             fill
             className="object-cover opacity-20 blur-2xl scale-110"
             unoptimized
@@ -377,7 +379,7 @@ export function ArtistDetailContent({
                     className="prose prose-invert max-w-none text-foreground/80 leading-relaxed font-serif
                       [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
                       [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
-                    dangerouslySetInnerHTML={{ __html: artist.bio }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(artist.bio) }}
                   />
                 ) : (
                   <p className="text-foreground/80 leading-relaxed font-serif text-base whitespace-pre-line">
@@ -584,7 +586,7 @@ export function ArtistDetailContent({
                             <div className="relative aspect-square overflow-hidden">
                               <Image
                                 src={getOptimizedImageUrl(release.coverArt, 400)}
-                                alt={`${release.title} cover`}
+                                alt={`${release.title} by ${artist.name} – cover art`}
                                 fill
                                 className="object-cover group-hover:scale-105 transition-transform duration-500"
                                 unoptimized
@@ -654,7 +656,7 @@ export function ArtistDetailContent({
                           {post.imageUrl && (
                             <Image
                               src={getOptimizedImageUrl(post.imageUrl, 120)}
-                              alt={post.title}
+                              alt={`${post.title} – news thumbnail`}
                               width={80}
                               height={80}
                               className="w-20 h-20 object-cover rounded-lg shrink-0"

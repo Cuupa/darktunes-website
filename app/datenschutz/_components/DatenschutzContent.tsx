@@ -2,6 +2,7 @@
 
 import { marked } from 'marked'
 import { useMemo } from 'react'
+import DOMPurify from 'dompurify'
 
 interface DatenschutzContentProps {
   content: string
@@ -20,9 +21,10 @@ function isHtml(str: string) {
 export function DatenschutzContent({ content }: DatenschutzContentProps) {
   const html = useMemo(() => {
     if (!content) return ''
-    if (isHtml(content)) return content
+    if (isHtml(content)) return DOMPurify.sanitize(content)
     const result = marked.parse(content, { async: false })
-    return typeof result === 'string' ? result : ''
+    const raw = typeof result === 'string' ? result : ''
+    return DOMPurify.sanitize(raw)
   }, [content])
 
   return (

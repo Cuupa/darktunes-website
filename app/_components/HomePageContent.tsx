@@ -3,12 +3,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Hero } from '@/components/Hero'
-import { Releases } from '@/components/Releases'
 import { News } from '@/components/News'
-import { Videos } from '@/components/Videos'
 import { Concerts } from '@/components/Concerts'
 import { Footer } from '@/components/Footer'
 import { NewsletterSection } from '@/components/NewsletterSection'
+
+const Releases = dynamic(
+  () => import('@/components/Releases').then((m) => m.Releases),
+  {
+    ssr: false,
+    loading: () => <div className="h-96 rounded-xl bg-muted/30 animate-pulse" aria-hidden="true" />,
+  },
+)
+
+const Videos = dynamic(
+  () => import('@/components/Videos').then((m) => m.Videos),
+  {
+    ssr: false,
+    loading: () => <div className="h-80 rounded-xl bg-muted/30 animate-pulse" aria-hidden="true" />,
+  },
+)
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection, Artist } from '@/types'

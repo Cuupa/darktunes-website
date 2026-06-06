@@ -7,9 +7,18 @@
  */
 
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { getCachedPublicArtists } from '@/lib/cache/publicQueries'
 import { ArtistsGridContent } from './_components/ArtistsGridContent'
+
+export const metadata: Metadata = {
+  title: 'Artists — darkTunes Music Group',
+  openGraph: {
+    title: 'Artists — darkTunes Music Group',
+    type: 'website',
+  },
+}
 
 export default async function ArtistsPage() {
   const [artists, locale] = await Promise.all([

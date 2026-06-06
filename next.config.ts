@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://open.spotify.com https://www.youtube.com",
+              "script-src 'self' 'unsafe-inline' https://open.spotify.com https://www.youtube.com",
               "frame-src https://open.spotify.com https://www.youtube.com",
               "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://*.mzstatic.com https://*.bcbits.com",
               "style-src 'self' 'unsafe-inline'",

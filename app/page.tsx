@@ -11,6 +11,7 @@
  */
 
 import { unstable_cache } from 'next/cache'
+import type { Metadata } from 'next'
 import { HomePageContent } from './_components/HomePageContent'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
@@ -28,6 +29,16 @@ import {
   buildWebSiteSchema,
   serializeJsonLd,
 } from '@/lib/seo/jsonld'
+
+/**
+ * Homepage-specific metadata. Inherits base title/description/OG from the root
+ * layout's generateMetadata(), and adds homepage-specific Twitter card tags.
+ */
+export const metadata: Metadata = {
+  twitter: {
+    card: 'summary_large_image',
+  },
+}
 
 // ---------------------------------------------------------------------------
 // Home page uses a richer fallback for site settings (non-nullable SiteSettings)
