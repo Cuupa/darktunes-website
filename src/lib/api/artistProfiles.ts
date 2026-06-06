@@ -34,19 +34,11 @@ export interface ArtistProfile {
   bioLong: string | undefined
   photoUrl: string | undefined
   genres: string[]
-  websiteUrl: string | undefined
-  instagramUrl: string | undefined
-  youtubeUrl: string | undefined
-  bandcampUrl: string | undefined
   pressQuote: string | undefined
   foundingYear: number | undefined
   hometown: string | undefined
   bookingContact: string | undefined
   pressContact: string | undefined
-  spotifyUrl: string | undefined
-  appleMusicUrl: string | undefined
-  tiktokUrl: string | undefined
-  facebookUrl: string | undefined
   soundcloudUrl: string | undefined
   riderStagePlotUrl: string | undefined
   riderTechnicalUrl: string | undefined
@@ -78,19 +70,11 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     bioLong: row.bio_long ?? undefined,
     photoUrl: row.photo_url ?? undefined,
     genres: row.genres,
-    websiteUrl: row.website_url ?? undefined,
-    instagramUrl: row.instagram_url ?? undefined,
-    youtubeUrl: row.youtube_url ?? undefined,
-    bandcampUrl: row.bandcamp_url ?? undefined,
     pressQuote: row.press_quote ?? undefined,
     foundingYear: row.founding_year ?? undefined,
     hometown: row.hometown ?? undefined,
     bookingContact: row.booking_contact ?? undefined,
     pressContact: row.press_contact ?? undefined,
-    spotifyUrl: row.spotify_url ?? undefined,
-    appleMusicUrl: row.apple_music_url ?? undefined,
-    tiktokUrl: row.tiktok_url ?? undefined,
-    facebookUrl: row.facebook_url ?? undefined,
     soundcloudUrl: row.soundcloud_url ?? undefined,
     riderStagePlotUrl: row.rider_stage_plot_url ?? undefined,
     riderTechnicalUrl: row.rider_technical_url ?? undefined,
@@ -111,19 +95,21 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
 /**
  * Returns true when the artist has completed the minimum required profile fields:
  * a photo, at least one bio, and at least one social/streaming link.
+ * Social links live on the `Artist` record; pass the artist as the optional
+ * second argument to include them in the completeness check.
  * Used to decide whether to show the onboarding wizard.
  */
-export function isProfileComplete(profile: ArtistProfile | null): boolean {
+export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
   if (!profile) return false
   const hasPhoto = Boolean(profile.photoUrl)
   const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong || profile.bio)
   const hasLink = Boolean(
-    profile.spotifyUrl ||
-      profile.instagramUrl ||
-      profile.websiteUrl ||
-      profile.youtubeUrl ||
-      profile.appleMusicUrl ||
-      profile.soundcloudUrl,
+    profile.soundcloudUrl ||
+      artist?.spotifyUrl ||
+      artist?.instagramUrl ||
+      artist?.websiteUrl ||
+      artist?.youtubeUrl ||
+      artist?.appleMusicUrl,
   )
   return hasPhoto && hasBio && hasLink
 }

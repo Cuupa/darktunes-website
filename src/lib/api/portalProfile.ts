@@ -26,14 +26,6 @@ export type ArtistProfilePayload = Pick<
   | 'hometown'
   | 'booking_contact'
   | 'press_contact'
-  | 'website_url'
-  | 'instagram_url'
-  | 'youtube_url'
-  | 'bandcamp_url'
-  | 'spotify_url'
-  | 'apple_music_url'
-  | 'tiktok_url'
-  | 'facebook_url'
   | 'soundcloud_url'
   | 'rider_stage_plot_url'
   | 'rider_technical_url'
@@ -49,6 +41,16 @@ export type ArtistProfilePayload = Pick<
   // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
   epk_password_raw?: string | null
   epk_custom_theme_tokens?: Record<string, string> | null
+  // Social/streaming URLs — stored in the artists table (single source of truth).
+  // Included here so the route can write them to artists in a single request.
+  website_url?: string | null
+  instagram_url?: string | null
+  youtube_url?: string | null
+  bandcamp_url?: string | null
+  spotify_url?: string | null
+  apple_music_url?: string | null
+  tiktok_url?: string | null
+  facebook_url?: string | null
 }
 
 export type RiderType = 'stage_plot' | 'technical' | 'hospitality'

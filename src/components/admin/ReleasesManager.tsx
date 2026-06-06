@@ -109,7 +109,6 @@ function releaseToFormData(release: Release): ReleaseFormData {
 function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
   return {
     title: data.title,
-    artist_name: data.artistName,
     release_date: data.releaseDate,
     type: data.type,
     cover_art: data.coverArt || null,

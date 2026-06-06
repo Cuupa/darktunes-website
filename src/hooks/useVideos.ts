@@ -55,7 +55,6 @@ export function useVideos() {
           ...(data.is_visible !== undefined ? { isVisible: data.is_visible } : {}),
           ...(data.is_short !== undefined ? { isShort: data.is_short } : {}),
           ...(data.title !== undefined ? { title: data.title } : {}),
-          ...(data.artist_name !== undefined ? { artistName: data.artist_name } : {}),
           ...(data.youtube_id !== undefined ? { youtubeId: data.youtube_id } : {}),
           ...(data.thumbnail_url !== undefined ? { thumbnailUrl: data.thumbnail_url ?? '' } : {}),
           ...(data.published_at !== undefined ? { publishedAt: data.published_at ?? v.publishedAt } : {}),

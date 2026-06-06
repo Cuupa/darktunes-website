@@ -187,7 +187,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     !isOnOnboarding &&
     artistProfile !== null &&
     !artistProfile.onboardingCompleted &&
-    !isProfileComplete(artistProfile)
+    !isProfileComplete(artistProfile, artist)
   ) {
     redirect('/portal/onboarding')
   }

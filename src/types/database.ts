@@ -282,19 +282,11 @@ export interface Database {
           bio_long: string | null
           photo_url: string | null
           genres: string[]
-          website_url: string | null
-          instagram_url: string | null
-          youtube_url: string | null
-          bandcamp_url: string | null
           press_quote: string | null
           founding_year: number | null
           hometown: string | null
           booking_contact: string | null
           press_contact: string | null
-          spotify_url: string | null
-          apple_music_url: string | null
-          tiktok_url: string | null
-          facebook_url: string | null
           soundcloud_url: string | null
           rider_stage_plot_url: string | null
           rider_technical_url: string | null
@@ -319,19 +311,11 @@ export interface Database {
           bio_long?: string | null
           photo_url?: string | null
           genres?: string[]
-          website_url?: string | null
-          instagram_url?: string | null
-          youtube_url?: string | null
-          bandcamp_url?: string | null
           press_quote?: string | null
           founding_year?: number | null
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
-          spotify_url?: string | null
-          apple_music_url?: string | null
-          tiktok_url?: string | null
-          facebook_url?: string | null
           soundcloud_url?: string | null
           rider_stage_plot_url?: string | null
           rider_technical_url?: string | null
@@ -356,19 +340,11 @@ export interface Database {
           bio_long?: string | null
           photo_url?: string | null
           genres?: string[]
-          website_url?: string | null
-          instagram_url?: string | null
-          youtube_url?: string | null
-          bandcamp_url?: string | null
           press_quote?: string | null
           founding_year?: number | null
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
-          spotify_url?: string | null
-          apple_music_url?: string | null
-          tiktok_url?: string | null
-          facebook_url?: string | null
           soundcloud_url?: string | null
           rider_stage_plot_url?: string | null
           rider_technical_url?: string | null
@@ -541,7 +517,6 @@ export interface Database {
           id: string
           title: string
           artist_id: string | null
-          artist_name: string
           release_date: string
           cover_art: string | null
           type: 'album' | 'ep' | 'single'
@@ -576,7 +551,6 @@ export interface Database {
           id?: string
           title: string
           artist_id?: string | null
-          artist_name: string
           release_date: string
           cover_art?: string | null
           type: 'album' | 'ep' | 'single'
@@ -611,7 +585,6 @@ export interface Database {
           id?: string
           title?: string
           artist_id?: string | null
-          artist_name?: string
           release_date?: string
           cover_art?: string | null
           type?: 'album' | 'ep' | 'single'
@@ -648,7 +621,6 @@ export interface Database {
         Row: {
           id: string
           artist_id: string | null
-          artist_name: string
           event_name: string
           venue_name: string | null
           venue_city: string | null
@@ -673,7 +645,6 @@ export interface Database {
         Insert: {
           id?: string
           artist_id?: string | null
-          artist_name: string
           event_name: string
           venue_name?: string | null
           venue_city?: string | null
@@ -698,7 +669,6 @@ export interface Database {
         Update: {
           id?: string
           artist_id?: string | null
-          artist_name?: string
           event_name?: string
           venue_name?: string | null
           venue_city?: string | null
@@ -894,7 +864,6 @@ export interface Database {
         Row: {
           id: string
           title: string
-          artist_name: string
           artist_id: string | null
           youtube_id: string
           thumbnail_url: string | null
@@ -907,7 +876,6 @@ export interface Database {
         Insert: {
           id?: string
           title: string
-          artist_name: string
           artist_id?: string | null
           youtube_id: string
           thumbnail_url?: string | null
@@ -920,7 +888,6 @@ export interface Database {
         Update: {
           id?: string
           title?: string
-          artist_name?: string
           artist_id?: string | null
           youtube_id?: string
           thumbnail_url?: string | null

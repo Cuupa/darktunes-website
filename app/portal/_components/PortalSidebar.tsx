@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   CaretUpDown,
   ChartBar,
@@ -43,45 +43,98 @@ interface PortalSidebarProps {
   featureFlags: Record<string, boolean>
 }
 
-const baseNavItems = [
-  { href: '/portal', label: 'overview', icon: ChartBar },
-  { href: '/portal/profile', label: 'profile', icon: User },
-  { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
-  { href: '/portal/releases', label: 'releases', icon: MusicNotes },
-  { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
-  { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
-  { href: '/portal/events', label: 'tour', icon: MapPin },
-  { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
-  { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
-  { href: '/portal/interviews', label: 'interviews', icon: Chats },
-  { href: '/portal/settings', label: 'settings', icon: Gear },
-  { href: '/portal/help', label: 'help', icon: Question },
-] as const
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ElementType
+  flag?: string
+}
 
-const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
-const invoicesNavItem = { href: '/portal/invoices', label: 'invoices_heading', icon: Receipt, flag: 'artist.invoices' } as const
-const documentsNavItem = { href: '/portal/documents', label: 'documents_heading', icon: Files, flag: 'artist.documents' } as const
+type NavGroup = {
+  groupKey: string
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    groupKey: 'nav_group_dashboard',
+    items: [
+      { href: '/portal', label: 'overview', icon: ChartBar },
+      { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
+    ],
+  },
+  {
+    groupKey: 'nav_group_music',
+    items: [
+      { href: '/portal/profile', label: 'profile', icon: User },
+      { href: '/portal/releases', label: 'releases', icon: MusicNotes },
+      { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
+      { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
+    ],
+  },
+  {
+    groupKey: 'nav_group_live',
+    items: [
+      { href: '/portal/events', label: 'tour', icon: MapPin },
+      { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
+    ],
+  },
+  {
+    groupKey: 'nav_group_finance',
+    items: [
+      { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' },
+      { href: '/portal/invoices', label: 'invoices_heading', icon: Receipt, flag: 'artist.invoices' },
+    ],
+  },
+  {
+    groupKey: 'nav_group_communication',
+    items: [
+      { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
+      { href: '/portal/interviews', label: 'interviews', icon: Chats },
+    ],
+  },
+  {
+    groupKey: 'nav_group_files',
+    items: [
+      { href: '/portal/documents', label: 'documents_heading', icon: Files, flag: 'artist.documents' },
+    ],
+  },
+  {
+    groupKey: 'nav_group_account',
+    items: [
+      { href: '/portal/settings', label: 'settings', icon: Gear },
+      { href: '/portal/help', label: 'help', icon: Question },
+    ],
+  },
+]
 
 export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unreadCount } = useUnreadMessages()
 
-  // Determine active artist from URL ?artistId param, falling back to first artist.
-  const searchParams = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : new URLSearchParams()
-  const activeArtistIdFromUrl = searchParams.get('artistId')
-  const defaultIndex = activeArtistIdFromUrl
-    ? Math.max(0, artists.findIndex((a) => a.id === activeArtistIdFromUrl))
-    : 0
-  const [activeArtistIndex, setActiveArtistIndex] = useState(defaultIndex)
+  // Derive active artist directly from URL — no stale local state
+  const activeArtistId = searchParams.get('artistId')
+  const activeArtist = useMemo(
+    () =>
+      (activeArtistId ? artists.find((a) => a.id === activeArtistId) : null) ??
+      artists[0] ??
+      null,
+    [activeArtistId, artists],
+  )
 
-  const activeArtist = artists[activeArtistIndex] ?? null
+  /** Append artistId to nav links so server components always get the correct artist */
+  const navHref = (base: string) =>
+    artists.length > 1 && activeArtistId ? `${base}?artistId=${activeArtistId}` : base
 
-  const navItems = useMemo(
-    () => [...baseNavItems, statementsNavItem, invoicesNavItem, documentsNavItem].filter((item) => !('flag' in item) || (featureFlags[item.flag] ?? true)),
+  const navGroups = useMemo(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.flag || (featureFlags[item.flag] ?? true)),
+      })).filter((group) => group.items.length > 0),
     [featureFlags],
   )
 
@@ -93,42 +146,47 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
     router.refresh()
   }
 
-  /** Switch active artist — updates index and reloads the page with ?artistId */
-  const handleArtistSwitch = (idx: number) => {
-    setActiveArtistIndex(idx)
-    const artist = artists[idx]
-    if (!artist) return
-    // Navigate to same pathname with new artistId so all server components reload
+  /** Switch active artist — URL is the single source of truth */
+  const handleArtistSwitch = (artist: Artist) => {
     router.push(`${pathname}?artistId=${artist.id}`)
     router.refresh()
   }
 
   const renderNav = (onNavigate?: () => void) => (
-    <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Artist portal navigation">
-      {navItems.map(({ href, label, icon: Icon }) => {
-        const isActive = href === '/portal' ? pathname === '/portal' : pathname.startsWith(href)
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={[
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              isActive
-                ? 'portal-nav-active bg-primary/20 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            ].join(' ')}
-          >
-            <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
-            {dict[label as keyof typeof dict]}
-            {href === '/portal/messages' && unreadCount > 0 && (
-              <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-                {unreadCount}
-              </span>
-            )}
-          </Link>
-        )
-      })}
+    <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Artist portal navigation">
+      {navGroups.map(({ groupKey, items }) => (
+        <div key={groupKey} className="mb-3">
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            {dict[groupKey as keyof typeof dict] as string}
+          </p>
+          <div className="space-y-0.5">
+            {items.map(({ href, label, icon: Icon }) => {
+              const isActive = href === '/portal' ? pathname === '/portal' : pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={navHref(href)}
+                  onClick={onNavigate}
+                  className={[
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'portal-nav-active bg-primary/20 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  ].join(' ')}
+                >
+                  <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
+                  <span className="truncate">{dict[label as keyof typeof dict] as string}</span>
+                  {href === '/portal/messages' && unreadCount > 0 && (
+                    <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   )
 
@@ -148,11 +206,11 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            {artists.map((a, idx) => (
+            {artists.map((a) => (
               <DropdownMenuItem
                 key={a.id}
-                onSelect={() => handleArtistSwitch(idx)}
-                className={idx === activeArtistIndex ? 'font-semibold text-primary' : ''}
+                onSelect={() => handleArtistSwitch(a)}
+                className={a.id === activeArtist?.id ? 'font-semibold text-primary' : ''}
               >
                 {a.name}
               </DropdownMenuItem>

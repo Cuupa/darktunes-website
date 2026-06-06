@@ -100,13 +100,12 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     .filter((m): m is NonNullable<typeof m> => Boolean(m))
 
   const rows = videos.map((v) => {
-    const { artistId, artistName } = resolveVideoArtist(v.title, v.channelTitle, artistMatchers)
+    const { artistId } = resolveVideoArtist(v.title, v.channelTitle, artistMatchers)
     return {
-      // artist_id and artist_name: resolved from title match; fall back to channel title
+      // artist_id: resolved from title match; fall back to channel title
       artist_id: artistId,
       youtube_id: v.youtubeId,
       title: v.title,
-      artist_name: artistName,
       thumbnail_url: v.thumbnailUrl,
       published_at: v.publishedAt,
       // is_visible intentionally excluded so that admin-hidden videos are not

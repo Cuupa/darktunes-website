@@ -597,7 +597,14 @@
     "help_statements_title": "Royalty Statements",
     "help_statements_body": "Royalty statements are uploaded by the label and appear here as downloadable PDF files. They summarise your earnings from streaming, downloads, and sync licensing for a given accounting period.",
     "help_settings_title": "Settings",
-    "help_settings_body": "Change your account password here. You can also switch the portal language between English and German — the selected language is shown above the button so you always know the current state."
+    "help_settings_body": "Change your account password here. You can also switch the portal language between English and German — the selected language is shown above the button so you always know the current state.",
+    "nav_group_dashboard": "Dashboard",
+    "nav_group_music": "Music",
+    "nav_group_live": "Live & Promo",
+    "nav_group_finance": "Finance",
+    "nav_group_communication": "Communication",
+    "nav_group_files": "Files",
+    "nav_group_account": "Account"
   },
   "press": {
     "title": "Press & Media",

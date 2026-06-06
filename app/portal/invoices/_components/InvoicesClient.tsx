@@ -119,15 +119,15 @@ export function InvoicesClient({ dict, invoices: initialInvoices, artistId }: In
           <CardHeader>
             <CardTitle className="text-base">{dict.invoices_heading}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{dict.invoice_number ?? '#'}</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.invoice_number ?? '#'}</TableHead>
                   <TableHead>{dict.invoice_client}</TableHead>
-                  <TableHead>{dict.invoice_total}</TableHead>
-                  <TableHead>{dict.invoice_status_draft}</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.invoice_total}</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.invoice_status_draft}</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

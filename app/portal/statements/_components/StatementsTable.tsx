@@ -75,22 +75,22 @@ export function StatementsTable({ dict, statements }: StatementsTableProps) {
           <CardHeader>
             <CardTitle className="text-base">{dict.statements_heading}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead>{dict.statements_period}</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.statements_period}</TableHead>
                   <TableHead>{dict.statements_filename}</TableHead>
-                  <TableHead className="text-right">{dict.statements_amount}</TableHead>
-                  <TableHead className="text-right">{dict.statements_download}</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">{dict.statements_amount}</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">{dict.statements_download}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {statements.map((stmt) => (
                   <TableRow key={stmt.id} className="border-border hover:bg-muted/50">
-                    <TableCell className="font-mono text-sm">{stmt.period}</TableCell>
+                    <TableCell className="font-mono text-sm whitespace-nowrap">{stmt.period}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{stmt.filename}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">
+                    <TableCell className="text-right font-mono text-sm whitespace-nowrap">
                       {formatAmountEur(stmt.amountEur)}
                     </TableCell>
                     <TableCell className="text-right">

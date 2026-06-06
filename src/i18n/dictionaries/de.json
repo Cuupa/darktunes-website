@@ -597,7 +597,14 @@
     "help_statements_title": "Royalty-Abrechnungen",
     "help_statements_body": "Royalty-Abrechnungen werden vom Label hochgeladen und erscheinen hier als PDF-Downloads. Sie fassen deine Einnahmen aus Streaming, Downloads und Sync-Lizenzierung für einen bestimmten Abrechnungszeitraum zusammen.",
     "help_settings_title": "Einstellungen",
-    "help_settings_body": "Ändere hier dein Kontopasswort. Du kannst auch die Portalsprache zwischen Englisch und Deutsch wechseln – die aktuell eingestellte Sprache wird über dem Button angezeigt, damit du immer weißt, was gerade aktiv ist."
+    "help_settings_body": "Ändere hier dein Kontopasswort. Du kannst auch die Portalsprache zwischen Englisch und Deutsch wechseln – die aktuell eingestellte Sprache wird über dem Button angezeigt, damit du immer weißt, was gerade aktiv ist.",
+    "nav_group_dashboard": "Dashboard",
+    "nav_group_music": "Musik",
+    "nav_group_live": "Live & Promotion",
+    "nav_group_finance": "Finanzen",
+    "nav_group_communication": "Kommunikation",
+    "nav_group_files": "Dateien",
+    "nav_group_account": "Konto"
   },
   "press": {
     "title": "Presse & Medien",
