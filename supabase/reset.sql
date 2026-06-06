@@ -802,9 +802,59 @@ CREATE TABLE IF NOT EXISTS public.concerts (
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS bandsintown_id TEXT UNIQUE;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'admin';
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS event_time TIME;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'gig';
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS trailer_url TEXT;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_lat FLOAT8;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_lng FLOAT8;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_osm_id TEXT;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS news_post_id UUID REFERENCES public.news_posts(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_concerts_artist_id    ON public.concerts (artist_id);
 CREATE INDEX IF NOT EXISTS idx_concerts_concert_date ON public.concerts (concert_date ASC);
+CREATE INDEX IF NOT EXISTS idx_concerts_news_post    ON public.concerts (news_post_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: concert_artists  (featured/supporting artists for a concert)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.concert_artists (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  concert_id  UUID NOT NULL REFERENCES public.concerts(id) ON DELETE CASCADE,
+  artist_id   UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  sort_order  INT  NOT NULL DEFAULT 0,
+  UNIQUE (concert_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_concert_artists_concert ON public.concert_artists (concert_id);
+CREATE INDEX IF NOT EXISTS idx_concert_artists_artist  ON public.concert_artists (artist_id);
+
+ALTER TABLE public.concert_artists ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "concert_artists: public read" ON public.concert_artists;
+CREATE POLICY "concert_artists: public read" ON public.concert_artists
+  FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "concert_artists: artist manage" ON public.concert_artists;
+CREATE POLICY "concert_artists: artist manage" ON public.concert_artists
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.concerts c
+      JOIN public.artist_members am ON am.artist_id = c.artist_id
+      WHERE c.id = concert_id AND am.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.concerts c
+      JOIN public.artist_members am ON am.artist_id = c.artist_id
+      WHERE c.id = concert_id AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "concert_artists: admin all" ON public.concert_artists;
+CREATE POLICY "concert_artists: admin all" ON public.concert_artists
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: editor_activity_log

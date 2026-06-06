@@ -23,6 +23,13 @@ function rowToConcert(row: ConcertRow): Concert {
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    eventTime: row.event_time ?? null,
+    eventType: row.event_type ?? 'gig',
+    trailerUrl: row.trailer_url ?? null,
+    venueLat: row.venue_lat ?? null,
+    venueLng: row.venue_lng ?? null,
+    venueOsmId: row.venue_osm_id ?? null,
+    newsPostId: row.news_post_id ?? null,
   }
 }
 
@@ -35,7 +42,8 @@ export async function getConcertsByArtistId(db: DbClient, artistId: string): Pro
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
   if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToConcert)
+  const concerts = (data ?? []).map(rowToConcert)
+  return attachConcertArtists(db, concerts)
 }
 
 export async function getConcerts(db: DbClient): Promise<Concert[]> {
@@ -124,3 +132,50 @@ export async function getPublicConcerts(db: DbClient): Promise<Concert[]> {
       return new Date(a.concertDate).getTime() - new Date(b.concertDate).getTime()
     })
 }
+
+/**
+ * Attach featured/supporting artists to concerts from the concert_artists junction table.
+ */
+export async function attachConcertArtists(db: DbClient, concerts: Concert[]): Promise<Concert[]> {
+  if (concerts.length === 0) return concerts
+
+  try {
+    const ids = concerts.map((c) => c.id)
+    const { data, error } = await db
+      .from('concert_artists')
+      .select('concert_id, artist_id, sort_order, artists(id, name, slug)')
+      .in('concert_id', ids)
+      .order('sort_order', { ascending: true })
+    if (error) return concerts // graceful fallback
+
+    type JoinRow = { concert_id: string; artist_id: string; sort_order: number; artists: { id: string; name: string; slug: string } | null }
+
+    const byId: Record<string, { id: string; name: string; slug: string }[]> = {}
+    for (const row of (data ?? []) as JoinRow[]) {
+      if (!row.artists) continue
+      if (!byId[row.concert_id]) byId[row.concert_id] = []
+      byId[row.concert_id].push(row.artists)
+    }
+
+    return concerts.map((c) => ({ ...c, featuredArtists: byId[c.id] ?? [] }))
+  } catch {
+    return concerts // graceful fallback when mock/DB doesn't support .in()
+  }
+}
+
+/**
+ * Replace the concert_artists rows for a concert.
+ */
+export async function setConcertArtists(
+  db: DbClient,
+  concertId: string,
+  artistIds: string[],
+): Promise<void> {
+  await db.from('concert_artists').delete().eq('concert_id', concertId)
+  if (artistIds.length === 0) return
+  const rows = artistIds.map((artist_id, i) => ({ concert_id: concertId, artist_id, sort_order: i }))
+  const { error } = await db.from('concert_artists').insert(rows)
+  if (error) throw new Error(error.message)
+}
+
+

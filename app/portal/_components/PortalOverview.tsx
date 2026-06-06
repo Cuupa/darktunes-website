@@ -173,7 +173,7 @@ export function PortalOverview({
           </Card>
         </Link>
 
-        <Link href="/portal/tour">
+        <Link href="/portal/events">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">

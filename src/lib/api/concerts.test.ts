@@ -52,6 +52,13 @@ const mockConcerts: ConcertRow[] = [
     source: 'admin',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    event_time: null,
+    event_type: 'gig',
+    trailer_url: null,
+    venue_lat: null,
+    venue_lng: null,
+    venue_osm_id: null,
+    news_post_id: null,
   },
   {
     id: 'concert-ok',
@@ -70,6 +77,13 @@ const mockConcerts: ConcertRow[] = [
     source: 'admin',
     created_at: '2026-01-02T00:00:00Z',
     updated_at: '2026-01-02T00:00:00Z',
+    event_time: '20:00',
+    event_type: 'dj_set',
+    trailer_url: null,
+    venue_lat: 53.5503,
+    venue_lng: 9.9928,
+    venue_osm_id: '62782',
+    news_post_id: null,
   },
 ]
 
