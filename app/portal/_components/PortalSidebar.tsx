@@ -10,10 +10,12 @@ import {
   Chats,
   Eye,
   FileText,
+  Files,
   List,
   MapPin,
   MegaphoneSimple,
   MusicNotes,
+  Receipt,
   SignOut,
   User,
   Gear,
@@ -55,6 +57,8 @@ const baseNavItems = [
 ] as const
 
 const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const
+const invoicesNavItem = { href: '/portal/invoices', label: 'invoices_heading', icon: Receipt, flag: 'artist.invoices' } as const
+const documentsNavItem = { href: '/portal/documents', label: 'documents_heading', icon: Files, flag: 'artist.documents' } as const
 
 export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
   const pathname = usePathname()
@@ -75,7 +79,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
   const activeArtist = artists[activeArtistIndex] ?? null
 
   const navItems = useMemo(
-    () => [...baseNavItems, statementsNavItem].filter((item) => !('flag' in item) || (featureFlags[item.flag] ?? true)),
+    () => [...baseNavItems, statementsNavItem, invoicesNavItem, documentsNavItem].filter((item) => !('flag' in item) || (featureFlags[item.flag] ?? true)),
     [featureFlags],
   )
 

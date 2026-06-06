@@ -52,6 +52,12 @@ export interface ArtistProfile {
   riderTechnicalUrl: string | undefined
   riderHospitalityUrl: string | undefined
   onboardingCompleted: boolean
+  // EPK customisation
+  epkTheme: string
+  epkSectionsOrder: string[]
+  epkSectionsHidden: string[]
+  epkPasswordHash: string | undefined
+  epkPasswordSections: string[]
   createdAt: string
   updatedAt: string
 }
@@ -88,6 +94,11 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     riderTechnicalUrl: row.rider_technical_url ?? undefined,
     riderHospitalityUrl: row.rider_hospitality_url ?? undefined,
     onboardingCompleted: row.onboarding_completed ?? false,
+    epkTheme: row.epk_theme ?? 'default',
+    epkSectionsOrder: row.epk_sections_order ?? [],
+    epkSectionsHidden: row.epk_sections_hidden ?? [],
+    epkPasswordHash: row.epk_password_hash ?? undefined,
+    epkPasswordSections: row.epk_password_sections ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

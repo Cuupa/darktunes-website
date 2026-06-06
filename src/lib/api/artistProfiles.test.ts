@@ -99,6 +99,11 @@ const mockProfileRow: ArtistProfileRow = {
   rider_technical_url: null,
   rider_hospitality_url: null,
   onboarding_completed: false,
+  epk_theme: 'default',
+  epk_sections_order: [],
+  epk_sections_hidden: [],
+  epk_password_hash: null,
+  epk_password_sections: [],
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -937,18 +937,24 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium       TEX
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INTEGER;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact    TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS spotify_url      TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS apple_music_url  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url             TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url           TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url   TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url    TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS onboarding_completed   BOOLEAN NOT NULL DEFAULT FALSE;
-
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS spotify_url           TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS apple_music_url       TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url            TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url          TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url        TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
+-- EPK Theme & Section customisation
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
+-- EPK Password protection for sensitive sections
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 
 DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
@@ -2001,6 +2007,8 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.statements', 'Artist Statements', TRUE, 'artist'),
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
+  ('artist.invoices', 'Artist Invoices', TRUE, 'artist'),
+  ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
@@ -2766,6 +2774,124 @@ DROP POLICY IF EXISTS "submission_form_schema: editor+ write" ON public.submissi
 CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_schema
   FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_invoices  (performance fee / remix invoices, portal-managed)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_invoices (
+  id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id         UUID         NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  invoice_number    TEXT         NOT NULL,
+  client_name       TEXT         NOT NULL,
+  client_email      TEXT         NOT NULL,
+  client_address    TEXT,
+  line_items        JSONB        NOT NULL DEFAULT '[]',
+  currency          VARCHAR(3)   NOT NULL DEFAULT 'EUR',
+  tax_rate_pct      NUMERIC(5,2) NOT NULL DEFAULT 19.00,
+  status            TEXT         NOT NULL DEFAULT 'draft',
+  due_date          DATE,
+  issued_date       DATE         NOT NULL DEFAULT CURRENT_DATE,
+  pdf_url           TEXT,
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, invoice_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoices (artist_id);
+
+DROP TRIGGER IF EXISTS trg_artist_invoices_updated_at ON public.artist_invoices;
+CREATE TRIGGER trg_artist_invoices_updated_at
+  BEFORE UPDATE ON public.artist_invoices
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.artist_invoices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_invoices: artist read own"   ON public.artist_invoices;
+CREATE POLICY "artist_invoices: artist read own" ON public.artist_invoices
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_invoices.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_invoices: artist write own" ON public.artist_invoices;
+CREATE POLICY "artist_invoices: artist write own" ON public.artist_invoices
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_invoices.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_invoices.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_invoices: admin all" ON public.artist_invoices;
+CREATE POLICY "artist_invoices: admin all" ON public.artist_invoices
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_documents  (contract vault — legal docs per artist)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_documents (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id        UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  label            TEXT        NOT NULL,
+  category         TEXT        NOT NULL DEFAULT 'other',
+  file_path        TEXT        NOT NULL,
+  file_size_bytes  INTEGER,
+  mime_type        TEXT,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_documents_artist_id ON public.artist_documents (artist_id);
+
+DROP TRIGGER IF EXISTS trg_artist_documents_updated_at ON public.artist_documents;
+CREATE TRIGGER trg_artist_documents_updated_at
+  BEFORE UPDATE ON public.artist_documents
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.artist_documents ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_documents: artist read own"  ON public.artist_documents;
+CREATE POLICY "artist_documents: artist read own" ON public.artist_documents
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_documents.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_documents: artist write own" ON public.artist_documents;
+CREATE POLICY "artist_documents: artist write own" ON public.artist_documents
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_documents.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_documents.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_documents: admin all" ON public.artist_documents;
+CREATE POLICY "artist_documents: admin all" ON public.artist_documents
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ===========================================================================
 -- USER ROLES (multi-role junction table)  — added 2026-06

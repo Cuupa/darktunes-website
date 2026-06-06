@@ -7,15 +7,20 @@
  * Renders HTML bios via DOMPurify, supports all artist metadata,
  * and is styled like a real press kit document.
  *
+ * Features:
+ *  - Modular theme architecture (default / blade-runner)
+ *  - Section manager (up/down reordering + visibility toggle)
+ *  - Optional password protection for sensitive sections
+ *
  * Also contains <EPKModal> — a full-screen dialog view of the EPK.
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import Image from 'next/image'
 import DOMPurify from 'dompurify'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -36,9 +41,17 @@ import {
   FilePdf,
   X,
   Link as LinkIcon,
+  Eye,
+  EyeSlash,
+  ArrowUp,
+  ArrowDown,
+  LockKey,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
+import { EPKThemeProvider, useEPKTheme } from '@/lib/epk/EPKThemeContext'
+import type { EPKSectionId } from '@/lib/epk/themes'
+import { DEFAULT_SECTIONS_ORDER } from '@/lib/epk/themes'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +81,13 @@ export interface EPKData {
   riderStagePlotUrl?: string
   riderTechnicalUrl?: string
   riderHospitalityUrl?: string
+  // theme + section customisation
+  epkTheme?: string
+  epkSectionsOrder?: string[]
+  epkSectionsHidden?: string[]
+  // password protection
+  epkPasswordSections?: string[]
+  epkPasswordHash?: string
   /** Label name shown in the EPK footer — sourced from site settings. */
   labelName?: string
   /** Label logo URL shown in the EPK footer — sourced from site settings. */
@@ -78,6 +98,14 @@ interface EPKPreviewProps {
   dict: Dictionary['portal']
   data: EPKData
   artistSlug?: string | null
+  // EPK customisation — can be passed independently of EPKData (used by ProfileForm)
+  epkTheme?: string
+  epkSectionsOrder?: string[]
+  epkSectionsHidden?: string[]
+  epkPasswordHash?: string
+  epkPasswordSections?: string[]
+  /** Called when theme/section/password settings change */
+  onSettingsChange?: (updates: Partial<Pick<EPKData, 'epkTheme' | 'epkSectionsOrder' | 'epkSectionsHidden' | 'epkPasswordSections' | 'epkPasswordHash'>>) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +120,6 @@ function sanitize(html: string): string {
   })
 }
 
-/** Detect if a string contains HTML tags */
 function isHtml(str: string): boolean {
   return /<[a-z][\s\S]*>/i.test(str)
 }
@@ -132,241 +159,279 @@ function buildSocialLinks(data: EPKData): SocialLinkItem[] {
 }
 
 // ---------------------------------------------------------------------------
-// EPK Document — the actual press kit layout
+// Section label mapping
 // ---------------------------------------------------------------------------
 
-function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData }) {
+const SECTION_LABEL_KEYS: Record<EPKSectionId, keyof Dictionary['portal']> = {
+  header:   'epk_section_header',
+  quote:    'epk_section_quote',
+  bio:      'epk_section_bio',
+  info:     'epk_section_info',
+  contacts: 'epk_section_contacts',
+  riders:   'epk_section_riders',
+  links:    'epk_section_links',
+}
+
+// ---------------------------------------------------------------------------
+// Per-section render blocks
+// ---------------------------------------------------------------------------
+
+function SectionHeader({ data }: { data: EPKData }) {
+  const theme = useEPKTheme()
   const genres = data.genres
     ? data.genres.split(',').map((g) => g.trim()).filter(Boolean)
     : []
-
-  const socialLinks = buildSocialLinks(data)
-
-  const hasBio    = data.bioShort || data.bioMedium || data.bioLong
-  const hasInfo   = data.foundingYear || data.hometown
-  const hasContacts = data.bookingContact || data.pressContact
-
   return (
-    <article className="epk-document bg-card text-foreground rounded-xl overflow-hidden border border-border shadow-lg">
-      {/* ── Header band ─────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-primary/20 to-primary/5 border-b border-border px-8 py-6 flex items-center gap-6">
-        {data.photoUrl && (
-          <div className="relative w-24 h-24 shrink-0 rounded-full overflow-hidden border-2 border-primary/40">
-            <Image
-              src={data.photoUrl}
-              alt={`${data.artistName} – artist photo`}
-              fill
-              className="object-cover"
-              sizes="96px"
-            />
+    <div style={theme.header}>
+      {data.photoUrl && (
+        <div style={{
+          position: 'relative',
+          width: 96,
+          height: 96,
+          flexShrink: 0,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          border: `2px solid ${theme.accent}40`,
+        }}>
+          <Image
+            src={data.photoUrl}
+            alt={`${data.artistName} – artist photo`}
+            fill
+            className="object-cover"
+            sizes="96px"
+          />
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={theme.headerLabel}>Electronic Press Kit</p>
+        <h1 style={theme.artistName}>{data.artistName}</h1>
+        {genres.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', marginTop: '0.5rem' }}>
+            {genres.map((g) => (
+              <span key={g} style={theme.badge}>{g}</span>
+            ))}
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold mb-1">
-            Electronic Press Kit
-          </p>
-          <h1 className="text-3xl font-bold truncate">{data.artistName}</h1>
-          {genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {genres.map((g) => (
-                <Badge key={g} variant="secondary" className="text-xs font-normal">
-                  {g}
-                </Badge>
-              ))}
+      </div>
+    </div>
+  )
+}
+
+function SectionQuote({ data }: { data: EPKData }) {
+  const theme = useEPKTheme()
+  if (!data.pressQuote) return null
+  return (
+    <blockquote style={theme.blockquote}>
+      &ldquo;{data.pressQuote}&rdquo;
+    </blockquote>
+  )
+}
+
+function SectionBio({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  const hasBio = data.bioShort || data.bioMedium || data.bioLong
+  if (!hasBio) return null
+  return (
+    <section aria-label="Biography">
+      {data.bioShort && (
+        <div style={{ marginBottom: '1rem' }}>
+          <h2 style={theme.sectionHeading}>{dict.profile_epk_bio_short_label}</h2>
+          <BioBlock html={data.bioShort} />
+        </div>
+      )}
+      {data.bioMedium && (
+        <div style={{ marginBottom: '1rem' }}>
+          <h2 style={theme.sectionHeading}>{dict.profile_epk_bio_medium_label}</h2>
+          <BioBlock html={data.bioMedium} />
+        </div>
+      )}
+      {data.bioLong && (
+        <div>
+          <h2 style={theme.sectionHeading}>{dict.profile_epk_bio_long_label}</h2>
+          <BioBlock html={data.bioLong} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SectionInfo({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  if (!data.foundingYear && !data.hometown) return null
+  return (
+    <>
+      <div style={theme.divider} role="separator" />
+      <section aria-label={dict.profile_epk_info_section}>
+        <h2 style={theme.sectionHeading}>{dict.profile_epk_info_section}</h2>
+        <dl style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 2rem' }}>
+          {data.foundingYear && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <Calendar size={14} style={{ color: theme.accent, flexShrink: 0 }} aria-hidden="true" />
+              <dt style={{ fontSize: '0.75rem', ...theme.mutedText }}>{dict.profile_epk_founded}:</dt>
+              <dd style={{ fontSize: '0.875rem', fontWeight: 500, ...theme.text }}>{data.foundingYear}</dd>
             </div>
           )}
-        </div>
+          {data.hometown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <MapPin size={14} style={{ color: theme.accent, flexShrink: 0 }} aria-hidden="true" />
+              <dt style={{ fontSize: '0.75rem', ...theme.mutedText }}>{dict.profile_epk_origin}:</dt>
+              <dd style={{ fontSize: '0.875rem', fontWeight: 500, ...theme.text }}>{data.hometown}</dd>
+            </div>
+          )}
+        </dl>
+      </section>
+    </>
+  )
+}
+
+function SectionContacts({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  if (!data.bookingContact && !data.pressContact) return null
+  return (
+    <>
+      <div style={theme.divider} role="separator" />
+      <section aria-label={dict.profile_epk_contacts_section}>
+        <h2 style={theme.sectionHeading}>{dict.profile_epk_contacts_section}</h2>
+        <dl style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+          {data.bookingContact && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Envelope size={14} style={{ color: theme.accent, flexShrink: 0 }} aria-hidden="true" />
+              <dt style={{ fontSize: '0.75rem', width: '5rem', flexShrink: 0, ...theme.mutedText }}>{dict.profile_epk_booking}:</dt>
+              <dd style={{ fontSize: '0.875rem', wordBreak: 'break-all', ...theme.text }}>{data.bookingContact}</dd>
+            </div>
+          )}
+          {data.pressContact && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Envelope size={14} style={{ color: theme.accent, flexShrink: 0 }} aria-hidden="true" />
+              <dt style={{ fontSize: '0.75rem', width: '5rem', flexShrink: 0, ...theme.mutedText }}>{dict.profile_epk_press}:</dt>
+              <dd style={{ fontSize: '0.875rem', wordBreak: 'break-all', ...theme.text }}>{data.pressContact}</dd>
+            </div>
+          )}
+        </dl>
+      </section>
+    </>
+  )
+}
+
+function SectionRiders({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  if (!data.riderStagePlotUrl && !data.riderTechnicalUrl && !data.riderHospitalityUrl) return null
+  return (
+    <>
+      <div style={theme.divider} role="separator" />
+      <section aria-label={dict.profile_epk_riders_section}>
+        <h2 style={theme.sectionHeading}>{dict.profile_epk_riders_section}</h2>
+        <ul style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', listStyle: 'none', margin: 0, padding: 0 }} role="list">
+          {data.riderStagePlotUrl && (
+            <li>
+              <a href={data.riderStagePlotUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: '0.75rem', color: theme.accent }}>
+                {dict.profile_rider_stage_plot}
+              </a>
+            </li>
+          )}
+          {data.riderTechnicalUrl && (
+            <li>
+              <a href={data.riderTechnicalUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: '0.75rem', color: theme.accent }}>
+                {dict.profile_rider_technical}
+              </a>
+            </li>
+          )}
+          {data.riderHospitalityUrl && (
+            <li>
+              <a href={data.riderHospitalityUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: '0.75rem', color: theme.accent }}>
+                {dict.profile_rider_hospitality}
+              </a>
+            </li>
+          )}
+        </ul>
+      </section>
+    </>
+  )
+}
+
+function SectionLinks({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  const socialLinks = buildSocialLinks(data)
+  if (socialLinks.length === 0) return null
+  return (
+    <>
+      <div style={theme.divider} role="separator" />
+      <section aria-label={dict.profile_epk_links_section}>
+        <h2 style={theme.sectionHeading}>{dict.profile_epk_links_section}</h2>
+        <ul style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(8rem, 1fr))',
+          gap: '0.5rem',
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+        }} role="list">
+          {socialLinks.map(({ href, label, icon: Icon }) => (
+            <li key={href}>
+              <a href={href} target="_blank" rel="noopener noreferrer"
+                aria-label={`${data.artistName} on ${label}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: theme.accent, wordBreak: 'break-all' }}>
+                <Icon size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>{label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// EPK Document — theme-aware, section-ordered
+// ---------------------------------------------------------------------------
+
+function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData }) {
+  const theme = useEPKTheme()
+  const sectionsOrder = (data.epkSectionsOrder ?? DEFAULT_SECTIONS_ORDER) as EPKSectionId[]
+  const sectionsHidden = new Set(data.epkSectionsHidden ?? [])
+
+  const sectionMap: Record<EPKSectionId, React.ReactNode> = {
+    header:   <SectionHeader   key="header"   data={data} />,
+    quote:    <SectionQuote    key="quote"    data={data} />,
+    bio:      <SectionBio      key="bio"      data={data} dict={dict} />,
+    info:     <SectionInfo     key="info"     data={data} dict={dict} />,
+    contacts: <SectionContacts key="contacts" data={data} dict={dict} />,
+    riders:   <SectionRiders   key="riders"   data={data} dict={dict} />,
+    links:    <SectionLinks    key="links"    data={data} dict={dict} />,
+  }
+
+  const allIds: EPKSectionId[] = ['header', 'quote', 'bio', 'info', 'contacts', 'riders', 'links']
+  const visibleSections = sectionsOrder.filter((id) => !sectionsHidden.has(id))
+  const extraSections = allIds.filter((id) => !sectionsOrder.includes(id) && !sectionsHidden.has(id))
+  const renderOrder = [...visibleSections, ...extraSections]
+
+  const headerNode = !sectionsHidden.has('header') ? sectionMap.header : null
+  const bodyNodes = renderOrder.filter((id) => id !== 'header').map((id) => sectionMap[id]).filter(Boolean)
+
+  return (
+    <article className="epk-document" style={theme.article}>
+      {headerNode}
+      <div style={{ ...theme.body, display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+        {bodyNodes}
       </div>
-
-      <div className="px-8 py-6 space-y-7">
-        {/* ── Press quote ─────────────────────────────────────────────── */}
-        {data.pressQuote && (
-          <blockquote className="border-l-4 border-primary/60 pl-4 italic text-foreground/70 text-sm leading-relaxed">
-            &ldquo;{data.pressQuote}&rdquo;
-          </blockquote>
-        )}
-
-        {/* ── Bios ─────────────────────────────────────────────────────── */}
-        {hasBio && (
-          <section aria-label="Biography">
-            {data.bioShort && (
-              <div className="mb-4">
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-2">
-                  {dict.profile_epk_bio_short_label}
-                </h2>
-                <BioBlock html={data.bioShort} />
-              </div>
-            )}
-            {data.bioMedium && (
-              <div className="mb-4">
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-2">
-                  {dict.profile_epk_bio_medium_label}
-                </h2>
-                <BioBlock html={data.bioMedium} />
-              </div>
-            )}
-            {data.bioLong && (
-              <div>
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-2">
-                  {dict.profile_epk_bio_long_label}
-                </h2>
-                <BioBlock html={data.bioLong} />
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ── Info strip ──────────────────────────────────────────────── */}
-        {hasInfo && (
-          <>
-            <Separator className="bg-border" />
-            <section aria-label={dict.profile_epk_info_section}>
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
-                {dict.profile_epk_info_section}
-              </h2>
-              <dl className="flex flex-wrap gap-x-8 gap-y-2">
-                {data.foundingYear && (
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={14} className="text-primary shrink-0" aria-hidden="true" />
-                    <dt className="text-xs text-muted-foreground">{dict.profile_epk_founded}:</dt>
-                    <dd className="text-sm font-medium">{data.foundingYear}</dd>
-                  </div>
-                )}
-                {data.hometown && (
-                  <div className="flex items-center gap-1.5">
-                    <MapPin size={14} className="text-primary shrink-0" aria-hidden="true" />
-                    <dt className="text-xs text-muted-foreground">{dict.profile_epk_origin}:</dt>
-                    <dd className="text-sm font-medium">{data.hometown}</dd>
-                  </div>
-                )}
-              </dl>
-            </section>
-          </>
-        )}
-
-        {/* ── Contacts ────────────────────────────────────────────────── */}
-        {hasContacts && (
-          <>
-            <Separator className="bg-border" />
-            <section aria-label={dict.profile_epk_contacts_section}>
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
-                {dict.profile_epk_contacts_section}
-              </h2>
-              <dl className="space-y-1.5">
-                {data.bookingContact && (
-                  <div className="flex items-center gap-2">
-                    <Envelope size={14} className="text-primary shrink-0" aria-hidden="true" />
-                    <dt className="text-xs text-muted-foreground w-20 shrink-0">{dict.profile_epk_booking}:</dt>
-                    <dd className="text-sm break-all">{data.bookingContact}</dd>
-                  </div>
-                )}
-                {data.pressContact && (
-                  <div className="flex items-center gap-2">
-                    <Envelope size={14} className="text-primary shrink-0" aria-hidden="true" />
-                    <dt className="text-xs text-muted-foreground w-20 shrink-0">{dict.profile_epk_press}:</dt>
-                    <dd className="text-sm break-all">{data.pressContact}</dd>
-                  </div>
-                )}
-              </dl>
-            </section>
-          </>
-        )}
-
-        {/* ── Rider Documents ─────────────────────────────────────────── */}
-        {(data.riderStagePlotUrl || data.riderTechnicalUrl || data.riderHospitalityUrl) && (
-          <>
-            <Separator className="bg-border" />
-            <section aria-label={dict.profile_epk_riders_section}>
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
-                {dict.profile_epk_riders_section}
-              </h2>
-              <ul className="flex flex-wrap gap-3" role="list">
-                {data.riderStagePlotUrl && (
-                  <li>
-                    <a
-                      href={data.riderStagePlotUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
-                    >
-                      <span>{dict.profile_rider_stage_plot}</span>
-                    </a>
-                  </li>
-                )}
-                {data.riderTechnicalUrl && (
-                  <li>
-                    <a
-                      href={data.riderTechnicalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
-                    >
-                      <span>{dict.profile_rider_technical}</span>
-                    </a>
-                  </li>
-                )}
-                {data.riderHospitalityUrl && (
-                  <li>
-                    <a
-                      href={data.riderHospitalityUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
-                    >
-                      <span>{dict.profile_rider_hospitality}</span>
-                    </a>
-                  </li>
-                )}
-              </ul>
-            </section>
-          </>
-        )}
-
-        {/* ── Links ───────────────────────────────────────────────────── */}
-        {socialLinks.length > 0 && (
-          <>
-            <Separator className="bg-border" />
-            <section aria-label={dict.profile_epk_links_section}>
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
-                {dict.profile_epk_links_section}
-              </h2>
-              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="list">
-                {socialLinks.map(({ href, label, icon: Icon }) => (
-                  <li key={href}>
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${data.artistName} on ${label}`}
-                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors break-all"
-                    >
-                      <Icon size={14} aria-hidden="true" className="shrink-0" />
-                      <span>{label}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </>
-        )}
-      </div>
-
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <div className="border-t border-border px-8 py-3 flex items-center justify-between bg-muted/30">
+      <div style={theme.footer}>
         {data.labelLogoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={data.labelLogoUrl}
             alt={data.labelName ?? 'Label logo'}
-            className="h-5 w-auto object-contain"
+            style={{ height: '1.25rem', width: 'auto', objectFit: 'contain' }}
           />
         ) : (
-          <p className="text-xs text-muted-foreground tracking-widest uppercase">
+          <p style={theme.footerText}>
             {data.labelName ?? 'Electronic Press Kit'}
           </p>
         )}
-        <p className="text-xs text-muted-foreground">{new Date().getFullYear()}</p>
-      </div>
+        <p style={theme.footerText}>{new Date().getFullYear()}</p>      </div>
     </article>
   )
 }
@@ -413,8 +478,6 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
         <DialogTitle id={titleId} className="sr-only">
           {dict.profile_epk_preview_heading} — {data.artistName}
         </DialogTitle>
-
-        {/* Toolbar */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 no-print">
           <p className="text-sm font-semibold">{dict.profile_epk_preview_heading}</p>
           <div className="flex items-center gap-2">
@@ -432,20 +495,15 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
               <FilePdf size={13} aria-hidden="true" />
               {downloading ? '…' : dict.profile_download_epk}
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={onClose}
-              className="h-8 w-8"
-              aria-label={dict.profile_epk_close_preview}
-            >
+            <Button size="icon" variant="ghost" onClick={onClose} className="h-8 w-8" aria-label={dict.profile_epk_close_preview}>
               <X size={16} aria-hidden="true" />
             </Button>
           </div>
         </div>
-
         <div className="p-4 sm:p-6 epk-print-area">
-          <EPKDocument dict={dict} data={data} />
+          <EPKThemeProvider themeId={data.epkTheme}>
+            <EPKDocument dict={dict} data={data} />
+          </EPKThemeProvider>
         </div>
       </DialogContent>
     </Dialog>
@@ -453,14 +511,230 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
 }
 
 // ---------------------------------------------------------------------------
-// EPKPreview — inline preview panel (used inside the Profile page)
+// Theme Selector
 // ---------------------------------------------------------------------------
 
-export function EPKPreview({ dict, data }: EPKPreviewProps) {
+function EPKThemeSelector({
+  dict,
+  value,
+  onChange,
+}: {
+  dict: Dictionary['portal']
+  value: string
+  onChange: (v: string) => void
+}) {
+  const themes = [
+    { id: 'default',      label: dict.epk_theme_default },
+    { id: 'blade-runner', label: dict.epk_theme_blade_runner },
+  ]
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {dict.epk_theme_label}
+      </Label>
+      <div className="flex gap-2 flex-wrap">
+        {themes.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChange(t.id)}
+            aria-pressed={value === t.id}
+            className={[
+              'flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+              value === t.id
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-card text-muted-foreground hover:bg-muted',
+            ].join(' ')}
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block w-4 h-4 rounded flex-shrink-0"
+              style={{ background: t.id === 'blade-runner' ? '#000' : '#1a1a1a', border: '1px solid #ffffff40' }}
+            />
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Section Manager
+// ---------------------------------------------------------------------------
+
+function EPKSectionManagerPanel({
+  dict,
+  data,
+  onSettingsChange,
+}: {
+  dict: Dictionary['portal']
+  data: EPKData
+  onSettingsChange?: EPKPreviewProps['onSettingsChange']
+}) {
+  const sectionsOrder = (data.epkSectionsOrder ?? DEFAULT_SECTIONS_ORDER) as EPKSectionId[]
+  const hiddenSet = new Set(data.epkSectionsHidden ?? [])
+
+  const move = (index: number, dir: -1 | 1) => {
+    const next = [...sectionsOrder]
+    const target = index + dir
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onSettingsChange?.({ epkSectionsOrder: next })
+  }
+
+  const toggle = (id: EPKSectionId) => {
+    const next = new Set(hiddenSet)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    onSettingsChange?.({ epkSectionsHidden: [...next] })
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <div>
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {dict.epk_sections_label}
+        </Label>
+        <p className="text-xs text-muted-foreground mt-0.5">{dict.epk_sections_desc}</p>
+      </div>
+      <ul className="space-y-1" role="list">
+        {sectionsOrder.map((id, index) => {
+          const isHidden = hiddenSet.has(id)
+          return (
+            <li key={id} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+              <span className={['flex-1 text-sm', isHidden ? 'line-through text-muted-foreground' : ''].join(' ')}>
+                {dict[SECTION_LABEL_KEYS[id] as keyof typeof dict] as string}
+              </span>
+              <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0"
+                aria-label={dict.epk_section_move_up} disabled={index === 0} onClick={() => move(index, -1)}>
+                <ArrowUp size={12} aria-hidden="true" />
+              </Button>
+              <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0"
+                aria-label={dict.epk_section_move_down} disabled={index === sectionsOrder.length - 1} onClick={() => move(index, 1)}>
+                <ArrowDown size={12} aria-hidden="true" />
+              </Button>
+              <Button type="button" size="icon" variant="ghost"
+                className={['h-6 w-6 shrink-0', isHidden ? 'text-muted-foreground' : 'text-foreground'].join(' ')}
+                aria-label={isHidden ? dict.epk_section_show : dict.epk_section_hide}
+                onClick={() => toggle(id)}>
+                {isHidden ? <EyeSlash size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
+              </Button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Password Protection panel
+// ---------------------------------------------------------------------------
+
+function EPKPasswordPanel({
+  dict,
+  data,
+  onSettingsChange,
+}: {
+  dict: Dictionary['portal']
+  data: EPKData
+  onSettingsChange?: EPKPreviewProps['onSettingsChange']
+}) {
+  const [enabled, setEnabled] = useState(Boolean(data.epkPasswordHash || (data.epkPasswordSections ?? []).length > 0))
+  const [password, setPassword] = useState('')
+  const protectable: EPKSectionId[] = ['riders', 'links']
+  const passwordSections = new Set(data.epkPasswordSections ?? [])
+
+  const handleEnableToggle = () => {
+    if (enabled) {
+      setEnabled(false)
+      setPassword('')
+      onSettingsChange?.({ epkPasswordSections: [], epkPasswordHash: undefined })
+    } else {
+      setEnabled(true)
+    }
+  }
+
+  const toggleSection = (id: EPKSectionId) => {
+    const next = new Set(passwordSections)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    onSettingsChange?.({ epkPasswordSections: [...next] })
+  }
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val)
+    // Signal new plaintext password to parent; API route will hash it server-side.
+    onSettingsChange?.({ epkPasswordHash: val ? `__plain__${val}` : undefined })
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <LockKey size={14} className="text-muted-foreground" aria-hidden="true" />
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {dict.epk_password_heading}
+          </Label>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={handleEnableToggle}
+          className={['relative inline-flex h-5 w-9 cursor-pointer rounded-full transition-colors', enabled ? 'bg-primary' : 'bg-muted'].join(' ')}
+        >
+          <span className="sr-only">{dict.epk_password_enable}</span>
+          <span className={['pointer-events-none absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform', enabled ? 'translate-x-4' : 'translate-x-0.5'].join(' ')} />
+        </button>
+      </div>
+      {enabled && (
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-muted-foreground">{dict.epk_password_desc}</p>
+          <div className="space-y-1">
+            <Label htmlFor="epk-password" className="text-xs">{dict.epk_password_label}</Label>
+            <Input id="epk-password" type="password" autoComplete="new-password"
+              placeholder={dict.epk_password_placeholder}
+              value={password}
+              onChange={(e) => handlePasswordChange(e.target.value)}
+              className="h-8 text-xs" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{dict.epk_password_sections_label}</Label>
+            <div className="flex flex-wrap gap-2">
+              {protectable.map((id) => (
+                <button key={id} type="button" onClick={() => toggleSection(id)} aria-pressed={passwordSections.has(id)}
+                  className={['rounded border px-2 py-0.5 text-xs transition-colors', passwordSections.has(id) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'].join(' ')}>
+                  {dict[SECTION_LABEL_KEYS[id] as keyof typeof dict] as string}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// EPKPreview — inline preview panel (used inside Profile page)
+// ---------------------------------------------------------------------------
+
+export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder, epkSectionsHidden, epkPasswordHash, epkPasswordSections, onSettingsChange }: EPKPreviewProps) {
+  // Merge prop overrides into data for display
+  const effectiveData: EPKData = {
+    ...data,
+    ...(epkTheme !== undefined ? { epkTheme } : {}),
+    ...(epkSectionsOrder !== undefined ? { epkSectionsOrder } : {}),
+    ...(epkSectionsHidden !== undefined ? { epkSectionsHidden } : {}),
+    ...(epkPasswordHash !== undefined ? { epkPasswordHash } : {}),
+    ...(epkPasswordSections !== undefined ? { epkPasswordSections } : {}),
+  }
+  void artistSlug
   const [modalOpen, setModalOpen] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
 
-  // Close modal on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setModalOpen(false)
@@ -470,33 +744,26 @@ export function EPKPreview({ dict, data }: EPKPreviewProps) {
   }, [])
 
   return (
-    <section ref={previewRef} className="epk-print-area space-y-3">
+    <section ref={previewRef} className="epk-print-area space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{dict.profile_epk_preview_heading}</h2>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setModalOpen(true)}
-          className="gap-1.5 text-xs"
-        >
+        <Button type="button" size="sm" variant="outline" onClick={() => setModalOpen(true)} className="gap-1.5 text-xs">
           <LinkIcon size={13} aria-hidden="true" />
           {dict.profile_epk_open_preview}
         </Button>
       </div>
 
-      {/* Compact preview card */}
+      <EPKThemeSelector dict={dict} value={effectiveData.epkTheme ?? 'default'} onChange={(v) => onSettingsChange?.({ epkTheme: v })} />
+      <EPKSectionManagerPanel dict={dict} data={effectiveData} onSettingsChange={onSettingsChange} />
+      <EPKPasswordPanel dict={dict} data={effectiveData} onSettingsChange={onSettingsChange} />
+
       <div className="rounded-lg border border-border bg-card/50 p-4">
-        <EPKDocument dict={dict} data={data} />
+        <EPKThemeProvider themeId={effectiveData.epkTheme}>
+          <EPKDocument dict={dict} data={effectiveData} />
+        </EPKThemeProvider>
       </div>
 
-      <EPKModal
-        dict={dict}
-        data={data}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
+      <EPKModal dict={dict} data={effectiveData} open={modalOpen} onClose={() => setModalOpen(false)} />
     </section>
   )
 }
-

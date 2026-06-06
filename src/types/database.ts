@@ -300,6 +300,11 @@ export interface Database {
           rider_technical_url: string | null
           rider_hospitality_url: string | null
           onboarding_completed: boolean
+          epk_theme: string
+          epk_sections_order: string[]
+          epk_sections_hidden: string[]
+          epk_password_hash: string | null
+          epk_password_sections: string[]
           created_at: string
           updated_at: string
         }
@@ -330,6 +335,11 @@ export interface Database {
           rider_technical_url?: string | null
           rider_hospitality_url?: string | null
           onboarding_completed?: boolean
+          epk_theme?: string
+          epk_sections_order?: string[]
+          epk_sections_hidden?: string[]
+          epk_password_hash?: string | null
+          epk_password_sections?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -360,6 +370,104 @@ export interface Database {
           rider_technical_url?: string | null
           rider_hospitality_url?: string | null
           onboarding_completed?: boolean
+          epk_theme?: string
+          epk_sections_order?: string[]
+          epk_sections_hidden?: string[]
+          epk_password_hash?: string | null
+          epk_password_sections?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      artist_invoices: {
+        Row: {
+          id: string
+          artist_id: string
+          invoice_number: string
+          client_name: string
+          client_email: string
+          client_address: string | null
+          line_items: { description: string; qty: number; unit_price_cents: number }[]
+          currency: string
+          tax_rate_pct: number
+          status: 'draft' | 'sent' | 'paid' | 'cancelled'
+          due_date: string | null
+          issued_date: string
+          pdf_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          invoice_number: string
+          client_name: string
+          client_email: string
+          client_address?: string | null
+          line_items?: { description: string; qty: number; unit_price_cents: number }[]
+          currency?: string
+          tax_rate_pct?: number
+          status?: 'draft' | 'sent' | 'paid' | 'cancelled'
+          due_date?: string | null
+          issued_date?: string
+          pdf_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          invoice_number?: string
+          client_name?: string
+          client_email?: string
+          client_address?: string | null
+          line_items?: { description: string; qty: number; unit_price_cents: number }[]
+          currency?: string
+          tax_rate_pct?: number
+          status?: 'draft' | 'sent' | 'paid' | 'cancelled'
+          due_date?: string | null
+          issued_date?: string
+          pdf_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      artist_documents: {
+        Row: {
+          id: string
+          artist_id: string
+          label: string
+          category: string
+          file_path: string
+          file_size_bytes: number | null
+          mime_type: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          label: string
+          category?: string
+          file_path: string
+          file_size_bytes?: number | null
+          mime_type?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          label?: string
+          category?: string
+          file_path?: string
+          file_size_bytes?: number | null
+          mime_type?: string | null
+          notes?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -81,6 +81,21 @@ export function usePortalProfileForm({
   })
   const [riderUploading, setRiderUploading] = useState<RiderType | null>(null)
 
+  // EPK customisation settings (theme, section order, password)
+  const [epkSettings, setEpkSettings] = useState<{
+    epkTheme: string
+    epkSectionsOrder: string[]
+    epkSectionsHidden: string[]
+    epkPasswordSections: string[]
+    epkPasswordRaw?: string | null
+  }>({
+    epkTheme: initialProfile?.epkTheme ?? 'default',
+    epkSectionsOrder: initialProfile?.epkSectionsOrder?.length ? initialProfile.epkSectionsOrder : ['header','quote','bio','info','contacts','riders','links'],
+    epkSectionsHidden: initialProfile?.epkSectionsHidden ?? [],
+    epkPasswordSections: initialProfile?.epkPasswordSections ?? [],
+    epkPasswordRaw: undefined,
+  })
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -167,7 +182,40 @@ export function usePortalProfileForm({
   }
 
   // -------------------------------------------------------------------------
-  // Form submission (includes rider URLs)
+  // EPK settings change handler (called from EPKPreview child)
+  // -------------------------------------------------------------------------
+
+  const handleEpkSettingsChange = (updates: Partial<{
+    epkTheme: string
+    epkSectionsOrder: string[]
+    epkSectionsHidden: string[]
+    epkPasswordSections: string[]
+    epkPasswordHash: string | undefined
+  }>) => {
+    setEpkSettings((prev) => {
+      // Extract raw password from the __plain__ sentinel
+      let epkPasswordRaw = prev.epkPasswordRaw
+      if (updates.epkPasswordHash !== undefined) {
+        const raw = updates.epkPasswordHash
+        if (raw === undefined) {
+          epkPasswordRaw = null // signal: clear password
+        } else if (typeof raw === 'string' && raw.startsWith('__plain__')) {
+          epkPasswordRaw = raw.slice('__plain__'.length) || null
+        }
+      }
+      return {
+        ...prev,
+        ...(updates.epkTheme !== undefined ? { epkTheme: updates.epkTheme } : {}),
+        ...(updates.epkSectionsOrder !== undefined ? { epkSectionsOrder: updates.epkSectionsOrder } : {}),
+        ...(updates.epkSectionsHidden !== undefined ? { epkSectionsHidden: updates.epkSectionsHidden } : {}),
+        ...(updates.epkPasswordSections !== undefined ? { epkPasswordSections: updates.epkPasswordSections } : {}),
+        epkPasswordRaw,
+      }
+    })
+  }
+
+  // -------------------------------------------------------------------------
+  // Form submission (includes rider URLs + EPK settings)
   // -------------------------------------------------------------------------
 
   const onSubmit = async (values: ProfileFormValues) => {
@@ -212,6 +260,11 @@ export function usePortalProfileForm({
           rider_stage_plot_url: riderUrls.stage_plot ?? null,
           rider_technical_url: riderUrls.technical ?? null,
           rider_hospitality_url: riderUrls.hospitality ?? null,
+          epk_theme: epkSettings.epkTheme,
+          epk_sections_order: epkSettings.epkSectionsOrder,
+          epk_sections_hidden: epkSettings.epkSectionsHidden,
+          epk_password_sections: epkSettings.epkPasswordSections,
+          ...(epkSettings.epkPasswordRaw !== undefined ? { epk_password_raw: epkSettings.epkPasswordRaw } : {}),
         },
         session.access_token,
       )
@@ -232,9 +285,11 @@ export function usePortalProfileForm({
     watched,
     riderUrls,
     riderUploading,
+    epkSettings,
     handlePhotoChange,
     handleRiderUpload,
     handleRiderDelete,
+    handleEpkSettingsChange,
     onSubmit: form.handleSubmit(onSubmit),
   }
 }

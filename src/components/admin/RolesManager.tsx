@@ -94,7 +94,7 @@ function formatDate(iso: string) {
 
 async function getAuthHeader(supabase: ReturnType<typeof createBrowserSupabaseClient>) {
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
+  if (!session?.access_token) throw new Error('Please sign in to continue.')
   return { Authorization: 'Bearer ' + session.access_token }
 }
 
@@ -715,6 +715,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 function RbacAuditTab() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const dict = useDict()
   const [entries, setEntries] = useState<RbacAuditEntry[]>([])
   const [total, setTotal]     = useState(0)
   const [page, setPage]       = useState(0)
@@ -737,7 +738,7 @@ function RbacAuditTab() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, page])
+  }, [supabase, page, dict.errors.SERVER_ERROR])
 
   useEffect(() => { setPage(0) }, [search])
   useEffect(() => { void load() }, [load])
