@@ -83,17 +83,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="darkTunes" />
         <link rel="apple-touch-icon" href={settings?.faviconUrl || '/icons/icon-192.png'} />
-        {/*
-          Explicit <link> tags for favicon — these appear after Next.js-generated
-          links from generateMetadata() and take precedence in the browser.
-          Logo (settings.logoUrl) and favicon (settings.faviconUrl) are independent:
-          the logo is used in the header/footer; the favicon in the browser tab.
-        */}
-        {settings?.faviconUrl ? (
-          <link rel="icon" href={settings.faviconUrl} />
-        ) : (
-          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        )}
         {/* Software platform identity — readable by crawlers and Wappalyzer */}
         <meta name="generator" content="Neuroklast & Seifried.dev" />
         {/* Inject admin-configured color token overrides before first paint */}
