@@ -11,15 +11,12 @@
 
 import type { EPKData } from './EPKPreview'
 
-/** Strip HTML tags and decode common entities — used for PDF text content. */
+/**
+ * Strip HTML tags via DOM — safe text extraction for PDF content.
+ * This function is only ever called from browser click handlers, so
+ * `document` is always available.
+ */
 function htmlToText(html: string): string {
-  if (typeof window === 'undefined') {
-    // Remove script/style blocks first, then strip remaining tags
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]*>/g, '')
-  }
   const div = document.createElement('div')
   div.innerHTML = html
   return (div.textContent ?? div.innerText ?? '').trim()
