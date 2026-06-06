@@ -376,10 +376,13 @@ export function ArtistDetailContent({
                 <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
                 {/^\s*<[a-z]/i.test(artist.bio) ? (
                   <div
+                    suppressHydrationWarning
                     className="prose prose-invert max-w-none text-foreground/80 leading-relaxed font-serif
                       [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
                       [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(artist.bio) }}
+                    dangerouslySetInnerHTML={{
+                      __html: typeof window !== 'undefined' ? DOMPurify.sanitize(artist.bio) : artist.bio,
+                    }}
                   />
                 ) : (
                   <p className="text-foreground/80 leading-relaxed font-serif text-base whitespace-pre-line">
