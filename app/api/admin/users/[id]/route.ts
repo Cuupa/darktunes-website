@@ -1,26 +1,37 @@
 /**
  * app/api/admin/users/[id]/route.ts
  *
- * PATCH /api/admin/users/:id — Update a user's role and/or ban status.
+ * PATCH /api/admin/users/:id — Update a user's role(s) and/or ban status.
  * DELETE /api/admin/users/:id — Permanently delete a user.
  *
  * Security:
  *   - Only users with role = 'admin' may call these endpoints.
  *   - An admin cannot modify or delete their own account.
+ *
+ * PATCH body options:
+ *   { role }        — legacy single-role update (still supported)
+ *   { addRole }     — add one role to the user's role set
+ *   { removeRole }  — remove one role from the user's role set
+ *   { ban, reason } — ban / unban the user
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { updateUserRole, banUser, deleteUser, logBanAction } from '@/lib/api/users'
+import { updateUserRole, addUserRole, removeUserRole, banUser, deleteUser, logBanAction } from '@/lib/api/users'
+import type { UserRole } from '@/types/users'
 
 // ---------------------------------------------------------------------------
 // Validation schemas
 // ---------------------------------------------------------------------------
 
+const ROLES = ['admin', 'artist', 'editor', 'journalist', 'user'] as const
+
 const patchSchema = z.object({
-  role: z.enum(['admin', 'artist', 'editor', 'journalist', 'user']).optional(),
+  role: z.enum(ROLES).optional(),
+  addRole: z.enum(ROLES).optional(),
+  removeRole: z.enum(ROLES).optional(),
   ban: z.boolean().optional(),
   reason: z.string().optional(),
 })
@@ -77,10 +88,21 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 
-  const { role, ban, reason } = parsed.data
+  const { role, addRole, removeRole, ban, reason } = parsed.data
 
+  // Legacy single-role update
   if (role !== undefined) {
     await updateUserRole(adminClient, targetId, role)
+  }
+
+  // Multi-role: add a role
+  if (addRole !== undefined) {
+    await addUserRole(adminClient, targetId, addRole as UserRole, currentUserId)
+  }
+
+  // Multi-role: remove a role
+  if (removeRole !== undefined) {
+    await removeUserRole(adminClient, targetId, removeRole as UserRole)
   }
 
   if (ban !== undefined) {
@@ -110,3 +132,4 @@ export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextRes
 
   return NextResponse.json({ success: true })
 })
+
