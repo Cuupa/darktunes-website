@@ -145,14 +145,15 @@ export async function middleware(request: NextRequest) {
     const isAdmin = profile?.role === 'admin'
 
     if (!isAdmin) {
-      const { data: linkedArtist } = await supabase
-        .from('artists')
-        .select('id')
+      // Check artist_members (junction table) — the link-artist API writes here
+      const { data: membership } = await supabase
+        .from('artist_members')
+        .select('artist_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle()
 
-      if (!linkedArtist) {
+      if (!membership) {
         const loginUrl = request.nextUrl.clone()
         loginUrl.pathname = '/portal/login'
         loginUrl.searchParams.set('error', 'no_artist')
@@ -171,14 +172,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(portalUrl)
     }
 
-    const { data: linkedArtist } = await supabase
-      .from('artists')
-      .select('id')
+    // Check artist_members (junction table)
+    const { data: membership } = await supabase
+      .from('artist_members')
+      .select('artist_id')
       .eq('user_id', user.id)
       .limit(1)
       .maybeSingle()
 
-    if (linkedArtist) {
+    if (membership) {
       const portalUrl = request.nextUrl.clone()
       portalUrl.pathname = '/portal'
       return NextResponse.redirect(portalUrl)

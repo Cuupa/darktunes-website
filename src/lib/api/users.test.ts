@@ -54,8 +54,9 @@ function makeAdminClient(opts: {
   listUsersError?: unknown
   profilesData?: unknown
   profilesError?: unknown
-  artistsData?: unknown
-  artistsError?: unknown
+  /** Data returned for the artist_members join query (second .from() call). */
+  membershipsData?: unknown
+  membershipsError?: unknown
   updateUserError?: unknown
   deleteUserError?: unknown
   fromData?: unknown
@@ -66,8 +67,8 @@ function makeAdminClient(opts: {
     listUsersError = null,
     profilesData = [],
     profilesError = null,
-    artistsData = [],
-    artistsError = null,
+    membershipsData = [],
+    membershipsError = null,
     updateUserError = null,
     deleteUserError = null,
     fromData = null,
@@ -78,7 +79,7 @@ function makeAdminClient(opts: {
   let callCount = 0
   const responses = [
     { data: profilesData, error: profilesError },
-    { data: artistsData, error: artistsError },
+    { data: membershipsData, error: membershipsError },
     { data: fromData, error: fromError },
   ]
 
@@ -120,7 +121,7 @@ describe('listUsersWithProfiles', () => {
         },
       ],
       profilesData: [{ id: 'user-1', role: 'admin' }],
-      artistsData: [],
+      membershipsData: [],
     })
 
     const users = await listUsersWithProfiles(client)
@@ -143,7 +144,10 @@ describe('listUsersWithProfiles', () => {
         },
       ],
       profilesData: [{ id: 'user-1', role: 'user' }],
-      artistsData: [{ id: 'artist-1', name: 'Dark Band', slug: 'dark-band', user_id: 'user-1' }],
+      // artist_members join shape: { user_id, artists: { id, name, slug } }
+      membershipsData: [
+        { user_id: 'user-1', artists: { id: 'artist-1', name: 'Dark Band', slug: 'dark-band' } },
+      ],
     })
 
     const users = await listUsersWithProfiles(client)
@@ -167,7 +171,7 @@ describe('listUsersWithProfiles', () => {
         },
       ],
       profilesData: [],
-      artistsData: [],
+      membershipsData: [],
     })
 
     const users = await listUsersWithProfiles(client)

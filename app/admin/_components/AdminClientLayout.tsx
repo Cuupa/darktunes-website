@@ -27,7 +27,10 @@ interface AdminClientLayoutProps {
 export function AdminClientLayout({ children }: AdminClientLayoutProps) {
   return (
     <AuthProvider>
-      <div className="flex h-screen bg-background overflow-hidden">
+      {/* On mobile the sidebar renders as a sticky header + Sheet drawer;
+          on ≥md it renders as a traditional left sidebar column.
+          AdminSidebarNav handles both breakpoints internally. */}
+      <div className="flex flex-col md:flex-row md:h-screen bg-background md:overflow-hidden">
         <AdminSidebarNav />
         <main
           className="flex-1 overflow-y-auto flex flex-col"
