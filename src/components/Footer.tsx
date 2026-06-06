@@ -17,7 +17,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
   const handleSmoothScroll = useSmoothScrollToAnchor()
 
   return (
-    <footer className="border-t border-border bg-card/50 backdrop-blur-sm overflow-x-hidden">
+    <footer className="border-t border-border bg-background overflow-x-hidden">
       <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>

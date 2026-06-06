@@ -133,7 +133,7 @@ export function HomePageContent({
         )
       case 'spotify':
         return (
-          <section key="spotify" id="spotify-player" className="py-12 px-4 lg:px-16 bg-muted/30">
+          <section key="spotify" id="spotify-player" className="py-12 px-4 lg:px-16">
             <div className="container mx-auto">
               <motion.div
                 initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
