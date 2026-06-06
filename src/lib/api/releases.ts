@@ -60,36 +60,30 @@ function rowToRelease(row: ReleaseRow): Release {
 
 /**
  * Attach the full artist list from the release_artists junction table.
- * Falls back gracefully when the junction table doesn't exist yet (PGRST200/42P01).
  */
 async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<Release[]> {
   if (releases.length === 0) return releases
   const ids = releases.map((r) => r.id)
 
-  try {
-    const { data, error } = await (db as DbClient)
-      .from('release_artists' as const)
-      .select('release_id, sort_order, artists(id, name, slug)')
-      .in('release_id', ids)
-      .order('sort_order', { ascending: true })
+  const { data, error } = await (db as DbClient)
+    .from('release_artists' as const)
+    .select('release_id, sort_order, artists(id, name, slug)')
+    .in('release_id', ids)
+    .order('sort_order', { ascending: true })
 
-    // Gracefully ignore missing table (migration not yet applied)
-    if (error) return releases
+  if (error) throw new Error(`Failed to load release artists: ${error.message}`)
 
-    const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
-    for (const row of (data ?? []) as unknown as (JunctionArtist & { release_id: string })[]) {
-      if (!row.artists) continue
-      if (!byRelease.has(row.release_id)) byRelease.set(row.release_id, [])
-      byRelease.get(row.release_id)!.push(row.artists)
-    }
-
-    return releases.map((r) => ({
-      ...r,
-      artists: byRelease.get(r.id) ?? undefined,
-    }))
-  } catch {
-    return releases
+  const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
+  for (const row of (data ?? []) as unknown as (JunctionArtist & { release_id: string })[]) {
+    if (!row.artists) continue
+    if (!byRelease.has(row.release_id)) byRelease.set(row.release_id, [])
+    byRelease.get(row.release_id)!.push(row.artists)
   }
+
+  return releases.map((r) => ({
+    ...r,
+    artists: byRelease.get(r.id) ?? undefined,
+  }))
 }
 
 export async function getReleasesByArtistId(db: DbClient, artistId: string): Promise<Release[]> {
@@ -105,34 +99,29 @@ export async function getReleasesByArtistId(db: DbClient, artistId: string): Pro
   const legacyIds = new Set(legacyReleases.map((r) => r.id))
 
   // Secondary: also collect releases linked via the many-to-many junction table
-  // (gracefully degraded — no error thrown if table is absent or query fails)
-  try {
-    const { data: junctionRows } = await (db as DbClient)
-      .from('release_artists' as const)
-      .select('release_id')
-      .eq('artist_id', artistId)
+  const { data: junctionRows } = await (db as DbClient)
+    .from('release_artists' as const)
+    .select('release_id')
+    .eq('artist_id', artistId)
 
-    const extraIds = ((junctionRows ?? []) as { release_id: string }[])
-      .map((r) => r.release_id)
-      .filter((id) => id && !legacyIds.has(id))
+  const extraIds = ((junctionRows ?? []) as { release_id: string }[])
+    .map((r) => r.release_id)
+    .filter((id) => id && !legacyIds.has(id))
 
-    if (extraIds.length > 0) {
-      const { data: extra } = await db
-        .from('releases')
-        .select('*')
-        .in('id', extraIds)
-        .order('release_date', { ascending: false })
+  if (extraIds.length > 0) {
+    const { data: extra } = await db
+      .from('releases')
+      .select('*')
+      .in('id', extraIds)
+      .order('release_date', { ascending: false })
 
-      if (extra && extra.length > 0) {
-        const merged = [
-          ...legacyReleases,
-          ...extra.map(rowToRelease),
-        ].sort((a, b) => b.releaseDate.localeCompare(a.releaseDate))
-        return attachReleaseArtists(db, merged)
-      }
+    if (extra && extra.length > 0) {
+      const merged = [
+        ...legacyReleases,
+        ...extra.map(rowToRelease),
+      ].sort((a, b) => b.releaseDate.localeCompare(a.releaseDate))
+      return attachReleaseArtists(db, merged)
     }
-  } catch {
-    // Junction table not available — fall through to legacy results
   }
 
   return attachReleaseArtists(db, legacyReleases)
