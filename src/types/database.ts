@@ -656,6 +656,13 @@ export interface Database {
           source: string
           created_at: string
           updated_at: string
+          event_time: string | null
+          event_type: string
+          trailer_url: string | null
+          venue_lat: number | null
+          venue_lng: number | null
+          venue_osm_id: string | null
+          news_post_id: string | null
         }
         Insert: {
           id?: string
@@ -674,6 +681,13 @@ export interface Database {
           source?: string
           created_at?: string
           updated_at?: string
+          event_time?: string | null
+          event_type?: string
+          trailer_url?: string | null
+          venue_lat?: number | null
+          venue_lng?: number | null
+          venue_osm_id?: string | null
+          news_post_id?: string | null
         }
         Update: {
           id?: string
@@ -692,6 +706,34 @@ export interface Database {
           source?: string
           created_at?: string
           updated_at?: string
+          event_time?: string | null
+          event_type?: string
+          trailer_url?: string | null
+          venue_lat?: number | null
+          venue_lng?: number | null
+          venue_osm_id?: string | null
+          news_post_id?: string | null
+        }
+        Relationships: []
+      }
+      concert_artists: {
+        Row: {
+          id: string
+          concert_id: string
+          artist_id: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          concert_id: string
+          artist_id: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          concert_id?: string
+          artist_id?: string
+          sort_order?: number
         }
         Relationships: []
       }

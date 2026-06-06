@@ -591,6 +591,22 @@ export interface Concert {
   status: string
   createdAt: string
   updatedAt: string
+  /** Time of the event (HH:MM format) */
+  eventTime: string | null
+  /** Event type: 'gig' | 'dj_set' | 'tour' | custom string */
+  eventType: string
+  /** Optional YouTube/video trailer URL */
+  trailerUrl: string | null
+  /** Latitude for venue OSM lookup */
+  venueLat: number | null
+  /** Longitude for venue OSM lookup */
+  venueLng: number | null
+  /** OpenStreetMap place_id for the venue */
+  venueOsmId: string | null
+  /** Linked news post ID */
+  newsPostId: string | null
+  /** Featured/supporting artists (populated from concert_artists join) */
+  featuredArtists?: { id: string; name: string; slug: string }[]
 }
 
 export interface NewsletterSubscriber {

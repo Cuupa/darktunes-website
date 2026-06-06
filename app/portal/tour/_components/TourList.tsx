@@ -75,6 +75,13 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
         status: data.status,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        eventTime: null,
+        eventType: 'gig',
+        trailerUrl: null,
+        venueLat: null,
+        venueLng: null,
+        venueOsmId: null,
+        newsPostId: null,
       },
       ...prev,
     ])
