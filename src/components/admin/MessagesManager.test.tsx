@@ -50,6 +50,32 @@ const {
 
 vi.mock('@phosphor-icons/react', () => ({
   PencilSimple: () => null,
+  ArrowBendUpLeft: () => null,
+  ArrowBendUpRight: () => null,
+  Star: () => null,
+  StarFour: () => null,
+  Trash: () => null,
+  Download: () => null,
+  Paperclip: () => null,
+  Tray: () => null,
+  PaperPlaneTilt: () => null,
+  Folder: () => null,
+  Plus: () => null,
+  X: () => null,
+  Check: () => null,
+  Pencil: () => null,
+  ToggleLeft: () => null,
+  ToggleRight: () => null,
+  Warning: () => null,
+  Globe: () => null,
+  FilePdf: () => null,
+  FileZip: () => null,
+  FileImage: () => null,
+  FileAudio: () => null,
+  FileVideo: () => null,
+  FileDoc: () => null,
+  FileArrowDown: () => null,
+  File: () => null,
 }))
 
 vi.mock('sonner', () => ({

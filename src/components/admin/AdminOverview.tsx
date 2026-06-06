@@ -89,7 +89,7 @@ export function AdminOverview() {
       const [artists, releases, news, videos] = await Promise.all([
         supabase.from('artists').select('id', { count: 'exact', head: true }),
         supabase.from('releases').select('id', { count: 'exact', head: true }),
-        supabase.from('news').select('id', { count: 'exact', head: true }),
+        supabase.from('news_posts').select('id', { count: 'exact', head: true }),
         supabase.from('videos').select('id', { count: 'exact', head: true }),
       ])
       if (cancelled) return

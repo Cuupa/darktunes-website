@@ -172,6 +172,16 @@ export interface LabelMessage {
   starred?: boolean
   deletedAt?: string | null
   sentAt: string
+  /** Custom folder the message belongs to (null = Inbox). */
+  folderId?: string | null
+  /** Sender email address (for external/incoming messages). */
+  senderEmail?: string | null
+  /** True if this message was sent to/from an external email address. */
+  isExternal?: boolean
+  /** ID of the original message this was forwarded from. */
+  forwardedFrom?: string | null
+  /** True when the message has associated file attachments. */
+  hasAttachments?: boolean
 }
 
 export interface ArtistReply {
@@ -510,6 +520,60 @@ export interface SiteSettings {
   themeAccent?: string
   /** Override for the `--border` CSS custom property. */
   themeBorder?: string
+  // ── Gradient Tokens ───────────────────────────────────────────────────────
+  /** Start color of the hero gradient (`--gradient-hero`). */
+  themeGradientHeroFrom?: string
+  /** End color of the hero gradient (`--gradient-hero`). */
+  themeGradientHeroTo?: string
+  /** CSS direction / angle of the hero gradient, e.g. "135deg" or "to right". */
+  themeGradientHeroDir?: string
+  /** Start color of the accent gradient (`--gradient-accent`). */
+  themeGradientAccentFrom?: string
+  /** End color of the accent gradient (`--gradient-accent`). */
+  themeGradientAccentTo?: string
+  /** CSS direction / angle of the accent gradient. */
+  themeGradientAccentDir?: string
+}
+
+// ── Messaging ──────────────────────────────────────────────────────────────
+
+export interface MessageFolder {
+  id: string
+  name: string
+  /** Phosphor icon name (e.g. "Inbox", "Archive", "Star"). */
+  icon?: string
+  /** Hex color for the folder badge. */
+  color?: string
+  createdAt: string
+}
+
+export type MessageRuleConditionField = 'subject' | 'body' | 'artist_id' | 'sender_email'
+export type MessageRuleConditionOperator = 'contains' | 'equals' | 'starts_with' | 'ends_with'
+export type MessageRuleActionType = 'move_to_folder' | 'mark_read' | 'star' | 'delete'
+
+export interface MessageRule {
+  id: string
+  name: string
+  conditionField: MessageRuleConditionField
+  conditionOperator: MessageRuleConditionOperator
+  conditionValue: string
+  actionType: MessageRuleActionType
+  /** Target folder id when actionType is "move_to_folder". */
+  actionTarget?: string
+  active: boolean
+  createdAt: string
+}
+
+export interface MessageAttachment {
+  id: string
+  messageId: string
+  filename: string
+  url: string
+  /** MIME type, e.g. "application/pdf". */
+  mimeType: string
+  /** File size in bytes. */
+  size: number
+  createdAt: string
 }
 
 export interface Concert {

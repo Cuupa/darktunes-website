@@ -13,19 +13,12 @@ import {
   Newspaper,
   VideoCamera,
   Image as ImageIcon,
-  Gear,
-  Heartbeat,
-  Broadcast,
-  Users,
   ToggleRight,
-  ClipboardText,
-  ShieldCheck,
   ArrowUp,
   ArrowDown,
   ArrowsDownUp,
   CheckCircle,
   FileText,
-  Palette,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -38,22 +31,12 @@ const ReleasesManager = lazy(() => import('./ReleasesManager').then((m) => ({ de
 const NewsManager = lazy(() => import('./NewsManager').then((m) => ({ default: m.NewsManager })))
 const VideosManager = lazy(() => import('./VideosManager').then((m) => ({ default: m.VideosManager })))
 const AssetsManager = lazy(() => import('./AssetsManager').then((m) => ({ default: m.AssetsManager })))
-const SiteSettingsManager = lazy(() => import('./SiteSettingsManager').then((m) => ({ default: m.SiteSettingsManager })))
-const SystemHealthWidget = lazy(() => import('./SystemHealthWidget').then((m) => ({ default: m.SystemHealthWidget })))
-const MediaManager = lazy(() => import('./MediaManager').then((m) => ({ default: m.MediaManager })))
-const UsersManager = lazy(() => import('./UsersManager').then((m) => ({ default: m.UsersManager })))
-const FeatureTogglesManager = lazy(() => import('./FeatureTogglesManager').then((m) => ({ default: m.FeatureTogglesManager })))
-const FeatureFlagsManager = lazy(() => import('./FeatureFlagsManager').then((m) => ({ default: m.FeatureFlagsManager })))
-const MessagesManager = lazy(() => import('./MessagesManager').then((m) => ({ default: m.MessagesManager })))
 const AccreditationsManager = lazy(() => import('./AccreditationsManager').then((m) => ({ default: m.AccreditationsManager })))
-const LogsManager = lazy(() => import('./LogsManager').then((m) => ({ default: m.LogsManager })))
-const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
 const StatementsManager = lazy(() => import('./StatementsManager').then((m) => ({ default: m.StatementsManager })))
 const PressManager = lazy(() => import('./PressManager').then((m) => ({ default: m.PressManager })))
 const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager').then((m) => ({ default: m.ReleaseSubmissionsManager })))
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
-const ColorThemeManager = lazy(() => import('./ColorThemeManager').then((m) => ({ default: m.ColorThemeManager })))
 
 function TabFallback() {
   return (
@@ -72,10 +55,8 @@ function TabFallback() {
 
 type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
-  | 'settings' | 'health' | 'media' | 'users' | 'features'
-  | 'feature-flags' | 'messages' | 'accreditations' | 'press' | 'logs' | 'roles'
-  | 'statements' | 'release-submissions' | 'video-submissions' | 'submission-form'
-  | 'color-theme'
+  | 'accreditations' | 'press' | 'statements'
+  | 'release-submissions' | 'video-submissions' | 'submission-form'
 
 interface TabDef {
   value: TabValue
@@ -91,22 +72,12 @@ const TAB_DEFS: TabDef[] = [
   { value: 'news',           label: 'News',               adminOnly: false, icon: Newspaper },
   { value: 'videos',         label: 'Videos',             adminOnly: false, icon: VideoCamera },
   { value: 'assets',         label: 'Assets',             adminOnly: true,  icon: ImageIcon },
-  { value: 'settings',       label: 'Settings',           adminOnly: true,  icon: Gear },
-  { value: 'health',         label: 'Health',             adminOnly: true,  icon: Heartbeat },
-  { value: 'media',          label: 'Media',              adminOnly: true,  icon: Broadcast },
-  { value: 'users',          label: 'Users',              adminOnly: true,  icon: Users },
-  { value: 'features',       label: 'Site Toggles',       adminOnly: true,  icon: ToggleRight },
-  { value: 'feature-flags',  label: 'Rollout Flags',      adminOnly: true,  icon: ToggleRight },
-  { value: 'messages',       label: 'Messages',           adminOnly: true,  icon: Broadcast },
   { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
   { value: 'press',          label: 'Press Portal',       adminOnly: true,  icon: Newspaper },
-  { value: 'logs',           label: 'Logs',               adminOnly: true,  icon: ClipboardText },
-  { value: 'roles',          label: 'Roles & Permissions',adminOnly: true,  icon: ShieldCheck },
   { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
   { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
   { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
   { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
-  { value: 'color-theme',         label: 'Color Theme',         adminOnly: true,  icon: Palette },
 ]
 
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
@@ -119,22 +90,12 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   news:            { title: 'News Management',                   description: 'Create and manage news posts and announcements' },
   videos:          { title: 'Videos Management',                 description: 'Manage music videos and YouTube content' },
   assets:          { title: 'Assets Management',                 description: 'Upload and manage images, covers, and media files' },
-  settings:        { title: 'Site Settings',                     description: 'Manage global site content: social links, hero text, SEO metadata, and more' },
-  health:          { title: 'System Health & API Status',        description: 'Monitor external API synchronisation status and trigger a manual sync' },
-  media:           { title: 'Press & Media',                     description: 'Manage journalist applications, press photos (EPK), and private promo tracks' },
-  users:           { title: 'User Management',                   description: 'Manage registered users: assign roles, ban/unban accounts, link artists, or delete users' },
-  features:        { title: 'Feature Toggles',                   description: 'Enable or disable portal modules globally. Disabled features disappear from their dashboards and routes are secured.' },
-  'feature-flags': { title: 'Portal & Journalist Feature Flags', description: 'Enable or disable sections for artist and journalist dashboards.' },
-  messages:        { title: 'Artist Messages',                   description: 'Send inbox messages to artists and track read status.' },
   accreditations:  { title: 'Accreditations',                    description: 'Review journalist accreditation requests and approve or reject them.' },
   press:           { title: 'Press Portal',                      description: 'Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.' },
-  logs:            { title: 'Logs',                              description: 'Audit log of all sync runs and error log for failed or partial syncs.' },
-  roles:           { title: 'Roles & Permissions',               description: 'Configure what each user role is allowed to do. Admin always has full access.' },
   statements:      { title: 'Statements',                        description: 'Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.' },
   'release-submissions': { title: 'Release Submissions',          description: 'Review and manage artist release submissions.' },
   'video-submissions':   { title: 'Video Submissions',            description: 'Review and manage artist music video submissions.' },
   'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
-  'color-theme':         { title: 'Color Theme Editor',           description: 'Customise the site-wide color palette by overriding CSS design tokens. Changes are applied live without a deploy.' },
 }
 
 function isValidTab(value: string | null): value is TabValue {
@@ -174,10 +135,10 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
-  const { user, profile, signOut, session } = useAuthContext()
+  const { user, profile, signOut } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { settings: siteSettings, isLoading: siteSettingsLoading, saveSettings } = useSiteSettings()
+  const { settings: siteSettings, isLoading: siteSettingsLoading } = useSiteSettings()
 
   const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor'
@@ -221,11 +182,6 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     } else {
       toast.success('Signed out successfully')
     }
-  }
-
-  const handleSaveFeatureToggles = async (updated: typeof siteSettings) => {
-    await saveSettings(updated)
-    toast.success('Feature toggles saved')
   }
 
   const canSeeTab = (tab: TabValue) => {
@@ -391,34 +347,12 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               news:            <NewsManager />,
               videos:          <VideosManager />,
               assets:          <AssetsManager />,
-              settings:        <SiteSettingsManager value={siteSettings} onChange={saveSettings} isLoading={siteSettingsLoading} />,
-              health:          <SystemHealthWidget bearerToken={session?.access_token ?? ''} />,
-              media:           <MediaManager />,
-              users:           <UsersManager />,
-              features:        (
-                <FeatureTogglesManager
-                  value={siteSettings.featureToggles ?? { promoPool: true, editorTools: true }}
-                  onChange={(toggles) => void handleSaveFeatureToggles({ ...siteSettings, featureToggles: toggles })}
-                  isLoading={siteSettingsLoading}
-                />
-              ),
-              'feature-flags': <FeatureFlagsManager />,
-              messages:        <MessagesManager />,
               accreditations:  <AccreditationsManager />,
               press:           <PressManager />,
-              logs:            <LogsManager />,
-              roles:           <RolesManager />,
               statements:      <StatementsManager />,
               'release-submissions': <ReleaseSubmissionsManager />,
               'video-submissions':   <VideoSubmissionsManager />,
               'submission-form':     <SubmissionFormManager />,
-              'color-theme':         (
-                <ColorThemeManager
-                  value={siteSettings}
-                  onChange={saveSettings}
-                  isLoading={siteSettingsLoading}
-                />
-              ),
             }
 
             return TAB_DEFS.map(({ value, adminOnly }) => {
