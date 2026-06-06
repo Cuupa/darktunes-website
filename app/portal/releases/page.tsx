@@ -8,14 +8,14 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getOrCreateReleaseChecklist } from '@/lib/api/releaseChecklists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseChecklistPanel } from './_components/ReleaseChecklist'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function ReleasesSkeleton() {
   return (
@@ -28,16 +28,16 @@ function ReleasesSkeleton() {
   )
 }
 
-async function ReleasesContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function ReleasesContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const releases = artist
     ? await getReleasesByArtistId(supabase, artist.id).catch(() => [])
     : []
@@ -71,10 +71,10 @@ async function ReleasesContent() {
   )
 }
 
-export default function ReleasesPage() {
+export default function ReleasesPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<ReleasesSkeleton />}>
-      <ReleasesContent />
+      <ReleasesContent searchParams={searchParams} />
     </Suspense>
   )
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -28,6 +28,10 @@ import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { SiteSettings, HomepageSection } from '@/types'
+
+const RolesManager = lazy(() =>
+  import('@/components/admin/RolesManager').then((m) => ({ default: m.RolesManager })),
+)
 import type { AdminPanelProps } from '@/lib/component-contracts'
 
 // ---------------------------------------------------------------------------
@@ -204,6 +208,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingFavicon, setIsUploadingFavicon] = useState(false)
   const [isUploadingHeroBg, setIsUploadingHeroBg] = useState(false)
+  const [activeTab, setActiveTab] = useState('global')
   const logoInputRef = useRef<HTMLInputElement>(null)
   const faviconInputRef = useRef<HTMLInputElement>(null)
   const heroBgInputRef = useRef<HTMLInputElement>(null)
@@ -307,7 +312,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <Tabs defaultValue="global" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="global">Global</TabsTrigger>
           <TabsTrigger value="branding">Logo &amp; Favicon</TabsTrigger>
@@ -320,6 +325,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
           <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
           <TabsTrigger value="visual">Visual Effects</TabsTrigger>
+          <TabsTrigger value="roles">Roles &amp; Permissions</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------------------------------------------ */}
@@ -1629,13 +1635,24 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Roles & Permissions                                                   */}
+        {/* ------------------------------------------------------------------ */}
+        <TabsContent value="roles">
+          <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
+            <RolesManager />
+          </Suspense>
+        </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
-          {isSubmitting ? 'Saving…' : 'Save Settings'}
-        </Button>
-      </div>
+      {activeTab !== 'roles' && (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
+            {isSubmitting ? 'Saving…' : 'Save Settings'}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

@@ -9,12 +9,12 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
+import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProfileForm } from './_components/ProfileForm'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function ProfileSkeleton() {
   return (
@@ -33,9 +33,9 @@ function ProfileSkeleton() {
   )
 }
 
-async function ProfileContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function ProfileContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -45,7 +45,7 @@ async function ProfileContent() {
   if (!user) return null
 
   const [artist, siteSettings] = await Promise.all([
-    getArtistByUserId(supabase, user.id).catch(() => null),
+    resolvePortalArtist(supabase, user.id, artistId).catch(() => null),
     getCachedSiteSettings().catch(() => null),
   ])
   const profile = artist
@@ -66,10 +66,10 @@ async function ProfileContent() {
   )
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<ProfileSkeleton />}>
-      <ProfileContent />
+      <ProfileContent searchParams={searchParams} />
     </Suspense>
   )
 }

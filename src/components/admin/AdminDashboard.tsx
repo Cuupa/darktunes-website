@@ -14,10 +14,6 @@ import {
   VideoCamera,
   Image as ImageIcon,
   ToggleRight,
-  ArrowUp,
-  ArrowDown,
-  ArrowsDownUp,
-  CheckCircle,
   FileText,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -81,7 +77,6 @@ const TAB_DEFS: TabDef[] = [
 ]
 
 const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
-const LS_KEY = 'admin-tab-order'
 
 // Static card titles and descriptions for each tab panel
 const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> = {
@@ -100,22 +95,6 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
 
 function isValidTab(value: string | null): value is TabValue {
   return ALL_TAB_VALUES.includes(value as TabValue)
-}
-
-/** Load persisted order from localStorage, filling in any new tabs at the end */
-function loadTabOrder(): TabValue[] {
-  if (typeof window === 'undefined') return ALL_TAB_VALUES
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return ALL_TAB_VALUES
-    const saved = JSON.parse(raw) as TabValue[]
-    // Keep only known values, then append any new ones not yet saved
-    const filtered = saved.filter((v) => isValidTab(v))
-    const missing = ALL_TAB_VALUES.filter((v) => !filtered.includes(v))
-    return [...filtered, ...missing]
-  } catch {
-    return ALL_TAB_VALUES
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -149,13 +128,6 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   }, [searchParams])
 
   const [activeTab, setActiveTab] = useState<TabValue>(getInitialTab)
-  const [tabOrder, setTabOrder] = useState<TabValue[]>(ALL_TAB_VALUES)
-  const [reorderMode, setReorderMode] = useState(false)
-
-  // Load persisted order after hydration
-  useEffect(() => {
-    setTabOrder(loadTabOrder())
-  }, [])
 
   // Sync tab from URL on mount and when search params change
   useEffect(() => {
@@ -193,25 +165,6 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     return false
   }
 
-  // Move a tab up or down in the order list
-  const moveTab = (value: TabValue, direction: 'up' | 'down') => {
-    setTabOrder((prev) => {
-      const idx = prev.indexOf(value)
-      if (idx === -1) return prev
-      const next = [...prev]
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-      if (swapIdx < 0 || swapIdx >= next.length) return prev
-      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
-      localStorage.setItem(LS_KEY, JSON.stringify(next))
-      return next
-    })
-  }
-
-  const handleDoneReorder = () => {
-    setReorderMode(false)
-    toast.success('Tab order saved')
-  }
-
   // If editor tools feature is disabled, editors cannot access the admin
   if (isEditor && !siteSettings.featureToggles?.editorTools && !siteSettingsLoading) {
     return (
@@ -233,10 +186,8 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     )
   }
 
-  // Ordered + filtered list of tabs visible to this user
-  const visibleTabs = tabOrder
-    .map((v) => TAB_DEFS.find((t) => t.value === v))
-    .filter((def): def is TabDef => !!def && canSeeTab(def.value))
+  // Filtered list of tabs visible to this user
+  const visibleTabs = TAB_DEFS.filter((def) => canSeeTab(def.value))
 
   return (
     <div className={standalone ? 'min-h-screen bg-background' : undefined}>
@@ -270,72 +221,15 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
 
       <main className={standalone ? 'container mx-auto px-4 py-8' : 'px-4 py-6'}>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          {/* Tab bar + reorder controls */}
-          <div className="space-y-2">
-            {!reorderMode ? (
-              <div className="flex items-center gap-2 flex-wrap">
-                <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-                  {visibleTabs.map(({ value, label, icon: Icon }) => (
-                    <TabsTrigger key={value} value={value} className="gap-2">
-                      <Icon size={16} weight="bold" aria-hidden="true" />
-                      {label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {isAdmin && !contentOnly && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setReorderMode(true)}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    title="Reorder tabs"
-                  >
-                    <ArrowsDownUp size={16} className="mr-1" aria-hidden="true" />
-                    Reorder
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="border border-border rounded-lg p-3 space-y-1 bg-card">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-muted-foreground">Drag to reorder — use arrows to move tabs</p>
-                  <Button size="sm" variant="default" onClick={handleDoneReorder}>
-                    <CheckCircle size={16} className="mr-1" aria-hidden="true" />
-                    Done
-                  </Button>
-                </div>
-                {visibleTabs.map(({ value, label, icon: Icon }, idx) => (
-                  <div
-                    key={value}
-                    className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/50"
-                  >
-                    <Icon size={16} aria-hidden="true" className="text-muted-foreground shrink-0" />
-                    <span className="flex-1 text-sm">{label}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 min-w-[44px] min-h-[44px]"
-                      disabled={idx === 0}
-                      onClick={() => moveTab(value, 'up')}
-                      aria-label={`Move ${label} up`}
-                    >
-                      <ArrowUp size={14} aria-hidden="true" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 min-w-[44px] min-h-[44px]"
-                      disabled={idx === visibleTabs.length - 1}
-                      onClick={() => moveTab(value, 'down')}
-                      aria-label={`Move ${label} down`}
-                    >
-                      <ArrowDown size={14} aria-hidden="true" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Tab bar */}
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+            {visibleTabs.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger key={value} value={value} className="gap-2">
+                <Icon size={16} weight="bold" aria-hidden="true" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
           {/* Tab content panels — each manager is lazy-loaded on first tab visit.
               Panel components for tabs with special props are defined here as a

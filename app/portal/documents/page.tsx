@@ -5,13 +5,13 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { listArtistDocuments } from '@/lib/api/artistDocuments'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DocumentVault } from './_components/DocumentVault'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function DocumentsSkeleton() {
   return (
@@ -24,9 +24,9 @@ function DocumentsSkeleton() {
   )
 }
 
-async function DocumentsContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function DocumentsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -44,7 +44,7 @@ async function DocumentsContent() {
     )
   }
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const documents = artist
     ? await listArtistDocuments(supabase, artist.id).catch(() => [])
     : []
@@ -58,10 +58,10 @@ async function DocumentsContent() {
   )
 }
 
-export default function DocumentsPage() {
+export default function DocumentsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<DocumentsSkeleton />}>
-      <DocumentsContent />
+      <DocumentsContent searchParams={searchParams} />
     </Suspense>
   )
 }

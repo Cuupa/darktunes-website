@@ -7,19 +7,19 @@
 
 export const dynamic = 'force-dynamic'
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
+import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { calcProfileCompletion } from '@/lib/portal/profileCompletion'
 import { PortalOverview } from './_components/PortalOverview'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
-export default async function PortalPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+export default async function PortalPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -28,7 +28,7 @@ export default async function PortalPage() {
 
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
 
   const [stats, releases, concerts, openChecklistCountResult, featureFlags, artistProfile, statementCountResult, assetCountResult] = artist
     ? await Promise.all([

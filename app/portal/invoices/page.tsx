@@ -5,13 +5,13 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { listArtistInvoices } from '@/lib/api/artistInvoices'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InvoicesClient } from './_components/InvoicesClient'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function InvoicesSkeleton() {
   return (
@@ -24,9 +24,9 @@ function InvoicesSkeleton() {
   )
 }
 
-async function InvoicesContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function InvoicesContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -44,7 +44,7 @@ async function InvoicesContent() {
     )
   }
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const { invoices } = artist
     ? await listArtistInvoices(supabase, artist.id).catch(() => ({ invoices: [], total: 0 }))
     : { invoices: [] }
@@ -58,10 +58,10 @@ async function InvoicesContent() {
   )
 }
 
-export default function InvoicesPage() {
+export default function InvoicesPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<InvoicesSkeleton />}>
-      <InvoicesContent />
+      <InvoicesContent searchParams={searchParams} />
     </Suspense>
   )
 }

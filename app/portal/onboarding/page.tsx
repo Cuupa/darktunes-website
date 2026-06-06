@@ -8,14 +8,13 @@
 
 export const dynamic = 'force-dynamic'
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { OnboardingWizard } from './_components/OnboardingWizard'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 export default async function OnboardingPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const dict = await getPortalDictionary()
 
   const supabase = await createServerSupabaseClient()
   const {

@@ -4,11 +4,10 @@
  * Fully static page — no API calls needed.
  */
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { HelpPanel } from './_components/HelpPanel'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 export default async function HelpPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const dict = await getPortalDictionary()
   return <HelpPanel dict={dict.portal} />
 }

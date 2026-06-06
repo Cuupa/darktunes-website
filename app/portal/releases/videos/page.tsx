@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic'
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getPortalDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getVideoSubmissionsByArtistId } from '@/lib/api/videoSubmissions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,13 +31,14 @@ function statusLabel(status: VideoSubmission['status'], dict: Dictionary['portal
   }
 }
 
-export default async function VideoSubmissionsPage() {
+export default async function VideoSubmissionsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  const artist = user ? await getArtistByUserId(supabase, user.id).catch(() => null) : null
+  const artist = user ? await resolvePortalArtist(supabase, user.id, artistId).catch(() => null) : null
   const submissions = artist
     ? await getVideoSubmissionsByArtistId(supabase, artist.id).catch(() => [])
     : []

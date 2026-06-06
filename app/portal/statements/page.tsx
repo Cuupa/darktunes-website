@@ -11,13 +11,13 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatementsTable } from './_components/StatementsTable'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function StatementsSkeleton() {
   return (
@@ -30,9 +30,9 @@ function StatementsSkeleton() {
   )
 }
 
-async function StatementsContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function StatementsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -53,7 +53,7 @@ async function StatementsContent() {
     )
   }
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const statements = artist
     ? await getSalesStatementsByArtistId(supabase, artist.id).catch(() => [])
     : []
@@ -61,10 +61,10 @@ async function StatementsContent() {
   return <StatementsTable dict={dict.portal} statements={statements} />
 }
 
-export default function StatementsPage() {
+export default function StatementsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<StatementsSkeleton />}>
-      <StatementsContent />
+      <StatementsContent searchParams={searchParams} />
     </Suspense>
   )
 }

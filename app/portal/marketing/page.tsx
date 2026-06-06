@@ -7,14 +7,14 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getAssetsByArtist } from '@/lib/api/assets'
 import { getArtistAssets } from '@/lib/api/artistAssets'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SmartLinks } from './_components/SmartLinks'
+import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function MarketingSkeleton() {
   return (
@@ -29,16 +29,16 @@ function MarketingSkeleton() {
   )
 }
 
-async function MarketingContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function MarketingContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+  const dict = await getPortalDictionary()
+  const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
   if (flags['artist.marketing'] === false) {
     return <p className="text-muted-foreground">Marketing module is currently disabled.</p>
@@ -53,10 +53,10 @@ async function MarketingContent() {
   return <SmartLinks dict={dict.portal} assets={assets} artistAssets={artistAssets} />
 }
 
-export default function MarketingPage() {
+export default function MarketingPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
   return (
     <Suspense fallback={<MarketingSkeleton />}>
-      <MarketingContent />
+      <MarketingContent searchParams={searchParams} />
     </Suspense>
   )
 }

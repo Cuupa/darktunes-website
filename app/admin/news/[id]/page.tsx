@@ -97,9 +97,7 @@ export default function NewsEditPage() {
         await supabase.from('news_post_artists' as const).insert(inserts)
       }
       toast.success('News post saved')
-      router.push('/admin?tab=news')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+      router.push('/admin/content?tab=news')
     } finally {
       setIsSaving(false)
     }

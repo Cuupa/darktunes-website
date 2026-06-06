@@ -1,12 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getPortalDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { SettingsPanel } from './_components/SettingsPanel'
 
 export default async function PortalSettingsPage() {
   const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const dict = await getPortalDictionary()
 
   const supabase = await createServerSupabaseClient()
   const {
