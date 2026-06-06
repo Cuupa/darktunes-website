@@ -11,6 +11,8 @@ import { useState } from 'react'
 import type {
   ArtistMapping, CompilationFilter, SplitFee,
   ManualRevenue, ExpenseEntry, IgnoredEntry,
+  CSVColumnAlias, AppDefaults, EmailConfig,
+  TrackRevenueAssignment,
 } from '@/lib/sos/types'
 import { ArtistMappingManager } from './ArtistMappingManager'
 import { CompilationFilterManager } from './CompilationFilterManager'
@@ -18,8 +20,22 @@ import { SplitFeeManager } from './SplitFeeManager'
 import { ManualRevenueManager } from './ManualRevenueManager'
 import { ExpenseManager } from './ExpenseManager'
 import { IgnoredEntriesManager } from './IgnoredEntriesManager'
+import { CsvAliasManager } from './CsvAliasManager'
+import { DefaultSettingsManager } from './DefaultSettingsManager'
+import { EmailConfigManager } from './EmailConfigManager'
+import { TrackRevenueAssignmentManager } from './TrackRevenueAssignmentManager'
 
-type RulesTab = 'mappings' | 'compilations' | 'splits' | 'revenues' | 'expenses' | 'ignored'
+type RulesTab =
+  | 'mappings'
+  | 'compilations'
+  | 'splits'
+  | 'revenues'
+  | 'expenses'
+  | 'ignored'
+  | 'track-splits'
+  | 'aliases'
+  | 'defaults'
+  | 'email'
 
 export interface RulesPanelProps {
   // State (passed in from parent so rules persist across sub-tab changes)
@@ -29,6 +45,10 @@ export interface RulesPanelProps {
   manualRevenues: ManualRevenue[]
   expenses: ExpenseEntry[]
   ignoredEntries: IgnoredEntry[]
+  csvAliases: CSVColumnAlias[]
+  trackRevenueAssignments: TrackRevenueAssignment[]
+  appDefaults: AppDefaults
+  emailConfig: Partial<EmailConfig>
 
   // Callbacks
   onAddArtistMapping: (m: Omit<ArtistMapping, 'id'>) => void
@@ -53,6 +73,15 @@ export interface RulesPanelProps {
   onAddIgnoredEntry: (e: Omit<IgnoredEntry, 'id' | 'createdAt'>) => void
   onRemoveIgnoredEntry: (id: string) => void
 
+  onAddCsvAlias: (alias: Omit<CSVColumnAlias, 'id'>) => void
+  onRemoveCsvAlias: (id: string) => void
+
+  onAddTrackAssignment: (a: TrackRevenueAssignment) => void
+  onRemoveTrackAssignment: (id: string) => void
+
+  onUpdateAppDefaults: (next: AppDefaults) => void
+  onUpdateEmailConfig: (next: Partial<EmailConfig>) => void
+
   // Context data from useCSVProcessor
   availableArtists?: string[]
   availableReleases?: string[]
@@ -63,32 +92,43 @@ const TABS: { id: RulesTab; label: string }[] = [
   { id: 'mappings',     label: 'Artist Mappings' },
   { id: 'compilations', label: 'Compilations' },
   { id: 'splits',       label: 'Splits' },
+  { id: 'track-splits', label: 'Track Splits' },
   { id: 'revenues',     label: 'Manual Revenue' },
   { id: 'expenses',     label: 'Expenses' },
   { id: 'ignored',      label: 'Ignored' },
+  { id: 'aliases',      label: 'CSV Columns' },
+  { id: 'defaults',     label: 'Defaults' },
+  { id: 'email',        label: 'Email' },
 ]
 
 export function RulesPanel({
-  artistMappings, compilationFilters, splitFees, manualRevenues, expenses, ignoredEntries,
+  artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
+  ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig,
   onAddArtistMapping, onRemoveArtistMapping, onUpdateArtistMapping,
   onAddCompilationFilter, onRemoveCompilationFilter,
   onAddSplitFee, onRemoveSplitFee, onUpdateSplitFee,
   onAddManualRevenue, onRemoveManualRevenue, onUpdateManualRevenue,
   onAddExpense, onRemoveExpense, onUpdateExpense,
   onAddIgnoredEntry, onRemoveIgnoredEntry,
+  onAddCsvAlias, onRemoveCsvAlias,
+  onAddTrackAssignment, onRemoveTrackAssignment,
+  onUpdateAppDefaults,
+  onUpdateEmailConfig,
   availableArtists = [],
   availableReleases = [],
   autoMappings = [],
 }: RulesPanelProps) {
   const [activeTab, setActiveTab] = useState<RulesTab>('mappings')
 
-  const counts: Record<RulesTab, number> = {
+  const counts: Partial<Record<RulesTab, number>> = {
     mappings:     artistMappings.length + autoMappings.length,
     compilations: compilationFilters.length,
     splits:       splitFees.length,
     revenues:     manualRevenues.length,
     expenses:     expenses.length,
     ignored:      ignoredEntries.length,
+    'track-splits': trackRevenueAssignments.length,
+    aliases:      csvAliases.length,
   }
 
   return (
@@ -106,7 +146,7 @@ export function RulesPanel({
             }`}
           >
             {label}
-            {counts[id] > 0 && (
+            {(counts[id] ?? 0) > 0 && (
               <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
                 {counts[id]}
               </span>
@@ -143,6 +183,14 @@ export function RulesPanel({
             artists={availableArtists}
           />
         )}
+        {activeTab === 'track-splits' && (
+          <TrackRevenueAssignmentManager
+            assignments={trackRevenueAssignments}
+            onAddAssignment={onAddTrackAssignment}
+            onRemoveAssignment={onRemoveTrackAssignment}
+            availableArtists={availableArtists}
+          />
+        )}
         {activeTab === 'revenues' && (
           <ManualRevenueManager
             revenues={manualRevenues}
@@ -168,6 +216,25 @@ export function RulesPanel({
             onRemoveEntry={onRemoveIgnoredEntry}
             artists={availableArtists}
             releaseTitles={availableReleases}
+          />
+        )}
+        {activeTab === 'aliases' && (
+          <CsvAliasManager
+            aliases={csvAliases}
+            onAddAlias={onAddCsvAlias}
+            onRemoveAlias={onRemoveCsvAlias}
+          />
+        )}
+        {activeTab === 'defaults' && (
+          <DefaultSettingsManager
+            defaults={appDefaults}
+            onUpdate={onUpdateAppDefaults}
+          />
+        )}
+        {activeTab === 'email' && (
+          <EmailConfigManager
+            config={emailConfig}
+            onUpdate={onUpdateEmailConfig}
           />
         )}
       </div>
