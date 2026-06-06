@@ -562,7 +562,14 @@
     "documents_category_other": "Other",
     "documents_noData": "No documents uploaded yet.",
     "documents_file_too_large": "File exceeds the 20 MB limit.",
-    "documents_invalid_type": "Only PDF and DOCX files are accepted."
+    "documents_invalid_type": "Only PDF and DOCX files are accepted.",
+    "nav_group_dashboard": "Dashboard",
+    "nav_group_music": "Music",
+    "nav_group_live": "Live & Promo",
+    "nav_group_finance": "Finance",
+    "nav_group_communication": "Communication",
+    "nav_group_files": "Files",
+    "nav_group_account": "Account"
   },
   "press": {
     "title": "Press & Media",

@@ -52,21 +52,23 @@ export function PortalOverview({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16 border border-border">
+      <div className="flex flex-wrap items-center gap-4">
+        <Avatar className="h-16 w-16 shrink-0 border border-border">
           <AvatarImage
             src={profileImageUrl ? getSquareThumbnail(profileImageUrl, 64) : undefined}
             alt={`${artistName ?? 'Artist'} – artist photo`}
           />
           <AvatarFallback className="bg-primary/20 text-xl font-bold text-primary">{initials}</AvatarFallback>
         </Avatar>
-        <h1 className="bg-gradient-to-r from-foreground to-primary/70 bg-clip-text text-3xl font-bold text-transparent">
-          {dict.welcomeBack}
-          {artistName ? `, ${artistName}` : ''}
-        </h1>
-        {!artistName && (
-          <p className="mt-2 text-muted-foreground">{dict.notLinked}</p>
-        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="bg-gradient-to-r from-foreground to-primary/70 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
+            {dict.welcomeBack}
+            {artistName ? `, ${artistName}` : ''}
+          </h1>
+          {!artistName && (
+            <p className="mt-1 text-muted-foreground">{dict.notLinked}</p>
+          )}
+        </div>
       </div>
 
       {/* Profile Completion Card — hidden when 100% complete */}

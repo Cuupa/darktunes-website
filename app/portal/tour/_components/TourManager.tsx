@@ -209,14 +209,14 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
 
       <div className="space-y-3">
         {items.map((concert) => (
-          <div key={concert.id} className="rounded-lg border border-border p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium">{concert.eventName}</p>
+          <div key={concert.id} className="rounded-lg border border-border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{concert.eventName}</p>
               <p className="text-sm text-muted-foreground">
                 {concert.concertDate.slice(0, 10)} · {[concert.venueName, concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')} · {getStatusLabel(concert.status)}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="outline" onClick={() => startEdit(concert)}>
                 {dict.tour_edit}
               </Button>
