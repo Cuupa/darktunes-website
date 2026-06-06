@@ -214,6 +214,32 @@ If a cron fails: check Admin → Logs → Error Log for the failed sync_logs ent
 3. Change role to `journalist`
 4. The journalist can now access `/press/dashboard/*`
 
+## Color Theme (CI Color System)
+
+The **Color Theme** tab under **Admin → Site Settings → Visual** lets you override the darkTunes brand colors at runtime — no code deployment required.
+
+### How It Works
+
+Colors are stored in `site_settings` (`theme_primary`, `theme_secondary`, `theme_background`, `theme_card`, `theme_border`, `theme_foreground`). At render time, `ThemeStyleInjector` (a React Server Component in `app/layout.tsx`) reads these values and emits an inline `<style>` block that overrides the following CSS custom properties **server-side** (no FOUC):
+
+| CSS custom property | Default | Controls |
+|---|---|---|
+| `--primary` / `--accent` / `--ring` | `#493687` | Primary CTAs, active nav, focus rings |
+| `--secondary` | `#7e1e37` | Secondary buttons, hover effects, promo badges |
+| `--background` | `#101010` | Global page background |
+| `--card` / `--muted` / `--popover` | `#292929` | Cards, modals, dropdowns |
+| `--border` / `--input` | `#383838` | Borders, input frames |
+| `--foreground` | `#ffffff` | Primary text |
+
+### Behavior
+
+- If a theme field is left **empty**, the CSS falls back to the brand defaults defined in `app/globals.css` — no override is applied.
+- Changes take effect on the **next page request** (ISR revalidation is triggered automatically on save).
+- The `ThemeStyleInjector` never introduces a flash-of-unstyled-content (FOUC) because the style is injected server-side before the browser renders the page.
+- The default darkTunes CI palette is always safe to use without any overrides.
+
+> **⚠️ WCAG contrast requirement**: Any color override must maintain ≥ 4.5:1 contrast for normal text and ≥ 3:1 for large text (WCAG 1.4.3 AA). Use [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) before saving non-default colors.
+
 ## Manual ISR Cache Invalidation
 
 If a public page shows stale data after an admin save:
