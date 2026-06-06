@@ -163,9 +163,17 @@ function loadTabOrder(): TabValue[] {
 
 interface AdminDashboardProps {
   contentOnly?: boolean
+  /**
+   * When true (default) the component renders its own full-page wrapper,
+   * sticky header, and sign-out button — used on the /editor standalone page
+   * and via AdminApp.
+   * When false the component renders only the tabs section, relying on the
+   * surrounding AdminClientLayout to supply the page shell (sidebar, header).
+   */
+  standalone?: boolean
 }
 
-export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
+export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
   const { user, profile, signOut, session } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -251,17 +259,19 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
   // If editor tools feature is disabled, editors cannot access the admin
   if (isEditor && !siteSettings.featureToggles?.editorTools && !siteSettingsLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center' : 'flex flex-1 items-center justify-center py-16'}>
         <div className="text-center space-y-4 max-w-md px-4">
           <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label="Feature disabled" />
           <h1 className="text-2xl font-bold">Editor Tools Disabled</h1>
           <p className="text-muted-foreground">
             The Editor Tools feature has been disabled by an administrator. Please contact your admin if you believe this is an error.
           </p>
-          <Button variant="outline" onClick={handleSignOut}>
-            <SignOut size={16} className="mr-2" aria-hidden="true" />
-            Sign Out
-          </Button>
+          {standalone && (
+            <Button variant="outline" onClick={handleSignOut}>
+              <SignOut size={16} className="mr-2" aria-hidden="true" />
+              Sign Out
+            </Button>
+          )}
         </div>
       </div>
     )
@@ -273,34 +283,36 @@ export function AdminDashboard({ contentOnly = false }: AdminDashboardProps) {
     .filter((def): def is TabDef => !!def && canSeeTab(def.value))
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{contentOnly ? 'darkTunes Editor' : 'darkTunes Admin'}</h1>
-            <p className="text-sm text-muted-foreground">
-              {contentOnly ? 'Editor Dashboard' : 'Content Management System'}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {contentOnly && user?.id && <EditorNotificationBell userId={user.id} />}
-            <div className="text-right">
-              <p className="text-sm font-medium">{user?.email}</p>
-              <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
+    <div className={standalone ? 'min-h-screen bg-background' : undefined}>
+      {standalone && (
+        <header className="border-b border-border bg-card sticky top-0 z-40">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">{contentOnly ? 'darkTunes Editor' : 'darkTunes Admin'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {contentOnly ? 'Editor Dashboard' : 'Content Management System'}
+              </p>
             </div>
-            <Button
-              onClick={handleSignOut}
-              variant="outline"
-              size="sm"
-            >
-              <SignOut size={16} weight="bold" className="mr-2" aria-hidden="true" />
-              Sign Out
-            </Button>
+            <div className="flex items-center gap-4">
+              {contentOnly && user?.id && <EditorNotificationBell userId={user.id} />}
+              <div className="text-right">
+                <p className="text-sm font-medium">{user?.email}</p>
+                <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
+              </div>
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                size="sm"
+              >
+                <SignOut size={16} weight="bold" className="mr-2" aria-hidden="true" />
+                Sign Out
+              </Button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="container mx-auto px-4 py-8">
+      <main className={standalone ? 'container mx-auto px-4 py-8' : 'px-4 py-6'}>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           {/* Tab bar + reorder controls */}
           <div className="space-y-2">

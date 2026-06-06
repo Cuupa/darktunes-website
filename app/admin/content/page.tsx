@@ -11,5 +11,5 @@ export const dynamic = 'force-dynamic'
 import { AdminDashboardWrapper } from '../_components/AdminDashboardWrapper'
 
 export default function AdminContentPage() {
-  return <AdminDashboardWrapper />
+  return <AdminDashboardWrapper standalone={false} />
 }
