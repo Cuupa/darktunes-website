@@ -1,6 +1,6 @@
 import { jsPDF, GState } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import type { SafeProcessedArtistData, LabelInfo, PdfExportSettings, LabelArtist, CompilationFilter, AppDefaults, EmailConfig } from './types'
 import { resolveTemplate } from './utils'
 import { APP_CREDITS, APP_LOGO, APP_NAME } from '@/config/softwareBranding'
@@ -840,16 +840,16 @@ function buildPDF(
   return doc.output('blob')
 }
 
-export function generateExcel(
+export async function generateExcel(
   artistData: SafeProcessedArtistData,
   labelInfo: LabelInfo,
   periodStart?: string,
   periodEnd?: string,
   compilationFilters: CompilationFilter[] = [],
   settings?: Partial<PdfExportSettings>
-): Blob {
+): Promise<Blob> {
   try {
-    return buildExcel(artistData, labelInfo, periodStart, periodEnd, compilationFilters, settings)
+    return await buildExcel(artistData, labelInfo, periodStart, periodEnd, compilationFilters, settings)
   } catch (err) {
     throw new Error(
       `Excel generation failed for "${artistData.artist}": ${err instanceof Error ? err.message : String(err)}`
@@ -857,15 +857,15 @@ export function generateExcel(
   }
 }
 
-function buildExcel(
+async function buildExcel(
   artistData: SafeProcessedArtistData,
   labelInfo: LabelInfo,
   periodStart?: string,
   periodEnd?: string,
   compilationFilters: CompilationFilter[] = [],
   settings?: Partial<PdfExportSettings>
-): Blob {
-  const workbook = XLSX.utils.book_new()
+): Promise<Blob> {
+  const workbook = new ExcelJS.Workbook()
   const digitalFallbackSplit = artistData.digitalSplitPercentage
   // Keep source rows visible when they are economically relevant (have revenue),
   // even if the percentage currently matches the fallback.
@@ -883,7 +883,7 @@ function buildExcel(
   }
   digitalSplitRows.push(['Artist Split – Other Digital (%)', digitalFallbackSplit])
 
-  const summaryData = [
+  const summaryData: Array<Array<string | number>> = [
     ['Statement of Sales'],
     [],
     ['Label', labelInfo.name || ''],
@@ -908,14 +908,10 @@ function buildExcel(
     ['Final Payout', artistData.finalPayout],
   ]
 
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-  summarySheet['!cols'] = [{ wch: 25 }, { wch: 25 }]
-
-  if (summarySheet['A1']) {
-    summarySheet['A1'].s = { font: { bold: true, sz: 14 } }
-  }
-
-  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary')
+  const summarySheet = workbook.addWorksheet('Summary')
+  summarySheet.columns = [{ width: 38 }, { width: 25 }]
+  summarySheet.addRows(summaryData)
+  summarySheet.getCell('A1').font = { bold: true, size: 14 }
 
   // Release breakdown sheet (aggregated, memory-efficient alternative to raw rows)
   const shouldHideCompilations = settings?.hideCompilationsInStatement ?? DEFAULT_PDF_SETTINGS.hideCompilationsInStatement
@@ -923,57 +919,55 @@ function buildExcel(
     ? artistData.releaseBreakdown.filter(rel => !isCompilationRelease(rel, compilationFilters))
     : artistData.releaseBreakdown
   if (releaseBreakdown.length > 0) {
-    const releaseHeaders = [
-      'Release Title', 'UPC/EAN', 'Catalog Number', 'Revenue', 'Quantity', 'Type',
+    const releaseSheet = workbook.addWorksheet('Releases')
+    releaseSheet.columns = [
+      { width: 35 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 10 }, { width: 10 },
     ]
-    const releaseRows = releaseBreakdown.map(r => [
-      r.releaseTitle || '',
-      r.upcEan || '',
-      r.catalogNumber || '',
-      r.revenue,
-      r.quantity,
-      r.isPhysical ? 'Physical' : 'Digital',
-    ])
-    const releaseSheet = XLSX.utils.aoa_to_sheet([releaseHeaders, ...releaseRows])
-    releaseSheet['!cols'] = [
-      { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 },
-    ]
-    XLSX.utils.book_append_sheet(workbook, releaseSheet, 'Releases')
+    releaseSheet.addRow(['Release Title', 'UPC/EAN', 'Catalog Number', 'Revenue', 'Quantity', 'Type'])
+    for (const r of releaseBreakdown) {
+      releaseSheet.addRow([
+        r.releaseTitle || '',
+        r.upcEan || '',
+        r.catalogNumber || '',
+        r.revenue,
+        r.quantity,
+        r.isPhysical ? 'Physical' : 'Digital',
+      ])
+    }
   }
 
   // Platform breakdown sheet
   if (artistData.platformBreakdown.length > 0) {
-    const platformHeaders = ['Platform', 'Revenue', 'Quantity']
-    const platformRows = artistData.platformBreakdown.map(p => [
-      p.platform || 'Unknown', p.revenue, p.quantity,
-    ])
-    const platformSheet = XLSX.utils.aoa_to_sheet([platformHeaders, ...platformRows])
-    platformSheet['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }]
-    XLSX.utils.book_append_sheet(workbook, platformSheet, 'Platforms')
+    const platformSheet = workbook.addWorksheet('Platforms')
+    platformSheet.columns = [{ width: 25 }, { width: 15 }, { width: 10 }]
+    platformSheet.addRow(['Platform', 'Revenue', 'Quantity'])
+    for (const p of artistData.platformBreakdown) {
+      platformSheet.addRow([p.platform || 'Unknown', p.revenue, p.quantity])
+    }
   }
 
   // Country breakdown sheet
   if (artistData.countryBreakdown.length > 0) {
-    const countryHeaders = ['Country', 'Revenue', 'Quantity']
-    const countryRows = artistData.countryBreakdown.map(c => [
-      c.country || 'Unknown', c.revenue, c.quantity,
-    ])
-    const countrySheet = XLSX.utils.aoa_to_sheet([countryHeaders, ...countryRows])
-    countrySheet['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 10 }]
-    XLSX.utils.book_append_sheet(workbook, countrySheet, 'Countries')
+    const countrySheet = workbook.addWorksheet('Countries')
+    countrySheet.columns = [{ width: 20 }, { width: 15 }, { width: 10 }]
+    countrySheet.addRow(['Country', 'Revenue', 'Quantity'])
+    for (const c of artistData.countryBreakdown) {
+      countrySheet.addRow([c.country || 'Unknown', c.revenue, c.quantity])
+    }
   }
 
   // Monthly breakdown sheet
   if (artistData.monthlyBreakdown.length > 0) {
-    const monthHeaders = ['Month', 'Revenue']
-    const monthRows = artistData.monthlyBreakdown.map(m => [m.month, m.revenue])
-    const monthSheet = XLSX.utils.aoa_to_sheet([monthHeaders, ...monthRows])
-    monthSheet['!cols'] = [{ wch: 12 }, { wch: 15 }]
-    XLSX.utils.book_append_sheet(workbook, monthSheet, 'Monthly')
+    const monthSheet = workbook.addWorksheet('Monthly')
+    monthSheet.columns = [{ width: 12 }, { width: 15 }]
+    monthSheet.addRow(['Month', 'Revenue'])
+    for (const m of artistData.monthlyBreakdown) {
+      monthSheet.addRow([m.month, m.revenue])
+    }
   }
 
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-  return new Blob([excelBuffer], {
+  const buffer = await workbook.xlsx.writeBuffer()
+  return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 }
@@ -1050,7 +1044,7 @@ export async function generateZipOfAllStatements(
     }
 
     if (format === 'excel' || format === 'both') {
-      const excelBlob = generateExcel(artistData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings)
+      const excelBlob = await generateExcel(artistData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings)
       zip.file(`${safeArtistName}_statement.xlsx`, excelBlob)
     }
 

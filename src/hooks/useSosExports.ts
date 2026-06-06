@@ -127,7 +127,7 @@ export function useExports(
   )
 
   const handleDownloadExcel = useCallback(
-    (artist: string) => {
+    async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
         toast.error(`No data found for artist "${artist}"`)
@@ -135,7 +135,7 @@ export function useExports(
       }
 
       try {
-        const blob = generateExcel(
+        const blob = await generateExcel(
           artistData,
           labelInfo,
           periodStart || undefined,

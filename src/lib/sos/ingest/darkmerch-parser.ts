@@ -131,41 +131,36 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
 
 /**
  * Converts a Darkmerch XLSX file to a CSV string without fully parsing it.
- * Returns null if the conversion fails (e.g. corrupted file, missing SheetJS).
+ * Returns null if the conversion fails (e.g. corrupted file, missing library).
  *
  * This function is intentionally separate from {@link parseDarkmerchXLSX} so that
  * `useFileManager` can obtain a storable CSV string before the worker receives it.
  * By storing CSV instead of raw binary, the worker always receives a valid text
  * payload regardless of the original file format.
  *
- * **Why dynamic import?** SheetJS (`xlsx`) is a large dependency (~1 MB). Using
- * a dynamic import ensures the module is only loaded when an XLSX file is actually
- * uploaded, keeping the initial bundle lean for users who only upload CSV files.
+ * **Why dynamic import?** ExcelJS is a large dependency. Using a dynamic import
+ * ensures the module is only loaded when an XLSX file is actually uploaded,
+ * keeping the initial bundle lean for users who only upload CSV files.
  *
  * @param buffer - Raw XLSX file content as an ArrayBuffer.
  * @returns CSV string on success, or `null` if conversion failed.
- *   Returns `null` when: (1) SheetJS module fails to load, (2) workbook has no sheets,
+ *   Returns `null` when: (1) ExcelJS module fails to load, (2) workbook has no sheets,
  *   (3) first sheet cannot be read, or (4) any other XLSX parsing exception occurs.
  */
 export async function darkmerchXLSXtoCSV(buffer: ArrayBuffer): Promise<string | null> {
-  // NOTE: xlsx@0.18.5 is the last MIT-licensed version of SheetJS. Newer versions
-  // require a commercial licence (sheetjs.com). Known CVEs exist but only affect
-  // server-side untrusted file processing; client-side read-only usage is lower risk.
-  // Track: https://github.com/advisories?query=xlsx for updates.
-  let XLSX: typeof import('xlsx')
+  let ExcelJS: typeof import('exceljs')
   try {
-    XLSX = await import('xlsx')
+    ExcelJS = await import('exceljs')
   } catch (err) {
-    console.error('[darkmerchXLSXtoCSV] Failed to load xlsx library:', err)
+    console.error('[darkmerchXLSXtoCSV] Failed to load ExcelJS library:', err)
     return null
   }
   try {
-    const workbook = XLSX.read(buffer, { type: 'array' })
-    const firstSheetName = workbook.SheetNames[0]
-    if (!firstSheetName) return null
-    const sheet = workbook.Sheets[firstSheetName]
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(Buffer.from(buffer) as never)
+    const sheet = workbook.worksheets[0]
     if (!sheet) return null
-    return XLSX.utils.sheet_to_csv(sheet)
+    return worksheetToCSV(sheet)
   } catch (err) {
     console.error('[darkmerchXLSXtoCSV] Failed to parse XLSX workbook:', err)
     return null
@@ -175,12 +170,12 @@ export async function darkmerchXLSXtoCSV(buffer: ArrayBuffer): Promise<string | 
 /**
  * Parses a Darkmerch orders XLSX file and returns a list of SalesTransactions.
  *
- * Reads the first sheet of the workbook, converts it to CSV via SheetJS, and
+ * Reads the first sheet of the workbook, converts it to CSV via ExcelJS, and
  * delegates to {@link parseDarkmerchCSV} for row-level parsing.
  *
- * **Why dynamic import?** SheetJS (`xlsx`) is a large dependency (~1 MB). Using
- * a dynamic import ensures the module is only loaded when an XLSX file is actually
- * uploaded, keeping the initial bundle lean for users who only upload CSV files.
+ * **Why dynamic import?** ExcelJS is a large dependency. Using a dynamic import
+ * ensures the module is only loaded when an XLSX file is actually uploaded,
+ * keeping the initial bundle lean for users who only upload CSV files.
  *
  * **Edge cases:**
  * - Empty workbook (no sheets) → returns a structured error, no exception thrown.
@@ -191,13 +186,9 @@ export async function darkmerchXLSXtoCSV(buffer: ArrayBuffer): Promise<string | 
  * @returns Parsed transactions and any row-level or structural parse errors.
  */
 export async function parseDarkmerchXLSX(buffer: ArrayBuffer): Promise<DarkmerchParseResult> {
-  // NOTE: xlsx@0.18.5 is the last MIT-licensed version of SheetJS. Newer versions
-  // require a commercial licence (sheetjs.com). Known CVEs exist but only affect
-  // server-side untrusted file processing; client-side read-only usage is lower risk.
-  // Track: https://github.com/advisories?query=xlsx for updates.
-  let XLSX: typeof import('xlsx')
+  let ExcelJS: typeof import('exceljs')
   try {
-    XLSX = await import('xlsx')
+    ExcelJS = await import('exceljs')
   } catch {
     return {
       transactions: [],
@@ -206,22 +197,16 @@ export async function parseDarkmerchXLSX(buffer: ArrayBuffer): Promise<Darkmerch
   }
 
   try {
-    const workbook = XLSX.read(buffer, { type: 'array' })
-    const firstSheetName = workbook.SheetNames[0]
-    if (!firstSheetName) {
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(Buffer.from(buffer) as never)
+    const sheet = workbook.worksheets[0]
+    if (!sheet) {
       return {
         transactions: [],
         errors: [{ row: 0, reason: 'XLSX workbook has no sheets', data: '' }],
       }
     }
-    const sheet = workbook.Sheets[firstSheetName]
-    if (!sheet) {
-      return {
-        transactions: [],
-        errors: [{ row: 0, reason: 'Could not read first sheet from XLSX', data: '' }],
-      }
-    }
-    const csv = XLSX.utils.sheet_to_csv(sheet)
+    const csv = worksheetToCSV(sheet)
     return parseDarkmerchCSV(csv)
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'Unknown error reading XLSX file'
@@ -230,4 +215,23 @@ export async function parseDarkmerchXLSX(buffer: ArrayBuffer): Promise<Darkmerch
       errors: [{ row: 0, reason: `Failed to read XLSX file: ${reason}`, data: '' }],
     }
   }
+}
+
+/**
+ * Converts an ExcelJS worksheet to a CSV string.
+ * Values containing commas, quotes, or newlines are properly quoted.
+ */
+function worksheetToCSV(worksheet: import('exceljs').Worksheet): string {
+  const rows: string[] = []
+  worksheet.eachRow({ includeEmpty: true }, row => {
+    const values = (row.values as import('exceljs').CellValue[]).slice(1) // index 0 is always undefined
+    const csvRow = values.map(cell => {
+      const val = cell == null ? '' : String(cell)
+      return val.includes(',') || val.includes('"') || val.includes('\n')
+        ? `"${val.replace(/"/g, '""')}"`
+        : val
+    })
+    rows.push(csvRow.join(','))
+  })
+  return rows.join('\n')
 }
