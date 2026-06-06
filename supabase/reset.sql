@@ -102,6 +102,82 @@ $$;
 GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
 GRANT INSERT ON public.profiles      TO supabase_auth_admin;
 
+-- ---------------------------------------------------------------------------
+-- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
+-- preventing infinite recursion in policies that need to check the caller's role.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid()
+$$;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: role_permissions
+-- Stores per-role boolean permission flags.
+-- Admin role always has full access (enforced in policies and verifyPermission).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  role                public.user_role PRIMARY KEY,
+  can_publish_news    BOOLEAN NOT NULL DEFAULT FALSE,
+  can_edit_news       BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_artists  BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_releases BOOLEAN NOT NULL DEFAULT FALSE,
+  can_manage_videos   BOOLEAN NOT NULL DEFAULT FALSE,
+  can_view_admin_panel BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by          UUID REFERENCES auth.users(id)
+);
+
+-- Insert default permissions for all roles (idempotent)
+INSERT INTO public.role_permissions (role, can_publish_news, can_edit_news, can_manage_artists, can_manage_releases, can_manage_videos, can_view_admin_panel)
+VALUES
+  ('admin',      TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+  ('editor',     TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE),
+  ('journalist', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('artist',     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('user',       FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
+ON CONFLICT (role) DO NOTHING;
+
+DROP TRIGGER IF EXISTS role_permissions_updated_at ON public.role_permissions;
+CREATE TRIGGER role_permissions_updated_at
+  BEFORE UPDATE ON public.role_permissions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: permission check — looks up the calling user's role in profiles,
+-- joins role_permissions, and returns the boolean value for the given column.
+-- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE perm
+    WHEN 'can_publish_news'    THEN rp.can_publish_news
+    WHEN 'can_edit_news'       THEN rp.can_edit_news
+    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
+    WHEN 'can_manage_releases' THEN rp.can_manage_releases
+    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
+    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
+    ELSE FALSE
+  END
+  FROM public.profiles p
+  JOIN public.role_permissions rp ON rp.role = p.role
+  WHERE p.id = auth.uid()
+  LIMIT 1;
+$$;
+
+
 -- =============================================================================
 -- TABLES
 -- =============================================================================
@@ -269,7 +345,6 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS twitter_url    TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
-ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
@@ -561,7 +636,7 @@ DROP POLICY IF EXISTS "release_artists: can_manage_releases write" ON public.rel
 CREATE POLICY "release_artists: public read" ON public.release_artists
   FOR SELECT USING (true);
 CREATE POLICY "release_artists: can_manage_releases write" ON public.release_artists
-  FOR ALL USING (public.has_permission(auth.uid(), 'can_manage_releases'));
+  FOR ALL USING (public.has_permission('can_manage_releases'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: news_post_artists  (many-to-many: news_posts ↔ artists)
@@ -584,7 +659,7 @@ DROP POLICY IF EXISTS "news_post_artists: can_publish_news write" ON public.news
 CREATE POLICY "news_post_artists: public read" ON public.news_post_artists
   FOR SELECT USING (true);
 CREATE POLICY "news_post_artists: can_publish_news write" ON public.news_post_artists
-  FOR ALL USING (public.has_permission(auth.uid(), 'can_publish_news'));
+  FOR ALL USING (public.has_permission('can_publish_news'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: videos
@@ -1152,81 +1227,6 @@ ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
-
--- ---------------------------------------------------------------------------
--- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
--- preventing infinite recursion in policies that need to check the caller's role.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS TEXT
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid()
-$$;
-
--- ---------------------------------------------------------------------------
--- TABLE: role_permissions
--- Stores per-role boolean permission flags.
--- Admin role always has full access (enforced in policies and verifyPermission).
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.role_permissions (
-  role                public.user_role PRIMARY KEY,
-  can_publish_news    BOOLEAN NOT NULL DEFAULT FALSE,
-  can_edit_news       BOOLEAN NOT NULL DEFAULT FALSE,
-  can_manage_artists  BOOLEAN NOT NULL DEFAULT FALSE,
-  can_manage_releases BOOLEAN NOT NULL DEFAULT FALSE,
-  can_manage_videos   BOOLEAN NOT NULL DEFAULT FALSE,
-  can_view_admin_panel BOOLEAN NOT NULL DEFAULT FALSE,
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_by          UUID REFERENCES auth.users(id)
-);
-
--- Insert default permissions for all roles (idempotent)
-INSERT INTO public.role_permissions (role, can_publish_news, can_edit_news, can_manage_artists, can_manage_releases, can_manage_videos, can_view_admin_panel)
-VALUES
-  ('admin',      TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
-  ('editor',     TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE),
-  ('journalist', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
-  ('artist',     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
-  ('user',       FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
-ON CONFLICT (role) DO NOTHING;
-
-DROP TRIGGER IF EXISTS role_permissions_updated_at ON public.role_permissions;
-CREATE TRIGGER role_permissions_updated_at
-  BEFORE UPDATE ON public.role_permissions
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
-
--- ---------------------------------------------------------------------------
--- HELPER: permission check — looks up the calling user's role in profiles,
--- joins role_permissions, and returns the boolean value for the given column.
--- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE perm
-    WHEN 'can_publish_news'    THEN rp.can_publish_news
-    WHEN 'can_edit_news'       THEN rp.can_edit_news
-    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
-    WHEN 'can_manage_releases' THEN rp.can_manage_releases
-    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
-    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
-    ELSE FALSE
-  END
-  FROM public.profiles p
-  JOIN public.role_permissions rp ON rp.role = p.role
-  WHERE p.id = auth.uid()
-  LIMIT 1;
-$$;
 
 -- ---------------------------------------------------------------------------
 -- RLS: profiles
