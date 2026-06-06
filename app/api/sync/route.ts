@@ -19,9 +19,9 @@ import { revalidateTag } from 'next/cache'
 import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { serverEnv } from '@/lib/env.server'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import type { ServerEnv } from '@/lib/env.server'
 
 // ---------------------------------------------------------------------------
 // Auth helpers
@@ -35,10 +35,10 @@ function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
   return timingSafeEqual(authBuffer, expectedBuffer)
 }
 
-async function verifyToken(token: string): Promise<void> {
+async function verifyToken(token: string, env: ServerEnv): Promise<void> {
   const admin = createClient(
-    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
-    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } },
   )
   const { data, error } = await admin.auth.getUser(token)
@@ -50,6 +50,8 @@ async function verifyToken(token: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  const { serverEnv } = await import('@/lib/env.server')
+
   // 1. Authenticate — accept either a Vercel cron call or a user token
   const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
@@ -62,7 +64,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     if (!authHeader.startsWith('Bearer ')) {
       throw new ApiError(401, 'Missing or invalid Authorization header')
     }
-    await verifyToken(authHeader.slice(7))
+    await verifyToken(authHeader.slice(7), serverEnv)
   }
 
   // 2. Wire up dependencies (serverEnv validates all required vars at startup)
