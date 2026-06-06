@@ -51,6 +51,64 @@ export interface Database {
           }
         ]
       }
+      sos_rules_presets: {
+        Row: {
+          id: string
+          name: string
+          config: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          config: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          config?: Record<string, unknown>
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sos_period_summaries: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          total_revenue: number
+          total_payout: number
+          artist_count: number
+          artist_breakdowns: unknown[]
+          platform_breakdowns: unknown[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          total_revenue?: number
+          total_payout?: number
+          artist_count?: number
+          artist_breakdowns?: unknown[]
+          platform_breakdowns?: unknown[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          total_revenue?: number
+          total_payout?: number
+          artist_count?: number
+          artist_breakdowns?: unknown[]
+          platform_breakdowns?: unknown[]
+        }
+        Relationships: []
+      }
       app_logs: {
         Row: {
           id: string
