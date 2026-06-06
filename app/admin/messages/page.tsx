@@ -5,7 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, lazy } from 'react'
-import { AdminPageShell } from '../../_components/AdminPageShell'
+import { AdminPageShell } from '../_components/AdminPageShell'
 
 const MessagesManager = lazy(() =>
   import('@/components/admin/MessagesManager').then((m) => ({ default: m.MessagesManager })),

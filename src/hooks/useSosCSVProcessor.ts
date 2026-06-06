@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
-import i18next from 'i18next'
 import { computeAutoMappings } from '@/lib/sos/auto-mapping'
 import { fetchExchangeRates, fetchHistoricalExchangeRates } from '@/lib/sos/currency'
 import type { ExchangeRates, HistoricalRates } from '@/lib/sos/currency'
@@ -23,7 +22,7 @@ import type {
   IgnoredEntry,
   TrackRevenueAssignment,
 } from '@/lib/sos/types'
-import type { WorkerRequest, WorkerResponse, WorkerProcessConfig, WorkerResult } from '@/workers/csv-processor.worker'
+import type { WorkerRequest, WorkerResponse, WorkerProcessConfig, WorkerResult } from '@/workers/sos-csv-processor.worker'
 
 interface CSVProcessorConfig {
   compilationFilters: CompilationFilter[]
@@ -165,10 +164,10 @@ export function useCSVProcessor(
       ])
       setExchangeRates(rates)
       if (historical !== null) setHistoricalRates(historical)
-      toast.success(i18next.t('ingest.exchangeRatesUpdated'))
+      toast.success('Exchange rates updated successfully')
     } catch (err) {
       console.warn('[useCSVProcessor] Exchange rate refresh failed:', err)
-      toast.warning(i18next.t('ingest.exchangeRatesFailed'))
+      toast.warning('Failed to fetch exchange rates. Using fallback rates.')
     } finally {
       setExchangeRatesLoading(false)
     }
@@ -246,7 +245,7 @@ export function useCSVProcessor(
 
   useEffect(() => {
     const worker = new Worker(
-      new URL('../workers/csv-processor.worker.ts', import.meta.url),
+      new URL('../workers/sos-csv-processor.worker.ts', import.meta.url),
       { type: 'module' }
     )
     workerRef.current = worker
@@ -375,7 +374,7 @@ export function useCSVProcessor(
 
   const revenues: ArtistRevenue[] = useMemo(
     () =>
-      workerResult.processedData.map(data => ({
+      workerResult.processedData.map((data: SafeProcessedArtistData) => ({
         artist: data.artist,
         believeRevenue: data.believeRevenue,
         bandcampRevenue: data.bandcampRevenue,

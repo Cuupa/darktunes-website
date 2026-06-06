@@ -5,7 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, lazy } from 'react'
-import { AdminPageShell } from '../../_components/AdminPageShell'
+import { AdminPageShell } from '../_components/AdminPageShell'
 
 const UsersManager = lazy(() =>
   import('@/components/admin/UsersManager').then((m) => ({ default: m.UsersManager })),

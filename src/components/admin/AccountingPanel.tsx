@@ -157,7 +157,6 @@ function SosGeneratorPanel() {
               printfulManager={printfulManager}
               darkmerchManager={darkmerchManager}
               onAddAliases={() => {}}
-              onImportArtistRoster={() => {}}
             />
           </div>
         )}

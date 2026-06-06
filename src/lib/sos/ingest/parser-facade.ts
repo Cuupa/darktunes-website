@@ -18,7 +18,7 @@ import type { SalesTransaction } from './csv-parser'
 import { parseCSVLine } from './csv-parser'
 import { parseCSVContentStreaming } from './streaming-csv-parser'
 import type { StreamingParseResult } from './streaming-csv-parser'
-import type { CsvImportProfile, FinancialFieldKey } from './ingest/types'
+import type { CsvImportProfile, FinancialFieldKey } from './types'
 import {
   FINANCIAL_KEY_TO_INTERNAL,
   SYSTEM_BANDCAMP_PROFILE_ID,
@@ -32,7 +32,7 @@ import {
 } from './ecommerce-merger'
 import type { ShopifyRawOrder, PrintfulRawCost } from './ecommerce-merger'
 import { parsePrintfulCSV } from './printful-parser'
-import type { LabelArtist } from './types'
+import type { LabelArtist } from '../types'
 
 export type FileType = 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'master-data' | 'unknown'
 
