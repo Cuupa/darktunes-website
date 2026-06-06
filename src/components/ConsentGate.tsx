@@ -16,6 +16,12 @@ interface ConsentGateProps {
   placeholderAlt?: string
   /** Text shown above the opt-in button explaining data transfer. */
   gateText?: string
+  /**
+   * Optional server-read initial consent value.
+   * Pass the value of the `darktunes_consent` cookie read server-side to
+   * render the embed immediately on first paint (eliminates SSR flash).
+   */
+  initialConsent?: ConsentState
 }
 
 /**
@@ -25,6 +31,10 @@ interface ConsentGateProps {
  * Shows a placeholder image (from Cloudflare R2 if provided) with an
  * opt-in button. Reacts immediately to ConsentBanner decisions via a
  * custom DOM event.
+ *
+ * Consent is persisted in a first-party cookie so it survives page reloads
+ * in all privacy contexts. Pass `initialConsent` from a server component to
+ * avoid the hydration flash entirely.
  */
 export function ConsentGate({
   children,
@@ -32,11 +42,12 @@ export function ConsentGate({
   placeholderUrl,
   placeholderAlt = 'External content — click to load',
   gateText = 'This content is provided by an external provider. By loading it, you agree to the transfer of data.',
+  initialConsent,
 }: ConsentGateProps) {
-  const [consent, setConsent] = useState<ConsentState>(null)
+  const [consent, setConsent] = useState<ConsentState>(initialConsent ?? null)
 
   useEffect(() => {
-    // Hydrate from localStorage
+    // Hydrate from cookie (or migrate legacy localStorage value)
     setConsent(getConsentState())
 
     // React to consent changes triggered by ConsentBanner

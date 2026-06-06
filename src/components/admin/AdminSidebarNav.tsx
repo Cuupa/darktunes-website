@@ -6,11 +6,14 @@
  * Client component for the persistent admin sidebar navigation.
  * Uses usePathname() for active-state highlighting and useAuthContext()
  * to hide admin-only sections from editors.
+ *
+ * On mobile (< md) the sidebar is hidden; a hamburger button in the layout
+ * header opens this nav inside a Sheet drawer.
  */
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useCallback } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useCallback, useState } from 'react'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
   SquaresFour,
@@ -22,9 +25,13 @@ import {
   Gear,
   Cpu,
   SignOut,
+  List,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 interface NavItem {
   label: string
@@ -46,7 +53,9 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AdminSidebarNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { isAdmin, isEditor, user, profile, signOut } = useAuthContext()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = useCallback(async () => {
     const { error } = await signOut()
@@ -54,8 +63,9 @@ export function AdminSidebarNav() {
       toast.error('Failed to sign out')
     } else {
       toast.success('Signed out successfully')
+      router.push('/admin/login')
     }
-  }, [signOut])
+  }, [signOut, router])
 
   const canSee = (item: NavItem) => {
     if (isAdmin) return true
@@ -70,56 +80,89 @@ export function AdminSidebarNav() {
 
   const visibleItems = NAV_ITEMS.filter(canSee)
 
+  const renderNavLinks = (onNavigate?: () => void) => (
+    <nav className="flex-1 overflow-y-auto py-3 px-2" aria-label="Admin sections">
+      <ul className="space-y-0.5">
+        {visibleItems.map((item) => {
+          const Icon = item.icon
+          const active = isActive(item.href)
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
+                {item.label}
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
+  )
+
+  const renderFooter = () => (
+    <div className="border-t border-border px-3 py-3 space-y-2">
+      <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+      >
+        <SignOut size={16} weight="bold" aria-hidden="true" />
+        Sign Out
+      </button>
+    </div>
+  )
+
   return (
-    <aside
-      className="flex flex-col h-full w-56 shrink-0 border-r border-border bg-card"
-      aria-label="Admin navigation"
-    >
-      {/* Brand header */}
-      <div className="px-4 py-5 border-b border-border">
+    <>
+      {/* Mobile header — only visible below md breakpoint */}
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
-        <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
-      </div>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
+              <List size={20} aria-hidden="true" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-56 p-0">
+            <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
+            <div className="flex h-full flex-col bg-card">
+              <div className="px-4 py-5 border-b border-border">
+                <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+                <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+              </div>
+              {renderNavLinks(() => setMobileOpen(false))}
+              {renderFooter()}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </header>
 
-      {/* Nav links */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2" aria-label="Admin sections">
-        <ul className="space-y-0.5">
-          {visibleItems.map((item) => {
-            const Icon = item.icon
-            const active = isActive(item.href)
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
-                  {item.label}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+      {/* Desktop sidebar — hidden below md */}
+      <aside
+        className="hidden md:flex flex-col h-full w-56 shrink-0 border-r border-border bg-card"
+        aria-label="Admin navigation"
+      >
+        {/* Brand header */}
+        <div className="px-4 py-5 border-b border-border">
+          <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+          <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+        </div>
 
-      {/* Footer: user info + sign out */}
-      <div className="border-t border-border px-3 py-3 space-y-2">
-        <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <SignOut size={16} weight="bold" aria-hidden="true" />
-          Sign Out
-        </button>
-      </div>
-    </aside>
+        {renderNavLinks()}
+        <Separator className="bg-border" />
+        {renderFooter()}
+      </aside>
+    </>
   )
 }

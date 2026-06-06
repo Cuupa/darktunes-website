@@ -73,8 +73,10 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
         if (error) {
           toast.error(dict.login_error)
         } else {
-          router.refresh()
-          router.push('/portal')
+          // Use a hard navigation instead of router.push so the full HTTP
+          // request carries the newly-set auth cookie, ensuring the server
+          // component sees the authenticated session on first render.
+          window.location.assign('/portal')
         }
       } catch {
         toast.error(dict.login_error)

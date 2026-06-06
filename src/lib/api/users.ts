@@ -55,18 +55,22 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
     profileMap.set(p.id, p.role as UserRole)
   }
 
-  // 3. Fetch all artists that have a linked user_id
-  const { data: artists, error: artistsError } = await adminClient
-    .from('artists')
-    .select('id, name, slug, user_id')
-    .not('user_id', 'is', null)
+  // 3. Fetch artist memberships — join artist_members → artists to get
+  //    (user_id, artist_id, artist_name, artist_slug).
+  //    This reflects the current many-to-many model used by the link-artist API.
+  const { data: memberships, error: membershipsError } = await adminClient
+    .from('artist_members')
+    .select('user_id, artists!inner(id, name, slug)')
 
-  if (artistsError) throw new Error(artistsError.message)
+  if (membershipsError) throw new Error(membershipsError.message)
 
+  // Build a map keyed by user_id.  For users with multiple memberships we
+  // keep the first one (display purposes only).
   const artistMap = new Map<string, { id: string; name: string; slug: string }>()
-  for (const a of artists ?? []) {
-    if (a.user_id) {
-      artistMap.set(a.user_id, { id: a.id, name: a.name, slug: a.slug })
+  for (const m of memberships ?? []) {
+    if (!artistMap.has(m.user_id)) {
+      const a = (m as unknown as { artists: { id: string; name: string; slug: string } }).artists
+      if (a) artistMap.set(m.user_id, { id: a.id, name: a.name, slug: a.slug })
     }
   }
 
