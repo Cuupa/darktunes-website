@@ -1,0 +1,67 @@
+/**
+ * app/portal/documents/page.tsx — Document Vault (Server Component)
+ */
+
+export const dynamic = 'force-dynamic'
+
+import { Suspense } from 'react'
+import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { listArtistDocuments } from '@/lib/api/artistDocuments'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DocumentVault } from './_components/DocumentVault'
+
+function DocumentsSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-56" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="h-14 w-full" />
+      ))}
+    </div>
+  )
+}
+
+async function DocumentsContent() {
+  const locale = await getLocale()
+  const dict = await getDictionary(locale)
+
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.documents'] === false) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">{dict.portal.documents_heading}</h1>
+        <p className="text-muted-foreground">
+          The Document Vault feature is currently unavailable.
+        </p>
+      </div>
+    )
+  }
+
+  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const documents = artist
+    ? await listArtistDocuments(supabase, artist.id).catch(() => [])
+    : []
+
+  return (
+    <DocumentVault
+      dict={dict.portal}
+      documents={documents}
+      artistId={artist?.id ?? ''}
+    />
+  )
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<DocumentsSkeleton />}>
+      <DocumentsContent />
+    </Suspense>
+  )
+}

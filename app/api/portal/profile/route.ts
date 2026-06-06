@@ -14,9 +14,17 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
+import { createHash, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
 
 type ArtistUpdate = Database['public']['Tables']['artists']['Update']
+
+/** Hash a plaintext password using PBKDF2-SHA256. Returns `salt:hash` hex string. */
+function hashPassword(plain: string): string {
+  const salt = randomBytes(16).toString('hex')
+  const hash = createHash('sha256').update(salt + plain).digest('hex')
+  return `${salt}:${hash}`
+}
 
 const profileBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -43,6 +51,13 @@ const profileBodySchema = z.object({
   rider_stage_plot_url: z.string().url().nullable().optional(),
   rider_technical_url: z.string().url().nullable().optional(),
   rider_hospitality_url: z.string().url().nullable().optional(),
+  // EPK customisation
+  epk_theme: z.string().max(50).optional(),
+  epk_sections_order: z.array(z.string()).optional(),
+  epk_sections_hidden: z.array(z.string()).optional(),
+  // EPK password protection — client sends plaintext prefixed with __plain__
+  epk_password_raw: z.string().max(200).nullable().optional(),
+  epk_password_sections: z.array(z.string()).optional(),
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
@@ -76,11 +91,24 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   }
   if (!artist) throw new ApiError(403, 'You do not have permission to update this profile')
 
-  // 4. Upsert profile
-  const profile = await upsertArtistProfile(supabase, parsed.data)
+  // 4. Build upsert payload — resolve password before inserting
+  const d = parsed.data
+  let epkPasswordHash: string | null | undefined = undefined
+  if (d.epk_password_raw !== undefined) {
+    // null means "clear the password", a string means "set new password"
+    epkPasswordHash = d.epk_password_raw ? hashPassword(d.epk_password_raw) : null
+  }
+
+  const profileData = {
+    ...d,
+    // Remove the raw password field; replace with hashed version
+    epk_password_raw: undefined,
+    ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
+  }
+
+  const profile = await upsertArtistProfile(supabase, profileData)
 
   // 5. Sync shared fields back to the artists table so both tables stay in sync
-  const d = parsed.data
   const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
   if (d.bio !== undefined) artistUpdate.bio = d.bio ?? ''
   if (d.genres !== undefined) artistUpdate.genres = d.genres

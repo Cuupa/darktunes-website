@@ -90,9 +90,11 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     watched,
     riderUrls,
     riderUploading,
+    epkSettings,
     handlePhotoChange,
     handleRiderUpload,
     handleRiderDelete,
+    handleEpkSettingsChange,
     onSubmit,
   } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
 
@@ -491,6 +493,12 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               dict={dict}
               data={epkData}
               artistSlug={artistSlug}
+              epkTheme={epkSettings.epkTheme}
+              epkSectionsOrder={epkSettings.epkSectionsOrder}
+              epkSectionsHidden={epkSettings.epkSectionsHidden}
+              epkPasswordHash={epkSettings.epkPasswordRaw ? `__plain__${epkSettings.epkPasswordRaw}` : undefined}
+              epkPasswordSections={epkSettings.epkPasswordSections}
+              onSettingsChange={handleEpkSettingsChange}
             />
           </TabsContent>
         </Tabs>
