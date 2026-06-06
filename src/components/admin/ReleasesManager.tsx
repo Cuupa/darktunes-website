@@ -158,19 +158,19 @@ export function ReleasesManager() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return releases.filter((r) =>
-      r.title.toLowerCase().includes(q) ||
-      r.artistName.toLowerCase().includes(q) ||
-      r.type.toLowerCase().includes(q),
+      (r.title ?? '').toLowerCase().includes(q) ||
+      (r.artistName ?? '').toLowerCase().includes(q) ||
+      (r.type ?? '').toLowerCase().includes(q),
     )
   }, [releases, search])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let cmp = 0
-      if (sortField === 'title') cmp = a.title.localeCompare(b.title)
-      else if (sortField === 'artistName') cmp = a.artistName.localeCompare(b.artistName)
-      else if (sortField === 'releaseDate') cmp = a.releaseDate.localeCompare(b.releaseDate)
-      else if (sortField === 'type') cmp = a.type.localeCompare(b.type)
+      if (sortField === 'title') cmp = (a.title ?? '').localeCompare(b.title ?? '')
+      else if (sortField === 'artistName') cmp = (a.artistName ?? '').localeCompare(b.artistName ?? '')
+      else if (sortField === 'releaseDate') cmp = (a.releaseDate ?? '').localeCompare(b.releaseDate ?? '')
+      else if (sortField === 'type') cmp = (a.type ?? '').localeCompare(b.type ?? '')
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [filtered, sortField, sortDir])
