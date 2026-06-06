@@ -941,9 +941,13 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact  TEX
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact    TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS spotify_url      TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS apple_music_url  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url       TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url     TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url   TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url             TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url           TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url         TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url   TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url    TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url  TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS onboarding_completed   BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 
@@ -1745,6 +1749,7 @@ GRANT UPDATE (status) ON public.newsletter_subscribers TO anon;
 -- RLS: artist_profiles
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_profiles;
+DROP POLICY IF EXISTS "artist_profiles: artist insert own" ON public.artist_profiles;
 DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_profiles;
 DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_profiles;
 
@@ -1753,6 +1758,11 @@ CREATE POLICY "artist_profiles: artist read own" ON public.artist_profiles
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
+
+-- Allows artists to insert their own EPK/profile (required for first-time upsert)
+CREATE POLICY "artist_profiles: artist insert own" ON public.artist_profiles
+  FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows artists to update their own EPK/profile data
 CREATE POLICY "artist_profiles: artist update own" ON public.artist_profiles

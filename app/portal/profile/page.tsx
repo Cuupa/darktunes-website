@@ -12,6 +12,7 @@ import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
+import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProfileForm } from './_components/ProfileForm'
 
@@ -43,7 +44,10 @@ async function ProfileContent() {
 
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
+  const [artist, siteSettings] = await Promise.all([
+    getArtistByUserId(supabase, user.id).catch(() => null),
+    getCachedSiteSettings().catch(() => null),
+  ])
   const profile = artist
     ? await getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
     : null
@@ -56,6 +60,8 @@ async function ProfileContent() {
       artistSlug={artist?.slug ?? null}
       initialProfile={profile}
       artist={artist}
+      labelName={siteSettings?.labelName ?? null}
+      labelLogoUrl={siteSettings?.logoUrl ?? null}
     />
   )
 }
