@@ -23,6 +23,8 @@ import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 const patchSchema = z.object({
   artistId: z.string().uuid().nullable(),
   memberRole: z.enum(['owner', 'member', 'guest']).optional().default('owner'),
+  /** When true and artistId is provided, removes that specific membership instead of adding */
+  remove: z.boolean().optional().default(false),
 })
 
 // ---------------------------------------------------------------------------
@@ -67,7 +69,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   }
 
   const userId = extractUserId(req)
-  const { artistId, memberRole } = parsed.data
+  const { artistId, memberRole, remove } = parsed.data
 
   const adminClient = await createServiceRoleSupabaseClient()
 
@@ -77,6 +79,15 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       .from('artist_members')
       .delete()
       .eq('user_id', userId)
+
+    if (deleteErr) throw buildApiError('DB_ERROR', 500)
+  } else if (remove === true) {
+    // Remove a specific artist membership
+    const { error: deleteErr } = await adminClient
+      .from('artist_members')
+      .delete()
+      .eq('user_id', userId)
+      .eq('artist_id', artistId)
 
     if (deleteErr) throw buildApiError('DB_ERROR', 500)
   } else {

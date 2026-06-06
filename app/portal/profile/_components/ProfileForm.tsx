@@ -15,6 +15,7 @@
  *  4. EPK Preview  — live preview of the press kit
  */
 
+import * as React from 'react'
 import { Controller } from 'react-hook-form'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -56,13 +57,17 @@ interface ProfileFormProps {
   initialProfile: ArtistProfile | null
   /** Full artist row — used to pre-fill fields when no EPK profile exists yet. */
   artist?: Artist | null
+  /** Label name from site settings — shown in EPK footer. */
+  labelName?: string | null
+  /** Label logo URL from site settings — shown in EPK footer. */
+  labelLogoUrl?: string | null
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormProps) {
+export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
   if (!artistId) {
     return (
       <Card className="bg-card border-border">
@@ -73,14 +78,15 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
     )
   }
 
-  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} />
+  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
 }
 
 interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
   artistId: string
 }
 
-function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormInnerProps) {
+function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
+  const [pdfDownloading, setPdfDownloading] = React.useState(false)
   const {
     form,
     photoUrl,
@@ -124,6 +130,8 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     riderStagePlotUrl: riderUrls.stage_plot,
     riderTechnicalUrl: riderUrls.technical,
     riderHospitalityUrl: riderUrls.hospitality,
+    labelName: labelName ?? undefined,
+    labelLogoUrl: labelLogoUrl ?? undefined,
   }
 
   // ---------------------------------------------------------------------------
@@ -158,8 +166,24 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
           )}
         </div>
         <div className="no-print flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => window.print()}>
-            {dict.profile_download_epk}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pdfDownloading}
+            onClick={async () => {
+              setPdfDownloading(true)
+              try {
+                const { generateEpkPdf } = await import('./epkPdf')
+                await generateEpkPdf(epkData)
+              } catch {
+                // toast is not in scope here — the EPKModal handles error display
+              } finally {
+                setPdfDownloading(false)
+              }
+            }}
+          >
+            <FilePdf size={16} aria-hidden="true" className="mr-1.5" />
+            {pdfDownloading ? '…' : dict.profile_download_epk}
           </Button>
           {artistSlug && (
             <Link

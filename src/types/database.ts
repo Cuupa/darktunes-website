@@ -2033,6 +2033,178 @@ export interface Database {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          granted_at: string
+          granted_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          granted_at?: string
+          granted_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          granted_at?: string
+          granted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      portal_message_folders: {
+        Row: {
+          id: string
+          artist_id: string
+          name: string
+          color: string | null
+          icon: string | null
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          name: string
+          color?: string | null
+          icon?: string | null
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          name?: string
+          color?: string | null
+          icon?: string | null
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_message_folders_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      portal_messages: {
+        Row: {
+          id: string
+          from_artist_id: string
+          to_artist_id: string | null
+          to_label: boolean
+          subject: string
+          body: string
+          body_html: string | null
+          sent_at: string
+          read_at: string | null
+          starred: boolean
+          deleted_at: string | null
+          folder_id: string | null
+          has_attachments: boolean
+          search_vector: string | null
+        }
+        Insert: {
+          id?: string
+          from_artist_id: string
+          to_artist_id?: string | null
+          to_label?: boolean
+          subject?: string
+          body?: string
+          body_html?: string | null
+          sent_at?: string
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
+          folder_id?: string | null
+          has_attachments?: boolean
+        }
+        Update: {
+          id?: string
+          from_artist_id?: string
+          to_artist_id?: string | null
+          to_label?: boolean
+          subject?: string
+          body?: string
+          body_html?: string | null
+          sent_at?: string
+          read_at?: string | null
+          starred?: boolean
+          deleted_at?: string | null
+          folder_id?: string | null
+          has_attachments?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_messages_from_artist_id_fkey"
+            columns: ["from_artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_messages_to_artist_id_fkey"
+            columns: ["to_artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      portal_message_attachments: {
+        Row: {
+          id: string
+          message_id: string
+          file_url: string
+          file_name: string
+          file_size: number | null
+          mime_type: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          file_url: string
+          file_name: string
+          file_size?: number | null
+          mime_type?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          file_url?: string
+          file_name?: string
+          file_size?: number | null
+          mime_type?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "portal_messages"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

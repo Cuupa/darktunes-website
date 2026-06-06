@@ -16,6 +16,7 @@
  */
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Users,
   LinkSimple,
@@ -27,6 +28,7 @@ import {
   ClockCounterClockwise,
   EnvelopeSimple,
   UserPlus,
+  PencilSimple,
 } from '@phosphor-icons/react'
 import { useUsers } from '@/hooks/useUsers'
 import { useArtists } from '@/hooks/useArtists'
@@ -88,8 +90,8 @@ function UserSkeletonRows() {
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
           <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-28 rounded-md" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-40 rounded-md" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
           <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-8 w-32" /></TableCell>
@@ -103,15 +105,26 @@ function UserSkeletonRows() {
 // Role badge
 // ---------------------------------------------------------------------------
 
+const ROLE_COLOURS: Record<UserRole, string> = {
+  admin: 'bg-violet-700 text-violet-100',
+  artist: 'bg-emerald-700 text-emerald-100',
+  editor: 'bg-blue-700 text-blue-100',
+  journalist: 'bg-amber-700 text-amber-100',
+  user: '',
+}
+
 function RoleBadge({ role }: { role: UserRole }) {
-  const colours: Record<UserRole, string> = {
-    admin: 'bg-violet-700 text-violet-100',
-    artist: 'bg-emerald-700 text-emerald-100',
-    editor: 'bg-blue-700 text-blue-100',
-    journalist: 'bg-amber-700 text-amber-100',
-    user: '',
-  }
-  return <Badge className={colours[role] || ''} variant={role === 'user' ? 'secondary' : undefined}>{role}</Badge>
+  return <Badge className={ROLE_COLOURS[role] || ''} variant={role === 'user' ? 'secondary' : undefined}>{role}</Badge>
+}
+
+/** Shows all roles a user holds as a compact list of badges. */
+function RoleBadgeList({ roles }: { roles: UserRole[] }) {
+  const list = roles.length > 0 ? roles : ['user' as UserRole]
+  return (
+    <div className="flex flex-wrap gap-1">
+      {list.map((r) => <RoleBadge key={r} role={r} />)}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +133,8 @@ function RoleBadge({ role }: { role: UserRole }) {
 
 export function UsersManager() {
   const { user: currentUser } = useAuthContext()
-  const { users, isLoading, updateRole, toggleBan, deleteUser, linkArtist, unlinkArtist } = useUsers()
+  const router = useRouter()
+  const { users, isLoading, toggleBan, deleteUser, linkArtist, unlinkArtist } = useUsers()
   const { artists } = useArtists()
 
   // Filter state
@@ -148,7 +162,7 @@ export function UsersManager() {
 
   // IDs of artists already linked to some user
   const linkedArtistIds = useMemo(
-    () => new Set(users.map((u) => u.linked_artist?.id).filter(Boolean)),
+    () => new Set(users.flatMap((u) => (u.linked_artists ?? [u.linked_artist]).filter(Boolean).map((a) => a!.id))),
     [users],
   )
 
@@ -158,24 +172,20 @@ export function UsersManager() {
     [artists, linkedArtistIds],
   )
 
-  // Client-side filter
+  // Client-side filter — matches email or any role
   const filteredUsers = useMemo(() => {
     if (!filter.trim()) return users
     const q = filter.toLowerCase()
     return users.filter(
       (u) =>
         u.email.toLowerCase().includes(q) ||
-        u.role.toLowerCase().includes(q),
+        (u.roles ?? [u.role]).some((r) => r.toLowerCase().includes(q)),
     )
   }, [users, filter])
 
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
-
-  const handleRoleChange = async (user: UserWithProfile, role: UserRole) => {
-    await updateRole(user.id, role)
-  }
 
   const handleBanConfirm = async () => {
     if (!banTarget) return
@@ -324,32 +334,29 @@ export function UsersManager() {
                       )}
                     </TableCell>
 
-                    {/* Role dropdown */}
+                    {/* Role display — multi-role badges, click to edit detail */}
                     <TableCell>
                       {self ? (
-                        <RoleBadge role={u.role} />
+                        <RoleBadgeList roles={u.roles ?? [u.role]} />
                       ) : (
-                        <Select
-                          value={u.role}
-                          onValueChange={(v) => void handleRoleChange(u, v as UserRole)}
-                        >
-                          <SelectTrigger className="h-8 w-32 text-sm" aria-label={`Role for ${u.email}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">admin</SelectItem>
-                            <SelectItem value="artist">artist</SelectItem>
-                            <SelectItem value="editor">editor</SelectItem>
-                            <SelectItem value="journalist">journalist</SelectItem>
-                            <SelectItem value="user">user</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <RoleBadgeList roles={u.roles ?? [u.role]} />
                       )}
                     </TableCell>
 
-                    {/* Linked band */}
+                    {/* Linked bands — show all */}
                     <TableCell className="text-sm">
-                      {u.linked_artist ? (
+                      {(u.linked_artists ?? []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {(u.linked_artists ?? []).slice(0, 2).map((a) => (
+                            <span key={a.id} className="text-foreground">{a.name}</span>
+                          ))}
+                          {(u.linked_artists ?? []).length > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{(u.linked_artists ?? []).length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      ) : u.linked_artist ? (
                         <span className="text-foreground">{u.linked_artist.name}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -393,6 +400,21 @@ export function UsersManager() {
                         </Tooltip>
                       ) : (
                         <div className="flex justify-end gap-1">
+                          {/* Edit detail page */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => router.push(`/admin/users/${u.id}`)}
+                                aria-label={`Edit ${u.email}`}
+                              >
+                                <PencilSimple size={15} aria-hidden="true" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit user detail</TooltipContent>
+                          </Tooltip>
+
                           {/* View History */}
                           <Tooltip>
                             <TooltipTrigger asChild>
