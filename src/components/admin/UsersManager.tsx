@@ -25,6 +25,8 @@ import {
   Trash,
   MagnifyingGlass,
   ClockCounterClockwise,
+  EnvelopeSimple,
+  UserPlus,
 } from '@phosphor-icons/react'
 import { useUsers } from '@/hooks/useUsers'
 import { useArtists } from '@/hooks/useArtists'
@@ -32,8 +34,10 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import { RoleChangeHistory } from '@/components/admin/RoleChangeHistory'
 import {
   Select,
@@ -134,6 +138,12 @@ export function UsersManager() {
   // History dialog
   const [historyTarget, setHistoryTarget] = useState<UserWithProfile | null>(null)
 
+  // Invite dialog
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<UserRole>('user')
+  const [isInviting, setIsInviting] = useState(false)
+
   const [isMutating, setIsMutating] = useState(false)
 
   // IDs of artists already linked to some user
@@ -211,6 +221,31 @@ export function UsersManager() {
     }
   }
 
+  const handleInviteSubmit = async () => {
+    if (!inviteEmail.trim()) return
+    setIsInviting(true)
+    try {
+      const res = await fetch('/api/admin/users/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      const json = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to send invite')
+        return
+      }
+      toast.success(`Invite sent to ${inviteEmail.trim()}`)
+      setInviteOpen(false)
+      setInviteEmail('')
+      setInviteRole('user')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send invite')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -225,7 +260,18 @@ export function UsersManager() {
       <div className="space-y-4">
         {/* Header row */}
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">{users.length} user(s)</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">{users.length} user(s)</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setInviteOpen(true)}
+              className="gap-1.5"
+            >
+              <UserPlus size={14} aria-hidden="true" />
+              Invite User
+            </Button>
+          </div>
           <div className="relative w-64">
             <MagnifyingGlass
               size={14}
@@ -594,6 +640,78 @@ export function UsersManager() {
             {historyTarget && (
               <RoleChangeHistory userId={historyTarget.id} />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Invite user dialog */}
+        <Dialog
+          open={inviteOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setInviteOpen(false)
+              setInviteEmail('')
+              setInviteRole('user')
+            }
+          }}
+        >
+          <DialogContent aria-describedby="invite-dialog-desc" aria-labelledby="invite-dialog-title">
+            <DialogHeader>
+              <DialogTitle id="invite-dialog-title">
+                <div className="flex items-center gap-2">
+                  <EnvelopeSimple size={18} aria-hidden="true" />
+                  Invite New User
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <p id="invite-dialog-desc" className="text-sm text-muted-foreground">
+              An invitation email will be sent to the address below. The recipient can set their
+              password and sign in immediately.
+            </p>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-email">Email address</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleInviteSubmit() }}
+                  disabled={isInviting}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-role">Initial role</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
+                  <SelectTrigger id="invite-role" aria-label="Select initial role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="artist">Artist</SelectItem>
+                    <SelectItem value="editor">Editor</SelectItem>
+                    <SelectItem value="journalist">Journalist</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setInviteOpen(false)}
+                disabled={isInviting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleInviteSubmit()}
+                disabled={!inviteEmail.trim() || isInviting}
+              >
+                <EnvelopeSimple size={14} className="mr-1.5" aria-hidden="true" />
+                {isInviting ? 'Sending…' : 'Send Invite'}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
