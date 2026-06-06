@@ -71,7 +71,12 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
     .in('release_id', ids)
     .order('sort_order', { ascending: true })
 
-  if (error) throw new Error(`Failed to load release artists: ${error.message}`)
+  if (error) {
+    // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
+    // migration hasn't run) so that SSG/ISR prerendering is never blocked.
+    console.warn(`release_artists lookup skipped: ${error.message}`)
+    return releases
+  }
 
   const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
   for (const row of (data ?? []) as unknown as (JunctionArtist & { release_id: string })[]) {
