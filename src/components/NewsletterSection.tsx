@@ -63,7 +63,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
   }
 
   return (
-    <section id="newsletter" className="py-24 px-4 lg:px-16 bg-gradient-to-b from-muted/20 to-primary/5">
+    <section id="newsletter" className="py-24 px-4 lg:px-16">
       <div className="container mx-auto max-w-2xl">
         <motion.div
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}

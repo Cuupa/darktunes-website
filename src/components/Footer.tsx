@@ -17,7 +17,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
   const handleSmoothScroll = useSmoothScrollToAnchor()
 
   return (
-    <footer className="border-t border-border bg-card/50 backdrop-blur-sm overflow-x-hidden">
+    <footer className="border-t border-border bg-background overflow-x-hidden">
       <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
@@ -167,7 +167,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="pt-8 border-t border-border flex flex-col md:flex-row md:flex-wrap justify-between items-center gap-2 md:gap-4">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} {siteSettings.labelName}. {dict.allRightsReserved}
           </p>
@@ -191,6 +191,17 @@ export function Footer({ siteSettings, dict }: FooterProps) {
               {dict.privacyPolicy}
             </Link>
           </div>
+          <p className="w-full text-center mt-1 text-xs text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors select-none">
+            Built by{' '}
+            <a
+              href="https://seifried.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-muted-foreground transition-colors"
+            >
+              Neuroklast &amp; Seifried.dev
+            </a>
+          </p>
         </div>
       </div>
     </footer>

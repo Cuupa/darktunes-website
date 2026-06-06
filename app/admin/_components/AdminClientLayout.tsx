@@ -23,8 +23,13 @@ export function AdminClientLayout({ children }: AdminClientLayoutProps) {
     <AuthProvider>
       <div className="flex h-screen bg-background overflow-hidden">
         <AdminSidebarNav />
-        <main className="flex-1 overflow-y-auto">
-          <Suspense>{children}</Suspense>
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <Suspense><div className="flex-1">{children}</div></Suspense>
+          <div className="py-4 text-center">
+            <p className="text-xs text-muted-foreground/30 select-none">
+              Platform by Neuroklast &amp; Seifried.dev
+            </p>
+          </div>
         </main>
       </div>
     </AuthProvider>
