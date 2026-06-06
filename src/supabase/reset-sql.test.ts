@@ -275,4 +275,53 @@ describe('supabase/reset.sql — static analysis', () => {
 
     expect(found).toBe(true)
   })
+
+  it('never calls public.has_permission with auth.uid() as first argument', () => {
+    const violations: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      if (/public\.has_permission\s*\(\s*auth\.uid\(\)\s*,/i.test(clean)) {
+        violations.push(`Line ${i + 1}: invalid has_permission signature usage: ${lines[i].trim()}`)
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
+
+  it('defines get_my_role, role_permissions, and has_permission before the tables section', () => {
+    const getMyRoleLine = lines.findIndex((line) =>
+      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.get_my_role\(\)/i.test(stripComment(line)),
+    )
+    const rolePermissionsLine = lines.findIndex((line) =>
+      /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.role_permissions/i.test(stripComment(line)),
+    )
+    const hasPermissionLine = lines.findIndex((line) =>
+      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.has_permission\(perm\s+TEXT\)/i.test(stripComment(line)),
+    )
+    const profilesCreateLine = lines.findIndex((line) =>
+      /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.profiles/i.test(stripComment(line)),
+    )
+
+    expect(getMyRoleLine).toBeGreaterThanOrEqual(0)
+    expect(rolePermissionsLine).toBeGreaterThanOrEqual(0)
+    expect(hasPermissionLine).toBeGreaterThanOrEqual(0)
+    expect(profilesCreateLine).toBeGreaterThanOrEqual(0)
+    expect(getMyRoleLine).toBeLessThan(profilesCreateLine)
+    expect(rolePermissionsLine).toBeLessThan(profilesCreateLine)
+    expect(hasPermissionLine).toBeLessThan(profilesCreateLine)
+  })
+
+  it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {
+    const violations: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const clean = stripComment(lines[i])
+      if (/^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+apple_music_url\b/i.test(clean)) {
+        violations.push(`Line ${i + 1}: redundant artists.apple_music_url ALTER TABLE guard`)
+      }
+    }
+
+    expect(violations, violations.join('\n')).toHaveLength(0)
+  })
 })

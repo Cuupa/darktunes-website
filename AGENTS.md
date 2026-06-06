@@ -867,3 +867,55 @@ Log to `app_logs` for errors that need admin visibility but are non-fatal:
 Use the service-role client; never expose app_logs to anon/public.
 Schema: { level: 'error'|'warn'|'info', message: string, context: JSONB, created_at }
 Visible in Admin → Logs tab (AppErrors sub-view).
+
+## Database Schema Management (supabase/reset.sql) — MANDATORY
+
+### Definition Order
+Helper Functions MUST be defined BEFORE their first use in CREATE TABLE / CREATE POLICY / TRIGGER.
+Required order in reset.sql:
+  1. EXTENSIONS
+  2. ENUM TYPES
+  3. ALL HELPER FUNCTIONS (set_updated_at, handle_new_auth_user, handle_oauth_artist_verification,
+     get_my_role, has_permission, and any future SECURITY DEFINER helpers)
+  4. TABLES (CREATE TABLE IF NOT EXISTS + ALTER TABLE … ADD COLUMN IF NOT EXISTS guards)
+  5. RLS POLICIES
+  6. DATA BACKFILLS (INSERT … ON CONFLICT DO NOTHING)
+
+### has_permission — Correct Call Signature
+`public.has_permission(perm TEXT)` takes EXACTLY ONE ARGUMENT.
+The function retrieves auth.uid() internally.
+NEVER call `public.has_permission(auth.uid(), 'permission_name')` — that is the wrong signature.
+  ✅ Correct:  public.has_permission('can_manage_releases')
+  ❌ Wrong:    public.has_permission(auth.uid(), 'can_manage_releases')
+
+### No Duplicate Column Declarations
+If a column is already declared inside the CREATE TABLE block, do NOT add a redundant
+ALTER TABLE … ADD COLUMN IF NOT EXISTS guard for the same column.
+Guards are ONLY for columns added after the initial CREATE TABLE definition.
+
+## Task Decomposition & Multi-Agent Pattern — RECOMMENDED
+
+### Large-Task Decomposition
+Before starting any task with >3 distinct concerns, the agent MUST:
+  1. Enumerate all sub-tasks as a numbered list in the PR description.
+  2. Commit each sub-task as a SEPARATE atomic commit (one concern per commit).
+  3. Run `npm run typecheck && npm test && npm run build` after EACH sub-task commit.
+  This ensures partial work is always in a passing, mergeable state.
+
+### Parallel Agent Sessions (Multi-Agent Pattern)
+For large features spanning multiple independent modules, PREFER splitting the work into
+separate GitHub Issues (one per module) rather than one monolithic PR.
+Each issue/PR must be independently mergeable and must not block sibling branches.
+
+Example split for a schema + DAL + UI task:
+  - Issue A: supabase/reset.sql + src/types/database.ts  (schema layer)
+  - Issue B: src/lib/api/*.ts DAL functions + unit tests  (data layer, depends on A)
+  - Issue C: src/components/ + app/ UI changes            (presentation layer, depends on B)
+
+Mark blocking relationships using GitHub's "blocking" issue feature.
+A coding agent session should be started per issue for true parallel execution.
+
+### Subtask Handoff in AGENTS.md
+When an agent completes a subtask that another agent depends on, it MUST leave a summary
+comment in the PR describing the exact exports / DB schema changes it introduced,
+so the dependent agent can pick up accurately.
