@@ -60,6 +60,8 @@ import { DEFAULT_SECTIONS_ORDER } from '@/lib/epk/themes'
 export interface EPKData {
   artistName: string
   photoUrl?: string
+  /** Additional press/gallery photos */
+  photoGallery?: string[]
   bioShort?: string
   bioMedium?: string
   bioLong?: string
@@ -85,6 +87,8 @@ export interface EPKData {
   epkTheme?: string
   epkSectionsOrder?: string[]
   epkSectionsHidden?: string[]
+  /** Custom color tokens used when epkTheme === 'custom' */
+  epkCustomThemeTokens?: Record<string, string>
   // password protection
   epkPasswordSections?: string[]
   epkPasswordHash?: string
@@ -104,8 +108,9 @@ interface EPKPreviewProps {
   epkSectionsHidden?: string[]
   epkPasswordHash?: string
   epkPasswordSections?: string[]
+  epkCustomThemeTokens?: Record<string, string>
   /** Called when theme/section/password settings change */
-  onSettingsChange?: (updates: Partial<Pick<EPKData, 'epkTheme' | 'epkSectionsOrder' | 'epkSectionsHidden' | 'epkPasswordSections' | 'epkPasswordHash'>>) => void
+  onSettingsChange?: (updates: Partial<Pick<EPKData, 'epkTheme' | 'epkSectionsOrder' | 'epkSectionsHidden' | 'epkPasswordSections' | 'epkPasswordHash' | 'epkCustomThemeTokens'>>) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +175,7 @@ const SECTION_LABEL_KEYS: Record<EPKSectionId, keyof Dictionary['portal']> = {
   contacts: 'epk_section_contacts',
   riders:   'epk_section_riders',
   links:    'epk_section_links',
+  gallery:  'epk_section_gallery',
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +391,36 @@ function SectionLinks({ data, dict }: { data: EPKData; dict: Dictionary['portal'
   )
 }
 
+function SectionGallery({ data, dict }: { data: EPKData; dict: Dictionary['portal'] }) {
+  const theme = useEPKTheme()
+  const photos = data.photoGallery ?? []
+  if (photos.length === 0) return null
+  return (
+    <>
+      <div style={theme.divider} role="separator" />
+      <section aria-label={dict.epk_gallery_heading}>
+        <h2 style={theme.sectionHeading}>{dict.epk_gallery_heading}</h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+          gap: '0.5rem',
+          marginTop: '0.75rem',
+        }}>
+          {photos.map((url, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={url}
+              src={url}
+              alt={`${data.artistName} ${i + 1}`}
+              style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '4px' }}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // EPK Document — theme-aware, section-ordered
 // ---------------------------------------------------------------------------
@@ -398,13 +434,14 @@ function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData
     header:   <SectionHeader   key="header"   data={data} />,
     quote:    <SectionQuote    key="quote"    data={data} />,
     bio:      <SectionBio      key="bio"      data={data} dict={dict} />,
+    gallery:  <SectionGallery  key="gallery"  data={data} dict={dict} />,
     info:     <SectionInfo     key="info"     data={data} dict={dict} />,
     contacts: <SectionContacts key="contacts" data={data} dict={dict} />,
     riders:   <SectionRiders   key="riders"   data={data} dict={dict} />,
     links:    <SectionLinks    key="links"    data={data} dict={dict} />,
   }
 
-  const allIds: EPKSectionId[] = ['header', 'quote', 'bio', 'info', 'contacts', 'riders', 'links']
+  const allIds: EPKSectionId[] = DEFAULT_SECTIONS_ORDER
   const visibleSections = sectionsOrder.filter((id) => !sectionsHidden.has(id))
   const extraSections = allIds.filter((id) => !sectionsOrder.includes(id) && !sectionsHidden.has(id))
   const renderOrder = [...visibleSections, ...extraSections]
@@ -501,7 +538,7 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
           </div>
         </div>
         <div className="p-4 sm:p-6 epk-print-area">
-          <EPKThemeProvider themeId={data.epkTheme}>
+          <EPKThemeProvider themeId={data.epkTheme} customTokens={data.epkCustomThemeTokens}>
             <EPKDocument dict={dict} data={data} />
           </EPKThemeProvider>
         </div>
@@ -518,14 +555,19 @@ function EPKThemeSelector({
   dict,
   value,
   onChange,
+  customTokens,
+  onCustomTokenChange,
 }: {
   dict: Dictionary['portal']
   value: string
   onChange: (v: string) => void
+  customTokens?: Record<string, string>
+  onCustomTokenChange?: (key: string, val: string) => void
 }) {
   const themes = [
     { id: 'default',      label: dict.epk_theme_default },
     { id: 'blade-runner', label: dict.epk_theme_blade_runner },
+    { id: 'custom',       label: dict.epk_theme_custom },
   ]
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
@@ -549,12 +591,37 @@ function EPKThemeSelector({
             <span
               aria-hidden="true"
               className="inline-block w-4 h-4 rounded flex-shrink-0"
-              style={{ background: t.id === 'blade-runner' ? '#000' : '#1a1a1a', border: '1px solid #ffffff40' }}
+              style={{ background: t.id === 'blade-runner' ? '#000' : t.id === 'custom' ? (customTokens?.bg ?? '#1a1a1a') : '#1a1a1a', border: '1px solid #ffffff40' }}
             />
             {t.label}
           </button>
         ))}
       </div>
+      {value === 'custom' && (
+        <div className="pt-2 space-y-2">
+          <p className="text-xs text-muted-foreground">{dict.epk_custom_colors}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'bg',      label: dict.epk_color_bg },
+              { key: 'text',    label: dict.epk_color_text },
+              { key: 'accent',  label: dict.epk_color_accent },
+              { key: 'heading', label: dict.epk_color_heading },
+            ] as Array<{ key: string; label: string }>).map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2">
+                <input
+                  type="color"
+                  id={`epk-color-${key}`}
+                  aria-label={label}
+                  value={customTokens?.[key] ?? '#ffffff'}
+                  onChange={(e) => onCustomTokenChange?.(key, e.target.value)}
+                  className="h-7 w-10 cursor-pointer rounded border-none bg-transparent p-0"
+                />
+                <Label htmlFor={`epk-color-${key}`} className="text-xs">{label}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -592,11 +659,41 @@ function EPKSectionManagerPanel({
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-      <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {dict.epk_sections_label}
-        </Label>
-        <p className="text-xs text-muted-foreground mt-0.5">{dict.epk_sections_desc}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {dict.epk_sections_label}
+          </Label>
+          <p className="text-xs text-muted-foreground mt-0.5">{dict.epk_sections_desc}</p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="text-xs shrink-0"
+          title={dict.epk_auto_layout_desc}
+          onClick={() => {
+            // Populated sections float to the top; empty ones sink to the bottom.
+            const hasContent: Record<EPKSectionId, boolean> = {
+              header:   Boolean(data.artistName),
+              quote:    Boolean(data.pressQuote),
+              bio:      Boolean(data.bioShort || data.bioMedium || data.bioLong),
+              gallery:  (data.photoGallery ?? []).length > 0,
+              info:     Boolean(data.genres || data.foundingYear || data.hometown),
+              contacts: Boolean(data.bookingContact || data.pressContact),
+              riders:   Boolean(data.riderStagePlotUrl || data.riderTechnicalUrl || data.riderHospitalityUrl),
+              links:    Boolean(data.websiteUrl || data.instagramUrl || data.youtubeUrl),
+            }
+            const allIds: EPKSectionId[] = DEFAULT_SECTIONS_ORDER
+            const sorted = [...allIds].sort((a, b) => {
+              if (hasContent[a] === hasContent[b]) return 0
+              return hasContent[a] ? -1 : 1
+            })
+            onSettingsChange?.({ epkSectionsOrder: sorted })
+          }}
+        >
+          {dict.epk_auto_layout}
+        </Button>
       </div>
       <ul className="space-y-1" role="list">
         {sectionsOrder.map((id, index) => {
@@ -721,7 +818,7 @@ function EPKPasswordPanel({
 // EPKPreview — inline preview panel (used inside Profile page)
 // ---------------------------------------------------------------------------
 
-export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder, epkSectionsHidden, epkPasswordHash, epkPasswordSections, onSettingsChange }: EPKPreviewProps) {
+export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder, epkSectionsHidden, epkPasswordHash, epkPasswordSections, epkCustomThemeTokens, onSettingsChange }: EPKPreviewProps) {
   // Merge prop overrides into data for display
   const effectiveData: EPKData = {
     ...data,
@@ -730,6 +827,7 @@ export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder,
     ...(epkSectionsHidden !== undefined ? { epkSectionsHidden } : {}),
     ...(epkPasswordHash !== undefined ? { epkPasswordHash } : {}),
     ...(epkPasswordSections !== undefined ? { epkPasswordSections } : {}),
+    ...(epkCustomThemeTokens !== undefined ? { epkCustomThemeTokens } : {}),
   }
   void artistSlug
   const [modalOpen, setModalOpen] = useState(false)
@@ -753,12 +851,18 @@ export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder,
         </Button>
       </div>
 
-      <EPKThemeSelector dict={dict} value={effectiveData.epkTheme ?? 'default'} onChange={(v) => onSettingsChange?.({ epkTheme: v })} />
+      <EPKThemeSelector
+        dict={dict}
+        value={effectiveData.epkTheme ?? 'default'}
+        onChange={(v) => onSettingsChange?.({ epkTheme: v })}
+        customTokens={effectiveData.epkCustomThemeTokens}
+        onCustomTokenChange={(key, val) => onSettingsChange?.({ epkCustomThemeTokens: { ...(effectiveData.epkCustomThemeTokens ?? {}), [key]: val } })}
+      />
       <EPKSectionManagerPanel dict={dict} data={effectiveData} onSettingsChange={onSettingsChange} />
       <EPKPasswordPanel dict={dict} data={effectiveData} onSettingsChange={onSettingsChange} />
 
       <div className="rounded-lg border border-border bg-card/50 p-4">
-        <EPKThemeProvider themeId={effectiveData.epkTheme}>
+        <EPKThemeProvider themeId={effectiveData.epkTheme} customTokens={effectiveData.epkCustomThemeTokens}>
           <EPKDocument dict={dict} data={effectiveData} />
         </EPKThemeProvider>
       </div>

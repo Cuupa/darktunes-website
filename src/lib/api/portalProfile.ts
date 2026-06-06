@@ -42,11 +42,13 @@ export type ArtistProfilePayload = Pick<
   | 'epk_sections_order'
   | 'epk_sections_hidden'
   | 'epk_password_sections'
+  | 'epk_gallery_photos'
 > & {
   // artist_id is required (not optional like in Insert)
   artist_id: string
   // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
   epk_password_raw?: string | null
+  epk_custom_theme_tokens?: Record<string, string> | null
 }
 
 export type RiderType = 'stage_plot' | 'technical' | 'hospitality'

@@ -26,6 +26,7 @@ import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
 interface ReleaseChecklistPanelProps {
   dict: Dictionary['portal']
   releases: Release[]
+  releasedReleases?: Release[]
   checklistsByReleaseId: Record<string, ReleaseChecklist[]>
 }
 
@@ -185,8 +186,10 @@ function ReleaseCard({
 export function ReleaseChecklistPanel({
   dict,
   releases,
+  releasedReleases = [],
   checklistsByReleaseId,
 }: ReleaseChecklistPanelProps) {
+  const [pastOpen, setPastOpen] = useState(false)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -196,7 +199,7 @@ export function ReleaseChecklistPanel({
         </Button>
       </div>
 
-      {releases.length === 0 ? (
+      {releases.length === 0 && releasedReleases.length === 0 ? (
         <PortalEmptyState
           icon={MusicNotes}
           heading={dict.releases_noReleases}
@@ -204,16 +207,70 @@ export function ReleaseChecklistPanel({
           action={{ label: dict.releases_submit_new, href: '/portal/releases/new' }}
         />
       ) : (
-        <div className="space-y-3">
-          {releases.map((release) => (
-            <ReleaseCard
-              key={release.id}
-              dict={dict}
-              release={release}
-              initialChecklist={checklistsByReleaseId[release.id] ?? []}
-            />
-          ))}
-        </div>
+        <>
+          {releases.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {dict.releases_upcoming_heading}
+              </p>
+              {releases.map((release) => (
+                <ReleaseCard
+                  key={release.id}
+                  dict={dict}
+                  release={release}
+                  initialChecklist={checklistsByReleaseId[release.id] ?? []}
+                />
+              ))}
+            </div>
+          )}
+
+          {releasedReleases.length > 0 && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider w-full text-left"
+                onClick={() => setPastOpen((v) => !v)}
+                aria-expanded={pastOpen}
+              >
+                {pastOpen ? <CaretUp size={14} aria-hidden="true" /> : <CaretDown size={14} aria-hidden="true" />}
+                {dict.releases_past_heading} ({releasedReleases.length})
+              </button>
+              {pastOpen && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">{dict.releases_past_desc}</p>
+                  {releasedReleases.map((r) => (
+                    <Card key={r.id} className="bg-card border-border">
+                      <CardHeader className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          {r.artworkUrl ? (
+                            <Image
+                              src={getOptimizedImageUrl(r.artworkUrl, 48)}
+                              alt={r.title}
+                              width={40}
+                              height={40}
+                              className="rounded shrink-0 object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                              <MusicNotes size={18} className="text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate text-sm">{r.title}</p>
+                            <p className="text-xs text-muted-foreground">{r.releaseDate}</p>
+                          </div>
+                          <Badge variant="secondary" className="shrink-0 text-xs capitalize">
+                            {r.type?.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

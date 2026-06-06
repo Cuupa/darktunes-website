@@ -9,7 +9,7 @@
  */
 
 import { createContext, useContext, useMemo } from 'react'
-import { getEPKTheme, DEFAULT_THEME_ID } from './themes'
+import { getEPKTheme, buildCustomTheme, DEFAULT_THEME_ID } from './themes'
 import type { EPKTheme } from './themes'
 
 // ---------------------------------------------------------------------------
@@ -24,11 +24,16 @@ const EPKThemeContext = createContext<EPKTheme>(getEPKTheme(DEFAULT_THEME_ID))
 
 interface EPKThemeProviderProps {
   themeId?: string
+  /** Custom color tokens — only used when themeId === 'custom'. */
+  customTokens?: Record<string, string>
   children: React.ReactNode
 }
 
-export function EPKThemeProvider({ themeId, children }: EPKThemeProviderProps) {
-  const theme = useMemo(() => getEPKTheme(themeId), [themeId])
+export function EPKThemeProvider({ themeId, customTokens, children }: EPKThemeProviderProps) {
+  const theme = useMemo(() => {
+    if (themeId === 'custom') return buildCustomTheme(customTokens ?? {})
+    return getEPKTheme(themeId)
+  }, [themeId, customTokens])
   return <EPKThemeContext.Provider value={theme}>{children}</EPKThemeContext.Provider>
 }
 

@@ -58,6 +58,8 @@ export interface ArtistProfile {
   epkSectionsHidden: string[]
   epkPasswordHash: string | undefined
   epkPasswordSections: string[]
+  epkGalleryPhotos: string[]
+  epkCustomThemeTokens: Record<string, string>
   createdAt: string
   updatedAt: string
 }
@@ -99,6 +101,8 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     epkSectionsHidden: row.epk_sections_hidden ?? [],
     epkPasswordHash: row.epk_password_hash ?? undefined,
     epkPasswordSections: row.epk_password_sections ?? [],
+    epkGalleryPhotos: row.epk_gallery_photos ?? [],
+    epkCustomThemeTokens: (row.epk_custom_theme_tokens as Record<string, string> | null) ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

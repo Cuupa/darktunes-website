@@ -40,6 +40,9 @@ export function IgnoredEntriesManager({ entries, onAddEntry, onRemoveEntry, arti
   const [releaseTitleInput, setReleaseTitleInput] = useState('')
   const [note, setNote] = useState('')
 
+  /** Sentinel for "all releases" — Radix UI prohibits empty-string SelectItem values */
+  const ALL_RELEASES = '__all__'
+
   const effectiveArtist = artists.includes(artist) ? artist : (artist === '__manual__' ? artistInput : artistInput)
   const effectiveRelease = releaseTitles.includes(releaseTitle) ? releaseTitle : (releaseTitle === '__manual__' ? releaseTitleInput : releaseTitleInput)
 
@@ -107,12 +110,12 @@ export function IgnoredEntriesManager({ entries, onAddEntry, onRemoveEntry, arti
                 <p className="text-xs text-muted-foreground">Leave blank to ignore all releases for this artist.</p>
                 {releaseTitles.length > 0 ? (
                   <>
-                    <Select value={releaseTitle} onValueChange={v => { setReleaseTitle(v); if (v !== '__manual__') setReleaseTitleInput('') }}>
+                    <Select value={releaseTitle || ALL_RELEASES} onValueChange={v => { setReleaseTitle(v === ALL_RELEASES ? '' : v); if (v !== '__manual__') setReleaseTitleInput('') }}>
                       <SelectTrigger>
                         <SelectValue placeholder="All releases (no filter)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All releases</SelectItem>
+                        <SelectItem value={ALL_RELEASES}>All releases</SelectItem>
                         {releaseTitles.slice(0, 50).map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                         <SelectItem value="__manual__">Enter manually…</SelectItem>
                       </SelectContent>

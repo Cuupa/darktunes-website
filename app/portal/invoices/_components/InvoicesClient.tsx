@@ -149,12 +149,17 @@ export function InvoicesClient({ dict, invoices: initialInvoices, artistId }: In
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          {inv.pdfUrl && (
-                            <Button asChild variant="ghost" size="sm">
+                          {inv.pdfUrl ? (
+                            <Button asChild variant="outline" size="sm">
                               <a href={inv.pdfUrl} target="_blank" rel="noreferrer" className="gap-1">
                                 <DownloadSimple size={14} aria-hidden="true" />
-                                PDF
+                                {dict.invoice_download_pdf}
                               </a>
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="sm" disabled className="gap-1 opacity-50">
+                              <DownloadSimple size={14} aria-hidden="true" />
+                              {dict.invoice_no_pdf}
                             </Button>
                           )}
                           {inv.status === 'sent' && (

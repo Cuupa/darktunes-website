@@ -15,6 +15,7 @@ import {
   MapPin,
   MegaphoneSimple,
   MusicNotes,
+  Question,
   Receipt,
   SignOut,
   User,
@@ -54,6 +55,7 @@ const baseNavItems = [
   { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
   { href: '/portal/interviews', label: 'interviews', icon: Chats },
   { href: '/portal/settings', label: 'settings', icon: Gear },
+  { href: '/portal/help', label: 'help', icon: Question },
 ] as const
 
 const statementsNavItem = { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' } as const

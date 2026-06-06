@@ -42,10 +42,15 @@ async function ReleasesContent() {
     ? await getReleasesByArtistId(supabase, artist.id).catch(() => [])
     : []
 
-  // Only seed checklists for the first 10 releases to avoid N+1 overhead
+  const today = new Date().toISOString().split('T')[0]
+  // Split into upcoming (checklist needed) and already-released (read-only)
+  const upcomingReleases = releases.filter((r) => !r.releaseDate || r.releaseDate > today)
+  const releasedReleases = releases.filter((r) => r.releaseDate && r.releaseDate <= today)
+
+  // Only seed checklists for upcoming releases to avoid N+1 overhead
   const checklistsByReleaseId: Record<string, ReleaseChecklist[]> = {}
   if (artist) {
-    const top10 = releases.slice(0, 10)
+    const top10 = upcomingReleases.slice(0, 10)
     const results = await Promise.allSettled(
       top10.map((r) => getOrCreateReleaseChecklist(supabase, artist.id, r.id)),
     )
@@ -59,7 +64,8 @@ async function ReleasesContent() {
   return (
     <ReleaseChecklistPanel
       dict={dict.portal}
-      releases={releases}
+      releases={upcomingReleases}
+      releasedReleases={releasedReleases}
       checklistsByReleaseId={checklistsByReleaseId}
     />
   )
