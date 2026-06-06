@@ -1,6 +1,5 @@
 import { jsPDF, GState } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import ExcelJS from 'exceljs'
 import type { SafeProcessedArtistData, LabelInfo, PdfExportSettings, LabelArtist, CompilationFilter, AppDefaults, EmailConfig } from './types'
 import { resolveTemplate } from './utils'
 import { APP_CREDITS, APP_LOGO, APP_NAME } from '@/config/softwareBranding'
@@ -865,6 +864,7 @@ async function buildExcel(
   compilationFilters: CompilationFilter[] = [],
   settings?: Partial<PdfExportSettings>
 ): Promise<Blob> {
+  const ExcelJS = (await import('exceljs')).default
   const workbook = new ExcelJS.Workbook()
   const digitalFallbackSplit = artistData.digitalSplitPercentage
   // Keep source rows visible when they are economically relevant (have revenue),

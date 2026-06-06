@@ -6,7 +6,7 @@ import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@ph
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
-import { SOCIAL_ICON_MAP } from '@/components/admin/SiteSettingsManager'
+import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
 
 interface FooterProps {
   siteSettings: SiteSettings

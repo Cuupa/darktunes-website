@@ -6,10 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { ArrowUp, ArrowDown, Plus, Trash, Globe,
-  InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo, TiktokLogo,
-  MusicNote, DiscordLogo, TelegramLogo, LinkedinLogo, GithubLogo, SoundcloudLogo,
 } from '@phosphor-icons/react'
-import type { Icon } from '@phosphor-icons/react'
+import { SOCIAL_ICON_MAP, SOCIAL_ICON_OPTIONS } from '@/config/socialIcons'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -142,28 +140,11 @@ const schema = z.object({
 type FormData = z.input<typeof schema>
 
 // ---------------------------------------------------------------------------
-// Icon map for custom social links
+// Icon map for custom social links — defined in @/config/socialIcons and
+// re-exported here for backward compatibility.
 // ---------------------------------------------------------------------------
 
-type IconComponent = Icon
-
-export const SOCIAL_ICON_MAP: Record<string, IconComponent> = {
-  InstagramLogo,
-  YoutubeLogo,
-  SpotifyLogo,
-  FacebookLogo,
-  TwitterLogo,
-  TiktokLogo,
-  BandcampLogo: MusicNote,
-  DiscordLogo,
-  TelegramLogo,
-  LinkedinLogo,
-  GithubLogo,
-  SoundcloudLogo,
-  Globe,
-}
-
-export const SOCIAL_ICON_OPTIONS = Object.keys(SOCIAL_ICON_MAP)
+export { SOCIAL_ICON_MAP, SOCIAL_ICON_OPTIONS }
 
 // ---------------------------------------------------------------------------
 // Sub-sections
