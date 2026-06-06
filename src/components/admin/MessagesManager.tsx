@@ -1,7 +1,16 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PencilSimple } from '@phosphor-icons/react'
+import {
+  PencilSimple,
+  ArrowBendUpLeft,
+  ArrowBendUpRight,
+  Star,
+  StarFour,
+  Trash,
+  Download,
+  Paperclip,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -16,15 +25,33 @@ import {
   starMessage,
   markMessageRead,
 } from '@/lib/api/labelMessages'
-import type { ArtistReply, LabelMessage, MessageTemplate } from '@/types'
+import {
+  getFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  moveMessageToFolder,
+} from '@/lib/api/messageFolders'
+import { getRules, createRule, updateRule, deleteRule } from '@/lib/api/messageRules'
+import { getAttachmentsForMessage } from '@/lib/api/messageAttachments'
+import type { ArtistReply, LabelMessage, MessageFolder, MessageRule, MessageAttachment, MessageTemplate } from '@/types'
 import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import { MessageComposer } from '@/components/messaging/MessageComposer'
 import { MessageSearch } from '@/components/messaging/MessageSearch'
-import { ThreadView } from '@/components/messaging/ThreadView'
+import { FolderTree, type FolderSelection } from '@/components/messaging/FolderTree'
+import { MessageRulesManager } from '@/components/messaging/MessageRulesManager'
+import { ExternalEmailComposer } from '@/components/messaging/ExternalEmailComposer'
+import { AttachmentViewer } from '@/components/messaging/AttachmentViewer'
 import { useAuthContext } from '@/contexts/AuthContext'
+import DOMPurify from 'dompurify'
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface SearchState {
   query: string
@@ -35,7 +62,9 @@ interface SearchState {
 type MessageRow = Database['public']['Tables']['label_messages']['Row']
 type ReplyRow = Database['public']['Tables']['artist_replies']['Row']
 
-const DEFAULT_SEARCH_STATE: SearchState = { query: '', artistId: null, unreadOnly: false }
+const DEFAULT_SEARCH: SearchState = { query: '', artistId: null, unreadOnly: false }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function rowToMessage(row: MessageRow): LabelMessage {
   return {
@@ -49,6 +78,11 @@ function rowToMessage(row: MessageRow): LabelMessage {
     starred: row.starred,
     deletedAt: row.deleted_at,
     sentAt: row.sent_at,
+    folderId: row.folder_id,
+    senderEmail: row.sender_email,
+    isExternal: row.is_external,
+    forwardedFrom: row.forwarded_from,
+    hasAttachments: row.has_attachments,
   }
 }
 
@@ -64,48 +98,114 @@ function rowToReply(row: ReplyRow): ArtistReply {
   }
 }
 
+function sanitizeHtml(html: string): string {
+  if (typeof window === 'undefined') return html
+  return DOMPurify.sanitize(html)
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const sameDay = d.toDateString() === now.toDateString()
+  if (sameDay) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
 async function loadReplies(
   supabase: ReturnType<typeof createBrowserSupabaseClient>,
   messages: LabelMessage[],
 ): Promise<Record<string, ArtistReply[]>> {
   const entries = await Promise.allSettled(
-    messages.map(async (message) => [message.id, await getRepliesForMessage(supabase, message.id)] as const),
+    messages.map(async (m) => [m.id, await getRepliesForMessage(supabase, m.id)] as const),
   )
-
-  return entries.reduce<Record<string, ArtistReply[]>>((accumulator, result) => {
-    if (result.status === 'fulfilled') {
-      accumulator[result.value[0]] = result.value[1]
-    }
-    return accumulator
+  return entries.reduce<Record<string, ArtistReply[]>>((acc, r) => {
+    if (r.status === 'fulfilled') acc[r.value[0]] = r.value[1]
+    return acc
   }, {})
 }
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export function MessagesManager() {
   const { loading: authLoading, session } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const searchStateRef = useRef<SearchState>(DEFAULT_SEARCH_STATE)
+  const searchStateRef = useRef<SearchState>(DEFAULT_SEARCH)
+
+  // Core data
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
   const [messages, setMessages] = useState<LabelMessage[]>([])
   const [repliesByMessageId, setRepliesByMessageId] = useState<Record<string, ArtistReply[]>>({})
   const [templates, setTemplates] = useState<MessageTemplate[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [folders, setFolders] = useState<MessageFolder[]>([])
+  const [rules, setRules] = useState<MessageRule[]>([])
+
+  // UI state
+  const [selectedFolder, setSelectedFolder] = useState<FolderSelection>('inbox')
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([])
+  const [loadingAttachments, setLoadingAttachments] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isLoadingArtists, setIsLoadingArtists] = useState(true)
   const [artistLoadError, setArtistLoadError] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // ── Folder-filtered message lists ─────────────────────────────────────────
+
+  const folderMessages = useMemo(() => {
+    switch (selectedFolder) {
+      case 'inbox':
+        return messages.filter((m) => !m.deletedAt && !m.folderId)
+      case 'starred':
+        return messages.filter((m) => !m.deletedAt && m.starred)
+      case 'sent':
+        return messages.filter((m) => !m.deletedAt && m.isExternal)
+      case 'trash':
+        return messages.filter((m) => !!m.deletedAt)
+      default:
+        return messages.filter((m) => !m.deletedAt && m.folderId === selectedFolder)
+    }
+  }, [messages, selectedFolder])
+
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return folderMessages
+    const q = searchQuery.toLowerCase()
+    return folderMessages.filter(
+      (m) => m.subject.toLowerCase().includes(q) || m.body.toLowerCase().includes(q),
+    )
+  }, [folderMessages, searchQuery])
+
+  const unreadCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    counts['inbox'] = messages.filter((m) => !m.deletedAt && !m.folderId && !m.read).length
+    counts['starred'] = messages.filter((m) => !m.deletedAt && m.starred && !m.read).length
+    counts['sent'] = 0
+    counts['trash'] = 0
+    folders.forEach((f) => {
+      counts[f.id] = messages.filter((m) => !m.deletedAt && m.folderId === f.id && !m.read).length
+    })
+    return counts
+  }, [messages, folders])
+
+  // Selected message
+  const selectedMessage = useMemo(
+    () => messages.find((m) => m.id === selectedMessageId) ?? null,
+    [messages, selectedMessageId],
+  )
+
+  // ── Data Loading ──────────────────────────────────────────────────────────
 
   const refreshMessages = useCallback(
     async (state: SearchState) => {
-      const nextMessages = state.query.trim() || state.artistId || state.unreadOnly
-        ? await searchLabelMessages(supabase, state.query, {
-            artistId: state.artistId ?? undefined,
-            unreadOnly: state.unreadOnly,
-          })
-        : await getAllLabelMessages(supabase)
-
-      setMessages(nextMessages)
-      setRepliesByMessageId(await loadReplies(supabase, nextMessages))
+      const next =
+        state.query.trim() || state.artistId || state.unreadOnly
+          ? await searchLabelMessages(supabase, state.query, {
+              artistId: state.artistId ?? undefined,
+              unreadOnly: state.unreadOnly,
+            })
+          : await getAllLabelMessages(supabase)
+      setMessages(next)
+      setRepliesByMessageId(await loadReplies(supabase, next))
     },
     [supabase],
   )
@@ -113,100 +213,92 @@ export function MessagesManager() {
   const load = useCallback(async () => {
     if (authLoading) return
     if (!session?.access_token || !session.refresh_token) {
-      setArtists([])
       setIsLoadingArtists(false)
       setArtistLoadError('Please sign in again to load artists.')
       return
     }
-
     setIsLoadingArtists(true)
     setArtistLoadError(null)
-
     try {
-      const { error: sessionError } = await supabase.auth.setSession({
+      await supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
       })
-      if (sessionError) throw new Error(sessionError.message)
-
-      const [artistResult, templateResult] = await Promise.allSettled([getArtists(supabase), getMessageTemplates(supabase)])
-
-      if (artistResult.status === 'fulfilled') {
-        setArtists(artistResult.value.map((artist) => ({ id: artist.id, name: artist.name })))
+      const [artistRes, templateRes, folderRes, ruleRes] = await Promise.allSettled([
+        getArtists(supabase),
+        getMessageTemplates(supabase),
+        getFolders(supabase),
+        getRules(supabase),
+      ])
+      if (artistRes.status === 'fulfilled') {
+        setArtists(artistRes.value.map((a) => ({ id: a.id, name: a.name })))
       } else {
-        setArtists([])
-        setArtistLoadError(artistResult.reason instanceof Error ? artistResult.reason.message : 'Failed to load artists')
+        setArtistLoadError(artistRes.reason instanceof Error ? artistRes.reason.message : 'Failed to load artists')
       }
-
-      if (templateResult.status === 'fulfilled') {
-        setTemplates(templateResult.value)
+      if (templateRes.status === 'fulfilled') {
+        setTemplates(templateRes.value)
       } else {
-        setTemplates([])
-        toast.error(templateResult.reason instanceof Error ? templateResult.reason.message : 'Failed to load message templates')
+        toast.error(templateRes.reason instanceof Error ? templateRes.reason.message : 'Failed to load templates')
       }
-
+      if (folderRes.status === 'fulfilled') setFolders(folderRes.value)
+      if (ruleRes.status === 'fulfilled') setRules(ruleRes.value)
       await refreshMessages(searchStateRef.current)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load messages'
-      setArtists([])
-      setArtistLoadError(message)
-      toast.error(message)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load messages'
+      setArtistLoadError(msg)
+      toast.error(msg)
     } finally {
       setIsLoadingArtists(false)
     }
   }, [authLoading, refreshMessages, session?.access_token, session?.refresh_token, supabase])
 
   useEffect(() => {
-    if (authLoading) return
-    void load()
+    if (!authLoading) void load()
   }, [authLoading, load])
 
+  // Realtime subscriptions
   useEffect(() => {
-    const messageChannel = supabase
+    const msgCh = supabase
       .channel('admin-label-messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'label_messages' },
-        (payload: RealtimePostgresInsertPayload<MessageRow>) => {
-          const nextMessage = rowToMessage(payload.new)
-          const state = searchStateRef.current
-          if (state.query.trim() || state.artistId || state.unreadOnly) {
-            void refreshMessages(state)
-            return
-          }
-          setMessages((current) => [nextMessage, ...current.filter((message) => message.id !== nextMessage.id)])
-        },
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'label_messages' }, (payload: RealtimePostgresInsertPayload<MessageRow>) => {
+        const next = rowToMessage(payload.new)
+        const state = searchStateRef.current
+        if (state.query.trim() || state.artistId || state.unreadOnly) { void refreshMessages(state); return }
+        setMessages((cur) => [next, ...cur.filter((m) => m.id !== next.id)])
+      })
       .subscribe()
-
-    const replyChannel = supabase
+    const replyCh = supabase
       .channel('admin-artist-replies')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'artist_replies' },
-        (payload: RealtimePostgresInsertPayload<ReplyRow>) => {
-          const nextReply = rowToReply(payload.new)
-          setRepliesByMessageId((current) => ({
-            ...current,
-            [nextReply.messageId]: [...(current[nextReply.messageId] ?? []), nextReply],
-          }))
-        },
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'artist_replies' }, (payload: RealtimePostgresInsertPayload<ReplyRow>) => {
+        const next = rowToReply(payload.new)
+        setRepliesByMessageId((cur) => ({
+          ...cur,
+          [next.messageId]: [...(cur[next.messageId] ?? []), next],
+        }))
+      })
       .subscribe()
-
-    return () => {
-      void supabase.removeChannel(messageChannel)
-      void supabase.removeChannel(replyChannel)
-    }
+    return () => { void supabase.removeChannel(msgCh); void supabase.removeChannel(replyCh) }
   }, [refreshMessages, supabase])
 
-  const unreadCount = useMemo(() => messages.filter((message) => !message.read && !message.deletedAt).length, [messages])
+  // Load attachments when a message is selected
+  useEffect(() => {
+    if (!selectedMessageId) { setAttachments([]); return }
+    const msg = messages.find((m) => m.id === selectedMessageId)
+    if (!msg?.hasAttachments) { setAttachments([]); return }
+    setLoadingAttachments(true)
+    getAttachmentsForMessage(supabase, selectedMessageId)
+      .then(setAttachments)
+      .catch(() => setAttachments([]))
+      .finally(() => setLoadingAttachments(false))
+  }, [selectedMessageId, messages, supabase])
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleSearch = useCallback(
     (query: string, artistId: string | null, unreadOnly: boolean) => {
-      const nextState = { query, artistId, unreadOnly }
-      searchStateRef.current = nextState
-      void refreshMessages(nextState)
+      const next = { query, artistId, unreadOnly }
+      searchStateRef.current = next
+      void refreshMessages(next)
     },
     [refreshMessages],
   )
@@ -215,12 +307,12 @@ export function MessagesManager() {
     async (artistIds: string[], subject: string, html: string, text: string) => {
       setIsSending(true)
       try {
-        await Promise.all(artistIds.map((artistId) => sendMessage(supabase, artistId, subject, text, html)))
+        await Promise.all(artistIds.map((id) => sendMessage(supabase, id, subject, text, html)))
         await refreshMessages(searchStateRef.current)
         toast.success(`Message sent to ${artistIds.length} artist${artistIds.length === 1 ? '' : 's'}`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to send message')
-        throw error
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to send message')
+        throw e
       } finally {
         setIsSending(false)
       }
@@ -232,9 +324,9 @@ export function MessagesManager() {
     async (id: string, starred: boolean) => {
       try {
         const updated = await starMessage(supabase, id, starred)
-        setMessages((current) => current.map((message) => (message.id === id ? updated : message)))
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to update star')
+        setMessages((cur) => cur.map((m) => (m.id === id ? updated : m)))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to update star')
       }
     },
     [supabase],
@@ -244,28 +336,53 @@ export function MessagesManager() {
     async (id: string) => {
       try {
         await softDeleteMessage(supabase, id)
-        setSelectedIds((current) => {
-          const next = new Set(current)
-          next.delete(id)
-          return next
-        })
+        if (selectedMessageId === id) setSelectedMessageId(null)
         await refreshMessages(searchStateRef.current)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to delete message')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to delete message')
       }
     },
-    [refreshMessages, supabase],
+    [refreshMessages, supabase, selectedMessageId],
+  )
+
+  const handleMarkRead = useCallback(
+    async (id: string) => {
+      try {
+        const updated = await markMessageRead(supabase, id)
+        setMessages((cur) => cur.map((m) => (m.id === id ? updated : m)))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to mark as read')
+      }
+    },
+    [supabase],
+  )
+
+  const handleMoveToFolder = useCallback(
+    async (id: string, folderId: string | null) => {
+      try {
+        await moveMessageToFolder(supabase, id, folderId)
+        setMessages((cur) => cur.map((m) => (m.id === id ? { ...m, folderId } : m)))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to move message')
+      }
+    },
+    [supabase],
+  )
+
+  const handleSelectMessage = useCallback(
+    async (id: string) => {
+      setSelectedMessageId(id)
+      const msg = messages.find((m) => m.id === id)
+      if (msg && !msg.read) await handleMarkRead(id)
+    },
+    [messages, handleMarkRead],
   )
 
   const handleExport = useCallback(
     (id: string) => {
-      const message = messages.find((item) => item.id === id)
+      const message = messages.find((m) => m.id === id)
       if (!message) return
-      const payload = {
-        message,
-        replies: repliesByMessageId[id] ?? [],
-      }
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const blob = new Blob([JSON.stringify({ message, replies: repliesByMessageId[id] ?? [] }, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -276,102 +393,351 @@ export function MessagesManager() {
     [messages, repliesByMessageId],
   )
 
-  const handleMarkRead = useCallback(
-    async (id: string) => {
-      try {
-        const updated = await markMessageRead(supabase, id)
-        setMessages((current) => current.map((message) => (message.id === id ? updated : message)))
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to mark message as read')
-      }
-    },
-    [supabase],
-  )
+  // Folder management
+  const handleCreateFolder = useCallback(async (name: string) => {
+    const folder = await createFolder(supabase, name)
+    setFolders((cur) => [...cur, folder])
+  }, [supabase])
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
+  const handleDeleteFolder = useCallback(async (id: string) => {
+    await deleteFolder(supabase, id)
+    setFolders((cur) => cur.filter((f) => f.id !== id))
+    if (selectedFolder === id) setSelectedFolder('inbox')
+  }, [supabase, selectedFolder])
 
-  const handleDeleteSelected = async () => {
-    if (selectedIds.size === 0) return
-    setIsBulkDeleting(true)
-    try {
-      await Promise.all(Array.from(selectedIds).map((id) => softDeleteMessage(supabase, id)))
-      setSelectedIds(new Set())
-      await refreshMessages(searchStateRef.current)
-      toast.success('Selected messages deleted')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete selected messages')
-    } finally {
-      setIsBulkDeleting(false)
-    }
-  }
+  const handleRenameFolder = useCallback(async (id: string, name: string) => {
+    const updated = await updateFolder(supabase, id, { name })
+    setFolders((cur) => cur.map((f) => (f.id === id ? updated : f)))
+  }, [supabase])
+
+  // Rule management
+  const handleCreateRule = useCallback(async (rule: Omit<MessageRule, 'id' | 'createdAt'>) => {
+    const created = await createRule(supabase, rule)
+    setRules((cur) => [...cur, created])
+  }, [supabase])
+
+  const handleToggleRule = useCallback(async (id: string, active: boolean) => {
+    const updated = await updateRule(supabase, id, { active })
+    setRules((cur) => cur.map((r) => (r.id === id ? updated : r)))
+  }, [supabase])
+
+  const handleDeleteRule = useCallback(async (id: string) => {
+    await deleteRule(supabase, id)
+    setRules((cur) => cur.filter((r) => r.id !== id))
+  }, [supabase])
+
+  const totalUnread = messages.filter((m) => !m.read && !m.deletedAt).length
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      {/* Header: title + unread badge + compose trigger */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-semibold">Artist Messages</h2>
-          {unreadCount > 0 && <Badge>{unreadCount} unread</Badge>}
+    <div className="flex h-full min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
+
+      {/* ── Left: Folder Tree ─────────────────────────────────────────────── */}
+      <aside
+        className="flex flex-col w-48 shrink-0 border-r border-border bg-card/40"
+        style={{ overscrollBehavior: 'contain' }}
+      >
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mailbox</p>
+          {totalUnread > 0 && <Badge className="text-xs px-1.5 py-0">{totalUnread}</Badge>}
         </div>
-        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-          <DialogTrigger asChild>
-            <Button type="button" className="min-h-[44px] gap-2">
-              <PencilSimple size={18} aria-hidden="true" />
-              Compose
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>New Message</DialogTitle>
-            </DialogHeader>
-            <MessageComposer
-              artists={artists}
-              templates={templates}
-              isSending={isSending}
-              isArtistsLoading={isLoadingArtists}
-              artistLoadError={artistLoadError}
-              onSend={handleSend}
-              onClose={() => setComposeOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex-1 overflow-y-auto px-1" style={{ overscrollBehavior: 'contain' }}>
+          <FolderTree
+            selected={selectedFolder}
+            onSelect={(id) => { setSelectedFolder(id); setSelectedMessageId(null) }}
+            customFolders={folders}
+            unreadCounts={unreadCounts}
+            onCreateFolder={handleCreateFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onRenameFolder={handleRenameFolder}
+          />
+        </div>
+      </aside>
+
+      {/* ── Middle: Message List ───────────────────────────────────────────── */}
+      <div className="flex flex-col w-72 shrink-0 border-r border-border">
+        {/* Toolbar */}
+        <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border bg-card/20">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search…"
+            className="h-7 text-sm flex-1"
+          />
+        </div>
+
+        {/* Action row */}
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/20">
+          <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="h-7 gap-1 text-xs">
+                <PencilSimple size={13} aria-hidden="true" />
+                Compose
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader><DialogTitle>New Message</DialogTitle></DialogHeader>
+              <MessageComposer
+                artists={artists}
+                templates={templates}
+                isSending={isSending}
+                isArtistsLoading={isLoadingArtists}
+                artistLoadError={artistLoadError}
+                onSend={handleSend}
+                onClose={() => setComposeOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+          <ExternalEmailComposer />
+          <MessageRulesManager
+            rules={rules}
+            folders={folders}
+            onCreate={handleCreateRule}
+            onToggle={handleToggleRule}
+            onDelete={handleDeleteRule}
+          />
+        </div>
+
+        {/* Message list */}
+        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+          {filteredMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground text-sm gap-2">
+              <p>No messages</p>
+            </div>
+          ) : (
+            filteredMessages.map((msg) => {
+              const artist = artists.find((a) => a.id === msg.artistId)
+              const isSelected = msg.id === selectedMessageId
+              return (
+                <button
+                  key={msg.id}
+                  type="button"
+                  onClick={() => void handleSelectMessage(msg.id)}
+                  className={cn(
+                    'w-full text-left px-3 py-3 border-b border-border/50 transition-colors',
+                    isSelected ? 'bg-primary/10' : 'hover:bg-muted/50',
+                    !msg.read && !isSelected ? 'bg-card/60' : '',
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        {!msg.read && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-label="Unread" />
+                        )}
+                        <span className={cn('text-sm truncate', !msg.read ? 'font-semibold' : 'font-medium')}>
+                          {msg.subject}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {msg.isExternal ? (msg.senderEmail ?? 'External') : (artist?.name ?? 'Unknown artist')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-xs text-muted-foreground">{formatDate(msg.sentAt)}</span>
+                      <div className="flex items-center gap-1">
+                        {msg.starred && <StarFour size={12} weight="fill" className="text-yellow-400" aria-hidden="true" />}
+                        {msg.hasAttachments && <Paperclip size={12} className="text-muted-foreground" aria-hidden="true" />}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+
+        {/* Search panel for advanced filters */}
+        <div className="border-t border-border">
+          <MessageSearch artists={artists} onSearch={handleSearch} />
+        </div>
       </div>
 
-      {/* Bulk delete bar */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-card/40 p-4">
-          <p className="text-sm text-muted-foreground">{selectedIds.size} message{selectedIds.size === 1 ? '' : 's'} selected</p>
-          <Button type="button" variant="destructive" disabled={isBulkDeleting} onClick={() => void handleDeleteSelected()}>
-            {isBulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
-          </Button>
-        </div>
-      )}
+      {/* ── Right: Message Detail ──────────────────────────────────────────── */}
+      <div
+        className="flex-1 flex flex-col min-w-0 overflow-hidden"
+      >
+        {selectedMessage ? (
+          <>
+            {/* Message header */}
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border bg-card/20 shrink-0">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold leading-snug">{selectedMessage.subject}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selectedMessage.isExternal
+                    ? `From: ${selectedMessage.senderEmail ?? 'External'}`
+                    : `From: ${artists.find((a) => a.id === selectedMessage.artistId)?.name ?? 'Unknown artist'}`}
+                  {' · '}
+                  {new Date(selectedMessage.sentAt).toLocaleString()}
+                  {selectedMessage.forwardedFrom && (
+                    <span className="ml-1.5 text-primary/70">Forwarded</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Star */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => void handleStar(selectedMessage.id, !selectedMessage.starred)}
+                  title={selectedMessage.starred ? 'Unstar' : 'Star'}
+                >
+                  {selectedMessage.starred
+                    ? <StarFour size={15} weight="fill" className="text-yellow-400" aria-hidden="true" />
+                    : <Star size={15} aria-hidden="true" />}
+                </Button>
+                {/* Forward as external email */}
+                <ExternalEmailComposer
+                  defaultSubject={`Fwd: ${selectedMessage.subject}`}
+                  defaultHtml={selectedMessage.bodyHtml ?? selectedMessage.body}
+                />
+                {/* Export */}
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleExport(selectedMessage.id)} title="Export JSON">
+                  <Download size={15} aria-hidden="true" />
+                </Button>
+                {/* Move to folder */}
+                {folders.length > 0 && (
+                  <select
+                    value={selectedMessage.folderId ?? ''}
+                    onChange={(e) => void handleMoveToFolder(selectedMessage.id, e.target.value || null)}
+                    className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    aria-label="Move to folder"
+                  >
+                    <option value="">Inbox</option>
+                    {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                )}
+                {/* Delete */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => void handleDelete(selectedMessage.id)}
+                  title="Delete"
+                >
+                  <Trash size={15} aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
 
-      {/* Filters / search */}
-      <MessageSearch artists={artists} onSearch={handleSearch} />
+            {/* Message body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }}>
+              {selectedMessage.bodyHtml ? (
+                <div
+                  className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedMessage.bodyHtml) }}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
+              )}
 
-      {/* Inbox */}
-      <ThreadView
-        messages={messages}
-        repliesByMessageId={repliesByMessageId}
-        artists={artists}
-        onStar={handleStar}
-        onDelete={handleDelete}
-        onExport={handleExport}
-        onMarkRead={handleMarkRead}
-        selectedIds={selectedIds}
-        onToggleSelect={toggleSelected}
-      />
+              {/* Attachments */}
+              {loadingAttachments ? (
+                <p className="text-xs text-muted-foreground">Loading attachments…</p>
+              ) : (
+                <AttachmentViewer attachments={attachments} />
+              )}
+
+              {/* Thread replies */}
+              {(repliesByMessageId[selectedMessage.id] ?? []).length > 0 && (
+                <div className="mt-6 space-y-3">
+                  <Separator />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Replies ({(repliesByMessageId[selectedMessage.id] ?? []).length})
+                  </p>
+                  {(repliesByMessageId[selectedMessage.id] ?? [])
+                    .filter((r) => !r.deletedAt)
+                    .map((reply) => {
+                      const replyArtist = artists.find((a) => a.id === reply.artistId)
+                      return (
+                        <div key={reply.id} className="rounded-lg border border-border bg-card/60 px-4 py-3 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-semibold">{replyArtist?.name ?? 'Artist'}</p>
+                            <span className="text-xs text-muted-foreground">{formatDate(reply.sentAt)}</span>
+                          </div>
+                          {reply.bodyHtml ? (
+                            <div
+                              className="prose prose-sm prose-invert max-w-none text-sm"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(reply.bodyHtml) }}
+                            />
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{reply.body}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+
+              {/* Quick reply */}
+              <div className="mt-6">
+                <Separator className="mb-4" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  <ArrowBendUpLeft size={12} className="inline mr-1" aria-hidden="true" />
+                  Quick Reply to Artist
+                </p>
+                <QuickReply
+                  message={selectedMessage}
+                  artists={artists}
+                  templates={templates}
+                  isSending={isSending}
+                  isArtistsLoading={isLoadingArtists}
+                  artistLoadError={artistLoadError}
+                  onSend={handleSend}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+            <ArrowBendUpRight size={32} className="opacity-20" aria-hidden="true" />
+            <p>Select a message to read</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+
+// ── QuickReply ────────────────────────────────────────────────────────────────
+
+interface QuickReplyProps {
+  message: LabelMessage
+  artists: Array<{ id: string; name: string }>
+  templates: MessageTemplate[]
+  isSending: boolean
+  isArtistsLoading: boolean
+  artistLoadError: string | null
+  onSend: (artistIds: string[], subject: string, html: string, text: string) => Promise<void>
+}
+
+function QuickReply({ message, artists, templates, isSending, isArtistsLoading, artistLoadError, onSend }: QuickReplyProps) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <ArrowBendUpLeft size={14} aria-hidden="true" />
+          Reply to {artists.find((a) => a.id === message.artistId)?.name ?? 'Artist'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Reply</DialogTitle></DialogHeader>
+        <MessageComposer
+          artists={artists}
+          templates={templates}
+          isSending={isSending}
+          isArtistsLoading={isArtistsLoading}
+          artistLoadError={artistLoadError}
+          defaultArtistId={message.artistId}
+          defaultSubject={`Re: ${message.subject}`}
+          onSend={onSend}
+          onClose={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+

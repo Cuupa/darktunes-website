@@ -10,14 +10,15 @@
  * the default from globals.css", so no override is needed.
  *
  * CSS token map:
- *   themePrimary    → --primary
- *   themeSecondary  → --secondary
- *   themeBackground → --background
- *   themeForeground → --foreground
- *   themeCard       → --card
- *   themeMuted      → --muted
- *   themeAccent     → --accent
- *   themeBorder     → --border
+ *   themePrimary          → --primary
+ *   themeSecondary        → --secondary
+ *   themeBackground       → --background
+ *   themeForeground       → --foreground
+ *   themeCard             → --card
+ *   themeMuted            → --muted
+ *   themeAccent           → --accent
+ *   themeBorder           → --border
+ *   themeGradient*        → --gradient-hero, --gradient-accent (computed)
  */
 
 export interface ThemeColors {
@@ -29,6 +30,12 @@ export interface ThemeColors {
   themeMuted?: string
   themeAccent?: string
   themeBorder?: string
+  themeGradientHeroFrom?: string
+  themeGradientHeroTo?: string
+  themeGradientHeroDir?: string
+  themeGradientAccentFrom?: string
+  themeGradientAccentTo?: string
+  themeGradientAccentDir?: string
 }
 
 const TOKEN_MAP: Array<[keyof ThemeColors, string]> = [
@@ -43,17 +50,30 @@ const TOKEN_MAP: Array<[keyof ThemeColors, string]> = [
 ]
 
 export function ThemeStyleInjector(colors: ThemeColors) {
-  const declarations = TOKEN_MAP
+  const declarations: string[] = TOKEN_MAP
     .filter(([key]) => {
       const v = colors[key]
       return typeof v === 'string' && v.trim() !== ''
     })
     .map(([key, cssVar]) => `  ${cssVar}: ${colors[key]};`)
-    .join('\n')
 
-  if (!declarations) return null
+  // Computed gradient tokens — only inject when from+to are set
+  const heroFrom = colors.themeGradientHeroFrom?.trim()
+  const heroTo = colors.themeGradientHeroTo?.trim()
+  const heroDir = colors.themeGradientHeroDir?.trim() || '135deg'
+  if (heroFrom && heroTo) {
+    declarations.push(`  --gradient-hero: linear-gradient(${heroDir}, ${heroFrom}, ${heroTo});`)
+  }
+  const accentFrom = colors.themeGradientAccentFrom?.trim()
+  const accentTo = colors.themeGradientAccentTo?.trim()
+  const accentDir = colors.themeGradientAccentDir?.trim() || '135deg'
+  if (accentFrom && accentTo) {
+    declarations.push(`  --gradient-accent: linear-gradient(${accentDir}, ${accentFrom}, ${accentTo});`)
+  }
 
-  const css = `:root {\n${declarations}\n}`
+  if (declarations.length === 0) return null
+
+  const css = `:root {\n${declarations.join('\n')}\n}`
 
   return (
     <style dangerouslySetInnerHTML={{ __html: css }} />

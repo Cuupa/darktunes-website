@@ -18,6 +18,10 @@ interface MessageComposerProps {
   artistLoadError?: string | null
   templates?: MessageTemplate[]
   onClose?: () => void
+  /** Pre-select an artist by ID (e.g. when replying to a specific artist). */
+  defaultArtistId?: string
+  /** Pre-fill the subject line. */
+  defaultSubject?: string
 }
 
 interface DraftState {
@@ -47,9 +51,13 @@ export function MessageComposer({
   artistLoadError = null,
   templates = [],
   onClose,
+  defaultArtistId,
+  defaultSubject,
 }: MessageComposerProps) {
-  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([])
-  const [subject, setSubject] = useState('')
+  const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>(() =>
+    defaultArtistId ? [defaultArtistId] : [],
+  )
+  const [subject, setSubject] = useState(() => defaultSubject ?? '')
   const [bodyHtml, setBodyHtml] = useState('')
   const [bodyText, setBodyText] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)

@@ -22,6 +22,7 @@ import {
   Gear,
   Cpu,
   SignOut,
+  Palette,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Messages',      href: '/admin/messages',   icon: ChatCircle,  adminOnly: true  },
   { label: 'Users',         href: '/admin/users',      icon: Users,       adminOnly: true  },
   { label: 'Feature Flags', href: '/admin/features',   icon: ToggleRight, adminOnly: true  },
+  { label: 'Colors',        href: '/admin/colors',     icon: Palette,     adminOnly: true  },
   { label: 'Settings',      href: '/admin/settings',   icon: Gear,        adminOnly: true  },
   { label: 'System',        href: '/admin/system',     icon: Cpu,         adminOnly: true  },
 ]
@@ -82,7 +84,7 @@ export function AdminSidebarNav() {
       </div>
 
       {/* Nav links */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2" aria-label="Admin sections">
+      <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ overscrollBehavior: 'contain' }} aria-label="Admin sections">
         <ul className="space-y-0.5">
           {visibleItems.map((item) => {
             const Icon = item.icon
