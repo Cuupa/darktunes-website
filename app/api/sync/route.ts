@@ -2,7 +2,7 @@
  * app/api/sync/route.ts — Manual "sync all artists" trigger
  *
  * POST /api/sync
- * Auth: Bearer <supabase-access-token>
+ * Auth: ******
  *
  * Verifies the caller is authenticated, then runs syncAll() across every
  * artist and every configured external API (iTunes, Spotify, Discogs,
@@ -21,6 +21,7 @@ import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import type { ServerEnv } from '@/lib/env.server'
 
 // ---------------------------------------------------------------------------
 // Auth helpers
@@ -34,12 +35,12 @@ function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
   return timingSafeEqual(authBuffer, expectedBuffer)
 }
 
-async function verifyToken(token: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new ApiError(500, 'Supabase service key not configured')
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+async function verifyToken(token: string, env: ServerEnv): Promise<void> {
+  const admin = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } },
+  )
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data.user) throw new ApiError(401, 'Unauthorized')
 }
@@ -49,10 +50,12 @@ async function verifyToken(token: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  // 1. Authenticate — accept either a Vercel cron call or a ******
+  const { serverEnv } = await import('@/lib/env.server')
+
+  // 1. Authenticate — accept either a Vercel cron call or a user token
   const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
-  const cronSecret = process.env.CRON_SECRET
+  const { CRON_SECRET: cronSecret } = serverEnv
   if (isCron) {
     if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
       throw new ApiError(401, 'Invalid cron secret')
@@ -61,10 +64,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     if (!authHeader.startsWith('Bearer ')) {
       throw new ApiError(401, 'Missing or invalid Authorization header')
     }
-    await verifyToken(authHeader.slice(7))
+    await verifyToken(authHeader.slice(7), serverEnv)
   }
 
-  // 2. Validate required configuration
+  // 2. Wire up dependencies (serverEnv validates all required vars at startup)
   const {
     CLOUDFLARE_R2_ACCOUNT_ID,
     CLOUDFLARE_R2_ACCESS_KEY_ID,
@@ -78,23 +81,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     DISCOGS_TOKEN,
     SONGKICK_API_KEY,
     BANDSINTOWN_API_KEY,
-  } = process.env
+  } = serverEnv
 
-  if (
-    !CLOUDFLARE_R2_ACCOUNT_ID ||
-    !CLOUDFLARE_R2_ACCESS_KEY_ID ||
-    !CLOUDFLARE_R2_SECRET_ACCESS_KEY ||
-    !CLOUDFLARE_R2_BUCKET_NAME ||
-    !CLOUDFLARE_R2_PUBLIC_URL
-  ) {
-    throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
-  }
-
-  if (!NEXT_PUBLIC_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new ApiError(500, 'Supabase is not configured', 'MISSING_SUPABASE_CONFIG')
-  }
-
-  // 3. Wire up dependencies
   const db = createClient<Database>(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   })
@@ -108,7 +96,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const uploadFn = (imageUrl: string, keyPrefix: string) =>
     uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
 
-  // 4. Run sync (never throws — errors captured in SyncAllResult)
+  // 3. Run sync (never throws — errors captured in SyncAllResult)
   const result = await syncAll({
     db,
     fetch: globalThis.fetch,

@@ -72,6 +72,11 @@ const serverEnvSchema = z.object({
     .string()
     .optional()
     .describe('Resend from address, e.g. noreply@darktunes.com'),
+  /** Cron job secret — protects the POST /api/sync endpoint from unauthorised triggers */
+  CRON_SECRET: z
+    .string()
+    .optional()
+    .describe('****** used to authenticate Vercel cron calls to /api/sync'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -93,6 +98,7 @@ function validateServerEnv(): ServerEnv {
     BANDSINTOWN_API_KEY: process.env.BANDSINTOWN_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    CRON_SECRET: process.env.CRON_SECRET,
   })
 
   if (!result.success) {

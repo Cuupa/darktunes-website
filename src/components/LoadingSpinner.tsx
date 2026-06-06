@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 interface LoadingSpinnerProps {
   /** Diameter of the spinner in pixels. Default: 40. */
@@ -13,8 +13,12 @@ interface LoadingSpinnerProps {
  *
  * The rotating arc uses a stroke-dashoffset animation so the sweep
  * eases in/out rather than jumping.
+ *
+ * When the user prefers reduced motion the rotation is suppressed and only
+ * a static arc is shown, satisfying WCAG 2.3.3 (Animation from Interactions).
  */
 export function LoadingSpinner({ size = 40 }: LoadingSpinnerProps) {
+  const prefersReducedMotion = useReducedMotion()
   const r = (size - 4) / 2
   const circumference = 2 * Math.PI * r
 
@@ -24,8 +28,8 @@ export function LoadingSpinner({ size = 40 }: LoadingSpinnerProps) {
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       aria-hidden="true"
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+      animate={prefersReducedMotion ? {} : { rotate: 360 }}
+      transition={prefersReducedMotion ? {} : { duration: 1, repeat: Infinity, ease: 'linear' }}
     >
       {/* Track */}
       <circle

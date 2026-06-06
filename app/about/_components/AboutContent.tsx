@@ -6,6 +6,7 @@ import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import DOMPurify from 'dompurify'
 import {
   InstagramLogo, YoutubeLogo, SpotifyLogo,
 } from '@phosphor-icons/react'
@@ -75,6 +76,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
         >
           {bodyHtml !== null ? (
             <div
+              suppressHydrationWarning
               className="prose prose-invert max-w-3xl text-lg text-foreground/90 leading-relaxed
                 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3
                 [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1
@@ -82,7 +84,9 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
                 [&_a]:text-accent [&_a]:underline [&_a]:hover:no-underline
                 [&_strong]:text-foreground [&_strong]:font-semibold
                 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-muted-foreground"
-              dangerouslySetInnerHTML={{ __html: bodyHtml }}
+              dangerouslySetInnerHTML={{
+                __html: typeof window !== 'undefined' ? DOMPurify.sanitize(bodyHtml) : bodyHtml,
+              }}
             />
           ) : (
             <MarkdownContent content={body} className="max-w-3xl text-lg" />

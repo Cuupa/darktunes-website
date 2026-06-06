@@ -93,7 +93,7 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={dict.searchPlaceholder}
               aria-label={dict.searchPlaceholder}
-              className="w-full pl-9 pr-4 py-2 text-sm font-mono bg-card border border-border rounded-full focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/40 transition-colors placeholder:text-muted-foreground/60"
+              className="w-full pl-9 pr-4 py-2 text-sm font-mono bg-card border border-border rounded-full focus:outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent transition-colors placeholder:text-muted-foreground/60"
             />
           </div>
 

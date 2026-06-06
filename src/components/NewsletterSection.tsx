@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -31,11 +31,15 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
   const [submitted, setSubmitted] = useState(false)
   const prefersReducedMotion = useReducedMotion()
 
-  // Build schema with translated error message
-  const schema = z.object({
-    email: z.string().email(dict.validationEmail),
-    name: z.string().max(120).optional(),
-  })
+  // Build schema with translated error message — memoised to avoid re-creation on every render
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(dict.validationEmail),
+        name: z.string().max(120).optional(),
+      }),
+    [dict.validationEmail],
+  )
 
   const {
     register,

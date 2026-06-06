@@ -12,6 +12,7 @@ import { getNewsPostBySlug } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
+import { NewsBodyClient } from './_components/NewsBodyClient'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -102,7 +103,7 @@ export default async function NewsDetailPage({ params }: Props) {
 
         <div className="prose prose-invert prose-sm max-w-none">
           {post.content.trimStart().startsWith('<') ? (
-            <div dangerouslySetInnerHTML={{ __html: post.content }} />
+            <NewsBodyClient content={post.content} />
           ) : (
             <MarkdownContent content={post.content} />
           )}
