@@ -19,7 +19,7 @@ function rowToRelease(row: ReleaseRow): Release {
     id: row.id,
     title: row.title,
     artistId: row.artist_id ?? '',
-    artistName: row.artist_name,
+    artistName: '',
     releaseDate: row.release_date,
     coverArt: row.cover_art ?? '',
     type: row.type,
@@ -88,6 +88,7 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
   return releases.map((r) => ({
     ...r,
     artists: byRelease.get(r.id) ?? undefined,
+    artistName: byRelease.get(r.id)?.[0]?.name ?? r.artistName,
   }))
 }
 

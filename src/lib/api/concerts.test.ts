@@ -11,6 +11,7 @@ import {
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
+type ConcertRowWithArtist = ConcertRow & { artists?: { name: string } | null }
 
 function makeBuilder(data: unknown = null, error: unknown = null) {
   const result = { data, error }
@@ -34,11 +35,11 @@ function makeMockDb(data: unknown = null, error: unknown = null): DbClient {
   return { from: vi.fn().mockReturnValue(makeBuilder(data, error)) } as unknown as DbClient
 }
 
-const mockConcerts: ConcertRow[] = [
+const mockConcerts: ConcertRowWithArtist[] = [
   {
     id: 'concert-cancelled',
     artist_id: 'artist-1',
-    artist_name: 'Artist A',
+    artists: { name: 'Artist A' },
     event_name: 'Cancelled Show',
     venue_name: 'Venue A',
     venue_city: 'Berlin',
@@ -63,7 +64,7 @@ const mockConcerts: ConcertRow[] = [
   {
     id: 'concert-ok',
     artist_id: 'artist-2',
-    artist_name: 'Artist B',
+    artists: { name: 'Artist B' },
     event_name: 'Upcoming Show',
     venue_name: 'Venue B',
     venue_city: 'Hamburg',
@@ -133,7 +134,6 @@ describe('createConcert', () => {
   it('creates and maps a concert row', async () => {
     const db = makeMockDb(mockConcerts[0])
     const result = await createConcert(db, {
-      artist_name: 'Artist A',
       event_name: 'Cancelled Show',
       concert_date: '2026-08-10',
     })

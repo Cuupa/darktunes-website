@@ -105,7 +105,6 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
       await upsertReleaseByItunesId(db, {
         title: release.collectionName,
         artist_id: artistId,
-        artist_name: release.artistName,
         release_date: release.releaseDate.split('T')[0],
         cover_art: coverArt,
         type: deriveReleaseType(release.trackCount),

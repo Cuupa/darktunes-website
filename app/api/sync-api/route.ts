@@ -94,7 +94,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       artist_id: artistMatchers.find((a) => a.pattern.test(v.title))?.id ?? null,
       youtube_id: v.youtubeId,
       title: v.title,
-      artist_name: v.channelTitle,
       thumbnail_url: v.thumbnailUrl,
       published_at: v.publishedAt,
       is_visible: true,

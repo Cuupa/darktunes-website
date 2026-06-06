@@ -26,6 +26,7 @@ import type { ApiErrorResponse } from '@/lib/errors'
 export interface VideoFormData {
   title: string
   artistName: string
+  artistId?: string
   youtubeId: string
   thumbnailUrl: string
   publishedAt: string
@@ -188,6 +189,8 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
                 value={watch('artistName')}
                 onValueChange={(val) => {
                   setValue('artistName', val)
+                  const found = artists.find((a) => a.name === val)
+                  if (found) setValue('artistId', found.id)
                   setArtistSearch('')
                 }}
                 disabled={isLoading}

@@ -27,19 +27,11 @@ const fullProfile: ArtistProfile = {
   bioLong: undefined,
   photoUrl: 'https://cdn.example.com/photo.jpg',
   genres: ['electronic'],
-  websiteUrl: 'https://artist.example.com',
-  instagramUrl: 'https://instagram.com/artist',
-  youtubeUrl: undefined,
-  bandcampUrl: undefined,
   pressQuote: undefined,
   foundingYear: 2010,
   hometown: 'Berlin',
   bookingContact: undefined,
   pressContact: undefined,
-  spotifyUrl: 'https://open.spotify.com/artist/123',
-  appleMusicUrl: undefined,
-  tiktokUrl: undefined,
-  facebookUrl: undefined,
   soundcloudUrl: undefined,
   riderStagePlotUrl: undefined,
   riderTechnicalUrl: undefined,
@@ -65,8 +57,14 @@ describe('calcProfileCompletion', () => {
     expect(result.missing).toHaveLength(COMPLETION_FIELDS.length)
   })
 
-  it('returns 100 score when all fields are filled via profile', () => {
-    const artistWithCountry: Artist = { ...baseArtist, country: 'DE' }
+  it('returns 100 score when all fields are filled via artist and profile', () => {
+    const artistWithCountry: Artist = {
+      ...baseArtist,
+      country: 'DE',
+      spotifyUrl: 'https://open.spotify.com/artist/123',
+      instagramUrl: 'https://instagram.com/artist',
+      websiteUrl: 'https://artist.example.com',
+    }
     const result = calcProfileCompletion(artistWithCountry, fullProfile)
     expect(result.score).toBe(100)
     expect(result.missing).toHaveLength(0)
@@ -79,9 +77,6 @@ describe('calcProfileCompletion', () => {
       bio: undefined,
       bioShort: undefined,
       genres: [],
-      spotifyUrl: undefined,
-      instagramUrl: undefined,
-      websiteUrl: undefined,
     }
     const result = calcProfileCompletion(baseArtist, partialProfile)
     // Only 'photo' field (weight 20) filled out of 100 total weight

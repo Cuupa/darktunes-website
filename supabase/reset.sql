@@ -497,7 +497,6 @@ CREATE TABLE IF NOT EXISTS public.releases (
   id              UUID                PRIMARY KEY DEFAULT uuid_generate_v4(),
   title           TEXT                NOT NULL,
   artist_id       UUID                REFERENCES public.artists (id) ON DELETE CASCADE,
-  artist_name     TEXT                NOT NULL,
   release_date    DATE                NOT NULL,
   cover_art       TEXT,
   type            public.release_type NOT NULL,
@@ -667,7 +666,6 @@ CREATE POLICY "news_post_artists: can_publish_news write" ON public.news_post_ar
 CREATE TABLE IF NOT EXISTS public.videos (
   id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   title         TEXT        NOT NULL,
-  artist_name   TEXT        NOT NULL,
   artist_id     UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
   youtube_id    TEXT        NOT NULL UNIQUE,
   thumbnail_url TEXT,
@@ -679,7 +677,6 @@ CREATE TABLE IF NOT EXISTS public.videos (
 );
 
 -- Idempotent column additions for videos (artist linkage was added after initial deploy)
-ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS artist_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS artist_id   UUID REFERENCES public.artists (id) ON DELETE SET NULL;
 ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS is_visible  BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS is_short    BOOLEAN NOT NULL DEFAULT FALSE;
@@ -783,7 +780,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_logs_created_at ON public.sync_logs (created
 CREATE TABLE IF NOT EXISTS public.concerts (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id       UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
-  artist_name     TEXT        NOT NULL,
   event_name      TEXT        NOT NULL,
   venue_name      TEXT,
   venue_city      TEXT,
@@ -973,10 +969,6 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
   bio_long       TEXT,
   photo_url      TEXT,
   genres         TEXT[]      NOT NULL DEFAULT '{}',
-  website_url    TEXT,
-  instagram_url  TEXT,
-  youtube_url    TEXT,
-  bandcamp_url   TEXT,
   press_quote    TEXT,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -989,10 +981,6 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INT
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS spotify_url           TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS apple_music_url       TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS tiktok_url            TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS facebook_url          TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url        TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
@@ -1306,6 +1294,54 @@ CREATE TABLE IF NOT EXISTS public.app_logs (
 CREATE INDEX IF NOT EXISTS idx_app_logs_source     ON public.app_logs (source);
 CREATE INDEX IF NOT EXISTS idx_app_logs_level      ON public.app_logs (level);
 CREATE INDEX IF NOT EXISTS idx_app_logs_created_at ON public.app_logs (created_at DESC);
+
+-- =============================================================================
+-- COLUMN REMOVALS (idempotent)
+-- Transitive-dependency fix (Track 1): artist_name was a 3NF violation.
+-- Social-URL consolidation (Track 2): URLs live exclusively in artists table.
+-- =============================================================================
+
+-- Track 1: Remove redundant artist_name columns
+ALTER TABLE public.releases DROP COLUMN IF EXISTS artist_name;
+ALTER TABLE public.videos   DROP COLUMN IF EXISTS artist_name;
+-- concerts.artist_name was NOT NULL so set a default first to be safe
+DO $$ BEGIN
+  BEGIN
+    ALTER TABLE public.concerts ALTER COLUMN artist_name SET DEFAULT '';
+  EXCEPTION WHEN undefined_column THEN NULL;
+  END;
+END $$;
+ALTER TABLE public.concerts DROP COLUMN IF EXISTS artist_name;
+
+-- Track 2: Consolidate social URLs — artists table is the single source of truth.
+-- Data migration: copy any non-null values from artist_profiles → artists before dropping.
+UPDATE public.artists a
+SET
+  instagram_url   = COALESCE(a.instagram_url,   ap.instagram_url),
+  youtube_url     = COALESCE(a.youtube_url,     ap.youtube_url),
+  website_url     = COALESCE(a.website_url,     ap.website_url),
+  bandcamp_url    = COALESCE(a.bandcamp_url,    ap.bandcamp_url),
+  spotify_url     = COALESCE(a.spotify_url,     ap.spotify_url),
+  apple_music_url = COALESCE(a.apple_music_url, ap.apple_music_url),
+  tiktok_url      = COALESCE(a.tiktok_url,      ap.tiktok_url),
+  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url)
+FROM public.artist_profiles ap
+WHERE ap.artist_id = a.id
+  AND (
+    ap.instagram_url IS NOT NULL OR ap.youtube_url IS NOT NULL OR
+    ap.website_url IS NOT NULL OR ap.bandcamp_url IS NOT NULL OR
+    ap.spotify_url IS NOT NULL OR ap.apple_music_url IS NOT NULL OR
+    ap.tiktok_url IS NOT NULL OR ap.facebook_url IS NOT NULL
+  );
+
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS instagram_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS youtube_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS website_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bandcamp_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS spotify_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS apple_music_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS tiktok_url;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS facebook_url;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY

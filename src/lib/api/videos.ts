@@ -4,14 +4,16 @@ import type { Video } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 type VideoRow = Database['public']['Tables']['videos']['Row']
+/** VideoRow extended with the embedded artists FK join used in SELECT queries. */
+type VideoRowWithArtist = VideoRow & { artists?: { name: string } | null }
 export type VideoInsert = Database['public']['Tables']['videos']['Insert']
 export type VideoUpdate = Database['public']['Tables']['videos']['Update']
 
-function rowToVideo(row: VideoRow): Video {
+function rowToVideo(row: VideoRowWithArtist): Video {
   return {
     id: row.id,
     title: row.title,
-    artistName: row.artist_name,
+    artistName: row.artists?.name ?? '',
     artistId: row.artist_id ?? undefined,
     youtubeId: row.youtube_id,
     thumbnailUrl: row.thumbnail_url ?? '',
@@ -24,7 +26,7 @@ function rowToVideo(row: VideoRow): Video {
 export async function getVideos(db: DbClient): Promise<Video[]> {
   const { data, error } = await db
     .from('videos')
-    .select('*')
+    .select('*, artists(name)')
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToVideo)
@@ -34,7 +36,7 @@ export async function getVideos(db: DbClient): Promise<Video[]> {
 export async function getPublicVideos(db: DbClient): Promise<Video[]> {
   const { data, error } = await db
     .from('videos')
-    .select('*')
+    .select('*, artists(name)')
     .eq('is_visible', true)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -42,7 +44,7 @@ export async function getPublicVideos(db: DbClient): Promise<Video[]> {
 }
 
 export async function getVideoById(db: DbClient, id: string): Promise<Video | null> {
-  const { data, error } = await db.from('videos').select('*').eq('id', id).single()
+  const { data, error } = await db.from('videos').select('*, artists(name)').eq('id', id).single()
   if (error) {
     if (error.code === 'PGRST116') return null
     throw new Error(error.message)
@@ -53,7 +55,7 @@ export async function getVideoById(db: DbClient, id: string): Promise<Video | nu
 export async function getVideosByArtistId(db: DbClient, artistId: string): Promise<Video[]> {
   const { data, error } = await db
     .from('videos')
-    .select('*')
+    .select('*, artists(name)')
     .eq('artist_id', artistId)
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -61,7 +63,7 @@ export async function getVideosByArtistId(db: DbClient, artistId: string): Promi
 }
 
 export async function createVideo(db: DbClient, videoData: VideoInsert): Promise<Video> {
-  const { data, error } = await db.from('videos').insert(videoData).select().single()
+  const { data, error } = await db.from('videos').insert(videoData).select('*, artists(name)').single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createVideo')
   return rowToVideo(data)
@@ -76,7 +78,7 @@ export async function updateVideo(
     .from('videos')
     .update(videoData)
     .eq('id', id)
-    .select()
+    .select('*, artists(name)')
     .single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from updateVideo')

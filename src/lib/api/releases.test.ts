@@ -45,7 +45,6 @@ const mockReleaseRow: ReleaseRow = {
   id: 'rel-001',
   title: 'Polymorph',
   artist_id: 'art-001',
-  artist_name: 'C Z A R I N A',
   release_date: '2024-03-15',
   cover_art: 'https://example.com/cover.jpg',
   type: 'album',
@@ -89,7 +88,7 @@ describe('getReleases', () => {
     const result = await getReleases(db)
     expect(result).toHaveLength(1)
     expect(result[0].title).toBe('Polymorph')
-    expect(result[0].artistName).toBe('C Z A R I N A')
+    expect(result[0].artistName).toBe('')
     expect(result[0].type).toBe('album')
     expect(result[0].featured).toBe(true)
     expect(result[0].isVisible).toBe(true)
@@ -219,7 +218,6 @@ describe('createRelease', () => {
     const db = makeMockDb(mockReleaseRow)
     const result = await createRelease(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
     })
@@ -232,7 +230,6 @@ describe('createRelease', () => {
     await expect(
       createRelease(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
       }),
@@ -244,7 +241,6 @@ describe('createRelease', () => {
     await expect(
       createRelease(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
       }),
@@ -269,7 +265,6 @@ describe('upsertReleaseByItunesId', () => {
     const db = makeMockDb(mockReleaseRow)
     const result = await upsertReleaseByItunesId(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
       itunes_id: '123456789',
@@ -282,7 +277,6 @@ describe('upsertReleaseByItunesId', () => {
     await expect(
       upsertReleaseByItunesId(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
         itunes_id: '999',
@@ -302,7 +296,6 @@ describe('upsertReleaseByItunesId', () => {
 
     const result = await upsertReleaseByItunesId(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
       itunes_id: '123456789',
@@ -329,7 +322,7 @@ describe('getReleases', () => {
     const result = await getReleases(db)
     expect(result).toHaveLength(1)
     expect(result[0].title).toBe('Polymorph')
-    expect(result[0].artistName).toBe('C Z A R I N A')
+    expect(result[0].artistName).toBe('')
     expect(result[0].type).toBe('album')
     expect(result[0].featured).toBe(true)
   })
@@ -380,7 +373,6 @@ describe('createRelease', () => {
     const db = makeMockDb(mockReleaseRow)
     const result = await createRelease(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
     })
@@ -393,7 +385,6 @@ describe('createRelease', () => {
     await expect(
       createRelease(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
       }),
@@ -405,7 +396,6 @@ describe('createRelease', () => {
     await expect(
       createRelease(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
       }),
@@ -430,7 +420,6 @@ describe('upsertReleaseByItunesId', () => {
     const db = makeMockDb(mockReleaseRow)
     const result = await upsertReleaseByItunesId(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
       itunes_id: '123456789',
@@ -443,7 +432,6 @@ describe('upsertReleaseByItunesId', () => {
     await expect(
       upsertReleaseByItunesId(db, {
         title: 'Test',
-        artist_name: 'Artist',
         release_date: '2024-01-01',
         type: 'single',
         itunes_id: '999',
@@ -463,7 +451,6 @@ describe('upsertReleaseByItunesId', () => {
 
     const result = await upsertReleaseByItunesId(db, {
       title: 'Polymorph',
-      artist_name: 'C Z A R I N A',
       release_date: '2024-03-15',
       type: 'album',
       itunes_id: '123456789',
