@@ -1,14 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { getLabelMessages } from '@/lib/api/labelMessages'
-import { getRepliesForMessage } from '@/lib/api/artistReplies'
+import { getArtistsByUserId } from '@/lib/api/artistProfiles'
+import { getPortalFolders } from '@/lib/api/portalMessages'
+import { getArtists } from '@/lib/api/artists'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { ArtistReply } from '@/types'
-import { MessagesInbox } from './_components/MessagesInbox'
+import { PortalMailbox } from '@/components/portal/PortalMailbox'
+import type { Artist } from '@/types'
 
 function MessagesSkeleton() {
   return (
@@ -21,40 +20,43 @@ function MessagesSkeleton() {
   )
 }
 
-async function MessagesContent() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+async function MessagesContent({ searchParams }: { searchParams?: Promise<Record<string, string | undefined>> }) {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const artist = await getArtistByUserId(supabase, user.id).catch(() => null)
-  if (!artist) return null
+  const params = searchParams ? await searchParams : {}
+  const artistIdParam = params?.artistId
 
-  const messages = await getLabelMessages(supabase, artist.id).catch(() => [])
-  const repliesByMessageId: Record<string, ArtistReply[]> = {}
+  const userArtists = await getArtistsByUserId(supabase, user.id).catch(() => [])
+  if (userArtists.length === 0) return null
 
-  const replyResults = await Promise.allSettled(
-    messages.map((message) => getRepliesForMessage(supabase, message.id)),
+  // Resolve active artist from ?artistId or default to first
+  const activeArtist = (artistIdParam
+    ? userArtists.find((a) => a.id === artistIdParam)
+    : null) ?? userArtists[0]
+
+  const [allArtists, folders] = await Promise.all([
+    getArtists(supabase).catch(() => [] as Artist[]),
+    getPortalFolders(supabase, activeArtist.id).catch(() => []),
+  ])
+
+  return (
+    <PortalMailbox
+      artistId={activeArtist.id}
+      artists={allArtists}
+      initialFolders={folders}
+    />
   )
-
-  replyResults.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      repliesByMessageId[messages[index].id] = result.value
-    } else {
-      console.error('[PortalMessagesPage] Failed to load replies for message', messages[index]?.id, result.reason)
-    }
-  })
-
-  return <MessagesInbox dict={dict.portal} initialMessages={messages} initialRepliesByMessageId={repliesByMessageId} />
 }
 
-export default function PortalMessagesPage() {
+export default function PortalMessagesPage({ searchParams }: { searchParams?: Promise<Record<string, string | undefined>> }) {
   return (
     <Suspense fallback={<MessagesSkeleton />}>
-      <MessagesContent />
+      <MessagesContent searchParams={searchParams} />
     </Suspense>
   )
 }
+

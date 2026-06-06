@@ -2756,3 +2756,204 @@ DROP POLICY IF EXISTS "submission_form_schema: editor+ write" ON public.submissi
 CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_schema
   FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ===========================================================================
+-- USER ROLES (multi-role junction table)  — added 2026-06
+-- ===========================================================================
+
+-- TABLE: user_roles — one row per (user, role) pair
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id         UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID             NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  role       public.user_role NOT NULL,
+  granted_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+  granted_by UUID             REFERENCES public.profiles (id) ON DELETE SET NULL,
+  UNIQUE (user_id, role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON public.user_roles (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role    ON public.user_roles (role);
+
+-- Backfill: seed user_roles from existing profiles.role values (idempotent)
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, role FROM public.profiles
+ON CONFLICT (user_id, role) DO NOTHING;
+
+-- TRIGGER: after user_roles changes, keep profiles.role = highest-privilege role
+-- Privilege order: admin > editor > journalist > artist > user
+CREATE OR REPLACE FUNCTION public.sync_primary_role()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_user_id UUID;
+  v_new_role public.user_role;
+BEGIN
+  -- Determine which user changed
+  IF TG_OP = 'DELETE' THEN
+    v_user_id := OLD.user_id;
+  ELSE
+    v_user_id := NEW.user_id;
+  END IF;
+
+  -- Pick most-privileged remaining role (or default 'user')
+  SELECT role INTO v_new_role
+  FROM public.user_roles
+  WHERE user_id = v_user_id
+  ORDER BY
+    CASE role
+      WHEN 'admin'      THEN 1
+      WHEN 'editor'     THEN 2
+      WHEN 'journalist' THEN 3
+      WHEN 'artist'     THEN 4
+      ELSE                   5
+    END
+  LIMIT 1;
+
+  IF v_new_role IS NULL THEN
+    v_new_role := 'user';
+  END IF;
+
+  UPDATE public.profiles SET role = v_new_role WHERE id = v_user_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_primary_role ON public.user_roles;
+CREATE TRIGGER trg_sync_primary_role
+  AFTER INSERT OR UPDATE OR DELETE ON public.user_roles
+  FOR EACH ROW EXECUTE FUNCTION public.sync_primary_role();
+
+-- RLS for user_roles
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "user_roles: own read"  ON public.user_roles;
+CREATE POLICY "user_roles: own read" ON public.user_roles
+  FOR SELECT USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "user_roles: admin all" ON public.user_roles;
+CREATE POLICY "user_roles: admin all" ON public.user_roles
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ===========================================================================
+-- PORTAL MESSAGES — artist-to-artist and artist-to-label messaging
+-- ===========================================================================
+
+-- TABLE: portal_message_folders — per-artist custom folders
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_message_folders (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id  UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  name       TEXT        NOT NULL,
+  color      TEXT,
+  icon       TEXT,
+  position   INT         NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_msg_folders_artist ON public.portal_message_folders (artist_id);
+
+ALTER TABLE public.portal_message_folders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "portal_msg_folders: artist own" ON public.portal_message_folders;
+CREATE POLICY "portal_msg_folders: artist own" ON public.portal_message_folders
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "portal_msg_folders: admin all" ON public.portal_message_folders;
+CREATE POLICY "portal_msg_folders: admin all" ON public.portal_message_folders
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- TABLE: portal_messages — outbound messages from artists
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_messages (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_artist_id  UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  to_artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  to_label        BOOLEAN     NOT NULL DEFAULT FALSE,
+  subject         TEXT        NOT NULL DEFAULT '',
+  body            TEXT        NOT NULL DEFAULT '',
+  body_html       TEXT,
+  sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  read_at         TIMESTAMPTZ,
+  starred         BOOLEAN     NOT NULL DEFAULT FALSE,
+  deleted_at      TIMESTAMPTZ,
+  folder_id       UUID        REFERENCES public.portal_message_folders (id) ON DELETE SET NULL,
+  has_attachments BOOLEAN     NOT NULL DEFAULT FALSE,
+  search_vector   TSVECTOR    GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
+  ) STORED
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_portal_msg_search  ON public.portal_messages USING GIN(search_vector);
+
+ALTER TABLE public.portal_messages ENABLE ROW LEVEL SECURITY;
+
+-- Sender can read/update/delete their own sent messages
+DROP POLICY IF EXISTS "portal_messages: sender own" ON public.portal_messages;
+CREATE POLICY "portal_messages: sender own" ON public.portal_messages
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = auth.uid())
+  );
+
+-- Recipient artist members can read received messages
+DROP POLICY IF EXISTS "portal_messages: recipient read" ON public.portal_messages;
+CREATE POLICY "portal_messages: recipient read" ON public.portal_messages
+  FOR SELECT USING (
+    to_artist_id IS NOT NULL AND
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = to_artist_id AND am.user_id = auth.uid())
+  );
+
+-- Admins can do everything (needed for label-side inbox view)
+DROP POLICY IF EXISTS "portal_messages: admin all" ON public.portal_messages;
+CREATE POLICY "portal_messages: admin all" ON public.portal_messages
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- TABLE: portal_message_attachments
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_message_attachments (
+  id          UUID   PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id  UUID   NOT NULL REFERENCES public.portal_messages (id) ON DELETE CASCADE,
+  file_url    TEXT   NOT NULL,
+  file_name   TEXT   NOT NULL,
+  file_size   BIGINT,
+  mime_type   TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_attach_msg ON public.portal_message_attachments (message_id);
+
+ALTER TABLE public.portal_message_attachments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "portal_attach: via message sender" ON public.portal_message_attachments;
+CREATE POLICY "portal_attach: via message sender" ON public.portal_message_attachments
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.portal_messages pm
+      JOIN public.artist_members am ON am.artist_id = pm.from_artist_id
+      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.portal_messages pm
+      JOIN public.artist_members am ON am.artist_id = pm.from_artist_id
+      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "portal_attach: admin all" ON public.portal_message_attachments;
+CREATE POLICY "portal_attach: admin all" ON public.portal_message_attachments
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
