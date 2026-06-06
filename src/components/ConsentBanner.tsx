@@ -2,10 +2,14 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { getConsentState, setConsentState } from '@/lib/consentState'
 import type { Dictionary } from '@/i18n/types'
+
+/** Routes where the consent banner must not appear (no external embeds). */
+const BANNER_HIDDEN_PREFIXES = ['/admin', '/portal', '/press', '/editor']
 
 interface ConsentBannerProps {
   dict: Dictionary['consent']
@@ -21,8 +25,15 @@ interface ConsentBannerProps {
  * Note: This implements opt-in consent for external services (DSGVO Art. 6).
  */
 export function ConsentBanner({ dict }: ConsentBannerProps) {
+  const pathname = usePathname()
   const [visible, setVisible] = useState(() => getConsentState() === null)
   const prefersReducedMotion = useReducedMotion()
+
+  // Never show the consent banner on portal / admin routes — no external embeds there.
+  const isSuppressed = BANNER_HIDDEN_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
+  )
+  if (isSuppressed) return null
 
   const handleAccept = () => {
     setConsentState('accepted')
