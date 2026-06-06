@@ -47,6 +47,7 @@ type VideoFilter = 'all' | 'visible' | 'hidden' | 'shorts'
 const EMPTY_FORM: VideoFormData = {
   title: '',
   artistName: '',
+  artistId: undefined,
   youtubeId: '',
   thumbnailUrl: '',
   publishedAt: new Date().toISOString().split('T')[0],
@@ -58,6 +59,7 @@ function videoToFormData(video: Video): VideoFormData {
   return {
     title: video.title,
     artistName: video.artistName,
+    artistId: video.artistId,
     youtubeId: video.youtubeId,
     thumbnailUrl: video.thumbnailUrl ?? '',
     publishedAt: video.publishedAt.split('T')[0],
@@ -69,7 +71,7 @@ function videoToFormData(video: Video): VideoFormData {
 function formDataToInsert(data: VideoFormData): VideoInsert {
   return {
     title: data.title,
-    artist_name: data.artistName,
+    artist_id: data.artistId ?? null,
     youtube_id: data.youtubeId,
     thumbnail_url: data.thumbnailUrl || null,
     published_at: data.publishedAt || new Date().toISOString(),

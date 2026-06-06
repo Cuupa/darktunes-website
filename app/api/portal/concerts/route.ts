@@ -99,7 +99,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const concert = await createConcert(supabase, {
     artist_id: artist.id,
-    artist_name: artist.name,
     event_name: body.eventName,
     concert_date: body.concertDate,
     event_time: body.concertTime ?? null,

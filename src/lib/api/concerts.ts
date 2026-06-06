@@ -4,14 +4,16 @@ import type { Concert } from '@/types'
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
+/** ConcertRow extended with the embedded artists FK join used in SELECT queries. */
+type ConcertRowWithArtist = ConcertRow & { artists?: { name: string } | null }
 export type ConcertInsert = Database['public']['Tables']['concerts']['Insert']
 export type ConcertUpdate = Database['public']['Tables']['concerts']['Update']
 
-function rowToConcert(row: ConcertRow): Concert {
+function rowToConcert(row: ConcertRowWithArtist): Concert {
   return {
     id: row.id,
     artistId: row.artist_id,
-    artistName: row.artist_name,
+    artistName: row.artists?.name ?? '',
     eventName: row.event_name,
     venueName: row.venue_name,
     venueCity: row.venue_city,
@@ -37,7 +39,7 @@ export async function getConcertsByArtistId(db: DbClient, artistId: string): Pro
   const today = new Date().toISOString().split('T')[0]
   const { data, error } = await db
     .from('concerts')
-    .select('*')
+    .select('*, artists(name)')
     .eq('artist_id', artistId)
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
@@ -50,7 +52,7 @@ export async function getConcerts(db: DbClient): Promise<Concert[]> {
   const today = new Date().toISOString().split('T')[0]
   const { data, error } = await db
     .from('concerts')
-    .select('*')
+    .select('*, artists(name)')
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
 
@@ -67,7 +69,7 @@ export async function getConcerts(db: DbClient): Promise<Concert[]> {
 }
 
 export async function createConcert(db: DbClient, concertData: ConcertInsert): Promise<Concert> {
-  const { data, error } = await db.from('concerts').insert(concertData).select('*').single()
+  const { data, error } = await db.from('concerts').insert(concertData).select('*, artists(name)').single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createConcert')
   return rowToConcert(data)
@@ -82,7 +84,7 @@ export async function updateConcert(
     .from('concerts')
     .update(concertData)
     .eq('id', id)
-    .select('*')
+    .select('*, artists(name)')
     .single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from updateConcert')
@@ -112,7 +114,7 @@ export async function getPublicConcerts(db: DbClient): Promise<Concert[]> {
 
   let builder = db
     .from('concerts')
-    .select('*')
+    .select('*, artists(name)')
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
 

@@ -62,11 +62,11 @@ function isFieldFilled(key: string, artist: Artist, profile: ArtistProfile | nul
     case 'genres':
       return (profile?.genres ?? artist.genres).length > 0
     case 'spotify':
-      return Boolean(profile?.spotifyUrl || artist.spotifyUrl)
+      return Boolean(artist.spotifyUrl)
     case 'instagram':
-      return Boolean(profile?.instagramUrl || artist.instagramUrl)
+      return Boolean(artist.instagramUrl)
     case 'website':
-      return Boolean(profile?.websiteUrl || artist.websiteUrl)
+      return Boolean(artist.websiteUrl)
     case 'country':
       return Boolean(artist.country)
     default:

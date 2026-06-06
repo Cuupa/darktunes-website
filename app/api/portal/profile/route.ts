@@ -14,15 +14,15 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
-import { createHash, randomBytes } from 'crypto'
+import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
 
 type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
-/** Hash a plaintext password using PBKDF2-SHA256. Returns `salt:hash` hex string. */
+/** Hash a plaintext password using scrypt. Returns `salt:hash` hex string. */
 function hashPassword(plain: string): string {
   const salt = randomBytes(16).toString('hex')
-  const hash = createHash('sha256').update(salt + plain).digest('hex')
+  const hash = scryptSync(plain, salt, 64).toString('hex')
   return `${salt}:${hash}`
 }
 
@@ -34,19 +34,21 @@ const profileBodySchema = z.object({
   bio_long: z.string().max(30000).nullable().optional(),
   photo_url: z.string().url().nullable().optional(),
   genres: z.array(z.string()).optional(),
+  // Social/streaming URLs — stored in the artists table (single source of truth).
+  // Accepted here so the form submits a single payload; written to artists only.
   website_url: z.string().url().nullable().optional(),
   instagram_url: z.string().url().nullable().optional(),
   youtube_url: z.string().url().nullable().optional(),
   bandcamp_url: z.string().url().nullable().optional(),
+  spotify_url: z.string().url().nullable().optional(),
+  apple_music_url: z.string().url().nullable().optional(),
+  tiktok_url: z.string().url().nullable().optional(),
+  facebook_url: z.string().url().nullable().optional(),
   press_quote: z.string().max(1000).nullable().optional(),
   founding_year: z.number().int().min(1900).max(2100).nullable().optional(),
   hometown: z.string().max(200).nullable().optional(),
   booking_contact: z.string().max(500).nullable().optional(),
   press_contact: z.string().max(500).nullable().optional(),
-  spotify_url: z.string().url().nullable().optional(),
-  apple_music_url: z.string().url().nullable().optional(),
-  tiktok_url: z.string().url().nullable().optional(),
-  facebook_url: z.string().url().nullable().optional(),
   soundcloud_url: z.string().url().nullable().optional(),
   rider_stage_plot_url: z.string().url().nullable().optional(),
   rider_technical_url: z.string().url().nullable().optional(),
@@ -91,16 +93,30 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   }
   if (!artist) throw new ApiError(403, 'You do not have permission to update this profile')
 
-  // 4. Build upsert payload — resolve password before inserting
+  // 4. Build upsert payload — resolve password before inserting.
+  // Social/streaming URLs (website_url, instagram_url, etc.) are stored in
+  // the artists table only (Track 2 consolidation); exclude them here.
   const d = parsed.data
+  const {
+    website_url,
+    instagram_url,
+    youtube_url,
+    bandcamp_url,
+    spotify_url,
+    apple_music_url,
+    tiktok_url,
+    facebook_url,
+    ...profileFields
+  } = d
+
   let epkPasswordHash: string | null | undefined = undefined
-  if (d.epk_password_raw !== undefined) {
+  if (profileFields.epk_password_raw !== undefined) {
     // null means "clear the password", a string means "set new password"
-    epkPasswordHash = d.epk_password_raw ? hashPassword(d.epk_password_raw) : null
+    epkPasswordHash = profileFields.epk_password_raw ? hashPassword(profileFields.epk_password_raw) : null
   }
 
   const profileData = {
-    ...d,
+    ...profileFields,
     // Remove the raw password field; replace with hashed version
     epk_password_raw: undefined,
     ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
@@ -108,19 +124,19 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   const profile = await upsertArtistProfile(supabase, profileData)
 
-  // 5. Sync shared fields back to the artists table so both tables stay in sync
+  // 5. Sync shared fields back to the artists table (single source of truth for URLs)
   const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
-  if (d.bio !== undefined) artistUpdate.bio = d.bio ?? ''
-  if (d.genres !== undefined) artistUpdate.genres = d.genres
-  if (d.website_url !== undefined) artistUpdate.website_url = d.website_url
-  if (d.instagram_url !== undefined) artistUpdate.instagram_url = d.instagram_url
-  if (d.youtube_url !== undefined) artistUpdate.youtube_url = d.youtube_url
-  if (d.bandcamp_url !== undefined) artistUpdate.bandcamp_url = d.bandcamp_url
-  if (d.spotify_url !== undefined) artistUpdate.spotify_url = d.spotify_url
-  if (d.apple_music_url !== undefined) artistUpdate.apple_music_url = d.apple_music_url
-  if (d.tiktok_url !== undefined) artistUpdate.tiktok_url = d.tiktok_url
-  if (d.facebook_url !== undefined) artistUpdate.facebook_url = d.facebook_url
-  if (d.founding_year !== undefined) artistUpdate.founded_year = d.founding_year
+  if (profileFields.bio !== undefined) artistUpdate.bio = profileFields.bio ?? ''
+  if (profileFields.genres !== undefined) artistUpdate.genres = profileFields.genres
+  if (website_url !== undefined) artistUpdate.website_url = website_url
+  if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
+  if (youtube_url !== undefined) artistUpdate.youtube_url = youtube_url
+  if (bandcamp_url !== undefined) artistUpdate.bandcamp_url = bandcamp_url
+  if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
+  if (apple_music_url !== undefined) artistUpdate.apple_music_url = apple_music_url
+  if (tiktok_url !== undefined) artistUpdate.tiktok_url = tiktok_url
+  if (facebook_url !== undefined) artistUpdate.facebook_url = facebook_url
+  if (profileFields.founding_year !== undefined) artistUpdate.founded_year = profileFields.founding_year
 
   await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
 

@@ -27,7 +27,6 @@ export async function createTourDate(input: CreateTourInput) {
     .from('concerts')
     .insert({
       artist_id: artist.id,
-      artist_name: artist.name,
       event_name: input.eventName,
       concert_date: input.concertDate,
       venue_name: input.venueName || null,

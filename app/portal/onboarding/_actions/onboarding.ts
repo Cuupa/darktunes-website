@@ -38,6 +38,8 @@ async function getCurrentArtist() {
 /**
  * Persists partial profile data for the current onboarding step.
  * Accepts only the fields relevant to the wizard (subset of the full profile).
+ * Social/streaming URLs (instagram_url, spotify_url, website_url) are stored
+ * in the artists table only — written directly here without going via artist_profiles.
  */
 export async function saveOnboardingStep(data: {
   photo_url?: string | null
@@ -48,10 +50,23 @@ export async function saveOnboardingStep(data: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const { supabase, artist } = await getCurrentArtist()
+
+    // Profile-specific fields only (bio, photo)
+    const { instagram_url, spotify_url, website_url, ...profileFields } = data
     await upsertArtistProfile(supabase, {
       artist_id: artist.id,
-      ...data,
+      ...profileFields,
     })
+
+    // URL fields go to the artists table (single source of truth)
+    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null } = {}
+    if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
+    if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
+    if (website_url !== undefined) artistUpdate.website_url = website_url
+    if (Object.keys(artistUpdate).length > 0) {
+      await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+    }
+
     return { ok: true }
   } catch (err) {
     console.error('[saveOnboardingStep]', err)
@@ -71,11 +86,22 @@ export async function completeOnboarding(data?: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const { supabase, artist } = await getCurrentArtist()
+
+    const { instagram_url, spotify_url, website_url, ...profileFields } = data ?? {}
     await upsertArtistProfile(supabase, {
       artist_id: artist.id,
-      ...data,
+      ...profileFields,
       onboarding_completed: true,
     })
+
+    // URL fields go to the artists table (single source of truth)
+    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null } = {}
+    if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
+    if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
+    if (website_url !== undefined) artistUpdate.website_url = website_url
+    if (Object.keys(artistUpdate).length > 0) {
+      await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+    }
 
     // Send an automatic welcome message to the artist's inbox
     const locale = await getLocale()

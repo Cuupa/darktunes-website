@@ -198,7 +198,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                 {
                   title: release.title,
                   artist_id: artist.id,
-                  artist_name: artist.name,
                   release_date: release.releaseDate,
                   cover_art: coverArt,
                   type: release.type,
@@ -285,7 +284,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                 {
                   title: release.title,
                   artist_id: artist.id,
-                  artist_name: artist.name,
                   release_date: release.releaseDate ?? new Date().toISOString().slice(0, 10),
                   cover_art: coverArt,
                   type: release.format === 'vinyl' || release.format === 'cd' ? 'album' : 'single',
@@ -341,7 +339,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               .upsert(
                 {
                   artist_id: artist.id,
-                  artist_name: artist.name,
                   event_name: concert.eventName,
                   venue_name: concert.venueName,
                   venue_city: concert.venueCity,
@@ -401,7 +398,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               .upsert(
                 {
                   artist_id: artist.id,
-                  artist_name: artist.name,
                   event_name: concert.eventName,
                   venue_name: concert.venueName,
                   venue_city: concert.venueCity,

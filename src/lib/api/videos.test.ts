@@ -31,7 +31,6 @@ function makeMockDb(data: unknown = null, error: unknown = null): DbClient {
 const mockVideoRow: VideoRow = {
   id: 'vid-001',
   title: 'Monsters (Official Music Video)',
-  artist_name: 'BLACKBOOK',
   artist_id: 'artist-001',
   youtube_id: 'Bx51eegLTY8',
   thumbnail_url: 'https://img.youtube.com/vi/Bx51eegLTY8/maxresdefault.jpg',
@@ -55,7 +54,7 @@ describe('getVideos', () => {
     expect(result).toHaveLength(1)
     expect(result[0].title).toBe('Monsters (Official Music Video)')
     expect(result[0].youtubeId).toBe('Bx51eegLTY8')
-    expect(result[0].artistName).toBe('BLACKBOOK')
+    expect(result[0].artistName).toBe('')
     expect(result[0].artistId).toBe('artist-001')
   })
 
@@ -84,7 +83,6 @@ describe('createVideo', () => {
     const db = makeMockDb(mockVideoRow)
     const result = await createVideo(db, {
       title: 'Monsters',
-      artist_name: 'BLACKBOOK',
       youtube_id: 'Bx51eegLTY8',
     })
     expect(result.id).toBe('vid-001')
@@ -94,14 +92,14 @@ describe('createVideo', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Duplicate youtube_id', code: '23505' })
     await expect(
-      createVideo(db, { title: 'Test', artist_name: 'Artist', youtube_id: 'abc' }),
+      createVideo(db, { title: 'Monsters', youtube_id: 'Bx51eegLTY8' }),
     ).rejects.toThrow('Duplicate youtube_id')
   })
 
   it('throws when no data returned', async () => {
     const db = makeMockDb(null)
     await expect(
-      createVideo(db, { title: 'Test', artist_name: 'Artist', youtube_id: 'abc' }),
+      createVideo(db, { title: 'Monsters', youtube_id: 'Bx51eegLTY8' }),
     ).rejects.toThrow('No data returned from createVideo')
   })
 })
