@@ -13,7 +13,13 @@ import type { EPKData } from './EPKPreview'
 
 /** Strip HTML tags and decode common entities — used for PDF text content. */
 function htmlToText(html: string): string {
-  if (typeof window === 'undefined') return html.replace(/<[^>]*>/g, '')
+  if (typeof window === 'undefined') {
+    // Remove script/style blocks first, then strip remaining tags
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, '')
+  }
   const div = document.createElement('div')
   div.innerHTML = html
   return (div.textContent ?? div.innerText ?? '').trim()
