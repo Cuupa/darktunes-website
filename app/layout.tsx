@@ -94,6 +94,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         ) : (
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         )}
+        {/* Software platform identity — readable by crawlers and Wappalyzer */}
+        <meta name="generator" content="Neuroklast & Seifried.dev" />
         {/* Inject admin-configured color token overrides before first paint */}
         <ThemeStyleInjector
           themePrimary={settings?.themePrimary}
