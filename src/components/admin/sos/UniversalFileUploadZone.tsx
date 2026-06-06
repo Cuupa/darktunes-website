@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { useCallback, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { UploadedFile, FileProcessingState, LabelArtist } from '@/lib/sos/types'
 import { parseCSVLine } from '@/lib/sos/ingest/csv-parser'
@@ -514,13 +514,14 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
   const isDone = !state || state.status === 'done' || state.status === 'idle'
   const hasData = Boolean(file.data)
   const needsReupload = isDone && !hasData && !file.rowsParsed
+  const prefersReducedMotion = useReducedMotion()
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
+      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -24 }}
-      transition={{ delay: index * 0.04 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
+      transition={prefersReducedMotion ? { duration: 0 } : { delay: index * 0.04 }}
     >
       {replaceRef && (
         <input
@@ -631,6 +632,7 @@ export function UniversalFileUploadZone({
   const [isDragging, setIsDragging] = useState(false)
   const [sizeWarning, setSizeWarning] = useState<string | null>(null)
   const [typeError, setTypeError] = useState<string | null>(null)
+  const prefersReducedMotion = useReducedMotion()
 
   // Pending file awaiting format mapping from the user
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -941,9 +943,10 @@ export function UniversalFileUploadZone({
       <AnimatePresence>
         {sizeWarning && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            exit={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : undefined}
             className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs"
           >
             <Warning size={14} className="shrink-0 mt-0.5" />
@@ -956,9 +959,10 @@ export function UniversalFileUploadZone({
         {typeError && (
           <motion.div
             role="alert"
-            initial={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            exit={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : undefined}
             className="flex items-start gap-2 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs"
           >
             <WarningCircle size={14} className="shrink-0 mt-0.5" />
@@ -971,9 +975,10 @@ export function UniversalFileUploadZone({
       <AnimatePresence mode="popLayout">
         {allFiles.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            exit={{ opacity: 0, height: prefersReducedMotion ? 'auto' : 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : undefined}
             className="space-y-2"
           >
             {allFiles.map(({ file, source, state, onRemove, onReplace, replaceRef, onReplaceInput }, index) => (
