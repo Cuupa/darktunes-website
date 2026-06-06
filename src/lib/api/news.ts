@@ -63,36 +63,30 @@ function rowToNewsPost(row: NewsRow): NewsPost {
 
 /**
  * Attach the full artist list from the news_post_artists junction table.
- * Falls back gracefully when the junction table doesn't exist yet (PGRST200/42P01).
  */
 async function attachNewsArtists(db: DbClient, posts: NewsPost[]): Promise<NewsPost[]> {
   if (posts.length === 0) return posts
   const ids = posts.map((p) => p.id)
 
-  try {
-    const { data, error } = await (db as DbClient)
-      .from('news_post_artists' as const)
-      .select('news_post_id, sort_order, artists(id, name, slug)')
-      .in('news_post_id', ids)
-      .order('sort_order', { ascending: true })
+  const { data, error } = await (db as DbClient)
+    .from('news_post_artists' as const)
+    .select('news_post_id, sort_order, artists(id, name, slug)')
+    .in('news_post_id', ids)
+    .order('sort_order', { ascending: true })
 
-    // Gracefully ignore missing table (migration not yet applied)
-    if (error) return posts
+  if (error) throw new Error(`Failed to load news post artists: ${error.message}`)
 
-    const byPost = new Map<string, { id: string; name: string; slug: string }[]>()
-    for (const row of (data ?? []) as unknown as JunctionArtist[]) {
-      if (!row.artists) continue
-      if (!byPost.has(row.news_post_id)) byPost.set(row.news_post_id, [])
-      byPost.get(row.news_post_id)!.push(row.artists)
-    }
-
-    return posts.map((p) => ({
-      ...p,
-      artists: byPost.get(p.id) ?? undefined,
-    }))
-  } catch {
-    return posts
+  const byPost = new Map<string, { id: string; name: string; slug: string }[]>()
+  for (const row of (data ?? []) as unknown as JunctionArtist[]) {
+    if (!row.artists) continue
+    if (!byPost.has(row.news_post_id)) byPost.set(row.news_post_id, [])
+    byPost.get(row.news_post_id)!.push(row.artists)
   }
+
+  return posts.map((p) => ({
+    ...p,
+    artists: byPost.get(p.id) ?? undefined,
+  }))
 }
 
 export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
@@ -142,35 +136,31 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
   const legacyIds = new Set(legacyPosts.map((p) => p.id))
 
   // Secondary: also collect posts linked via the many-to-many junction table
-  try {
-    const { data: junctionRows } = await (db as DbClient)
-      .from('news_post_artists' as const)
-      .select('news_post_id')
-      .eq('artist_id', artistId)
+  const { data: junctionRows } = await (db as DbClient)
+    .from('news_post_artists' as const)
+    .select('news_post_id')
+    .eq('artist_id', artistId)
 
-    const extraIds = ((junctionRows ?? []) as { news_post_id: string }[])
-      .map((r) => r.news_post_id)
-      .filter((id) => id && !legacyIds.has(id))
+  const extraIds = ((junctionRows ?? []) as { news_post_id: string }[])
+    .map((r) => r.news_post_id)
+    .filter((id) => id && !legacyIds.has(id))
 
-    if (extraIds.length > 0) {
-      const { data: extra } = await db
-        .from('news_posts')
-        .select('*')
-        .in('id', extraIds)
-        .in('status', ['published', 'scheduled'])
-        .lte('published_at', now)
-        .order('published_at', { ascending: false })
+  if (extraIds.length > 0) {
+    const { data: extra } = await db
+      .from('news_posts')
+      .select('*')
+      .in('id', extraIds)
+      .in('status', ['published', 'scheduled'])
+      .lte('published_at', now)
+      .order('published_at', { ascending: false })
 
-      if (extra && extra.length > 0) {
-        const merged = [
-          ...legacyPosts,
-          ...extra.map(rowToNewsPost),
-        ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-        return attachNewsArtists(db, merged)
-      }
+    if (extra && extra.length > 0) {
+      const merged = [
+        ...legacyPosts,
+        ...extra.map(rowToNewsPost),
+      ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      return attachNewsArtists(db, merged)
     }
-  } catch {
-    // Junction table not available — fall through to legacy results
   }
 
   return attachNewsArtists(db, legacyPosts)

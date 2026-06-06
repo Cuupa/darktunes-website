@@ -113,11 +113,14 @@ describe('getPublicReleases', () => {
     const artistBuilder = makeBuilder([], null)
     // Second call (releases): returns the visible release
     const releaseBuilder = makeBuilder([mockReleaseRow], null)
+    // Third call (release_artists junction): no multi-artist data
+    const junctionBuilder = makeBuilder([], null)
 
     const db = {
       from: vi.fn()
         .mockReturnValueOnce(artistBuilder)
-        .mockReturnValueOnce(releaseBuilder),
+        .mockReturnValueOnce(releaseBuilder)
+        .mockReturnValueOnce(junctionBuilder),
     } as unknown as DbClient
 
     const result = await getPublicReleases(db)

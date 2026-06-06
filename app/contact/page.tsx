@@ -14,12 +14,13 @@ export const metadata: Metadata = {
   description: 'Get in touch with darkTunes Music Group.',
 }
 
-const SUBMITHUB_URL = 'https://www.submithub.com/playlister/darktunes-music-group'
+const SUBMITHUB_URL_FALLBACK = 'https://www.submithub.com/playlister/darktunes-music-group'
 
 export default async function ContactPage() {
   const [locale, settings] = await Promise.all([getLocale(), getCachedSiteSettings().catch(() => null)])
   const dict = await getDictionary(locale)
   const c = dict.contact
+  const submitHubUrl = settings?.submitHubUrl || SUBMITHUB_URL_FALLBACK
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -50,7 +51,7 @@ export default async function ContactPage() {
             {c.submitMusicDescription}
           </p>
           <a
-            href={SUBMITHUB_URL}
+            href={submitHubUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-bold uppercase tracking-wider hover:bg-primary/90 transition-all hover:scale-105"
