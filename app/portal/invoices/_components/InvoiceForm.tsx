@@ -196,38 +196,43 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
               </Button>
             </div>
             {lineItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-[1fr_80px_100px_36px] gap-2 items-center">
+              <div key={idx} className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_80px_100px_36px] gap-2 items-start sm:items-center">
                 <Input
+                  className="col-span-1 sm:col-span-1"
                   placeholder="Description"
                   value={item.description}
                   onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
                   required
                 />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="Qty"
-                  value={item.qty}
-                  onChange={(e) => updateLineItem(idx, 'qty', parseInt(e.target.value, 10) || 1)}
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="Price (cents)"
-                  value={item.unit_price_cents}
-                  onChange={(e) => updateLineItem(idx, 'unit_price_cents', parseInt(e.target.value, 10) || 0)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={lineItems.length === 1}
-                  onClick={() => removeLineItem(idx)}
-                  aria-label="Remove line item"
-                >
-                  <Trash size={14} aria-hidden="true" />
-                </Button>
+                <div className="flex gap-2 sm:contents">
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="Qty"
+                    value={item.qty}
+                    onChange={(e) => updateLineItem(idx, 'qty', parseInt(e.target.value, 10) || 1)}
+                    className="w-20 sm:w-auto"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="Price (cents)"
+                    value={item.unit_price_cents}
+                    onChange={(e) => updateLineItem(idx, 'unit_price_cents', parseInt(e.target.value, 10) || 0)}
+                    className="w-28 sm:w-auto"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={lineItems.length === 1}
+                    onClick={() => removeLineItem(idx)}
+                    aria-label="Remove line item"
+                  >
+                    <Trash size={14} aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

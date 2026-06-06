@@ -131,8 +131,8 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
             {assets.map((asset) => (
               <Card key={asset.id} className="bg-card border-border">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium">{asset.originalFilename}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{asset.originalFilename}</p>
                     <p className="text-xs text-muted-foreground">{asset.mimeType}</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void download(asset.id)} disabled={loadingId === asset.id}>
