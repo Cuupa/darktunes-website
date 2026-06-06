@@ -11,6 +11,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ClockCounterClockwise, ArrowRight, Prohibit, CheckCircle } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 import type { RoleChangeRecord, BanRecord } from '@/types/users'
 
 interface HistoryResponse {
@@ -27,6 +30,7 @@ interface Props {
 }
 
 export function RoleChangeHistory({ userId }: Props) {
+  const dict = useDict()
   const [data, setData] = useState<HistoryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,16 +42,16 @@ export function RoleChangeHistory({ userId }: Props) {
       // Same-origin fetch: auth cookies are sent automatically
       const res = await fetch(`/api/admin/users/${userId}/role-history`)
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? 'Failed to load history')
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
       setData((await res.json()) as HistoryResponse)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsLoading(false)
     }
-  }, [userId])
+  }, [userId, dict])
 
   useEffect(() => {
     void load()

@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withErrorHandler, ApiError } from '@/lib/errors'
+import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getArtistById } from '@/lib/api/artists'
 import { createSalesStatement } from '@/lib/api/salesStatements'
@@ -58,7 +58,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   // 1. Authenticate — shared secret API key (same as Step 1)
   const sosSecret = process.env.SOS_WEBHOOK_SECRET
   if (!sosSecret) {
-    throw new ApiError(503, 'SOS webhook is not configured (SOS_WEBHOOK_SECRET missing)', 'NOT_CONFIGURED')
+    throw buildApiError('CONFIG_ERROR', 503)
   }
 
   const authHeader = req.headers.get('authorization') ?? ''

@@ -3,6 +3,11 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MessagesManager } from './MessagesManager'
 
+vi.mock('@/contexts/DictContext', () => ({
+  useDict: () => ({ errors: { SERVER_ERROR: 'Something went wrong.', AUTH_REQUIRED: 'Please sign in.', EMAIL_SEND_FAILED: 'Could not send email.', EMAIL_NOT_CONFIGURED: 'Email not configured.' } }),
+  DictContext: { Provider: ({ children }: React.PropsWithChildren) => children },
+}))
+
 const {
   mockToastError,
   mockGetArtists,

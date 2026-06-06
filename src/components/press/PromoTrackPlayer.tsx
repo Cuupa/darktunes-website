@@ -18,9 +18,11 @@ import { Label } from '@/components/ui/label'
 import { getPromoStreamUrl } from '../../../app/press/dashboard/promo-pool/_actions/stream'
 import { getJournalistDownloadUrl } from '../../../app/press/dashboard/_actions/download'
 import type { PromoTrack } from '@/lib/api/promoTracks'
+import type { Dictionary } from '@/i18n/types'
 
 interface PromoTrackPlayerProps {
   track: PromoTrack
+  dict: Dictionary['promoPool']
 }
 
 function formatDuration(seconds: number): string {
@@ -29,7 +31,7 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
+export function PromoTrackPlayer({ track, dict }: PromoTrackPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -52,7 +54,7 @@ export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
       }
       const { url } = await getPromoStreamUrl(track.r2Key)
       if (!url) {
-        toast.error('Preview unavailable')
+        toast.error(dict.streamError)
         return
       }
       const audio = new Audio(url)
@@ -61,7 +63,7 @@ export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
       await audio.play()
       setIsPlaying(true)
     } catch {
-      toast.error('Could not load preview')
+      toast.error(dict.streamError)
     } finally {
       setLoadingPreview(false)
     }

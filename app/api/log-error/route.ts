@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { withErrorHandler, ApiError } from '@/lib/errors'
+import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const supabase = await createServerSupabaseClient()
@@ -67,7 +67,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     .single()
 
   if (error) {
-    throw new ApiError(500, `Failed to write log: ${error.message}`)
+    throw buildApiError('DB_ERROR', 500)
   }
 
   return NextResponse.json({ id: data.id }, { status: 201 })

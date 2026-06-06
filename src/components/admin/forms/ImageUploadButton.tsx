@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { UploadSimple, CheckCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
+import type { ApiErrorResponse } from '@/lib/errors'
+import { getErrorMessage } from '@/lib/clientErrors'
 
 interface ImageUploadButtonProps {
   /** Called with the R2 public URL once the upload succeeds. */
@@ -34,6 +37,7 @@ export function ImageUploadButton({
   endpoint = '/api/upload',
   artistId,
 }: ImageUploadButtonProps) {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -66,23 +70,23 @@ export function ImageUploadButton({
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              const data = JSON.parse(xhr.responseText) as { publicUrl?: string; error?: string }
+              const data = JSON.parse(xhr.responseText) as { publicUrl?: string; error?: string; code?: string }
               if (data.publicUrl) {
                 setUploadProgress(100)
                 onUploaded(data.publicUrl)
                 resolve()
               } else {
-                reject(new Error(data.error ?? `HTTP ${xhr.status}`))
+                reject(new Error(getErrorMessage(data as ApiErrorResponse, dict)))
               }
             } catch {
-              reject(new Error('Invalid server response'))
+              reject(new Error(dict.errors.SERVER_ERROR))
             }
           } else {
             try {
-              const data = JSON.parse(xhr.responseText) as { error?: string }
-              reject(new Error(data.error ?? `HTTP ${xhr.status}`))
+              const data = JSON.parse(xhr.responseText) as ApiErrorResponse
+              reject(new Error(getErrorMessage(data, dict)))
             } catch {
-              reject(new Error(`HTTP ${xhr.status}`))
+              reject(new Error(dict.errors.SERVER_ERROR))
             }
           }
         })
@@ -97,7 +101,7 @@ export function ImageUploadButton({
 
       toast.success('Image uploaded')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       // Keep progress bar visible briefly at 100% then hide
       setTimeout(() => setUploadProgress(null), 800)

@@ -55,7 +55,7 @@ export function PromoDownloads({ releases, promoTracks, dict }: PromoDownloadsPr
 
       <section className="space-y-3" aria-labelledby="promo-tracks-heading">
         <h2 id="promo-tracks-heading" className="text-xl font-semibold">Promo Tracks</h2>
-        {promoTracks.map((track) => <PromoTrackPlayer key={track.id} track={track} />)}
+        {promoTracks.map((track) => <PromoTrackPlayer key={track.id} track={track} dict={dict} />)}
         {promoTracks.length === 0 && <p className="text-sm text-muted-foreground">{dict.noTracks}</p>}
       </section>
     </div>
