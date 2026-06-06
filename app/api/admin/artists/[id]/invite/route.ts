@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,7 +109,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   })
 
   if (inviteError) {
-    throw new ApiError(500, `Failed to send invite: ${inviteError.message}`)
+    throw buildApiError('EMAIL_SEND_FAILED', 500)
   }
 
   return NextResponse.json({ ok: true, email })

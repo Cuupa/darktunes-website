@@ -32,7 +32,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
     try {
       const result = await getMarketingAssetDownloadUrl(assetId)
       if (!result.url) {
-        toast.error('Failed to generate download link')
+        toast.error(dict.statements_downloadError)
         return
       }
       window.open(result.url, '_blank', 'noopener,noreferrer')

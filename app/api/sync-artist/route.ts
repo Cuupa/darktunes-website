@@ -19,7 +19,7 @@ import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { syncArtist } from '@/lib/sync/syncArtist'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Auth helper
@@ -28,11 +28,11 @@ import { ApiError, withErrorHandler } from '@/lib/errors'
 async function verifyToken(token: string): Promise<string> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new ApiError(500, 'Supabase service key not configured')
+  if (!url || !serviceKey) throw buildApiError('CONFIG_ERROR', 500)
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
   const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new ApiError(401, 'Unauthorized')
+  if (error || !data.user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
   return data.user.id
 }
 
@@ -44,7 +44,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   // 1. Authenticate
   const authHeader = request.headers.get('authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Missing or invalid Authorization header')
+    throw buildApiError('AUTH_TOKEN_MISSING', 401)
   }
   await verifyToken(authHeader.slice(7))
 
@@ -81,11 +81,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     !CLOUDFLARE_R2_BUCKET_NAME ||
     !CLOUDFLARE_R2_PUBLIC_URL
   ) {
-    throw new ApiError(500, 'R2 storage is not configured')
+    throw buildApiError('CONFIG_ERROR', 500)
   }
 
   if (!NEXT_PUBLIC_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new ApiError(500, 'Supabase is not configured')
+    throw buildApiError('CONFIG_ERROR', 500)
   }
 
   // 4. Wire up dependencies

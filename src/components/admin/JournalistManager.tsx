@@ -34,6 +34,9 @@ import { getPromoTracks, createPromoTrack, deletePromoTrack } from '@/lib/api/pr
 import type { JournalistApplication } from '@/lib/api/journalistApplications'
 import type { PressPhoto } from '@/lib/api/pressPhotos'
 import type { PromoTrack } from '@/lib/api/promoTracks'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Status badge
@@ -59,6 +62,7 @@ function StatusBadge({ status }: { status: string }) {
 // ---------------------------------------------------------------------------
 
 export function JournalistManager() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const [applications, setApplications] = useState<JournalistApplication[]>([])
@@ -111,7 +115,7 @@ export function JournalistManager() {
       toast.success(`Application ${status}`)
       fetchAll()
     } else {
-      toast.error('Failed to update application')
+      toast.error(dict.errors.SERVER_ERROR)
     }
   }
 
@@ -138,7 +142,7 @@ export function JournalistManager() {
       })
       if (!uploadRes.ok) {
         const err = (await uploadRes.json().catch(() => ({}) )) as { error?: string }
-        throw new Error(err.error ?? `Upload failed (${uploadRes.status})`)
+        throw new Error(getErrorMessage(err as ApiErrorResponse, dict))
       }
       const { r2Key, publicUrl } = (await uploadRes.json()) as { r2Key: string; publicUrl: string }
 
@@ -154,7 +158,7 @@ export function JournalistManager() {
       setPhotoFile(null)
       fetchAll()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setPhotoUploading(false)
     }
@@ -183,7 +187,7 @@ export function JournalistManager() {
       })
       if (!uploadRes.ok) {
         const err = (await uploadRes.json().catch(() => ({}) )) as { error?: string }
-        throw new Error(err.error ?? `Upload failed (${uploadRes.status})`)
+        throw new Error(getErrorMessage(err as ApiErrorResponse, dict))
       }
       const { r2Key } = (await uploadRes.json()) as { r2Key: string; publicUrl: string }
 
@@ -199,7 +203,7 @@ export function JournalistManager() {
       setTrackFile(null)
       fetchAll()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setTrackUploading(false)
     }
@@ -348,7 +352,7 @@ export function JournalistManager() {
                       onClick={() => {
                         deletePressPhoto(supabase, photo.id)
                           .then(fetchAll)
-                          .catch(() => toast.error('Delete failed'))
+                          .catch(() => toast.error(dict.errors.SERVER_ERROR))
                       }}
                       aria-label={`Delete ${photo.title}`}
                     >
@@ -431,7 +435,7 @@ export function JournalistManager() {
                     onClick={() => {
                       deletePromoTrack(supabase, track.id)
                         .then(fetchAll)
-                        .catch(() => toast.error('Delete failed'))
+                        .catch(() => toast.error(dict.errors.SERVER_ERROR))
                     }}
                     aria-label={`Delete ${track.title}`}
                   >

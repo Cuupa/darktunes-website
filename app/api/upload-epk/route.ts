@@ -24,7 +24,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
 
 const ALLOWED_CATEGORIES = ['press-photos', 'promo-tracks'] as const
@@ -73,7 +73,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     !CLOUDFLARE_R2_BUCKET_NAME ||
     !CLOUDFLARE_R2_PUBLIC_URL
   ) {
-    throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
+    throw buildApiError('CONFIG_ERROR', 500)
   }
 
   // 4. Upload to R2 server-side

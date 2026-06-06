@@ -75,7 +75,7 @@ describe('uploadRiderDocument', () => {
         'technical',
         'test-token',
       ),
-    ).rejects.toThrow('Upload failed (422)')
+    ).rejects.toThrow('Upload failed')
   })
 
   it('throws when response has no url', async () => {
@@ -121,6 +121,6 @@ describe('saveArtistProfile', () => {
 
   it('throws on non-OK response', async () => {
     globalThis.fetch = mockFetch(500, {})
-    await expect(saveArtistProfile(minimalPayload, 'tok')).rejects.toThrow('Save failed (500)')
+    await expect(saveArtistProfile(minimalPayload, 'tok')).rejects.toThrow('Save failed')
   })
 })

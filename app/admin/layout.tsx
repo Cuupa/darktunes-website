@@ -10,6 +10,7 @@
  */
 
 import type { Metadata } from 'next'
+import { getDictionary } from '@/i18n/getDictionary'
 import { AdminClientLayout } from './_components/AdminClientLayout'
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <AdminClientLayout>{children}</AdminClientLayout>
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const dict = await getDictionary()
+  return <AdminClientLayout dict={dict}>{children}</AdminClientLayout>
 }

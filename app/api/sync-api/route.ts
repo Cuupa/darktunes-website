@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
-import { withErrorHandler, ApiError } from '@/lib/errors'
+import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
@@ -24,18 +24,18 @@ import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw new ApiError(500, 'Supabase service key not configured')
+  if (!url || !serviceKey) throw buildApiError('CONFIG_ERROR', 500)
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
   const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new ApiError(401, 'Unauthorized')
+  if (error || !data.user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate
   const authHeader = request.headers.get('authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Missing or invalid Authorization header')
+    throw buildApiError('AUTH_TOKEN_MISSING', 401)
   }
   await verifyToken(authHeader.slice(7))
 
@@ -50,26 +50,23 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) {
-    throw new ApiError(500, 'Supabase is not configured', 'MISSING_SUPABASE_CONFIG')
+    throw buildApiError('CONFIG_ERROR', 500)
   }
 
   // 4. YouTube — handled separately (no R2 needed)
   if (apiSource === 'youtube') {
     const youtubeApiKey = process.env.YOUTUBE_API_KEY
     const youtubeChannelId = process.env.YOUTUBE_CHANNEL_ID
-    if (!youtubeApiKey)
-      throw new ApiError(500, 'YOUTUBE_API_KEY is not configured', 'MISSING_CONFIG')
-    if (!youtubeChannelId)
-      throw new ApiError(500, 'YOUTUBE_CHANNEL_ID is not configured', 'MISSING_CONFIG')
+    if (!youtubeApiKey) throw buildApiError('CONFIG_ERROR', 500)
+    if (!youtubeChannelId) throw buildApiError('CONFIG_ERROR', 500)
 
     const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
     let videos
     try {
       videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      throw new ApiError(502, `YouTube API error: ${msg}`, 'YOUTUBE_FETCH_ERROR')
+    } catch {
+      throw buildApiError('EXTERNAL_API_ERROR', 502)
     }
 
     if (videos.length === 0) {
@@ -106,7 +103,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     const { error } = await db
       .from('videos')
       .upsert(rows, { onConflict: 'youtube_id', ignoreDuplicates: false })
-    if (error) throw new ApiError(500, `DB upsert failed: ${error.message}`)
+    if (error) throw buildApiError('DB_ERROR', 500)
 
     // Write a sync_log entry so the health dashboard reflects the last YouTube sync time
     await db.from('sync_logs').insert({
@@ -148,7 +145,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     !CLOUDFLARE_R2_PUBLIC_URL
   ) {
     if (!NO_R2_APIS.has(apiSource ?? '')) {
-      throw new ApiError(500, 'R2 storage is not configured', 'MISSING_R2_CONFIG')
+      throw buildApiError('CONFIG_ERROR', 500)
     }
   }
 

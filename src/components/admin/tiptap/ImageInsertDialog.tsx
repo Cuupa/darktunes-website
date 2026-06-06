@@ -43,6 +43,9 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ImageFloat, ResizableImageAttrs } from './ResizableImageExtension'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -91,6 +94,7 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
 // ─── Upload tab ──────────────────────────────────────────────────────────────
 
 function UploadTab({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<number | null>(null)
@@ -102,7 +106,7 @@ function UploadTab({ onUploaded }: { onUploaded: (url: string) => void }) {
     setProgress(0)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
+      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
@@ -115,23 +119,23 @@ function UploadTab({ onUploaded }: { onUploaded: (url: string) => void }) {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              const data = JSON.parse(xhr.responseText) as { publicUrl?: string; error?: string }
+              const data = JSON.parse(xhr.responseText) as { publicUrl?: string; error?: string; code?: string }
               if (data.publicUrl) { setProgress(100); onUploaded(data.publicUrl); resolve() }
-              else reject(new Error(data.error ?? `HTTP ${xhr.status}`))
-            } catch { reject(new Error('Invalid server response')) }
+              else reject(new Error(getErrorMessage(data as ApiErrorResponse, dict)))
+            } catch { reject(new Error(dict.errors.SERVER_ERROR)) }
           } else {
-            try { reject(new Error((JSON.parse(xhr.responseText) as { error?: string }).error ?? `HTTP ${xhr.status}`)) }
-            catch { reject(new Error(`HTTP ${xhr.status}`)) }
+            try { reject(new Error(getErrorMessage(JSON.parse(xhr.responseText) as ApiErrorResponse, dict))) }
+            catch { reject(new Error(dict.errors.SERVER_ERROR)) }
           }
         })
-        xhr.addEventListener('error', () => reject(new Error('Network error')))
+        xhr.addEventListener('error', () => reject(new Error(dict.errors.SERVER_ERROR)))
         xhr.open('POST', '/api/upload')
         xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token)
         xhr.send(formData)
       })
       toast.success('Image uploaded')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setTimeout(() => setProgress(null), 800)
       if (inputRef.current) inputRef.current.value = ''

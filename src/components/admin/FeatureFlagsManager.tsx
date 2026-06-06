@@ -6,9 +6,13 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getFeatureFlags } from '@/lib/api/featureFlags'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 import type { PortalFeatureFlag } from '@/types'
 
 export function FeatureFlagsManager() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [flags, setFlags] = useState<PortalFeatureFlag[]>([])
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -16,8 +20,8 @@ export function FeatureFlagsManager() {
   useEffect(() => {
     void getFeatureFlags(supabase)
       .then(setFlags)
-      .catch((err) => toast.error(err instanceof Error ? err.message : 'Failed to load feature flags'))
-  }, [supabase])
+      .catch(() => toast.error(dict.errors.SERVER_ERROR))
+  }, [supabase, dict])
 
   const toggleFlag = async (flag: PortalFeatureFlag, enabled: boolean) => {
     setLoadingId(flag.id)
@@ -25,26 +29,26 @@ export function FeatureFlagsManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
+      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
 
       const res = await fetch(`/api/admin/feature-flags/${flag.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: 'Bearer ' + session.access_token,
         },
         body: JSON.stringify({ enabled }),
       })
 
       if (!res.ok) {
-        const body = (await res.json()) as { error?: string }
-        throw new Error(body.error ?? 'Failed to update feature flag')
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
       }
 
       setFlags((prev) => prev.map((item) => (item.id === flag.id ? { ...item, enabled } : item)))
       toast.success(`Updated ${flag.label}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update feature flag')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setLoadingId(null)
     }

@@ -50,6 +50,9 @@ import {
 } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
+import { useDict } from '@/contexts/DictContext'
+import { getErrorMessage } from '@/lib/clientErrors'
+import type { ApiErrorResponse } from '@/lib/errors'
 
 type DbRolePermissions = Database['public']['Tables']['role_permissions']['Row']
 type PermissionKey = Exclude<keyof DbRolePermissions, 'role' | 'updated_at' | 'updated_by'>
@@ -91,7 +94,7 @@ function formatDate(iso: string) {
 
 async function getAuthHeader(supabase: ReturnType<typeof createBrowserSupabaseClient>) {
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error('Not authenticated')
+  if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
   return { Authorization: 'Bearer ' + session.access_token }
 }
 
@@ -100,6 +103,7 @@ async function getAuthHeader(supabase: ReturnType<typeof createBrowserSupabaseCl
 // ---------------------------------------------------------------------------
 
 function SystemRolesTab() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving]   = useState(false)
@@ -111,18 +115,18 @@ function SystemRolesTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch('/api/admin/roles/permissions', { headers })
-      if (!res.ok) throw new Error(`Failed to load permissions: ${res.statusText}`)
+      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
       const rows = (await res.json()) as DbRolePermissions[]
       const map: PermissionsMap = {}
       for (const row of rows) map[row.role as Role] = row
       setServerData(map)
       setLocal(map)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load permissions')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
+  }, [supabase, dict])
 
   useEffect(() => { void loadPermissions() }, [loadPermissions])
 
@@ -163,8 +167,8 @@ function SystemRolesTab() {
             body: JSON.stringify({ role, permissions }),
           })
           if (!res.ok) {
-            const body = (await res.json().catch(() => ({}))) as { error?: string }
-            throw new Error(body.error ?? `Failed to save ${role} permissions`)
+            const body = (await res.json().catch(() => ({}))) as ApiErrorResponse
+            throw new Error(getErrorMessage(body, dict))
           }
           const updated = (await res.json()) as DbRolePermissions
           setServerData((prev) => ({ ...prev, [role]: updated }))
@@ -173,7 +177,7 @@ function SystemRolesTab() {
       )
       toast.success('Role permissions saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsSaving(false)
     }
@@ -247,6 +251,7 @@ interface RoleFormState {
 }
 
 function CustomRolesTab() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [roles, setRoles]             = useState<CustomRole[]>([])
   const [permDefs, setPermDefs]       = useState<CustomPermDef[]>([])
@@ -265,16 +270,16 @@ function CustomRolesTab() {
         fetch('/api/admin/roles/custom', { headers }),
         fetch('/api/admin/roles/permissions-def', { headers }),
       ])
-      if (!rolesRes.ok) throw new Error('Failed to load custom roles')
-      if (!permsRes.ok) throw new Error('Failed to load permission definitions')
+      if (!rolesRes.ok) { const body = (await rolesRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
+      if (!permsRes.ok) { const body = (await permsRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
       setRoles((await rolesRes.json()) as CustomRole[])
       setPermDefs((await permsRes.json()) as CustomPermDef[])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Load failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
+  }, [supabase, dict])
 
   useEffect(() => { void loadData() }, [loadData])
 
@@ -300,8 +305,8 @@ function CustomRolesTab() {
   }
 
   const handleSave = async () => {
-    if (!form.label.trim()) { toast.error('Label is required'); return }
-    if (!editingRole && !form.name.trim()) { toast.error('Name is required'); return }
+    if (!form.label.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
+    if (!editingRole && !form.name.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
     setIsSaving(true)
     try {
       const headers = { ...(await getAuthHeader(supabase)), 'Content-Type': 'application/json' }
@@ -311,20 +316,20 @@ function CustomRolesTab() {
           headers,
           body: JSON.stringify({ label: form.label, description: form.description || null, permissions: form.permissions }),
         })
-        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Save failed')
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       } else {
         const res = await fetch('/api/admin/roles/custom', {
           method: 'POST',
           headers,
           body: JSON.stringify({ name: form.name, label: form.label, description: form.description || undefined, permissions: form.permissions }),
         })
-        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Create failed')
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       }
       toast.success(editingRole ? 'Role updated' : 'Role created')
       setShowForm(false)
       void loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsSaving(false)
     }
@@ -335,12 +340,12 @@ function CustomRolesTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/custom/${deleteTarget.id}`, { method: 'DELETE', headers })
-      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Delete failed')
+      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       toast.success('Role deleted')
       setDeleteTarget(null)
       void loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Delete failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 
@@ -499,6 +504,7 @@ function CustomRolesTab() {
 // ---------------------------------------------------------------------------
 
 function CustomPermissionsTab() {
+  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [defs, setDefs]             = useState<CustomPermDef[]>([])
   const [isLoading, setIsLoading]   = useState(true)
@@ -513,14 +519,14 @@ function CustomPermissionsTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch('/api/admin/roles/permissions-def', { headers })
-      if (!res.ok) throw new Error('Failed to load permission definitions')
+      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
       setDefs((await res.json()) as CustomPermDef[])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Load failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
+  }, [supabase, dict])
 
   useEffect(() => { void loadDefs() }, [loadDefs])
 
@@ -537,7 +543,7 @@ function CustomPermissionsTab() {
   }
 
   const handleSave = async () => {
-    if (!form.label.trim()) { toast.error('Label is required'); return }
+    if (!form.label.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
     if (!editingDef && !form.name.trim()) { toast.error('Name is required'); return }
     setIsSaving(true)
     try {
@@ -548,20 +554,20 @@ function CustomPermissionsTab() {
           headers,
           body: JSON.stringify({ label: form.label, description: form.description || null }),
         })
-        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Save failed')
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       } else {
         const res = await fetch('/api/admin/roles/permissions-def', {
           method: 'POST',
           headers,
           body: JSON.stringify({ name: form.name, label: form.label, description: form.description || undefined }),
         })
-        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Create failed')
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       }
       toast.success(editingDef ? 'Permission updated' : 'Permission created')
       setShowForm(false)
       void loadDefs()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsSaving(false)
     }
@@ -572,12 +578,12 @@ function CustomPermissionsTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/permissions-def/${deleteTarget.id}`, { method: 'DELETE', headers })
-      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Delete failed')
+      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
       toast.success('Permission definition deleted')
       setDeleteTarget(null)
       void loadDefs()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Delete failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     }
   }
 
@@ -727,7 +733,7 @@ function RbacAuditTab() {
       setEntries(body.data)
       setTotal(body.total)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Load failed')
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setLoading(false)
     }

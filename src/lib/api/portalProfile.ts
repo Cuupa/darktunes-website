@@ -64,7 +64,8 @@ export async function uploadRiderDocument(
   })
 
   if (!res.ok) {
-    throw new Error(`Upload failed (${res.status})`)
+    const errBody = await res.json().catch(() => ({}) ) as { error?: string }
+    throw new Error(errBody.error ?? 'Upload failed')
   }
 
   const data = (await res.json()) as { url?: string }
@@ -115,7 +116,12 @@ export function uploadArtistPhoto(
           reject(new Error('Invalid server response'))
         }
       } else {
-        reject(new Error(`Upload failed (${xhr.status})`))
+        try {
+          const errBody = JSON.parse(xhr.responseText) as { error?: string }
+          reject(new Error(errBody.error ?? 'Upload failed'))
+        } catch {
+          reject(new Error('Upload failed'))
+        }
       }
     })
 
@@ -147,6 +153,7 @@ export async function saveArtistProfile(
   })
 
   if (!res.ok) {
-    throw new Error(`Save failed (${res.status})`)
+    const errBody = await res.json().catch(() => ({}) ) as { error?: string }
+    throw new Error(errBody.error ?? 'Save failed')
   }
 }

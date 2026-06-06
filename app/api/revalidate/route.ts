@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { buildApiError, withErrorHandler } from '@/lib/errors'
 
 const ALL_TAGS = ['artists', 'releases', 'news', 'videos', 'site-settings'] as const
 type CacheTag = (typeof ALL_TAGS)[number]
@@ -34,13 +34,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   // Authenticate with shared secret
   const secret = process.env.REVALIDATE_SECRET
   if (!secret) {
-    throw new ApiError(503, 'Revalidation is not configured (REVALIDATE_SECRET not set)')
+    throw buildApiError('CONFIG_ERROR', 503)
   }
 
   const authHeader = request.headers.get('authorization') ?? ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
   if (token !== secret) {
-    throw new ApiError(401, 'Unauthorized')
+    throw buildApiError('AUTH_TOKEN_INVALID', 401)
   }
 
   // Parse body — tolerate empty body (Supabase sends minimal payloads)
