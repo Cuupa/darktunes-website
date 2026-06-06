@@ -61,11 +61,10 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates }
           <CardTitle>{dict.analytics_monthlyTrend}</CardTitle>
         </CardHeader>
         <CardContent>
+          <div role="img" aria-label={dict.analytics_monthlyTrend}>
           <ResponsiveContainer
             width="100%"
             height={300}
-            role="img"
-            aria-label={dict.analytics_monthlyTrend}
           >
             <BarChart data={monthlyData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#383838" />
@@ -92,6 +91,7 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates }
               ))}
             </BarChart>
           </ResponsiveContainer>
+          </div>
 
           {/* Visually-hidden data table for screen readers */}
           <table className="sr-only">
