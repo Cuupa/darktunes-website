@@ -182,7 +182,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           artistName: artist.name,
           invoiceNumber,
           clientEmail: labelEmail,
-          clientName: siteSettings.siteName ?? 'Label',
+          clientName: siteSettings.labelName ?? 'Label',
           pdfUrl,
         },
         {

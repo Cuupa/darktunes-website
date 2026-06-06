@@ -242,9 +242,9 @@ export function ReleaseChecklistPanel({
                     <Card key={r.id} className="bg-card border-border">
                       <CardHeader className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          {r.artworkUrl ? (
+                          {r.coverArt ? (
                             <Image
-                              src={getOptimizedImageUrl(r.artworkUrl, 48)}
+                              src={getOptimizedImageUrl(r.coverArt, 48)}
                               alt={r.title}
                               width={40}
                               height={40}
