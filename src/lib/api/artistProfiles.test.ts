@@ -96,6 +96,8 @@ const mockProfileRow: ArtistProfileRow = {
   epk_sections_hidden: [],
   epk_password_hash: null,
   epk_password_sections: [],
+  epk_gallery_photos: [],
+  epk_custom_theme_tokens: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -105,10 +105,13 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle>{dict.settings_language}</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {dict.settings_language_current}: {locale === 'de' ? 'Deutsch' : 'English'}
+          </p>
         </CardHeader>
         <CardContent>
           <Button variant="outline" onClick={switchLocale}>
-            {locale === 'de' ? 'English' : 'Deutsch'}
+            {dict.settings_language_switch_to} {locale === 'de' ? 'English' : 'Deutsch'}
           </Button>
         </CardContent>
       </Card>

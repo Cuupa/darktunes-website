@@ -246,16 +246,43 @@ export function getEPKTheme(id: string | undefined): EPKTheme {
   return EPK_THEMES[id ?? DEFAULT_THEME_ID] ?? EPK_THEMES[DEFAULT_THEME_ID]
 }
 
+/** Build a theme from user-supplied custom color tokens, falling back to the default theme. */
+export function buildCustomTheme(tokens: Record<string, string>): EPKTheme {
+  const base = defaultTheme
+  const bg = tokens.bg ?? 'hsl(var(--card))'
+  const text = tokens.text ?? 'hsl(var(--foreground))'
+  const accent = tokens.accent ?? 'hsl(var(--primary))'
+  const heading = tokens.heading ?? 'hsl(var(--muted-foreground))'
+
+  return {
+    ...base,
+    id: 'custom',
+    name: 'Custom',
+    article: { ...base.article, background: bg, color: text },
+    header: { ...base.header, background: bg },
+    headerLabel: { ...base.headerLabel, color: accent },
+    artistName: { ...base.artistName },
+    body: { ...base.body, background: bg },
+    sectionHeading: { ...base.sectionHeading, color: heading },
+    text: { color: text },
+    mutedText: { color: text + '99' },
+    accent,
+    blockquote: { ...base.blockquote, borderLeft: `4px solid ${accent}99`, color: text + 'b3' },
+    footer: { ...base.footer, background: bg },
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Section ordering constants
 // ---------------------------------------------------------------------------
 
-export type EPKSectionId = 'header' | 'quote' | 'bio' | 'info' | 'contacts' | 'riders' | 'links'
+export type EPKSectionId = 'header' | 'quote' | 'bio' | 'info' | 'contacts' | 'riders' | 'links' | 'gallery'
 
 export const DEFAULT_SECTIONS_ORDER: EPKSectionId[] = [
   'header',
   'quote',
   'bio',
+  'gallery',
   'info',
   'contacts',
   'riders',

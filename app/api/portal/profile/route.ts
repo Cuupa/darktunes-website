@@ -60,6 +60,9 @@ const profileBodySchema = z.object({
   // EPK password protection — client sends plaintext prefixed with __plain__
   epk_password_raw: z.string().max(200).nullable().optional(),
   epk_password_sections: z.array(z.string()).optional(),
+  // EPK gallery + custom theme
+  epk_gallery_photos: z.array(z.string().url()).optional(),
+  epk_custom_theme_tokens: z.record(z.string(), z.string()).nullable().optional(),
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {

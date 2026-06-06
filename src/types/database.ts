@@ -297,6 +297,8 @@ export interface Database {
           epk_sections_hidden: string[]
           epk_password_hash: string | null
           epk_password_sections: string[]
+          epk_gallery_photos: string[]
+          epk_custom_theme_tokens: Record<string, string> | null
           created_at: string
           updated_at: string
         }
@@ -324,6 +326,8 @@ export interface Database {
           epk_sections_hidden?: string[]
           epk_password_hash?: string | null
           epk_password_sections?: string[]
+          epk_gallery_photos?: string[]
+          epk_custom_theme_tokens?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }
@@ -351,6 +355,8 @@ export interface Database {
           epk_sections_hidden?: string[]
           epk_password_hash?: string | null
           epk_password_sections?: string[]
+          epk_gallery_photos?: string[]
+          epk_custom_theme_tokens?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }

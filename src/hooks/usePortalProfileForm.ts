@@ -81,20 +81,26 @@ export function usePortalProfileForm({
   })
   const [riderUploading, setRiderUploading] = useState<RiderType | null>(null)
 
-  // EPK customisation settings (theme, section order, password)
+  // EPK customisation settings (theme, section order, password, gallery, custom colors)
   const [epkSettings, setEpkSettings] = useState<{
     epkTheme: string
     epkSectionsOrder: string[]
     epkSectionsHidden: string[]
     epkPasswordSections: string[]
     epkPasswordRaw?: string | null
+    epkCustomThemeTokens: Record<string, string>
   }>({
     epkTheme: initialProfile?.epkTheme ?? 'default',
-    epkSectionsOrder: initialProfile?.epkSectionsOrder?.length ? initialProfile.epkSectionsOrder : ['header','quote','bio','info','contacts','riders','links'],
+    epkSectionsOrder: initialProfile?.epkSectionsOrder?.length ? initialProfile.epkSectionsOrder : ['header','quote','bio','gallery','info','contacts','riders','links'],
     epkSectionsHidden: initialProfile?.epkSectionsHidden ?? [],
     epkPasswordSections: initialProfile?.epkPasswordSections ?? [],
     epkPasswordRaw: undefined,
+    epkCustomThemeTokens: initialProfile?.epkCustomThemeTokens ?? {},
   })
+
+  // Gallery photos (managed separately from the main form)
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>(initialProfile?.epkGalleryPhotos ?? [])
+  const [galleryUploading, setGalleryUploading] = useState(false)
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -182,6 +188,35 @@ export function usePortalProfileForm({
   }
 
   // -------------------------------------------------------------------------
+  // Gallery photo upload / remove
+  // -------------------------------------------------------------------------
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setGalleryUploading(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { toast.error(dict.profile_photoError); return }
+      // Reuse the same upload endpoint — filename collision avoidance via timestamp
+      const renamedFile = new File([file], `gallery-${Date.now()}-${file.name}`, { type: file.type })
+      const url = await uploadArtistPhoto(artistId, renamedFile, session.access_token, () => {})
+      setGalleryPhotos((prev) => [...prev, url])
+      toast.success(dict.profile_photoUploaded)
+    } catch {
+      toast.error(dict.profile_photoError)
+    } finally {
+      setGalleryUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleGalleryRemove = (url: string) => {
+    setGalleryPhotos((prev) => prev.filter((u) => u !== url))
+  }
+
+  // -------------------------------------------------------------------------
   // EPK settings change handler (called from EPKPreview child)
   // -------------------------------------------------------------------------
 
@@ -191,6 +226,7 @@ export function usePortalProfileForm({
     epkSectionsHidden: string[]
     epkPasswordSections: string[]
     epkPasswordHash: string | undefined
+    epkCustomThemeTokens: Record<string, string>
   }>) => {
     setEpkSettings((prev) => {
       // Extract raw password from the __plain__ sentinel
@@ -209,6 +245,7 @@ export function usePortalProfileForm({
         ...(updates.epkSectionsOrder !== undefined ? { epkSectionsOrder: updates.epkSectionsOrder } : {}),
         ...(updates.epkSectionsHidden !== undefined ? { epkSectionsHidden: updates.epkSectionsHidden } : {}),
         ...(updates.epkPasswordSections !== undefined ? { epkPasswordSections: updates.epkPasswordSections } : {}),
+        ...(updates.epkCustomThemeTokens !== undefined ? { epkCustomThemeTokens: updates.epkCustomThemeTokens } : {}),
         epkPasswordRaw,
       }
     })
@@ -264,6 +301,10 @@ export function usePortalProfileForm({
           epk_sections_order: epkSettings.epkSectionsOrder,
           epk_sections_hidden: epkSettings.epkSectionsHidden,
           epk_password_sections: epkSettings.epkPasswordSections,
+          epk_gallery_photos: galleryPhotos,
+          epk_custom_theme_tokens: Object.keys(epkSettings.epkCustomThemeTokens).length > 0
+            ? epkSettings.epkCustomThemeTokens
+            : null,
           ...(epkSettings.epkPasswordRaw !== undefined ? { epk_password_raw: epkSettings.epkPasswordRaw } : {}),
         },
         session.access_token,
@@ -286,9 +327,13 @@ export function usePortalProfileForm({
     riderUrls,
     riderUploading,
     epkSettings,
+    galleryPhotos,
+    galleryUploading,
     handlePhotoChange,
     handleRiderUpload,
     handleRiderDelete,
+    handleGalleryUpload,
+    handleGalleryRemove,
     handleEpkSettingsChange,
     onSubmit: form.handleSubmit(onSubmit),
   }

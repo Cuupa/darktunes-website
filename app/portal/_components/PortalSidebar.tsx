@@ -15,6 +15,7 @@ import {
   MapPin,
   MegaphoneSimple,
   MusicNotes,
+  Question,
   Receipt,
   SignOut,
   User,
@@ -102,6 +103,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_account',
     items: [
       { href: '/portal/settings', label: 'settings', icon: Gear },
+      { href: '/portal/help', label: 'help', icon: Question },
     ],
   },
 ]

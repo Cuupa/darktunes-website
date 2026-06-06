@@ -97,9 +97,13 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     riderUrls,
     riderUploading,
     epkSettings,
+    galleryPhotos,
+    galleryUploading,
     handlePhotoChange,
     handleRiderUpload,
     handleRiderDelete,
+    handleGalleryUpload,
+    handleGalleryRemove,
     handleEpkSettingsChange,
     onSubmit,
   } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
@@ -132,6 +136,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     riderStagePlotUrl: riderUrls.stage_plot,
     riderTechnicalUrl: riderUrls.technical,
     riderHospitalityUrl: riderUrls.hospitality,
+    photoGallery: galleryPhotos,
     labelName: labelName ?? undefined,
     labelLogoUrl: labelLogoUrl ?? undefined,
   }
@@ -264,6 +269,48 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
                   {uploadProgress !== null && (
                     <Progress value={uploadProgress} className="h-1 w-48" aria-label="Upload progress" />
                   )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Gallery photos */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{dict.epk_gallery_heading}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {galleryPhotos.map((url) => (
+                    <div key={url} className="relative group aspect-square">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt=""
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={dict.epk_gallery_remove}
+                        onClick={() => handleGalleryRemove(url)}
+                      >
+                        <Trash size={12} aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ))}
+                  <label className="aspect-square flex flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground text-xs">
+                    <Camera size={18} aria-hidden="true" />
+                    <span>{galleryUploading ? dict.epk_gallery_uploading : dict.epk_gallery_add}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={galleryUploading}
+                      onChange={handleGalleryUpload}
+                    />
+                  </label>
                 </div>
               </CardContent>
             </Card>
@@ -522,6 +569,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               epkSectionsHidden={epkSettings.epkSectionsHidden}
               epkPasswordHash={epkSettings.epkPasswordRaw ? `__plain__${epkSettings.epkPasswordRaw}` : undefined}
               epkPasswordSections={epkSettings.epkPasswordSections}
+              epkCustomThemeTokens={epkSettings.epkCustomThemeTokens}
               onSettingsChange={handleEpkSettingsChange}
             />
           </TabsContent>

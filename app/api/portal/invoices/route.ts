@@ -35,6 +35,7 @@ const createInvoiceSchema = z.object({
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   issued_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   send_email: z.boolean().default(true),
+  send_to_label: z.boolean().default(false),
 })
 
 // ── GET /api/portal/invoices ──────────────────────────────────────────────
@@ -152,7 +153,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     status: d.send_email ? 'sent' : 'draft',
   })
 
-  // Send email
+  // Send email to client
   if (d.send_email) {
     await sendInvoiceEmail(
       {
@@ -168,6 +169,29 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         fetch: globalThis.fetch,
       },
     )
+  }
+
+  // Optionally send a copy to the label
+  if (d.send_to_label) {
+    const { getSiteSettings } = await import('@/lib/api/siteSettings')
+    const siteSettings = await getSiteSettings(supabase)
+    const labelEmail = siteSettings.contactEmail
+    if (labelEmail) {
+      await sendInvoiceEmail(
+        {
+          artistName: artist.name,
+          invoiceNumber,
+          clientEmail: labelEmail,
+          clientName: siteSettings.labelName ?? 'Label',
+          pdfUrl,
+        },
+        {
+          resendApiKey: serverEnv.RESEND_API_KEY ?? '',
+          resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? '',
+          fetch: globalThis.fetch,
+        },
+      )
+    }
   }
 
   return NextResponse.json({ invoice: updated, pdf_url: pdfUrl }, { status: 201 })

@@ -38,6 +38,7 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
   const [currency, setCurrency] = useState('EUR')
   const [taxRatePct, setTaxRatePct] = useState(19)
   const [sendEmail, setSendEmail] = useState(true)
+  const [sendToLabel, setSendToLabel] = useState(true)
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: '', qty: 1, unit_price_cents: 0 },
   ])
@@ -91,6 +92,7 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
           tax_rate_pct: taxRatePct,
           due_date: dueDate,
           send_email: sendEmail,
+          send_to_label: sendToLabel,
         }),
       })
       if (!res.ok) {
@@ -263,6 +265,18 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
               className="h-4 w-4 rounded border-border"
             />
             <Label htmlFor="inv-send-email">{dict.invoice_send}</Label>
+          </div>
+
+          {/* Send copy to label */}
+          <div className="flex items-center gap-2">
+            <input
+              id="inv-send-to-label"
+              type="checkbox"
+              checked={sendToLabel}
+              onChange={(e) => setSendToLabel(e.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="inv-send-to-label">{dict.invoice_send_to_label}</Label>
           </div>
 
           <div className="flex justify-end gap-3">

@@ -51,6 +51,9 @@ type EventType = 'gig' | 'dj_set' | 'tour' | 'custom'
 
 const PRESET_TYPES: EventType[] = ['gig', 'dj_set', 'tour', 'custom']
 
+/** Sentinel for "no news post selected" — Radix UI prohibits empty-string SelectItem values */
+const NO_NEWS_POST = '__none__'
+
 const EMPTY_FORM = {
   eventName: '',
   concertDate: '',
@@ -508,12 +511,14 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
                   {dict.tour_news_link}
                 </span>
               </Label>
-              <Select value={form.newsPostId || ''} onValueChange={(v) => setForm((prev) => ({ ...prev, newsPostId: v }))}>
+              <Select
+                value={form.newsPostId || NO_NEWS_POST}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, newsPostId: v === NO_NEWS_POST ? '' : v }))}>
                 <SelectTrigger id="ev-news" className="min-h-[44px]">
                   <SelectValue placeholder={dict.tour_news_none} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{dict.tour_news_none}</SelectItem>
+                  <SelectItem value={NO_NEWS_POST}>{dict.tour_news_none}</SelectItem>
                   {newsPosts.map((post) => (
                     <SelectItem key={post.id} value={post.id}>{post.title}</SelectItem>
                   ))}
