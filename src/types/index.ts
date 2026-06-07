@@ -545,6 +545,14 @@ export interface SiteSettings {
   themeGradientAccentTo?: string
   /** CSS direction / angle of the accent gradient. */
   themeGradientAccentDir?: string
+  /**
+   * Full structured theme config stored as a JSON blob in site_settings
+   * (key = 'theme_config').  When present this takes precedence over the
+   * individual flat theme_* keys for typography, glass, and animation
+   * tokens.  Colors and gradients still fall back to flat keys for
+   * backward compatibility.
+   */
+  themeConfig?: import('@/config/themeConfig').ThemeConfig
 }
 
 // ── Messaging ──────────────────────────────────────────────────────────────

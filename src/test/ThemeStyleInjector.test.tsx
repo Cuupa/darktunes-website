@@ -16,11 +16,17 @@ import React from 'react'
 // @ts-ignore — path outside @/ alias, resolved by relative import
 import { ThemeStyleInjector } from '../../app/_components/ThemeStyleInjector'
 import type { ThemeColors } from '../../app/_components/ThemeStyleInjector'
+import type { ThemeConfig } from '@/config/themeConfig'
 
 function renderStyle(colors: ThemeColors) {
   const { container } = render(<ThemeStyleInjector {...colors} />)
   const style = container.querySelector('style')
   return style?.textContent ?? null
+}
+
+function renderFull(colors: ThemeColors) {
+  const { container } = render(<ThemeStyleInjector {...colors} />)
+  return container
 }
 
 describe('ThemeStyleInjector', () => {
@@ -82,4 +88,98 @@ describe('ThemeStyleInjector', () => {
     const css = renderStyle({ themePrimary: '   ' })
     expect(css).toBeNull()
   })
+
+  // ── ThemeConfig path ────────────────────────────────────────────────────
+
+  it('emits colors from themeConfig.colors', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aabbcc', secondary: '#ddeeff', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: {},
+      glass: {},
+      animation: {},
+    }
+    const css = renderStyle({ themeConfig: config })
+    expect(css).toContain('--primary: #aabbcc')
+    expect(css).toContain('--secondary: #ddeeff')
+  })
+
+  it('emits --font-family-body from themeConfig.typography.fontFamily', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: { fontFamily: 'Inter' },
+      glass: {},
+      animation: {},
+    }
+    const css = renderStyle({ themeConfig: config })
+    expect(css).toContain('--font-family-body: Inter')
+  })
+
+  it('emits --heading-size from themeConfig.typography.headingSize', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: { headingSize: '3.5rem' },
+      glass: {},
+      animation: {},
+    }
+    const css = renderStyle({ themeConfig: config })
+    expect(css).toContain('--heading-size: 3.5rem')
+  })
+
+  it('emits glass tokens from themeConfig.glass', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: {},
+      glass: { blur: '16px', opacity: '0.2' },
+      animation: {},
+    }
+    const css = renderStyle({ themeConfig: config })
+    expect(css).toContain('--glass-blur: 16px')
+    expect(css).toContain('--glass-opacity: 0.2')
+  })
+
+  it('emits --animation-duration from themeConfig.animation', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: {},
+      glass: {},
+      animation: { duration: '0.6s' },
+    }
+    const css = renderStyle({ themeConfig: config })
+    expect(css).toContain('--animation-duration: 0.6s')
+  })
+
+  it('injects Google Font link tags when fontFamily is a known Google Font', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: { fontFamily: 'Inter' },
+      glass: {},
+      animation: {},
+    }
+    const container = renderFull({ themeConfig: config })
+    const links = container.querySelectorAll('link')
+    expect(links.length).toBeGreaterThanOrEqual(1)
+    const hrefs = Array.from(links).map((l) => l.getAttribute('href') ?? '')
+    expect(hrefs.some((h) => h.includes('fonts.googleapis.com'))).toBe(true)
+  })
+
+  it('does NOT inject Google Font links for unknown font family', () => {
+    const config: ThemeConfig = {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: { fontFamily: "'My Custom Font', sans-serif" },
+      glass: {},
+      animation: {},
+    }
+    const container = renderFull({ themeConfig: config })
+    const links = container.querySelectorAll('link')
+    const hasGoogleFont = Array.from(links).some((l) => (l.getAttribute('href') ?? '').includes('fonts.googleapis.com'))
+    expect(hasGoogleFont).toBe(false)
+  })
 })
+

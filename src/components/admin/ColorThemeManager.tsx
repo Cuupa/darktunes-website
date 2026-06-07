@@ -22,6 +22,8 @@ import {
   Eye,
   FilmStrip,
   Sun,
+  TextAa,
+  Sparkle,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,6 +35,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { SiteSettings } from '@/types'
 import { COLOR_PRESETS } from '@/config/colorPresets'
 import type { ThemePresetColors } from '@/config/colorPresets'
+import { THEME_PRESETS, THEME_PRESET_LABELS } from '@/config/themePresets'
+import { ANIMATION_PRESETS, ANIMATION_PRESET_LABELS } from '@/config/animationPresets'
+import type { ThemeConfig } from '@/config/themeConfig'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +89,22 @@ const GRADIENT_DIRECTIONS = [
   { value: '45deg',          label: '↗ 45°' },
   { value: '180deg',         label: '↓ 180°' },
   { value: '90deg',          label: '→ 90°' },
+]
+
+/** Popular Google Font options for the Typography tab. */
+const GOOGLE_FONT_OPTIONS = [
+  { value: '',                label: 'Default (Oxanium)' },
+  { value: 'Inter',           label: 'Inter' },
+  { value: 'Roboto',          label: 'Roboto' },
+  { value: 'Open Sans',       label: 'Open Sans' },
+  { value: 'Lato',            label: 'Lato' },
+  { value: 'Montserrat',      label: 'Montserrat' },
+  { value: 'Raleway',         label: 'Raleway' },
+  { value: 'Poppins',         label: 'Poppins' },
+  { value: 'Playfair Display',label: 'Playfair Display' },
+  { value: 'DM Sans',         label: 'DM Sans' },
+  { value: 'Nunito',          label: 'Nunito' },
+  { value: 'custom',          label: 'Custom…' },
 ]
 
 // ── WCAG contrast helpers ────────────────────────────────────────────────────
@@ -188,6 +209,26 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
   const [gradientAccentDir, setGradientAccentDir] = useState(() => value.themeGradientAccentDir ?? '135deg')
   const originalGradients = useRef({ gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' })
 
+  // Typography state
+  const [fontFamily, setFontFamily] = useState(() => value.themeConfig?.typography.fontFamily ?? '')
+  const [customFont, setCustomFont] = useState(() => {
+    const f = value.themeConfig?.typography.fontFamily ?? ''
+    return GOOGLE_FONT_OPTIONS.some((o) => o.value === f) ? '' : f
+  })
+  const [headingSize, setHeadingSize] = useState(() => {
+    const raw = value.themeConfig?.typography.headingSize ?? '2.5rem'
+    return parseFloat(raw) || 2.5
+  })
+  const originalTypography = useRef({ fontFamily: value.themeConfig?.typography.fontFamily ?? '', headingSize: parseFloat(value.themeConfig?.typography.headingSize ?? '2.5') || 2.5 })
+
+  // Animation state
+  const [animPreset, setAnimPreset] = useState(() => value.themeConfig?.animation.preset ?? 'slide-up')
+  const [animDuration, setAnimDuration] = useState(() => {
+    const raw = value.themeConfig?.animation.duration ?? '0.4s'
+    return parseFloat(raw) || 0.4
+  })
+  const originalAnimation = useRef({ animPreset: value.themeConfig?.animation.preset ?? 'slide-up', animDuration: parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4 })
+
   useEffect(() => {
     const fresh = extractColors(value)
     setColors(fresh)
@@ -205,6 +246,17 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setGradientAccentTo(g.gradientAccentTo)
     setGradientAccentDir(g.gradientAccentDir)
     originalGradients.current = g
+    const ff = value.themeConfig?.typography.fontFamily ?? ''
+    const hs = parseFloat(value.themeConfig?.typography.headingSize ?? '2.5') || 2.5
+    setFontFamily(ff)
+    setCustomFont(GOOGLE_FONT_OPTIONS.some((o) => o.value === ff) ? '' : ff)
+    setHeadingSize(hs)
+    originalTypography.current = { fontFamily: ff, headingSize: hs }
+    const ap = value.themeConfig?.animation.preset ?? 'slide-up'
+    const ad = parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4
+    setAnimPreset(ap)
+    setAnimDuration(ad)
+    originalAnimation.current = { animPreset: ap, animDuration: ad }
   }, [value])
 
   useEffect(() => { applyLive(colors) }, [colors])
@@ -224,6 +276,32 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setColors(preset.colors)
   }, [])
 
+  const handleFullPreset = useCallback((presetKey: string) => {
+    const p = THEME_PRESETS[presetKey]
+    if (!p) return
+    setColors({
+      themePrimary:    p.colors.primary,
+      themeSecondary:  p.colors.secondary,
+      themeBackground: p.colors.background,
+      themeForeground: p.colors.foreground,
+      themeCard:       p.colors.card,
+      themeMuted:      p.colors.muted,
+      themeAccent:     p.colors.accent,
+      themeBorder:     p.colors.border,
+    })
+    setGradientHeroFrom(p.gradients.heroFrom ?? '')
+    setGradientHeroTo(p.gradients.heroTo ?? '')
+    setGradientHeroDir(p.gradients.heroDir ?? '135deg')
+    setGradientAccentFrom(p.gradients.accentFrom ?? '')
+    setGradientAccentTo(p.gradients.accentTo ?? '')
+    setGradientAccentDir(p.gradients.accentDir ?? '135deg')
+    setFontFamily(p.typography.fontFamily ?? '')
+    setCustomFont('')
+    setHeadingSize(parseFloat(p.typography.headingSize ?? '2.5') || 2.5)
+    setAnimPreset(p.animation.preset ?? 'slide-up')
+    setAnimDuration(parseFloat(p.animation.duration ?? '0.4') || 0.4)
+  }, [])
+
   const handleCancel = useCallback(() => {
     setColors(originalColors.current)
     applyLive(originalColors.current)
@@ -238,11 +316,46 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setGradientAccentFrom(g.gradientAccentFrom)
     setGradientAccentTo(g.gradientAccentTo)
     setGradientAccentDir(g.gradientAccentDir)
+    setFontFamily(originalTypography.current.fontFamily)
+    setCustomFont('')
+    setHeadingSize(originalTypography.current.headingSize)
+    setAnimPreset(originalAnimation.current.animPreset)
+    setAnimDuration(originalAnimation.current.animDuration)
   }, [])
 
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
+      const effectiveFontFamily = fontFamily === 'custom' ? customFont : fontFamily
+      const themeConfig: ThemeConfig = {
+        colors: {
+          primary:    colors.themePrimary    ?? '',
+          secondary:  colors.themeSecondary  ?? '',
+          background: colors.themeBackground ?? '',
+          foreground: colors.themeForeground ?? '',
+          card:       colors.themeCard       ?? '',
+          muted:      colors.themeMuted      ?? '',
+          accent:     colors.themeAccent     ?? '',
+          border:     colors.themeBorder     ?? '',
+        },
+        gradients: {
+          heroFrom:   gradientHeroFrom,
+          heroTo:     gradientHeroTo,
+          heroDir:    gradientHeroDir,
+          accentFrom: gradientAccentFrom,
+          accentTo:   gradientAccentTo,
+          accentDir:  gradientAccentDir,
+        },
+        typography: {
+          fontFamily:  effectiveFontFamily || undefined,
+          headingSize: `${headingSize}rem`,
+        },
+        glass: value.themeConfig?.glass ?? {},
+        animation: {
+          preset:   animPreset,
+          duration: `${animDuration}s`,
+        },
+      }
       await onChange({
         ...value,
         ...colors,
@@ -255,35 +368,55 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         themeGradientAccentFrom: gradientAccentFrom,
         themeGradientAccentTo: gradientAccentTo,
         themeGradientAccentDir: gradientAccentDir,
+        themeConfig,
       })
       originalColors.current = { ...colors }
       originalEffects.current = { noiseOpacity, crtEnabled, vignetteIntensity }
       originalGradients.current = { gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir }
+      originalTypography.current = { fontFamily: effectiveFontFamily, headingSize }
+      originalAnimation.current = { animPreset, animDuration }
       toast.success('Color theme saved')
     } catch {
       toast.error('Failed to save color theme')
     } finally {
       setIsSaving(false)
     }
-  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
+  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir, fontFamily, customFont, headingSize, animPreset, animDuration])
 
   const disabled = isLoading || isSaving
 
   return (
     <div className="space-y-6">
       <Tabs defaultValue="colors">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="colors">Colors</TabsTrigger>
           <TabsTrigger value="effects">Effects</TabsTrigger>
           <TabsTrigger value="gradients">Gradients</TabsTrigger>
+          <TabsTrigger value="typography">Typography</TabsTrigger>
+          <TabsTrigger value="animations">Animations</TabsTrigger>
           <TabsTrigger value="contrast">Contrast Check</TabsTrigger>
         </TabsList>
 
         {/* ── Colors Tab ──────────────────────────────────────────── */}
         <TabsContent value="colors" className="space-y-6">
-          {/* Presets */}
+          {/* Full-theme presets */}
           <div className="space-y-2">
-            <p className="text-sm font-medium">Quick Presets</p>
+            <p className="text-sm font-medium">Full Theme Presets</p>
+            <p className="text-xs text-muted-foreground">Applies colors, gradients, typography and animation all at once.</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(THEME_PRESETS).map((key) => (
+                <Button key={key} variant="outline" size="sm" onClick={() => handleFullPreset(key)} disabled={disabled}>
+                  {THEME_PRESET_LABELS[key] ?? key}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Color-only presets */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Quick Color Presets</p>
             <div className="flex flex-wrap gap-2">
               {COLOR_PRESETS.map((preset) => (
                 <Button key={preset.name} variant="outline" size="sm" onClick={() => handlePreset(preset)} disabled={disabled}>
@@ -443,6 +576,125 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
               directions={GRADIENT_DIRECTIONS}
               label="accent"
             />
+          </div>
+        </TabsContent>
+
+        {/* ── Typography Tab ──────────────────────────────────────── */}
+        <TabsContent value="typography" className="space-y-8">
+          <p className="text-sm text-muted-foreground">
+            Override the site body font and base heading size. Font family is loaded from Google Fonts when a named option is selected.
+          </p>
+
+          {/* Font Family */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <TextAa size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Body Font Family</Label>
+            </div>
+            <select
+              value={GOOGLE_FONT_OPTIONS.some((o) => o.value === fontFamily) ? fontFamily : 'custom'}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v !== 'custom') { setFontFamily(v); setCustomFont('') }
+                else setFontFamily('custom')
+              }}
+              disabled={disabled}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Body font family"
+            >
+              {GOOGLE_FONT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {fontFamily === 'custom' && (
+              <Input
+                type="text"
+                value={customFont}
+                onChange={(e) => setCustomFont(e.target.value)}
+                placeholder="e.g. 'Fira Code', monospace"
+                disabled={disabled}
+                className="font-mono text-sm"
+                aria-label="Custom font family value"
+              />
+            )}
+            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--font-family-body</code></p>
+          </div>
+
+          <Separator />
+
+          {/* Heading Size */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <TextAa size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Base Heading Size</Label>
+            </div>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={1.5} max={5} step={0.125}
+                value={[headingSize]}
+                onValueChange={([v]) => setHeadingSize(v)}
+                disabled={disabled}
+                className="flex-1"
+                aria-label="Heading size"
+              />
+              <span className="w-16 text-right font-mono text-sm text-muted-foreground">{headingSize.toFixed(3)}rem</span>
+            </div>
+            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--heading-size</code>. Applied to h1/h2/h3.</p>
+          </div>
+        </TabsContent>
+
+        {/* ── Animations Tab ──────────────────────────────────────── */}
+        <TabsContent value="animations" className="space-y-8">
+          <p className="text-sm text-muted-foreground">
+            Choose how pages and sections animate on entry and exit. All presets respect <code className="text-xs font-mono">prefers-reduced-motion</code>.
+          </p>
+
+          {/* Preset picker */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkle size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Animation Preset</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {Object.keys(ANIMATION_PRESETS).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setAnimPreset(key)}
+                  disabled={disabled}
+                  className={`rounded-md border px-3 py-2 text-left text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                    animPreset === key
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-background text-foreground hover:border-primary/50'
+                  }`}
+                  aria-pressed={animPreset === key}
+                >
+                  {ANIMATION_PRESET_LABELS[key] ?? key}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Duration */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkle size={16} className="text-muted-foreground" aria-hidden="true" />
+              <Label className="text-sm font-medium">Animation Duration</Label>
+            </div>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={0.1} max={1.2} step={0.05}
+                value={[animDuration]}
+                onValueChange={([v]) => setAnimDuration(v)}
+                disabled={disabled}
+                className="flex-1"
+                aria-label="Animation duration"
+              />
+              <span className="w-16 text-right font-mono text-sm text-muted-foreground">{animDuration.toFixed(2)}s</span>
+            </div>
+            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--animation-duration</code>. Used by PageTransition and future motion components.</p>
           </div>
         </TabsContent>
 

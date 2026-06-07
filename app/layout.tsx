@@ -75,7 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const settings = await getCachedSiteSettings().catch(() => null)
 
   return (
-    <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
       <head>
         {/* PWA meta — prevents white flash and styles the status bar */}
         <meta name="theme-color" content="#101010" />
@@ -102,6 +102,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           themeGradientAccentFrom={settings?.themeGradientAccentFrom}
           themeGradientAccentTo={settings?.themeGradientAccentTo}
           themeGradientAccentDir={settings?.themeGradientAccentDir}
+          themeConfig={settings?.themeConfig}
         />
       </head>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>

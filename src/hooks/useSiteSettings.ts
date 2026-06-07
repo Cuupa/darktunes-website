@@ -153,6 +153,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     theme_gradient_accent_from: s.themeGradientAccentFrom ?? '',
     theme_gradient_accent_to: s.themeGradientAccentTo ?? '',
     theme_gradient_accent_dir: s.themeGradientAccentDir ?? '135deg',
+    theme_config: s.themeConfig ? JSON.stringify(s.themeConfig) : '',
   }
 }
 

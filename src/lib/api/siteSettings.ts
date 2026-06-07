@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import type { Database } from '@/types/database'
 import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig, CustomSocialLink } from '@/types'
+import { parseThemeConfig, themeConfigFromFlatFields } from '@/config/themeConfig'
+import type { ThemeConfig } from '@/config/themeConfig'
 
 type DbClient = SupabaseClient<Database>
 
@@ -263,6 +265,22 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     themeGradientAccentFrom: map['theme_gradient_accent_from'] ?? '',
     themeGradientAccentTo: map['theme_gradient_accent_to'] ?? '',
     themeGradientAccentDir: map['theme_gradient_accent_dir'] ?? '135deg',
+    themeConfig: parseThemeConfig(map['theme_config'] ?? null) ?? themeConfigFromFlatFields({
+      themePrimary: map['theme_primary'],
+      themeSecondary: map['theme_secondary'],
+      themeBackground: map['theme_background'],
+      themeForeground: map['theme_foreground'],
+      themeCard: map['theme_card'],
+      themeMuted: map['theme_muted'],
+      themeAccent: map['theme_accent'],
+      themeBorder: map['theme_border'],
+      themeGradientHeroFrom: map['theme_gradient_hero_from'],
+      themeGradientHeroTo: map['theme_gradient_hero_to'],
+      themeGradientHeroDir: map['theme_gradient_hero_dir'],
+      themeGradientAccentFrom: map['theme_gradient_accent_from'],
+      themeGradientAccentTo: map['theme_gradient_accent_to'],
+      themeGradientAccentDir: map['theme_gradient_accent_dir'],
+    }),
   }
 }
 
@@ -301,6 +319,71 @@ export async function upsertSiteSettings(
 ): Promise<void> {
   const rows = Object.entries(settings).map(([key, value]) => ({ key, value: value ?? '' }))
   if (rows.length === 0) return
+  const { error } = await db.from('site_settings').upsert(rows, { onConflict: 'key' })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Read the structured ThemeConfig from the `theme_config` key in site_settings.
+ * Falls back to reconstructing a ThemeConfig from the legacy flat theme_* keys.
+ * Returns null only when the DB cannot be reached.
+ */
+export async function readThemeConfig(db: DbClient): Promise<ThemeConfig | null> {
+  const { data, error } = await db
+    .from('site_settings')
+    .select('key, value')
+    .in('key', [
+      'theme_config',
+      'theme_primary', 'theme_secondary', 'theme_background', 'theme_foreground',
+      'theme_card', 'theme_muted', 'theme_accent', 'theme_border',
+      'theme_gradient_hero_from', 'theme_gradient_hero_to', 'theme_gradient_hero_dir',
+      'theme_gradient_accent_from', 'theme_gradient_accent_to', 'theme_gradient_accent_dir',
+    ])
+  if (error) return null
+  const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]))
+  const parsed = parseThemeConfig(map['theme_config'] ?? null)
+  if (parsed) return parsed
+  return themeConfigFromFlatFields({
+    themePrimary: map['theme_primary'],
+    themeSecondary: map['theme_secondary'],
+    themeBackground: map['theme_background'],
+    themeForeground: map['theme_foreground'],
+    themeCard: map['theme_card'],
+    themeMuted: map['theme_muted'],
+    themeAccent: map['theme_accent'],
+    themeBorder: map['theme_border'],
+    themeGradientHeroFrom: map['theme_gradient_hero_from'],
+    themeGradientHeroTo: map['theme_gradient_hero_to'],
+    themeGradientHeroDir: map['theme_gradient_hero_dir'],
+    themeGradientAccentFrom: map['theme_gradient_accent_from'],
+    themeGradientAccentTo: map['theme_gradient_accent_to'],
+    themeGradientAccentDir: map['theme_gradient_accent_dir'],
+  })
+}
+
+/**
+ * Persist a ThemeConfig atomically as the `theme_config` JSON key in site_settings.
+ * Also back-fills the legacy flat keys so older code paths still read correct values.
+ */
+export async function upsertThemeConfig(db: DbClient, config: ThemeConfig): Promise<void> {
+  const rows: Array<{ key: string; value: string }> = [
+    { key: 'theme_config', value: JSON.stringify(config) },
+    // Keep legacy flat keys in sync so old read paths remain correct.
+    { key: 'theme_primary',               value: config.colors.primary },
+    { key: 'theme_secondary',             value: config.colors.secondary },
+    { key: 'theme_background',            value: config.colors.background },
+    { key: 'theme_foreground',            value: config.colors.foreground },
+    { key: 'theme_card',                  value: config.colors.card },
+    { key: 'theme_muted',                 value: config.colors.muted },
+    { key: 'theme_accent',                value: config.colors.accent },
+    { key: 'theme_border',                value: config.colors.border },
+    { key: 'theme_gradient_hero_from',    value: config.gradients.heroFrom    ?? '' },
+    { key: 'theme_gradient_hero_to',      value: config.gradients.heroTo      ?? '' },
+    { key: 'theme_gradient_hero_dir',     value: config.gradients.heroDir     ?? '135deg' },
+    { key: 'theme_gradient_accent_from',  value: config.gradients.accentFrom  ?? '' },
+    { key: 'theme_gradient_accent_to',    value: config.gradients.accentTo    ?? '' },
+    { key: 'theme_gradient_accent_dir',   value: config.gradients.accentDir   ?? '135deg' },
+  ]
   const { error } = await db.from('site_settings').upsert(rows, { onConflict: 'key' })
   if (error) throw new Error(error.message)
 }
