@@ -153,6 +153,7 @@ export function HomePageContent({
                 playlists={playlists}
                 placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
                 loadLabel={dict.consent.loadSpotify}
+                gateText={dict.consent.gateText}
               />
             </div>
           </section>

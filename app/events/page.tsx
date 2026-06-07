@@ -33,7 +33,7 @@ export default async function EventsPage() {
             href="/"
             className="text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-6 inline-block"
           >
-            ← {dict.pages.backToHome}
+            {dict.pages.backToHome}
           </Link>
           <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{dict.concerts.heading}</h1>
           <p className="text-xl text-muted-foreground font-serif mt-3">{dict.concerts.subheading}</p>

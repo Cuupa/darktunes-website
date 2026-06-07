@@ -193,6 +193,9 @@ export function ArtistDetailContent({
                   width={480}
                   height={480}
                   className="w-full aspect-square object-cover"
+                  style={{
+                    objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
+                  }}
                   unoptimized
                   onError={(e) => {
                     e.currentTarget.style.display = 'none'
