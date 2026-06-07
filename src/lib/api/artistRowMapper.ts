@@ -55,5 +55,8 @@ export function rowToArtist(row: ArtistRow): Artist {
     storageQuotaBytes: row.storage_quota_bytes ?? null,
     smartLinks: (row.smart_links ?? []) as Array<{ label: string; url: string }>,
     userId: row.user_id ?? null,
+    imagePositionX: row.image_position_x ?? null,
+    imagePositionY: row.image_position_y ?? null,
+    imageScale: row.image_scale ?? null,
   }
 }

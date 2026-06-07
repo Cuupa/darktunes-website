@@ -31,7 +31,131 @@ import { useDict } from '@/contexts/DictContext'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 
-/** Maps a Discogs external URL to the appropriate ArtistFormData field key. */
+// ── Image Position Editor ────────────────────────────────────────────────────
+
+interface ImagePositionEditorProps {
+  imageUrl: string | null
+  positionX: number
+  positionY: number
+  scale: number
+  onPositionChange: (x: number, y: number) => void
+  onScaleChange: (scale: number) => void
+}
+
+/**
+ * Interactive square preview that lets the admin drag the focal point and
+ * set a zoom level for the artist portrait photo.
+ *
+ * The resulting x/y values (0–100%) are stored as `image_position_x` and
+ * `image_position_y` on the artists table.  Scale (1–2) is stored as
+ * `image_scale`.  All three map to CSS `objectPosition` + `scale()` so the
+ * square crop always shows the most important part of the image.
+ */
+function ImagePositionEditor({
+  imageUrl,
+  positionX,
+  scale,
+  positionY,
+  onPositionChange,
+  onScaleChange,
+}: ImagePositionEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+
+  const updatePosition = (e: React.MouseEvent | MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)))
+    const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)))
+    onPositionChange(x, y)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true
+    updatePosition(e)
+  }
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => { if (isDragging.current) updatePosition(e) }
+    const onUp = () => { isDragging.current = false }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!imageUrl) return null
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/20">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">Portrait framing</Label>
+        <span className="text-xs text-muted-foreground font-mono">
+          pos: {positionX}% / {positionY}% · zoom: {scale.toFixed(1)}×
+        </span>
+      </div>
+      <div className="flex gap-4 items-start">
+        {/* Square preview with draggable focal-point crosshair */}
+        <div
+          ref={containerRef}
+          className="relative w-32 h-32 shrink-0 rounded-md overflow-hidden cursor-crosshair select-none border border-border"
+          onMouseDown={handleMouseDown}
+          title="Click or drag to set the focal point"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl}
+            alt="Focal point preview"
+            className="absolute inset-0 w-full h-full"
+            style={{
+              objectFit: 'cover',
+              objectPosition: `${positionX}% ${positionY}%`,
+              transform: `scale(${scale})`,
+              transformOrigin: `${positionX}% ${positionY}%`,
+            }}
+            draggable={false}
+          />
+          {/* Crosshair marker */}
+          <div
+            className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ left: `${positionX}%`, top: `${positionY}%` }}
+          >
+            <div className="absolute inset-0 rounded-full border-2 border-white shadow-lg" />
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-white/70" />
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/70" />
+          </div>
+        </div>
+
+        {/* Zoom slider */}
+        <div className="flex-1 space-y-2 pt-1">
+          <Label htmlFor="imageScale" className="text-xs text-muted-foreground">
+            Zoom level (1× – 2×)
+          </Label>
+          <input
+            id="imageScale"
+            type="range"
+            min={1}
+            max={2}
+            step={0.05}
+            value={scale}
+            onChange={(e) => onScaleChange(parseFloat(e.target.value))}
+            className="w-full accent-primary"
+          />
+          <p className="text-xs text-muted-foreground">
+            Click or drag in the preview to place the focal point. The portrait will always be displayed as a square.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 function classifyDiscogsUrl(url: string): keyof ArtistFormData | null {
   try {
     const { hostname, pathname } = new URL(url)
@@ -87,6 +211,12 @@ export interface ArtistFormData {
   storageQuotaMb: string
   /** Custom smart links for the artist profile (e.g. Linktree-style). */
   smartLinks: Array<{ label: string; url: string }>
+  /** Horizontal focal point for portrait image (0–100, default 50). */
+  imagePositionX: number
+  /** Vertical focal point for portrait image (0–100, default 50). */
+  imagePositionY: number
+  /** Zoom scale for portrait image (1–2, default 1). */
+  imageScale: number
 }
 
 /**
@@ -476,6 +606,16 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
               </div>
             </div>
           </div>
+
+          {/* Image position editor */}
+          <ImagePositionEditor
+            imageUrl={watch('imageUrl') || null}
+            positionX={watch('imagePositionX')}
+            positionY={watch('imagePositionY')}
+            scale={watch('imageScale')}
+            onPositionChange={(x, y) => { setValue('imagePositionX', x); setValue('imagePositionY', y) }}
+            onScaleChange={(s) => setValue('imageScale', s)}
+          />
 
           {mode === 'admin' && (
             <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-border">

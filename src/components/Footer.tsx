@@ -50,40 +50,40 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                 <li>
                   <Link
                     href="/artists"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
                     {dict.artistsLink}
                   </Link>
                 </li>
                 {(siteSettings?.showAboutInFooter ?? true) && (
                 <li>
-                  <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {siteSettings?.aboutNavLabel || dict.aboutLink || 'About'}
                   </Link>
                 </li>
                 )}
                 <li>
-                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {dict.releasesLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {dict.newsLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {dict.videosLink}
                   </a>
                 </li>
                 <li>
-                  <Link href="/events" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <Link href="/events" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {dict.tourLink}
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
                     {dict.contactLink}
                   </Link>
                 </li>
@@ -92,7 +92,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href={siteSettings.submitHubUrl || 'https://www.submithub.com/playlister/darktunes-music-group'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
                     {dict.submitMusicLink}
                   </a>
@@ -103,7 +103,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                       href={siteSettings.shopifyStoreUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 uppercase"
                     >
                       <ShoppingBag size={14} />
                       {dict.shopLink}

@@ -50,6 +50,9 @@ function artistToFormData(artist: Artist): ArtistFormData {
       ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
       : '',
     smartLinks: artist.smartLinks ?? [],
+    imagePositionX: artist.imagePositionX ?? 50,
+    imagePositionY: artist.imagePositionY ?? 50,
+    imageScale: artist.imageScale ?? 1,
   }
 }
 
@@ -86,6 +89,9 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     bandsintown_id: data.bandsintownId || null,
     storage_quota_bytes: quotaMb != null && !Number.isNaN(quotaMb) ? quotaMb * 1024 * 1024 : null,
     smart_links: data.smartLinks?.length ? data.smartLinks : null,
+    image_position_x: data.imagePositionX,
+    image_position_y: data.imagePositionY,
+    image_scale: data.imageScale,
   }
 }
 

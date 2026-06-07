@@ -39,6 +39,12 @@ export interface Artist {
   smartLinks?: Array<{ label: string; url: string }>
   /** Supabase Auth user ID linked to this artist (null if not yet invited/linked). */
   userId?: string | null
+  /** Horizontal focal point for the portrait image (0–100%, default 50). */
+  imagePositionX?: number | null
+  /** Vertical focal point for the portrait image (0–100%, default 50). */
+  imagePositionY?: number | null
+  /** Zoom scale for the portrait image (≥1, default 1). */
+  imageScale?: number | null
 }
 
 export interface SyncLog {

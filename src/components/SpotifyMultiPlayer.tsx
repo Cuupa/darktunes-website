@@ -13,9 +13,11 @@ interface SpotifyMultiPlayerProps {
   playlists: SpotifyPlaylistEntry[]
   placeholderUrl?: string
   loadLabel?: string
+  /** Translated explanation text shown before user grants Spotify consent. */
+  gateText?: string
 }
 
-export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: SpotifyMultiPlayerProps) {
+export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateText }: SpotifyMultiPlayerProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const prefersReducedMotion = useReducedMotion()
   const lenis = useLenis()
@@ -49,7 +51,7 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel }: Spo
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
       >
-        <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
+        <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl} gateText={gateText}>
           {!playerActivated ? (
             <button
               type="button"

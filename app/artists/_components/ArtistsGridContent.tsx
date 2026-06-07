@@ -86,15 +86,26 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                 aria-label={artist.name}
               >
                 {artist.imageUrl ? (
-                  <Image
-                    src={getSquareThumbnail(artist.imageUrl, 400)}
-                    alt={`${artist.name} – artist photo`}
-                    fill
-                    priority={index < 6}
-                    className="object-cover object-center transition-transform duration-500 group-hover:scale-110"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    unoptimized
-                  />
+                  <div
+                    className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
+                    style={{
+                      transform: artist.imageScale && artist.imageScale > 1 ? `scale(${artist.imageScale})` : undefined,
+                      transformOrigin: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
+                    }}
+                  >
+                    <Image
+                      src={getSquareThumbnail(artist.imageUrl, 400)}
+                      alt={`${artist.name} – artist photo`}
+                      fill
+                      priority={index < 6}
+                      className="object-cover"
+                      style={{
+                        objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
+                      }}
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      unoptimized
+                    />
+                  </div>
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">
                     <span className="text-6xl font-bold text-muted-foreground/30 uppercase select-none">

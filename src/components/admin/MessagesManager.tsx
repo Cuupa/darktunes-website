@@ -431,7 +431,7 @@ export function MessagesManager() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
+    <div className="flex w-full min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
 
       {/* ── Left: Folder Tree ─────────────────────────────────────────────── */}
       <aside

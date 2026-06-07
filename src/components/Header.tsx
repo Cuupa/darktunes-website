@@ -96,7 +96,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
             </Link>
           )}
 
-          <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
+          <nav className="hidden lg:flex items-center gap-1 ml-8" aria-label="Main navigation">
             {navItems.map((item) => (
               <Button
                 key={item.id}
