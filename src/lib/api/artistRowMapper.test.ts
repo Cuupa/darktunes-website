@@ -42,6 +42,7 @@ const BASE_ROW: ArtistRow = {
   logo_url: null,
   platform_links: null,
   storage_quota_bytes: null,
+  smart_links: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

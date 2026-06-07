@@ -431,7 +431,7 @@ export function MessagesManager() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
+    <div className="flex min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
 
       {/* ── Left: Folder Tree ─────────────────────────────────────────────── */}
       <aside
@@ -691,7 +691,7 @@ export function MessagesManager() {
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+          <div className="flex-1 flex flex-col items-center justify-center min-h-[200px] text-muted-foreground text-sm gap-2">
             <ArrowBendUpRight size={32} className="opacity-20" aria-hidden="true" />
             <p>Select a message to read</p>
           </div>

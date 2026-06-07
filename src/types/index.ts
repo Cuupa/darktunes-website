@@ -35,6 +35,8 @@ export interface Artist {
   platformLinks?: Record<string, string>
   /** Admin-configured storage quota in bytes. NULL = use system default (no limit). */
   storageQuotaBytes?: number | null
+  /** Custom smart links shown on the artist profile (e.g. Linktree-style). */
+  smartLinks?: Array<{ label: string; url: string }>
   /** Supabase Auth user ID linked to this artist (null if not yet invited/linked). */
   userId?: string | null
 }
@@ -109,6 +111,11 @@ export interface Release {
    * has no entries (backwards compatibility).
    */
   artists?: { id: string; name: string; slug: string }[]
+  /**
+   * Free-text field for non-roster guest artists (e.g. remixes, features).
+   * Examples: "feat. John Doe", "Remix by XYZ"
+   */
+  guestArtists?: string
 }
 
 export interface NewsPost {

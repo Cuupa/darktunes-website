@@ -182,7 +182,7 @@ export function parseThemeConfig(json: string | null | undefined): ThemeConfig |
     const raw = JSON.parse(json) as Record<string, unknown>
     // Minimal runtime validation — ensure top-level keys exist
     if (raw && typeof raw === 'object' && 'colors' in raw) {
-      return raw as ThemeConfig
+      return raw as unknown as ThemeConfig
     }
     return null
   } catch {

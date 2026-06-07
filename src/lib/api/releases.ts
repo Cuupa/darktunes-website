@@ -57,6 +57,7 @@ function rowToRelease(row: ReleaseRow): Release {
           href: row.hero_secondary_btn_href ?? undefined,
         }
       : undefined,
+    guestArtists: row.guest_artists ?? undefined,
   }
 }
 

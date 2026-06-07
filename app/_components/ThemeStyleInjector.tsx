@@ -70,7 +70,9 @@ const GOOGLE_FONT_URL_MAP: Record<string, string> = {
   Nunito:          'Nunito:wght@300;400;600;700',
 }
 
-const LEGACY_TOKEN_MAP: Array<[keyof ThemeColors, string]> = [
+type LegacyColorKey = keyof Omit<ThemeColors, 'themeConfig'>
+
+const LEGACY_TOKEN_MAP: Array<[LegacyColorKey, string]> = [
   ['themePrimary',    '--primary'],
   ['themeSecondary',  '--secondary'],
   ['themeBackground', '--background'],
@@ -172,4 +174,3 @@ export function ThemeStyleInjector(props: ThemeColors) {
     </>
   )
 }
-

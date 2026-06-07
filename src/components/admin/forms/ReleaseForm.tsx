@@ -20,7 +20,8 @@ import { ImageUploadButton } from './ImageUploadButton'
 
 export interface ReleaseFormData {
   title: string
-  artistName: string
+  /** Free-text display name for guest/non-roster artists (remixes, features, etc.) */
+  guestArtists: string
   /** IDs of all associated artists (many-to-many via junction table). */
   artistIds: string[]
   releaseDate: string
@@ -79,16 +80,25 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
           <Input id="title" {...register('title', { required: true })} disabled={isLoading} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="artistName">Artist Name *</Label>
-          <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
+          <Label htmlFor="guestArtists">
+            Guest / Featured Artists{' '}
+            <span className="text-muted-foreground text-xs font-normal">(not in label roster)</span>
+          </Label>
+          <Input
+            id="guestArtists"
+            {...register('guestArtists')}
+            disabled={isLoading}
+            placeholder="e.g. feat. John Doe, Remix by XYZ"
+          />
         </div>
       </div>
 
       {/* Multi-artist selection */}
       <div className="space-y-3">
-        <Label>Artists (for featurings / collaborations)</Label>
+        <Label>Label Artists *</Label>
         <p className="text-xs text-muted-foreground">
-          Associate one or more label artists. The first selected artist is the primary one. The Artist Name above overrides the display name.
+          Select one or more artists from the label roster. The first selected artist becomes the primary one.
+          Use the &quot;Guest / Featured Artists&quot; field above for non-roster collaborators.
         </p>
         <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto rounded border border-border p-3">
           {artists.length === 0 && (
