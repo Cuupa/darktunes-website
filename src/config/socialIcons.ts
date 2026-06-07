@@ -41,4 +41,20 @@ export const SOCIAL_ICON_MAP: Record<string, Icon> = {
   Globe,
 }
 
+export const SOCIAL_ICON_LABELS: Record<string, string> = {
+  InstagramLogo: 'Instagram',
+  YoutubeLogo: 'YouTube',
+  SpotifyLogo: 'Spotify',
+  FacebookLogo: 'Facebook',
+  TwitterLogo: 'X / Twitter',
+  TiktokLogo: 'TikTok',
+  BandcampLogo: 'Bandcamp',
+  DiscordLogo: 'Discord',
+  TelegramLogo: 'Telegram',
+  LinkedinLogo: 'LinkedIn',
+  GithubLogo: 'GitHub',
+  SoundcloudLogo: 'SoundCloud',
+  Globe: 'Website',
+}
+
 export const SOCIAL_ICON_OPTIONS = Object.keys(SOCIAL_ICON_MAP)

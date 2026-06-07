@@ -13,6 +13,7 @@ import {
   AppleLogo,
   YoutubeLogo,
   MusicNote,
+  Globe,
 } from '@phosphor-icons/react'
 import type { ElementType } from 'react'
 
@@ -40,6 +41,7 @@ export const ODESLI_PLATFORM_CONFIG: Record<string, PlatformConfig> = {
   napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote   },
   audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote   },
   anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote   },
+  smartlink:    { label: 'Listen Everywhere', bg: '#6366F1', textColor: 'text-white', icon: Globe   },
 }
 
 /**

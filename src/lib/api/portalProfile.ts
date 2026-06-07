@@ -51,6 +51,7 @@ export type ArtistProfilePayload = Pick<
   apple_music_url?: string | null
   tiktok_url?: string | null
   facebook_url?: string | null
+  custom_links?: Array<{ label: string; url: string }> | null
 }
 
 export type RiderType = 'stage_plot' | 'technical' | 'hospitality'

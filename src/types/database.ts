@@ -143,9 +143,11 @@ export interface Database {
         Row: {
           id: string
           email: string
-          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           avatar_url: string | null
           provider: string
+          full_name: string | null
+          is_active: boolean | null
           created_at: string
           updated_at: string
           deleted_at: string | null
@@ -153,9 +155,11 @@ export interface Database {
         Insert: {
           id: string
           email: string
-          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           avatar_url?: string | null
           provider?: string
+          full_name?: string | null
+          is_active?: boolean | null
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
@@ -163,9 +167,11 @@ export interface Database {
         Update: {
           id?: string
           email?: string
-          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           avatar_url?: string | null
           provider?: string
+          full_name?: string | null
+          is_active?: boolean | null
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
@@ -357,6 +363,7 @@ export interface Database {
           epk_password_sections: string[]
           epk_gallery_photos: string[]
           epk_custom_theme_tokens: Record<string, string> | null
+          custom_links: Array<{ label: string; url: string }> | null
           created_at: string
           updated_at: string
         }
@@ -386,6 +393,7 @@ export interface Database {
           epk_password_sections?: string[]
           epk_gallery_photos?: string[]
           epk_custom_theme_tokens?: Record<string, string> | null
+          custom_links?: Array<{ label: string; url: string }> | null
           created_at?: string
           updated_at?: string
         }
@@ -415,6 +423,7 @@ export interface Database {
           epk_password_sections?: string[]
           epk_gallery_photos?: string[]
           epk_custom_theme_tokens?: Record<string, string> | null
+          custom_links?: Array<{ label: string; url: string }> | null
           created_at?: string
           updated_at?: string
         }
@@ -581,6 +590,8 @@ export interface Database {
           spotify_url: string | null
           apple_music_url: string | null
           youtube_url: string | null
+          bandcamp_url: string | null
+          smartlink_url: string | null
           featured: boolean
           itunes_id: string | null
           spotify_id: string | null
@@ -615,6 +626,8 @@ export interface Database {
           spotify_url?: string | null
           apple_music_url?: string | null
           youtube_url?: string | null
+          bandcamp_url?: string | null
+          smartlink_url?: string | null
           featured?: boolean
           itunes_id?: string | null
           spotify_id?: string | null
@@ -649,6 +662,8 @@ export interface Database {
           spotify_url?: string | null
           apple_music_url?: string | null
           youtube_url?: string | null
+          bandcamp_url?: string | null
+          smartlink_url?: string | null
           featured?: boolean
           itunes_id?: string | null
           spotify_id?: string | null
@@ -2218,21 +2233,21 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           granted_at: string
           granted_by: string | null
         }
         Insert: {
           id?: string
           user_id: string
-          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           granted_at?: string
           granted_by?: string | null
         }
         Update: {
           id?: string
           user_id?: string
-          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+          role?: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
           granted_at?: string
           granted_by?: string | null
         }

@@ -110,6 +110,7 @@ const ROLE_COLOURS: Record<UserRole, string> = {
   artist: 'bg-emerald-700 text-emerald-100',
   editor: 'bg-blue-700 text-blue-100',
   journalist: 'bg-amber-700 text-amber-100',
+  press: 'bg-cyan-700 text-cyan-100',
   user: '',
 }
 
@@ -172,13 +173,14 @@ export function UsersManager() {
     [artists, linkedArtistIds],
   )
 
-  // Client-side filter — matches email or any role
+  // Client-side filter — matches email, display name, or any role
   const filteredUsers = useMemo(() => {
     if (!filter.trim()) return users
     const q = filter.toLowerCase()
     return users.filter(
       (u) =>
         u.email.toLowerCase().includes(q) ||
+        (u.displayName?.toLowerCase().includes(q) ?? false) ||
         (u.roles ?? [u.role]).some((r) => r.toLowerCase().includes(q)),
     )
   }, [users, filter])
@@ -301,6 +303,7 @@ export function UsersManager() {
           <TableHeader>
             <TableRow>
               <TableHead>Email</TableHead>
+              <TableHead>Name</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Linked Band</TableHead>
               <TableHead>Status</TableHead>
@@ -332,6 +335,11 @@ export function UsersManager() {
                           You
                         </Badge>
                       )}
+                    </TableCell>
+
+                    {/* Display name from profiles */}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {u.displayName ?? '—'}
                     </TableCell>
 
                     {/* Role display — multi-role badges, click to edit detail */}

@@ -46,6 +46,10 @@ export const profileSchema = z.object({
   tiktok_url: optionalUrl,
   facebook_url: optionalUrl,
   soundcloud_url: optionalUrl,
+  custom_links: z.array(z.object({
+    label: z.string().min(1, 'Label required'),
+    url: z.string().url('Must be a valid URL').or(z.literal('')),
+  })).optional(),
 })
 
 export type ProfileFormValues = z.infer<typeof profileSchema>
@@ -124,6 +128,7 @@ export function usePortalProfileForm({
       tiktok_url: artist?.tiktokUrl ?? '',
       facebook_url: artist?.facebookUrl ?? '',
       soundcloud_url: initialProfile?.soundcloudUrl ?? '',
+      custom_links: initialProfile?.customLinks ?? [],
     },
   })
 
@@ -294,6 +299,7 @@ export function usePortalProfileForm({
           tiktok_url: values.tiktok_url || null,
           facebook_url: values.facebook_url || null,
           soundcloud_url: values.soundcloud_url || null,
+          custom_links: (values.custom_links ?? []).filter((l) => l.label && l.url) as Array<{ label: string; url: string }> | null,
           rider_stage_plot_url: riderUrls.stage_plot ?? null,
           rider_technical_url: riderUrls.technical ?? null,
           rider_hospitality_url: riderUrls.hospitality ?? null,

@@ -75,6 +75,7 @@ const ROLE_COLOURS: Record<UserRole, string> = {
   artist: 'bg-emerald-700 text-emerald-100',
   editor: 'bg-blue-700 text-blue-100',
   journalist: 'bg-amber-700 text-amber-100',
+  press: 'bg-cyan-700 text-cyan-100',
   user: '',
 }
 

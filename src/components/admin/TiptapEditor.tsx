@@ -270,6 +270,40 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
 
         <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
 
+        {/* Text color — hidden in compact mode */}
+        {!compact && (
+          <>
+            <label
+              className="relative h-7 w-7 flex items-center justify-center rounded hover:bg-accent/20 cursor-pointer"
+              title="Text Color"
+              aria-label="Text Color"
+            >
+              <span aria-hidden="true" className="text-xs font-bold" style={{ textDecoration: 'underline', textDecorationColor: editor.getAttributes('textStyle').color ?? '#ffffff' }}>A</span>
+              <input
+                type="color"
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                defaultValue={editor.getAttributes('textStyle').color ?? '#ffffff'}
+                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                disabled={disabled}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-xs"
+              onClick={() => editor.chain().focus().unsetColor().run()}
+              title="Remove Text Color"
+              aria-label="Remove Text Color"
+              disabled={disabled}
+            >
+              <span aria-hidden="true">✕</span>
+            </Button>
+          </>
+        )}
+
+        <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
+
         {/* Link & Image */}
         <LinkPopover editor={editor} disabled={disabled} />
         {/* Image insert — hidden in compact mode */}

@@ -5,7 +5,7 @@
  * These supplement the database types in src/types/database.ts.
  */
 
-export type UserRole = 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+export type UserRole = 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
 
 export interface LinkedArtist {
   id: string
@@ -17,6 +17,8 @@ export interface LinkedArtist {
 export interface UserWithProfile {
   id: string
   email: string
+  /** Full name from profiles table */
+  displayName?: string | null
   /** Primary (highest-privilege) role — kept for backwards compatibility */
   role: UserRole
   /** All roles the user holds */

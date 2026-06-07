@@ -55,11 +55,13 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     {dict.artistsLink}
                   </Link>
                 </li>
+                {(siteSettings?.showAboutInFooter ?? true) && (
                 <li>
                   <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {dict.aboutLink ?? 'About'}
+                    {siteSettings?.aboutNavLabel || dict.aboutLink || 'About'}
                   </Link>
                 </li>
+                )}
                 <li>
                   <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.releasesLink}

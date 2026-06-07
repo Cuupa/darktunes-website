@@ -29,6 +29,8 @@ export interface ReleaseFormData {
   spotifyUrl: string
   appleMusicUrl: string
   youtubeUrl: string
+  bandcampUrl: string
+  smartlinkUrl: string
   featured: boolean
   isVisible: boolean
   isPromo: boolean
@@ -182,6 +184,17 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
       <div className="space-y-1">
         <Label htmlFor="youtubeUrl">YouTube URL</Label>
         <Input id="youtubeUrl" {...register('youtubeUrl')} disabled={isLoading} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="bandcampUrl">Bandcamp URL</Label>
+          <Input id="bandcampUrl" {...register('bandcampUrl')} disabled={isLoading} placeholder="https://artist.bandcamp.com/…" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="smartlinkUrl">Smartlink URL</Label>
+          <Input id="smartlinkUrl" {...register('smartlinkUrl')} disabled={isLoading} placeholder="https://linktr.ee/…" />
+        </div>
       </div>
 
       <div className="flex items-center gap-6">

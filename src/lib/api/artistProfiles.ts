@@ -52,6 +52,7 @@ export interface ArtistProfile {
   epkPasswordSections: string[]
   epkGalleryPhotos: string[]
   epkCustomThemeTokens: Record<string, string>
+  customLinks: Array<{ label: string; url: string }>
   createdAt: string
   updatedAt: string
 }
@@ -87,6 +88,7 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     epkPasswordSections: row.epk_password_sections ?? [],
     epkGalleryPhotos: row.epk_gallery_photos ?? [],
     epkCustomThemeTokens: (row.epk_custom_theme_tokens as Record<string, string> | null) ?? {},
+    customLinks: (row as unknown as { custom_links?: Array<{ label: string; url: string }> | null }).custom_links ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

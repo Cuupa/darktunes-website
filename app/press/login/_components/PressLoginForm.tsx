@@ -24,13 +24,30 @@ export function PressLoginForm({ dict }: { dict: Dictionary['pressLogin'] }) {
     setError(null)
     try {
       const supabase = createBrowserSupabaseClient()
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
       if (signInError) {
         setError(dict.errorInvalid)
-      } else {
-        router.push('/press/dashboard')
-        router.refresh()
+        return
       }
+
+      // Verify that the account has role 'press' and is active
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, is_active')
+        .eq('id', signInData.user.id)
+        .single()
+
+      const isPress = profile?.role === 'press'
+      const isActive = profile?.is_active !== false
+
+      if (!isPress || !isActive) {
+        await supabase.auth.signOut()
+        setError(dict.errorUnauthorized)
+        return
+      }
+
+      router.push('/press/dashboard')
+      router.refresh()
     } finally {
       setLoading(false)
     }

@@ -100,12 +100,24 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
                 )
               })}
               {artist.logoUrl && (
-                <Button asChild>
-                  <a href={artist.logoUrl} target="_blank" rel="noopener noreferrer" download>
-                    <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                    Download Logo
-                  </a>
-                </Button>
+                <div className="flex flex-col items-start gap-2">
+                  <div className="relative h-20 w-auto">
+                    <Image
+                      src={artist.logoUrl}
+                      alt={`${artist.name} logo`}
+                      width={200}
+                      height={80}
+                      className="h-20 w-auto object-contain"
+                      unoptimized
+                    />
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={artist.logoUrl} target="_blank" rel="noopener noreferrer" download>
+                      <DownloadSimple size={16} weight="bold" aria-hidden="true" />
+                      Download Logo
+                    </a>
+                  </Button>
+                </div>
               )}
             </div>
           </div>
