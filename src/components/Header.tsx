@@ -102,7 +102,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
                 key={item.id}
                 variant="ghost"
                 asChild
-                className="text-sm font-medium tracking-wider transition-colors"
+                className="text-sm font-medium tracking-wider uppercase transition-colors"
               >
                 {item.isLink ? (
                   item.external ? (
@@ -154,7 +154,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
                   <Button
                     key={item.id}
                     variant="ghost"
-                    className="justify-start text-base font-medium tracking-wider"
+                    className="justify-start text-base font-medium tracking-wider uppercase"
                     asChild
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -168,7 +168,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
                   <Button
                     key={item.id}
                     variant="ghost"
-                    className="justify-start text-base font-medium tracking-wider"
+                    className="justify-start text-base font-medium tracking-wider uppercase"
                     onClick={(e) => {
                       handleSmoothScroll(e, item.href)
                       setMobileMenuOpen(false)

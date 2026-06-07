@@ -2,7 +2,9 @@
 
 import { useState, useRef, useMemo, useDeferredValue } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { MagnifyingGlass } from '@phosphor-icons/react'
+import Link from 'next/link'
+import { MagnifyingGlass, ArrowRight } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
 import { ReleasesCoverflow } from '@/components/ReleasesCoverflow'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
@@ -70,6 +72,18 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
         </motion.div>
+
+        {/* View all button row */}
+        <div className="flex justify-end mb-4">
+          {dict.viewAll && (
+            <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
+              <Link href="/releases">
+                {dict.viewAll}
+                <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
+              </Link>
+            </Button>
+          )}
+        </div>
 
         {/* Search + category filter row */}
         <motion.div

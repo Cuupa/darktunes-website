@@ -78,9 +78,9 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                   </a>
                 </li>
                 <li>
-                  <a href="#concerts" onClick={(e) => handleSmoothScroll(e, '#concerts')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <Link href="/events" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     {dict.tourLink}
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

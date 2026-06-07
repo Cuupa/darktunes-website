@@ -52,14 +52,14 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        // SVG favicon — modern browsers prefer this; shows custom "DT" logo
+        // Custom favicon from admin settings takes highest priority when set
+        ...(customFaviconUrl ? [{ url: customFaviconUrl, type: 'image/png', sizes: '32x32' }] : []),
+        // SVG favicon — used when no custom favicon is configured
         { url: '/favicon.svg', type: 'image/svg+xml' },
-        // Custom favicon from admin settings (PNG, higher specificity via order)
-        ...(customFaviconUrl ? [{ url: customFaviconUrl, type: 'image/png' }] : []),
         // ICO fallback for legacy browsers
         { url: '/favicon.ico', sizes: '32x32' },
       ],
-      shortcut: '/favicon.ico',
+      shortcut: customFaviconUrl || '/favicon.ico',
       apple: { url: customFaviconUrl || '/icons/icon-192.png', sizes: '192x192' },
     },
   }

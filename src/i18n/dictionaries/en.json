@@ -4,7 +4,7 @@
     "artists": "ARTISTS",
     "about": "ABOUT",
     "releases": "RELEASES",
-    "tour": "TOUR",
+    "tour": "EVENTS",
     "news": "NEWS",
     "videos": "VIDEOS",
     "spotify": "SPOTIFY",
@@ -35,7 +35,8 @@
     "noResults": "No releases found.",
     "viewFullPage": "View Full Page",
     "streamingLinks": "Streaming Links",
-    "previewTitle": "Preview"
+    "previewTitle": "Preview",
+    "viewAll": "All Releases"
   },
   "news": {
     "heading": "NEWS",
@@ -48,17 +49,20 @@
     "subheading": "Watch the latest music videos and visualizers",
     "loadMore": "Load More",
     "noVideos": "No videos available yet.",
-    "viewAll": "View all videos",
+    "viewAll": "All Videos",
     "searchPlaceholder": "Search videos by title or artist…"
   },
   "concerts": {
-    "heading": "TOUR",
-    "subheading": "Live dates and upcoming shows",
+    "heading": "EVENTS",
+    "subheading": "Live dates, gigs & upcoming shows",
     "ticketLink": "Get Tickets",
     "opensInNewTab": "opens in new tab",
     "cancelled": "Cancelled",
-    "noShows": "No upcoming tour dates at the moment.",
-    "checkBack": "Check back soon for new dates."
+    "noShows": "No upcoming events at the moment.",
+    "checkBack": "Check back soon for new dates.",
+    "viewAll": "All Events",
+    "filterArtist": "All Artists",
+    "filterCountry": "All Countries"
   },
   "spotify": {
     "heading": "SPOTIFY",
@@ -73,7 +77,7 @@
     "releasesLink": "Releases",
     "newsLink": "News",
     "videosLink": "Videos",
-    "tourLink": "Tour",
+    "tourLink": "Events",
     "allRightsReserved": "All rights reserved.",
     "contact": "Contact",
     "privacyPolicy": "Privacy Policy",
