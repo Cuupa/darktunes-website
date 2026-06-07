@@ -20,6 +20,8 @@ import {
   Database,
   FloppyDisk,
   Image as ImageIcon,
+  Plus,
+  Trash,
 } from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
 import { AssetPicker } from '../file-explorer/AssetPicker'
@@ -83,6 +85,8 @@ export interface ArtistFormData {
   bandsintownId: string
   /** Storage quota in MB (empty string = no limit / system default). Admin-only field. */
   storageQuotaMb: string
+  /** Custom smart links for the artist profile (e.g. Linktree-style). */
+  smartLinks: Array<{ label: string; url: string }>
 }
 
 /**
@@ -140,6 +144,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
   const [assetPickerTarget, setAssetPickerTarget] = useState<'imageUrl' | 'logoUrl' | null>(null)
+  const smartLinks = watch('smartLinks')
 
   const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs
 
@@ -583,6 +588,67 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
               <Input id="shopUrl" {...register('shopUrl')} placeholder="Auto-filled from slug" disabled={isLoading} />
             </div>
           </div>
+
+          {/* ── Smart / Custom Links ─────────────────────────────────── */}
+          <div className="space-y-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <Label>
+                Additional Links{' '}
+                <span className="text-muted-foreground text-xs font-normal">(smart / custom links)</span>
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs"
+                disabled={isLoading}
+                onClick={() => setValue('smartLinks', [...(smartLinks ?? []), { label: '', url: '' }])}
+              >
+                <Plus size={12} aria-hidden="true" />
+                Add Link
+              </Button>
+            </div>
+            {(smartLinks ?? []).length === 0 && (
+              <p className="text-xs text-muted-foreground">No additional links added yet.</p>
+            )}
+            {(smartLinks ?? []).map((link, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  value={link.label}
+                  onChange={(e) => {
+                    const next = [...(smartLinks ?? [])]
+                    next[index] = { ...next[index], label: e.target.value }
+                    setValue('smartLinks', next)
+                  }}
+                  placeholder="Label (e.g. Linktree)"
+                  disabled={isLoading}
+                  className="w-36 shrink-0"
+                />
+                <Input
+                  value={link.url}
+                  onChange={(e) => {
+                    const next = [...(smartLinks ?? [])]
+                    next[index] = { ...next[index], url: e.target.value }
+                    setValue('smartLinks', next)
+                  }}
+                  placeholder="https://…"
+                  disabled={isLoading}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  disabled={isLoading}
+                  onClick={() => setValue('smartLinks', (smartLinks ?? []).filter((_, i) => i !== index))}
+                  title="Remove link"
+                >
+                  <Trash size={14} aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </TabsContent>
 
         {/* ── Tab 3: Social Media ───────────────────────────────────────── */}
@@ -614,30 +680,33 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
           <div className="rounded-lg border border-border bg-card/40 p-4 space-y-3">
             <h3 className="text-sm font-semibold">Asset Library</h3>
             <p className="text-sm text-muted-foreground">
-              Pick existing files from the asset manager for the artist photo or logo. The picker is filtered to the current artist when available.
+              Pick existing files from the asset manager for the artist photo or logo.{' '}
+              {artistId ? 'The picker is filtered to this artist.' : 'The picker shows all assets.'}
             </p>
-            {!artistId ? (
-              <p className="text-xs text-muted-foreground">
-                Save the artist first to filter assets by ownership. You can still use the field-level asset picker above.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('imageUrl')}>
-                  Pick Artist Image
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('logoUrl')}>
-                  Pick Logo / Wordmark
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('imageUrl')}>
+                Pick Artist Image
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setAssetPickerTarget('logoUrl')}>
+                Pick Logo / Wordmark
+              </Button>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-md border border-border p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current image</p>
-                <p className="mt-2 break-all text-sm">{watch('imageUrl') || 'No image selected yet.'}</p>
+                {watch('imageUrl') ? (
+                  <img src={watch('imageUrl')} alt="Artist" className="mt-2 max-h-24 rounded object-contain" />
+                ) : (
+                  <p className="mt-2 break-all text-sm text-muted-foreground">No image selected yet.</p>
+                )}
               </div>
               <div className="rounded-md border border-border p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current logo</p>
-                <p className="mt-2 break-all text-sm">{watch('logoUrl') || 'No logo selected yet.'}</p>
+                {watch('logoUrl') ? (
+                  <img src={watch('logoUrl')} alt="Logo" className="mt-2 max-h-24 rounded object-contain" />
+                ) : (
+                  <p className="mt-2 break-all text-sm text-muted-foreground">No logo selected yet.</p>
+                )}
               </div>
             </div>
           </div>

@@ -49,6 +49,7 @@ function artistToFormData(artist: Artist): ArtistFormData {
     storageQuotaMb: artist.storageQuotaBytes != null
       ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
       : '',
+    smartLinks: artist.smartLinks ?? [],
   }
 }
 
@@ -84,6 +85,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     songkick_id: data.songkickId || null,
     bandsintown_id: data.bandsintownId || null,
     storage_quota_bytes: quotaMb != null && !Number.isNaN(quotaMb) ? quotaMb * 1024 * 1024 : null,
+    smart_links: data.smartLinks?.length ? data.smartLinks : null,
   }
 }
 
@@ -199,7 +201,7 @@ export default function ArtistEditPage() {
               )}
             </CardHeader>
             <CardContent>
-              <ArtistForm value={formValue} onChange={handleSave} isLoading={isSaving} />
+              <ArtistForm value={formValue} onChange={handleSave} isLoading={isSaving} artistId={artistId} />
             </CardContent>
           </Card>
         )}

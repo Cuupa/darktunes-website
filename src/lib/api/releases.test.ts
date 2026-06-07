@@ -76,6 +76,7 @@ const mockReleaseRow: ReleaseRow = {
   updated_at: '2024-01-01T00:00:00Z',
   bandcamp_url: null,
   smartlink_url: null,
+  guest_artists: null,
 }
 
 describe('getReleases', () => {

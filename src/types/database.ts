@@ -257,6 +257,7 @@ export interface Database {
           logo_url: string | null
           platform_links: Record<string, string> | null
           storage_quota_bytes: number | null
+          smart_links: Array<{ label: string; url: string }> | null
           created_at: string
           updated_at: string
         }
@@ -294,6 +295,7 @@ export interface Database {
           logo_url?: string | null
           platform_links?: Record<string, string> | null
           storage_quota_bytes?: number | null
+          smart_links?: Array<{ label: string; url: string }> | null
           created_at?: string
           updated_at?: string
         }
@@ -331,6 +333,7 @@ export interface Database {
           logo_url?: string | null
           platform_links?: Record<string, string> | null
           storage_quota_bytes?: number | null
+          smart_links?: Array<{ label: string; url: string }> | null
           created_at?: string
           updated_at?: string
         }
@@ -613,6 +616,7 @@ export interface Database {
           hero_secondary_btn_label: string | null
           hero_secondary_btn_action: string | null
           hero_secondary_btn_href: string | null
+          guest_artists: string | null
           created_at: string
           updated_at: string
         }
@@ -649,6 +653,7 @@ export interface Database {
           hero_secondary_btn_label?: string | null
           hero_secondary_btn_action?: string | null
           hero_secondary_btn_href?: string | null
+          guest_artists?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -685,6 +690,7 @@ export interface Database {
           hero_secondary_btn_label?: string | null
           hero_secondary_btn_action?: string | null
           hero_secondary_btn_href?: string | null
+          guest_artists?: string | null
           created_at?: string
           updated_at?: string
         }

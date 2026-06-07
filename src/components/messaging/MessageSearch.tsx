@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface MessageSearchProps {
@@ -13,31 +12,23 @@ interface MessageSearchProps {
 const ALL_ARTISTS = 'all-artists'
 
 export function MessageSearch({ artists, onSearch }: MessageSearchProps) {
-  const [query, setQuery] = useState('')
   const [artistId, setArtistId] = useState<string>(ALL_ARTISTS)
   const [unreadOnly, setUnreadOnly] = useState(false)
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      onSearch(query, artistId === ALL_ARTISTS ? null : artistId, unreadOnly)
+      onSearch('', artistId === ALL_ARTISTS ? null : artistId, unreadOnly)
     }, 300)
 
     return () => window.clearTimeout(timeout)
-  }, [artistId, onSearch, query, unreadOnly])
+  }, [artistId, onSearch, unreadOnly])
 
-  const hasFilters = query.trim().length > 0 || artistId !== ALL_ARTISTS || unreadOnly
+  const hasFilters = artistId !== ALL_ARTISTS || unreadOnly
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border p-4 md:flex-row md:items-center">
-      <Input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search messages…"
-        aria-label="Search messages"
-        className="md:flex-1"
-      />
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
       <Select value={artistId} onValueChange={setArtistId}>
-        <SelectTrigger aria-label="Filter by artist" className="w-full md:w-56">
+        <SelectTrigger aria-label="Filter by artist" className="h-7 text-xs w-36">
           <SelectValue placeholder="All artists" />
         </SelectTrigger>
         <SelectContent>
@@ -51,8 +42,9 @@ export function MessageSearch({ artists, onSearch }: MessageSearchProps) {
       </Select>
       <Button
         type="button"
+        size="sm"
         variant={unreadOnly ? 'default' : 'outline'}
-        className="min-h-[44px]"
+        className="h-7 text-xs"
         aria-pressed={unreadOnly}
         onClick={() => setUnreadOnly((current) => !current)}
       >
@@ -61,10 +53,10 @@ export function MessageSearch({ artists, onSearch }: MessageSearchProps) {
       {hasFilters && (
         <Button
           type="button"
+          size="sm"
           variant="ghost"
-          className="min-h-[44px]"
+          className="h-7 text-xs"
           onClick={() => {
-            setQuery('')
             setArtistId(ALL_ARTISTS)
             setUnreadOnly(false)
           }}

@@ -350,6 +350,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT N
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS platform_links JSONB;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS storage_quota_bytes BIGINT DEFAULT NULL;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS smart_links JSONB DEFAULT '[]'::JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
@@ -546,6 +547,7 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_href   TEX
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS guest_artists             TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey

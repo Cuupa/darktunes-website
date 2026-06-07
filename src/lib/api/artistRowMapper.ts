@@ -53,6 +53,7 @@ export function rowToArtist(row: ArtistRow): Artist {
     logoUrl: row.logo_url ?? undefined,
     platformLinks: row.platform_links ?? undefined,
     storageQuotaBytes: row.storage_quota_bytes ?? null,
+    smartLinks: (row.smart_links ?? []) as Array<{ label: string; url: string }>,
     userId: row.user_id ?? null,
   }
 }

@@ -60,7 +60,7 @@ type SortDir = 'asc' | 'desc'
 
 const EMPTY_FORM: ReleaseFormData = {
   title: '',
-  artistName: '',
+  guestArtists: '',
   artistIds: [],
   releaseDate: '',
   type: 'single',
@@ -86,7 +86,7 @@ const EMPTY_FORM: ReleaseFormData = {
 function releaseToFormData(release: Release): ReleaseFormData {
   return {
     title: release.title,
-    artistName: release.artistName,
+    guestArtists: release.guestArtists ?? '',
     artistIds: release.artists?.map((a) => a.id) ?? (release.artistId ? [release.artistId] : []),
     releaseDate: release.releaseDate,
     type: release.type,
@@ -114,6 +114,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
   return {
     title: data.title,
     artist_id: (data.artistIds?.[0]) ?? null,
+    guest_artists: data.guestArtists || null,
     release_date: data.releaseDate,
     type: data.type,
     cover_art: data.coverArt || null,
@@ -537,7 +538,12 @@ export function ReleasesManager() {
             paginated.map((release) => (
               <TableRow key={release.id}>
                 <TableCell className="font-medium">{release.title}</TableCell>
-                <TableCell>{release.artistName}</TableCell>
+                <TableCell>
+                  {release.artistName}
+                  {release.guestArtists && (
+                    <span className="block text-xs text-muted-foreground">{release.guestArtists}</span>
+                  )}
+                </TableCell>
                 <TableCell>{release.releaseDate}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{release.type}</Badge>
