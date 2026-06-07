@@ -439,4 +439,38 @@ describe('getSiteSettings – round-trip for all admin-managed fields', () => {
     expect(result.themeAccent).toBe('')
     expect(result.themeBorder).toBe('')
   })
+
+  it('populates themeConfig from flat keys when theme_config key is absent', async () => {
+    const db = makeMockDb([
+      { key: 'theme_primary',    value: '#ff0000' },
+      { key: 'theme_secondary',  value: '#00ff00' },
+      { key: 'theme_background', value: '#000000' },
+      { key: 'theme_foreground', value: '#ffffff' },
+      { key: 'theme_card',       value: '#111111' },
+      { key: 'theme_muted',      value: '#222222' },
+      { key: 'theme_accent',     value: '#0000ff' },
+      { key: 'theme_border',     value: '#333333' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.themeConfig).toBeDefined()
+    expect(result.themeConfig?.colors.primary).toBe('#ff0000')
+    expect(result.themeConfig?.colors.background).toBe('#000000')
+  })
+
+  it('populates themeConfig from theme_config JSON when present', async () => {
+    const config = {
+      colors: { primary: '#aabbcc', secondary: '#ddeeff', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography: { fontFamily: 'Inter', headingSize: '3rem' },
+      glass: { blur: '12px', opacity: '0.2' },
+      animation: { preset: 'blur-in', duration: '0.5s' },
+    }
+    const db = makeMockDb([
+      { key: 'theme_config', value: JSON.stringify(config) },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.themeConfig?.colors.primary).toBe('#aabbcc')
+    expect(result.themeConfig?.typography.fontFamily).toBe('Inter')
+    expect(result.themeConfig?.animation.preset).toBe('blur-in')
+  })
 })

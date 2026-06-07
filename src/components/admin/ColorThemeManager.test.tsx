@@ -70,6 +70,8 @@ vi.mock('@phosphor-icons/react', () => ({
   Eye: () => null,
   FilmStrip: () => null,
   Sun: () => null,
+  TextAa: () => null,
+  Sparkle: () => null,
 }))
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -246,10 +248,12 @@ describe('ColorThemeManager', () => {
         onChange={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: /darkTunes Default/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Purple Night/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Red Ember/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Midnight Blue/i })).toBeDefined()
+    // Full theme presets + color-only presets both share names like "darkTunes Default"
+    // use getAllByRole since there may be multiple buttons with overlapping names
+    expect(screen.getAllByRole('button', { name: /darkTunes Default/i }).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByRole('button', { name: /Purple Night/i }).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByRole('button', { name: /Red Ember/i }).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByRole('button', { name: /Midnight Blue/i }).length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows WCAG warning when contrast ratio is below 4.5:1', () => {
