@@ -1,0 +1,190 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Calendar, MapPin, Ticket, FunnelSimple } from '@phosphor-icons/react'
+import type { Concert } from '@/types'
+import type { Dictionary, Locale } from '@/i18n/types'
+
+interface EventsPageContentProps {
+  concerts: Concert[]
+  dict: Dictionary['concerts']
+  locale: Locale
+}
+
+export function EventsPageContent({ concerts, dict, locale }: EventsPageContentProps) {
+  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const prefersReducedMotion = useReducedMotion()
+
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
+
+  // Collect unique artist names and countries
+  const artists = useMemo(() => {
+    const names = new Set<string>()
+    concerts.forEach((c) => { if (c.artistName) names.add(c.artistName) })
+    return Array.from(names).sort()
+  }, [concerts])
+
+  const countries = useMemo(() => {
+    const list = new Set<string>()
+    concerts.forEach((c) => { if (c.venueCountry) list.add(c.venueCountry) })
+    return Array.from(list).sort()
+  }, [concerts])
+
+  const filtered = useMemo(() => {
+    return concerts.filter((c) => {
+      if (selectedArtist && c.artistName !== selectedArtist) return false
+      if (selectedCountry && c.venueCountry !== selectedCountry) return false
+      return true
+    })
+  }, [concerts, selectedArtist, selectedCountry])
+
+  return (
+    <div>
+      {/* Filters */}
+      {(artists.length > 1 || countries.length > 1) && (
+        <motion.div
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
+          className="flex flex-col sm:flex-row gap-4 mb-8"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <FunnelSimple size={16} aria-hidden="true" />
+          </div>
+
+          {/* Artist filter */}
+          {artists.length > 1 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by artist">
+              <button
+                onClick={() => setSelectedArtist(null)}
+                aria-pressed={selectedArtist === null}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  selectedArtist === null
+                    ? 'bg-accent text-accent-foreground border-accent'
+                    : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
+                }`}
+              >
+                {dict.filterArtist}
+              </button>
+              {artists.map((artist) => (
+                <button
+                  key={artist}
+                  onClick={() => setSelectedArtist(artist === selectedArtist ? null : artist)}
+                  aria-pressed={selectedArtist === artist}
+                  className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                    selectedArtist === artist
+                      ? 'bg-accent text-accent-foreground border-accent'
+                      : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  {artist}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Country filter */}
+          {countries.length > 1 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by country">
+              <button
+                onClick={() => setSelectedCountry(null)}
+                aria-pressed={selectedCountry === null}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  selectedCountry === null
+                    ? 'bg-secondary text-secondary-foreground border-secondary'
+                    : 'bg-transparent border-border text-muted-foreground hover:border-secondary/50 hover:text-foreground'
+                }`}
+              >
+                {dict.filterCountry}
+              </button>
+              {countries.map((country) => (
+                <button
+                  key={country}
+                  onClick={() => setSelectedCountry(country === selectedCountry ? null : country)}
+                  aria-pressed={selectedCountry === country}
+                  className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-full border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                    selectedCountry === country
+                      ? 'bg-secondary text-secondary-foreground border-secondary'
+                      : 'bg-transparent border-border text-muted-foreground hover:border-secondary/50 hover:text-foreground'
+                  }`}
+                >
+                  {country}
+                </button>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Events list */}
+      {filtered.length === 0 ? (
+        <Card className="bg-card border-border p-8 text-center">
+          <p className="text-lg font-semibold mb-2">{dict.noShows}</p>
+          <p className="text-muted-foreground">{dict.checkBack}</p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((concert, index) => {
+            const isCancelled = concert.status === 'cancelled'
+            const location = [concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')
+            return (
+              <motion.div
+                key={concert.id}
+                initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.05 }}
+              >
+                <Card className="bg-card border-border p-5 md:p-6">
+                  <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm uppercase tracking-wider text-muted-foreground">
+                        <Calendar size={16} />
+                        <span className={isCancelled ? 'line-through' : ''}>
+                          {new Date(concert.concertDate).toLocaleDateString(dateLocale, {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        {isCancelled && (
+                          <Badge variant="destructive" className="uppercase tracking-wide">
+                            {dict.cancelled}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-2xl font-bold tracking-tight">{concert.artistName}</p>
+                      <p className="text-muted-foreground">{concert.eventName}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin size={16} />
+                        <span>{[concert.venueName, location].filter(Boolean).join(' · ')}</span>
+                      </div>
+                    </div>
+
+                    {concert.ticketUrl && (
+                      <Button asChild className="uppercase tracking-wider font-bold">
+                        <a
+                          href={concert.ticketUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${dict.ticketLink} (${dict.opensInNewTab})`}
+                        >
+                          <Ticket size={16} className="mr-2" />
+                          {dict.ticketLink}
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

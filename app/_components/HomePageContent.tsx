@@ -6,6 +6,7 @@ import { Hero } from '@/components/Hero'
 import { News } from '@/components/News'
 import { Concerts } from '@/components/Concerts'
 import { NewsletterSection } from '@/components/NewsletterSection'
+import { CaretLeft, CaretRight } from '@phosphor-icons/react'
 
 const Releases = dynamic(
   () => import('@/components/Releases').then((m) => m.Releases),
@@ -236,21 +237,42 @@ export function HomePageContent({
             </motion.div>
           </AnimatePresence>
           {heroItems.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1">
-              {heroItems.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setHeroState({ key: heroItemsKey, index: i })}
-                  aria-label={`Show hero item ${i + 1}`}
-                  className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                >
-                  <span
-                    className={`block rounded-full transition-all duration-300 ${i === heroIndex ? 'w-3 h-3 bg-accent scale-125' : 'w-2.5 h-2.5 bg-muted-foreground/50 hover:bg-muted-foreground'}`}
-                  />
-                </button>
-              ))}
-            </div>
+            <>
+              {/* Left arrow */}
+              <button
+                type="button"
+                aria-label="Previous hero item"
+                onClick={() => setHeroState({ key: heroItemsKey, index: (heroIndex - 1 + heroItems.length) % heroItems.length })}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-background/30 hover:bg-background/60 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 hover:border-white/30 transition-all duration-200"
+              >
+                <CaretLeft size={20} weight="bold" />
+              </button>
+              {/* Right arrow */}
+              <button
+                type="button"
+                aria-label="Next hero item"
+                onClick={() => setHeroState({ key: heroItemsKey, index: (heroIndex + 1) % heroItems.length })}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-background/30 hover:bg-background/60 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 hover:border-white/30 transition-all duration-200"
+              >
+                <CaretRight size={20} weight="bold" />
+              </button>
+              {/* Dot indicators */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1">
+                {heroItems.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setHeroState({ key: heroItemsKey, index: i })}
+                    aria-label={`Show hero item ${i + 1}`}
+                    className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  >
+                    <span
+                      className={`block rounded-full transition-all duration-300 ${i === heroIndex ? 'w-3 h-3 bg-accent scale-125' : 'w-2.5 h-2.5 bg-muted-foreground/50 hover:bg-muted-foreground'}`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
 

@@ -1,10 +1,11 @@
 'use client'
 
 import { motion, useReducedMotion } from 'framer-motion'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Ticket } from '@phosphor-icons/react'
+import { Calendar, MapPin, Ticket, ArrowRight } from '@phosphor-icons/react'
 import type { Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -27,10 +28,20 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-12"
+          className="mb-12 flex items-end justify-between gap-4 flex-wrap"
         >
-          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-          <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+          <div>
+            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
+            <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+          </div>
+          {dict.viewAll && (
+            <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
+              <Link href="/events">
+                {dict.viewAll}
+                <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
+              </Link>
+            </Button>
+          )}
         </motion.div>
 
         {concerts.length === 0 ? (
