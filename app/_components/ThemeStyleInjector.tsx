@@ -28,37 +28,7 @@
  *   animation.duration   → --animation-duration
  */
 
-interface ThemeConfig {
-  colors: {
-    primary: string
-    secondary: string
-    background: string
-    foreground: string
-    card: string
-    muted: string
-    accent: string
-    border: string
-  }
-  gradients: {
-    heroFrom: string
-    heroTo: string
-    heroDir: string
-    accentFrom: string
-    accentTo: string
-    accentDir: string
-  }
-  typography: {
-    fontFamily: string
-    headingSize: string
-  }
-  glass: {
-    blur: string
-    opacity: string
-  }
-  animation: {
-    duration: string
-  }
-}
+import type { ThemeConfig } from '@/config/themeConfig'
 
 // ── Flat-field legacy interface (kept for backward compatibility) ─────────────
 
