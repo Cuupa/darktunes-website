@@ -165,7 +165,8 @@ describe('ThemeStyleInjector', () => {
     const links = container.querySelectorAll('link')
     expect(links.length).toBeGreaterThanOrEqual(1)
     const hrefs = Array.from(links).map((l) => l.getAttribute('href') ?? '')
-    expect(hrefs.some((h) => h.includes('fonts.googleapis.com'))).toBe(true)
+    const googleFontsUrl = 'https://fonts.googleapis.com/css2?family=Inter'
+    expect(hrefs.some((h) => h.startsWith(googleFontsUrl))).toBe(true)
   })
 
   it('does NOT inject Google Font links for unknown font family', () => {
@@ -178,7 +179,10 @@ describe('ThemeStyleInjector', () => {
     }
     const container = renderFull({ themeConfig: config })
     const links = container.querySelectorAll('link')
-    const hasGoogleFont = Array.from(links).some((l) => (l.getAttribute('href') ?? '').includes('fonts.googleapis.com'))
+    const hasGoogleFont = Array.from(links).some((l) => {
+      const href = l.getAttribute('href') ?? ''
+      return href.startsWith('https://fonts.googleapis.com/')
+    })
     expect(hasGoogleFont).toBe(false)
   })
 })
