@@ -23,6 +23,8 @@ export async function SiteHeader() {
       locale={locale}
       logoUrl={settings?.logoUrl}
       sectionOrder={settings?.homepageSectionOrder}
+      showAbout={settings?.showAboutInHeader ?? true}
+      aboutNavLabel={settings?.aboutNavLabel || undefined}
     />
   )
 }

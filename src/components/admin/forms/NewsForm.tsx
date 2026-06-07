@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ImageUploadButton } from './ImageUploadButton'
+import { AssetPicker } from '@/components/admin/file-explorer/AssetPicker'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 
 export interface NewsFormData {
@@ -70,6 +71,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
 
   const [htmlContent, setHtmlContent] = useState(value?.content ?? '')
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -227,7 +229,20 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
             label="Upload"
             onUploaded={(url) => setValue('imageUrl', url)}
           />
+          <Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+            Library
+          </Button>
         </div>
+        {watch('imageUrl') && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={watch('imageUrl')} alt="Cover preview" className="mt-2 h-20 w-auto rounded object-cover" />
+        )}
+        <AssetPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(asset) => { setValue('imageUrl', asset.publicUrl); setPickerOpen(false) }}
+          mimeTypeFilter="image/"
+        />
       </div>
 
       <div className="space-y-1">

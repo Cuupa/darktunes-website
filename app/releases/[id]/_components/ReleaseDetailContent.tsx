@@ -68,6 +68,8 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
     if (release.spotifyUrl)    fallback.push({ key: 'spotify',    url: release.spotifyUrl })
     if (release.appleMusicUrl) fallback.push({ key: 'appleMusic', url: release.appleMusicUrl })
     if (release.youtubeUrl)    fallback.push({ key: 'youtube',    url: release.youtubeUrl })
+    if (release.bandcampUrl)   fallback.push({ key: 'bandcamp',   url: release.bandcampUrl })
+    if (release.smartlinkUrl)  fallback.push({ key: 'smartlink',  url: release.smartlinkUrl })
     return fallback
   })()
 

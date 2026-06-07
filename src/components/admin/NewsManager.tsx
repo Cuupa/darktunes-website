@@ -2,13 +2,20 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star, Copy } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -40,19 +47,33 @@ const STATUS_BADGE: Record<NewsPost['status'], { label: string; className: strin
 
 export function NewsManager() {
   const router = useRouter()
-  const { news, isLoading, updateNewsPost, deleteNewsPost } = useNews()
+  const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [bandFilter, setBandFilter] = useState<string>('all')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const allBandNames = useMemo(() => {
+    const names = new Set<string>()
+    news.forEach((p) => p.artists?.forEach((a) => names.add(a.name)))
+    return Array.from(names).sort()
+  }, [news])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return news
       .filter((p) => {
         if (statusFilter !== 'all' && p.status !== statusFilter) return false
-        return !q || p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)
+        if (bandFilter !== 'all' && !p.artists?.some((a) => a.name === bandFilter)) return false
+        if (!q) return true
+        return (
+          p.title.toLowerCase().includes(q) ||
+          p.slug.toLowerCase().includes(q) ||
+          (p.artists?.some((a) => a.name.toLowerCase().includes(q)) ?? false)
+        )
       })
       .sort((a, b) => {
         const cmp = new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()
@@ -77,6 +98,38 @@ export function NewsManager() {
     }
   }
 
+  const handleTogglePublished = async (post: NewsPost, checked: boolean) => {
+    setTogglingId(post.id)
+    try {
+      await updateNewsPost(post.id, { status: checked ? 'published' : 'draft' })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Update failed')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const handleDuplicate = async (post: NewsPost) => {
+    try {
+      const timestamp = Date.now()
+      await createNewsPost({
+        title: `${post.title} (Copy)`,
+        slug: `${post.slug}-copy-${timestamp}`,
+        excerpt: post.excerpt,
+        content: post.content,
+        status: 'draft',
+        image_url: post.imageUrl ?? null,
+        is_press_only: post.isPressOnly,
+        featured: false,
+        published_at: new Date().toISOString(),
+      })
+      toast.success('Post duplicated as draft')
+      router.push('/admin/news')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Duplicate failed')
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteTarget) return
     setIsMutating(true)
@@ -93,15 +146,30 @@ export function NewsManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search posts…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="relative min-w-[200px]">
+            <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search posts…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {allBandNames.length > 0 && (
+            <Select value={bandFilter} onValueChange={setBandFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All Bands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Bands</SelectItem>
+                {allBandNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="flex gap-2">
           <Button
@@ -132,25 +200,26 @@ export function NewsManager() {
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
-            <TableHead>Slug</TableHead>
+            <TableHead>Bands</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Audience</TableHead>
             <TableHead title="Show in hero carousel">Featured</TableHead>
+            <TableHead title="Toggle published/draft">Published</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                {search || statusFilter !== 'all' ? 'No posts match your filters.' : 'No posts yet. Click "New Post" to add one.'}
+              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                {search || statusFilter !== 'all' || bandFilter !== 'all' ? 'No posts match your filters.' : 'No posts yet. Click "New Post" to add one.'}
               </TableCell>
             </TableRow>
           ) : (
@@ -164,7 +233,16 @@ export function NewsManager() {
                       {post.title}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">{post.slug}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {post.artists && post.artists.length > 0
+                        ? post.artists.map((a) => (
+                            <Badge key={a.id} variant="outline" className="text-xs">{a.name}</Badge>
+                          ))
+                        : <span className="text-muted-foreground text-xs">—</span>
+                      }
+                    </div>
+                  </TableCell>
                   <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`gap-1 ${badge.className}`}>
@@ -180,6 +258,14 @@ export function NewsManager() {
                       title="Show in hero carousel"
                     />
                   </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={post.status === 'published'}
+                      onCheckedChange={(checked) => void handleTogglePublished(post, checked)}
+                      disabled={togglingId === post.id}
+                      aria-label={`Toggle published for "${post.title}"`}
+                    />
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button
@@ -189,6 +275,14 @@ export function NewsManager() {
                         title="Edit"
                       >
                         <PencilSimple size={16} />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => void handleDuplicate(post)}
+                        title="Duplicate as draft"
+                      >
+                        <Copy size={16} />
                       </Button>
                       {post.status !== 'archived' && (
                         <Button

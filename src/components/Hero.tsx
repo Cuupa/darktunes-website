@@ -210,10 +210,17 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                     className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
                     asChild
                   >
-                    <Link href={primaryHref}>
-                      <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
-                      {primaryLabel}
-                    </Link>
+                    {primaryHref.startsWith('http') ? (
+                      <a href={primaryHref} target="_blank" rel="noopener noreferrer">
+                        <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
+                        {primaryLabel}
+                      </a>
+                    ) : (
+                      <Link href={primaryHref}>
+                        <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
+                        {primaryLabel}
+                      </Link>
+                    )}
                   </Button>
                 )
               )}
@@ -225,10 +232,16 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                     className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                     asChild
                   >
+                  {secondaryHref.startsWith('http') ? (
+                    <a href={secondaryHref} target="_blank" rel="noopener noreferrer">
+                      {secondaryLabel}
+                    </a>
+                  ) : (
                     <Link href={secondaryHref}>
                       {secondaryLabel}
                     </Link>
-                  </Button>
+                  )}
+                </Button>
                 ) : (
                   <Button
                     size="lg"

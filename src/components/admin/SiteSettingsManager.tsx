@@ -123,6 +123,11 @@ const schema = z.object({
   releasesSectionSubheading: z.string().optional().default(''),
   shopifyStoreUrl: z.string().url('Must be a valid URL').or(z.literal('')),
   submitHubUrl: z.string().url('Must be a valid URL').or(z.literal('')).optional().default(''),
+  submitHubLabel: z.string().optional().default(''),
+  submitHubDescription: z.string().optional().default(''),
+  showAboutInHeader: z.boolean().optional().default(true),
+  showAboutInFooter: z.boolean().optional().default(true),
+  aboutNavLabel: z.string().optional().default('About'),
   youtubeChannelId: z.string().optional().default(''),
   contactTopics: z.array(
     z.object({
@@ -503,6 +508,48 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Navigation visibility toggles */}
+              <div className="flex flex-col gap-3 pb-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Controller
+                    name="showAboutInHeader"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="showAboutInHeader"
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                      />
+                    )}
+                  />
+                  <Label htmlFor="showAboutInHeader">Show About in header navigation</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Controller
+                    name="showAboutInFooter"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="showAboutInFooter"
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                      />
+                    )}
+                  />
+                  <Label htmlFor="showAboutInFooter">Show About in footer navigation</Label>
+                </div>
+                <Field id="aboutNavLabel" label="Navigation label (default: &quot;About&quot;)">
+                  <Input
+                    id="aboutNavLabel"
+                    placeholder="About"
+                    {...register('aboutNavLabel')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+              </div>
+
               <Field id="aboutHeadline" label="Headline (optional — overrides i18n default)">
                 <Input
                   id="aboutHeadline"
@@ -596,6 +643,24 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   id="submitHubUrl"
                   placeholder="https://www.submithub.com/playlister/your-profile"
                   {...register('submitHubUrl')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="submitHubLabel" label="SubmitHub Button Label (optional, overrides default)" error={errors.submitHubLabel?.message}>
+                <Input
+                  id="submitHubLabel"
+                  placeholder="Submit Your Music"
+                  {...register('submitHubLabel')}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field id="submitHubDescription" label="SubmitHub Section Description (optional)" error={errors.submitHubDescription?.message}>
+                <Input
+                  id="submitHubDescription"
+                  placeholder="Send us your demo…"
+                  {...register('submitHubDescription')}
                   disabled={isSubmitting}
                 />
               </Field>

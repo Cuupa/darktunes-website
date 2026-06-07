@@ -74,6 +74,8 @@ const mockReleaseRow: ReleaseRow = {
   hero_secondary_btn_action: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
+  bandcamp_url: null,
+  smartlink_url: null,
 }
 
 describe('getReleases', () => {

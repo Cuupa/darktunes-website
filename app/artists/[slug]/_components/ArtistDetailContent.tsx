@@ -30,6 +30,7 @@ import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import { ShareButton } from './ShareButton'
@@ -311,31 +312,42 @@ export function ArtistDetailContent({
 
               {/* Social links */}
               <div className="flex flex-wrap gap-3 pt-1">
+                <TooltipProvider>
                 {socialLinks
                   .filter((s) => s.url)
                   .map(({ url, icon: Icon, label }) => (
-                    <a
-                      key={label}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={label}
-                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
-                    >
-                      <Icon size={20} weight="fill" aria-hidden="true" />
-                    </a>
+                    <Tooltip key={label}>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={label}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                        >
+                          <Icon size={20} weight="fill" aria-hidden="true" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>{label}</TooltipContent>
+                    </Tooltip>
                   ))}
                 {artist.bandsintownId && (
-                  <a
-                    href={`https://www.bandsintown.com/a/${encodeURIComponent(artist.bandsintownId)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`${artist.name} on Bandsintown`}
-                    className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110 font-mono text-xs font-bold uppercase tracking-tighter"
-                  >
-                    BIT
-                  </a>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={`https://www.bandsintown.com/a/${encodeURIComponent(artist.bandsintownId)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${artist.name} on Bandsintown`}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110 font-mono text-xs font-bold uppercase tracking-tighter"
+                      >
+                        BIT
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>Bandsintown</TooltipContent>
+                  </Tooltip>
                 )}
+                </TooltipProvider>
               </div>
 
               {/* Share button */}

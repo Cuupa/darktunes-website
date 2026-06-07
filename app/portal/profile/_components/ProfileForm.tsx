@@ -16,7 +16,7 @@
  */
 
 import * as React from 'react'
-import { Controller } from 'react-hook-form'
+import { Controller, useFieldArray } from 'react-hook-form'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,6 +107,9 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     handleEpkSettingsChange,
     onSubmit,
   } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
+
+  const { fields: customLinkFields, append: appendCustomLink, remove: removeCustomLink } =
+    useFieldArray({ control: form.control, name: 'custom_links' })
 
   // ---------------------------------------------------------------------------
   // Build live EPK data from form watch
@@ -488,6 +491,50 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Custom Links */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Custom Links</CardTitle>
+                <CardDescription>Add any additional links (e.g. personal site, merch, EPK)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {customLinkFields.map((field, index) => (
+                  <div key={field.id} className="flex gap-2 items-start">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Label (e.g. Merch)"
+                        {...form.register(`custom_links.${index}.label`)}
+                        className="bg-muted border-border"
+                      />
+                      <Input
+                        type="url"
+                        placeholder="https://"
+                        {...form.register(`custom_links.${index}.url`)}
+                        className="bg-muted border-border"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive shrink-0"
+                      onClick={() => removeCustomLink(index)}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => appendCustomLink({ label: '', url: '' })}
+                >
+                  + Add Link
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

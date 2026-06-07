@@ -23,6 +23,7 @@ export function LinkPopover({ editor, disabled }: Props) {
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
   const [newTab, setNewTab] = useState(true)
+  const [linkColor, setLinkColor] = useState('')
 
   // Prefill with current link attrs when opening
   useEffect(() => {
@@ -30,19 +31,25 @@ export function LinkPopover({ editor, disabled }: Props) {
     const attrs = editor.getAttributes('link')
     setUrl((attrs.href as string | undefined) ?? '')
     setNewTab((attrs.target as string | undefined) !== '_self')
+    setLinkColor((editor.getAttributes('textStyle').color as string | undefined) ?? '')
   }, [open, editor])
 
   const handleApply = useCallback(() => {
     if (!url.trim()) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
     } else {
-      editor.chain().focus().extendMarkRange('link').setLink({
+      const chain = editor.chain().focus().extendMarkRange('link').setLink({
         href: url.trim(),
         target: newTab ? '_blank' : '_self',
-      }).run()
+      })
+      if (linkColor) {
+        chain.setColor(linkColor).run()
+      } else {
+        chain.run()
+      }
     }
     setOpen(false)
-  }, [editor, url, newTab])
+  }, [editor, url, newTab, linkColor])
 
   const handleRemove = useCallback(() => {
     editor.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -82,6 +89,23 @@ export function LinkPopover({ editor, disabled }: Props) {
         <div className="flex items-center gap-2">
           <Switch id="link-popover-newtab" checked={newTab} onCheckedChange={setNewTab} />
           <Label htmlFor="link-popover-newtab">Open in new tab</Label>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="link-popover-color">Link text color (optional)</Label>
+          <div className="flex items-center gap-2">
+            <input
+              id="link-popover-color"
+              type="color"
+              value={linkColor || '#ffffff'}
+              onChange={(e) => setLinkColor(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0.5"
+            />
+            {linkColor && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setLinkColor('')} className="h-7 px-2 text-xs">
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <Button type="button" size="sm" className="flex-1" onClick={handleApply}>

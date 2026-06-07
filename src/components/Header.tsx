@@ -18,9 +18,11 @@ interface HeaderProps {
   locale: Locale
   logoUrl?: string
   sectionOrder?: HomepageSection[]
+  showAbout?: boolean
+  aboutNavLabel?: string
 }
 
-export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
+export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNavLabel }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
@@ -38,9 +40,9 @@ export function Header({ dict, locale, logoUrl, sectionOrder }: HeaderProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const navItems = buildNavItems(sectionOrder).map((item) => ({
+  const navItems = buildNavItems(sectionOrder, { showAbout: showAbout ?? true, aboutLabel: aboutNavLabel }).map((item) => ({
     id: item.id,
-    label: dict[item.labelKey],
+    label: item.id === 'about' && aboutNavLabel ? aboutNavLabel : dict[item.labelKey],
     // On sub-pages convert anchor hrefs (e.g. #releases) to absolute homepage
     // links (e.g. /#releases) so the navigation still works from any route.
     href: !isHomePage && item.routeType === 'anchor' ? `/${item.href}` : item.href,

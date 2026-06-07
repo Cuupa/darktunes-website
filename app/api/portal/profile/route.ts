@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
@@ -50,6 +51,7 @@ const profileBodySchema = z.object({
   booking_contact: z.string().max(500).nullable().optional(),
   press_contact: z.string().max(500).nullable().optional(),
   soundcloud_url: z.string().url().nullable().optional(),
+  custom_links: z.array(z.object({ label: z.string(), url: z.string() })).nullable().optional(),
   rider_stage_plot_url: z.string().url().nullable().optional(),
   rider_technical_url: z.string().url().nullable().optional(),
   rider_hospitality_url: z.string().url().nullable().optional(),
@@ -142,6 +144,12 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (profileFields.founding_year !== undefined) artistUpdate.founded_year = profileFields.founding_year
 
   await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+
+  // 6. Invalidate public-facing artist pages so changes are reflected immediately
+  if (artist.slug) {
+    revalidatePath(`/artists/${artist.slug}`)
+  }
+  revalidatePath('/artists')
 
   return NextResponse.json({ profile })
 })

@@ -3,6 +3,7 @@ import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
 import { Providers } from './_components/Providers'
 import { NavHidingWrapper } from './_components/ConditionalSiteHeader'
 import { SiteHeader } from './_components/SiteHeader'
+import { SiteFooter } from './_components/SiteFooter'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
@@ -119,6 +120,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers consentDict={dict.consent}>
           <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
           {children}
+          <SiteFooter />
         </Providers>
       </body>
     </html>

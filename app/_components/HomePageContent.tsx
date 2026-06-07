@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { Hero } from '@/components/Hero'
 import { News } from '@/components/News'
 import { Concerts } from '@/components/Concerts'
-import { Footer } from '@/components/Footer'
 import { NewsletterSection } from '@/components/NewsletterSection'
 
 const Releases = dynamic(
@@ -237,15 +236,19 @@ export function HomePageContent({
             </motion.div>
           </AnimatePresence>
           {heroItems.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1">
               {heroItems.map((_, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setHeroState({ key: heroItemsKey, index: i })}
                   aria-label={`Show hero item ${i + 1}`}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === heroIndex ? 'bg-accent scale-125' : 'bg-muted-foreground/50 hover:bg-muted-foreground'}`}
-                />
+                  className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  <span
+                    className={`block rounded-full transition-all duration-300 ${i === heroIndex ? 'w-3 h-3 bg-accent scale-125' : 'w-2.5 h-2.5 bg-muted-foreground/50 hover:bg-muted-foreground'}`}
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -253,7 +256,6 @@ export function HomePageContent({
 
         {sectionOrder.map((section) => renderSection(section))}
       </main>
-      <Footer siteSettings={siteSettings} dict={dict.footer} />
     </div>
   )
 }

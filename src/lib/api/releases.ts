@@ -26,6 +26,8 @@ function rowToRelease(row: ReleaseRow): Release {
     spotifyUrl: row.spotify_url ?? undefined,
     appleMusicUrl: row.apple_music_url ?? undefined,
     youtubeUrl: row.youtube_url ?? undefined,
+    bandcampUrl: row.bandcamp_url ?? undefined,
+    smartlinkUrl: row.smartlink_url ?? undefined,
     featured: row.featured,
     itunesId: row.itunes_id ?? undefined,
     spotifyId: row.spotify_id ?? undefined,

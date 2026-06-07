@@ -44,16 +44,16 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
 
   const users = authData.users
 
-  // 2. Fetch primary roles from profiles
+  // 2. Fetch primary roles + full_name from profiles
   const { data: profiles, error: profilesError } = await adminClient
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, is_active')
 
   if (profilesError) throw new Error(profilesError.message)
 
-  const profileMap = new Map<string, UserRole>()
-  for (const p of profiles ?? []) {
-    profileMap.set(p.id, p.role as UserRole)
+  const profileMap = new Map<string, { role: UserRole; fullName: string | null }>()
+  for (const p of (profiles ?? []) as Array<{ id: string; role: string; full_name?: string | null; is_active?: boolean | null }>) {
+    profileMap.set(p.id, { role: p.role as UserRole, fullName: p.full_name ?? null })
   }
 
   // 3. Fetch all user_roles rows for the full multi-role list
@@ -88,12 +88,14 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
 
   // 5. Merge
   return users.map((u) => {
-    const primaryRole = profileMap.get(u.id) ?? 'user'
+    const profile = profileMap.get(u.id)
+    const primaryRole = profile?.role ?? 'user'
     const roles = userRolesMap.get(u.id) ?? [primaryRole]
     const linkedArtists = artistsMap.get(u.id) ?? []
     return {
       id: u.id,
       email: u.email ?? '',
+      displayName: profile?.fullName ?? null,
       role: primaryRole,
       roles,
       created_at: u.created_at,

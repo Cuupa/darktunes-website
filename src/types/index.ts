@@ -78,6 +78,8 @@ export interface Release {
   spotifyUrl?: string
   appleMusicUrl?: string
   youtubeUrl?: string
+  bandcampUrl?: string
+  smartlinkUrl?: string
   featured: boolean
   itunesId?: string
   spotifyId?: string
@@ -273,7 +275,7 @@ export interface Video {
 export interface UserProfile {
   id: string
   email: string
-  role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist'
+  role: 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
   createdAt: string
   updatedAt: string
 }
@@ -497,6 +499,16 @@ export interface SiteSettings {
    * hardcoded darkTunes SubmitHub link when empty.
    */
   submitHubUrl?: string
+  /** Override label text for the SubmitHub button (falls back to i18n key). */
+  submitHubLabel?: string
+  /** Override description for the SubmitHub section (falls back to i18n key). */
+  submitHubDescription?: string
+  /** Whether the About link should appear in the global header navigation. */
+  showAboutInHeader?: boolean
+  /** Whether the About link should appear in the global footer navigation. */
+  showAboutInFooter?: boolean
+  /** Display label for the About link in navigation menus. */
+  aboutNavLabel?: string
   // ── Color Theme Tokens ────────────────────────────────────────────────────
   /**
    * CSS color overrides for the site's design tokens. Each value is a valid
