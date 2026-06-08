@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
 import { Providers } from './_components/Providers'
 import { NavHidingWrapper } from './_components/ConditionalSiteHeader'
@@ -66,6 +66,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
+ * Viewport export — ensures correct mobile rendering on all devices.
+ * Next.js App Router does not inject a viewport meta tag by default, so we
+ * must export it explicitly.  `width=device-width, initial-scale=1` is the
+ * standard mobile-web baseline; `interactive-widget=resizes-visual` prevents
+ * the layout from resizing when the virtual keyboard opens on mobile.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  interactiveWidget: 'resizes-visual',
+}
+
+/**
  * Root Server Component layout — no "use client" here.
  * Providers wraps the tree with client-only concerns (Lenis, Toaster, ErrorBoundary).
  */
@@ -121,7 +134,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers consentDict={dict.consent}>
           <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
           {children}
-          <SiteFooter />
+          <NavHidingWrapper><SiteFooter /></NavHidingWrapper>
         </Providers>
       </body>
     </html>

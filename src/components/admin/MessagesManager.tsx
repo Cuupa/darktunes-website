@@ -431,11 +431,11 @@ export function MessagesManager() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex w-full min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
+    <div className="flex flex-col md:flex-row w-full min-h-[400px] md:min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
 
-      {/* ── Left: Folder Tree ─────────────────────────────────────────────── */}
+      {/* ── Left: Folder Tree — hidden on mobile ──────────────────────────── */}
       <aside
-        className="flex flex-col w-48 shrink-0 border-r border-border bg-card/40"
+        className="hidden md:flex flex-col md:w-48 shrink-0 border-r border-border bg-card/40"
         style={{ overscrollBehavior: 'contain' }}
       >
         <div className="flex items-center justify-between px-3 py-3 border-b border-border">
@@ -455,8 +455,13 @@ export function MessagesManager() {
         </div>
       </aside>
 
-      {/* ── Middle: Message List ───────────────────────────────────────────── */}
-      <div className="flex flex-col w-72 shrink-0 border-r border-border">
+      {/* ── Middle: Message List — full width on mobile (hidden when detail is open), fixed on md ── */}
+      <div className={cn(
+        "flex flex-col border-border",
+        selectedMessage
+          ? "hidden md:flex md:w-72 md:shrink-0 md:border-r"
+          : "flex-1 md:w-72 md:shrink-0 md:border-r",
+      )}>
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border bg-card/20">
           <Input
@@ -554,12 +559,24 @@ export function MessagesManager() {
         </div>
       </div>
 
-      {/* ── Right: Message Detail ──────────────────────────────────────────── */}
+      {/* ── Right: Message Detail — hidden on mobile when no message selected ── */}
       <div
-        className="flex-1 flex flex-col min-w-0 overflow-hidden"
+        className={cn(
+          "flex-1 flex flex-col min-w-0 overflow-hidden",
+          !selectedMessage && "hidden md:flex",
+        )}
       >
         {selectedMessage ? (
           <>
+            {/* Mobile back button */}
+            <button
+              type="button"
+              onClick={() => setSelectedMessageId(null)}
+              className="md:hidden flex items-center gap-2 px-4 py-2.5 border-b border-border text-sm text-muted-foreground hover:text-foreground transition-colors bg-card/20"
+            >
+              <ArrowBendUpLeft size={14} aria-hidden="true" />
+              Back to messages
+            </button>
             {/* Message header */}
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border bg-card/20 shrink-0">
               <div className="min-w-0">

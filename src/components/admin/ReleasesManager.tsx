@@ -492,6 +492,7 @@ export function ReleasesManager() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -620,6 +621,7 @@ export function ReleasesManager() {
           )}
         </TableBody>
       </Table>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
