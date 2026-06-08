@@ -111,6 +111,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     apple_music_url,
     tiktok_url,
     facebook_url,
+    soundcloud_url,
     ...profileFields
   } = d
 
@@ -141,7 +142,8 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (apple_music_url !== undefined) artistUpdate.apple_music_url = apple_music_url
   if (tiktok_url !== undefined) artistUpdate.tiktok_url = tiktok_url
   if (facebook_url !== undefined) artistUpdate.facebook_url = facebook_url
-  if (profileFields.founding_year !== undefined) artistUpdate.founded_year = profileFields.founding_year
+  if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = soundcloud_url
+  if (profileFields.founding_year !== undefined) artistUpdate.founding_year = profileFields.founding_year
 
   await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
 

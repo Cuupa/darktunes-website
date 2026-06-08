@@ -32,7 +32,6 @@ const fullProfile: ArtistProfile = {
   hometown: 'Berlin',
   bookingContact: undefined,
   pressContact: undefined,
-  soundcloudUrl: undefined,
   riderStagePlotUrl: undefined,
   riderTechnicalUrl: undefined,
   riderHospitalityUrl: undefined,

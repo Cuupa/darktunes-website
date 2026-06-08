@@ -17,6 +17,7 @@ export interface Artist {
   tiktokUrl?: string
   bandcampUrl?: string
   shopUrl?: string
+  soundcloudUrl?: string
   /** When true, this artist is guaranteed to appear in the homepage Artists section regardless of shuffle. */
   featured: boolean
   country?: string

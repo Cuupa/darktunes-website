@@ -2,6 +2,10 @@
 
 This guide explains how to set up the darkTunes database schema in Supabase.
 
+> **Schema conventions and 3NF requirements** are documented in
+> [`supabase/DB_REQUIREMENTS.md`](./DB_REQUIREMENTS.md). Read it before making
+> any schema changes.
+
 ## Prerequisites
 
 Before running `reset.sql`, you **MUST** execute these commands in the Supabase Dashboard SQL Editor:

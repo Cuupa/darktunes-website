@@ -303,12 +303,14 @@ Tested Modules (unit test files exist): `spotifyEmbedPath`, `utils/cn`, `syncLog
 Database Schema Management
 ⛔ MIGRATION SCRIPTS ARE STRICTLY AND ABSOLUTELY FORBIDDEN. Never create files in `supabase/migrations/` or any incremental SQL patch files. Every agent or developer who creates a migration script violates this rule and must immediately delete it and move the change into `supabase/reset.sql`.
 `supabase/reset.sql` and `src/types/database.ts` are the ONE AND ONLY source of truth for the database structure. They MUST always be in sync. There is only ONE schema script — the idempotent reset script.
+Full schema requirements (3NF, naming conventions, RLS rules, idempotency patterns, audit rules) are documented in `supabase/DB_REQUIREMENTS.md`. Read it before making any schema changes.
 
 MANDATORY RULE — Schema Change Checklist:
 Every PR that adds, removes, or renames a column / table / enum MUST include ALL of the following:
   1. Updated `supabase/reset.sql` — add the column/table to the CREATE TABLE definition AND add an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` guard so existing databases are updated safely.
   2. Updated `src/types/database.ts` to reflect the new schema (Row, Insert, Update shapes).
   3. If applicable: updated application hooks (src/hooks/use*.ts) that query the affected table.
+  4. Verified compliance with `supabase/DB_REQUIREMENTS.md` (3NF, no transitive dependencies, RLS enabled).
 
 Apply the schema to Supabase cloud: paste `supabase/reset.sql` into the Supabase SQL Editor and run it (fully idempotent — safe on fresh and existing databases).
 Visibility & Cascading Deletes: `artists.is_visible` and `releases.is_visible` (both BOOLEAN DEFAULT TRUE) control public visibility. `releases.artist_id` uses `ON DELETE CASCADE` so deleting an artist removes all their releases automatically. RLS policies enforce visibility at the DB level for the public role; the DAL public functions (`getPublicArtists`, `getPublicReleases`, `getPublicConcerts`) enforce it additionally at the application layer.

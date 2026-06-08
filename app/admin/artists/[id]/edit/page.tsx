@@ -76,7 +76,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     bandcamp_url: data.bandcampUrl || null,
     shop_url: data.shopUrl || null,
     country: data.country || null,
-    founded_year: data.foundedYear ? parseInt(data.foundedYear, 10) : null,
+    founding_year: data.foundedYear ? parseInt(data.foundedYear, 10) : null,
     email: data.email || null,
     vat_number: data.vatNumber || null,
     featured: data.featured,
