@@ -6,6 +6,7 @@ import { SiteHeader } from './_components/SiteHeader'
 import { SiteFooter } from './_components/SiteFooter'
 import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
+import { ThemeEffectsClient } from './_components/ThemeEffectsClient'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { WebVitals } from './web-vitals'
@@ -134,7 +135,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           noiseOpacity={settings?.noiseOpacity ?? 0.03}
           crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
           vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
+          effects={settings?.themeConfig?.effects}
         />
+        <ThemeEffectsClient effects={settings?.themeConfig?.effects} />
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
         <Providers consentDict={dict.consent}>
           <NavHidingWrapper><SiteHeader /></NavHidingWrapper>

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { globSync } from 'glob'
 
-const ALLOWED_COLORS = new Set(['#493687', '#7e1e37', '#101010', '#292929', '#383838', '#ffffff'])
+// #1db954 is Spotify's official brand color — required for Spotify logo icons
+const ALLOWED_COLORS = new Set(['#493687', '#7e1e37', '#101010', '#292929', '#383838', '#ffffff', '#1db954'])
 
 type Violation = {
   file: string

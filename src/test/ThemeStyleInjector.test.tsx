@@ -113,7 +113,7 @@ describe('ThemeStyleInjector', () => {
       animation: {},
     }
     const css = renderStyle({ themeConfig: config })
-    expect(css).toContain('--font-family-body: Inter')
+    expect(css).toContain("--font-family-body: 'Inter', sans-serif")
   })
 
   it('emits --heading-size from themeConfig.typography.headingSize', () => {

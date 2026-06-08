@@ -79,7 +79,7 @@ export function NewsManager() {
         const cmp = new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()
         return sortDir === 'desc' ? -cmp : cmp
       })
-  }, [news, search, statusFilter, sortDir])
+  }, [news, search, statusFilter, bandFilter, sortDir])
 
   const handleArchive = async (post: NewsPost) => {
     try {

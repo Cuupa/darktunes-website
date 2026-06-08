@@ -3,8 +3,9 @@
 /**
  * VisualEffectsOverlay
  *
- * Renders all visual effects (vignette, CRT scanlines, film grain/noise) as a
- * **single** `position: fixed` element to minimise GPU compositor layers.
+ * Renders all overlay visual effects (vignette, CRT scanlines, film grain/noise,
+ * chromatic aberration, colour wash) as a **single** `position: fixed` element
+ * to minimise GPU compositor layers.
  *
  * Layer strategy:
  *  - Parent div  — vignette via `background` + `box-shadow: inset`
@@ -15,10 +16,15 @@
  *  --vfx-noise-opacity   : controls noise ::after opacity
  *  --vfx-vignette-shadow : full rgba value for box-shadow inset
  *  --vfx-vignette-grad   : reduced rgba value for radial-gradient background
+ *  --fx-chromatic-offset : chromatic aberration drop-shadow offset
+ *  --fx-wash-color       : colour wash overlay tint
+ *  --fx-wash-opacity     : colour wash overlay opacity
  *
  * All overlays use pointer-events: none — they never block user interactions.
  * The CSS for ::before/::after lives in globals.css (.vfx-overlay).
  */
+
+import type { ThemeEffects } from '@/config/themeConfig'
 
 interface VisualEffectsOverlayProps {
   /** Opacity of the animated noise/grain layer (0–1). */
@@ -27,24 +33,48 @@ interface VisualEffectsOverlayProps {
   crtScanlinesEnabled: boolean
   /** Opacity of the vignette radial gradient (0–1). */
   vignetteIntensity: number
+  /** Full effects config for extended overlay effects. */
+  effects?: ThemeEffects
 }
 
 export function VisualEffectsOverlay({
   noiseOpacity,
   crtScanlinesEnabled,
   vignetteIntensity,
+  effects,
 }: VisualEffectsOverlayProps) {
+  const chromaticEnabled  = effects?.overlay?.chromaticAberration?.enabled ?? false
+  const chromaticIntensity = effects?.overlay?.chromaticAberration?.intensity ?? 2
+  const washEnabled       = effects?.overlay?.colorWash?.enabled ?? false
+  const washColor         = effects?.overlay?.colorWash?.color ?? 'transparent'
+  const washOpacity       = effects?.overlay?.colorWash?.opacity ?? 0
+
   return (
-    <div
-      aria-hidden="true"
-      className={`vfx-overlay${crtScanlinesEnabled ? ' vfx-scanlines' : ''}`}
-      style={
-        {
-          '--vfx-noise-opacity': noiseOpacity,
-          '--vfx-vignette-shadow': `rgba(0,0,0,${vignetteIntensity})`,
-          '--vfx-vignette-grad': `rgba(0,0,0,${(vignetteIntensity * 0.65).toFixed(3)})`,
-        } as React.CSSProperties
-      }
-    />
+    <>
+      <div
+        aria-hidden="true"
+        className={`vfx-overlay${crtScanlinesEnabled ? ' vfx-scanlines' : ''}${chromaticEnabled ? ' vfx-chromatic' : ''}`}
+        style={
+          {
+            '--vfx-noise-opacity':   noiseOpacity,
+            '--vfx-vignette-shadow': `rgba(0,0,0,${vignetteIntensity})`,
+            '--vfx-vignette-grad':   `rgba(0,0,0,${(vignetteIntensity * 0.65).toFixed(3)})`,
+            '--fx-chromatic-offset': chromaticEnabled ? `${chromaticIntensity}px` : '0px',
+          } as React.CSSProperties
+        }
+      />
+      {washEnabled && (
+        <div
+          aria-hidden="true"
+          className="vfx-color-wash"
+          style={
+            {
+              '--fx-wash-color':   washColor,
+              '--fx-wash-opacity': washOpacity,
+            } as React.CSSProperties
+          }
+        />
+      )}
+    </>
   )
 }
