@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import logoImage from '@/assets/images/logo_(1).png'
 import type { Release, NewsPost, SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
@@ -32,6 +33,8 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
   // Stop the bounce animation as soon as the hero scrolls out of view so the
   // Framer Motion rAF loop doesn't keep running while the user reads below.
   const isInView = useInView(sectionRef, { margin: '0px 0px -20% 0px' })
+  // Must be called unconditionally before any early returns (Rules of Hooks).
+  const handleSmoothScroll = useSmoothScrollToAnchor()
 
   // ── Logo-only fallback when nothing is featured ──────────────────────────
   if (!heroItem) {
@@ -68,16 +71,6 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
   }
 
   const itemIsRelease = isRelease(heroItem)
-
-  const handleSmoothScroll = (targetId: string) => {
-    const target = document.querySelector(targetId)
-    if (target) {
-      const headerOffset = 140
-      const elementPosition = target.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.scrollY - headerOffset
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
-    }
-  }
 
   /**
    * Background image hierarchy (highest priority first):
@@ -199,7 +192,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                   <Button
                     size="lg"
                     className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider text-base px-8 py-6"
-                    onClick={() => handleSmoothScroll(primaryHref)}
+                    onClick={(e) => handleSmoothScroll(e, primaryHref)}
                   >
                     <Play className="mr-2" weight="fill" size={20} aria-hidden="true" />
                     {primaryLabel}
@@ -247,7 +240,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                     size="lg"
                     variant="outline"
                     className="border-2 font-bold uppercase tracking-wider text-base px-8 py-6 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                    onClick={() => handleSmoothScroll(secondaryHref)}
+                    onClick={(e) => handleSmoothScroll(e, secondaryHref)}
                   >
                     {secondaryLabel}
                   </Button>
