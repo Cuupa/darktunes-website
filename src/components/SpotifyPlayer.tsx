@@ -3,7 +3,7 @@
 import { Card } from '@/components/ui/card'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ConsentGate } from '@/components/ConsentGate'
-import { MusicNote } from '@phosphor-icons/react'
+import { MusicNote, SpotifyLogo } from '@phosphor-icons/react'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 
 interface SpotifyPlayerProps {
@@ -12,11 +12,17 @@ interface SpotifyPlayerProps {
   artistUri?: string
   /** Optional R2 placeholder image URL shown before consent is given. */
   placeholderUrl?: string
-  /** Translated label for the Spotify consent gate button. */
+  /** Short button label for the Spotify consent gate (e.g. "Load Spotify Player"). */
   loadLabel?: string
+  /** Title shown in the consent gate (e.g. "Listen on Spotify"). */
+  gateTitle?: string
+  /** Explanation text for the consent gate. */
+  gateText?: string
+  /** Privacy policy link label. */
+  privacyPolicyLabel?: string
 }
 
-export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl, loadLabel }: SpotifyPlayerProps) {
+export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl, loadLabel, gateTitle, gateText, privacyPolicyLabel }: SpotifyPlayerProps) {
   const spotifyUri = trackUri || playlistUri || artistUri
   const prefersReducedMotion = useReducedMotion()
 
@@ -27,7 +33,15 @@ export function SpotifyPlayer({ trackUri, playlistUri, artistUri, placeholderUrl
         animate={{ opacity: 1, y: 0 }}
       >
         {spotifyUri ? (
-          <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl}>
+          <ConsentGate
+            label={loadLabel ?? 'Load Spotify Player'}
+            title={gateTitle}
+            providerIcon={<SpotifyLogo size={20} weight="fill" className="text-[#1DB954]" aria-hidden="true" />}
+            placeholderUrl={placeholderUrl}
+            gateText={gateText}
+            privacyPolicyUrl="/datenschutz"
+            privacyPolicyLabel={privacyPolicyLabel}
+          >
             <iframe
               src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyUri)}`}
               width="100%"

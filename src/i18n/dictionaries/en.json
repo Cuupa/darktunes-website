@@ -111,10 +111,12 @@
     "privacyLink": "Privacy Policy",
     "reject": "Reject",
     "accept": "Accept",
-    "gateText": "This content is hosted by Spotify (an external provider). Click the button below to load it — doing so will transfer data to Spotify as described in our privacy policy.",
+    "gateText": "This content is hosted by Spotify (an external provider). Loading it will transfer data to Spotify as described in our privacy policy.",
+    "spotifyTitle": "Listen on Spotify",
+    "spotifyBtnLabel": "Load Spotify Player",
     "loadExternal": "Load external content",
     "loadExternalAlt": "External content — click to load",
-    "loadSpotify": "This content is hosted by Spotify (an external provider). Click the button below to load it — doing so will transfer data to Spotify as described in our privacy policy.",
+    "loadSpotify": "Load Spotify Player",
     "loadYouTube": "Load YouTube"
   },
   "releaseDetail": {

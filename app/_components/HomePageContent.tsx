@@ -152,8 +152,10 @@ export function HomePageContent({
               <SpotifyMultiPlayer
                 playlists={playlists}
                 placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-                loadLabel={dict.consent.loadSpotify}
+                loadLabel={dict.consent.spotifyBtnLabel}
+                gateTitle={dict.consent.spotifyTitle}
                 gateText={dict.consent.gateText}
+                privacyPolicyLabel={dict.consent.privacyLink}
               />
             </div>
           </section>
