@@ -390,6 +390,7 @@ export function ArtistsManager() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -506,6 +507,7 @@ export function ArtistsManager() {
           )}
         </TableBody>
       </Table>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (

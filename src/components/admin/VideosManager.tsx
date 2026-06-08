@@ -193,6 +193,7 @@ export function VideosManager() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -273,6 +274,7 @@ export function VideosManager() {
           )}
         </TableBody>
       </Table>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined} aria-labelledby="videos-form-dialog-title" className="sm:max-w-xl max-h-[90vh] overflow-y-auto">

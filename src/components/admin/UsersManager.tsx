@@ -271,7 +271,7 @@ export function UsersManager() {
     <TooltipProvider>
       <div className="space-y-4">
         {/* Header row */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-3">
             <p className="text-sm text-muted-foreground">{users.length} user(s)</p>
             <Button
@@ -284,7 +284,7 @@ export function UsersManager() {
               Invite User
             </Button>
           </div>
-          <div className="relative w-64">
+          <div className="relative flex-1 min-w-[200px]">
             <MagnifyingGlass
               size={14}
               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -299,6 +299,7 @@ export function UsersManager() {
           </div>
         </div>
 
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -525,8 +526,7 @@ export function UsersManager() {
             )}
           </TableBody>
         </Table>
-
-        {/* Ban confirmation dialog */}
+        </div>
         <AlertDialog
           open={!!banTarget}
           onOpenChange={(open) => {

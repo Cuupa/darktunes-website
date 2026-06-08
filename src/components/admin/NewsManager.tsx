@@ -196,6 +196,7 @@ export function NewsManager() {
         </TabsList>
       </Tabs>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -312,6 +313,7 @@ export function NewsManager() {
           )}
         </TableBody>
       </Table>
+      </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
