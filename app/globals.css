@@ -222,6 +222,190 @@
   50%       { opacity: 0.85; }
 }
 
+/* ── Chromatic aberration overlay ────────────────────────────────────────── */
+/* Only rendered when .vfx-chromatic is present on the vfx-overlay div.      */
+/* Uses a pseudo-element with mix-blend-mode to split colour channels.        */
+.vfx-overlay.vfx-chromatic::before {
+  filter:
+    drop-shadow(calc(-1 * var(--fx-chromatic-offset, 0px)) 0 0 rgba(255,0,0,0.45))
+    drop-shadow(var(--fx-chromatic-offset, 0px) 0 0 rgba(0,0,255,0.45));
+}
+
+/* ── Colour wash overlay ─────────────────────────────────────────────────── */
+.vfx-color-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-global-fx);
+  background: var(--fx-wash-color, transparent);
+  opacity: var(--fx-wash-opacity, 0);
+}
+
+/* ── Image hover zoom ────────────────────────────────────────────────────── */
+html[data-fx-hover-zoom] img,
+html[data-fx-hover-zoom] .cover-art,
+html[data-fx-hover-zoom] [data-hover-zoom] {
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+html[data-fx-hover-zoom] img:hover,
+html[data-fx-hover-zoom] .cover-art:hover,
+html[data-fx-hover-zoom] [data-hover-zoom]:hover {
+  transform: scale(var(--fx-hover-zoom, 1.05));
+}
+
+/* ── Image hover 3D tilt ─────────────────────────────────────────────────── */
+html[data-fx-hover-tilt] [data-hover-tilt],
+html[data-fx-hover-tilt] .card-tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease;
+}
+html[data-fx-hover-tilt] [data-hover-tilt]:hover,
+html[data-fx-hover-tilt] .card-tilt:hover {
+  transform: perspective(600px) rotateX(4deg) rotateY(-4deg);
+}
+
+/* ── Image hover glow ────────────────────────────────────────────────────── */
+html[data-fx-hover-glow] img,
+html[data-fx-hover-glow] .cover-art,
+html[data-fx-hover-glow] [data-hover-glow] {
+  transition: filter 0.35s ease;
+}
+html[data-fx-hover-glow] img:hover,
+html[data-fx-hover-glow] .cover-art:hover,
+html[data-fx-hover-glow] [data-hover-glow]:hover {
+  filter: drop-shadow(0 0 var(--fx-hover-glow-blur, 24px) var(--fx-hover-glow-color, currentColor));
+}
+
+/* ── Card hover scale ────────────────────────────────────────────────────── */
+html[data-fx-card-scale] .card,
+html[data-fx-card-scale] [data-card] {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+html[data-fx-card-scale] .card:hover,
+html[data-fx-card-scale] [data-card]:hover {
+  transform: scale(var(--fx-card-hover-scale, 1.03));
+}
+
+/* ── Card hover lift (drop-shadow elevation) ─────────────────────────────── */
+html[data-fx-card-lift] .card,
+html[data-fx-card-lift] [data-card] {
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+html[data-fx-card-lift] .card:hover,
+html[data-fx-card-lift] [data-card]:hover {
+  box-shadow: 0 var(--fx-card-hover-lift, 24px) calc(var(--fx-card-hover-lift, 24px) * 2) rgba(0,0,0,0.4);
+  transform: translateY(calc(-1 * var(--fx-card-hover-lift, 24px) * 0.25));
+}
+
+/* ── Heading glow ────────────────────────────────────────────────────────── */
+html[data-fx-heading-glow] h1,
+html[data-fx-heading-glow] h2 {
+  text-shadow: 0 0 var(--fx-heading-glow-blur, 16px) var(--fx-heading-glow-color, currentColor);
+}
+
+/* ── Heading shimmer ─────────────────────────────────────────────────────── */
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+html[data-fx-text-shimmer] h1,
+html[data-fx-text-shimmer] h2 {
+  background: linear-gradient(
+    90deg,
+    currentColor 20%,
+    var(--accent, #c084fc) 40%,
+    var(--primary, #a855f7) 50%,
+    var(--accent, #c084fc) 60%,
+    currentColor 80%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 3.5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-fx-text-shimmer] h1,
+  html[data-fx-text-shimmer] h2 {
+    animation: none;
+    background-position: 0 center;
+  }
+}
+
+/* ── Border pulse ────────────────────────────────────────────────────────── */
+@keyframes border-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary, #a855f7); }
+  50%       { box-shadow: 0 0 0 3px transparent; }
+}
+html[data-fx-border-pulse] button,
+html[data-fx-border-pulse] [role="button"],
+html[data-fx-border-pulse] a.btn {
+  animation: border-pulse var(--fx-border-pulse-speed, 2.5s) ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-fx-border-pulse] button,
+  html[data-fx-border-pulse] [role="button"],
+  html[data-fx-border-pulse] a.btn {
+    animation: none;
+  }
+}
+
+/* ── Button ripple ───────────────────────────────────────────────────────── */
+html[data-fx-btn-ripple] button,
+html[data-fx-btn-ripple] [role="button"] {
+  position: relative;
+  overflow: hidden;
+}
+html[data-fx-btn-ripple] button::after,
+html[data-fx-btn-ripple] [role="button"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+html[data-fx-btn-ripple] button:active::after,
+html[data-fx-btn-ripple] [role="button"]:active::after {
+  transform: scale(2);
+  opacity: 1;
+  transition: none;
+}
+
+/* ── Scroll reveal ───────────────────────────────────────────────────────── */
+/* Elements with [data-reveal] start hidden; JS (IntersectionObserver) adds   */
+/* data-revealed="" when they enter the viewport.                             */
+html[data-fx-scroll-reveal] [data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+html[data-fx-scroll-reveal] [data-reveal][data-revealed] {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-fx-scroll-reveal] [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ── Extended typography CSS vars fallbacks ──────────────────────────────── */
+body {
+  font-family: var(--font-family-body, inherit);
+  font-size:   var(--body-size, 1rem);
+  font-weight: var(--body-weight, 400);
+  line-height: var(--line-height-body, 1.5);
+  letter-spacing: var(--letter-spacing-body, normal);
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-heading, var(--font-family-body, inherit));
+  font-weight: var(--heading-weight, 700);
+}
+
 /* Hides the native scrollbar on horizontally-scrollable swipe containers
    (Artists / Videos mobile carousels) while keeping scroll functionality. */
 .scrollbar-hide {

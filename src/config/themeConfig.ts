@@ -19,12 +19,19 @@
  *   colors.border        → --border
  *   gradients.heroFrom/heroTo/heroDir  → --gradient-hero   (computed)
  *   gradients.accentFrom/accentTo/accentDir → --gradient-accent (computed)
- *   typography.fontFamily → --font-family-body
- *   typography.headingSize → --heading-size
+ *   typography.fontFamily    → --font-family-body
+ *   typography.headingFamily → --font-family-heading
+ *   typography.headingSize   → --heading-size
+ *   typography.bodySize      → --body-size
+ *   typography.bodyWeight    → --body-weight
+ *   typography.headingWeight → --heading-weight
+ *   typography.lineHeight    → --line-height-body
+ *   typography.letterSpacing → --letter-spacing-body
  *   glass.blur           → --glass-blur
  *   glass.opacity        → --glass-opacity
  *   animation.duration   → --animation-duration
  *   animation.preset     → consumed by PageTransition / animationPresets
+ *   effects.*            → --fx-* CSS custom properties + data-fx-* on <html>
  */
 
 // ── Sub-types ─────────────────────────────────────────────────────────────────
@@ -65,16 +72,117 @@ export interface ThemeGradients {
 
 export interface ThemeTypography {
   /**
-   * CSS font-family string, e.g. "'Inter', sans-serif".
-   * When set to a Google Font name, ThemeStyleInjector injects a <link> tag.
+   * Body font-family string, e.g. "Inter".
+   * When set to a known Google Font name, ThemeStyleInjector injects a <link> tag.
    * CSS token: --font-family-body
    */
   fontFamily?: string
   /**
-   * Base heading size, e.g. "3rem".
+   * Separate heading font-family (e.g. "Oswald").  Falls back to fontFamily.
+   * CSS token: --font-family-heading
+   */
+  headingFamily?: string
+  /**
+   * Base heading (h1) size, e.g. "3rem".
    * CSS token: --heading-size
    */
   headingSize?: string
+  /**
+   * Body base font size, e.g. "1rem" or "16px".
+   * CSS token: --body-size
+   */
+  bodySize?: string
+  /**
+   * Body font weight, e.g. "400".
+   * CSS token: --body-weight
+   */
+  bodyWeight?: string
+  /**
+   * Heading font weight, e.g. "700".
+   * CSS token: --heading-weight
+   */
+  headingWeight?: string
+  /**
+   * Body line-height, e.g. "1.6".
+   * CSS token: --line-height-body
+   */
+  lineHeight?: string
+  /**
+   * Body letter-spacing, e.g. "0.01em".
+   * CSS token: --letter-spacing-body
+   */
+  letterSpacing?: string
+}
+
+// ── Effects ───────────────────────────────────────────────────────────────────
+
+/**
+ * Overlay effects — rendered by VisualEffectsOverlay as a single fixed layer.
+ * Disabled effects consume zero GPU/CPU resources (CSS vars at neutral values).
+ */
+export interface OverlayEffects {
+  /** Film grain / noise intensity 0–0.15.  CSS: --fx-noise-opacity */
+  noiseOpacity?: number
+  /** CRT horizontal scanlines.  data-fx-crt on <html> */
+  crtEnabled?: boolean
+  /** Vignette darkened edges 0–1.  CSS: --fx-vignette */
+  vignetteIntensity?: number
+  /** Chromatic colour fringing offset 0–6 (px).  CSS: --fx-chromatic-offset */
+  chromaticAberration?: { enabled: boolean; intensity: number }
+  /** Colour wash overlay (tints the entire page).  CSS: --fx-wash-color, --fx-wash-opacity */
+  colorWash?: { enabled: boolean; color: string; opacity: number }
+}
+
+/**
+ * Image & card hover effects — applied via CSS classes using data-fx-* attributes
+ * on the <html> element.  Disabled means the class / data attribute is absent → zero cost.
+ */
+export interface HoverEffects {
+  /** Scale images on hover.  CSS: .img-hover-zoom img:hover { scale: --fx-hover-zoom } */
+  imageHoverZoom?: { enabled: boolean; scale: number }
+  /** 3D tilt on image hover (CSS perspective + rotateX/Y).  data-fx-hover-tilt */
+  imageHoverTilt?: { enabled: boolean }
+  /** Glow behind images on hover.  CSS: --fx-hover-glow-color, --fx-hover-glow-blur */
+  imageHoverGlow?: { enabled: boolean; color: string; blur: number }
+  /** Scale up cards on hover.  CSS: --fx-card-hover-scale */
+  cardHoverScale?: { enabled: boolean; scale: number }
+  /** Drop-shadow lift on card hover.  CSS: --fx-card-hover-lift */
+  cardHoverLift?: { enabled: boolean; intensity: number }
+}
+
+/**
+ * Text decoration effects — applied to headings / body text.
+ */
+export interface TextEffects {
+  /** Neon glow on headings.  CSS: --fx-heading-glow-color, --fx-heading-glow-blur */
+  headingGlow?: { enabled: boolean; color: string; blur: number }
+  /** Animated gradient shimmer across text.  data-fx-text-shimmer */
+  textShimmer?: { enabled: boolean }
+}
+
+/**
+ * Global UI effects.
+ */
+export interface UiEffects {
+  /** Pulse animation on borders.  CSS: --fx-border-pulse-speed  data-fx-border-pulse */
+  borderPulse?: { enabled: boolean; speed: number }
+  /** Ripple on button click.  data-fx-btn-ripple */
+  buttonRipple?: { enabled: boolean }
+  /** Scroll-triggered fade-in for page sections.  data-fx-scroll-reveal */
+  scrollReveal?: { enabled: boolean }
+}
+
+/**
+ * Full effects configuration.  All sub-objects are optional so partial updates
+ * can be stored without touching unrelated effects.
+ */
+export interface ThemeEffects {
+  overlay?: OverlayEffects
+  hover?: HoverEffects
+  text?: TextEffects
+  ui?: UiEffects
+  /** Raw CSS injected after all generated rules — for advanced customisation. */
+  customCss?: string
 }
 
 export interface ThemeGlass {
@@ -105,6 +213,13 @@ export interface ThemeConfig {
   typography: ThemeTypography
   glass: ThemeGlass
   animation: ThemeAnimation
+  /** Optional complete effects configuration. */
+  effects?: ThemeEffects
+  /**
+   * Identifier of the full theme preset this config was derived from.
+   * Used by the Themes tab to highlight the active preset.
+   */
+  themeId?: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

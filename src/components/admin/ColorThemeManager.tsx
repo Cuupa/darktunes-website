@@ -6,9 +6,13 @@
  * Admin panel for customising the site's design-token color palette.
  *
  * Tabs:
- *  - Colors    : 8 CSS token rows + WCAG contrast check table for all key pairs
- *  - Effects   : Noise opacity, CRT scanlines, vignette intensity
+ *  - Themes    : 6 signature + 20 general presets — one-click full-theme apply
+ *  - Colors    : 8 CSS token rows + saveable custom presets + WCAG contrast check
+ *  - Effects   : 15+ toggleable visual effects (overlay, hover, text, UI, custom CSS)
  *  - Gradients : Hero & Accent gradients (from/to/direction + live preview)
+ *  - Typography: 50+ fonts, heading/body split, weights, sizes, line-height, letter-spacing
+ *  - Animations: Page-transition preset + duration
+ *  - Contrast  : WCAG 2.1 AA/AAA contrast check
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,25 +23,24 @@ import {
   X,
   Warning,
   CheckCircle,
-  Eye,
-  FilmStrip,
-  Sun,
-  TextAa,
   Sparkle,
+  BookmarkSimple,
+  Trash,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { SiteSettings } from '@/types'
 import { COLOR_PRESETS } from '@/config/colorPresets'
 import type { ThemePresetColors } from '@/config/colorPresets'
-import { THEME_PRESETS, THEME_PRESET_LABELS } from '@/config/themePresets'
 import { ANIMATION_PRESETS, ANIMATION_PRESET_LABELS } from '@/config/animationPresets'
-import type { ThemeConfig } from '@/config/themeConfig'
+import type { ThemeConfig, ThemeEffects } from '@/config/themeConfig'
+import { EffectsTab } from '@/components/admin/theme-tabs/EffectsTab'
+import { TypographyTab } from '@/components/admin/theme-tabs/TypographyTab'
+import { ThemesTab } from '@/components/admin/theme-tabs/ThemesTab'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +57,11 @@ interface TokenRow {
   cssVar: string
   label: string
   defaultHint: string
+}
+
+interface CustomColorPreset {
+  name: string
+  colors: ThemeColors
 }
 
 // ── Token definitions ────────────────────────────────────────────────────────
@@ -91,21 +99,7 @@ const GRADIENT_DIRECTIONS = [
   { value: '90deg',          label: '→ 90°' },
 ]
 
-/** Popular Google Font options for the Typography tab. */
-const GOOGLE_FONT_OPTIONS = [
-  { value: '',                label: 'Default (Oxanium)' },
-  { value: 'Inter',           label: 'Inter' },
-  { value: 'Roboto',          label: 'Roboto' },
-  { value: 'Open Sans',       label: 'Open Sans' },
-  { value: 'Lato',            label: 'Lato' },
-  { value: 'Montserrat',      label: 'Montserrat' },
-  { value: 'Raleway',         label: 'Raleway' },
-  { value: 'Poppins',         label: 'Poppins' },
-  { value: 'Playfair Display',label: 'Playfair Display' },
-  { value: 'DM Sans',         label: 'DM Sans' },
-  { value: 'Nunito',          label: 'Nunito' },
-  { value: 'custom',          label: 'Custom…' },
-]
+const CUSTOM_PRESETS_KEY = 'darktunes-admin-custom-color-presets'
 
 // ── WCAG contrast helpers ────────────────────────────────────────────────────
 
@@ -187,6 +181,22 @@ function applyGradientLive(heroFrom: string, heroTo: string, heroDir: string, ac
   }
 }
 
+function loadCustomPresets(): CustomColorPreset[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_PRESETS_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as CustomColorPreset[]
+  } catch {
+    return []
+  }
+}
+
+function saveCustomPresets(presets: CustomColorPreset[]) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(presets))
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ColorThemeManager({ value, onChange, isLoading = false }: ColorThemeManagerProps) {
@@ -194,11 +204,15 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
   const [isSaving, setIsSaving] = useState(false)
   const originalColors = useRef<ThemeColors>(extractColors(value))
 
-  // Effects state
+  // Effects state — legacy flat fields
   const [noiseOpacity, setNoiseOpacity] = useState(() => value.noiseOpacity ?? 0.04)
   const [crtEnabled, setCrtEnabled] = useState(() => value.crtScanlinesEnabled ?? true)
   const [vignetteIntensity, setVignetteIntensity] = useState(() => value.vignetteIntensity ?? 0.5)
   const originalEffects = useRef({ noiseOpacity: value.noiseOpacity ?? 0.04, crtEnabled: value.crtScanlinesEnabled ?? true, vignetteIntensity: value.vignetteIntensity ?? 0.5 })
+
+  // Extended effects state (ThemeEffects)
+  const [effects, setEffects] = useState<ThemeEffects>(() => value.themeConfig?.effects ?? {})
+  const originalExtEffects = useRef<ThemeEffects>(value.themeConfig?.effects ?? {})
 
   // Gradient state
   const [gradientHeroFrom, setGradientHeroFrom] = useState(() => value.themeGradientHeroFrom ?? '')
@@ -209,17 +223,9 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
   const [gradientAccentDir, setGradientAccentDir] = useState(() => value.themeGradientAccentDir ?? '135deg')
   const originalGradients = useRef({ gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' })
 
-  // Typography state
-  const [fontFamily, setFontFamily] = useState(() => value.themeConfig?.typography.fontFamily ?? '')
-  const [customFont, setCustomFont] = useState(() => {
-    const f = value.themeConfig?.typography.fontFamily ?? ''
-    return GOOGLE_FONT_OPTIONS.some((o) => o.value === f) ? '' : f
-  })
-  const [headingSize, setHeadingSize] = useState(() => {
-    const raw = value.themeConfig?.typography.headingSize ?? '2.5rem'
-    return parseFloat(raw) || 2.5
-  })
-  const originalTypography = useRef({ fontFamily: value.themeConfig?.typography.fontFamily ?? '', headingSize: parseFloat(value.themeConfig?.typography.headingSize ?? '2.5') || 2.5 })
+  // Typography state — driven by ThemeTypography object
+  const [typography, setTypography] = useState(() => value.themeConfig?.typography ?? {})
+  const originalTypography = useRef(value.themeConfig?.typography ?? {})
 
   // Animation state
   const [animPreset, setAnimPreset] = useState(() => value.themeConfig?.animation.preset ?? 'slide-up')
@@ -228,6 +234,13 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     return parseFloat(raw) || 0.4
   })
   const originalAnimation = useRef({ animPreset: value.themeConfig?.animation.preset ?? 'slide-up', animDuration: parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4 })
+
+  // Current theme ID (for Themes tab active highlighting)
+  const [activeThemeId, setActiveThemeId] = useState(() => value.themeConfig?.themeId)
+
+  // Custom color presets (localStorage)
+  const [customPresets, setCustomPresets] = useState<CustomColorPreset[]>(() => loadCustomPresets())
+  const [newPresetName, setNewPresetName] = useState('')
 
   useEffect(() => {
     const fresh = extractColors(value)
@@ -238,6 +251,9 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setCrtEnabled(e.crtEnabled)
     setVignetteIntensity(e.vignetteIntensity)
     originalEffects.current = e
+    const extFx = value.themeConfig?.effects ?? {}
+    setEffects(extFx)
+    originalExtEffects.current = extFx
     const g = { gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' }
     setGradientHeroFrom(g.gradientHeroFrom)
     setGradientHeroTo(g.gradientHeroTo)
@@ -246,26 +262,29 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setGradientAccentTo(g.gradientAccentTo)
     setGradientAccentDir(g.gradientAccentDir)
     originalGradients.current = g
-    const ff = value.themeConfig?.typography.fontFamily ?? ''
-    const hs = parseFloat(value.themeConfig?.typography.headingSize ?? '2.5') || 2.5
-    setFontFamily(ff)
-    setCustomFont(GOOGLE_FONT_OPTIONS.some((o) => o.value === ff) ? '' : ff)
-    setHeadingSize(hs)
-    originalTypography.current = { fontFamily: ff, headingSize: hs }
+    const typo = value.themeConfig?.typography ?? {}
+    setTypography(typo)
+    originalTypography.current = typo
     const ap = value.themeConfig?.animation.preset ?? 'slide-up'
     const ad = parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4
     setAnimPreset(ap)
     setAnimDuration(ad)
     originalAnimation.current = { animPreset: ap, animDuration: ad }
+    setActiveThemeId(value.themeConfig?.themeId)
   }, [value])
 
-  useEffect(() => { applyLive(colors) }, [colors])
+  // Live-preview colors in admin (doesn't affect public site until Save)
   useEffect(() => {
+    if (Object.values(colors).some((v) => v !== '')) {
+      applyLive(colors)
+    } else {
+      removeLive()
+    }
     applyGradientLive(gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir)
-  }, [gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
+  }, [colors, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
 
-  const handleColorChange = useCallback((key: keyof ThemeColors, v: string) => {
-    setColors((prev) => ({ ...prev, [key]: v }))
+  const handleColorChange = useCallback((key: keyof ThemeColors, val: string) => {
+    setColors((prev) => ({ ...prev, [key]: val }))
   }, [])
 
   const handleReset = useCallback((key: keyof ThemeColors) => {
@@ -276,30 +295,36 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setColors(preset.colors)
   }, [])
 
-  const handleFullPreset = useCallback((presetKey: string) => {
-    const p = THEME_PRESETS[presetKey]
-    if (!p) return
+  /** Apply a complete ThemeConfig preset (from Themes tab). */
+  const handleApplyTheme = useCallback((theme: ThemeConfig) => {
     setColors({
-      themePrimary:    p.colors.primary,
-      themeSecondary:  p.colors.secondary,
-      themeBackground: p.colors.background,
-      themeForeground: p.colors.foreground,
-      themeCard:       p.colors.card,
-      themeMuted:      p.colors.muted,
-      themeAccent:     p.colors.accent,
-      themeBorder:     p.colors.border,
+      themePrimary:    theme.colors.primary,
+      themeSecondary:  theme.colors.secondary,
+      themeBackground: theme.colors.background,
+      themeForeground: theme.colors.foreground,
+      themeCard:       theme.colors.card,
+      themeMuted:      theme.colors.muted,
+      themeAccent:     theme.colors.accent,
+      themeBorder:     theme.colors.border,
     })
-    setGradientHeroFrom(p.gradients.heroFrom ?? '')
-    setGradientHeroTo(p.gradients.heroTo ?? '')
-    setGradientHeroDir(p.gradients.heroDir ?? '135deg')
-    setGradientAccentFrom(p.gradients.accentFrom ?? '')
-    setGradientAccentTo(p.gradients.accentTo ?? '')
-    setGradientAccentDir(p.gradients.accentDir ?? '135deg')
-    setFontFamily(p.typography.fontFamily ?? '')
-    setCustomFont('')
-    setHeadingSize(parseFloat(p.typography.headingSize ?? '2.5') || 2.5)
-    setAnimPreset(p.animation.preset ?? 'slide-up')
-    setAnimDuration(parseFloat(p.animation.duration ?? '0.4') || 0.4)
+    setGradientHeroFrom(theme.gradients.heroFrom ?? '')
+    setGradientHeroTo(theme.gradients.heroTo ?? '')
+    setGradientHeroDir(theme.gradients.heroDir ?? '135deg')
+    setGradientAccentFrom(theme.gradients.accentFrom ?? '')
+    setGradientAccentTo(theme.gradients.accentTo ?? '')
+    setGradientAccentDir(theme.gradients.accentDir ?? '135deg')
+    setTypography(theme.typography)
+    setAnimPreset(theme.animation.preset ?? 'slide-up')
+    setAnimDuration(parseFloat(theme.animation.duration ?? '0.4') || 0.4)
+    if (theme.effects) {
+      setEffects(theme.effects)
+      // Sync legacy flat fields from theme effects if present
+      setNoiseOpacity(theme.effects.overlay?.noiseOpacity ?? 0.04)
+      setCrtEnabled(theme.effects.overlay?.crtEnabled ?? false)
+      setVignetteIntensity(theme.effects.overlay?.vignetteIntensity ?? 0.5)
+    }
+    setActiveThemeId(theme.themeId)
+    toast.info(`"${theme.themeId ?? 'Preset'}" theme applied. Click Save Theme to persist.`)
   }, [])
 
   const handleCancel = useCallback(() => {
@@ -309,6 +334,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setNoiseOpacity(originalEffects.current.noiseOpacity)
     setCrtEnabled(originalEffects.current.crtEnabled)
     setVignetteIntensity(originalEffects.current.vignetteIntensity)
+    setEffects(originalExtEffects.current)
     const g = originalGradients.current
     setGradientHeroFrom(g.gradientHeroFrom)
     setGradientHeroTo(g.gradientHeroTo)
@@ -316,17 +342,26 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setGradientAccentFrom(g.gradientAccentFrom)
     setGradientAccentTo(g.gradientAccentTo)
     setGradientAccentDir(g.gradientAccentDir)
-    setFontFamily(originalTypography.current.fontFamily)
-    setCustomFont('')
-    setHeadingSize(originalTypography.current.headingSize)
+    setTypography(originalTypography.current)
     setAnimPreset(originalAnimation.current.animPreset)
     setAnimDuration(originalAnimation.current.animDuration)
-  }, [])
+    setActiveThemeId(value.themeConfig?.themeId)
+  }, [value])
 
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
-      const effectiveFontFamily = fontFamily === 'custom' ? customFont : fontFamily
+      // Merge legacy overlay values into effects.overlay for storage
+      const mergedEffects: ThemeEffects = {
+        ...effects,
+        overlay: {
+          ...effects.overlay,
+          noiseOpacity,
+          crtEnabled,
+          vignetteIntensity,
+        },
+      }
+
       const themeConfig: ThemeConfig = {
         colors: {
           primary:    colors.themePrimary    ?? '',
@@ -346,15 +381,14 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           accentTo:   gradientAccentTo,
           accentDir:  gradientAccentDir,
         },
-        typography: {
-          fontFamily:  effectiveFontFamily || undefined,
-          headingSize: `${headingSize}rem`,
-        },
+        typography,
         glass: value.themeConfig?.glass ?? {},
         animation: {
           preset:   animPreset,
           duration: `${animDuration}s`,
         },
+        effects: mergedEffects,
+        themeId: activeThemeId,
       }
       await onChange({
         ...value,
@@ -372,8 +406,9 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
       })
       originalColors.current = { ...colors }
       originalEffects.current = { noiseOpacity, crtEnabled, vignetteIntensity }
+      originalExtEffects.current = mergedEffects
       originalGradients.current = { gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir }
-      originalTypography.current = { fontFamily: effectiveFontFamily, headingSize }
+      originalTypography.current = typography
       originalAnimation.current = { animPreset, animDuration }
       toast.success('Color theme saved')
     } catch {
@@ -381,14 +416,33 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     } finally {
       setIsSaving(false)
     }
-  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir, fontFamily, customFont, headingSize, animPreset, animDuration])
+  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, effects, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir, typography, animPreset, animDuration, activeThemeId])
+
+  // ── Custom preset management ─────────────────────────────────────────────
+
+  function handleSaveCustomPreset() {
+    const name = newPresetName.trim()
+    if (!name) { toast.error('Enter a name for the preset'); return }
+    const updated = [...customPresets.filter((p) => p.name !== name), { name, colors }]
+    setCustomPresets(updated)
+    saveCustomPresets(updated)
+    setNewPresetName('')
+    toast.success(`Preset "${name}" saved`)
+  }
+
+  function handleDeleteCustomPreset(name: string) {
+    const updated = customPresets.filter((p) => p.name !== name)
+    setCustomPresets(updated)
+    saveCustomPresets(updated)
+  }
 
   const disabled = isLoading || isSaving
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="colors">
+      <Tabs defaultValue="themes">
         <TabsList className="mb-4 flex-wrap">
+          <TabsTrigger value="themes">Themes</TabsTrigger>
           <TabsTrigger value="colors">Colors</TabsTrigger>
           <TabsTrigger value="effects">Effects</TabsTrigger>
           <TabsTrigger value="gradients">Gradients</TabsTrigger>
@@ -397,24 +451,17 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           <TabsTrigger value="contrast">Contrast Check</TabsTrigger>
         </TabsList>
 
+        {/* ── Themes Tab ──────────────────────────────────────────── */}
+        <TabsContent value="themes">
+          <ThemesTab
+            currentThemeId={activeThemeId}
+            onApply={handleApplyTheme}
+          />
+        </TabsContent>
+
         {/* ── Colors Tab ──────────────────────────────────────────── */}
         <TabsContent value="colors" className="space-y-6">
-          {/* Full-theme presets */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Full Theme Presets</p>
-            <p className="text-xs text-muted-foreground">Applies colors, gradients, typography and animation all at once.</p>
-            <div className="flex flex-wrap gap-2">
-              {Object.keys(THEME_PRESETS).map((key) => (
-                <Button key={key} variant="outline" size="sm" onClick={() => handleFullPreset(key)} disabled={disabled}>
-                  {THEME_PRESET_LABELS[key] ?? key}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Color-only presets */}
+          {/* Quick Color-only presets */}
           <div className="space-y-2">
             <p className="text-sm font-medium">Quick Color Presets</p>
             <div className="flex flex-wrap gap-2">
@@ -424,6 +471,63 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Custom saved presets */}
+          {customPresets.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Custom Presets</p>
+                <div className="flex flex-wrap gap-2">
+                  {customPresets.map((preset) => (
+                    <div key={preset.name} className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" onClick={() => handlePreset(preset)} disabled={disabled}>
+                        {preset.name}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteCustomPreset(preset.name)}
+                        aria-label={`Delete preset ${preset.name}`}
+                        title={`Delete "${preset.name}"`}
+                      >
+                        <Trash size={13} aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Save current colors as custom preset */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Save Current Colors as Preset</p>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Preset name…"
+                value={newPresetName}
+                onChange={(e) => setNewPresetName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCustomPreset() }}
+                className="max-w-xs"
+                disabled={disabled}
+                aria-label="New preset name"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSaveCustomPreset}
+                disabled={!newPresetName.trim()}
+              >
+                <BookmarkSimple size={14} className="mr-1.5" aria-hidden="true" />
+                Save Preset
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Presets are stored in your browser&apos;s localStorage (per device).</p>
           </div>
 
           <Separator />
@@ -479,70 +583,18 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         </TabsContent>
 
         {/* ── Effects Tab ─────────────────────────────────────────── */}
-        <TabsContent value="effects" className="space-y-8">
-          <p className="text-sm text-muted-foreground">Visual overlay effects applied site-wide. Changes are reflected immediately.</p>
-
-          {/* Noise / Film Grain */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <FilmStrip size={16} className="text-muted-foreground" aria-hidden="true" />
-              <Label className="text-sm font-medium">Film Grain / Noise</Label>
-            </div>
-            <div className="flex items-center gap-4">
-              <Slider
-                min={0} max={0.15} step={0.005}
-                value={[noiseOpacity]}
-                onValueChange={([v]) => setNoiseOpacity(v)}
-                disabled={disabled}
-                className="flex-1"
-                aria-label="Noise opacity"
-              />
-              <span className="w-12 text-right font-mono text-sm text-muted-foreground">{noiseOpacity.toFixed(3)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">0 = no grain, 0.15 = heavy grain. Default: 0.04</p>
-          </div>
-
-          <Separator />
-
-          {/* CRT Scanlines */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Eye size={16} className="text-muted-foreground" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-medium">CRT Scanlines</p>
-                <p className="text-xs text-muted-foreground">Animated horizontal scanline overlay — retro CRT monitor effect.</p>
-              </div>
-            </div>
-            <Switch
-              id="crt-scanlines"
-              checked={crtEnabled}
-              onCheckedChange={setCrtEnabled}
-              disabled={disabled}
-              aria-label="Toggle CRT scanlines"
-            />
-          </div>
-
-          <Separator />
-
-          {/* Vignette */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Sun size={16} className="text-muted-foreground" aria-hidden="true" />
-              <Label className="text-sm font-medium">Vignette Intensity</Label>
-            </div>
-            <div className="flex items-center gap-4">
-              <Slider
-                min={0} max={1} step={0.05}
-                value={[vignetteIntensity]}
-                onValueChange={([v]) => setVignetteIntensity(v)}
-                disabled={disabled}
-                className="flex-1"
-                aria-label="Vignette intensity"
-              />
-              <span className="w-12 text-right font-mono text-sm text-muted-foreground">{vignetteIntensity.toFixed(2)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">0 = no vignette, 1 = strong darkened edges. Default: 0.50</p>
-          </div>
+        <TabsContent value="effects">
+          <EffectsTab
+            noiseOpacity={noiseOpacity}
+            crtEnabled={crtEnabled}
+            vignetteIntensity={vignetteIntensity}
+            effects={effects}
+            onNoiseOpacity={setNoiseOpacity}
+            onCrtEnabled={setCrtEnabled}
+            onVignetteIntensity={setVignetteIntensity}
+            onEffects={setEffects}
+            disabled={disabled}
+          />
         </TabsContent>
 
         {/* ── Gradients Tab ───────────────────────────────────────── */}
@@ -580,67 +632,12 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         </TabsContent>
 
         {/* ── Typography Tab ──────────────────────────────────────── */}
-        <TabsContent value="typography" className="space-y-8">
-          <p className="text-sm text-muted-foreground">
-            Override the site body font and base heading size. Font family is loaded from Google Fonts when a named option is selected.
-          </p>
-
-          {/* Font Family */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <TextAa size={16} className="text-muted-foreground" aria-hidden="true" />
-              <Label className="text-sm font-medium">Body Font Family</Label>
-            </div>
-            <select
-              value={GOOGLE_FONT_OPTIONS.some((o) => o.value === fontFamily) ? fontFamily : 'custom'}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v !== 'custom') { setFontFamily(v); setCustomFont('') }
-                else setFontFamily('custom')
-              }}
-              disabled={disabled}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              aria-label="Body font family"
-            >
-              {GOOGLE_FONT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            {fontFamily === 'custom' && (
-              <Input
-                type="text"
-                value={customFont}
-                onChange={(e) => setCustomFont(e.target.value)}
-                placeholder="e.g. 'Fira Code', monospace"
-                disabled={disabled}
-                className="font-mono text-sm"
-                aria-label="Custom font family value"
-              />
-            )}
-            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--font-family-body</code></p>
-          </div>
-
-          <Separator />
-
-          {/* Heading Size */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <TextAa size={16} className="text-muted-foreground" aria-hidden="true" />
-              <Label className="text-sm font-medium">Base Heading Size</Label>
-            </div>
-            <div className="flex items-center gap-4">
-              <Slider
-                min={1.5} max={5} step={0.125}
-                value={[headingSize]}
-                onValueChange={([v]) => setHeadingSize(v)}
-                disabled={disabled}
-                className="flex-1"
-                aria-label="Heading size"
-              />
-              <span className="w-16 text-right font-mono text-sm text-muted-foreground">{headingSize.toFixed(3)}rem</span>
-            </div>
-            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--heading-size</code>. Applied to h1/h2/h3.</p>
-          </div>
+        <TabsContent value="typography">
+          <TypographyTab
+            typography={typography}
+            onChange={setTypography}
+            disabled={disabled}
+          />
         </TabsContent>
 
         {/* ── Animations Tab ──────────────────────────────────────── */}
@@ -694,7 +691,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
               />
               <span className="w-16 text-right font-mono text-sm text-muted-foreground">{animDuration.toFixed(2)}s</span>
             </div>
-            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--animation-duration</code>. Used by PageTransition and future motion components.</p>
+            <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--animation-duration</code>. Used by PageTransition and motion components.</p>
           </div>
         </TabsContent>
 

@@ -61,18 +61,10 @@ vi.mock('@/components/ui/switch', () => ({
     <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onCheckedChange?.(e.target.checked)} />
   ),
 }))
-vi.mock('@phosphor-icons/react', () => ({
-  ArrowCounterClockwise: () => null,
-  FloppyDisk: () => null,
-  X: () => null,
-  Warning: () => null,
-  CheckCircle: () => null,
-  Eye: () => null,
-  FilmStrip: () => null,
-  Sun: () => null,
-  TextAa: () => null,
-  Sparkle: () => null,
-}))
+vi.mock('@phosphor-icons/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@phosphor-icons/react')>()
+  return { ...actual }
+})
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

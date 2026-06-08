@@ -107,31 +107,110 @@ const wipeUp: FramerAnimationPreset = {
   transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
 }
 
+/**
+ * Graffiti tag — quick spray-paint entrance: clip sweeps left-to-right with
+ * a slight skew and rotation. Good for HipHop themes.
+ */
+const graffitiTag: FramerAnimationPreset = {
+  variants: {
+    hidden:  { opacity: 0, x: -30, rotate: -3, clipPath: 'inset(0 100% 0 0)' },
+    visible: { opacity: 1, x: 0,   rotate: 0,  clipPath: 'inset(0 0% 0 0)'   },
+    exit:    { opacity: 0, x: 20,  rotate: 2 },
+  },
+  transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] },
+}
+
+/**
+ * Heavy drop — content falls in from above with a heavy damped spring.
+ * Good for Metal themes.
+ */
+const heavyDrop: FramerAnimationPreset = {
+  variants: {
+    hidden:  { opacity: 0, y: -40, scale: 1.04 },
+    visible: { opacity: 1, y: 0,   scale: 1 },
+    exit:    { opacity: 0, y: 20,  scale: 0.97 },
+  },
+  transition: { type: 'spring', stiffness: 280, damping: 18 },
+}
+
+/**
+ * OS boot — rapid reveal in horizontal scanlines, like a CRT powering up.
+ * Good for Cyberpunk / Future White themes.
+ */
+const osBoot: FramerAnimationPreset = {
+  variants: {
+    hidden:  { opacity: 0, filter: 'brightness(0) contrast(2)', scale: 1.01 },
+    visible: {
+      opacity: [0, 0.2, 0.8, 0.6, 1],
+      filter:  ['brightness(0) contrast(2)', 'brightness(2) contrast(3)', 'brightness(1.5) contrast(2)', 'brightness(1) contrast(1.2)', 'brightness(1) contrast(1)'],
+      scale: 1,
+    },
+    exit: { opacity: 0, filter: 'brightness(2) contrast(3)', scale: 0.99 },
+  },
+  transition: { duration: 0.55, ease: 'easeOut' },
+}
+
+/**
+ * Synthwave glide — content slides up with a soft neon-inflected spring.
+ * Wider initial travel to evoke VHS rewind / retro transitions.
+ */
+const synthwaveGlide: FramerAnimationPreset = {
+  variants: {
+    hidden:  { opacity: 0, y: 28, filter: 'blur(6px) saturate(2)' },
+    visible: { opacity: 1, y: 0,  filter: 'blur(0px) saturate(1)' },
+    exit:    { opacity: 0, y: -16, filter: 'blur(4px)' },
+  },
+  transition: { type: 'spring', stiffness: 220, damping: 30 },
+}
+
+/**
+ * Clinical reveal — pixel-precise horizontal wipe with no blur, very clean.
+ * Good for the Future White / Umbrella-Corp theme.
+ */
+const clinicalReveal: FramerAnimationPreset = {
+  variants: {
+    hidden:  { opacity: 0, x: -8, clipPath: 'inset(0 100% 0 0)' },
+    visible: { opacity: 1, x: 0,  clipPath: 'inset(0 0% 0 0)'   },
+    exit:    { opacity: 0, x: 4,  clipPath: 'inset(0 0 0 100%)'  },
+  },
+  transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] },
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const ANIMATION_PRESETS: Record<string, FramerAnimationPreset> = {
   fade,
-  'slide-up':      slideUp,
-  'scale-in':      scaleIn,
-  'slide-in-right': slideInRight,
-  'glitch-fade':   glitchFade,
-  'neon-flicker':  neonFlicker,
-  'blur-in':       blurIn,
-  'wipe-up':       wipeUp,
+  'slide-up':        slideUp,
+  'scale-in':        scaleIn,
+  'slide-in-right':  slideInRight,
+  'glitch-fade':     glitchFade,
+  'neon-flicker':    neonFlicker,
+  'blur-in':         blurIn,
+  'wipe-up':         wipeUp,
+  'graffiti-tag':    graffitiTag,
+  'heavy-drop':      heavyDrop,
+  'os-boot':         osBoot,
+  'synthwave-glide': synthwaveGlide,
+  'clinical-reveal': clinicalReveal,
 }
 
 export const DEFAULT_ANIMATION_PRESET_KEY = 'slide-up'
 
 /** Human-readable labels for the admin Animation preset picker. */
 export const ANIMATION_PRESET_LABELS: Record<string, string> = {
-  'fade':           'Fade',
-  'slide-up':       'Slide Up (Default)',
-  'scale-in':       'Scale In',
-  'slide-in-right': 'Slide In Right',
-  'glitch-fade':    'Glitch Fade',
-  'neon-flicker':   'Neon Flicker',
-  'blur-in':        'Blur In',
-  'wipe-up':        'Wipe Up',
+  'fade':            'Fade',
+  'slide-up':        'Slide Up (Default)',
+  'scale-in':        'Scale In',
+  'slide-in-right':  'Slide In Right',
+  'glitch-fade':     'Glitch Fade',
+  'neon-flicker':    'Neon Flicker',
+  'blur-in':         'Blur In',
+  'wipe-up':         'Wipe Up',
+  'graffiti-tag':    'Graffiti Tag',
+  'heavy-drop':      'Heavy Drop',
+  'os-boot':         'OS Boot',
+  'synthwave-glide': 'Synthwave Glide',
+  'clinical-reveal': 'Clinical Reveal',
 }
 
 /**
