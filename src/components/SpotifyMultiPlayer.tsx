@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConsentGate } from '@/components/ConsentGate'
+import { SpotifyLogo } from '@phosphor-icons/react'
 import { useLenis } from '@/components/animations/LenisProvider'
 import type { SpotifyPlaylistEntry } from '@/types'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
@@ -12,12 +13,17 @@ import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 interface SpotifyMultiPlayerProps {
   playlists: SpotifyPlaylistEntry[]
   placeholderUrl?: string
+  /** Short button label for the Spotify consent gate (e.g. "Load Spotify Player"). */
   loadLabel?: string
-  /** Translated explanation text shown before user grants Spotify consent. */
+  /** Title shown in the consent gate (e.g. "Listen on Spotify"). */
+  gateTitle?: string
+  /** Explanation text for the consent gate. */
   gateText?: string
+  /** Privacy policy link label. */
+  privacyPolicyLabel?: string
 }
 
-export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateText }: SpotifyMultiPlayerProps) {
+export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateTitle, gateText, privacyPolicyLabel }: SpotifyMultiPlayerProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const prefersReducedMotion = useReducedMotion()
   const lenis = useLenis()
@@ -51,7 +57,15 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateT
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
       >
-        <ConsentGate label={loadLabel ?? 'Spotify laden'} placeholderUrl={placeholderUrl} gateText={gateText}>
+        <ConsentGate
+          label={loadLabel ?? 'Load Spotify Player'}
+          title={gateTitle}
+          providerIcon={<SpotifyLogo size={20} weight="fill" className="text-[#1DB954]" aria-hidden="true" />}
+          placeholderUrl={placeholderUrl}
+          gateText={gateText}
+          privacyPolicyUrl="/datenschutz"
+          privacyPolicyLabel={privacyPolicyLabel}
+        >
           {!playerActivated ? (
             <button
               type="button"

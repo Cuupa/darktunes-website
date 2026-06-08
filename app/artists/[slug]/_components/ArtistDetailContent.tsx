@@ -414,7 +414,14 @@ export function ArtistDetailContent({
                   <SpotifyLogo size={22} weight="fill" className="text-[#1DB954]" aria-hidden="true" />
                   {dict.listenOn}
                 </h2>
-                <ConsentGate label={consentDict.loadSpotify} gateText={consentDict.gateText}>
+                <ConsentGate
+                  label={consentDict.spotifyBtnLabel}
+                  title={consentDict.spotifyTitle}
+                  providerIcon={<SpotifyLogo size={20} weight="fill" className="text-[#1DB954]" aria-hidden="true" />}
+                  gateText={consentDict.gateText}
+                  privacyPolicyUrl="/datenschutz"
+                  privacyPolicyLabel={consentDict.privacyLink}
+                >
                   <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60">
                     <iframe
                       src={`https://open.spotify.com/embed/artist/${artist.spotifyId}?utm_source=generator&theme=0`}

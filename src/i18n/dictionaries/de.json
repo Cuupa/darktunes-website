@@ -111,10 +111,12 @@
     "privacyLink": "Datenschutzerklärung",
     "reject": "Ablehnen",
     "accept": "Akzeptieren",
-    "gateText": "Dieser Inhalt wird von Spotify (einem externen Anbieter) bereitgestellt. Klicken Sie auf die Schaltfläche, um ihn zu laden — dabei werden Daten an Spotify übertragen, wie in unserer Datenschutzerklärung beschrieben.",
+    "gateText": "Dieser Inhalt wird von Spotify (einem externen Anbieter) bereitgestellt. Das Laden überträgt Daten an Spotify, wie in unserer Datenschutzerklärung beschrieben.",
+    "spotifyTitle": "Auf Spotify hören",
+    "spotifyBtnLabel": "Spotify-Player laden",
     "loadExternal": "Externe Inhalte laden",
     "loadExternalAlt": "Externer Inhalt — Klicken zum Laden",
-    "loadSpotify": "Dieser Inhalt wird von Spotify (einem externen Anbieter) bereitgestellt. Klicken Sie auf die Schaltfläche, um ihn zu laden — dabei werden Daten an Spotify übertragen, wie in unserer Datenschutzerklärung beschrieben.",
+    "loadSpotify": "Spotify-Player laden",
     "loadYouTube": "YouTube laden"
   },
   "releaseDetail": {
