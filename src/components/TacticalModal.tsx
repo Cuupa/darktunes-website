@@ -265,7 +265,7 @@ export function TacticalModal({
               </div>
 
               {/* ── Body ───────────────────────────────────────────────── */}
-              <div className={cn('overflow-y-auto max-h-[70vh] p-6', className)}>
+              <div data-lenis-prevent className={cn('overflow-y-auto max-h-[70vh] p-6', className)}>
                 {children}
               </div>
             </motion.div>

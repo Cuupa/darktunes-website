@@ -59,7 +59,7 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
           </div>
 
           {/* Info – scrollable body so long content never clips the viewport */}
-          <div className="overflow-y-auto max-h-[70vh] flex flex-col gap-3 p-4 flex-1 min-w-0">
+          <div data-lenis-prevent className="overflow-y-auto max-h-[70vh] flex flex-col gap-3 p-4 flex-1 min-w-0">
             <div>
               <Badge variant="secondary" className="text-xs uppercase tracking-wider mb-2">
                 {release.type}
