@@ -835,6 +835,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
               <div className="rounded-md border border-border p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current image</p>
                 {watch('imageUrl') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={watch('imageUrl')} alt="Artist" className="mt-2 max-h-24 rounded object-contain" />
                 ) : (
                   <p className="mt-2 break-all text-sm text-muted-foreground">No image selected yet.</p>
@@ -843,6 +844,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
               <div className="rounded-md border border-border p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current logo</p>
                 {watch('logoUrl') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={watch('logoUrl')} alt="Logo" className="mt-2 max-h-24 rounded object-contain" />
                 ) : (
                   <p className="mt-2 break-all text-sm text-muted-foreground">No logo selected yet.</p>
