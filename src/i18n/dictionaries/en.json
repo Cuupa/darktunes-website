@@ -114,7 +114,7 @@
     "gateText": "This content is hosted by Spotify (an external provider). Click the button below to load it — doing so will transfer data to Spotify as described in our privacy policy.",
     "loadExternal": "Load external content",
     "loadExternalAlt": "External content — click to load",
-    "loadSpotify": "Click to load Spotify player",
+    "loadSpotify": "This content is hosted by Spotify (an external provider). Click the button below to load it — doing so will transfer data to Spotify as described in our privacy policy.",
     "loadYouTube": "Load YouTube"
   },
   "releaseDetail": {
