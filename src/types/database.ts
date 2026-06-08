@@ -1314,6 +1314,7 @@ export interface Database {
           id: string
           title: string
           artist_name: string
+          artist_id: string | null
           r2_key: string
           file_size_bytes: number | null
           duration_seconds: number | null
@@ -1330,6 +1331,7 @@ export interface Database {
           id?: string
           title: string
           artist_name: string
+          artist_id?: string | null
           r2_key: string
           file_size_bytes?: number | null
           duration_seconds?: number | null
@@ -1346,6 +1348,7 @@ export interface Database {
           id?: string
           title?: string
           artist_name?: string
+          artist_id?: string | null
           r2_key?: string
           file_size_bytes?: number | null
           duration_seconds?: number | null
@@ -1358,7 +1361,15 @@ export interface Database {
           embargo_until?: string | null
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'promo_tracks_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          }
+        ]
       }
       journalist_applications: {
         Row: {

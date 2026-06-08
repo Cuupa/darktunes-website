@@ -329,6 +329,10 @@ CREATE TABLE IF NOT EXISTS public.artists (
   user_id          UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
   -- Visibility toggle: FALSE hides the artist (and all their releases/concerts) from public
   is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
+  -- Portrait focal-point and zoom (percentage 0-100 for x/y, scale ≥ 1)
+  image_position_x FLOAT               DEFAULT 50,
+  image_position_y FLOAT               DEFAULT 50,
+  image_scale      FLOAT               DEFAULT 1,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -351,6 +355,10 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS platform_links JSONB;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS storage_quota_bytes BIGINT DEFAULT NULL;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS smart_links JSONB DEFAULT '[]'::JSONB;
+-- Portrait focal-point / zoom (added 2026-06-07)
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_x FLOAT DEFAULT 50;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_y FLOAT DEFAULT 50;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_scale      FLOAT DEFAULT 1;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
@@ -972,6 +980,9 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
   photo_url      TEXT,
   genres         TEXT[]      NOT NULL DEFAULT '{}',
   press_quote    TEXT,
+  -- EPK gallery photos (R2 URLs) and custom EPK color tokens
+  epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
+  epk_custom_theme_tokens JSONB            DEFAULT NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -995,6 +1006,14 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_hidden 
 -- EPK Password protection for sensitive sections
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
+-- EPK gallery and custom theme tokens (added 2026-06-07)
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB  DEFAULT NULL;
+
+COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
+  'Array of R2 URLs for additional press/EPK gallery photos.';
+COMMENT ON COLUMN public.artist_profiles.epk_custom_theme_tokens IS
+  'JSON object with custom EPK color tokens: { bg, text, accent, heading }.';
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 
 DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
@@ -1079,11 +1098,16 @@ CREATE INDEX IF NOT EXISTS idx_press_photos_display_order
 
 -- ---------------------------------------------------------------------------
 -- TABLE: promo_tracks  (journalist-gated unreleased audio — R2 key only)
+-- 3NF note: artist_name is the display name (required, may be for external/unlisted
+-- artists). artist_id is an optional FK to a system artist — set it when the track
+-- belongs to a known artist so the two tables stay in sync.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.promo_tracks (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   title            TEXT        NOT NULL,
   artist_name      TEXT        NOT NULL,
+  -- Optional FK to a system artist (3NF: avoids name duplication for known artists)
+  artist_id        UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
   r2_key           TEXT        NOT NULL UNIQUE,
   file_size_bytes  BIGINT,
   duration_seconds INTEGER,
@@ -1103,6 +1127,10 @@ ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS key            TEXT;
 ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS release_date   DATE;
 ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS nda_required   BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS embargo_until  TIMESTAMPTZ;
+-- artist_id FK (optional — links to system artist when applicable)
+ALTER TABLE public.promo_tracks ADD COLUMN IF NOT EXISTS artist_id      UUID REFERENCES public.artists (id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_promo_tracks_artist_id ON public.promo_tracks (artist_id);
 
 CREATE INDEX IF NOT EXISTS idx_promo_tracks_display_order
   ON public.promo_tracks (display_order ASC);
@@ -3181,3 +3209,58 @@ DROP POLICY IF EXISTS "portal_attach: admin all" ON public.portal_message_attach
 CREATE POLICY "portal_attach: admin all" ON public.portal_message_attachments
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
+-- SOS (Statement-of-Sales) PERSISTENCE
+-- Stores admin-configured rule presets and historical period summaries for the
+-- SOS Generator accounting panel.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
+-- Each row bundles all rule types into a single JSONB config blob.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  config     JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.sos_rules_presets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "sos_rules_presets: admin all" ON public.sos_rules_presets;
+CREATE POLICY "sos_rules_presets: admin all" ON public.sos_rules_presets
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+DROP TRIGGER IF EXISTS sos_rules_presets_updated_at ON public.sos_rules_presets;
+CREATE TRIGGER sos_rules_presets_updated_at
+  BEFORE UPDATE ON public.sos_rules_presets
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: sos_period_summaries  — per-period aggregate revenue figures
+-- Stores historical trend data: total revenue, payouts, and per-artist/platform
+-- breakdowns as JSONB.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sos_period_summaries (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start        TEXT        NOT NULL,
+  period_end          TEXT        NOT NULL,
+  total_revenue       NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  total_payout        NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  artist_count        INTEGER     NOT NULL DEFAULT 0,
+  artist_breakdowns   JSONB       NOT NULL DEFAULT '[]'::JSONB,
+  platform_breakdowns JSONB       NOT NULL DEFAULT '[]'::JSONB,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.sos_period_summaries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_summaries;
+CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
