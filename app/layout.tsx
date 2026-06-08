@@ -32,6 +32,13 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
+function getFaviconMimeType(url: string): string {
+  if (url.endsWith('.svg')) return 'image/svg+xml'
+  if (url.endsWith('.ico')) return 'image/x-icon'
+  if (url.endsWith('.webp')) return 'image/webp'
+  return 'image/png'
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getCachedSiteSettings().catch(() => null)
   const title = settings?.seoTitle ?? 'darkTunes Music Group'
@@ -51,14 +58,12 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
     },
     icons: {
-      icon: [
-        // Custom favicon from admin settings takes highest priority when set
-        ...(customFaviconUrl ? [{ url: customFaviconUrl, type: 'image/png', sizes: '32x32' }] : []),
-        // SVG favicon — used when no custom favicon is configured
-        { url: '/favicon.svg', type: 'image/svg+xml' },
-        // ICO fallback for legacy browsers
-        { url: '/favicon.ico', sizes: '32x32' },
-      ],
+      icon: customFaviconUrl
+        ? [{ url: customFaviconUrl, type: getFaviconMimeType(customFaviconUrl) }]
+        : [
+            { url: '/favicon.svg', type: 'image/svg+xml' },
+            { url: '/favicon.ico', sizes: '32x32' },
+          ],
       shortcut: customFaviconUrl || '/favicon.ico',
       apple: { url: customFaviconUrl || '/icons/icon-192.png', sizes: '192x192' },
     },
