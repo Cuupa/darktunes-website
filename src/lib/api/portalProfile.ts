@@ -26,7 +26,6 @@ export type ArtistProfilePayload = Pick<
   | 'hometown'
   | 'booking_contact'
   | 'press_contact'
-  | 'soundcloud_url'
   | 'rider_stage_plot_url'
   | 'rider_technical_url'
   | 'rider_hospitality_url'
@@ -51,6 +50,7 @@ export type ArtistProfilePayload = Pick<
   apple_music_url?: string | null
   tiktok_url?: string | null
   facebook_url?: string | null
+  soundcloud_url?: string | null
   custom_links?: Array<{ label: string; url: string }> | null
 }
 

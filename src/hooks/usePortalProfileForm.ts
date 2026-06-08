@@ -127,7 +127,7 @@ export function usePortalProfileForm({
       apple_music_url: artist?.appleMusicUrl ?? '',
       tiktok_url: artist?.tiktokUrl ?? '',
       facebook_url: artist?.facebookUrl ?? '',
-      soundcloud_url: initialProfile?.soundcloudUrl ?? '',
+      soundcloud_url: artist?.soundcloudUrl ?? '',
       custom_links: initialProfile?.customLinks ?? [],
     },
   })

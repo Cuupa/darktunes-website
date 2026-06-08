@@ -252,7 +252,8 @@ export interface Database {
           tiktok_url: string | null
           bandcamp_url: string | null
           shop_url: string | null
-          founded_year: number | null
+          founding_year: number | null
+          soundcloud_url: string | null
           is_visible: boolean
           logo_url: string | null
           platform_links: Record<string, string> | null
@@ -293,7 +294,8 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
-          founded_year?: number | null
+          founding_year?: number | null
+          soundcloud_url?: string | null
           is_visible?: boolean
           logo_url?: string | null
           platform_links?: Record<string, string> | null
@@ -334,7 +336,8 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
-          founded_year?: number | null
+          founding_year?: number | null
+          soundcloud_url?: string | null
           is_visible?: boolean
           logo_url?: string | null
           platform_links?: Record<string, string> | null
@@ -363,7 +366,6 @@ export interface Database {
           hometown: string | null
           booking_contact: string | null
           press_contact: string | null
-          soundcloud_url: string | null
           rider_stage_plot_url: string | null
           rider_technical_url: string | null
           rider_hospitality_url: string | null
@@ -393,7 +395,6 @@ export interface Database {
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
-          soundcloud_url?: string | null
           rider_stage_plot_url?: string | null
           rider_technical_url?: string | null
           rider_hospitality_url?: string | null
@@ -423,7 +424,6 @@ export interface Database {
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
-          soundcloud_url?: string | null
           rider_stage_plot_url?: string | null
           rider_technical_url?: string | null
           rider_hospitality_url?: string | null

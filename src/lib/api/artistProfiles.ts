@@ -39,7 +39,6 @@ export interface ArtistProfile {
   hometown: string | undefined
   bookingContact: string | undefined
   pressContact: string | undefined
-  soundcloudUrl: string | undefined
   riderStagePlotUrl: string | undefined
   riderTechnicalUrl: string | undefined
   riderHospitalityUrl: string | undefined
@@ -76,7 +75,6 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     hometown: row.hometown ?? undefined,
     bookingContact: row.booking_contact ?? undefined,
     pressContact: row.press_contact ?? undefined,
-    soundcloudUrl: row.soundcloud_url ?? undefined,
     riderStagePlotUrl: row.rider_stage_plot_url ?? undefined,
     riderTechnicalUrl: row.rider_technical_url ?? undefined,
     riderHospitalityUrl: row.rider_hospitality_url ?? undefined,
@@ -106,7 +104,7 @@ export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist
   const hasPhoto = Boolean(profile.photoUrl)
   const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong || profile.bio)
   const hasLink = Boolean(
-    profile.soundcloudUrl ||
+    artist?.soundcloudUrl ||
       artist?.spotifyUrl ||
       artist?.instagramUrl ||
       artist?.websiteUrl ||

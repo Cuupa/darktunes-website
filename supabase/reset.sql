@@ -349,7 +349,8 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS twitter_url    TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
-ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founded_year   SMALLINT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founding_year  INTEGER;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS soundcloud_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS platform_links JSONB;
@@ -366,6 +367,12 @@ CREATE INDEX IF NOT EXISTS idx_artists_visible  ON public.artists (is_visible);
 -- DEPRECATED: artists_user_id_key was a 1:1 constraint. Replaced by artist_members.
 -- Kept as a DROP to remove the index from any existing database that still has it.
 DROP INDEX IF EXISTS public.artists_user_id_key;
+-- bio and genres are denormalized copies kept here for efficient public-page reads.
+-- The portal profile API route syncs artist_profiles.bio/genres → these columns.
+COMMENT ON COLUMN public.artists.bio IS
+  'Denormalized copy of artist_profiles.bio. Synced by the portal profile API route; admin may also edit directly. Source of truth for public-facing pages.';
+COMMENT ON COLUMN public.artists.genres IS
+  'Denormalized copy of artist_profiles.genres. Synced by the portal profile API route. Both tables may diverge if updated via different paths; this column drives the public site.';
 
 DROP TRIGGER IF EXISTS trg_artists_updated_at ON public.artists;
 CREATE TRIGGER trg_artists_updated_at
@@ -1014,6 +1021,12 @@ COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
 COMMENT ON COLUMN public.artist_profiles.epk_custom_theme_tokens IS
   'JSON object with custom EPK color tokens: { bg, text, accent, heading }.';
+-- bio/genres are denormalized into artists for public-page read performance;
+-- changes here are synced to artists.bio / artists.genres by the portal API route.
+COMMENT ON COLUMN public.artist_profiles.bio IS
+  'EPK biography written by the artist. Synced to artists.bio by the portal profile API route.';
+COMMENT ON COLUMN public.artist_profiles.genres IS
+  'EPK genres set by the artist. Synced to artists.genres by the portal profile API route.';
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 
 DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
@@ -1372,6 +1385,31 @@ ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS spotify_url;
 ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS apple_music_url;
 ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS tiktok_url;
 ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS facebook_url;
+
+-- Track 2 (continued): soundcloud_url was omitted from the original consolidation.
+-- Migrate any non-null values from artist_profiles → artists, then drop the column.
+UPDATE public.artists a
+SET soundcloud_url = COALESCE(a.soundcloud_url, ap.soundcloud_url)
+FROM public.artist_profiles ap
+WHERE ap.artist_id = a.id
+  AND ap.soundcloud_url IS NOT NULL;
+
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS soundcloud_url;
+
+-- =============================================================================
+-- Track 3: Align founding-year column name between artists and artist_profiles.
+-- Rename founded_year → founding_year and promote SMALLINT → INTEGER so both
+-- tables share the same column name and compatible type.
+-- =============================================================================
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'artists' AND column_name = 'founded_year'
+  ) THEN
+    ALTER TABLE public.artists RENAME COLUMN founded_year TO founding_year;
+    ALTER TABLE public.artists ALTER COLUMN founding_year TYPE INTEGER USING founding_year::INTEGER;
+  END IF;
+END $$;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
