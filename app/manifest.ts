@@ -17,10 +17,17 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const settings = await getCachedSiteSettings().catch(() => null)
   const customFaviconUrl = settings?.faviconUrl || ''
 
+  // Determine the MIME type of the custom favicon
+  const customFaviconType = customFaviconUrl.endsWith('.svg') ? 'image/svg+xml'
+    : customFaviconUrl.endsWith('.ico') ? 'image/x-icon'
+    : customFaviconUrl.endsWith('.webp') ? 'image/webp'
+    : 'image/png'
+
   const icons: MetadataRoute.Manifest['icons'] = [
-    // SVG favicon — listed first so modern browsers and OS installers
-    // prefer the vector source, which always matches the <link rel="icon">.
-    { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+    // Custom favicon first — when set, this becomes the primary app icon
+    ...(customFaviconUrl
+      ? [{ src: customFaviconUrl, sizes: 'any', type: customFaviconType, purpose: 'any' as const }]
+      : [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }]),
     // Standard raster icons (PNG, used for notifications / splash screens)
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
     { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -29,11 +36,6 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     // The artwork must have ~10 % safe-zone padding around the main icon.
     { src: '/icons/icon-192-maskable.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
     { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    // Custom favicon from admin settings — overrides static PNGs when set so
-    // the installed app icon matches whatever is shown in the browser tab.
-    ...(customFaviconUrl
-      ? [{ src: customFaviconUrl, sizes: 'any', type: 'image/png', purpose: 'any' as const }]
-      : []),
   ]
 
   return {
