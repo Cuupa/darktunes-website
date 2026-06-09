@@ -188,8 +188,13 @@ export function useSiteSettings() {
     async (updated: SiteSettings): Promise<void> => {
       await upsertSiteSettings(supabase, settingsToRecord(updated))
       setSettings(updated)
-      // Revalidate the Next.js server cache so the public site picks up changes
-      await fetch('/api/revalidate-site-settings', { method: 'POST' })
+      // Revalidate the Next.js server cache so the public site picks up changes.
+      // Throw if the API returns an error so the caller (e.g. ColorThemeManager)
+      // can surface a meaningful toast instead of silently showing stale colors.
+      const res = await fetch('/api/revalidate-site-settings', { method: 'POST' })
+      if (!res.ok) {
+        throw new Error(`Cache revalidation failed (${res.status}): theme changes will appear within 60 s`)
+      }
     },
     [supabase],
   )
