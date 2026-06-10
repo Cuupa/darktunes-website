@@ -71,6 +71,18 @@ BEGIN
   END IF;
 END $$;
 
+-- Ensure 'press' exists (added for journalist/press dashboard access)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumtypid = 'public.user_role'::regtype
+      AND enumlabel = 'press'
+  ) THEN
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'press';
+  END IF;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- HELPER: auto-update updated_at on every row change
 -- ---------------------------------------------------------------------------
@@ -198,12 +210,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
 
--- Idempotent guards for columns added after initial schema creation
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url  TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS provider    TEXT NOT NULL DEFAULT 'email';
+-- Idempotent guard for column added after initial schema creation
+-- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name   TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_active   BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
@@ -523,6 +532,8 @@ CREATE TABLE IF NOT EXISTS public.releases (
   spotify_url     TEXT,
   apple_music_url TEXT,
   youtube_url     TEXT,
+  bandcamp_url    TEXT,
+  smartlink_url   TEXT,
   featured        BOOLEAN             NOT NULL DEFAULT FALSE,
   itunes_id       TEXT                UNIQUE,
   -- External API sync fields
@@ -545,20 +556,10 @@ CREATE TABLE IF NOT EXISTS public.releases (
   updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS spotify_id     TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS discogs_id     TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS isrc           TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS barcode        TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS catalog_number TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS preview_url    TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS platform_links JSONB;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT NULL DEFAULT FALSE;
--- Optional per-release hero customisation
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS promo_text     TEXT;
-ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_bg_url    TEXT;
+-- Idempotent guards for columns added after initial schema creation.
+-- Columns already in CREATE TABLE above (spotify_id … hero_bg_url, bandcamp_url,
+-- smartlink_url) do NOT need guards — they are created by CREATE TABLE IF NOT EXISTS.
+-- Guards remain only for columns that are NOT in the base CREATE TABLE definition.
 -- Hero button overrides (primary + secondary)
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
@@ -994,13 +995,14 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
   -- EPK gallery photos (R2 URLs) and custom EPK color tokens
   epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
   epk_custom_theme_tokens JSONB            DEFAULT NULL,
+  custom_links            JSONB            DEFAULT NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short        TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium       TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long         TEXT;
+-- Idempotent guards for columns added after initial schema creation.
+-- bio_short, bio_medium, bio_long, epk_gallery_photos, epk_custom_theme_tokens,
+-- custom_links are defined in CREATE TABLE above — no guards needed for them.
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INTEGER;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
@@ -1017,9 +1019,6 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_hidden 
 -- EPK Password protection for sensitive sections
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
--- EPK gallery and custom theme tokens (added 2026-06-07)
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB  DEFAULT NULL;
 
 COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
@@ -1438,6 +1437,9 @@ ALTER TABLE public.promo_tracks          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.portal_feature_flags  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
@@ -2091,6 +2093,47 @@ CREATE POLICY "label_messages: artist own read" ON public.label_messages
 
 -- Allows admins full access to all label messages
 CREATE POLICY "label_messages: admin all" ON public.label_messages
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_folders (admin-managed inbox folders)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_folders: admin all" ON public.message_folders;
+
+CREATE POLICY "message_folders: admin all" ON public.message_folders
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_rules (admin-managed inbox routing rules)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_rules: admin all" ON public.message_rules;
+
+CREATE POLICY "message_rules: admin all" ON public.message_rules
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_attachments (attachments on label_messages)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_attachments: artist own read" ON public.message_attachments;
+DROP POLICY IF EXISTS "message_attachments: admin all"       ON public.message_attachments;
+
+-- Artists can read attachments on messages addressed to their artist profile
+CREATE POLICY "message_attachments: artist own read" ON public.message_attachments
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.label_messages lm
+      JOIN public.artist_members am ON am.artist_id = lm.artist_id
+      WHERE lm.id = message_id AND am.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "message_attachments: admin all" ON public.message_attachments
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
