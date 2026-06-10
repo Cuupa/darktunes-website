@@ -131,13 +131,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to main content
         </a>
-        <VisualEffectsOverlay
-          noiseOpacity={settings?.noiseOpacity ?? 0.03}
-          crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
-          vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
-          effects={settings?.themeConfig?.effects}
-        />
-        <ThemeEffectsClient effects={settings?.themeConfig?.effects} />
+        {/* Visual effects and interactive CSS data-attributes are suppressed on
+            admin / portal / press / editor routes so the dashboard UI is not
+            obscured by noise, vignettes, scanlines, or hover animations. */}
+        <NavHidingWrapper>
+          <VisualEffectsOverlay
+            noiseOpacity={settings?.noiseOpacity ?? 0.03}
+            crtScanlinesEnabled={settings?.crtScanlinesEnabled ?? true}
+            vignetteIntensity={settings?.vignetteIntensity ?? 0.5}
+            effects={settings?.themeConfig?.effects}
+          />
+          <ThemeEffectsClient effects={settings?.themeConfig?.effects} />
+        </NavHidingWrapper>
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
         <Providers consentDict={dict.consent}>
           <NavHidingWrapper><SiteHeader /></NavHidingWrapper>

@@ -32,6 +32,7 @@ const mockTrackRow: PromoTrackRow = {
   id: 'track-uuid-1',
   title: 'Unreleased Banger',
   artist_name: 'darkArtist',
+  artist_id: null,
   r2_key: 'promo-tracks/track-uuid-1.wav',
   file_size_bytes: 52428800,
   duration_seconds: 210,

@@ -15,6 +15,16 @@
  *  sidebar scrolls its nav links and the main area scrolls page content.
  *  CSS `overscroll-behavior: contain` prevents scroll from leaking to the
  *  parent once a panel reaches its boundary.
+ *
+ *  `data-lenis-prevent` on both overflow containers tells the global Lenis
+ *  smooth-scroll instance (LenisProvider) to yield wheel/touch events that
+ *  originate inside those elements to the browser's native scroll handler.
+ *  Without this attribute Lenis intercepts all events at document level,
+ *  and mouse-wheel scrolling is silently blocked inside the admin panels.
+ *
+ * Visual effects:
+ *  VisualEffectsOverlay and ThemeEffectsClient are suppressed for
+ *  /admin/* routes in app/layout.tsx via NavHidingWrapper.
  */
 
 import { Suspense } from 'react'
@@ -39,9 +49,15 @@ export function AdminClientLayout({ children, dict }: AdminClientLayoutProps) {
           <AdminSidebarNav />
           <main className="flex-1 flex flex-col min-h-0">
             <Suspense>
+              {/* data-lenis-prevent tells Lenis (global smooth-scroll) to yield
+                  wheel/touch events that originate inside this overflow container
+                  to the browser's native scroll handler. Without it Lenis
+                  intercepts all events at document level and the overflow-y-auto
+                  panel cannot be scrolled. */}
               <div
                 className="flex-1 overflow-y-auto min-h-0"
                 style={{ overscrollBehavior: 'contain' }}
+                data-lenis-prevent
               >
                 {children}
               </div>
