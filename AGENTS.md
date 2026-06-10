@@ -486,6 +486,14 @@ Settings are stored in the site_settings KV table (keys: noise_opacity, crt_scan
 CSS animation keyframes (.noise-overlay, .scanlines-overlay) live in app/globals.css. Opacity/visibility is controlled via inline style props — never hardcoded.
 CRITICAL DESIGN RULE: Do NOT use neon glows, bright highlights, or flashy cyberpunk effects. Keep the aesthetic raw, dark, industrial, and subtle.
 
+Color Theme Admin (ColorThemeManager)
+`src/components/admin/ColorThemeManager.tsx` is the admin editor for the CI Color System. Key architectural rules:
+- All mutable editor state lives in a SINGLE `useReducer` (`ThemeDraft` + `ThemeAction` union). Do NOT add individual `useState` hooks per field — use `dispatch({ type: ... })` instead.
+- Live preview is DECLARATIVE: `buildPreviewCss(draft)` produces a `:root { … }` CSS string which is rendered as `<style data-id="ctm-live-preview" dangerouslySetInnerHTML={{ ... }} />` in JSX. React mounts/unmounts it automatically. Do NOT reintroduce `document.documentElement.style.setProperty` / `removeProperty` calls — they cause hydration mismatches.
+- `ThemeStyleInjector` (app/_components/ThemeStyleInjector.tsx) handles the SSR side: it injects the SAVED theme as a `<style>` tag in `<head>` at server-render time to prevent FOUC. ColorThemeManager handles the live preview only.
+- `handleCancel` restores the original draft in one `dispatch({ type: 'SET_DRAFT', draft: originalDraft.current })` call — no imperative cleanup needed.
+- `handleSave` diffs the draft against `value` props and calls `onChange` with only the changed fields.
+
 Press & Media Ecosystem
 Public EPK page: `app/press/page.tsx` (Server Component) fetches press_photos, artist profile bios (short/medium/long), concerts, and press_quote from Supabase. All photo display URLs pass through `getOptimizedImageUrl()` (wsrv.nl proxy); download links point to the original R2 public CDN URL.
 Promo Pool: `/promo-pool/*` is a dual-gated journalist-only area.
