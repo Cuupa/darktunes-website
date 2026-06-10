@@ -557,9 +557,25 @@ CREATE TABLE IF NOT EXISTS public.releases (
 );
 
 -- Idempotent guards for columns added after initial schema creation.
--- Columns already in CREATE TABLE above (spotify_id … hero_bg_url, bandcamp_url,
--- smartlink_url) do NOT need guards — they are created by CREATE TABLE IF NOT EXISTS.
--- Guards remain only for columns that are NOT in the base CREATE TABLE definition.
+-- All columns listed here MUST have a guard so that existing databases are updated
+-- safely when running this script (CREATE TABLE IF NOT EXISTS is a no-op on existing
+-- tables, so guards are the only way to add new columns to live databases).
+-- External API sync fields
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS spotify_id     TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS discogs_id     TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS isrc           TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS barcode        TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS catalog_number TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS preview_url    TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smart_url      TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS platform_links JSONB;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS popularity     INTEGER;
+-- Visibility and promo flags
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS is_promo       BOOLEAN NOT NULL DEFAULT FALSE;
+-- Hero customisation
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS promo_text     TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_bg_url    TEXT;
 -- Hero button overrides (primary + secondary)
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_label  TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_primary_btn_action TEXT;
@@ -1001,8 +1017,16 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
 );
 
 -- Idempotent guards for columns added after initial schema creation.
--- bio_short, bio_medium, bio_long, epk_gallery_photos, epk_custom_theme_tokens,
--- custom_links are defined in CREATE TABLE above — no guards needed for them.
+-- All columns listed here MUST have a guard so that existing databases are updated
+-- safely when running this script (CREATE TABLE IF NOT EXISTS is a no-op on existing
+-- tables, so guards are the only way to add new columns to live databases).
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short               TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium              TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long                TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_quote             TEXT;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
+ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INTEGER;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
