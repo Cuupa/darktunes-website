@@ -50,7 +50,9 @@ export function ThemeEffectsClient({ effects }: ThemeEffectsClientProps) {
     if (!effects) {
       // Remove all data-fx attributes
       Object.values(DATA_FX_MAP).forEach((attr) => root.removeAttribute(attr))
-      return
+      return () => {
+        Object.values(DATA_FX_MAP).forEach((attr) => root.removeAttribute(attr))
+      }
     }
 
     const { overlay, hover, text, ui } = effects
@@ -75,6 +77,12 @@ export function ThemeEffectsClient({ effects }: ThemeEffectsClientProps) {
     setAttr(root, DATA_FX_MAP.borderPulse, ui?.borderPulse?.enabled === true)
     setAttr(root, DATA_FX_MAP.buttonRipple, ui?.buttonRipple?.enabled === true)
     setAttr(root, DATA_FX_MAP.scrollReveal, ui?.scrollReveal?.enabled === true)
+
+    // Cleanup: strip all data-fx attributes when this component unmounts (e.g.
+    // when NavHidingWrapper suppresses it on admin/portal/press routes).
+    return () => {
+      Object.values(DATA_FX_MAP).forEach((attr) => root.removeAttribute(attr))
+    }
   }, [effects])
 
   return null

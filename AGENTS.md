@@ -38,6 +38,7 @@ Do NOT use CSS scroll-behavior: smooth as a replacement – Lenis overrides this
 LenisProvider uses ReactLenis from lenis/react (root mode) so any component can call useLenis() to get the Lenis instance for programmatic scrolling.
 useLenis is re-exported from src/components/animations/LenisProvider.tsx. Import from there (not directly from lenis/react) for consistency.
 For anchor-based scrolling in Header/Footer, use: const lenis = useLenis(); lenis?.scrollTo(href, { offset: -140 })
+CRITICAL — overflow containers inside the admin/portal/press layouts: Lenis runs in root mode and intercepts ALL wheel/touch events at the document level. Any element that uses overflow-y-auto or overflow-auto INSIDE a layout that sets overflow-hidden on the root container (like AdminClientLayout) MUST carry the `data-lenis-prevent` HTML attribute. Without it Lenis grabs the event, tries to scroll the (non-scrollable) window, and mouse-wheel scrolling is silently blocked. This attribute is already set on the main content div (app/admin/_components/AdminClientLayout.tsx) and the sidebar nav (src/components/admin/AdminSidebarNav.tsx). Apply the same attribute to any future overflow-y-auto containers added to admin/portal/press layouts.
 
 WCAG 2.1 AA/AAA Accessibility — MANDATORY
 COMPLIANCE IS NON-NEGOTIABLE: Every public-facing page and component MUST comply with WCAG 2.1 AA as a hard requirement. Strive for AAA where feasible. Any new UI element introduced without meeting at minimum AA criteria is considered a defect and must be fixed before merging. Violations found in existing code must be remediated immediately.
@@ -485,6 +486,7 @@ All overlays use pointer-events: none and z-index 9996–9998 so they never bloc
 Settings are stored in the site_settings KV table (keys: noise_opacity, crt_scanlines_enabled, vignette_intensity, shopify_store_url, youtube_channel_id) and managed via the Admin CMS "Visual Effects" tab (Slider + Switch controls).
 CSS animation keyframes (.noise-overlay, .scanlines-overlay) live in app/globals.css. Opacity/visibility is controlled via inline style props — never hardcoded.
 CRITICAL DESIGN RULE: Do NOT use neon glows, bright highlights, or flashy cyberpunk effects. Keep the aesthetic raw, dark, industrial, and subtle.
+ADMIN/PORTAL/PRESS ROUTES — NO VISUAL EFFECTS: VisualEffectsOverlay and ThemeEffectsClient are both wrapped in NavHidingWrapper in app/layout.tsx. They are NOT rendered on /admin/*, /portal/*, /press/*, or /editor/* routes. Do NOT move these components outside the NavHidingWrapper. ThemeEffectsClient also removes all data-fx-* attributes from <html> in its useEffect cleanup (on unmount), so navigating from a public page to admin never leaves stale effect attributes behind.
 
 Color Theme Admin (ColorThemeManager)
 `src/components/admin/ColorThemeManager.tsx` is the admin editor for the CI Color System. Key architectural rules:

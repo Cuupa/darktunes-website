@@ -83,7 +83,7 @@ export function AdminSidebarNav() {
   const visibleItems = NAV_ITEMS.filter(canSee)
 
   const renderNavLinks = (onNavigate?: () => void) => (
-    <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ overscrollBehavior: 'contain' }} aria-label="Admin sections">
+    <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent aria-label="Admin sections">
       <ul className="space-y-0.5">
         {visibleItems.map((item) => {
           const Icon = item.icon
