@@ -13,9 +13,18 @@
  *  - Typography: 50+ fonts, heading/body split, weights, sizes, line-height, letter-spacing
  *  - Animations: Page-transition preset + duration
  *  - Contrast  : WCAG 2.1 AA/AAA contrast check
+ *
+ * State management: a single `useReducer` drives all editable theme fields
+ * (`ThemeDraft`).  This eliminates the previous 15+ useState/useRef pairs and
+ * keeps handleSave / handleCancel trivially simple.
+ *
+ * Live preview: CSS overrides are built into a `:root { … }` string and rendered
+ * as an inline `<style data-id="ctm-live-preview">` element — no imperative
+ * `document.documentElement.style.setProperty` calls.  React removes the element
+ * on unmount, so color overrides never bleed into other pages.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   ArrowCounterClockwise,
@@ -37,7 +46,7 @@ import type { SiteSettings } from '@/types'
 import { COLOR_PRESETS } from '@/config/colorPresets'
 import type { ThemePresetColors } from '@/config/colorPresets'
 import { ANIMATION_PRESETS, ANIMATION_PRESET_LABELS } from '@/config/animationPresets'
-import type { ThemeConfig, ThemeEffects } from '@/config/themeConfig'
+import type { ThemeConfig, ThemeEffects, ThemeTypography } from '@/config/themeConfig'
 import { EffectsTab } from '@/components/admin/theme-tabs/EffectsTab'
 import { TypographyTab } from '@/components/admin/theme-tabs/TypographyTab'
 import { ThemesTab } from '@/components/admin/theme-tabs/ThemesTab'
@@ -50,10 +59,11 @@ export interface ColorThemeManagerProps {
   isLoading?: boolean
 }
 
-type ThemeColors = ThemePresetColors
+/** Alias for the flat legacy color keys (themePrimary, themeSecondary, …) */
+type LegacyColors = ThemePresetColors
 
 interface TokenRow {
-  key: keyof ThemeColors
+  key: keyof LegacyColors
   cssVar: string
   label: string
   defaultHint: string
@@ -61,7 +71,107 @@ interface TokenRow {
 
 interface CustomColorPreset {
   name: string
-  colors: ThemeColors
+  colors: LegacyColors
+}
+
+// ── Atomic draft state ───────────────────────────────────────────────────────
+
+/**
+ * All mutable theme fields live in one atomic `ThemeDraft` object, managed by
+ * `useReducer`.  This replaces the previous 15+ separate `useState` calls.
+ */
+interface ThemeDraft {
+  colors: LegacyColors
+  noiseOpacity: number
+  crtEnabled: boolean
+  vignetteIntensity: number
+  effects: ThemeEffects
+  heroFrom: string
+  heroTo: string
+  heroDir: string
+  accentFrom: string
+  accentTo: string
+  accentDir: string
+  typography: ThemeTypography
+  animPreset: string
+  animDuration: number
+  activeThemeId: string | undefined
+}
+
+type ThemeAction =
+  | { type: 'SET_COLOR';         key: keyof LegacyColors; value: string }
+  | { type: 'RESET_COLOR';       key: keyof LegacyColors }
+  | { type: 'APPLY_COLORS';      colors: LegacyColors }
+  | { type: 'APPLY_THEME';       theme: ThemeConfig }
+  | { type: 'SET_NOISE_OPACITY'; value: number }
+  | { type: 'SET_CRT';           value: boolean }
+  | { type: 'SET_VIGNETTE';      value: number }
+  | { type: 'SET_EFFECTS';       effects: ThemeEffects }
+  | { type: 'SET_HERO_FROM';     value: string }
+  | { type: 'SET_HERO_TO';       value: string }
+  | { type: 'SET_HERO_DIR';      value: string }
+  | { type: 'SET_ACCENT_FROM';   value: string }
+  | { type: 'SET_ACCENT_TO';     value: string }
+  | { type: 'SET_ACCENT_DIR';    value: string }
+  | { type: 'SET_TYPOGRAPHY';    typography: ThemeTypography }
+  | { type: 'SET_ANIM_PRESET';   preset: string }
+  | { type: 'SET_ANIM_DURATION'; duration: number }
+  | { type: 'SET_DRAFT';         draft: ThemeDraft }
+
+function themeReducer(state: ThemeDraft, action: ThemeAction): ThemeDraft {
+  switch (action.type) {
+    case 'SET_COLOR':
+      return { ...state, colors: { ...state.colors, [action.key]: action.value } }
+    case 'RESET_COLOR':
+      return { ...state, colors: { ...state.colors, [action.key]: '' } }
+    case 'APPLY_COLORS':
+      return { ...state, colors: action.colors }
+    case 'APPLY_THEME': {
+      const t = action.theme
+      return {
+        ...state,
+        colors: {
+          themePrimary:    t.colors.primary,
+          themeSecondary:  t.colors.secondary,
+          themeBackground: t.colors.background,
+          themeForeground: t.colors.foreground,
+          themeCard:       t.colors.card,
+          themeMuted:      t.colors.muted,
+          themeAccent:     t.colors.accent,
+          themeBorder:     t.colors.border,
+        },
+        heroFrom:         t.gradients.heroFrom   ?? '',
+        heroTo:           t.gradients.heroTo     ?? '',
+        heroDir:          t.gradients.heroDir    ?? '135deg',
+        accentFrom:       t.gradients.accentFrom ?? '',
+        accentTo:         t.gradients.accentTo   ?? '',
+        accentDir:        t.gradients.accentDir  ?? '135deg',
+        typography:       t.typography,
+        animPreset:       t.animation.preset   ?? 'slide-up',
+        animDuration:     parseFloat(t.animation.duration ?? '0.4') || 0.4,
+        effects:          t.effects ?? state.effects,
+        noiseOpacity:     t.effects?.overlay?.noiseOpacity     ?? state.noiseOpacity,
+        crtEnabled:       t.effects?.overlay?.crtEnabled       ?? state.crtEnabled,
+        vignetteIntensity: t.effects?.overlay?.vignetteIntensity ?? state.vignetteIntensity,
+        activeThemeId:    t.themeId,
+      }
+    }
+    case 'SET_NOISE_OPACITY':  return { ...state, noiseOpacity: action.value }
+    case 'SET_CRT':            return { ...state, crtEnabled: action.value }
+    case 'SET_VIGNETTE':       return { ...state, vignetteIntensity: action.value }
+    case 'SET_EFFECTS':        return { ...state, effects: action.effects }
+    case 'SET_HERO_FROM':      return { ...state, heroFrom: action.value }
+    case 'SET_HERO_TO':        return { ...state, heroTo: action.value }
+    case 'SET_HERO_DIR':       return { ...state, heroDir: action.value }
+    case 'SET_ACCENT_FROM':    return { ...state, accentFrom: action.value }
+    case 'SET_ACCENT_TO':      return { ...state, accentTo: action.value }
+    case 'SET_ACCENT_DIR':     return { ...state, accentDir: action.value }
+    case 'SET_TYPOGRAPHY':     return { ...state, typography: action.typography }
+    case 'SET_ANIM_PRESET':    return { ...state, animPreset: action.preset }
+    case 'SET_ANIM_DURATION':  return { ...state, animDuration: action.duration }
+    case 'SET_DRAFT':          return action.draft
+    default:                   return state
+  }
 }
 
 // ── Token definitions ────────────────────────────────────────────────────────
@@ -143,45 +253,68 @@ function contrastRatio(hex1: string, hex2: string): number | null {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function extractColors(s: SiteSettings): ThemeColors {
+/**
+ * Converts a `SiteSettings` snapshot into the flat `ThemeDraft` the component
+ * manages internally.  Used both as the `useReducer` initialiser and to update
+ * the "original" ref when the parent pushes fresh data.
+ */
+function draftFromSettings(s: SiteSettings): ThemeDraft {
   return {
-    themePrimary:    s.themePrimary    ?? '',
-    themeSecondary:  s.themeSecondary  ?? '',
-    themeBackground: s.themeBackground ?? '',
-    themeForeground: s.themeForeground ?? '',
-    themeCard:       s.themeCard       ?? '',
-    themeMuted:      s.themeMuted      ?? '',
-    themeAccent:     s.themeAccent     ?? '',
-    themeBorder:     s.themeBorder     ?? '',
+    colors: {
+      themePrimary:    s.themePrimary    ?? '',
+      themeSecondary:  s.themeSecondary  ?? '',
+      themeBackground: s.themeBackground ?? '',
+      themeForeground: s.themeForeground ?? '',
+      themeCard:       s.themeCard       ?? '',
+      themeMuted:      s.themeMuted      ?? '',
+      themeAccent:     s.themeAccent     ?? '',
+      themeBorder:     s.themeBorder     ?? '',
+    },
+    noiseOpacity:      s.noiseOpacity         ?? 0.04,
+    crtEnabled:        s.crtScanlinesEnabled   ?? true,
+    vignetteIntensity: s.vignetteIntensity     ?? 0.5,
+    effects:           s.themeConfig?.effects  ?? {},
+    heroFrom:          s.themeGradientHeroFrom   ?? '',
+    heroTo:            s.themeGradientHeroTo     ?? '',
+    heroDir:           s.themeGradientHeroDir    ?? '135deg',
+    accentFrom:        s.themeGradientAccentFrom ?? '',
+    accentTo:          s.themeGradientAccentTo   ?? '',
+    accentDir:         s.themeGradientAccentDir  ?? '135deg',
+    typography:        s.themeConfig?.typography ?? {},
+    animPreset:        s.themeConfig?.animation.preset ?? 'slide-up',
+    animDuration:      parseFloat(s.themeConfig?.animation.duration ?? '0.4') || 0.4,
+    activeThemeId:     s.themeConfig?.themeId,
   }
 }
 
-function applyLive(colors: ThemeColors) {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  TOKEN_ROWS.forEach(({ key, cssVar, defaultHint }) => {
-    root.style.setProperty(cssVar, colors[key] || defaultHint)
-  })
-}
+/**
+ * Builds a `:root { … }` CSS override string from the current draft.
+ *
+ * The result is rendered as an inline `<style data-id="ctm-live-preview">` tag
+ * in the component JSX — no direct DOM mutation required.  React removes the
+ * element on unmount, which naturally prevents color overrides from bleeding
+ * into other pages after the admin navigates away.
+ *
+ * Returns an empty string when no overrides are needed (the style tag is
+ * omitted in that case).
+ */
+function buildPreviewCss(draft: ThemeDraft): string {
+  const rules: string[] = []
 
-function removeLive() {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  TOKEN_ROWS.forEach(({ cssVar }) => root.style.removeProperty(cssVar))
-  // Also remove gradient inline overrides so they don't outlive the component
-  root.style.removeProperty('--gradient-hero')
-  root.style.removeProperty('--gradient-accent')
-}
+  if (Object.values(draft.colors).some((v) => v !== '')) {
+    TOKEN_ROWS.forEach(({ key, cssVar, defaultHint }) => {
+      rules.push(`  ${cssVar}: ${draft.colors[key] || defaultHint};`)
+    })
+  }
 
-function applyGradientLive(heroFrom: string, heroTo: string, heroDir: string, accentFrom: string, accentTo: string, accentDir: string) {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  if (heroFrom && heroTo) {
-    root.style.setProperty('--gradient-hero', `linear-gradient(${heroDir || '135deg'}, ${heroFrom}, ${heroTo})`)
+  if (draft.heroFrom && draft.heroTo) {
+    rules.push(`  --gradient-hero: linear-gradient(${draft.heroDir || '135deg'}, ${draft.heroFrom}, ${draft.heroTo});`)
   }
-  if (accentFrom && accentTo) {
-    root.style.setProperty('--gradient-accent', `linear-gradient(${accentDir || '135deg'}, ${accentFrom}, ${accentTo})`)
+  if (draft.accentFrom && draft.accentTo) {
+    rules.push(`  --gradient-accent: linear-gradient(${draft.accentDir || '135deg'}, ${draft.accentFrom}, ${draft.accentTo});`)
   }
+
+  return rules.length > 0 ? `:root {\n${rules.join('\n')}\n}` : ''
 }
 
 function loadCustomPresets(): CustomColorPreset[] {
@@ -203,233 +336,118 @@ function saveCustomPresets(presets: CustomColorPreset[]) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ColorThemeManager({ value, onChange, isLoading = false }: ColorThemeManagerProps) {
-  const [colors, setColors] = useState<ThemeColors>(() => extractColors(value))
+  // ── Single atomic draft state (replaces 15+ useState/useRef pairs) ────────
+  const [draft, dispatch] = useReducer(themeReducer, value, draftFromSettings)
   const [isSaving, setIsSaving] = useState(false)
-  const originalColors = useRef<ThemeColors>(extractColors(value))
+  /** Snapshot of last-saved/persisted state, used to restore on Cancel. */
+  const originalDraft = useRef<ThemeDraft>(draftFromSettings(value))
 
-  // Effects state — legacy flat fields
-  const [noiseOpacity, setNoiseOpacity] = useState(() => value.noiseOpacity ?? 0.04)
-  const [crtEnabled, setCrtEnabled] = useState(() => value.crtScanlinesEnabled ?? true)
-  const [vignetteIntensity, setVignetteIntensity] = useState(() => value.vignetteIntensity ?? 0.5)
-  const originalEffects = useRef({ noiseOpacity: value.noiseOpacity ?? 0.04, crtEnabled: value.crtScanlinesEnabled ?? true, vignetteIntensity: value.vignetteIntensity ?? 0.5 })
-
-  // Extended effects state (ThemeEffects)
-  const [effects, setEffects] = useState<ThemeEffects>(() => value.themeConfig?.effects ?? {})
-  const originalExtEffects = useRef<ThemeEffects>(value.themeConfig?.effects ?? {})
-
-  // Gradient state
-  const [gradientHeroFrom, setGradientHeroFrom] = useState(() => value.themeGradientHeroFrom ?? '')
-  const [gradientHeroTo, setGradientHeroTo] = useState(() => value.themeGradientHeroTo ?? '')
-  const [gradientHeroDir, setGradientHeroDir] = useState(() => value.themeGradientHeroDir ?? '135deg')
-  const [gradientAccentFrom, setGradientAccentFrom] = useState(() => value.themeGradientAccentFrom ?? '')
-  const [gradientAccentTo, setGradientAccentTo] = useState(() => value.themeGradientAccentTo ?? '')
-  const [gradientAccentDir, setGradientAccentDir] = useState(() => value.themeGradientAccentDir ?? '135deg')
-  const originalGradients = useRef({ gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' })
-
-  // Typography state — driven by ThemeTypography object
-  const [typography, setTypography] = useState(() => value.themeConfig?.typography ?? {})
-  const originalTypography = useRef(value.themeConfig?.typography ?? {})
-
-  // Animation state
-  const [animPreset, setAnimPreset] = useState(() => value.themeConfig?.animation.preset ?? 'slide-up')
-  const [animDuration, setAnimDuration] = useState(() => {
-    const raw = value.themeConfig?.animation.duration ?? '0.4s'
-    return parseFloat(raw) || 0.4
-  })
-  const originalAnimation = useRef({ animPreset: value.themeConfig?.animation.preset ?? 'slide-up', animDuration: parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4 })
-
-  // Current theme ID (for Themes tab active highlighting)
-  const [activeThemeId, setActiveThemeId] = useState(() => value.themeConfig?.themeId)
-
-  // Custom color presets (localStorage)
+  // UI-only state (not part of the theme draft)
   const [customPresets, setCustomPresets] = useState<CustomColorPreset[]>(() => loadCustomPresets())
   const [newPresetName, setNewPresetName] = useState('')
 
+  // Sync draft when the parent pushes a fresh `value` (e.g. after a remote save)
   useEffect(() => {
-    const fresh = extractColors(value)
-    setColors(fresh)
-    originalColors.current = fresh
-    const e = { noiseOpacity: value.noiseOpacity ?? 0.04, crtEnabled: value.crtScanlinesEnabled ?? true, vignetteIntensity: value.vignetteIntensity ?? 0.5 }
-    setNoiseOpacity(e.noiseOpacity)
-    setCrtEnabled(e.crtEnabled)
-    setVignetteIntensity(e.vignetteIntensity)
-    originalEffects.current = e
-    const extFx = value.themeConfig?.effects ?? {}
-    setEffects(extFx)
-    originalExtEffects.current = extFx
-    const g = { gradientHeroFrom: value.themeGradientHeroFrom ?? '', gradientHeroTo: value.themeGradientHeroTo ?? '', gradientHeroDir: value.themeGradientHeroDir ?? '135deg', gradientAccentFrom: value.themeGradientAccentFrom ?? '', gradientAccentTo: value.themeGradientAccentTo ?? '', gradientAccentDir: value.themeGradientAccentDir ?? '135deg' }
-    setGradientHeroFrom(g.gradientHeroFrom)
-    setGradientHeroTo(g.gradientHeroTo)
-    setGradientHeroDir(g.gradientHeroDir)
-    setGradientAccentFrom(g.gradientAccentFrom)
-    setGradientAccentTo(g.gradientAccentTo)
-    setGradientAccentDir(g.gradientAccentDir)
-    originalGradients.current = g
-    const typo = value.themeConfig?.typography ?? {}
-    setTypography(typo)
-    originalTypography.current = typo
-    const ap = value.themeConfig?.animation.preset ?? 'slide-up'
-    const ad = parseFloat(value.themeConfig?.animation.duration ?? '0.4') || 0.4
-    setAnimPreset(ap)
-    setAnimDuration(ad)
-    originalAnimation.current = { animPreset: ap, animDuration: ad }
-    setActiveThemeId(value.themeConfig?.themeId)
+    const next = draftFromSettings(value)
+    dispatch({ type: 'SET_DRAFT', draft: next })
+    originalDraft.current = next
   }, [value])
 
-  // Live-preview colors in admin (doesn't affect public site until Save).
-  // The cleanup removes all inline overrides on unmount so they never bleed
-  // into other pages when the admin navigates away via client-side routing.
-  useEffect(() => {
-    if (Object.values(colors).some((v) => v !== '')) {
-      applyLive(colors)
-    } else {
-      removeLive()
-    }
-    applyGradientLive(gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir)
-    return () => { removeLive() }
-  }, [colors, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
+  // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleColorChange = useCallback((key: keyof ThemeColors, val: string) => {
-    setColors((prev) => ({ ...prev, [key]: val }))
+  const handleColorChange = useCallback((key: keyof LegacyColors, val: string) => {
+    dispatch({ type: 'SET_COLOR', key, value: val })
   }, [])
 
-  const handleReset = useCallback((key: keyof ThemeColors) => {
-    setColors((prev) => ({ ...prev, [key]: '' }))
+  const handleReset = useCallback((key: keyof LegacyColors) => {
+    dispatch({ type: 'RESET_COLOR', key })
   }, [])
 
-  const handlePreset = useCallback((preset: { colors: ThemeColors }) => {
-    setColors(preset.colors)
+  const handlePreset = useCallback((preset: { colors: LegacyColors }) => {
+    dispatch({ type: 'APPLY_COLORS', colors: preset.colors })
   }, [])
 
   /** Apply a complete ThemeConfig preset (from Themes tab). */
   const handleApplyTheme = useCallback((theme: ThemeConfig) => {
-    setColors({
-      themePrimary:    theme.colors.primary,
-      themeSecondary:  theme.colors.secondary,
-      themeBackground: theme.colors.background,
-      themeForeground: theme.colors.foreground,
-      themeCard:       theme.colors.card,
-      themeMuted:      theme.colors.muted,
-      themeAccent:     theme.colors.accent,
-      themeBorder:     theme.colors.border,
-    })
-    setGradientHeroFrom(theme.gradients.heroFrom ?? '')
-    setGradientHeroTo(theme.gradients.heroTo ?? '')
-    setGradientHeroDir(theme.gradients.heroDir ?? '135deg')
-    setGradientAccentFrom(theme.gradients.accentFrom ?? '')
-    setGradientAccentTo(theme.gradients.accentTo ?? '')
-    setGradientAccentDir(theme.gradients.accentDir ?? '135deg')
-    setTypography(theme.typography)
-    setAnimPreset(theme.animation.preset ?? 'slide-up')
-    setAnimDuration(parseFloat(theme.animation.duration ?? '0.4') || 0.4)
-    if (theme.effects) {
-      setEffects(theme.effects)
-      // Sync legacy flat fields from theme effects if present
-      setNoiseOpacity(theme.effects.overlay?.noiseOpacity ?? 0.04)
-      setCrtEnabled(theme.effects.overlay?.crtEnabled ?? false)
-      setVignetteIntensity(theme.effects.overlay?.vignetteIntensity ?? 0.5)
-    }
-    setActiveThemeId(theme.themeId)
+    dispatch({ type: 'APPLY_THEME', theme })
     toast.info(`"${theme.themeId ?? 'Preset'}" theme applied. Click Save Theme to persist.`)
   }, [])
 
   const handleCancel = useCallback(() => {
-    setColors(originalColors.current)
-    applyLive(originalColors.current)
-    if (Object.values(originalColors.current).every((v) => v === '')) removeLive()
-    setNoiseOpacity(originalEffects.current.noiseOpacity)
-    setCrtEnabled(originalEffects.current.crtEnabled)
-    setVignetteIntensity(originalEffects.current.vignetteIntensity)
-    setEffects(originalExtEffects.current)
-    const g = originalGradients.current
-    setGradientHeroFrom(g.gradientHeroFrom)
-    setGradientHeroTo(g.gradientHeroTo)
-    setGradientHeroDir(g.gradientHeroDir)
-    setGradientAccentFrom(g.gradientAccentFrom)
-    setGradientAccentTo(g.gradientAccentTo)
-    setGradientAccentDir(g.gradientAccentDir)
-    setTypography(originalTypography.current)
-    setAnimPreset(originalAnimation.current.animPreset)
-    setAnimDuration(originalAnimation.current.animDuration)
-    setActiveThemeId(value.themeConfig?.themeId)
-  }, [value])
+    dispatch({ type: 'SET_DRAFT', draft: originalDraft.current })
+  }, [])
 
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
       // Merge legacy overlay values into effects.overlay for storage
       const mergedEffects: ThemeEffects = {
-        ...effects,
+        ...draft.effects,
         overlay: {
-          ...effects.overlay,
-          noiseOpacity,
-          crtEnabled,
-          vignetteIntensity,
+          ...draft.effects.overlay,
+          noiseOpacity:      draft.noiseOpacity,
+          crtEnabled:        draft.crtEnabled,
+          vignetteIntensity: draft.vignetteIntensity,
         },
       }
 
       const themeConfig: ThemeConfig = {
         colors: {
-          primary:    colors.themePrimary    ?? '',
-          secondary:  colors.themeSecondary  ?? '',
-          background: colors.themeBackground ?? '',
-          foreground: colors.themeForeground ?? '',
-          card:       colors.themeCard       ?? '',
-          muted:      colors.themeMuted      ?? '',
-          accent:     colors.themeAccent     ?? '',
-          border:     colors.themeBorder     ?? '',
+          primary:    draft.colors.themePrimary    ?? '',
+          secondary:  draft.colors.themeSecondary  ?? '',
+          background: draft.colors.themeBackground ?? '',
+          foreground: draft.colors.themeForeground ?? '',
+          card:       draft.colors.themeCard       ?? '',
+          muted:      draft.colors.themeMuted      ?? '',
+          accent:     draft.colors.themeAccent     ?? '',
+          border:     draft.colors.themeBorder     ?? '',
         },
         gradients: {
-          heroFrom:   gradientHeroFrom,
-          heroTo:     gradientHeroTo,
-          heroDir:    gradientHeroDir,
-          accentFrom: gradientAccentFrom,
-          accentTo:   gradientAccentTo,
-          accentDir:  gradientAccentDir,
+          heroFrom:   draft.heroFrom,
+          heroTo:     draft.heroTo,
+          heroDir:    draft.heroDir,
+          accentFrom: draft.accentFrom,
+          accentTo:   draft.accentTo,
+          accentDir:  draft.accentDir,
         },
-        typography,
-        glass: value.themeConfig?.glass ?? {},
+        typography: draft.typography,
+        glass:      value.themeConfig?.glass ?? {},
         animation: {
-          preset:   animPreset,
-          duration: `${animDuration}s`,
+          preset:   draft.animPreset,
+          duration: `${draft.animDuration}s`,
         },
-        effects: mergedEffects,
-        themeId: activeThemeId,
+        effects:  mergedEffects,
+        themeId:  draft.activeThemeId,
       }
       await onChange({
         ...value,
-        ...colors,
-        noiseOpacity,
-        crtScanlinesEnabled: crtEnabled,
-        vignetteIntensity,
-        themeGradientHeroFrom: gradientHeroFrom,
-        themeGradientHeroTo: gradientHeroTo,
-        themeGradientHeroDir: gradientHeroDir,
-        themeGradientAccentFrom: gradientAccentFrom,
-        themeGradientAccentTo: gradientAccentTo,
-        themeGradientAccentDir: gradientAccentDir,
+        ...draft.colors,
+        noiseOpacity:            draft.noiseOpacity,
+        crtScanlinesEnabled:     draft.crtEnabled,
+        vignetteIntensity:       draft.vignetteIntensity,
+        themeGradientHeroFrom:   draft.heroFrom,
+        themeGradientHeroTo:     draft.heroTo,
+        themeGradientHeroDir:    draft.heroDir,
+        themeGradientAccentFrom: draft.accentFrom,
+        themeGradientAccentTo:   draft.accentTo,
+        themeGradientAccentDir:  draft.accentDir,
         themeConfig,
       })
-      originalColors.current = { ...colors }
-      originalEffects.current = { noiseOpacity, crtEnabled, vignetteIntensity }
-      originalExtEffects.current = mergedEffects
-      originalGradients.current = { gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir }
-      originalTypography.current = typography
-      originalAnimation.current = { animPreset, animDuration }
+      originalDraft.current = { ...draft }
       toast.success('Color theme saved')
     } catch {
       toast.error('Failed to save color theme')
     } finally {
       setIsSaving(false)
     }
-  }, [onChange, value, colors, noiseOpacity, crtEnabled, vignetteIntensity, effects, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir, typography, animPreset, animDuration, activeThemeId])
+  }, [onChange, value, draft])
 
-  // ── Custom preset management ─────────────────────────────────────────────
+  // ── Custom preset management ──────────────────────────────────────────────
 
   function handleSaveCustomPreset() {
     const name = newPresetName.trim()
     if (!name) { toast.error('Enter a name for the preset'); return }
-    const updated = [...customPresets.filter((p) => p.name !== name), { name, colors }]
+    const updated = [...customPresets.filter((p) => p.name !== name), { name, colors: draft.colors }]
     setCustomPresets(updated)
     saveCustomPresets(updated)
     setNewPresetName('')
@@ -444,8 +462,17 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
 
   const disabled = isLoading || isSaving
 
+  // ── Live-preview CSS ──────────────────────────────────────────────────────
+  // Rendered as an inline <style> tag — no imperative DOM mutations needed.
+  // React removes the element on unmount, preventing color bleed across pages.
+  const previewCss = buildPreviewCss(draft)
+
   return (
-    <div className="space-y-6">
+    <>
+      {previewCss && (
+        <style data-id="ctm-live-preview" dangerouslySetInnerHTML={{ __html: previewCss }} />
+      )}
+      <div className="space-y-6">
       <Tabs defaultValue="themes">
         <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="themes">Themes</TabsTrigger>
@@ -460,7 +487,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         {/* ── Themes Tab ──────────────────────────────────────────── */}
         <TabsContent value="themes">
           <ThemesTab
-            currentThemeId={activeThemeId}
+            currentThemeId={draft.activeThemeId}
             onApply={handleApplyTheme}
           />
         </TabsContent>
@@ -541,7 +568,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           {/* Token rows */}
           <div className="space-y-4">
             {TOKEN_ROWS.map(({ key, cssVar, label, defaultHint }) => {
-              const current = colors[key]
+              const current = draft.colors[key]
               const picker = current || defaultHint
               return (
                 <div key={key} className="flex items-center gap-3">
@@ -591,14 +618,14 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         {/* ── Effects Tab ─────────────────────────────────────────── */}
         <TabsContent value="effects">
           <EffectsTab
-            noiseOpacity={noiseOpacity}
-            crtEnabled={crtEnabled}
-            vignetteIntensity={vignetteIntensity}
-            effects={effects}
-            onNoiseOpacity={setNoiseOpacity}
-            onCrtEnabled={setCrtEnabled}
-            onVignetteIntensity={setVignetteIntensity}
-            onEffects={setEffects}
+            noiseOpacity={draft.noiseOpacity}
+            crtEnabled={draft.crtEnabled}
+            vignetteIntensity={draft.vignetteIntensity}
+            effects={draft.effects}
+            onNoiseOpacity={(v) => dispatch({ type: 'SET_NOISE_OPACITY', value: v })}
+            onCrtEnabled={(v) => dispatch({ type: 'SET_CRT', value: v })}
+            onVignetteIntensity={(v) => dispatch({ type: 'SET_VIGNETTE', value: v })}
+            onEffects={(e) => dispatch({ type: 'SET_EFFECTS', effects: e })}
             disabled={disabled}
           />
         </TabsContent>
@@ -614,8 +641,10 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           <div className="space-y-4">
             <p className="text-sm font-semibold">Hero Gradient <code className="text-xs font-mono text-muted-foreground">--gradient-hero</code></p>
             <GradientEditor
-              from={gradientHeroFrom} to={gradientHeroTo} dir={gradientHeroDir}
-              onFrom={setGradientHeroFrom} onTo={setGradientHeroTo} onDir={setGradientHeroDir}
+              from={draft.heroFrom} to={draft.heroTo} dir={draft.heroDir}
+              onFrom={(v) => dispatch({ type: 'SET_HERO_FROM', value: v })}
+              onTo={(v) => dispatch({ type: 'SET_HERO_TO', value: v })}
+              onDir={(v) => dispatch({ type: 'SET_HERO_DIR', value: v })}
               disabled={disabled}
               directions={GRADIENT_DIRECTIONS}
               label="hero"
@@ -628,8 +657,10 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           <div className="space-y-4">
             <p className="text-sm font-semibold">Accent Gradient <code className="text-xs font-mono text-muted-foreground">--gradient-accent</code></p>
             <GradientEditor
-              from={gradientAccentFrom} to={gradientAccentTo} dir={gradientAccentDir}
-              onFrom={setGradientAccentFrom} onTo={setGradientAccentTo} onDir={setGradientAccentDir}
+              from={draft.accentFrom} to={draft.accentTo} dir={draft.accentDir}
+              onFrom={(v) => dispatch({ type: 'SET_ACCENT_FROM', value: v })}
+              onTo={(v) => dispatch({ type: 'SET_ACCENT_TO', value: v })}
+              onDir={(v) => dispatch({ type: 'SET_ACCENT_DIR', value: v })}
               disabled={disabled}
               directions={GRADIENT_DIRECTIONS}
               label="accent"
@@ -640,8 +671,8 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         {/* ── Typography Tab ──────────────────────────────────────── */}
         <TabsContent value="typography">
           <TypographyTab
-            typography={typography}
-            onChange={setTypography}
+            typography={draft.typography}
+            onChange={(t) => dispatch({ type: 'SET_TYPOGRAPHY', typography: t })}
             disabled={disabled}
           />
         </TabsContent>
@@ -663,14 +694,14 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setAnimPreset(key)}
+                  onClick={() => dispatch({ type: 'SET_ANIM_PRESET', preset: key })}
                   disabled={disabled}
                   className={`rounded-md border px-3 py-2 text-left text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
-                    animPreset === key
+                    draft.animPreset === key
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-background text-foreground hover:border-primary/50'
                   }`}
-                  aria-pressed={animPreset === key}
+                  aria-pressed={draft.animPreset === key}
                 >
                   {ANIMATION_PRESET_LABELS[key] ?? key}
                 </button>
@@ -689,13 +720,13 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
             <div className="flex items-center gap-4">
               <Slider
                 min={0.1} max={1.2} step={0.05}
-                value={[animDuration]}
-                onValueChange={([v]) => setAnimDuration(v)}
+                value={[draft.animDuration]}
+                onValueChange={([v]) => dispatch({ type: 'SET_ANIM_DURATION', duration: v })}
                 disabled={disabled}
                 className="flex-1"
                 aria-label="Animation duration"
               />
-              <span className="w-16 text-right font-mono text-sm text-muted-foreground">{animDuration.toFixed(2)}s</span>
+              <span className="w-16 text-right font-mono text-sm text-muted-foreground">{draft.animDuration.toFixed(2)}s</span>
             </div>
             <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--animation-duration</code>. Used by PageTransition and motion components.</p>
           </div>
@@ -718,8 +749,8 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
               </thead>
               <tbody>
                 {CONTRAST_PAIRS.map(({ label, fg, bg, fgHint, bgHint }) => {
-                  const fgColor = (colors[fg as keyof ThemeColors] || fgHint)
-                  const bgColor = (colors[bg as keyof ThemeColors] || bgHint)
+                  const fgColor = (draft.colors[fg as keyof LegacyColors] || fgHint)
+                  const bgColor = (draft.colors[bg as keyof LegacyColors] || bgHint)
                   const ratio = contrastRatio(fgColor, bgColor)
                   const aaPass = ratio !== null && ratio >= 4.5
                   const aaBigPass = ratio !== null && ratio >= 3
@@ -775,6 +806,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         </Button>
       </div>
     </div>
+    </>
   )
 }
 

@@ -233,20 +233,22 @@ describe('ColorThemeManager', () => {
     }
   })
 
-  it('removes inline CSS overrides on unmount (cleanup prevents color bleed)', () => {
-    const spyRemove = vi.spyOn(document.documentElement.style, 'removeProperty')
+  it('removes live CSS preview on unmount (cleanup prevents color bleed)', () => {
     const { unmount } = render(
       <ColorThemeManager
         value={makeSettings({ themePrimary: '#493687' })}
         onChange={vi.fn()}
       />,
     )
+    // Live-preview style element must be rendered while the component is mounted
+    const styleEl = document.querySelector('style[data-id="ctm-live-preview"]')
+    expect(styleEl).not.toBeNull()
+    expect(styleEl?.textContent).toContain('--primary')
+
     unmount()
-    // removeLive() should have cleared color tokens and gradient overrides
-    expect(spyRemove).toHaveBeenCalledWith('--primary')
-    expect(spyRemove).toHaveBeenCalledWith('--gradient-hero')
-    expect(spyRemove).toHaveBeenCalledWith('--gradient-accent')
-    spyRemove.mockRestore()
+
+    // React removes the style element on unmount — no color bleed into other pages
+    expect(document.querySelector('style[data-id="ctm-live-preview"]')).toBeNull()
   })
 
   it('shows error toast when onChange rejects with cache revalidation error', async () => {

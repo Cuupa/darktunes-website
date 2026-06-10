@@ -231,6 +231,15 @@ Colors are stored in `site_settings` (`theme_primary`, `theme_secondary`, `theme
 | `--border` / `--input` | `#383838` | Borders, input frames |
 | `--foreground` | `#ffffff` | Primary text |
 
+### Live Preview (Admin Editor)
+
+`ColorThemeManager` uses a **declarative live-preview** approach:
+
+1. All mutable theme state is held in a single `useReducer` (`ThemeDraft`) — no individual `useState` per field.
+2. A `buildPreviewCss(draft)` helper converts the current draft into a `:root { … }` CSS string.
+3. That string is rendered as `<style data-id="ctm-live-preview">` — a plain JSX sibling element. React mounts/unmounts it automatically; no imperative `document.documentElement.style.setProperty` calls are needed, and there are no hydration or render-desync risks.
+4. On **Save**, the draft is diffed against the original and only changed fields are written to `site_settings`. The `handleCancel` path restores the original draft in one `dispatch` call.
+
 ### Behavior
 
 - If a theme field is left **empty**, the CSS falls back to the brand defaults defined in `app/globals.css` — no override is applied.
