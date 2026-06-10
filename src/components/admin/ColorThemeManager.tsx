@@ -168,6 +168,9 @@ function removeLive() {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   TOKEN_ROWS.forEach(({ cssVar }) => root.style.removeProperty(cssVar))
+  // Also remove gradient inline overrides so they don't outlive the component
+  root.style.removeProperty('--gradient-hero')
+  root.style.removeProperty('--gradient-accent')
 }
 
 function applyGradientLive(heroFrom: string, heroTo: string, heroDir: string, accentFrom: string, accentTo: string, accentDir: string) {
@@ -273,7 +276,9 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     setActiveThemeId(value.themeConfig?.themeId)
   }, [value])
 
-  // Live-preview colors in admin (doesn't affect public site until Save)
+  // Live-preview colors in admin (doesn't affect public site until Save).
+  // The cleanup removes all inline overrides on unmount so they never bleed
+  // into other pages when the admin navigates away via client-side routing.
   useEffect(() => {
     if (Object.values(colors).some((v) => v !== '')) {
       applyLive(colors)
@@ -281,6 +286,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
       removeLive()
     }
     applyGradientLive(gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir)
+    return () => { removeLive() }
   }, [colors, gradientHeroFrom, gradientHeroTo, gradientHeroDir, gradientAccentFrom, gradientAccentTo, gradientAccentDir])
 
   const handleColorChange = useCallback((key: keyof ThemeColors, val: string) => {

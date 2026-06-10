@@ -233,6 +233,36 @@ describe('ColorThemeManager', () => {
     }
   })
 
+  it('removes inline CSS overrides on unmount (cleanup prevents color bleed)', () => {
+    const spyRemove = vi.spyOn(document.documentElement.style, 'removeProperty')
+    const { unmount } = render(
+      <ColorThemeManager
+        value={makeSettings({ themePrimary: '#493687' })}
+        onChange={vi.fn()}
+      />,
+    )
+    unmount()
+    // removeLive() should have cleared color tokens and gradient overrides
+    expect(spyRemove).toHaveBeenCalledWith('--primary')
+    expect(spyRemove).toHaveBeenCalledWith('--gradient-hero')
+    expect(spyRemove).toHaveBeenCalledWith('--gradient-accent')
+    spyRemove.mockRestore()
+  })
+
+  it('shows error toast when onChange rejects with cache revalidation error', async () => {
+    const handleChange = vi.fn().mockRejectedValue(
+      new Error('Cache revalidation failed (503): theme changes will appear within 60 s'),
+    )
+    render(
+      <ColorThemeManager
+        value={makeSettings()}
+        onChange={handleChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to save color theme'))
+  })
+
   it('renders preset buttons', () => {
     render(
       <ColorThemeManager
