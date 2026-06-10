@@ -61,7 +61,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://*.mzstatic.com https://*.bcbits.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://wsrv.nl",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://wsrv.nl https://fonts.googleapis.com https://fonts.gstatic.com",
               "media-src 'self' blob: https://*.r2.dev https://*.supabase.co",
               "worker-src 'self' blob:",
             ].join('; '),

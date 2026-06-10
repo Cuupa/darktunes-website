@@ -192,6 +192,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role       public.user_role NOT NULL DEFAULT 'user',
   avatar_url TEXT,
   provider   TEXT             NOT NULL DEFAULT 'email',
+  full_name  TEXT,
+  is_active  BOOLEAN          NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
@@ -200,6 +202,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url  TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS provider    TEXT NOT NULL DEFAULT 'email';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name   TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_active   BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
