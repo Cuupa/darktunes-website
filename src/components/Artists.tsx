@@ -116,6 +116,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
           <p className="text-muted-foreground font-serif">{dict.noResults}</p>
         ) : (
           <motion.ul
+            data-lenis-prevent
             className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}

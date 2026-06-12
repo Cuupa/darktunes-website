@@ -188,12 +188,14 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
             </p>
           )}
 
-          {/* data-lenis-prevent removed: vertical Lenis scroll is not affected by the grid layout */}
+          {/* data-lenis-prevent is required on mobile where this is overflow-x-auto snap-x.
+              On md+ it becomes a grid (overflow-x-visible) — the attribute is a no-op there. */}
           {/* key={currentPage} forces remount on page change so the whileInView
               IntersectionObserver fires fresh and new items animate in properly. */}
           <motion.ul
             key={currentPage}
             ref={listRef}
+            data-lenis-prevent
             className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
