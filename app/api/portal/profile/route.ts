@@ -112,6 +112,11 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     tiktok_url,
     facebook_url,
     soundcloud_url,
+    // bio, genres, founding_year are stored on artists (single source of truth);
+    // extract them here so they are NOT passed to upsertArtistProfile.
+    bio,
+    genres,
+    founding_year,
     ...profileFields
   } = d
 
@@ -130,10 +135,11 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   const profile = await upsertArtistProfile(supabase, profileData)
 
-  // 5. Sync shared fields back to the artists table (single source of truth for URLs)
+  // 5. Sync shared fields back to the artists table (single source of truth)
   const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
-  if (profileFields.bio !== undefined) artistUpdate.bio = profileFields.bio ?? ''
-  if (profileFields.genres !== undefined) artistUpdate.genres = profileFields.genres
+  if (bio !== undefined) artistUpdate.bio = bio ?? ''
+  if (genres !== undefined) artistUpdate.genres = genres
+  if (founding_year !== undefined) artistUpdate.founding_year = founding_year
   if (website_url !== undefined) artistUpdate.website_url = website_url
   if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
   if (youtube_url !== undefined) artistUpdate.youtube_url = youtube_url
@@ -143,7 +149,6 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (tiktok_url !== undefined) artistUpdate.tiktok_url = tiktok_url
   if (facebook_url !== undefined) artistUpdate.facebook_url = facebook_url
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = soundcloud_url
-  if (profileFields.founding_year !== undefined) artistUpdate.founding_year = profileFields.founding_year
 
   await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
 

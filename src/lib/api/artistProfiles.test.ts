@@ -75,14 +75,11 @@ function makeMockDb(data: unknown = null, error: unknown = null): DbClient {
 const mockProfileRow: ArtistProfileRow = {
   id: 'profile-uuid',
   artist_id: 'artist-uuid',
-  bio: 'Dark electronic music from Berlin',
   bio_short: null,
   bio_medium: null,
   bio_long: null,
   photo_url: 'https://cdn.darktunes.com/photos/czarina.webp',
-  genres: ['Darkpop', 'EBM'],
   press_quote: '"Outstanding!" — Darkroom Magazine',
-  founding_year: null,
   hometown: null,
   booking_contact: null,
   press_contact: null,
@@ -151,8 +148,6 @@ describe('getArtistProfileByArtistId', () => {
     const result = await getArtistProfileByArtistId(db, 'artist-uuid')
     expect(result).not.toBeNull()
     expect(result?.artistId).toBe('artist-uuid')
-    expect(result?.bio).toBe('Dark electronic music from Berlin')
-    expect(result?.genres).toEqual(['Darkpop', 'EBM'])
     expect(result?.pressQuote).toBe('"Outstanding!" — Darkroom Magazine')
   })
 
@@ -173,15 +168,15 @@ describe('upsertArtistProfile', () => {
     const db = makeMockDb(mockProfileRow)
     const result = await upsertArtistProfile(db, {
       artist_id: 'artist-uuid',
-      bio: 'Dark electronic music from Berlin',
+      bio_short: 'Short bio for test',
     })
     expect(result.artistId).toBe('artist-uuid')
-    expect(result.bio).toBe('Dark electronic music from Berlin')
+    expect(result.bioShort).toBeUndefined()
   })
 
   it('throws when error is returned', async () => {
     const db = makeMockDb(null, { message: 'Conflict error', code: '23505' })
-    await expect(upsertArtistProfile(db, { artist_id: 'artist-uuid', bio: 'Test' })).rejects.toThrow(
+    await expect(upsertArtistProfile(db, { artist_id: 'artist-uuid', bio_short: 'Test' })).rejects.toThrow(
       'Conflict error',
     )
   })

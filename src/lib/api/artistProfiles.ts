@@ -28,14 +28,11 @@ type ArtistRow = Database['public']['Tables']['artists']['Row']
 export interface ArtistProfile {
   id: string
   artistId: string
-  bio: string | undefined
   bioShort: string | undefined
   bioMedium: string | undefined
   bioLong: string | undefined
   photoUrl: string | undefined
-  genres: string[]
   pressQuote: string | undefined
-  foundingYear: number | undefined
   hometown: string | undefined
   bookingContact: string | undefined
   pressContact: string | undefined
@@ -64,14 +61,11 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
   return {
     id: row.id,
     artistId: row.artist_id,
-    bio: row.bio ?? undefined,
     bioShort: row.bio_short ?? undefined,
     bioMedium: row.bio_medium ?? undefined,
     bioLong: row.bio_long ?? undefined,
     photoUrl: row.photo_url ?? undefined,
-    genres: row.genres,
     pressQuote: row.press_quote ?? undefined,
-    foundingYear: row.founding_year ?? undefined,
     hometown: row.hometown ?? undefined,
     bookingContact: row.booking_contact ?? undefined,
     pressContact: row.press_contact ?? undefined,
@@ -102,7 +96,7 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
 export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
   if (!profile) return false
   const hasPhoto = Boolean(profile.photoUrl)
-  const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong || profile.bio)
+  const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong)
   const hasLink = Boolean(
     artist?.soundcloudUrl ||
       artist?.spotifyUrl ||

@@ -57,10 +57,10 @@ function isFieldFilled(key: string, artist: Artist, profile: ArtistProfile | nul
       return Boolean(profile?.photoUrl || artist.imageUrl)
     case 'bio':
       return Boolean(
-        profile?.bioShort || profile?.bioMedium || profile?.bioLong || profile?.bio || artist.bio,
+        profile?.bioShort || profile?.bioMedium || profile?.bioLong || artist.bio,
       )
     case 'genres':
-      return (profile?.genres ?? artist.genres).length > 0
+      return artist.genres.length > 0
     case 'spotify':
       return Boolean(artist.spotifyUrl)
     case 'instagram':

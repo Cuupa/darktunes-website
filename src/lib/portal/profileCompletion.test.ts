@@ -21,14 +21,11 @@ const baseArtist: Artist = {
 const fullProfile: ArtistProfile = {
   id: 'p1',
   artistId: 'a1',
-  bio: 'Bio text',
   bioShort: 'Short',
   bioMedium: undefined,
   bioLong: undefined,
   photoUrl: 'https://cdn.example.com/photo.jpg',
-  genres: ['electronic'],
   pressQuote: undefined,
-  foundingYear: 2010,
   hometown: 'Berlin',
   bookingContact: undefined,
   pressContact: undefined,
@@ -62,6 +59,7 @@ describe('calcProfileCompletion', () => {
   it('returns 100 score when all fields are filled via artist and profile', () => {
     const artistWithCountry: Artist = {
       ...baseArtist,
+      genres: ['electronic'],
       country: 'DE',
       spotifyUrl: 'https://open.spotify.com/artist/123',
       instagramUrl: 'https://instagram.com/artist',
@@ -76,9 +74,7 @@ describe('calcProfileCompletion', () => {
     // Only photo via profile is filled
     const partialProfile: ArtistProfile = {
       ...fullProfile,
-      bio: undefined,
       bioShort: undefined,
-      genres: [],
     }
     const result = calcProfileCompletion(baseArtist, partialProfile)
     // Only 'photo' field (weight 20) filled out of 100 total weight

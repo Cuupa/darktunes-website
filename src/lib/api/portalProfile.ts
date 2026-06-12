@@ -15,14 +15,11 @@ import type { Database } from '@/types/database'
 export type ArtistProfilePayload = Pick<
   Database['public']['Tables']['artist_profiles']['Insert'],
   | 'artist_id'
-  | 'bio'
   | 'bio_short'
   | 'bio_medium'
   | 'bio_long'
   | 'photo_url'
-  | 'genres'
   | 'press_quote'
-  | 'founding_year'
   | 'hometown'
   | 'booking_contact'
   | 'press_contact'
@@ -40,6 +37,11 @@ export type ArtistProfilePayload = Pick<
   // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
   epk_password_raw?: string | null
   epk_custom_theme_tokens?: Record<string, string> | null
+  // bio, genres, and founding_year are stored in the artists table (single source of truth).
+  // Included here so the route can write them to artists in a single request.
+  bio?: string | null
+  genres?: string[]
+  founding_year?: number | null
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   website_url?: string | null
