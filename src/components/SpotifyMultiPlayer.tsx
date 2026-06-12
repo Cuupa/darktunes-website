@@ -50,6 +50,14 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateT
   const activePlaylist = playlists[activeIndex] ?? playlists[0]
   const activeTheme = activePlaylist.theme === 'light' ? '?theme=0' : ''
 
+  /** Human-readable subtitle for the facade (e.g. "Darkwave" or "4 Playlists"). */
+  const facadeSubtitle =
+    playlists.length === 1
+      ? playlists[0].label
+      : playlists.length > 1
+        ? `${playlists.length} Playlists`
+        : ''
+
   return (
     <Card className="bg-card/80 backdrop-blur-md border-border p-6 shadow-xl">
       <motion.div
@@ -67,16 +75,48 @@ export function SpotifyMultiPlayer({ playlists, placeholderUrl, loadLabel, gateT
           privacyPolicyLabel={privacyPolicyLabel}
         >
           {!playerActivated ? (
+            /*
+              Click-to-load facade — shown after GDPR consent is accepted.
+              Defers the actual Spotify iframe (and its third-party network
+              requests) until the user explicitly clicks. Visually mirrors
+              the ConsentGate overlay so users get consistent Spotify branding
+              across all pages.
+            */
             <button
               type="button"
               onClick={() => setPlayerActivated(true)}
-              className="relative h-[352px] w-full rounded-md border border-border bg-muted/30 transition-colors hover:bg-muted/40 flex flex-col items-center justify-center gap-3"
+              className="relative h-[352px] w-full rounded-xl border border-border/60 bg-gradient-to-br from-primary/10 via-background to-secondary/10 transition-colors hover:from-primary/15 hover:to-secondary/15 flex flex-col items-center justify-center gap-4 group"
+              aria-label={loadLabel ?? 'Load Spotify Player'}
             >
-              <span className="text-base font-semibold text-foreground">
-                {loadLabel ?? 'Klicken zum Laden'}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {playlists.length === 1 ? playlists[0].label : (playlists.length > 1 ? `${playlists.length} Playlists` : '')}
+              {/* Spotify logo */}
+              <SpotifyLogo
+                size={44}
+                weight="fill"
+                className="text-[#1DB954]"
+                aria-hidden="true"
+              />
+
+              {/* Title */}
+              {gateTitle && (
+                <span className="text-base font-semibold text-foreground tracking-tight">
+                  {gateTitle}
+                </span>
+              )}
+
+              {/* Divider */}
+              <div className="w-8 h-px bg-border/60" aria-hidden="true" />
+
+              {/* Playlist count / label */}
+              {facadeSubtitle && (
+                <span className="text-sm text-muted-foreground">
+                  {facadeSubtitle}
+                </span>
+              )}
+
+              {/* CTA button */}
+              <span className="mt-1 inline-flex items-center gap-2 bg-primary text-primary-foreground text-xs font-semibold px-5 py-2 rounded-md group-hover:bg-primary/90 transition-colors">
+                <SpotifyLogo size={14} weight="fill" aria-hidden="true" />
+                {loadLabel ?? 'Load Spotify Player'}
               </span>
             </button>
           ) : (
