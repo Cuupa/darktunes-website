@@ -21,7 +21,10 @@ export function RelatedArtists({ artists, heading }: RelatedArtistsProps) {
   return (
     <section aria-label={heading}>
       <h2 className="text-2xl font-bold tracking-tight mb-6 text-foreground">{heading}</h2>
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent snap-x snap-mandatory">
+      <div
+        className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent snap-x snap-mandatory"
+        data-lenis-prevent
+      >
         {artists.map((artist) => (
           <Link
             key={artist.id}
