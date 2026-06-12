@@ -71,7 +71,7 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
   const bios = [
     { label: 'Short Bio', text: profile?.bioShort },
     { label: 'Medium Bio', text: profile?.bioMedium },
-    { label: 'Long Bio', text: profile?.bioLong || profile?.bio || artist.bio },
+    { label: 'Long Bio', text: profile?.bioLong || artist.bio },
   ].filter((item): item is { label: string; text: string } => Boolean(item.text))
 
   return (

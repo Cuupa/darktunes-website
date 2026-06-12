@@ -380,12 +380,12 @@ CREATE INDEX IF NOT EXISTS idx_artists_visible  ON public.artists (is_visible);
 -- DEPRECATED: artists_user_id_key was a 1:1 constraint. Replaced by artist_members.
 -- Kept as a DROP to remove the index from any existing database that still has it.
 DROP INDEX IF EXISTS public.artists_user_id_key;
--- bio and genres are denormalized copies kept here for efficient public-page reads.
--- The portal profile API route syncs artist_profiles.bio/genres → these columns.
+-- bio and genres are canonical on the artists table (single source of truth).
+-- The portal profile form writes them directly to this table via the profile API route.
 COMMENT ON COLUMN public.artists.bio IS
-  'Denormalized copy of artist_profiles.bio. Synced by the portal profile API route; admin may also edit directly. Source of truth for public-facing pages.';
+  'Canonical biography for public-facing pages. Written by admins directly or via the portal profile API route.';
 COMMENT ON COLUMN public.artists.genres IS
-  'Denormalized copy of artist_profiles.genres. Synced by the portal profile API route. Both tables may diverge if updated via different paths; this column drives the public site.';
+  'Canonical genre list. Written by admins directly or via the portal profile API route.';
 
 DROP TRIGGER IF EXISTS trg_artists_updated_at ON public.artists;
 CREATE TRIGGER trg_artists_updated_at
@@ -961,6 +961,7 @@ CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
   verification_token UUID        UNIQUE,
   unsubscribe_token  UUID        UNIQUE DEFAULT gen_random_uuid(),
   subscribed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT newsletter_subscribers_email_key UNIQUE (email)
 );
 
@@ -995,18 +996,26 @@ CREATE INDEX IF NOT EXISTS newsletter_subscribers_token_idx
 CREATE INDEX IF NOT EXISTS newsletter_subscribers_unsubscribe_token_idx
   ON public.newsletter_subscribers (unsubscribe_token);
 
+-- Guard for updated_at (GDPR: track when subscription status was last changed)
+ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+-- Backfill any rows missing updated_at
+UPDATE public.newsletter_subscribers SET updated_at = subscribed_at WHERE updated_at IS NULL;
+
+DROP TRIGGER IF EXISTS trg_newsletter_subscribers_updated_at ON public.newsletter_subscribers;
+CREATE TRIGGER trg_newsletter_subscribers_updated_at
+  BEFORE UPDATE ON public.newsletter_subscribers
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_profiles  (EPK data — artist-managed)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artist_profiles (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id      UUID        NOT NULL UNIQUE REFERENCES public.artists (id) ON DELETE CASCADE,
-  bio            TEXT,
   bio_short      TEXT,
   bio_medium     TEXT,
   bio_long       TEXT,
   photo_url      TEXT,
-  genres         TEXT[]      NOT NULL DEFAULT '{}',
   press_quote    TEXT,
   -- EPK gallery photos (R2 URLs) and custom EPK color tokens
   epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
@@ -1027,7 +1036,6 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_quote         
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS founding_year    INTEGER;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
@@ -1048,12 +1056,6 @@ COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
 COMMENT ON COLUMN public.artist_profiles.epk_custom_theme_tokens IS
   'JSON object with custom EPK color tokens: { bg, text, accent, heading }.';
--- bio/genres are denormalized into artists for public-page read performance;
--- changes here are synced to artists.bio / artists.genres by the portal API route.
-COMMENT ON COLUMN public.artist_profiles.bio IS
-  'EPK biography written by the artist. Synced to artists.bio by the portal profile API route.';
-COMMENT ON COLUMN public.artist_profiles.genres IS
-  'EPK genres set by the artist. Synced to artists.genres by the portal profile API route.';
 CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
 
 DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
@@ -1437,6 +1439,28 @@ DO $$ BEGIN
     ALTER TABLE public.artists ALTER COLUMN founding_year TYPE INTEGER USING founding_year::INTEGER;
   END IF;
 END $$;
+
+-- =============================================================================
+-- Track 4: 3NF cleanup — remove denormalized bio, genres, founding_year from
+-- artist_profiles.  artists is now the single canonical source for these fields.
+-- Data migration: copy non-null profile values into artists before dropping.
+-- =============================================================================
+UPDATE public.artists a
+SET
+  bio          = COALESCE(a.bio,          ap.bio),
+  genres       = CASE
+                   WHEN a.genres IS NOT NULL AND array_length(a.genres, 1) > 0 THEN a.genres
+                   WHEN ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0 THEN ap.genres
+                   ELSE a.genres
+                 END,
+  founding_year = COALESCE(a.founding_year, ap.founding_year)
+FROM public.artist_profiles ap
+WHERE ap.artist_id = a.id
+  AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0) OR ap.founding_year IS NOT NULL);
+
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bio;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS genres;
+ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS founding_year;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY

@@ -109,13 +109,13 @@ export function usePortalProfileForm({
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      bio: initialProfile?.bio ?? artist?.bio ?? '',
+      bio: artist?.bio ?? '',
       bio_short: initialProfile?.bioShort ?? '',
       bio_medium: initialProfile?.bioMedium ?? '',
       bio_long: initialProfile?.bioLong ?? '',
-      genres: (initialProfile?.genres.length ? initialProfile.genres : artist?.genres ?? []).join(', '),
+      genres: (artist?.genres ?? []).join(', '),
       press_quote: initialProfile?.pressQuote ?? '',
-      founding_year: initialProfile?.foundingYear?.toString() ?? artist?.foundedYear?.toString() ?? '',
+      founding_year: artist?.foundedYear?.toString() ?? '',
       hometown: initialProfile?.hometown ?? '',
       booking_contact: initialProfile?.bookingContact ?? '',
       press_contact: initialProfile?.pressContact ?? '',

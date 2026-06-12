@@ -355,14 +355,11 @@ export interface Database {
         Row: {
           id: string
           artist_id: string
-          bio: string | null
           bio_short: string | null
           bio_medium: string | null
           bio_long: string | null
           photo_url: string | null
-          genres: string[]
           press_quote: string | null
-          founding_year: number | null
           hometown: string | null
           booking_contact: string | null
           press_contact: string | null
@@ -384,14 +381,11 @@ export interface Database {
         Insert: {
           id?: string
           artist_id: string
-          bio?: string | null
           bio_short?: string | null
           bio_medium?: string | null
           bio_long?: string | null
           photo_url?: string | null
-          genres?: string[]
           press_quote?: string | null
-          founding_year?: number | null
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
@@ -413,14 +407,11 @@ export interface Database {
         Update: {
           id?: string
           artist_id?: string
-          bio?: string | null
           bio_short?: string | null
           bio_medium?: string | null
           bio_long?: string | null
           photo_url?: string | null
-          genres?: string[]
           press_quote?: string | null
-          founding_year?: number | null
           hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
@@ -1220,6 +1211,7 @@ export interface Database {
           verification_token: string | null
           unsubscribe_token: string | null
           subscribed_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -1230,6 +1222,7 @@ export interface Database {
           verification_token?: string | null
           unsubscribe_token?: string | null
           subscribed_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -1240,6 +1233,7 @@ export interface Database {
           verification_token?: string | null
           unsubscribe_token?: string | null
           subscribed_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2161,7 +2155,7 @@ export interface Database {
           thumbnail_url: string | null
           youtube_title: string | null
           youtube_description: string | null
-          youtube_tags: string[] | null
+          youtube_tags: string[]
           youtube_category: string | null
           target_publish_date: string | null
           notes: string | null
@@ -2180,7 +2174,7 @@ export interface Database {
           thumbnail_url?: string | null
           youtube_title?: string | null
           youtube_description?: string | null
-          youtube_tags?: string[] | null
+          youtube_tags?: string[]
           youtube_category?: string | null
           target_publish_date?: string | null
           notes?: string | null
@@ -2199,7 +2193,7 @@ export interface Database {
           thumbnail_url?: string | null
           youtube_title?: string | null
           youtube_description?: string | null
-          youtube_tags?: string[] | null
+          youtube_tags?: string[]
           youtube_category?: string | null
           target_publish_date?: string | null
           notes?: string | null
