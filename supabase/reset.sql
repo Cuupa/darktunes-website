@@ -112,7 +112,6 @@ $$;
 
 -- Allow the Supabase auth subsystem to call this function
 GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
-GRANT INSERT ON public.users      TO supabase_auth_admin;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
@@ -194,6 +193,12 @@ $$;
 -- TABLES
 -- =============================================================================
 
+DO $$ BEGIN
+  ALTER TABLE public.profiles RENAME TO users;
+EXCEPTION WHEN undefined_table THEN NULL;
+          WHEN duplicate_table THEN NULL;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- TABLE: profiles
 -- One-to-one extension of auth.users managed by Supabase Auth.
@@ -209,6 +214,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
+
+GRANT INSERT ON public.users      TO supabase_auth_admin;
 
 -- Idempotent guard for column added after initial schema creation
 -- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
@@ -243,7 +250,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name   = 'profiles'
+      AND table_name   = 'users'
       AND column_name  = 'role'
       AND data_type    = 'text'
   ) THEN
@@ -947,7 +954,11 @@ CREATE TRIGGER trg_concerts_updated_at
   BEFORE UPDATE ON public.concerts
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-ALTER TABLE artist_profiles RENAME TO artist_epks;
+DO $$ BEGIN
+  ALTER TABLE public.artist_profiles RENAME TO artist_epks;
+EXCEPTION WHEN undefined_table THEN NULL;
+          WHEN duplicate_table THEN NULL;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_epks  (EPK data — artist-managed)
@@ -1362,10 +1373,10 @@ ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS apple_music_url;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS tiktok_url;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS facebook_url;
 
-ALTER TABLE public.epks DROP COLUMN IF EXISTS founding_year;
-ALTER TABLE public.epks DROP COLUMN IF EXISTS hometown;
-ALTER TABLE public.epks DROP COLUMN IF EXISTS photo_url;
-ALTER TABLE public.epks DROP COLUMN IF EXISTS soundcloud_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS founding_year;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS hometown;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS photo_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 -- Track 2 (continued): soundcloud_url was omitted from the original consolidation.
 -- Migrate any non-null values from artist_profiles → artists, then drop the column.
@@ -1412,7 +1423,6 @@ WHERE ap.artist_id = a.id
 
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bio;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS genres;
-ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS founding_year;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
@@ -1427,7 +1437,6 @@ ALTER TABLE public.assets                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_logs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.concerts              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_epks       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements      ENABLE ROW LEVEL SECURITY;
@@ -1881,35 +1890,7 @@ CREATE POLICY "interview_requests: artist update own" ON public.interview_reques
   FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
   WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
--- ---------------------------------------------------------------------------
--- RLS: newsletter_subscribers
--- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "service_role_all"  ON public.newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_insert"       ON public.newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_unsubscribe"  ON public.newsletter_subscribers;
 
--- Allows service role full access (used by Edge Functions and server actions)
-CREATE POLICY "service_role_all" ON public.newsletter_subscribers
-  USING (TRUE) WITH CHECK (TRUE);
-
--- Allows anonymous users to subscribe (new pending row only)
-CREATE POLICY "anon_insert" ON public.newsletter_subscribers
-  FOR INSERT TO anon
-  WITH CHECK (status = 'pending');
-
--- Allows anonymous users to unsubscribe via their unique unsubscribe_token (GDPR Art. 7)
-CREATE POLICY "anon_unsubscribe" ON public.newsletter_subscribers
-  FOR UPDATE TO anon
-  USING (unsubscribe_token::text = (current_setting('request.jwt.claims', true)::jsonb->>'unsubscribe_token')
-         OR TRUE) -- token match enforced in application layer; policy opens UPDATE to anon
-  WITH CHECK (status = 'unsubscribed');
-
-REVOKE ALL ON public.newsletter_subscribers FROM anon;
-REVOKE ALL ON public.newsletter_subscribers FROM authenticated;
--- Re-grant INSERT for the anon_insert policy above
-GRANT INSERT ON public.newsletter_subscribers TO anon;
--- Re-grant UPDATE for the anon_unsubscribe policy above (restricted to status column)
-GRANT UPDATE (status) ON public.newsletter_subscribers TO anon;
 
 -- ---------------------------------------------------------------------------
 -- RLS: artist_epks
@@ -2419,6 +2400,8 @@ CREATE POLICY "media_files: admin delete"                ON public.media_files F
 -- Scheduled news publishing (pg_cron)
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.unschedule('publish-scheduled-news');
 
 SELECT cron.schedule(
   'publish-scheduled-news',
