@@ -1392,28 +1392,33 @@ ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
--- RLS: profiles
+-- RLS: users
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "profiles: own read"        ON public.users;
 DROP POLICY IF EXISTS "profiles: own update"      ON public.users;
 DROP POLICY IF EXISTS "profiles: admin read all"  ON public.users;
 DROP POLICY IF EXISTS "profiles: admin update all" ON public.users;
 
-CREATE POLICY "profiles: own read" ON public.users
+DROP POLICY IF EXISTS "users: own read"        ON public.users;
+DROP POLICY IF EXISTS "users: own update"      ON public.users;
+DROP POLICY IF EXISTS "users: admin read all"  ON public.users;
+DROP POLICY IF EXISTS "users: admin update all" ON public.users;
+
+CREATE POLICY "users: own read" ON public.users
   FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "profiles: own update" ON public.users
+CREATE POLICY "users: own update" ON public.users
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 -- Uses get_my_role() (SECURITY DEFINER) to avoid infinite recursion that
--- would occur if this policy queried the profiles table directly.
-CREATE POLICY "profiles: admin read all" ON public.users
+-- would occur if this policy queried the users table directly.
+CREATE POLICY "users: admin read all" ON public.users
   FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- Allows admins to update any user's profile row (e.g. change role, etc.)
 -- get_my_role() is SECURITY DEFINER so it safely reads the caller's own role
 -- without triggering recursive RLS evaluation.
-CREATE POLICY "profiles: admin update all" ON public.users
+CREATE POLICY "users: admin update all" ON public.users
   FOR UPDATE USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
@@ -1857,7 +1862,7 @@ CREATE POLICY "artist_epks: artist update own" ON public.artist_epks
   USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
--- Allows admins full access to all artist profiles
+-- Allows admins full access to all artist epks
 CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   FOR ALL
   USING (public.get_my_role() = 'admin')
