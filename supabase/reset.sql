@@ -1355,22 +1355,6 @@ ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
--- =============================================================================
--- Track 4: 3NF cleanup — remove denormalized bio, genres, founding_year from
--- artist_profiles.  artists is now the single canonical source for these fields.
--- Data migration: copy non-null profile values into artists before dropping.
--- =============================================================================
-UPDATE public.artists a
-SET
-  bio          = COALESCE(a.bio,          ap.bio),
-  genres       = CASE
-                   WHEN a.genres IS NOT NULL AND array_length(a.genres, 1) > 0 THEN a.genres
-                   WHEN ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0 THEN ap.genres
-                   ELSE a.genres
-                 END
-FROM public.artist_epks ap
-WHERE ap.artist_id = a.id
-  AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0));
 
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bio;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS genres;
