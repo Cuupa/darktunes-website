@@ -103,7 +103,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
+  INSERT INTO public.users (id, email, role)
   VALUES (NEW.id, NEW.email, 'user')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -112,7 +112,6 @@ $$;
 
 -- Allow the Supabase auth subsystem to call this function
 GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
-GRANT INSERT ON public.profiles      TO supabase_auth_admin;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
@@ -125,7 +124,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid()
+  SELECT role FROM public.users WHERE id = auth.uid()
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -183,7 +182,7 @@ AS $$
     WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
     ELSE FALSE
   END
-  FROM public.profiles p
+  FROM public.users p
   JOIN public.role_permissions rp ON rp.role = p.role
   WHERE p.id = auth.uid()
   LIMIT 1;
@@ -194,11 +193,17 @@ $$;
 -- TABLES
 -- =============================================================================
 
+DO $$ BEGIN
+  ALTER TABLE public.profiles RENAME TO users;
+EXCEPTION WHEN undefined_table THEN NULL;
+          WHEN duplicate_table THEN NULL;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- TABLE: profiles
 -- One-to-one extension of auth.users managed by Supabase Auth.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.profiles (
+CREATE TABLE IF NOT EXISTS public.users (
   id         UUID             PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   email      TEXT             NOT NULL,
   role       public.user_role NOT NULL DEFAULT 'user',
@@ -210,14 +215,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
 
+GRANT INSERT ON public.users      TO supabase_auth_admin;
+
 -- Idempotent guard for column added after initial schema creation
 -- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
 -- cast the column to the enum so that all five role values are accepted.
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS profiles_role_check;
 
 -- Drop ALL policies in the public schema before any column-type alterations.
 -- Policies are fully recreated below, so this is safe and idempotent.
@@ -243,22 +250,22 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name   = 'profiles'
+      AND table_name   = 'users'
       AND column_name  = 'role'
       AND data_type    = 'text'
   ) THEN
     -- Drop the text default first; it cannot be auto-cast to the enum type.
-    ALTER TABLE public.profiles ALTER COLUMN role DROP DEFAULT;
-    ALTER TABLE public.profiles
+    ALTER TABLE public.users ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE public.users
       ALTER COLUMN role TYPE public.user_role USING role::public.user_role;
     -- Re-apply the default as an enum literal.
-    ALTER TABLE public.profiles ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
+    ALTER TABLE public.users ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
   END IF;
 END $$;
 
-DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.users;
 CREATE TRIGGER trg_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
+  BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -305,8 +312,7 @@ CREATE TRIGGER on_oauth_artist_verify
   AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_artist_verification();
 
--- Backfill: sync any auth users who registered before this trigger existed
-INSERT INTO public.profiles (id, email, role)
+INSERT INTO public.users (id, email, role)
 SELECT id, email, 'user'
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
@@ -328,6 +334,8 @@ CREATE TABLE IF NOT EXISTS public.artists (
   website_url      TEXT,
   featured         BOOLEAN     NOT NULL DEFAULT FALSE,
   country          TEXT,
+  founding_year    INTEGER,
+  hometown         TEXT,
   email            TEXT,
   vat_number       TEXT,
   is_eu_non_german BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -338,9 +346,7 @@ CREATE TABLE IF NOT EXISTS public.artists (
   songkick_id      TEXT,
   bandsintown_id   TEXT,
   last_synced_at   TIMESTAMPTZ,
-  -- Multi-tenant Artist Portal (Bug 2 fix — was missing from initial schema)
   user_id          UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
-  -- Visibility toggle: FALSE hides the artist (and all their releases/concerts) from public
   is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
   -- Portrait focal-point and zoom (percentage 0-100 for x/y, scale ≥ 1)
   image_position_x FLOAT               DEFAULT 50,
@@ -739,7 +745,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   size_bytes        BIGINT  NOT NULL,
   r2_key            TEXT    NOT NULL UNIQUE,
   public_url        TEXT    NOT NULL,
-  uploaded_by       UUID    REFERENCES public.profiles (id) ON DELETE SET NULL,
+  uploaded_by       UUID    REFERENCES public.users (id) ON DELETE SET NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -948,76 +954,24 @@ CREATE TRIGGER trg_concerts_updated_at
   BEFORE UPDATE ON public.concerts
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- TABLE: newsletter_subscribers  (with Double Opt-In columns)
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
-  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  email              TEXT        NOT NULL,
-  name               TEXT,
-  source             TEXT        NOT NULL DEFAULT 'website',
-  status             TEXT        NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending', 'subscribed', 'unsubscribed')),
-  verification_token UUID        UNIQUE,
-  unsubscribe_token  UUID        UNIQUE DEFAULT gen_random_uuid(),
-  subscribed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT newsletter_subscribers_email_key UNIQUE (email)
-);
-
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS verification_token UUID UNIQUE;
--- Add unsubscribe_token for GDPR-compliant one-click unsubscribe links in emails
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribe_token UUID UNIQUE DEFAULT gen_random_uuid();
--- Add status as nullable first so existing rows are not rejected
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
--- Backfill any rows that have a NULL status (e.g. from an earlier schema version)
-UPDATE public.newsletter_subscribers SET status = 'subscribed' WHERE status IS NULL;
--- Backfill any rows that have a NULL unsubscribe_token (e.g. from an earlier schema version)
-UPDATE public.newsletter_subscribers SET unsubscribe_token = gen_random_uuid() WHERE unsubscribe_token IS NULL;
--- Now enforce NOT NULL + CHECK (no-op if the constraint already exists)
-ALTER TABLE public.newsletter_subscribers
-  ALTER COLUMN status SET NOT NULL,
-  ALTER COLUMN status SET DEFAULT 'pending';
--- Drop and recreate the status check constraint to include 'unsubscribed'
-ALTER TABLE public.newsletter_subscribers
-  DROP CONSTRAINT IF EXISTS newsletter_subscribers_status_check;
-DO $$
-BEGIN
-  ALTER TABLE public.newsletter_subscribers
-    ADD CONSTRAINT newsletter_subscribers_status_check
-    CHECK (status IN ('pending', 'subscribed', 'unsubscribed'));
-EXCEPTION WHEN duplicate_object THEN NULL;
+DO $$ BEGIN
+  ALTER TABLE public.artist_profiles RENAME TO artist_epks;
+EXCEPTION WHEN undefined_table THEN NULL;
+          WHEN duplicate_table THEN NULL;
 END $$;
 
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_email_idx
-  ON public.newsletter_subscribers (email);
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_token_idx
-  ON public.newsletter_subscribers (verification_token);
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_unsubscribe_token_idx
-  ON public.newsletter_subscribers (unsubscribe_token);
-
--- Guard for updated_at (GDPR: track when subscription status was last changed)
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
--- Backfill any rows missing updated_at
-UPDATE public.newsletter_subscribers SET updated_at = subscribed_at WHERE updated_at IS NULL;
-
-DROP TRIGGER IF EXISTS trg_newsletter_subscribers_updated_at ON public.newsletter_subscribers;
-CREATE TRIGGER trg_newsletter_subscribers_updated_at
-  BEFORE UPDATE ON public.newsletter_subscribers
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
 -- ---------------------------------------------------------------------------
--- TABLE: artist_profiles  (EPK data — artist-managed)
+-- TABLE: artist_epks  (EPK data — artist-managed)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.artist_profiles (
+CREATE TABLE IF NOT EXISTS public.artist_epks (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id      UUID        NOT NULL UNIQUE REFERENCES public.artists (id) ON DELETE CASCADE,
   bio_short      TEXT,
   bio_medium     TEXT,
   bio_long       TEXT,
-  photo_url      TEXT,
+  -- Simon: Gibt es einen Grund ein extra Foto mit ins EPK zu nehmen? Könnte man nicht einfach das Foto der Band nehmen?
+  -- photo_url      TEXT,
   press_quote    TEXT,
-  -- EPK gallery photos (R2 URLs) and custom EPK color tokens
   epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
   epk_custom_theme_tokens JSONB            DEFAULT NULL,
   custom_links            JSONB            DEFAULT NULL,
@@ -1029,38 +983,36 @@ CREATE TABLE IF NOT EXISTS public.artist_profiles (
 -- All columns listed here MUST have a guard so that existing databases are updated
 -- safely when running this script (CREATE TABLE IF NOT EXISTS is a no-op on existing
 -- tables, so guards are the only way to add new columns to live databases).
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short               TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium              TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long                TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_quote             TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url        TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_short               TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_medium              TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_long                TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS press_quote             TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS press_contact         TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
 -- EPK Theme & Section customisation
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
 -- EPK Password protection for sensitive sections
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
 
-COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
+COMMENT ON COLUMN public.artist_epks.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
-COMMENT ON COLUMN public.artist_profiles.epk_custom_theme_tokens IS
+COMMENT ON COLUMN public.artist_epks.epk_custom_theme_tokens IS
   'JSON object with custom EPK color tokens: { bg, text, accent, heading }.';
-CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
+CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_epks (artist_id);
 
-DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
+DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_epks;
 CREATE TRIGGER trg_artist_profiles_updated_at
-  BEFORE UPDATE ON public.artist_profiles
+  BEFORE UPDATE ON public.artist_epks
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -1359,7 +1311,7 @@ CREATE TABLE IF NOT EXISTS public.app_logs (
   level       TEXT        NOT NULL DEFAULT 'error', -- 'error' | 'warn' | 'info'
   message     TEXT        NOT NULL,
   details     JSONB       NOT NULL DEFAULT '{}',
-  user_id     UUID        REFERENCES public.profiles (id) ON DELETE SET NULL,
+  user_id     UUID        REFERENCES public.users (id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -1385,6 +1337,7 @@ DO $$ BEGIN
 END $$;
 ALTER TABLE public.concerts DROP COLUMN IF EXISTS artist_name;
 
+
 -- Track 2: Consolidate social URLs — artists table is the single source of truth.
 -- Data migration: copy any non-null values from artist_profiles → artists before dropping.
 UPDATE public.artists a
@@ -1396,34 +1349,44 @@ SET
   spotify_url     = COALESCE(a.spotify_url,     ap.spotify_url),
   apple_music_url = COALESCE(a.apple_music_url, ap.apple_music_url),
   tiktok_url      = COALESCE(a.tiktok_url,      ap.tiktok_url),
-  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url)
-FROM public.artist_profiles ap
+  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url),
+  hometown        = COALESCE(a.hometown,        ap.hometown),
+  image_url       = COALESCE(a.image_url,       ap.photo_url),
+  soundcloud_url  = COALESCE(a.soundcloud_url,  ap.soundcloud_url)
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND (
     ap.instagram_url IS NOT NULL OR ap.youtube_url IS NOT NULL OR
     ap.website_url IS NOT NULL OR ap.bandcamp_url IS NOT NULL OR
     ap.spotify_url IS NOT NULL OR ap.apple_music_url IS NOT NULL OR
     ap.tiktok_url IS NOT NULL OR ap.facebook_url IS NOT NULL
+    OR ap.hometown IS NOT NULL OR ap.photo_url IS NOT NULL
+    OR ap.soundcloud_url IS NOT NULL
   );
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS instagram_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS youtube_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS website_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bandcamp_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS spotify_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS apple_music_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS tiktok_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS facebook_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS instagram_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS youtube_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS website_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bandcamp_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS spotify_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS apple_music_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS tiktok_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS facebook_url;
+
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS founding_year;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS hometown;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS photo_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 -- Track 2 (continued): soundcloud_url was omitted from the original consolidation.
 -- Migrate any non-null values from artist_profiles → artists, then drop the column.
 UPDATE public.artists a
 SET soundcloud_url = COALESCE(a.soundcloud_url, ap.soundcloud_url)
-FROM public.artist_profiles ap
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND ap.soundcloud_url IS NOT NULL;
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS soundcloud_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 -- =============================================================================
 -- Track 3: Align founding-year column name between artists and artist_profiles.
@@ -1454,19 +1417,18 @@ SET
                    ELSE a.genres
                  END,
   founding_year = COALESCE(a.founding_year, ap.founding_year)
-FROM public.artist_profiles ap
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0) OR ap.founding_year IS NOT NULL);
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bio;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS genres;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS founding_year;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bio;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS genres;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
 -- =============================================================================
 
-ALTER TABLE public.profiles              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artists               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.releases              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.news_posts            ENABLE ROW LEVEL SECURITY;
@@ -1475,8 +1437,7 @@ ALTER TABLE public.assets                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_logs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.concerts              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.artist_profiles       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_epks       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
@@ -1498,26 +1459,26 @@ ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 -- ---------------------------------------------------------------------------
 -- RLS: profiles
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "profiles: own read"        ON public.profiles;
-DROP POLICY IF EXISTS "profiles: own update"      ON public.profiles;
-DROP POLICY IF EXISTS "profiles: admin read all"  ON public.profiles;
-DROP POLICY IF EXISTS "profiles: admin update all" ON public.profiles;
+DROP POLICY IF EXISTS "profiles: own read"        ON public.users;
+DROP POLICY IF EXISTS "profiles: own update"      ON public.users;
+DROP POLICY IF EXISTS "profiles: admin read all"  ON public.users;
+DROP POLICY IF EXISTS "profiles: admin update all" ON public.users;
 
-CREATE POLICY "profiles: own read" ON public.profiles
+CREATE POLICY "profiles: own read" ON public.users
   FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "profiles: own update" ON public.profiles
+CREATE POLICY "profiles: own update" ON public.users
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 -- Uses get_my_role() (SECURITY DEFINER) to avoid infinite recursion that
 -- would occur if this policy queried the profiles table directly.
-CREATE POLICY "profiles: admin read all" ON public.profiles
+CREATE POLICY "profiles: admin read all" ON public.users
   FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- Allows admins to update any user's profile row (e.g. change role, etc.)
 -- get_my_role() is SECURITY DEFINER so it safely reads the caller's own role
 -- without triggering recursive RLS evaluation.
-CREATE POLICY "profiles: admin update all" ON public.profiles
+CREATE POLICY "profiles: admin update all" ON public.users
   FOR UPDATE USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
@@ -1759,13 +1720,13 @@ CREATE POLICY "asset_artists: authenticated read" ON public.asset_artists
 -- Allows editors and admins to link assets to artists
 CREATE POLICY "asset_artists: editor+ write" ON public.asset_artists
   FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
   );
 
 -- Allows editors and admins to unlink assets from artists
 CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
   FOR DELETE TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
   );
 
 -- ---------------------------------------------------------------------------
@@ -1929,63 +1890,40 @@ CREATE POLICY "interview_requests: artist update own" ON public.interview_reques
   FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
   WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
--- ---------------------------------------------------------------------------
--- RLS: newsletter_subscribers
--- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "service_role_all"  ON public.newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_insert"       ON public.newsletter_subscribers;
-DROP POLICY IF EXISTS "anon_unsubscribe"  ON public.newsletter_subscribers;
 
--- Allows service role full access (used by Edge Functions and server actions)
-CREATE POLICY "service_role_all" ON public.newsletter_subscribers
-  USING (TRUE) WITH CHECK (TRUE);
-
--- Allows anonymous users to subscribe (new pending row only)
-CREATE POLICY "anon_insert" ON public.newsletter_subscribers
-  FOR INSERT TO anon
-  WITH CHECK (status = 'pending');
-
--- Allows anonymous users to unsubscribe via their unique unsubscribe_token (GDPR Art. 7)
-CREATE POLICY "anon_unsubscribe" ON public.newsletter_subscribers
-  FOR UPDATE TO anon
-  USING (unsubscribe_token::text = (current_setting('request.jwt.claims', true)::jsonb->>'unsubscribe_token')
-         OR TRUE) -- token match enforced in application layer; policy opens UPDATE to anon
-  WITH CHECK (status = 'unsubscribed');
-
-REVOKE ALL ON public.newsletter_subscribers FROM anon;
-REVOKE ALL ON public.newsletter_subscribers FROM authenticated;
--- Re-grant INSERT for the anon_insert policy above
-GRANT INSERT ON public.newsletter_subscribers TO anon;
--- Re-grant UPDATE for the anon_unsubscribe policy above (restricted to status column)
-GRANT UPDATE (status) ON public.newsletter_subscribers TO anon;
 
 -- ---------------------------------------------------------------------------
--- RLS: artist_profiles
+-- RLS: artist_epks
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: artist insert own" ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_profiles;
+DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: artist insert own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_epks;
+
+DROP POLICY IF EXISTS "artist_epks: artist read own"   ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: artist insert own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: artist update own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: admin all"         ON public.artist_epks;
 
 -- Allows artists to read their own EPK/profile data
-CREATE POLICY "artist_profiles: artist read own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist read own" ON public.artist_epks
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to insert their own EPK/profile (required for first-time upsert)
-CREATE POLICY "artist_profiles: artist insert own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist insert own" ON public.artist_epks
   FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows artists to update their own EPK/profile data
-CREATE POLICY "artist_profiles: artist update own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist update own" ON public.artist_epks
   FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows admins full access to all artist profiles
-CREATE POLICY "artist_profiles: admin all" ON public.artist_profiles
+CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
@@ -2313,7 +2251,7 @@ CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
 -- Allows admins full access to all artist assets
 CREATE POLICY "artist_assets_admin_all" ON public.artist_assets
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
   );
 
 -- ============================================================
@@ -2355,7 +2293,7 @@ CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
 -- Allows admins full access to all artist message replies
 CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
   );
 
 ALTER TABLE public.label_messages REPLICA IDENTITY FULL;
@@ -2400,7 +2338,7 @@ CREATE TABLE IF NOT EXISTS public.media_files (
   size_bytes        BIGINT  NOT NULL,
   r2_key            TEXT    NOT NULL UNIQUE,
   public_url        TEXT    NOT NULL,
-  uploaded_by       UUID    REFERENCES public.profiles(id) ON DELETE SET NULL,
+  uploaded_by       UUID    REFERENCES public.users(id) ON DELETE SET NULL,
   folder_id         UUID    REFERENCES public.media_folders(id) ON DELETE SET NULL,
   artist_id         UUID    REFERENCES public.artists(id) ON DELETE SET NULL,
   tags              TEXT[]  NOT NULL DEFAULT '{}',
@@ -2462,6 +2400,8 @@ CREATE POLICY "media_files: admin delete"                ON public.media_files F
 -- Scheduled news publishing (pg_cron)
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.unschedule('publish-scheduled-news');
 
 SELECT cron.schedule(
   'publish-scheduled-news',
@@ -2572,9 +2512,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_log_role_change ON public.profiles;
+DROP TRIGGER IF EXISTS trg_log_role_change ON public.users;
 CREATE TRIGGER trg_log_role_change
-  AFTER UPDATE OF role ON public.profiles
+  AFTER UPDATE OF role ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.log_role_change();
 
 -- ---------------------------------------------------------------------------
@@ -3150,10 +3090,10 @@ CREATE POLICY "artist_documents: admin all" ON public.artist_documents
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id         UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID             NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  user_id    UUID             NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
   role       public.user_role NOT NULL,
   granted_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-  granted_by UUID             REFERENCES public.profiles (id) ON DELETE SET NULL,
+  granted_by UUID             REFERENCES public.users (id) ON DELETE SET NULL,
   UNIQUE (user_id, role)
 );
 
@@ -3162,7 +3102,7 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_role    ON public.user_roles (role);
 
 -- Backfill: seed user_roles from existing profiles.role values (idempotent)
 INSERT INTO public.user_roles (user_id, role)
-SELECT id, role FROM public.profiles
+SELECT id, role FROM public.users
 ON CONFLICT (user_id, role) DO NOTHING;
 
 -- TRIGGER: after user_roles changes, keep profiles.role = highest-privilege role
@@ -3198,7 +3138,7 @@ BEGIN
     v_new_role := 'user';
   END IF;
 
-  UPDATE public.profiles SET role = v_new_role WHERE id = v_user_id;
+  UPDATE public.users SET role = v_new_role WHERE id = v_user_id;
   RETURN NEW;
 END;
 $$;
@@ -3396,4 +3336,3 @@ DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_sum
 CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
-
