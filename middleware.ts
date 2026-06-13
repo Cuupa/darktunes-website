@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   const isAccountRoute = pathname.startsWith('/account')
 
   // Fetch the user's role once for all route sections that need it.
-  // This avoids repeated round-trips to the profiles table within the same
+  // This avoids repeated round-trips to the users table within the same
   // middleware invocation when a request touches multiple guarded areas.
   let profile: { role: string } | null = null
   if (
@@ -78,7 +78,7 @@ export async function middleware(request: NextRequest) {
     (isAdminRoute || isEditorRoute || isPortalRoute || isPressLoginPage || isPressDashboardRoute)
   ) {
     const { data } = await supabase
-      .from('profiles')
+      .from('users')
       .select('role')
       .eq('id', user.id)
       .maybeSingle()
