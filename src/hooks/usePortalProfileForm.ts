@@ -72,7 +72,7 @@ export function usePortalProfileForm({
   artist,
   dict,
 }: UsePortalProfileFormOptions) {
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialProfile?.photoUrl)
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(artist?.imageUrl)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const isUploading = uploadProgress !== null && uploadProgress < 100
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -116,7 +116,7 @@ export function usePortalProfileForm({
       genres: (artist?.genres ?? []).join(', '),
       press_quote: initialProfile?.pressQuote ?? '',
       founding_year: artist?.foundedYear?.toString() ?? '',
-      hometown: initialProfile?.hometown ?? '',
+      hometown: artist?.hometown ?? '',
       booking_contact: initialProfile?.bookingContact ?? '',
       press_contact: initialProfile?.pressContact ?? '',
       website_url: artist?.websiteUrl ?? '',
@@ -281,7 +281,6 @@ export function usePortalProfileForm({
           bio_short: values.bio_short ?? null,
           bio_medium: values.bio_medium ?? null,
           bio_long: values.bio_long ?? null,
-          photo_url: photoUrl ?? null,
           genres: values.genres
             ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
             : [],

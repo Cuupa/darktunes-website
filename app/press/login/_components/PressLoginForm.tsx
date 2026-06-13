@@ -32,7 +32,7 @@ export function PressLoginForm({ dict }: { dict: Dictionary['pressLogin'] }) {
 
       // Verify that the account has role 'press' and is active
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('users')
         .select('role, is_active')
         .eq('id', signInData.user.id)
         .single()

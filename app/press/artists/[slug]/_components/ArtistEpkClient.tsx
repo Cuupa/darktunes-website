@@ -123,7 +123,7 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
           </div>
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-background/50">
             <Image
-              src={getOptimizedImageUrl(profile?.photoUrl || artist.imageUrl, 1200)}
+              src={getOptimizedImageUrl(artist.imageUrl, 1200)}
               alt={`${artist.name} – artist photo`}
               fill
               className="object-cover"

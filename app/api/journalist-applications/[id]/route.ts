@@ -24,7 +24,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   if (!user) throw new ApiError(401, 'Unauthorized')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()
@@ -44,7 +44,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   // Promote the applicant's role on approval; demote on rejection
   if (application.userId) {
     const newRole = status === 'approved' ? 'journalist' : 'user'
-    await db.from('profiles').update({ role: newRole }).eq('id', application.userId)
+    await db.from('users').update({ role: newRole }).eq('id', application.userId)
   }
 
   return NextResponse.json({ application })

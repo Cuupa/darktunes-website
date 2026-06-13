@@ -90,7 +90,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Notify editors
   const serviceRole = await createServiceRoleSupabaseClient()
   const { data: editorProfiles } = await serviceRole
-    .from('profiles')
+    .from('users')
     .select('id')
     .eq('role', 'editor')
 

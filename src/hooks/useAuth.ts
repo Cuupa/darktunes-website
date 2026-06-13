@@ -4,7 +4,7 @@ import type { User, Session, AuthError } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { UserProfile } from '@/types'
 
-type ProfileRow = Database['public']['Tables']['profiles']['Row']
+type ProfileRow = Database['public']['Tables']['users']['Row']
 
 export interface ArtistMembership {
   artistId: string
@@ -25,7 +25,7 @@ export function useAuth() {
   async function fetchProfile(userId: string) {
     try {
       const [profileResult, membershipsResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('users').select('*').eq('id', userId).single(),
         supabase
           .from('artist_members')
           .select('artist_id, member_role')

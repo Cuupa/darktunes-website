@@ -218,11 +218,11 @@ describe('updateUserRole', () => {
     await expect(updateUserRole(db, 'user-1', 'editor')).rejects.toThrow('Update failed')
   })
 
-  it('calls update on the profiles table', async () => {
+  it('calls update on the users table', async () => {
     const builder = makeBuilder([{ id: 'user-1' }], null)
     const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
     await updateUserRole(db, 'user-1', 'journalist')
-    expect(db.from).toHaveBeenCalledWith('profiles')
+    expect(db.from).toHaveBeenCalledWith('users')
     expect(builder.update).toHaveBeenCalledWith({ role: 'journalist' })
     expect(builder.eq).toHaveBeenCalledWith('id', 'user-1')
   })

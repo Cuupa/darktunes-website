@@ -21,6 +21,8 @@ export interface Artist {
   /** When true, this artist is guaranteed to appear in the homepage Artists section regardless of shuffle. */
   featured: boolean
   country?: string
+  foundedYear?: number
+  hometown?: string
   email?: string
   vatNumber?: string
   isEuNonGerman?: boolean
@@ -30,7 +32,6 @@ export interface Artist {
   songkickId?: string
   bandsintownId?: string
   lastSyncedAt?: string
-  foundedYear?: number
   isVisible: boolean
   /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */
   platformLinks?: Record<string, string>

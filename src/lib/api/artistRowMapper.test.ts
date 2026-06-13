@@ -38,6 +38,7 @@ const BASE_ROW: ArtistRow = {
   bandcamp_url: null,
   shop_url: null,
   founding_year: null,
+  hometown: null,
   soundcloud_url: null,
   is_visible: true,
   logo_url: null,

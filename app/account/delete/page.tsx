@@ -21,7 +21,7 @@ export default async function DeleteAccountPage() {
 
   // Admins are blocked from self-service deletion
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()

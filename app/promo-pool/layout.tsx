@@ -54,7 +54,7 @@ export default async function PromoPoolLayout({ children }: { children: ReactNod
   }
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()

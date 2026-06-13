@@ -1,9 +1,9 @@
 /**
  * src/lib/api/artistProfiles.ts
  *
- * Data Access Layer for the `artist_profiles` table.
+ * Data Access Layer for the `artist_epks` table.
  *
- * artist_profiles stores the artist-managed EPK (Electronic Press Kit) data.
+ * artist_epks stores the artist-managed EPK (Electronic Press Kit) data.
  * Each row is linked 1-to-1 with an artist. RLS ensures only the owning
  * Supabase Auth user can read/update their own profile row.
  *
@@ -17,8 +17,8 @@ import type { Artist } from '@/types'
 import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
-type ArtistProfileRow = Database['public']['Tables']['artist_profiles']['Row']
-type ArtistProfileInsert = Database['public']['Tables']['artist_profiles']['Insert']
+type ArtistProfileRow = Database['public']['Tables']['artist_epks']['Row']
+type ArtistProfileInsert = Database['public']['Tables']['artist_epks']['Insert']
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 // ---------------------------------------------------------------------------
@@ -31,9 +31,7 @@ export interface ArtistProfile {
   bioShort: string | undefined
   bioMedium: string | undefined
   bioLong: string | undefined
-  photoUrl: string | undefined
   pressQuote: string | undefined
-  hometown: string | undefined
   bookingContact: string | undefined
   pressContact: string | undefined
   riderStagePlotUrl: string | undefined
@@ -64,9 +62,7 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     bioShort: row.bio_short ?? undefined,
     bioMedium: row.bio_medium ?? undefined,
     bioLong: row.bio_long ?? undefined,
-    photoUrl: row.photo_url ?? undefined,
     pressQuote: row.press_quote ?? undefined,
-    hometown: row.hometown ?? undefined,
     bookingContact: row.booking_contact ?? undefined,
     pressContact: row.press_contact ?? undefined,
     riderStagePlotUrl: row.rider_stage_plot_url ?? undefined,
@@ -88,14 +84,14 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
 
 /**
  * Returns true when the artist has completed the minimum required profile fields:
- * a photo, at least one bio, and at least one social/streaming link.
+ * a photo (image_url on artists table), at least one bio, and at least one social/streaming link.
  * Social links live on the `Artist` record; pass the artist as the optional
  * second argument to include them in the completeness check.
  * Used to decide whether to show the onboarding wizard.
  */
 export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
-  if (!profile) return false
-  const hasPhoto = Boolean(profile.photoUrl)
+  if (!profile || !artist) return false
+  const hasPhoto = Boolean(artist.imageUrl)
   const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong)
   const hasLink = Boolean(
     artist?.soundcloudUrl ||
@@ -121,7 +117,7 @@ export async function getArtistProfileByArtistId(
   artistId: string,
 ): Promise<ArtistProfile | null> {
   const { data, error } = await db
-    .from('artist_profiles')
+    .from('artist_epks')
     .select('*')
     .eq('artist_id', artistId)
     .single()
@@ -144,7 +140,7 @@ export async function upsertArtistProfile(
   profileData: ArtistProfileInsert,
 ): Promise<ArtistProfile> {
   const { data, error } = await db
-    .from('artist_profiles')
+    .from('artist_epks')
     .upsert(profileData, { onConflict: 'artist_id' })
     .select()
     .single()

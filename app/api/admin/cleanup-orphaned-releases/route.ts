@@ -25,7 +25,7 @@ async function verifyTokenAndRole(token: string): Promise<void> {
   if (error || !data.user) throw new ApiError(401, 'Unauthorized')
 
   const { data: profile, error: profileErr } = await admin
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', data.user.id)
     .maybeSingle()

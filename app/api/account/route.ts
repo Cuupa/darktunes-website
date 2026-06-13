@@ -31,7 +31,7 @@ export const DELETE = withErrorHandler(async (): Promise<NextResponse> => {
 
   // 1. Check current role — admins cannot use self-service deletion
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role, deleted_at')
     .eq('id', user.id)
     .single()

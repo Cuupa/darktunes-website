@@ -139,7 +139,7 @@ export interface Database {
         }
         Relationships: []
       }
-      profiles: {
+      users: {
         Row: {
           id: string
           email: string
@@ -237,6 +237,8 @@ export interface Database {
           website_url: string | null
           featured: boolean
           country: string | null
+          founding_year: number | null
+          hometown: string | null
           email: string | null
           vat_number: string | null
           is_eu_non_german: boolean
@@ -252,7 +254,6 @@ export interface Database {
           tiktok_url: string | null
           bandcamp_url: string | null
           shop_url: string | null
-          founding_year: number | null
           soundcloud_url: string | null
           is_visible: boolean
           logo_url: string | null
@@ -279,6 +280,8 @@ export interface Database {
           website_url?: string | null
           featured?: boolean
           country?: string | null
+          founding_year?: number | null
+          hometown?: string | null
           email?: string | null
           vat_number?: string | null
           is_eu_non_german?: boolean
@@ -294,7 +297,6 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
-          founding_year?: number | null
           soundcloud_url?: string | null
           is_visible?: boolean
           logo_url?: string | null
@@ -321,6 +323,8 @@ export interface Database {
           website_url?: string | null
           featured?: boolean
           country?: string | null
+          founding_year?: number | null
+          hometown?: string | null
           email?: string | null
           vat_number?: string | null
           is_eu_non_german?: boolean
@@ -336,7 +340,6 @@ export interface Database {
           tiktok_url?: string | null
           bandcamp_url?: string | null
           shop_url?: string | null
-          founding_year?: number | null
           soundcloud_url?: string | null
           is_visible?: boolean
           logo_url?: string | null
@@ -351,16 +354,14 @@ export interface Database {
         }
         Relationships: []
       }
-      artist_profiles: {
+      artist_epks: {
         Row: {
           id: string
           artist_id: string
           bio_short: string | null
           bio_medium: string | null
           bio_long: string | null
-          photo_url: string | null
           press_quote: string | null
-          hometown: string | null
           booking_contact: string | null
           press_contact: string | null
           rider_stage_plot_url: string | null
@@ -384,9 +385,7 @@ export interface Database {
           bio_short?: string | null
           bio_medium?: string | null
           bio_long?: string | null
-          photo_url?: string | null
           press_quote?: string | null
-          hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
           rider_stage_plot_url?: string | null
@@ -410,9 +409,7 @@ export interface Database {
           bio_short?: string | null
           bio_medium?: string | null
           bio_long?: string | null
-          photo_url?: string | null
           press_quote?: string | null
-          hometown?: string | null
           booking_contact?: string | null
           press_contact?: string | null
           rider_stage_plot_url?: string | null
@@ -1198,42 +1195,6 @@ export interface Database {
           api_source?: string
           rate_limited?: boolean
           created_at?: string
-        }
-        Relationships: []
-      }
-      newsletter_subscribers: {
-        Row: {
-          id: string
-          email: string
-          name: string | null
-          source: string
-          status: 'pending' | 'subscribed' | 'unsubscribed'
-          verification_token: string | null
-          unsubscribe_token: string | null
-          subscribed_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          email: string
-          name?: string | null
-          source?: string
-          status?: 'pending' | 'subscribed' | 'unsubscribed'
-          verification_token?: string | null
-          unsubscribe_token?: string | null
-          subscribed_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          name?: string | null
-          source?: string
-          status?: 'pending' | 'subscribed' | 'unsubscribed'
-          verification_token?: string | null
-          unsubscribe_token?: string | null
-          subscribed_at?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -2276,7 +2237,7 @@ export interface Database {
             foreignKeyName: "user_roles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]

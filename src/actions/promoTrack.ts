@@ -30,7 +30,7 @@ export async function getPromoTrackStreamUrl(r2Key: string): Promise<{ url: stri
   if (!user) throw new Error('Unauthorized')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()

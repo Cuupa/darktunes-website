@@ -14,7 +14,7 @@ export async function getPressKitUrls(r2Keys: string[]): Promise<{ urls: Array<{
     } = await supabase.auth.getUser()
     if (!user) return { urls: [], error: 'Unauthorized' }
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
     if (!profile || !['journalist', 'admin'].includes(profile.role)) return { urls: [], error: 'Unauthorized' }
 
     const { serverEnv } = await import('@/lib/env.server')
