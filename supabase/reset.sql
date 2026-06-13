@@ -217,6 +217,7 @@ BEGIN
 END;
 $$;
 
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_active BOOLEAN;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS full_name TEXT;
 
 -- Idempotent guard for column added after initial schema creation
