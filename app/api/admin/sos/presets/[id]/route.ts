@@ -14,7 +14,7 @@ async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
   if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
   return supabase
 }

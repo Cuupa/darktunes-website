@@ -19,7 +19,7 @@ type DbClient = SupabaseClient<Database>
 // ---------------------------------------------------------------------------
 
 /**
- * Lists all auth users enriched with their `profiles` role, all roles from
+ * Lists all auth users enriched with their `users` role, all roles from
  * `user_roles`, and all linked artists from `artist_members`.
  * Requires a service-role client (Supabase Admin API).
  */
@@ -44,9 +44,9 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
 
   const users = authData.users
 
-  // 2. Fetch primary roles + full_name from profiles
+  // 2. Fetch primary roles + full_name from users
   const { data: profiles, error: profilesError } = await adminClient
-    .from('profiles')
+    .from('users')
     .select('id, role, full_name, is_active')
 
   if (profilesError) throw new Error(profilesError.message)
@@ -130,7 +130,7 @@ export async function getRoleHistory(
   // Enrich with changer email by fetching profiles for unique changed_by IDs
   const changerIds = [...new Set(rows.map((r) => r.changed_by))]
   const { data: changerProfiles } = await adminClient
-    .from('profiles')
+    .from('users')
     .select('id, email')
     .in('id', changerIds)
 
@@ -172,7 +172,7 @@ export async function getBanHistory(
 
   const changerIds = [...new Set(rows.map((r) => r.changed_by))]
   const { data: changerProfiles } = await adminClient
-    .from('profiles')
+    .from('users')
     .select('id, email')
     .in('id', changerIds)
 
@@ -244,7 +244,7 @@ export async function updateUserRole(
   role: UserRole,
 ): Promise<void> {
   const { data, error } = await adminClient
-    .from('profiles')
+    .from('users')
     .update({ role })
     .eq('id', userId)
     .select('id')
@@ -330,7 +330,7 @@ export async function softDeleteAccount(
 
   // 1. Mark profile as deleted and anonymise PII
   const { error: profileError } = await adminClient
-    .from('profiles')
+    .from('users')
     .update({ deleted_at: new Date().toISOString(), email: anonymisedEmail })
     .eq('id', userId)
 

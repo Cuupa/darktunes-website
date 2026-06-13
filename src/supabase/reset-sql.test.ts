@@ -299,17 +299,17 @@ describe('supabase/reset.sql — static analysis', () => {
     const hasPermissionLine = lines.findIndex((line) =>
       /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.has_permission\(perm\s+TEXT\)/i.test(stripComment(line)),
     )
-    const profilesCreateLine = lines.findIndex((line) =>
-      /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.profiles/i.test(stripComment(line)),
+    const usersCreateLine = lines.findIndex((line) =>
+      /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.users/i.test(stripComment(line)),
     )
 
     expect(getMyRoleLine).toBeGreaterThanOrEqual(0)
     expect(rolePermissionsLine).toBeGreaterThanOrEqual(0)
     expect(hasPermissionLine).toBeGreaterThanOrEqual(0)
-    expect(profilesCreateLine).toBeGreaterThanOrEqual(0)
-    expect(getMyRoleLine).toBeLessThan(profilesCreateLine)
-    expect(rolePermissionsLine).toBeLessThan(profilesCreateLine)
-    expect(hasPermissionLine).toBeLessThan(profilesCreateLine)
+    expect(usersCreateLine).toBeGreaterThanOrEqual(0)
+    expect(getMyRoleLine).toBeLessThan(usersCreateLine)
+    expect(rolePermissionsLine).toBeLessThan(usersCreateLine)
+    expect(hasPermissionLine).toBeLessThan(usersCreateLine)
   })
 
   it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {

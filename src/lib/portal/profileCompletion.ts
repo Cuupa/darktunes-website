@@ -54,7 +54,7 @@ const TOTAL_WEIGHT = COMPLETION_FIELDS.reduce((sum, f) => sum + f.weight, 0)
 function isFieldFilled(key: string, artist: Artist, profile: ArtistProfile | null): boolean {
   switch (key) {
     case 'photo':
-      return Boolean(profile?.photoUrl || artist.imageUrl)
+      return Boolean(artist.imageUrl)
     case 'bio':
       return Boolean(
         profile?.bioShort || profile?.bioMedium || profile?.bioLong || artist.bio,

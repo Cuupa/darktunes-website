@@ -27,7 +27,7 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
 
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+    .from('users')
     .select('id, email, role, created_at, deleted_at')
     .eq('id', user.id)
     .single()

@@ -108,7 +108,7 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
           setUploadProgress(pct),
         )
         setPhotoUrl(url)
-        await saveOnboardingStep({ photo_url: url })
+        await saveOnboardingStep({ image_url: url })
       } catch (err) {
         toast.error(dict.profile_photoError)
         console.error(err)

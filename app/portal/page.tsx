@@ -61,7 +61,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     <PortalOverview
       dict={dict.portal}
       artistName={artist?.name ?? null}
-      profileImageUrl={artistProfile?.photoUrl ?? artist?.imageUrl ?? null}
+      profileImageUrl={artist?.imageUrl ?? null}
       totalStreams={totalStreams}
       releaseCount={releases.length}
       upcomingShowCount={concerts.length}

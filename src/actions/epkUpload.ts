@@ -40,7 +40,7 @@ export async function getEpkUploadUrl(
   if (!user) throw new Error('Unauthorized')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()

@@ -20,7 +20,6 @@ const minimalPayload: ArtistProfilePayload = {
   bio_short: null,
   bio_medium: null,
   bio_long: null,
-  photo_url: null,
   genres: ['electronic'],
   press_quote: null,
   founding_year: null,

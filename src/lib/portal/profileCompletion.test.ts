@@ -24,9 +24,7 @@ const fullProfile: ArtistProfile = {
   bioShort: 'Short',
   bioMedium: undefined,
   bioLong: undefined,
-  photoUrl: 'https://cdn.example.com/photo.jpg',
   pressQuote: undefined,
-  hometown: 'Berlin',
   bookingContact: undefined,
   pressContact: undefined,
   riderStagePlotUrl: undefined,
@@ -59,6 +57,7 @@ describe('calcProfileCompletion', () => {
   it('returns 100 score when all fields are filled via artist and profile', () => {
     const artistWithCountry: Artist = {
       ...baseArtist,
+      imageUrl: 'https://cdn.darktunes.com/photo.jpg',
       genres: ['electronic'],
       country: 'DE',
       spotifyUrl: 'https://open.spotify.com/artist/123',
@@ -71,12 +70,16 @@ describe('calcProfileCompletion', () => {
   })
 
   it('returns partial score when only some fields are filled', () => {
-    // Only photo via profile is filled
+    // Only photo via artist.imageUrl is filled
+    const artistWithPhoto: Artist = {
+      ...baseArtist,
+      imageUrl: 'https://cdn.darktunes.com/photo.jpg',
+    }
     const partialProfile: ArtistProfile = {
       ...fullProfile,
       bioShort: undefined,
     }
-    const result = calcProfileCompletion(baseArtist, partialProfile)
+    const result = calcProfileCompletion(artistWithPhoto, partialProfile)
     // Only 'photo' field (weight 20) filled out of 100 total weight
     expect(result.score).toBe(20)
     expect(result.missing.map((f) => f.key)).toContain('bio')

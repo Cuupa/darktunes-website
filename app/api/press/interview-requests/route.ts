@@ -23,7 +23,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .maybeSingle()

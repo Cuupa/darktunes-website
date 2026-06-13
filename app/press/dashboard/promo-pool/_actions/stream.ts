@@ -13,7 +13,7 @@ export async function getPromoStreamUrl(r2Key: string): Promise<{ url: string | 
     } = await supabase.auth.getUser()
     if (!user) return { url: null }
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
     if (!profile || !['journalist', 'admin'].includes(profile.role)) return { url: null }
 
     const { serverEnv } = await import('@/lib/env.server')

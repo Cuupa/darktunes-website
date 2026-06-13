@@ -87,7 +87,7 @@ export async function verifyAdminOrEditor(token: string): Promise<string> {
   }
 
   const { data: profile, error: profileErr } = await admin
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', userData.user.id)
     .maybeSingle()
@@ -133,7 +133,7 @@ export async function verifyAdmin(token: string): Promise<string> {
   }
 
   const { data: profile, error: profileErr } = await adminClient
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', userData.user.id)
     .maybeSingle()
@@ -189,7 +189,7 @@ export async function verifyPermission(
   }
 
   const { data: profile, error: profileErr } = await adminClient
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', userData.user.id)
     .maybeSingle()

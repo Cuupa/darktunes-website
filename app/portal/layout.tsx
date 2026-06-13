@@ -91,7 +91,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
 
   // Fetch the user's role from their profile
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single()

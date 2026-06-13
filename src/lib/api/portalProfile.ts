@@ -13,14 +13,12 @@ import type { Database } from '@/types/database'
  * Only the fields that the portal form surfaces are included.
  */
 export type ArtistProfilePayload = Pick<
-  Database['public']['Tables']['artist_profiles']['Insert'],
+  Database['public']['Tables']['artist_epks']['Insert'],
   | 'artist_id'
   | 'bio_short'
   | 'bio_medium'
   | 'bio_long'
-  | 'photo_url'
   | 'press_quote'
-  | 'hometown'
   | 'booking_contact'
   | 'press_contact'
   | 'rider_stage_plot_url'
@@ -37,11 +35,12 @@ export type ArtistProfilePayload = Pick<
   // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
   epk_password_raw?: string | null
   epk_custom_theme_tokens?: Record<string, string> | null
-  // bio, genres, and founding_year are stored in the artists table (single source of truth).
+  // bio, genres, founding_year, and hometown are stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   bio?: string | null
   genres?: string[]
   founding_year?: number | null
+  hometown?: string | null
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   website_url?: string | null

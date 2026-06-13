@@ -38,11 +38,11 @@ async function getCurrentArtist() {
 /**
  * Persists partial profile data for the current onboarding step.
  * Accepts only the fields relevant to the wizard (subset of the full profile).
- * Social/streaming URLs (instagram_url, spotify_url, website_url) are stored
- * in the artists table only — written directly here without going via artist_profiles.
+ * Social/streaming URLs (instagram_url, spotify_url, website_url) and image_url
+ * are stored in the artists table only — written directly here without going via artist_epks.
  */
 export async function saveOnboardingStep(data: {
-  photo_url?: string | null
+  image_url?: string | null
   bio_short?: string | null
   instagram_url?: string | null
   spotify_url?: string | null
@@ -51,18 +51,19 @@ export async function saveOnboardingStep(data: {
   try {
     const { supabase, artist } = await getCurrentArtist()
 
-    // Profile-specific fields only (bio, photo)
-    const { instagram_url, spotify_url, website_url, ...profileFields } = data
+    // Profile-specific fields only (bio)
+    const { instagram_url, spotify_url, website_url, image_url, ...profileFields } = data
     await upsertArtistProfile(supabase, {
       artist_id: artist.id,
       ...profileFields,
     })
 
-    // URL fields go to the artists table (single source of truth)
-    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null } = {}
+    // URL fields and image_url go to the artists table (single source of truth)
+    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null; image_url?: string | null } = {}
     if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
     if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
     if (website_url !== undefined) artistUpdate.website_url = website_url
+    if (image_url !== undefined) artistUpdate.image_url = image_url
     if (Object.keys(artistUpdate).length > 0) {
       await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
     }

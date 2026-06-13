@@ -10,7 +10,7 @@ import {
 } from './artistProfiles'
 
 type DbClient = SupabaseClient<Database>
-type ArtistProfileRow = Database['public']['Tables']['artist_profiles']['Row']
+type ArtistProfileRow = Database['public']['Tables']['artist_epks']['Row']
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 // Builder that returns different data per table call
@@ -78,9 +78,7 @@ const mockProfileRow: ArtistProfileRow = {
   bio_short: null,
   bio_medium: null,
   bio_long: null,
-  photo_url: 'https://cdn.darktunes.com/photos/czarina.webp',
   press_quote: '"Outstanding!" — Darkroom Magazine',
-  hometown: null,
   booking_contact: null,
   press_contact: null,
   rider_stage_plot_url: null,
@@ -129,6 +127,7 @@ const mockArtistRow: ArtistRow = {
   bandcamp_url: null,
   shop_url: null,
   founding_year: null,
+  hometown: null,
   soundcloud_url: null,
   is_visible: true,
   logo_url: null,
