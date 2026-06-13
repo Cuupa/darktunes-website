@@ -132,34 +132,6 @@ CREATE TRIGGER role_permissions_updated_at
 
 ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 
--- ---------------------------------------------------------------------------
--- HELPER: permission check — looks up the calling user's role in profiles,
--- joins role_permissions, and returns the boolean value for the given column.
--- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE perm
-    WHEN 'can_publish_news'    THEN rp.can_publish_news
-    WHEN 'can_edit_news'       THEN rp.can_edit_news
-    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
-    WHEN 'can_manage_releases' THEN rp.can_manage_releases
-    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
-    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
-    ELSE FALSE
-  END
-  FROM public.users p
-  JOIN public.role_permissions rp ON rp.role = p.role
-  WHERE p.id = auth.uid()
-  LIMIT 1;
-$$;
-
-
 -- =============================================================================
 -- TABLES
 -- =============================================================================
@@ -318,6 +290,33 @@ SELECT id, email, 'user'
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
 
+
+-- ---------------------------------------------------------------------------
+-- HELPER: permission check — looks up the calling user's role in profiles,
+-- joins role_permissions, and returns the boolean value for the given column.
+-- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE perm
+    WHEN 'can_publish_news'    THEN rp.can_publish_news
+    WHEN 'can_edit_news'       THEN rp.can_edit_news
+    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
+    WHEN 'can_manage_releases' THEN rp.can_manage_releases
+    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
+    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
+    ELSE FALSE
+  END
+  FROM public.users p
+  JOIN public.role_permissions rp ON rp.role = p.role
+  WHERE p.id = auth.uid()
+  LIMIT 1;
+$$;
 -- ---------------------------------------------------------------------------
 -- TABLE: artists
 -- ---------------------------------------------------------------------------
