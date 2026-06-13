@@ -1338,31 +1338,6 @@ END $$;
 ALTER TABLE public.concerts DROP COLUMN IF EXISTS artist_name;
 
 
--- Track 2: Consolidate social URLs — artists table is the single source of truth.
--- Data migration: copy any non-null values from artist_profiles → artists before dropping.
-UPDATE public.artists a
-SET
-  instagram_url   = COALESCE(a.instagram_url,   ap.instagram_url),
-  youtube_url     = COALESCE(a.youtube_url,     ap.youtube_url),
-  website_url     = COALESCE(a.website_url,     ap.website_url),
-  bandcamp_url    = COALESCE(a.bandcamp_url,    ap.bandcamp_url),
-  spotify_url     = COALESCE(a.spotify_url,     ap.spotify_url),
-  apple_music_url = COALESCE(a.apple_music_url, ap.apple_music_url),
-  tiktok_url      = COALESCE(a.tiktok_url,      ap.tiktok_url),
-  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url),
-  hometown        = COALESCE(a.hometown,        ap.hometown),
-  image_url       = COALESCE(a.image_url,       ap.photo_url),
-  soundcloud_url  = COALESCE(a.soundcloud_url,  ap.soundcloud_url)
-FROM public.artist_epks ap
-WHERE ap.artist_id = a.id
-  AND (
-    ap.instagram_url IS NOT NULL OR ap.youtube_url IS NOT NULL OR
-    ap.website_url IS NOT NULL OR ap.bandcamp_url IS NOT NULL OR
-    ap.spotify_url IS NOT NULL OR ap.apple_music_url IS NOT NULL OR
-    ap.tiktok_url IS NOT NULL OR ap.facebook_url IS NOT NULL
-    OR ap.hometown IS NOT NULL OR ap.photo_url IS NOT NULL
-    OR ap.soundcloud_url IS NOT NULL
-  );
 
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS instagram_url;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS youtube_url;
@@ -1378,30 +1353,7 @@ ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS hometown;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS photo_url;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
--- Track 2 (continued): soundcloud_url was omitted from the original consolidation.
--- Migrate any non-null values from artist_profiles → artists, then drop the column.
-UPDATE public.artists a
-SET soundcloud_url = COALESCE(a.soundcloud_url, ap.soundcloud_url)
-FROM public.artist_epks ap
-WHERE ap.artist_id = a.id
-  AND ap.soundcloud_url IS NOT NULL;
-
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
-
--- =============================================================================
--- Track 3: Align founding-year column name between artists and artist_profiles.
--- Rename founded_year → founding_year and promote SMALLINT → INTEGER so both
--- tables share the same column name and compatible type.
--- =============================================================================
-DO $$ BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'artists' AND column_name = 'founded_year'
-  ) THEN
-    ALTER TABLE public.artists RENAME COLUMN founded_year TO founding_year;
-    ALTER TABLE public.artists ALTER COLUMN founding_year TYPE INTEGER USING founding_year::INTEGER;
-  END IF;
-END $$;
 
 -- =============================================================================
 -- Track 4: 3NF cleanup — remove denormalized bio, genres, founding_year from
@@ -1415,11 +1367,10 @@ SET
                    WHEN a.genres IS NOT NULL AND array_length(a.genres, 1) > 0 THEN a.genres
                    WHEN ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0 THEN ap.genres
                    ELSE a.genres
-                 END,
-  founding_year = COALESCE(a.founding_year, ap.founding_year)
+                 END
 FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
-  AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0) OR ap.founding_year IS NOT NULL);
+  AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0));
 
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bio;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS genres;
