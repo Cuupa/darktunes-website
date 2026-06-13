@@ -947,6 +947,7 @@ CREATE TRIGGER trg_concerts_updated_at
   BEFORE UPDATE ON public.concerts
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+ALTER TABLE artist_profiles RENAME TO artist_epks;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_epks  (EPK data — artist-managed)
@@ -971,36 +972,36 @@ CREATE TABLE IF NOT EXISTS public.artist_epks (
 -- All columns listed here MUST have a guard so that existing databases are updated
 -- safely when running this script (CREATE TABLE IF NOT EXISTS is a no-op on existing
 -- tables, so guards are the only way to add new columns to live databases).
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_short               TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_medium              TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS bio_long                TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_quote             TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_short               TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_medium              TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS bio_long                TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS press_quote             TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS press_contact         TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
 -- EPK Theme & Section customisation
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
 -- EPK Password protection for sensitive sections
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
 
-COMMENT ON COLUMN public.artist_profiles.epk_gallery_photos IS
+COMMENT ON COLUMN public.artist_epks.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
-COMMENT ON COLUMN public.artist_profiles.epk_custom_theme_tokens IS
+COMMENT ON COLUMN public.artist_epks.epk_custom_theme_tokens IS
   'JSON object with custom EPK color tokens: { bg, text, accent, heading }.';
-CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_profiles (artist_id);
+CREATE INDEX IF NOT EXISTS idx_artist_profiles_artist_id ON public.artist_epks (artist_id);
 
-DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_profiles;
+DROP TRIGGER IF EXISTS trg_artist_profiles_updated_at ON public.artist_epks;
 CREATE TRIGGER trg_artist_profiles_updated_at
-  BEFORE UPDATE ON public.artist_profiles
+  BEFORE UPDATE ON public.artist_epks
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -1325,6 +1326,7 @@ DO $$ BEGIN
 END $$;
 ALTER TABLE public.concerts DROP COLUMN IF EXISTS artist_name;
 
+
 -- Track 2: Consolidate social URLs — artists table is the single source of truth.
 -- Data migration: copy any non-null values from artist_profiles → artists before dropping.
 UPDATE public.artists a
@@ -1336,34 +1338,44 @@ SET
   spotify_url     = COALESCE(a.spotify_url,     ap.spotify_url),
   apple_music_url = COALESCE(a.apple_music_url, ap.apple_music_url),
   tiktok_url      = COALESCE(a.tiktok_url,      ap.tiktok_url),
-  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url)
-FROM public.artist_profiles ap
+  facebook_url    = COALESCE(a.facebook_url,    ap.facebook_url),
+  hometown        = COALESCE(a.hometown,        ap.hometown),
+  image_url       = COALESCE(a.image_url,       ap.photo_url),
+  soundcloud_url  = COALESCE(a.soundcloud_url,  ap.soundcloud_url)
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND (
     ap.instagram_url IS NOT NULL OR ap.youtube_url IS NOT NULL OR
     ap.website_url IS NOT NULL OR ap.bandcamp_url IS NOT NULL OR
     ap.spotify_url IS NOT NULL OR ap.apple_music_url IS NOT NULL OR
     ap.tiktok_url IS NOT NULL OR ap.facebook_url IS NOT NULL
+    OR ap.hometown IS NOT NULL OR ap.photo_url IS NOT NULL
+    OR ap.soundcloud_url IS NOT NULL
   );
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS instagram_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS youtube_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS website_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bandcamp_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS spotify_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS apple_music_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS tiktok_url;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS facebook_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS instagram_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS youtube_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS website_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bandcamp_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS spotify_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS apple_music_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS tiktok_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS facebook_url;
+
+ALTER TABLE public.epks DROP COLUMN IF EXISTS founding_year;
+ALTER TABLE public.epks DROP COLUMN IF EXISTS hometown;
+ALTER TABLE public.epks DROP COLUMN IF EXISTS photo_url;
+ALTER TABLE public.epks DROP COLUMN IF EXISTS soundcloud_url;
 
 -- Track 2 (continued): soundcloud_url was omitted from the original consolidation.
 -- Migrate any non-null values from artist_profiles → artists, then drop the column.
 UPDATE public.artists a
 SET soundcloud_url = COALESCE(a.soundcloud_url, ap.soundcloud_url)
-FROM public.artist_profiles ap
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND ap.soundcloud_url IS NOT NULL;
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS soundcloud_url;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 -- =============================================================================
 -- Track 3: Align founding-year column name between artists and artist_profiles.
@@ -1394,13 +1406,13 @@ SET
                    ELSE a.genres
                  END,
   founding_year = COALESCE(a.founding_year, ap.founding_year)
-FROM public.artist_profiles ap
+FROM public.artist_epks ap
 WHERE ap.artist_id = a.id
   AND (ap.bio IS NOT NULL OR (ap.genres IS NOT NULL AND array_length(ap.genres, 1) > 0) OR ap.founding_year IS NOT NULL);
 
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS bio;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS genres;
-ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS founding_year;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS bio;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS genres;
+ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS founding_year;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
@@ -1416,7 +1428,7 @@ ALTER TABLE public.site_settings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_logs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.concerts              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.artist_profiles       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_epks       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
@@ -1900,32 +1912,37 @@ GRANT INSERT ON public.newsletter_subscribers TO anon;
 GRANT UPDATE (status) ON public.newsletter_subscribers TO anon;
 
 -- ---------------------------------------------------------------------------
--- RLS: artist_profiles
+-- RLS: artist_epks
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: artist insert own" ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_profiles;
-DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_profiles;
+DROP POLICY IF EXISTS "artist_profiles: artist read own"   ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: artist insert own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: artist update own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_profiles: admin all"         ON public.artist_epks;
+
+DROP POLICY IF EXISTS "artist_epks: artist read own"   ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: artist insert own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: artist update own" ON public.artist_epks;
+DROP POLICY IF EXISTS "artist_epks: admin all"         ON public.artist_epks;
 
 -- Allows artists to read their own EPK/profile data
-CREATE POLICY "artist_profiles: artist read own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist read own" ON public.artist_epks
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
 -- Allows artists to insert their own EPK/profile (required for first-time upsert)
-CREATE POLICY "artist_profiles: artist insert own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist insert own" ON public.artist_epks
   FOR INSERT
   WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows artists to update their own EPK/profile data
-CREATE POLICY "artist_profiles: artist update own" ON public.artist_profiles
+CREATE POLICY "artist_epks: artist update own" ON public.artist_epks
   FOR UPDATE
   USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
 
 -- Allows admins full access to all artist profiles
-CREATE POLICY "artist_profiles: admin all" ON public.artist_profiles
+CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
