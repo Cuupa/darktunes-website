@@ -94,38 +94,9 @@ BEGIN
 END;
 $$;
 
--- ---------------------------------------------------------------------------
--- HELPER: auto-create a profile row when a new Auth user registers
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public AS $$
-BEGIN
-  INSERT INTO public.users (id, email, role)
-  VALUES (NEW.id, NEW.email, 'user')
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$;
 
 -- Allow the Supabase auth subsystem to call this function
 GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
-
--- ---------------------------------------------------------------------------
--- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
--- preventing infinite recursion in policies that need to check the caller's role.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS TEXT
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT role FROM public.users WHERE id = auth.uid()
-$$;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: role_permissions
@@ -216,6 +187,36 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 GRANT INSERT ON public.users      TO supabase_auth_admin;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: auto-create a profile row when a new Auth user registers
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.users (id, email, role)
+  VALUES (NEW.id, NEW.email, 'user')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
+-- preventing infinite recursion in policies that need to check the caller's role.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT role FROM public.users WHERE id = auth.uid()
+$$;
 
 -- Idempotent guard for column added after initial schema creation
 -- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
