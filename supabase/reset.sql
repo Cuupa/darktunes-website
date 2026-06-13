@@ -103,7 +103,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
+  INSERT INTO public.users (id, email, role)
   VALUES (NEW.id, NEW.email, 'user')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -112,7 +112,7 @@ $$;
 
 -- Allow the Supabase auth subsystem to call this function
 GRANT USAGE  ON SCHEMA public        TO supabase_auth_admin;
-GRANT INSERT ON public.profiles      TO supabase_auth_admin;
+GRANT INSERT ON public.users      TO supabase_auth_admin;
 
 -- ---------------------------------------------------------------------------
 -- HELPER: role lookup — SECURITY DEFINER bypasses RLS when reading profiles,
@@ -125,7 +125,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid()
+  SELECT role FROM public.users WHERE id = auth.uid()
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ AS $$
     WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
     ELSE FALSE
   END
-  FROM public.profiles p
+  FROM public.users p
   JOIN public.role_permissions rp ON rp.role = p.role
   WHERE p.id = auth.uid()
   LIMIT 1;
@@ -198,7 +198,7 @@ $$;
 -- TABLE: profiles
 -- One-to-one extension of auth.users managed by Supabase Auth.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.profiles (
+CREATE TABLE IF NOT EXISTS public.users (
   id         UUID             PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   email      TEXT             NOT NULL,
   role       public.user_role NOT NULL DEFAULT 'user',
@@ -212,12 +212,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Idempotent guard for column added after initial schema creation
 -- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
 
 -- Guard: existing databases may have role as TEXT with a CHECK constraint
 -- (created before the user_role enum was introduced). Drop the constraint and
 -- cast the column to the enum so that all five role values are accepted.
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS profiles_role_check;
 
 -- Drop ALL policies in the public schema before any column-type alterations.
 -- Policies are fully recreated below, so this is safe and idempotent.
@@ -248,17 +248,17 @@ BEGIN
       AND data_type    = 'text'
   ) THEN
     -- Drop the text default first; it cannot be auto-cast to the enum type.
-    ALTER TABLE public.profiles ALTER COLUMN role DROP DEFAULT;
-    ALTER TABLE public.profiles
+    ALTER TABLE public.users ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE public.users
       ALTER COLUMN role TYPE public.user_role USING role::public.user_role;
     -- Re-apply the default as an enum literal.
-    ALTER TABLE public.profiles ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
+    ALTER TABLE public.users ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
   END IF;
 END $$;
 
-DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.users;
 CREATE TRIGGER trg_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
+  BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -305,8 +305,7 @@ CREATE TRIGGER on_oauth_artist_verify
   AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_artist_verification();
 
--- Backfill: sync any auth users who registered before this trigger existed
-INSERT INTO public.profiles (id, email, role)
+INSERT INTO public.users (id, email, role)
 SELECT id, email, 'user'
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
@@ -328,6 +327,8 @@ CREATE TABLE IF NOT EXISTS public.artists (
   website_url      TEXT,
   featured         BOOLEAN     NOT NULL DEFAULT FALSE,
   country          TEXT,
+  founding_year    INTEGER,
+  hometown         TEXT,
   email            TEXT,
   vat_number       TEXT,
   is_eu_non_german BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -338,9 +339,7 @@ CREATE TABLE IF NOT EXISTS public.artists (
   songkick_id      TEXT,
   bandsintown_id   TEXT,
   last_synced_at   TIMESTAMPTZ,
-  -- Multi-tenant Artist Portal (Bug 2 fix — was missing from initial schema)
   user_id          UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
-  -- Visibility toggle: FALSE hides the artist (and all their releases/concerts) from public
   is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
   -- Portrait focal-point and zoom (percentage 0-100 for x/y, scale ≥ 1)
   image_position_x FLOAT               DEFAULT 50,
@@ -739,7 +738,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   size_bytes        BIGINT  NOT NULL,
   r2_key            TEXT    NOT NULL UNIQUE,
   public_url        TEXT    NOT NULL,
-  uploaded_by       UUID    REFERENCES public.profiles (id) ON DELETE SET NULL,
+  uploaded_by       UUID    REFERENCES public.users (id) ON DELETE SET NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -948,76 +947,19 @@ CREATE TRIGGER trg_concerts_updated_at
   BEFORE UPDATE ON public.concerts
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- TABLE: newsletter_subscribers  (with Double Opt-In columns)
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
-  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  email              TEXT        NOT NULL,
-  name               TEXT,
-  source             TEXT        NOT NULL DEFAULT 'website',
-  status             TEXT        NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending', 'subscribed', 'unsubscribed')),
-  verification_token UUID        UNIQUE,
-  unsubscribe_token  UUID        UNIQUE DEFAULT gen_random_uuid(),
-  subscribed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT newsletter_subscribers_email_key UNIQUE (email)
-);
-
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS verification_token UUID UNIQUE;
--- Add unsubscribe_token for GDPR-compliant one-click unsubscribe links in emails
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribe_token UUID UNIQUE DEFAULT gen_random_uuid();
--- Add status as nullable first so existing rows are not rejected
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
--- Backfill any rows that have a NULL status (e.g. from an earlier schema version)
-UPDATE public.newsletter_subscribers SET status = 'subscribed' WHERE status IS NULL;
--- Backfill any rows that have a NULL unsubscribe_token (e.g. from an earlier schema version)
-UPDATE public.newsletter_subscribers SET unsubscribe_token = gen_random_uuid() WHERE unsubscribe_token IS NULL;
--- Now enforce NOT NULL + CHECK (no-op if the constraint already exists)
-ALTER TABLE public.newsletter_subscribers
-  ALTER COLUMN status SET NOT NULL,
-  ALTER COLUMN status SET DEFAULT 'pending';
--- Drop and recreate the status check constraint to include 'unsubscribed'
-ALTER TABLE public.newsletter_subscribers
-  DROP CONSTRAINT IF EXISTS newsletter_subscribers_status_check;
-DO $$
-BEGIN
-  ALTER TABLE public.newsletter_subscribers
-    ADD CONSTRAINT newsletter_subscribers_status_check
-    CHECK (status IN ('pending', 'subscribed', 'unsubscribed'));
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_email_idx
-  ON public.newsletter_subscribers (email);
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_token_idx
-  ON public.newsletter_subscribers (verification_token);
-CREATE INDEX IF NOT EXISTS newsletter_subscribers_unsubscribe_token_idx
-  ON public.newsletter_subscribers (unsubscribe_token);
-
--- Guard for updated_at (GDPR: track when subscription status was last changed)
-ALTER TABLE public.newsletter_subscribers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
--- Backfill any rows missing updated_at
-UPDATE public.newsletter_subscribers SET updated_at = subscribed_at WHERE updated_at IS NULL;
-
-DROP TRIGGER IF EXISTS trg_newsletter_subscribers_updated_at ON public.newsletter_subscribers;
-CREATE TRIGGER trg_newsletter_subscribers_updated_at
-  BEFORE UPDATE ON public.newsletter_subscribers
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- TABLE: artist_profiles  (EPK data — artist-managed)
+-- TABLE: artist_epks  (EPK data — artist-managed)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.artist_profiles (
+CREATE TABLE IF NOT EXISTS public.artist_epks (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id      UUID        NOT NULL UNIQUE REFERENCES public.artists (id) ON DELETE CASCADE,
   bio_short      TEXT,
   bio_medium     TEXT,
   bio_long       TEXT,
-  photo_url      TEXT,
+  -- Simon: Gibt es einen Grund ein extra Foto mit ins EPK zu nehmen? Könnte man nicht einfach das Foto der Band nehmen?
+  -- photo_url      TEXT,
   press_quote    TEXT,
-  -- EPK gallery photos (R2 URLs) and custom EPK color tokens
   epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
   epk_custom_theme_tokens JSONB            DEFAULT NULL,
   custom_links            JSONB            DEFAULT NULL,
@@ -1036,10 +978,8 @@ ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_quote         
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}';
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS epk_custom_theme_tokens JSONB            DEFAULT NULL;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS custom_links            JSONB            DEFAULT NULL;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS hometown         TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS booking_contact       TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS press_contact         TEXT;
-ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS soundcloud_url        TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_stage_plot_url  TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_technical_url   TEXT;
 ALTER TABLE public.artist_profiles ADD COLUMN IF NOT EXISTS rider_hospitality_url TEXT;
@@ -1359,7 +1299,7 @@ CREATE TABLE IF NOT EXISTS public.app_logs (
   level       TEXT        NOT NULL DEFAULT 'error', -- 'error' | 'warn' | 'info'
   message     TEXT        NOT NULL,
   details     JSONB       NOT NULL DEFAULT '{}',
-  user_id     UUID        REFERENCES public.profiles (id) ON DELETE SET NULL,
+  user_id     UUID        REFERENCES public.users (id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -1466,7 +1406,7 @@ ALTER TABLE public.artist_profiles DROP COLUMN IF EXISTS founding_year;
 -- ROW LEVEL SECURITY
 -- =============================================================================
 
-ALTER TABLE public.profiles              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artists               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.releases              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.news_posts            ENABLE ROW LEVEL SECURITY;
@@ -1498,26 +1438,26 @@ ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 -- ---------------------------------------------------------------------------
 -- RLS: profiles
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS "profiles: own read"        ON public.profiles;
-DROP POLICY IF EXISTS "profiles: own update"      ON public.profiles;
-DROP POLICY IF EXISTS "profiles: admin read all"  ON public.profiles;
-DROP POLICY IF EXISTS "profiles: admin update all" ON public.profiles;
+DROP POLICY IF EXISTS "profiles: own read"        ON public.users;
+DROP POLICY IF EXISTS "profiles: own update"      ON public.users;
+DROP POLICY IF EXISTS "profiles: admin read all"  ON public.users;
+DROP POLICY IF EXISTS "profiles: admin update all" ON public.users;
 
-CREATE POLICY "profiles: own read" ON public.profiles
+CREATE POLICY "profiles: own read" ON public.users
   FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "profiles: own update" ON public.profiles
+CREATE POLICY "profiles: own update" ON public.users
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 -- Uses get_my_role() (SECURITY DEFINER) to avoid infinite recursion that
 -- would occur if this policy queried the profiles table directly.
-CREATE POLICY "profiles: admin read all" ON public.profiles
+CREATE POLICY "profiles: admin read all" ON public.users
   FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- Allows admins to update any user's profile row (e.g. change role, etc.)
 -- get_my_role() is SECURITY DEFINER so it safely reads the caller's own role
 -- without triggering recursive RLS evaluation.
-CREATE POLICY "profiles: admin update all" ON public.profiles
+CREATE POLICY "profiles: admin update all" ON public.users
   FOR UPDATE USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
@@ -1759,13 +1699,13 @@ CREATE POLICY "asset_artists: authenticated read" ON public.asset_artists
 -- Allows editors and admins to link assets to artists
 CREATE POLICY "asset_artists: editor+ write" ON public.asset_artists
   FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
   );
 
 -- Allows editors and admins to unlink assets from artists
 CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
   FOR DELETE TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
   );
 
 -- ---------------------------------------------------------------------------
@@ -2313,7 +2253,7 @@ CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
 -- Allows admins full access to all artist assets
 CREATE POLICY "artist_assets_admin_all" ON public.artist_assets
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
   );
 
 -- ============================================================
@@ -2355,7 +2295,7 @@ CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
 -- Allows admins full access to all artist message replies
 CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
   );
 
 ALTER TABLE public.label_messages REPLICA IDENTITY FULL;
@@ -2400,7 +2340,7 @@ CREATE TABLE IF NOT EXISTS public.media_files (
   size_bytes        BIGINT  NOT NULL,
   r2_key            TEXT    NOT NULL UNIQUE,
   public_url        TEXT    NOT NULL,
-  uploaded_by       UUID    REFERENCES public.profiles(id) ON DELETE SET NULL,
+  uploaded_by       UUID    REFERENCES public.users(id) ON DELETE SET NULL,
   folder_id         UUID    REFERENCES public.media_folders(id) ON DELETE SET NULL,
   artist_id         UUID    REFERENCES public.artists(id) ON DELETE SET NULL,
   tags              TEXT[]  NOT NULL DEFAULT '{}',
@@ -2572,9 +2512,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_log_role_change ON public.profiles;
+DROP TRIGGER IF EXISTS trg_log_role_change ON public.users;
 CREATE TRIGGER trg_log_role_change
-  AFTER UPDATE OF role ON public.profiles
+  AFTER UPDATE OF role ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.log_role_change();
 
 -- ---------------------------------------------------------------------------
@@ -3150,10 +3090,10 @@ CREATE POLICY "artist_documents: admin all" ON public.artist_documents
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id         UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID             NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  user_id    UUID             NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
   role       public.user_role NOT NULL,
   granted_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-  granted_by UUID             REFERENCES public.profiles (id) ON DELETE SET NULL,
+  granted_by UUID             REFERENCES public.users (id) ON DELETE SET NULL,
   UNIQUE (user_id, role)
 );
 
@@ -3162,7 +3102,7 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_role    ON public.user_roles (role);
 
 -- Backfill: seed user_roles from existing profiles.role values (idempotent)
 INSERT INTO public.user_roles (user_id, role)
-SELECT id, role FROM public.profiles
+SELECT id, role FROM public.users
 ON CONFLICT (user_id, role) DO NOTHING;
 
 -- TRIGGER: after user_roles changes, keep profiles.role = highest-privilege role
@@ -3198,7 +3138,7 @@ BEGIN
     v_new_role := 'user';
   END IF;
 
-  UPDATE public.profiles SET role = v_new_role WHERE id = v_user_id;
+  UPDATE public.users SET role = v_new_role WHERE id = v_user_id;
   RETURN NEW;
 END;
 $$;
@@ -3396,4 +3336,3 @@ DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_sum
 CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
-
