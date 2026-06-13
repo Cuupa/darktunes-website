@@ -217,6 +217,8 @@ BEGIN
 END;
 $$;
 
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS full_name TEXT;
+
 -- Idempotent guard for column added after initial schema creation
 -- (avatar_url, provider, full_name, is_active are defined in CREATE TABLE above)
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
