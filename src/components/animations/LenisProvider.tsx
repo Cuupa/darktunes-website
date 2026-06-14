@@ -52,15 +52,10 @@ export function LenisProvider({ children }: LenisProviderProps) {
     <ReactLenis
       root
       options={{
-        // FIX: Reduced from 0.8 → 0.65. Shorter tail, less perceived drag.
-        // The asymptotic easing at 0.8 spent ~300ms barely moving (97% done at t=0.5).
         duration: 0.65,
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         touchMultiplier: 1.5,
         infinite: false,
-        // FIX: Replace manual while-loop with Element.closest() — single native
-        // browser call instead of O(depth) getAttribute() calls per wheel event.
-        // At 60fps during scrolling this was firing 900–1800 getAttribute() calls/s.
         prevent: (node: Element) =>
           node.closest('[data-lenis-prevent]') !== null,
       }}
