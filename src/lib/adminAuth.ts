@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { ApiError } from '@/lib/errors'
 import type { Database } from '@/types/database'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 
 /** Granular permission keys from the role_permissions table. */
 export type RolePermissionKey =
@@ -86,17 +87,8 @@ export async function verifyAdminOrEditor(token: string): Promise<string> {
     throw new ApiError(401, 'Unauthorized')
   }
 
-  const { data: profile, error: profileErr } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', userData.user.id)
-    .maybeSingle()
+  const role = await getUserRoleWithClient(admin, userData.user.id)
 
-  if (profileErr) {
-    throw new ApiError(500, profileErr.message)
-  }
-
-  const role = profile?.role as string | undefined
   if (!role || !['admin', 'editor'].includes(role)) {
     throw new ApiError(403, 'Forbidden')
   }
@@ -132,17 +124,8 @@ export async function verifyAdmin(token: string): Promise<string> {
     throw new ApiError(401, 'Unauthorized')
   }
 
-  const { data: profile, error: profileErr } = await adminClient
-    .from('users')
-    .select('role')
-    .eq('id', userData.user.id)
-    .maybeSingle()
+  const role = await getUserRoleWithClient(adminClient, userData.user.id)
 
-  if (profileErr) {
-    throw new ApiError(500, profileErr.message)
-  }
-
-  const role = profile?.role as string | undefined
   if (role !== 'admin') {
     throw new ApiError(403, 'Forbidden: admin role required')
   }
@@ -188,17 +171,8 @@ export async function verifyPermission(
     throw new ApiError(401, 'Unauthorized')
   }
 
-  const { data: profile, error: profileErr } = await adminClient
-    .from('users')
-    .select('role')
-    .eq('id', userData.user.id)
-    .maybeSingle()
+  const role = await getUserRoleWithClient(adminClient, userData.user.id)
 
-  if (profileErr) {
-    throw new ApiError(500, profileErr.message)
-  }
-
-  const role = profile?.role as string | undefined
   if (!role) {
     throw new ApiError(403, 'Forbidden')
   }

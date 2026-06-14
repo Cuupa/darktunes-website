@@ -6,6 +6,7 @@
  */
 
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
@@ -28,12 +29,8 @@ export const GET = withErrorHandler(async () => {
   } = await supabase.auth.getUser()
   if (!user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
 
   const db = await createServiceRoleSupabaseClient()
   const applications = await getJournalistApplications(db)

@@ -58,16 +58,19 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  const isAdminLoginPage = pathname === '/admin/login'
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isEditorRoute = pathname.startsWith('/editor')
-
-  const isPortalLoginPage = pathname === '/portal/login'
-  const isPortalAcceptInvitePage = pathname === '/portal/accept-invite'
-  const isPortalRoute = pathname.startsWith('/portal')
-  const isPressLoginPage = pathname === '/press/login'
-  const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
-  const isAccountRoute = pathname.startsWith('/account')
+  const routeMatchers = {
+    isAdminLogin: pathname === '/admin/login',
+    isAdmin: pathname.startsWith('/admin'),
+    isEditor: pathname.startsWith('/editor'),
+    isPortalLogin: pathname === '/portal/login',
+    isPortalAcceptInvite: pathname === '/portal/accept-invite',
+    isPortal: pathname.startsWith('/portal'),
+    isPressLogin: pathname === '/press/login',
+    isPressDashboard: pathname.startsWith('/press/dashboard'),
+    isAccount: pathname.startsWith('/account'),
+    isPromoPoolLogin: pathname === '/promo-pool/login',
+    isPromoPool: pathname.startsWith('/promo-pool'),
+  }
 
   // Fetch the user's role once for all route sections that need it.
   // This avoids repeated round-trips to the users table within the same
@@ -75,7 +78,7 @@ export async function middleware(request: NextRequest) {
   let profile: { role: string } | null = null
   if (
     user &&
-    (isAdminRoute || isEditorRoute || isPortalRoute || isPressLoginPage || isPressDashboardRoute)
+    (routeMatchers.isAdmin || routeMatchers.isEditor || routeMatchers.isPortal || routeMatchers.isPressLogin || routeMatchers.isPressDashboard)
   ) {
     const { data } = await supabase
       .from('users')
@@ -88,44 +91,34 @@ export async function middleware(request: NextRequest) {
   // --- Admin route protection ---
 
   // Redirect unauthenticated users away from protected admin/editor routes
-  if ((isAdminRoute && !isAdminLoginPage && !user) || (isEditorRoute && !user)) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/admin/login'
-    return NextResponse.redirect(loginUrl)
+  if ((routeMatchers.isAdmin && !routeMatchers.isAdminLogin && !user) || (routeMatchers.isEditor && !user)) {
+    return NextResponse.redirect(new URL('/admin/login', request.url))
   }
 
   // For authenticated users on admin/editor routes (or the admin login page), check the role
-  if ((isAdminRoute || isEditorRoute) && user) {
+  if ((routeMatchers.isAdmin || routeMatchers.isEditor) && user) {
     const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
 
-    if (isAdminLoginPage) {
+    if (routeMatchers.isAdminLogin) {
       if (profile?.role === 'admin') {
-        const adminUrl = request.nextUrl.clone()
-        adminUrl.pathname = '/admin'
-        return NextResponse.redirect(adminUrl)
+        return NextResponse.redirect(new URL('/admin', request.url))
       }
       if (profile?.role === 'editor') {
-        const editorUrl = request.nextUrl.clone()
-        editorUrl.pathname = '/editor'
-        return NextResponse.redirect(editorUrl)
+        return NextResponse.redirect(new URL('/editor', request.url))
       }
       // Users without admin access may stay on the login page (already rejected above via no-session path)
-    } else if (isAdminRoute) {
+    } else if (routeMatchers.isAdmin) {
       if (profile?.role === 'editor') {
-        const editorUrl = request.nextUrl.clone()
-        editorUrl.pathname = '/editor'
-        return NextResponse.redirect(editorUrl)
+        return NextResponse.redirect(new URL('/editor', request.url))
       }
       // Protect all other /admin/* routes — deny non-admin/editor roles
       if (!hasAdminAccess) {
-        const loginUrl = request.nextUrl.clone()
-        loginUrl.pathname = '/admin/login'
-        loginUrl.searchParams.set('error', 'unauthorized')
-        return NextResponse.redirect(loginUrl)
+        const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(loginUrl)
       }
-    } else if (isEditorRoute && !hasAdminAccess) {
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/admin/login'
+    } else if (routeMatchers.isEditor && !hasAdminAccess) {
+      const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(loginUrl)
     }
@@ -134,13 +127,11 @@ export async function middleware(request: NextRequest) {
   // --- Portal route protection ---
 
   // Redirect unauthenticated users away from the artist portal
-  if (isPortalRoute && !isPortalLoginPage && !isPortalAcceptInvitePage && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/portal/login'
-    return NextResponse.redirect(loginUrl)
+  if (routeMatchers.isPortal && !routeMatchers.isPortalLogin && !routeMatchers.isPortalAcceptInvite && !user) {
+    return NextResponse.redirect(new URL('/portal/login', request.url))
   }
 
-  if (isPortalRoute && !isPortalLoginPage && !isPortalAcceptInvitePage && user) {
+  if (routeMatchers.isPortal && !routeMatchers.isPortalLogin && !routeMatchers.isPortalAcceptInvite && user) {
     // Admins can access the portal without a linked artist
     const isAdmin = profile?.role === 'admin'
 
@@ -154,22 +145,19 @@ export async function middleware(request: NextRequest) {
         .maybeSingle()
 
       if (!membership) {
-        const loginUrl = request.nextUrl.clone()
-        loginUrl.pathname = '/portal/login'
-        loginUrl.searchParams.set('error', 'no_artist')
-        return NextResponse.redirect(loginUrl)
+        const loginUrl = new URL('/portal/login', request.url)
+      loginUrl.searchParams.set('error', 'no_artist')
+      return NextResponse.redirect(loginUrl)
       }
     }
   }
 
   // Redirect already-authenticated portal users away from the login page
-  if (isPortalLoginPage && user) {
+  if (routeMatchers.isPortalLogin && user) {
     const isAdmin = profile?.role === 'admin'
 
     if (isAdmin) {
-      const portalUrl = request.nextUrl.clone()
-      portalUrl.pathname = '/portal'
-      return NextResponse.redirect(portalUrl)
+      return NextResponse.redirect(new URL('/portal', request.url))
     }
 
     // Check artist_members (junction table)
@@ -181,63 +169,47 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     if (membership) {
-      const portalUrl = request.nextUrl.clone()
-      portalUrl.pathname = '/portal'
-      return NextResponse.redirect(portalUrl)
+      return NextResponse.redirect(new URL('/portal', request.url))
     }
   }
 
-  const isPromoPoolLoginPage = pathname === '/promo-pool/login'
-  const isPromoPoolRoute = pathname.startsWith('/promo-pool')
-
   // Redirect unauthenticated users away from the promo-pool
-  if (isPromoPoolRoute && !isPromoPoolLoginPage && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/promo-pool/login'
-    return NextResponse.redirect(loginUrl)
+  if (routeMatchers.isPromoPool && !routeMatchers.isPromoPoolLogin && !user) {
+    return NextResponse.redirect(new URL('/promo-pool/login', request.url))
   }
 
   // Redirect already-authenticated promo-pool users away from the login page
-  if (isPromoPoolLoginPage && user) {
-    const promoUrl = request.nextUrl.clone()
-    promoUrl.pathname = '/promo-pool'
-    return NextResponse.redirect(promoUrl)
+  if (routeMatchers.isPromoPoolLogin && user) {
+    return NextResponse.redirect(new URL('/promo-pool', request.url))
   }
 
-  if (isPressDashboardRoute && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/press/login'
-    return NextResponse.redirect(loginUrl)
+  if (routeMatchers.isPressDashboard && !user) {
+    return NextResponse.redirect(new URL('/press/login', request.url))
   }
 
-  if (isPressLoginPage && user) {
+  if (routeMatchers.isPressLogin && user) {
     // Only redirect to dashboard if the user actually has press access.
     // Without this check an authenticated user without a journalist/admin role
     // would be bounced between /press/login and /press/dashboard indefinitely
     // (ERR_TOO_MANY_REDIRECTS).
     if (profile && ['journalist', 'admin'].includes(profile.role)) {
-      const pressUrl = request.nextUrl.clone()
-      pressUrl.pathname = '/press/dashboard'
-      return NextResponse.redirect(pressUrl)
+      return NextResponse.redirect(new URL('/press/dashboard', request.url))
     }
     // User is authenticated but lacks press access — stay on login page so the
     // "unauthorized" error message is visible.
   }
 
-  if (isPressDashboardRoute && user) {
+  if (routeMatchers.isPressDashboard && user) {
     if (!profile || !['journalist', 'admin'].includes(profile.role)) {
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/press/login'
+      const loginUrl = new URL('/press/login', request.url)
       loginUrl.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(loginUrl)
     }
   }
 
   // --- Account route protection (/account/*) ---
-  if (isAccountRoute && !user) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/portal/login'
-    return NextResponse.redirect(loginUrl)
+  if (routeMatchers.isAccount && !user) {
+    return NextResponse.redirect(new URL('/portal/login', request.url))
   }
 
   // -------------------------------------------------------------------------

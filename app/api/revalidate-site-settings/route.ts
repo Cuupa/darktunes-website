@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { revalidateTag } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -25,13 +26,9 @@ export const POST = withErrorHandler(async () => {
   }
 
   // Verify the user has admin or editor role
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const role = await getUserRoleWithClient(supabase, user.id)
 
-  if (!profile || !['admin', 'editor'].includes(profile.role)) {
+  if (!role || !['admin', 'editor'].includes(role)) {
     throw new ApiError(403, 'Forbidden')
   }
 

@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { listUsersWithProfiles } from '@/lib/api/users'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 
 export const GET = withErrorHandler(async (): Promise<NextResponse> => {
   // 1. Verify caller is authenticated and is an admin
@@ -24,13 +25,9 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const role = await getUserRoleWithClient(supabase, user.id)
 
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
 
   // 2. Fetch user list via service-role client (Admin API)
   const adminClient = await createServiceRoleSupabaseClient()

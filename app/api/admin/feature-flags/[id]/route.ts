@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -24,12 +25,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
 
   const parsed = schema.safeParse(await req.json())
   if (!parsed.success) throw new ApiError(400, 'Invalid payload', 'VALIDATION_ERROR')

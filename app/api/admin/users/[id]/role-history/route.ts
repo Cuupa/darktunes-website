@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getRoleHistory, getBanHistory } from '@/lib/api/users'
@@ -28,13 +29,9 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
 
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const role = await getUserRoleWithClient(supabase, user.id)
 
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
 
   // 2. Fetch history
   const targetId = extractId(req)

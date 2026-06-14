@@ -82,6 +82,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   interactiveWidget: 'resizes-visual',
+  themeColor: '#101010',
 }
 
 /**
@@ -97,7 +98,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
       <head>
         {/* PWA meta — prevents white flash and styles the status bar */}
-        <meta name="theme-color" content="#101010" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
