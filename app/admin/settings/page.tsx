@@ -9,7 +9,7 @@ import { AdminSettingsWrapper } from '../_components/AdminSettingsWrapper'
 
 export default function AdminSettingsPage() {
   return (
-    <AdminPageShell title="Settings" description="Manage site settings, color theme, and role permissions.">
+    <AdminPageShell title="Settings" description="Manage site settings and role permissions.">
       <AdminSettingsWrapper />
     </AdminPageShell>
   )
