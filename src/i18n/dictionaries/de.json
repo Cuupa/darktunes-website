@@ -938,5 +938,21 @@
     "SERVER_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
     "CONFIG_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
     "DB_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut."
+  },
+  "admin": {
+    "accreditations": {
+      "whatIsHeading": "Was sind Akkreditierungen?",
+      "whatIsDescription": "Journalisten nutzen das Presseportal, um eine Akkreditierung für anstehende Events oder Konzerte anzufragen. Hier kannst du die Anfragen prüfen, eine optionale interne Notiz hinzufügen und sie genehmigen oder ablehnen.",
+      "internalNote": "Admin-Notiz (nur intern)",
+      "approve": "Genehmigen",
+      "reject": "Ablehnen",
+      "approved": "Genehmigt",
+      "rejected": "Abgelehnt",
+      "pending": "Ausstehend",
+      "noRequests": "Noch keine Akkreditierungsanfragen.",
+      "loadError": "Akkreditierungsanfragen konnten nicht geladen werden",
+      "updateError": "Anfrage konnte nicht aktualisiert werden",
+      "updateSuccess": "Anfrage {status}"
+    }
   }
 }
