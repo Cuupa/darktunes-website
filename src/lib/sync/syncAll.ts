@@ -332,31 +332,26 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
           fetchSongkickArtistCalendar(artist.songkick_id!, songkickApiKey, fetchFn),
         )
 
-        for (const concert of concerts) {
-          try {
-            await db
-              .from('concerts')
-              .upsert(
-                {
-                  artist_id: artist.id,
-                  event_name: concert.eventName,
-                  venue_name: concert.venueName,
-                  venue_city: concert.venueCity,
-                  venue_country: concert.venueCountry,
-                  concert_date: concert.concertDate,
-                  ticket_url: concert.ticketUrl,
-                  songkick_id: concert.songkickId,
-                  status: concert.status,
-                },
-                { onConflict: 'songkick_id' },
-              )
-              .select()
-              .single()
+        if (concerts.length > 0) {
+          const concertsData = concerts.map((concert) => ({
+            artist_id: artist.id,
+            event_name: concert.eventName,
+            venue_name: concert.venueName,
+            venue_city: concert.venueCity,
+            venue_country: concert.venueCountry,
+            concert_date: concert.concertDate,
+            ticket_url: concert.ticketUrl,
+            songkick_id: concert.songkickId,
+            status: concert.status,
+          }))
 
-            songkickResult.concertsUpserted++
+          try {
+            await db.from('concerts').upsert(concertsData, { onConflict: 'songkick_id' })
+
+            songkickResult.concertsUpserted += concerts.length
           } catch (e) {
             songkickResult.errors.push(
-              `Failed to upsert concert "${concert.eventName}": ${String(e)}`,
+              `Failed to bulk upsert ${concerts.length} concerts for artist "${artist.name}": ${String(e)}`,
             )
           }
         }
@@ -391,31 +386,26 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
           fetchBandsintownArtistEvents(artist.bandsintown_id!, bandsintownApiKey, fetchFn),
         )
 
-        for (const concert of concerts) {
-          try {
-            await db
-              .from('concerts')
-              .upsert(
-                {
-                  artist_id: artist.id,
-                  event_name: concert.eventName,
-                  venue_name: concert.venueName,
-                  venue_city: concert.venueCity,
-                  venue_country: concert.venueCountry,
-                  concert_date: concert.concertDate,
-                  ticket_url: concert.ticketUrl,
-                  bandsintown_id: concert.bandsintownId,
-                  status: concert.status,
-                },
-                { onConflict: 'bandsintown_id' },
-              )
-              .select()
-              .single()
+        if (concerts.length > 0) {
+          const concertsData = concerts.map((concert) => ({
+            artist_id: artist.id,
+            event_name: concert.eventName,
+            venue_name: concert.venueName,
+            venue_city: concert.venueCity,
+            venue_country: concert.venueCountry,
+            concert_date: concert.concertDate,
+            ticket_url: concert.ticketUrl,
+            bandsintown_id: concert.bandsintownId,
+            status: concert.status,
+          }))
 
-            bandsintownResult.concertsUpserted++
+          try {
+            await db.from('concerts').upsert(concertsData, { onConflict: 'bandsintown_id' })
+
+            bandsintownResult.concertsUpserted += concerts.length
           } catch (e) {
             bandsintownResult.errors.push(
-              `Failed to upsert concert "${concert.eventName}": ${String(e)}`,
+              `Failed to bulk upsert ${concerts.length} concerts for artist "${artist.name}": ${String(e)}`,
             )
           }
         }
