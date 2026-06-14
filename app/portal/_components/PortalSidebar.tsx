@@ -142,7 +142,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
     toast.success(dict.signOut)
-    router.push('/portal/login')
+    router.push('/login')
     router.refresh()
   }
 

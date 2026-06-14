@@ -189,8 +189,8 @@
     "statements_noData": "No statements available yet.",
     "statements_downloading": "Generating secure download link…",
     "statements_downloadError": "Failed to generate download link. Please try again.",
-    "login_title": "Artist Portal Login",
-    "login_description": "Sign in to access your artist dashboard",
+    "login_title": "darkTunes Login",
+    "login_description": "Sign in to access your dashboard",
     "login_email": "Email",
     "login_password": "Password",
     "login_submit": "Sign In",
@@ -380,6 +380,7 @@
     "register_password_too_short": "Password must be at least 8 characters.",
     "register_switch_to_login": "Already have an account? Sign in",
     "login_switch_to_register": "No account yet? Register",
+    "login_request_press": "Request Press / Promo Pool Access",
     "oauth_or": "or",
     "oauth_google": "Continue with Google",
     "oauth_spotify": "Continue with Spotify",
@@ -938,5 +939,21 @@
     "SERVER_ERROR": "Something went wrong on our end. Please try again later.",
     "CONFIG_ERROR": "Something went wrong on our end. Please try again later.",
     "DB_ERROR": "Something went wrong on our end. Please try again later."
+  },
+  "admin": {
+    "accreditations": {
+      "whatIsHeading": "What are Accreditations?",
+      "whatIsDescription": "Journalists use the Press Portal to request accreditation for upcoming events or concerts. Here, you can review their requests, add an optional internal note, and approve or reject them.",
+      "internalNote": "Admin note (internal only)",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "pending": "Pending",
+      "noRequests": "No accreditation requests yet.",
+      "loadError": "Failed to load accreditation requests",
+      "updateError": "Failed to update request",
+      "updateSuccess": "Request {status}"
+    }
   }
 }

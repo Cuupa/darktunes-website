@@ -51,7 +51,7 @@ export function ApplyForm({ dict }: ApplyFormProps) {
             </CardHeader>
             <CardContent>
               <Button asChild>
-                <Link href="/press/login">{dict.success.login}</Link>
+                <Link href="/login">{dict.success.login}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -102,7 +102,7 @@ export function ApplyForm({ dict }: ApplyFormProps) {
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={isPending}>{isPending ? dict.submitting : dict.submit}</Button>
                 <Button asChild variant="outline">
-                  <Link href="/press/login">{dict.success.login}</Link>
+                  <Link href="/login">{dict.success.login}</Link>
                 </Button>
               </div>
             </form>

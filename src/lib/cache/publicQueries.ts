@@ -13,6 +13,7 @@
  */
 
 import { unstable_cache } from 'next/cache'
+import { cache } from 'react'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicReleases } from '@/lib/api/releases'
 import { getPublicNewsPosts } from '@/lib/api/news'
@@ -25,49 +26,49 @@ import type { Release, NewsPost, Video, Concert, Artist, SiteSettings } from '@/
 const TTL = 60 // seconds
 
 /** All public releases, cache-keyed to the `releases` tag. */
-export const getCachedPublicReleases = unstable_cache(
+export const getCachedPublicReleases = cache(unstable_cache(
   async (): Promise<Release[]> =>
     getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[]),
   ['public-releases'],
   { revalidate: TTL, tags: ['releases'] },
-)
+))
 
 /** All public news posts, cache-keyed to the `news` tag. */
-export const getCachedPublicNews = unstable_cache(
+export const getCachedPublicNews = cache(unstable_cache(
   async (): Promise<NewsPost[]> =>
     getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[]),
   ['public-news'],
   { revalidate: TTL, tags: ['news'] },
-)
+))
 
 /** All public videos, cache-keyed to the `videos` tag. */
-export const getCachedPublicVideos = unstable_cache(
+export const getCachedPublicVideos = cache(unstable_cache(
   async (): Promise<Video[]> =>
     getPublicVideos(createPublicSupabaseClient()).catch(() => [] as Video[]),
   ['public-videos'],
   { revalidate: TTL, tags: ['videos'] },
-)
+))
 
 /** All public concerts, cache-keyed to the `concerts` tag. */
-export const getCachedPublicConcerts = unstable_cache(
+export const getCachedPublicConcerts = cache(unstable_cache(
   async (): Promise<Concert[]> =>
     getPublicConcerts(createPublicSupabaseClient()).catch(() => [] as Concert[]),
   ['public-concerts'],
   { revalidate: TTL, tags: ['concerts'] },
-)
+))
 
 /** All public artists, cache-keyed to the `artists` tag. */
-export const getCachedPublicArtists = unstable_cache(
+export const getCachedPublicArtists = cache(unstable_cache(
   async (): Promise<Artist[]> =>
     getPublicArtists(createPublicSupabaseClient()).catch(() => [] as Artist[]),
   ['public-artists'],
   { revalidate: TTL, tags: ['artists'] },
-)
+))
 
 /** Site-wide settings, cache-keyed to the `site-settings` tag. */
-export const getCachedSiteSettings = unstable_cache(
+export const getCachedSiteSettings = cache(unstable_cache(
   async (): Promise<SiteSettings | null> =>
     getSiteSettings(createPublicSupabaseClient()).catch(() => null),
   ['public-site-settings'],
   { revalidate: TTL, tags: ['site-settings'] },
-)
+))
