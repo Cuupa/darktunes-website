@@ -54,7 +54,9 @@ function makeGetRelease(id: string) {
       return getReleaseById(client, id)
     },
     [`release-${id}`],
-    { revalidate: 60, tags: ['releases'] },
+    // Granular tags: 'releases' invalidates all release lists;
+    // `release-${id}` invalidates only this specific release page.
+    { revalidate: 60, tags: ['releases', `release-${id}`] },
   )
 }
 

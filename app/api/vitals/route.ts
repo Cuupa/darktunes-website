@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+
+type ConnectionType = '4g' | '3g' | '2g' | 'slow-2g' | 'unknown'
 
 type WebVitalMetric = {
   id: string
@@ -8,6 +11,21 @@ type WebVitalMetric = {
   delta: number
   rating: 'good' | 'needs-improvement' | 'poor'
   navigationType: string
+  pathname: string
+  connectionType: ConnectionType
+}
+
+/**
+ * Thresholds beyond which a metric is considered critical and warrants
+ * persistence in app_logs for admin visibility.
+ * Values based on Core Web Vitals "needs improvement" boundaries.
+ */
+const CRITICAL_THRESHOLDS: Partial<Record<WebVitalMetric['name'], number>> = {
+  LCP: 2500,  // ms — Largest Contentful Paint
+  CLS: 0.1,   // score — Cumulative Layout Shift
+  INP: 200,   // ms — Interaction to Next Paint
+  TTFB: 800,  // ms — Time to First Byte
+  FCP: 1800,  // ms — First Contentful Paint
 }
 
 function isWebVitalMetric(value: unknown): value is WebVitalMetric {
@@ -40,7 +58,35 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(400, 'Invalid metric payload')
   }
 
-  console.info('[WebVitals API]', JSON.stringify(body))
+  // Always log in development for debugging
+  if (process.env.NODE_ENV !== 'production') {
+    console.info('[WebVitals API]', JSON.stringify(body))
+  }
+
+  // Persist critical vitals to app_logs for admin visibility
+  const threshold = CRITICAL_THRESHOLDS[body.name]
+  if (threshold !== undefined && body.value > threshold) {
+    try {
+      const supabase = await createServiceRoleSupabaseClient()
+      await supabase.from('app_logs').insert({
+        source: 'web-vitals',
+        level: 'warn',
+        message: `[RUM] ${body.name} = ${body.value.toFixed(1)} (threshold: ${threshold}) on ${body.pathname ?? '/'}`,
+        details: {
+          metric: body.name,
+          value: body.value,
+          rating: body.rating,
+          pathname: body.pathname ?? null,
+          connectionType: body.connectionType ?? null,
+          navigationType: body.navigationType,
+          id: body.id,
+        },
+      })
+    } catch (logError) {
+      // Non-fatal — vitals logging must never fail the client request
+      console.error('[WebVitals API] Failed to persist to app_logs:', logError)
+    }
+  }
 
   return NextResponse.json({ ok: true })
 })

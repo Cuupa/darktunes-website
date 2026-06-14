@@ -2,29 +2,26 @@
  * app/api/sync/route.ts — Manual "sync all artists" trigger
  *
  * POST /api/sync
- * Auth: ******
+ * Auth: Supabase session token (Bearer) or Vercel Cron (x-vercel-cron: 1)
  *
- * Verifies the caller is authenticated, then runs syncAll() across every
- * artist and every configured external API (iTunes, Spotify, Discogs,
- * Songkick, Odesli).
+ * Enqueues async sync jobs for every artist in the database into the
+ * sync_queue table. The actual per-artist processing runs in small chunks
+ * via POST /api/process-sync-queue (Vercel cron: every 5 minutes) so that no
+ * single request exceeds Vercel's timeout limits.
  *
- * All business logic lives in src/lib/sync/syncAll.ts — this handler only
- * wires up real dependencies and delegates to withErrorHandler for error
- * handling.
+ * This endpoint returns immediately after enqueuing — it does not wait for
+ * the sync to complete. The Admin Health dashboard shows queue progress.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { revalidateTag } from 'next/cache'
 import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { syncAll } from '@/lib/sync/syncAll'
-import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import { enqueueArtistSyncJobs } from '@/lib/api/syncQueue'
 import type { ServerEnv } from '@/lib/env.server'
 
-// Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
-// A full multi-API sync over many artists can take several minutes.
+// Route-segment config: allow up to 300 seconds on Vercel Pro.
 export const maxDuration = 300
 
 // ---------------------------------------------------------------------------
@@ -71,51 +68,30 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     await verifyToken(authHeader.slice(7), serverEnv)
   }
 
-  // 2. Wire up dependencies (serverEnv validates all required vars at startup)
-  const {
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-    CLOUDFLARE_R2_BUCKET_NAME,
-    CLOUDFLARE_R2_PUBLIC_URL,
-    NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    DISCOGS_TOKEN,
-    SONGKICK_API_KEY,
-    BANDSINTOWN_API_KEY,
-  } = serverEnv
-
-  const db = createClient<Database>(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false },
-  })
-
-  const s3 = createR2Client(
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  // 2. Load all artist IDs
+  const db = createClient<Database>(
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } },
   )
 
-  const uploadFn = (imageUrl: string, keyPrefix: string) =>
-    uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
+  const { data: artists, error: artistsError } = await db
+    .from('artists')
+    .select('id')
+    .order('name', { ascending: true })
 
-  // 3. Run sync (never throws — errors captured in SyncAllResult)
-  const result = await syncAll({
-    db,
-    fetch: globalThis.fetch,
-    uploadToR2: uploadFn,
-    spotify:
-      SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET
-        ? { clientId: SPOTIFY_CLIENT_ID, clientSecret: SPOTIFY_CLIENT_SECRET }
-        : undefined,
-    discogsToken: DISCOGS_TOKEN,
-    songkickApiKey: SONGKICK_API_KEY,
-    bandsintownApiKey: BANDSINTOWN_API_KEY,
+  if (artistsError) {
+    throw new ApiError(500, 'Failed to load artists: ' + artistsError.message)
+  }
+
+  const artistIds = (artists ?? []).map((a) => a.id)
+
+  // 3. Enqueue one job per artist (skips artists already queued)
+  const queued = await enqueueArtistSyncJobs(db, artistIds, 'full')
+
+  return NextResponse.json({
+    queued,
+    total: artistIds.length,
+    message: queued + ' sync job(s) enqueued. Processing runs via cron every 5 minutes.',
   })
-
-  revalidateTag('releases')
-  revalidateTag('artists')
-  revalidateTag('concerts')
-  return NextResponse.json(result)
 })

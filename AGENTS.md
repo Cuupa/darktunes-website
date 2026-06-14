@@ -191,11 +191,25 @@ Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs 
 `syncAllReleases()` in `useReleases.ts` returns the full `SyncAllResult` (typed import from `src/lib/sync/syncAll.ts`). `ReleasesManager` parses the result: on success shows a toast with total items synced; on errors shows a warning toast and a "View Errors" button that opens a dialog with per-API error details.
 
 Cron Jobs (Vercel):
-  Two cron jobs are configured in `vercel.json`:
+  Three cron jobs are configured in `vercel.json`:
   - `/api/sync-youtube` — daily at 06:00 UTC: fetches latest YouTube channel videos.
-  - `/api/sync` — daily at 03:00 UTC: runs the full multi-API artist sync (Spotify, Discogs, iTunes, Odesli, Songkick/Bandsintown).
-  Both routes accept either a ****** (manual trigger) or a Vercel cron call (`x-vercel-cron: 1` header) optionally guarded by `CRON_SECRET` env var.
+  - `/api/sync` — daily at 03:00 UTC: enqueues async sync jobs for all artists into `sync_queue` and returns immediately.
+  - `/api/process-sync-queue` — every 5 minutes: picks one pending job from `sync_queue`, syncs that artist (iTunes), marks it done/failed. maxDuration: 60s.
+  All routes accept either a ****** (manual trigger) or a Vercel cron call (`x-vercel-cron: 1` header) optionally guarded by `CRON_SECRET` env var.
   The `isValidCronSecret` helper uses `timingSafeEqual` to prevent timing attacks.
+
+Async Sync Queue (`sync_queue` table):
+  `POST /api/sync` enqueues one row per artist with `status='pending'` — it does NOT run the sync inline.
+  `POST /api/process-sync-queue` claims one job at a time (atomic UPDATE to `status='running'`) to prevent double-processing.
+  Failed jobs are retried up to 3 times (`attempt_count`) with exponential backoff managed in `markSyncJobFailed()`.
+  DAL: `src/lib/api/syncQueue.ts` exports `enqueueArtistSyncJobs`, `claimNextSyncJob`, `markSyncJobDone`, `markSyncJobFailed`, `getSyncQueueStats`, `getRecentSyncJobs`.
+  The Admin Health tab shows queue progress via `getSyncQueueStats()`.
+
+Idempotency Keys (`idempotency_keys` table):
+  Financial and submission endpoints accept an optional `idempotencyKey` (UUID) in the request body.
+  DAL: `src/lib/api/idempotency.ts` exports `checkAndClaimIdempotencyKey(db, key, resourceType)` (atomic INSERT ... ON CONFLICT DO NOTHING) and `updateIdempotencyKeyResourceId(db, key, id)`.
+  Applied to: `/api/webhooks/sos/confirm`, `/api/portal/submit-release`.
+  Keys older than 24h are cleaned up on each check. Only service-role client can access this table (no public RLS).
 
 Spotify Sync Notes:
   `fetchSpotifyArtistReleases` builds the URL as a manual template literal to avoid `URLSearchParams` encoding commas in `include_groups` as `%2C`, which Spotify rejects with HTTP 400.
@@ -613,6 +627,27 @@ const artist = await getArtistBySlug(client, slug)
 return <ArtistHero artist={artist} /> // ArtistHero is "use client"
 ```
 
+## CQRS Convention (Command Query Responsibility Segregation)
+
+Read operations belong in React Server Components (RSC) or `unstable_cache`-wrapped
+DAL calls. Write operations from the React client context run exclusively as
+`"use server"` Server Actions or JWT-authenticated Route Handlers.
+
+| Context | Pattern | Examples |
+|---|---|---|
+| Portal forms (artist, profile, checklist) | Server Action (`"use server"`) | `src/actions/portal/*.ts` |
+| Admin forms (artists, releases, news) | Route Handler + JWT ****** `/api/admin/artists`, `/api/admin/releases` |
+| External systems (cron, webhooks, SOS) | Route Handler | `/api/sync`, `/api/webhooks/sos/*` |
+| Public reads | RSC + `unstable_cache` | `app/artists/[slug]/page.tsx` |
+
+**Why admin writes use Route Handlers (not Server Actions):** The Admin UI
+communicates via `fetch()` with a JWT ****** which is not the Next.js
+RSC request context. This is architecturally correct and should NOT be changed.
+
+**Why portal writes should use Server Actions:** Portal pages are RSC-rendered
+and the user session is available via cookies, making Server Actions the natural
+fit. Migrations from Route Handlers to Server Actions happen incrementally.
+
 ## Server Actions vs. Route Handlers
 
 | Use Case | Use |
@@ -669,12 +704,29 @@ Tags follow the pattern: lowercase table name as-is.
 Multi-resource pages combine tags: `['artists', 'releases']`
 Single-resource pages: `['releases', \`release-${id}\`]`
 
-Defined tag registry (use ONLY these):
+### List-level tags (invalidate all pages of this type)
   'artists' | 'releases' | 'news' | 'videos' | 'concerts'
   'site-settings' | 'artist-profiles' | 'sync-logs'
 
-When calling revalidateTag() or revalidatePath() in a Route Handler after a write,
-use the exact strings above. Adding an undocumented tag silently does nothing.
+### Entity-level tags (invalidate only one specific page)
+  `'artist-${slug}'`   → use in `app/artists/[slug]/page.tsx`
+  `'release-${id}'`    → use in `app/releases/[id]/page.tsx`
+  `'news-${slug}'`     → use in `app/news/[slug]/page.tsx`
+
+All pages use BOTH a list-level and an entity-level tag so that either a
+full-list revalidation or a targeted single-entity revalidation will bust them:
+  `app/artists/[slug]`  → tags: `['artists', 'artist-${slug}']`
+  `app/releases/[id]`   → tags: `['releases', 'release-${id}']`
+  `app/news/[slug]`     → tags: `['news', 'news-${slug}']`
+
+When calling revalidateTag() in a Route Handler after a write:
+- Artist update: `revalidateTag('artists')` + `revalidateTag('artist-${slug}')`
+- Release update: `revalidateTag('releases')` + `revalidateTag('release-${id}')`
+- News update: `revalidateTag('news')` + `revalidateTag('news-${slug}')`
+
+`POST /api/revalidate-content` accepts an optional `entityTags` array for
+targeted Supabase Database Webhook-driven revalidation.
+Adding an undocumented tag silently does nothing.
 
 ## Next.js Metadata API — MANDATORY for every page.tsx
 

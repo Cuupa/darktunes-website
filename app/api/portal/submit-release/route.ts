@@ -5,6 +5,7 @@ import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/l
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
+import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -22,6 +23,7 @@ const bodySchema = z.object({
   youtubeUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
   formData: z.record(z.string(), z.unknown()).nullable().optional(),
+  idempotencyKey: z.string().uuid().optional(),
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -36,6 +38,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   const body = bodySchema.parse(await req.json())
+
+  // Idempotency check — prevents double-submission on network retry/double-click
+  const serviceRole = await createServiceRoleSupabaseClient()
+  if (body.idempotencyKey) {
+    const claimed = await checkAndClaimIdempotencyKey(
+      serviceRole,
+      body.idempotencyKey,
+      'submit-release',
+    )
+    if (!claimed) {
+      throw new ApiError(409, 'Duplicate request: this submission was already processed')
+    }
+  }
 
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
   let artist
@@ -87,8 +102,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     form_data: body.formData ?? null,
   })
 
-  // Notify editors
-  const serviceRole = await createServiceRoleSupabaseClient()
+  // Notify editors (reuse the already-created serviceRole client)
   const { data: editorProfiles } = await serviceRole
     .from('users')
     .select('id')
@@ -106,6 +120,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (recipients.length > 0) {
     await serviceRole.from('editor_notifications').insert(recipients)
+  }
+
+  // Update idempotency key with the created resource ID (non-blocking)
+  if (body.idempotencyKey) {
+    void updateIdempotencyKeyResourceId(serviceRole, body.idempotencyKey, submission.id)
   }
 
   return NextResponse.json({ submissionId: submission.id })
