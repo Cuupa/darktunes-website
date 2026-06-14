@@ -85,21 +85,27 @@ export async function middleware(request: NextRequest) {
 
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profile) {
+    const returnTo = request.nextUrl.searchParams.get('returnTo')
+    const url = request.nextUrl.clone()
+
+    // Validate returnTo to prevent open redirects (only allow local paths)
+    if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+      url.pathname = returnTo
+      url.search = '' // Clear query params after redirecting back
+      return NextResponse.redirect(url)
+    }
+
     if (['admin'].includes(profile.role)) {
-      const url = request.nextUrl.clone()
       url.pathname = '/admin'
       return NextResponse.redirect(url)
     } else if (['editor'].includes(profile.role)) {
-      const url = request.nextUrl.clone()
       url.pathname = '/editor'
       return NextResponse.redirect(url)
     } else if (['journalist'].includes(profile.role)) {
-      const url = request.nextUrl.clone()
       url.pathname = '/press/dashboard'
       return NextResponse.redirect(url)
     } else {
       // Default / artist fallback
-      const url = request.nextUrl.clone()
       url.pathname = '/portal'
       return NextResponse.redirect(url)
     }
@@ -109,6 +115,7 @@ export async function middleware(request: NextRequest) {
   if (isProtectedRoute && !isLoginPage && !isPortalAcceptInvitePage && !user) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
+    loginUrl.searchParams.set('returnTo', request.nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
   }
 
