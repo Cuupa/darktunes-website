@@ -23,6 +23,10 @@ import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 import type { ServerEnv } from '@/lib/env.server'
 
+// Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
+// A full multi-API sync over many artists can take several minutes.
+export const maxDuration = 300
+
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------

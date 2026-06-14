@@ -19,6 +19,10 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 
+// Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
+// Fetching and upserting up to 200 YouTube videos can take longer than the default timeout.
+export const maxDuration = 300
+
 function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
   const expected = `Bearer ${cronSecret}`
   const authBuffer = Buffer.from(authHeader, 'utf-8')

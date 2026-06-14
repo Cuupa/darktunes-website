@@ -95,7 +95,8 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     }
   }
 
-  // 2. iTunes sync (existing pipeline)
+  // 2. iTunes sync (existing pipeline) — parallelised per artist with
+  // Promise.allSettled so one failed artist does not block the others.
   if (!onlyApi || onlyApi === 'itunes') {
     const itunesResult: ApiSyncResult = {
       api: 'itunes',
@@ -105,11 +106,17 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       rateLimited: false,
       errors: [],
     }
-    for (const artist of artists) {
-      const r = await syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2 })
+    const itunesOutcomes = await Promise.allSettled(
+      artists.map((artist) => syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2 })),
+    )
+    for (const outcome of itunesOutcomes) {
       itunesResult.artistsProcessed++
-      itunesResult.releasesUpserted += r.releasesUpserted
-      itunesResult.errors.push(...r.errors)
+      if (outcome.status === 'fulfilled') {
+        itunesResult.releasesUpserted += outcome.value.releasesUpserted
+        itunesResult.errors.push(...outcome.value.errors)
+      } else {
+        itunesResult.errors.push(`iTunes sync failed: ${String(outcome.reason)}`)
+      }
     }
     await writeSyncLog(db, 'itunes', itunesResult)
     results.push(itunesResult)
