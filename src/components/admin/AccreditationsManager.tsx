@@ -6,10 +6,10 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { listRequests, updateStatus } from '@/lib/api/accreditations'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { useTranslation } from '@/i18n/client'
+import { useDict } from '@/contexts/DictContext'
 
 export function AccreditationsManager() {
-  const { dict } = useTranslation()
+  const dict = useDict()
   const t = dict.admin?.accreditations || {
     whatIsHeading: "What are Accreditations?",
     whatIsDescription: "Journalists use the Press Portal to request accreditation for upcoming events or concerts. Here, you can review their requests, add an optional internal note, and approve or reject them.",
