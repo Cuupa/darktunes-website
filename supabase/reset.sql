@@ -204,6 +204,41 @@ GRANT INSERT ON public.users      TO supabase_auth_admin;
 -- ---------------------------------------------------------------------------
 -- HELPER: auto-create a profile row when a new Auth user registers
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- HELPER: sync user claims to auth.users.raw_app_meta_data
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.sync_user_claims()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_user_id UUID;
+  v_role TEXT;
+  v_artist_id UUID;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF TG_TABLE_NAME = 'artist_members' THEN
+      v_user_id := OLD.user_id;
+    ELSIF TG_TABLE_NAME = 'users' THEN
+      v_user_id := OLD.id;
+    END IF;
+  ELSE
+    IF TG_TABLE_NAME = 'artist_members' THEN
+      v_user_id := NEW.user_id;
+    ELSIF TG_TABLE_NAME = 'users' THEN
+      v_user_id := NEW.id;
+    END IF;
+  END IF;
+
+  SELECT role::TEXT INTO v_role FROM public.users WHERE id = v_user_id;
+  SELECT artist_id INTO v_artist_id FROM public.artist_members WHERE user_id = v_user_id LIMIT 1;
+
+  UPDATE auth.users
+  SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', v_role, 'artist_id', v_artist_id)
+  WHERE id = v_user_id;
+
+  RETURN NULL;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -270,6 +305,12 @@ DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.users;
 CREATE TRIGGER trg_profiles_updated_at
   BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+DROP TRIGGER IF EXISTS on_user_role_change ON public.users;
+CREATE TRIGGER on_user_role_change
+  AFTER UPDATE OF role ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.sync_user_claims();
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -430,6 +471,12 @@ SELECT user_id, id, 'owner'
 FROM   public.artists
 WHERE  user_id IS NOT NULL
 ON CONFLICT (user_id, artist_id) DO NOTHING;
+
+
+DROP TRIGGER IF EXISTS on_artist_member_change ON public.artist_members;
+CREATE TRIGGER on_artist_member_change
+  AFTER INSERT OR UPDATE OR DELETE ON public.artist_members
+  FOR EACH ROW EXECUTE FUNCTION public.sync_user_claims();
 
 ALTER TABLE public.artist_members ENABLE ROW LEVEL SECURITY;
 
@@ -3280,3 +3327,18 @@ DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_sum
 CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- Backfill claims for all existing users
+DO $$
+DECLARE
+  v_user RECORD;
+  v_artist_id UUID;
+BEGIN
+  FOR v_user IN SELECT id, role::TEXT FROM public.users LOOP
+    SELECT artist_id INTO v_artist_id FROM public.artist_members WHERE user_id = v_user.id LIMIT 1;
+    UPDATE auth.users
+    SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', v_user.role, 'artist_id', v_artist_id)
+    WHERE id = v_user.id;
+  END LOOP;
+END;
+$$;

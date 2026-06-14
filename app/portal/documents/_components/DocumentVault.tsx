@@ -52,7 +52,7 @@ function formatBytes(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function DocumentVault({ dict, documents: initialDocuments, artistId: _artistId }: DocumentVaultProps) {
+export function DocumentVault({ dict, documents: initialDocuments, artistId }: DocumentVaultProps) {
   const [documents, setDocuments] = useState<ArtistDocument[]>(initialDocuments)
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all')
   const [uploading, setUploading] = useState(false)
