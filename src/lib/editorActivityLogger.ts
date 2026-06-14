@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 
 interface LogEditorActivityInput {
   action: string
@@ -19,12 +20,9 @@ export async function logEditorActivity(
     } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-    if (profile?.role !== 'editor') return
+    const role = await getUserRoleWithClient(supabase, user.id)
+
+    if (role !== 'editor') return
 
     await supabase.from('editor_activity_log').insert({
       editor_id: user.id,

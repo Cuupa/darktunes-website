@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import type { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -14,8 +15,8 @@ async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
   return supabase
 }
 

@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
@@ -25,8 +26,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     error: authError,
   } = await supabase.auth.getUser()
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') throw new ApiError(403, 'Admin only')
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (role !== 'admin') throw new ApiError(403, 'Admin only')
 
   const body = await req.json() as unknown
   if (!body || typeof body !== 'object') throw new ApiError(400, 'Invalid request body')

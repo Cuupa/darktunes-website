@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
@@ -52,13 +53,9 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 
   if (authError || !user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const role = await getUserRoleWithClient(supabase, user.id)
 
-  if (!profile || profile.role !== 'admin') throw new ApiError(403, 'Forbidden')
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
 
   // 2. Parse body
   const body: unknown = await req.json()

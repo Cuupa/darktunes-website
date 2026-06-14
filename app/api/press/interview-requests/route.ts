@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -22,12 +23,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-  if (!profile || !['journalist', 'admin'].includes(profile.role)) {
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (!role || !['journalist', 'admin'].includes(role)) {
     throw new ApiError(403, 'Only journalists can submit interview requests')
   }
 

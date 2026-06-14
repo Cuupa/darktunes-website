@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createClient } from '@supabase/supabase-js'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import type { Database } from '@/types/database'
@@ -24,14 +25,7 @@ async function verifyTokenAndRole(token: string): Promise<void> {
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data.user) throw new ApiError(401, 'Unauthorized')
 
-  const { data: profile, error: profileErr } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', data.user.id)
-    .maybeSingle()
-
-  if (profileErr) throw new ApiError(500, profileErr.message)
-  const role = profile?.role as ProfileRole | undefined
+  const role = await getUserRoleWithClient(admin, data.user.id) as ProfileRole | undefined
   if (!role || (role !== 'admin' && role !== 'editor')) {
     throw new ApiError(403, 'Forbidden')
   }
