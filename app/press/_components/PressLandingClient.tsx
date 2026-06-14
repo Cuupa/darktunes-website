@@ -280,7 +280,7 @@ export function PressLandingClient({
                   <Link href="/press/apply">{t.contact.applyButton}</Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/press/login">{t.contact.dashboardButton}</Link>
+                  <Link href="/login">{t.contact.dashboardButton}</Link>
                 </Button>
               </div>
             </section>

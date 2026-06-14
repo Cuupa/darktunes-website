@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -96,9 +95,6 @@ const schema = z.object({
   datenschutzContent: z.string().optional().default(''),
   datenschutzContentEn: z.string().optional().default(''),
   consentPlaceholderUrl: z.string().url('Must be a valid URL').or(z.literal('')),
-  noiseOpacity: z.number().min(0).max(1).default(0.04),
-  crtScanlinesEnabled: z.boolean().default(true),
-  vignetteIntensity: z.number().min(0).max(1).default(0.5),
   carouselAutoplayMs: z.number().int().min(0).default(0),
   videosPerPage: z.number().int().min(1).max(50).default(9),
   videosLinkToPage: z.boolean().default(false),
@@ -329,7 +325,6 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
           <TabsTrigger value="hero">Hero Section</TabsTrigger>
           <TabsTrigger value="seo">SEO / Meta</TabsTrigger>
           <TabsTrigger value="legal">Legal / DSGVO</TabsTrigger>
-          <TabsTrigger value="visual">Visual Effects</TabsTrigger>
           <TabsTrigger value="roles">Roles &amp; Permissions</TabsTrigger>
         </TabsList>
 
@@ -794,41 +789,10 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             <CardHeader>
               <CardTitle>Homepage Content</CardTitle>
               <CardDescription>
-                Text and media shown on the public homepage (hero section, Spotify player).
+                Text and media shown on the public homepage (Spotify player, videos grid).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field id="heroBadge" label="Hero Badge Text (Releases) *" error={errors.heroBadge?.message}>
-                <Input
-                  id="heroBadge"
-                  placeholder="e.g. ⚡ New Release"
-                  {...register('heroBadge')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
-              <Field id="heroNewsBadge" label="Hero Badge Text (News)" error={errors.heroNewsBadge?.message}>
-                <Input
-                  id="heroNewsBadge"
-                  placeholder="e.g. 📰 News"
-                  {...register('heroNewsBadge')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
-              <Field
-                id="heroDescription"
-                label="Hero Description *"
-                error={errors.heroDescription?.message}
-              >
-                <Textarea
-                  id="heroDescription"
-                  rows={3}
-                  {...register('heroDescription')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
               <Field
                 id="spotifyPlaylistUri"
                 label="Spotify Playlist URI *"
@@ -1281,13 +1245,14 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             <CardHeader>
               <CardTitle>Hero Section</CardTitle>
               <CardDescription>
-                Featured releases and news posts will automatically appear in the hero carousel.
-                Mark items as featured in their respective forms.
+                Configure the Hero section at the top of the homepage.
+                Releases or News posts marked as &quot;Featured&quot; will automatically appear here.
+                The settings below act as fallbacks if the featured item is missing data.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Custom Background Image</Label>
+                <Label>Fallback Background Image</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="https://cdn.darktunes.com/hero-bg.jpg"
@@ -1353,18 +1318,18 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
               <Field id="heroBadge" label="Hero Badge Text (Releases) *" error={errors.heroBadge?.message}>
                 <Input id="heroBadge" {...register('heroBadge')} disabled={isSubmitting} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Short label shown on the hero badge pill for releases, e.g. &quot;⚡ New Release&quot;.
+                  Short label shown on the hero badge pill when the featured item is a Release, e.g. &quot;⚡ New Release&quot;.
                 </p>
               </Field>
 
               <Field id="heroNewsBadge" label="Hero Badge Text (News)" error={errors.heroNewsBadge?.message}>
                 <Input id="heroNewsBadge" placeholder="e.g. 📰 News" {...register('heroNewsBadge')} disabled={isSubmitting} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Short label shown on the hero badge pill for news articles, e.g. &quot;📰 News&quot;.
+                  Short label shown on the hero badge pill when the featured item is a News post, e.g. &quot;📰 News&quot;.
                 </p>
               </Field>
 
-              <Field id="heroDescription" label="Hero Description *" error={errors.heroDescription?.message}>
+              <Field id="heroDescription" label="Fallback Hero Description *" error={errors.heroDescription?.message}>
                 <Textarea
                   id="heroDescription"
                   rows={3}
@@ -1372,7 +1337,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   disabled={isSubmitting}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Fallback description shown beneath the hero title. Used when the featured item has no excerpt.
+                  Fallback description shown beneath the hero title. Used when the featured Release or News post has no excerpt.
                 </p>
               </Field>
             </CardContent>
@@ -1597,110 +1562,6 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             </Card>
           </div>
         </TabsContent>
-        {/* ------------------------------------------------------------------ */}
-        {/* Visual Effects                                                       */}
-        {/* ------------------------------------------------------------------ */}
-        <TabsContent value="visual">
-          <Card>
-            <CardHeader>
-              <CardTitle>Visual Effects</CardTitle>
-              <CardDescription>
-                Configure the industrial dark-aesthetic overlays rendered on the public site. All
-                effects are non-interactive and sit beneath UI elements.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Noise / Grain */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Noise / Grain Opacity</Label>
-                  <Controller
-                    name="noiseOpacity"
-                    control={control}
-                    render={({ field }) => (
-                      <span className="text-sm text-muted-foreground tabular-nums w-10 text-right">
-                        {(field.value ?? 0).toFixed(2)}
-                      </span>
-                    )}
-                  />
-                </div>
-                <Controller
-                  name="noiseOpacity"
-                  control={control}
-                  render={({ field }) => (
-                    <Slider
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={[field.value ?? 0]}
-                      onValueChange={([v]) => field.onChange(v)}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-                <p className="text-xs text-muted-foreground">
-                  0 = invisible · 0.04 = subtle (recommended) · 0.15 = heavy grain
-                </p>
-              </div>
-
-              {/* CRT Scanlines */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="crtScanlinesEnabled">CRT Scanlines</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Horizontal line pattern for a subtle industrial CRT look.
-                  </p>
-                </div>
-                <Controller
-                  name="crtScanlinesEnabled"
-                  control={control}
-                  render={({ field }) => (
-                    <Switch
-                      id="crtScanlinesEnabled"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-              </div>
-
-              {/* Vignette */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Vignette Intensity</Label>
-                  <Controller
-                    name="vignetteIntensity"
-                    control={control}
-                    render={({ field }) => (
-                      <span className="text-sm text-muted-foreground tabular-nums w-10 text-right">
-                        {(field.value ?? 0).toFixed(2)}
-                      </span>
-                    )}
-                  />
-                </div>
-                <Controller
-                  name="vignetteIntensity"
-                  control={control}
-                  render={({ field }) => (
-                    <Slider
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={[field.value ?? 0]}
-                      onValueChange={([v]) => field.onChange(v)}
-                      disabled={isSubmitting}
-                    />
-                  )}
-                />
-                <p className="text-xs text-muted-foreground">
-                  0 = no vignette · 0.5 = medium depth (recommended) · 1 = heavy
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* ------------------------------------------------------------------ */}
         {/* Roles & Permissions                                                   */}
         {/* ------------------------------------------------------------------ */}

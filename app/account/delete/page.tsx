@@ -17,7 +17,7 @@ export default async function DeleteAccountPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect('/portal/login')
+  if (!user) redirect('/login')
 
   // Admins are blocked from self-service deletion
   const { data: profile } = await supabase

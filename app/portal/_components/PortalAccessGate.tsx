@@ -26,7 +26,7 @@ export function PortalAccessGate({ role }: PortalAccessGateProps) {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
     toast.success('Signed out')
-    router.push('/portal/login')
+    router.push('/login')
     router.refresh()
   }
 
