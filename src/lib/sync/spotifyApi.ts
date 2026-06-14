@@ -117,11 +117,7 @@ export async function fetchSpotifyArtistReleases(
   const token = await getSpotifyAccessToken(clientId, clientSecret, fetchFn)
   const artistId = extractSpotifyId(spotifyArtistId)
 
-  const params = new URLSearchParams({
-    limit: '20',
-    include_groups: 'album,single,compilation',
-  })
-  const url = `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums?${params.toString()}`
+  const url = `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums?limit=20&include_groups=album,single,compilation`
 
   const response = await fetchFn(url, {
     headers: { Authorization: `Bearer ${token}` },
