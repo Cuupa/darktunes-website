@@ -6,6 +6,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getNewsPostBySlug } from '@/lib/api/news'
@@ -26,10 +27,27 @@ function createPublicSupabaseClient() {
   )
 }
 
+/**
+ * Wrap news post fetch in unstable_cache to attach granular cache tags.
+ * Allows targeted revalidation per news slug (via revalidateTag) in addition
+ * to the global 'news' tag used by list pages.
+ */
+function makeGetNewsPost(slug: string) {
+  return unstable_cache(
+    async () => {
+      const client = createPublicSupabaseClient()
+      return getNewsPostBySlug(client, slug)
+    },
+    [`news-post-${slug}`],
+    // Granular tags: 'news' invalidates all news lists;
+    // `news-${slug}` invalidates only this specific news article page.
+    { revalidate: 60, tags: ['news', `news-${slug}`] },
+  )
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const client = createPublicSupabaseClient()
-  const post = await getNewsPostBySlug(client, slug).catch(() => null)
+  const post = await makeGetNewsPost(slug)().catch(() => null)
   if (!post) return { title: 'Not Found' }
   return {
     title: `${post.title} — darkTunes Music Group`,
@@ -48,10 +66,9 @@ function formatDate(dateStr: string, locale: string): string {
 export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params
   const locale = await getLocale()
-  const client = createPublicSupabaseClient()
 
   const [post, dict] = await Promise.all([
-    getNewsPostBySlug(client, slug).catch(() => null),
+    makeGetNewsPost(slug)().catch(() => null),
     getDictionary(locale),
   ])
 

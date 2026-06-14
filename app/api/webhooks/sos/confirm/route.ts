@@ -26,6 +26,7 @@ import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getArtistById } from '@/lib/api/artists'
 import { createSalesStatement } from '@/lib/api/salesStatements'
+import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
 
 // ---------------------------------------------------------------------------
 // Request schema
@@ -48,6 +49,12 @@ const bodySchema = z.object({
     }),
   /** Total royalty amount in EUR (optional) */
   amountEur: z.number().nonnegative().optional(),
+  /**
+   * Optional idempotency key (UUID) to prevent duplicate statement creation
+   * on network retries. If omitted, the r2_key unique constraint still
+   * provides server-side deduplication.
+   */
+  idempotencyKey: z.string().uuid().optional(),
 })
 
 // ---------------------------------------------------------------------------
@@ -81,10 +88,24 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 
-  const { r2Key, artistId, filename, period, amountEur } = parsed.data
+  const { r2Key, artistId, filename, period, amountEur, idempotencyKey } = parsed.data
 
   // 3. Verify artist exists (service-role client bypasses RLS)
   const supabase = await createServiceRoleSupabaseClient()
+
+  // 3a. Idempotency check — if the caller provided a key, claim it atomically.
+  //     A duplicate key within 24 h means the operation was already processed.
+  if (idempotencyKey) {
+    const claimed = await checkAndClaimIdempotencyKey(supabase, idempotencyKey, 'sos-confirm')
+    if (!claimed) {
+      throw new ApiError(
+        409,
+        'This request has already been processed (duplicate idempotency key)',
+        'DUPLICATE_IDEMPOTENCY_KEY',
+      )
+    }
+  }
+
   const artist = await getArtistById(supabase, artistId)
   if (!artist) {
     throw new ApiError(404, `Artist ${artistId} not found`, 'ARTIST_NOT_FOUND')
@@ -127,6 +148,11 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   } catch (emailErr) {
     // Email failure is non-critical — log but don't abort response
     console.error('[SOS confirm] Email notification failed:', emailErr)
+  }
+
+  // Update idempotency key with the created resource ID (non-blocking)
+  if (idempotencyKey) {
+    void updateIdempotencyKeyResourceId(supabase, idempotencyKey, statement.id)
   }
 
   return NextResponse.json({ statementId: statement.id }, { status: 201 })

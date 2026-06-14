@@ -1371,6 +1371,59 @@ CREATE INDEX IF NOT EXISTS idx_app_logs_level      ON public.app_logs (level);
 CREATE INDEX IF NOT EXISTS idx_app_logs_created_at ON public.app_logs (created_at DESC);
 
 -- =============================================================================
+-- IDEMPOTENCY KEYS — prevent duplicate financial transactions
+-- Used by Portal write operations (submit-release, SOS confirm) to ensure
+-- client-side double-clicks or network retries never create duplicate records.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.idempotency_keys (
+  key           UUID        PRIMARY KEY,
+  resource_type TEXT        NOT NULL,  -- e.g. 'sos-confirm', 'submit-release'
+  resource_id   UUID,                  -- optional: ID of the created resource
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Cleanup index: used by the TTL cleanup query (rows older than 24 h)
+CREATE INDEX IF NOT EXISTS idx_idempotency_created_at ON public.idempotency_keys (created_at);
+
+-- RLS: only service-role can insert/read (called server-side only)
+ALTER TABLE public.idempotency_keys ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "idempotency_keys: service_role only" ON public.idempotency_keys;
+-- No policies → only service_role (bypasses RLS) can access this table.
+
+-- =============================================================================
+-- SYNC QUEUE — asynchronous background sync jobs
+-- Decouples the sync trigger (POST /api/sync) from the actual processing so
+-- that syncing many artists never exceeds Vercel's 10-second Edge timeout.
+-- Each job processes one artist via POST /api/process-sync-queue (every 5 min).
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.sync_queue (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id     UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
+  job_type      TEXT        NOT NULL DEFAULT 'full',  -- 'full' | 'spotify' | 'discogs' | 'youtube'
+  status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed'
+  scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at    TIMESTAMPTZ,
+  finished_at   TIMESTAMPTZ,
+  error_message TEXT,
+  attempt_count INTEGER     NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_queue_status       ON public.sync_queue (status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_artist        ON public.sync_queue (artist_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_created_at   ON public.sync_queue (created_at DESC);
+
+ALTER TABLE public.sync_queue ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "sync_queue: admin all" ON public.sync_queue;
+CREATE POLICY "sync_queue: admin all" ON public.sync_queue
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
 -- COLUMN REMOVALS (idempotent)
 -- Transitive-dependency fix (Track 1): artist_name was a 3NF violation.
 -- Social-URL consolidation (Track 2): URLs live exclusively in artists table.

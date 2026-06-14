@@ -11,7 +11,18 @@
  * Accepted tags: artists | releases | news | videos | site-settings
  *   Omit the `tags` field to revalidate ALL content tags at once.
  *
- * Example Supabase Webhook payload:
+ * Granular entity tags (optional):
+ *   Pass `entityTag` with the specific entity slug/id to revalidate only that
+ *   one page without invalidating every list page.
+ *   Pattern: "artist-{slug}" | "release-{id}" | "news-{slug}"
+ *
+ * Example Supabase Webhook payload (single artist update):
+ *   POST /api/revalidate
+ *   Authorization: ******
+ *   Content-Type: application/json
+ *   { "tags": ["artists"], "entityTag": "artist-my-band-slug" }
+ *
+ * Example for a full content flush:
  *   POST /api/revalidate
  *   Authorization: ******
  *   Content-Type: application/json
@@ -28,6 +39,15 @@ type CacheTag = (typeof ALL_TAGS)[number]
 
 const bodySchema = z.object({
   tags: z.array(z.enum(ALL_TAGS)).optional(),
+  /**
+   * Optional granular entity tag. If provided, revalidateTag is also called for
+   * this entity-specific tag in addition to any list-level tags.
+   * Pattern: "artist-{slug}" | "release-{uuid}" | "news-{slug}"
+   */
+  entityTag: z
+    .string()
+    .regex(/^(artist|release|news)-[\w-]+$/)
+    .optional(),
 })
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
@@ -45,19 +65,27 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // Parse body — tolerate empty body (Supabase sends minimal payloads)
   let tags: CacheTag[]
+  let entityTag: string | undefined
   try {
     const rawBody = await request.text()
     const body = rawBody ? (JSON.parse(rawBody) as unknown) : {}
     const parsed = bodySchema.safeParse(body)
     tags = parsed.success && parsed.data.tags ? parsed.data.tags : [...ALL_TAGS]
+    entityTag = parsed.success ? parsed.data.entityTag : undefined
   } catch {
     tags = [...ALL_TAGS]
+    entityTag = undefined
   }
 
-  // Revalidate each requested tag
+  // Revalidate each requested list-level tag
   for (const tag of tags) {
     revalidateTag(tag)
   }
 
-  return NextResponse.json({ revalidated: true, tags })
+  // Revalidate the specific entity page if provided (e.g. only artist-my-slug)
+  if (entityTag) {
+    revalidateTag(entityTag)
+  }
+
+  return NextResponse.json({ revalidated: true, tags, entityTag })
 })

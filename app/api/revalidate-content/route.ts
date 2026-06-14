@@ -8,7 +8,17 @@
  * Security: only authenticated admin/editor users may trigger revalidation.
  * The caller must pass the Supabase session ******
  *
- * Body: { tags: Array<'artists' | 'releases' | 'news' | 'videos' | 'concerts'> }
+ * Body:
+ *   {
+ *     tags: Array<'artists' | 'releases' | 'news' | 'videos' | 'concerts'>,
+ *     // Optional entity-specific tags for granular invalidation
+ *     entityTags?: string[]   // e.g. ['artist-some-slug', 'release-uuid-here']
+ *   }
+ *
+ * Entity-specific tags follow these patterns:
+ *   'artist-{slug}'  → invalidates only the specific artist detail page
+ *   'release-{id}'   → invalidates only the specific release detail page
+ *   'news-{slug}'    → invalidates only the specific news article page
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -23,6 +33,18 @@ type ContentTag = (typeof CONTENT_TAGS)[number]
 
 const bodySchema = z.object({
   tags: z.array(z.enum(CONTENT_TAGS)).min(1),
+  /** Optional granular entity tags, e.g. ['artist-my-artist', 'release-abc-123'] */
+  entityTags: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(256)
+        .regex(/^(artist|release|news)-[\w-]+$/, {
+          message: 'entityTags must match pattern: (artist|release|news)-{identifier}',
+        }),
+    )
+    .optional(),
 })
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
@@ -45,6 +67,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // Parse and validate body
   let tags: ContentTag[]
+  let entityTags: string[]
   try {
     const body: unknown = await request.json()
     const parsed = bodySchema.safeParse(body)
@@ -52,6 +75,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       throw new ApiError(400, 'Invalid or missing tags')
     }
     tags = parsed.data.tags
+    entityTags = parsed.data.entityTags ?? []
   } catch (err) {
     if (err instanceof ApiError) throw err
     throw new ApiError(400, 'Invalid JSON body')
@@ -61,5 +85,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     revalidateTag(tag)
   }
 
-  return NextResponse.json({ revalidated: true, tags })
+  // Revalidate granular entity-specific tags (e.g. after updating a single artist)
+  for (const tag of entityTags) {
+    revalidateTag(tag)
+  }
+
+  return NextResponse.json({ revalidated: true, tags, entityTags })
 })

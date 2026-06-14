@@ -108,6 +108,8 @@ echo "  — YouTube video sync (optional — YouTube Data API v3) —"
 optional_env "YOUTUBE_API_KEY"    "Google API key with YouTube Data API v3 (used by POST /api/sync-youtube)"
 optional_env "YOUTUBE_CHANNEL_ID" "YouTube channel ID (starts with UC)"
 optional_env "CRON_SECRET"        "Optional bearer token for Vercel cron calls to POST /api/sync-youtube"
+optional_env "SUPABASE_REPLICA_URL"      "Supabase read-replica connection URL (Pro plan — for analytics queries)"
+optional_env "SUPABASE_REPLICA_ANON_KEY" "Anon key for the read replica"
 echo ""
 
 if [ "$MISSING" -gt 0 ]; then

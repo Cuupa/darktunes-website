@@ -139,6 +139,74 @@ export interface Database {
         }
         Relationships: []
       }
+      idempotency_keys: {
+        Row: {
+          key: string
+          resource_type: string
+          resource_id: string | null
+          created_at: string
+        }
+        Insert: {
+          key: string
+          resource_type: string
+          resource_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          key?: string
+          resource_type?: string
+          resource_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      sync_queue: {
+        Row: {
+          id: string
+          artist_id: string | null
+          job_type: string
+          status: string
+          scheduled_at: string
+          started_at: string | null
+          finished_at: string | null
+          error_message: string | null
+          attempt_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id?: string | null
+          job_type?: string
+          status?: string
+          scheduled_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+          error_message?: string | null
+          attempt_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string | null
+          job_type?: string
+          status?: string
+          scheduled_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+          error_message?: string | null
+          attempt_count?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sync_queue_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       users: {
         Row: {
           id: string
