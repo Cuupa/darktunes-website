@@ -65,7 +65,7 @@ export function AdminSidebarNav() {
       toast.error('Failed to sign out')
     } else {
       toast.success('Signed out successfully')
-      router.push('/admin/login')
+      router.push('/login')
     }
   }, [signOut, router])
 

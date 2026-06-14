@@ -49,7 +49,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   // 3. Send invite via service-role client (Admin API)
   const adminClient = await createServiceRoleSupabaseClient()
   const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${siteUrl}/admin/login`,
+    redirectTo: `${siteUrl}/login`,
     data: { role },
   })
 

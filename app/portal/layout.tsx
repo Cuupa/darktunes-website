@@ -1,7 +1,7 @@
 /**
  * app/portal/layout.tsx — Artist Portal layout (Server Component)
  *
- * Wraps all /portal/* routes (except /portal/login which renders standalone).
+ * Wraps all /portal/* routes (except /login which renders standalone).
  * Auth is enforced by middleware.ts before this layout renders.
  * Fetches the current user and their linked artists for the sidebar.
  *
@@ -85,8 +85,8 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   } = await supabase.auth.getUser()
 
   // No user — let children render (middleware already handles redirecting
-  // non-login portal routes to /portal/login, so here we only reach this
-  // branch for /portal/login itself where the login form must be visible).
+  // non-login portal routes to /login, so here we only reach this
+  // branch for /login itself where the login form must be visible).
   if (!user) return <>{children}</>
 
   // Fetch the user's role from their profile

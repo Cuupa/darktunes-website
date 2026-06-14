@@ -20,7 +20,7 @@ export function PressNav({ email, links }: PressNavProps) {
   const signOut = async () => {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
-    router.push('/press/login')
+    router.push('/login')
     router.refresh()
   }
 

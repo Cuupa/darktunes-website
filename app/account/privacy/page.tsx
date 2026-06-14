@@ -20,7 +20,7 @@ export default async function AccountPrivacyPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect('/portal/login')
+  if (!user) redirect('/login')
 
   return <PrivacyClient email={user.email ?? ''} />
 }
