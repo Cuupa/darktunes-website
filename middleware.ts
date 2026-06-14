@@ -77,12 +77,7 @@ export async function middleware(request: NextRequest) {
     user &&
     (isAdminRoute || isEditorRoute || isPortalRoute || isPressLoginPage || isPressDashboardRoute)
   ) {
-    const { data } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-    profile = data
+    profile = { role: user.app_metadata?.role ?? 'user' }
   }
 
   // --- Admin route protection ---
@@ -145,13 +140,8 @@ export async function middleware(request: NextRequest) {
     const isAdmin = profile?.role === 'admin'
 
     if (!isAdmin) {
-      // Check artist_members (junction table) — the link-artist API writes here
-      const { data: membership } = await supabase
-        .from('artist_members')
-        .select('artist_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle()
+      // Extract artist_id from JWT app_metadata
+      const membership = user.app_metadata?.artist_id ? { artist_id: user.app_metadata.artist_id } : null
 
       if (!membership) {
         const loginUrl = request.nextUrl.clone()
@@ -172,13 +162,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(portalUrl)
     }
 
-    // Check artist_members (junction table)
-    const { data: membership } = await supabase
-      .from('artist_members')
-      .select('artist_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
+    // Extract artist_id from JWT app_metadata
+    const membership = user.app_metadata?.artist_id ? { artist_id: user.app_metadata.artist_id } : null
 
     if (membership) {
       const portalUrl = request.nextUrl.clone()
