@@ -29,8 +29,9 @@ import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
-import { AnalyticsDashboard } from '@/components/admin/sos/AnalyticsDashboard'
-import { TrendsDashboard } from '@/components/admin/sos/TrendsDashboard'
+import dynamic from 'next/dynamic'
+const AnalyticsDashboard = dynamic(() => import('@/components/admin/sos/AnalyticsDashboard').then(mod => mod.AnalyticsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
+const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 import {
