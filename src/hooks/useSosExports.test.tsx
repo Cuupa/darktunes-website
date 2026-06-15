@@ -8,7 +8,7 @@ const {
   mockToastError,
   mockGeneratePDF,
   mockDownloadBlob,
-  mockUploadStatementPdf,
+  mockUploadStatement,
   mockIsValidArtistId,
   mockIsValidPeriod,
 } = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ const {
   mockToastError: vi.fn(),
   mockGeneratePDF: vi.fn(),
   mockDownloadBlob: vi.fn(),
-  mockUploadStatementPdf: vi.fn(),
+  mockUploadStatement: vi.fn(),
   mockIsValidArtistId: vi.fn(),
   mockIsValidPeriod: vi.fn(),
 }))
@@ -37,10 +37,13 @@ vi.mock('@/lib/sos/export-utils', () => ({
   generateZipOfAllStatements: vi.fn(),
 }))
 
-vi.mock('@/lib/sos/sosWebhook', () => ({
-  uploadStatementPdf: mockUploadStatementPdf,
+vi.mock('@/lib/sos/validation', () => ({
   isValidArtistId: mockIsValidArtistId,
   isValidPeriod: mockIsValidPeriod,
+}))
+
+vi.mock('../../app/portal/statements/_actions/uploadStatement', () => ({
+  uploadStatement: mockUploadStatement,
 }))
 
 const labelInfo: LabelInfo = { name: 'darkTunes', address: '', invoiceNumberPrefix: 'SOS' }
@@ -61,7 +64,7 @@ describe('useSosExports.handlePublishToPortal', () => {
   })
 
   it('uploads statement PDF to portal with fallback quarter period', async () => {
-    mockUploadStatementPdf.mockResolvedValue({ success: true })
+    mockUploadStatement.mockResolvedValue({ success: true, statementId: 'stmt-123' })
 
     const labelArtists: LabelArtist[] = [
       { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
@@ -77,9 +80,7 @@ describe('useSosExports.handlePublishToPortal', () => {
         {},
         labelArtists,
         {},
-        [],
-        'https://example.com/api/webhooks/sos',
-        'secret'
+        []
       )
     )
 
@@ -88,23 +89,21 @@ describe('useSosExports.handlePublishToPortal', () => {
     })
 
     expect(mockGeneratePDF).toHaveBeenCalledOnce()
-    expect(mockUploadStatementPdf).toHaveBeenCalledWith(
-      {
+    expect(mockUploadStatement).toHaveBeenCalledWith(
+      expect.objectContaining({
         artistId: '123e4567-e89b-12d3-a456-426614174000',
         filename: 'Artist_One_statement.pdf',
         period: `Q1-${new Date().getFullYear()}`,
         amountEur: 123.45,
-      },
-      expect.any(Blob),
-      'https://example.com/api/webhooks/sos',
-      'secret'
+        pdfBase64: expect.any(String),
+      })
     )
     expect(mockToastSuccess).toHaveBeenCalledWith('Statement published to portal')
   })
 
   it('shows upload error and does not fall back to local download', async () => {
     mockIsValidPeriod.mockReturnValue(true)
-    mockUploadStatementPdf.mockResolvedValue({ success: false, error: 'Portal unavailable' })
+    mockUploadStatement.mockResolvedValue({ success: false, error: 'Portal unavailable' })
 
     const labelArtists: LabelArtist[] = [
       { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
@@ -120,9 +119,7 @@ describe('useSosExports.handlePublishToPortal', () => {
         {},
         labelArtists,
         {},
-        [],
-        'https://example.com/api/webhooks/sos',
-        'secret'
+        []
       )
     )
 

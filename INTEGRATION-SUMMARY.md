@@ -73,12 +73,12 @@
 - **LogsManager** *(admin-only tab)* — three-pane log viewer: Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filter dropdowns, and pagination.
 - **RolesManager** *(admin-only tab)* — configures per-role content permissions (`canPublishNews`, `canEditNews`, `canManageArtists`, `canManageReleases`, `canManageVideos`, `canViewAdminPanel`) stored as JSON in `site_settings` under key `role_permissions`. Admin permissions are always full and cannot be restricted.
 
-### SOS Webhook — Statement of Sales PDF Upload
-- `POST /api/webhooks/sos` — Step 1: Validates `SOS_WEBHOOK_SECRET` API key, verifies artist, generates a 15-minute presigned R2 PUT URL. Returns `{ uploadUrl, r2Key }`.
-- `POST /api/webhooks/sos/confirm` — Step 2: Validates API key, inserts `sales_statements` row via service-role client. Returns `{ statementId }`.
+### SOS (Statement of Sales) — Direct Server Action Upload
+- Statement-of-Sales PDFs are uploaded directly via the `uploadStatement` Server Action in `app/portal/statements/_actions/uploadStatement.ts`.
+- Authentication is via the caller's Supabase session (admin or editor role required) — no external webhook or shared secret needed.
+- The Server Action generates a presigned R2 PUT URL, uploads the PDF, persists a `sales_statements` row, and triggers an artist email notification.
 - `createSalesStatement(db, data)` DAL function in `src/lib/api/salesStatements.ts`.
 - `generatePresignedUploadUrl(r2Key, contentType, deps)` in `src/lib/portal/presignedUrl.ts` (15-min PUT URL).
-- Bypasses Vercel's 4.5 MB request body limit — PDFs go directly from SOS generator → R2.
 - `sales_statements` now carries workflow state (`draft`, `label_approved`, `artist_notified`, `acknowledged`) plus internal label notes and approval timestamps for the admin approval flow.
 - `artist_billing_profiles` stores artist invoicing master data and is required before any portal invoice can be created.
 - SOS-linked invoices store `statement_id`, `artist_invoice_number`, and optional notes; the portal creates §14 UStG-ready PDFs and marks approved statements as acknowledged after invoice creation.
@@ -191,7 +191,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |
 | Journalist Dashboard — feature modules | ✅ Implemented | Promo Pool, Press Kit, Press Releases, Accreditation, Download History with `journalist.*` flags |
 | Journalist download logging | ✅ Implemented | `journalist_downloads` tracks all secure journalist downloads |
-| SOS webhook — PDF upload from external generator | ✅ Implemented | 2-step presigned URL flow: POST /api/webhooks/sos (get PUT URL) + POST /api/webhooks/sos/confirm (create DB record). Requires `SOS_WEBHOOK_SECRET`. |
+| SOS — Statement of Sales PDF upload | ✅ Implemented | Direct `uploadStatement` Server Action (admin/editor session auth) — no external webhook or shared secret |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
 | Artist social/shop links | ✅ Implemented | `facebook_url`, `twitter_url`, `tiktok_url`, `bandcamp_url`, `shop_url` columns in `artists` table; icon buttons in public artist cards + modal + admin form |
 | News full page + detail page | ✅ Implemented | `/news` RSC with pagination via `ContentPagination`; `/news/[slug]` RSC detail page with `getNewsPostBySlug` DAL |
@@ -253,8 +253,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | `src/components/admin/RolesManager.tsx` | Admin role-permissions configurator — per-role toggle matrix stored in `site_settings.role_permissions` |
 | `app/api/revalidate-site-settings/route.ts` | Cache revalidation — POST /api/revalidate-site-settings (admin-only) |
 | `src/lib/portal/presignedUrl.ts` | Presigned URL generators: download (GET, 5 min) + upload (PUT, 15 min) with injected deps |
-| `app/api/webhooks/sos/route.ts` | SOS webhook Step 1 — generate presigned R2 PUT URL |
-| `app/api/webhooks/sos/confirm/route.ts` | SOS webhook Step 2 — insert sales_statements DB record |
+| `app/portal/statements/_actions/uploadStatement.ts` | SOS Server Action — authenticate, generate presigned URL, upload PDF to R2, insert sales_statements row |
 | `app/api/sync-youtube/route.ts` | YouTube video sync — POST /api/sync-youtube (admin bearer token or Vercel cron; optional `CRON_SECRET` check), upserts `artist_id` by case-insensitive title match against visible artists and writes `is_visible=true` for synced rows |
 | `src/lib/api/youtubeApi.ts` | YouTube Data API v3 utility — `fetchYouTubeChannelVideos(channelId, apiKey, maxResults)` |
 | `app/news/page.tsx` | Public news list RSC — paginated via ContentPagination |

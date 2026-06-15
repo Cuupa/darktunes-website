@@ -158,9 +158,6 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 - `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
 - `BANDSINTOWN_API_KEY`: Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access) — used by `src/lib/sync/bandsintownApi.ts` for concert sync
 
-### SOS Webhook (optional — Statement of Sales PDF upload from external generator)
-- `SOS_WEBHOOK_SECRET`: A random, high-entropy string shared between this app and the SOS PDF generator service. Used to authenticate server-to-server calls to `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm`. Generate with `openssl rand -hex 32`.
-
 ### Contact Form (optional — email delivery)
 - `CONTACT_EMAIL`: The email address that receives contact form submissions from `POST /api/contact`. Defaults to `info@darktunes.com` if not set. Use a monitored inbox.
 
@@ -184,8 +181,6 @@ After DOI confirmation, verified subscribers are pushed to MailerLite server-to-
 
 ### ISR Webhook Revalidation (optional — Supabase-triggered cache busting)
 - `REVALIDATE_SECRET`: A random, high-entropy ****** checked by `POST /api/revalidate`. Required when you configure Supabase webhooks to call this endpoint after DB writes so the ISR cache is busted automatically. Generate with `openssl rand -hex 32`. Share this value with the Supabase webhook configuration (Authorization header value).
-
-> ⚠️ **SOS Generator secret sharing**: `SOS_WEBHOOK_SECRET` must be shared with the external SOS PDF generator service at https://sos-generator-for-mu.vercel.app/ — configure it in that service's settings alongside your app's domain URL so it can authenticate server-to-server calls.
 
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 

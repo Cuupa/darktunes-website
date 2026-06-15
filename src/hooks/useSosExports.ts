@@ -9,8 +9,16 @@ import {
   generateZipOfAllStatements,
 } from '@/lib/sos/export-utils'
 import { createSafeFilename } from '@/lib/sos/utils'
-import { uploadStatementPdf, isValidArtistId, isValidPeriod } from '@/lib/sos/sosWebhook'
+import { isValidArtistId, isValidPeriod } from '@/lib/sos/validation'
+import { uploadStatement } from '../../app/portal/statements/_actions/uploadStatement'
 import type { SafeProcessedArtistData, LabelInfo, PdfExportSettings, AppDefaults, LabelArtist, EmailConfig, CompilationFilter } from '@/lib/sos/types'
+
+/** Converts a Blob to a Base64-encoded string. */
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
+}
 
 /**
  * Provides PDF, Excel and ZIP export actions with error handling.
@@ -26,8 +34,6 @@ export function useExports(
   labelArtists?: LabelArtist[],
   emailConfig?: Partial<EmailConfig>,
   compilationFilters: CompilationFilter[] = [],
-  sosWebhookUrl = '',
-  sosWebhookSecret = '',
   autoUploadToPortal = true
 ) {
   const emailOptions = useMemo(
@@ -79,11 +85,9 @@ export function useExports(
           compilationFilters
         )
 
-        // Attempt webhook upload if configured and auto-upload is enabled
+        // Attempt direct Server Action upload if auto-upload is enabled and artist is linked
         const shouldUpload =
           autoUploadToPortal &&
-          sosWebhookUrl.trim() !== '' &&
-          sosWebhookSecret.trim() !== '' &&
           artistInfo?.artistId != null &&
           isValidArtistId(artistInfo.artistId)
 
@@ -95,17 +99,14 @@ export function useExports(
 
           toast.loading('Uploading statement to portal…', { id: 'sos-upload' })
 
-          const result = await uploadStatementPdf(
-            {
-              artistId: artistInfo.artistId,
-              filename,
-              period: validPeriod,
-              amountEur: artistData.finalPayout,
-            },
-            blob,
-            sosWebhookUrl,
-            sosWebhookSecret
-          )
+          const pdfBase64 = await blobToBase64(blob)
+          const result = await uploadStatement({
+            artistId: artistInfo.artistId,
+            filename,
+            period: validPeriod,
+            amountEur: artistData.finalPayout,
+            pdfBase64,
+          })
 
           if (result.success) {
             toast.success('Statement uploaded! Artist will receive an email notification.', { id: 'sos-upload' })
@@ -123,7 +124,7 @@ export function useExports(
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, sosWebhookUrl, sosWebhookSecret, autoUploadToPortal]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal]
   )
 
   const handleDownloadExcel = useCallback(
@@ -257,10 +258,6 @@ export function useExports(
           throw new Error(`Artist "${artist}" is not linked to a valid portal artist ID`)
         }
 
-        if (sosWebhookUrl.trim() === '' || sosWebhookSecret.trim() === '') {
-          throw new Error('SOS webhook URL and secret are required')
-        }
-
         const currentYear = new Date().getFullYear()
         const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
         const artistSlug = artist.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4) || '0001'
@@ -280,17 +277,14 @@ export function useExports(
 
         const filename = `${createSafeFilename(artist)}_statement.pdf`
         const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
-        const result = await uploadStatementPdf(
-          {
-            artistId: artistInfo.artistId,
-            filename,
-            period: validPeriod,
-            amountEur: artistData.finalPayout,
-          },
-          blob,
-          sosWebhookUrl,
-          sosWebhookSecret
-        )
+        const pdfBase64 = await blobToBase64(blob)
+        const result = await uploadStatement({
+          artistId: artistInfo.artistId,
+          filename,
+          period: validPeriod,
+          amountEur: artistData.finalPayout,
+          pdfBase64,
+        })
 
         if (!result.success) {
           throw new Error(result.error ?? 'Failed to publish statement to portal')
@@ -302,7 +296,7 @@ export function useExports(
         toast.error(message)
       }
     },
-    [processedData, artistInfoMap, sosWebhookUrl, sosWebhookSecret, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters]
   )
 
   return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal }
