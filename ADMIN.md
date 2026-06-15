@@ -17,7 +17,7 @@ Portal features:
 - **Invoices** (`/portal/invoices`) — artists create invoices either manually or directly from an approved Statement of Sales. SOS-linked invoices lock the approved amount, store the artist’s own bookkeeping number, and generate a dark-themed §14 UStG-ready PDF.
 - **Tour Manager** (`/portal/tour`) — artists can create/delete their own concert entries (announced/confirmed/cancelled).
 - **Release Submission** (`/portal/releases/new`) — artists can submit new releases for admin review (`is_visible=false` until approved), including optional cover upload via `/api/portal/upload-release-cover`.
-- **Marketing Assets** (`/portal/marketing`) — artists can download assigned assets via short-lived presigned URLs and upload/delete their own assets via `/api/portal/upload-asset`.
+- **Marketing Assets** (`/portal/marketing`) — artists can review the label-managed Promo Log timeline, download assigned assets via short-lived presigned URLs, and upload/delete their own assets via `/api/portal/upload-asset`.
 - **Label Inbox** (`/portal/messages`) — artists can read rich-text label messages, receive realtime inbox updates, mark messages as read, and send rich-text replies (stored in `artist_replies`).
 - **Account Settings** (`/portal/settings`) — artists can update their password and switch locale (EN/DE).
 - **Feature-flag gating** — portal modules are controlled by `portal_feature_flags` (artist.* keys) and hidden/blocked when disabled.
@@ -45,6 +45,7 @@ WHERE slug = 'artist-slug';
 - **Feature Flags (admin-only)**: New **Feature Flags** tab to toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`)
 - **Admin Dashboard**: Tab state is persisted to the URL as a `?tab=` query param — tabs are bookmarkable and support browser back/forward navigation
 - **Messages (admin-only)**: Rich-text **Messages** tab for artist inbox communication (`label_messages`); supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions
+- **Promo Log**: Dedicated `/admin/promo-log` section for admins and editors to create, review, and delete artist-specific marketing activity entries that artists see read-only in their `/portal/marketing` timeline.
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Logs (admin-only)**: **Logs** tab with three sub-views — Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filters, and pagination.
 - **Statement Approval Workflow**: the Statements tab now shows statement workflow status (`draft`, `label_approved`, `artist_notified`, `acknowledged`) and lets admins/editors approve draft statements with optional internal label notes before artists generate linked invoices.
