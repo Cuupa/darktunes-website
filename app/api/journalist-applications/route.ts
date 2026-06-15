@@ -14,6 +14,7 @@ import {
   createJournalistApplication,
 } from '@/lib/api/journalistApplications'
 import { z } from 'zod'
+import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 
 const ApplySchema = z.object({
   email: z.string().email(),
@@ -38,6 +39,11 @@ export const GET = withErrorHandler(async () => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
+  // 3 applications per 30 minutes per IP
+  if (checkRateLimit(getClientIp(req), 3, 30 * 60_000).limited) {
+    throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
+  }
+
   const body = await req.json()
   const { email, name, outlet, message } = ApplySchema.parse(body)
 

@@ -314,7 +314,7 @@ Review & Update All Docs and Scripts: At the END of EVERY agent session, review 
 This review is MANDATORY, not optional, even when no documentation changes were part of the original task.
 Update Documentation: If new public APIs, components, or utilities were added, update the relevant docs in the docs/ directory or inline JSDoc comments.
 Minimal Changes Principle: Make the smallest possible change that fully addresses the requirement. Do not refactor unrelated code in the same PR. Do not add new dependencies unless absolutely necessary — check npm audit for any new package.
-Tested Modules (unit test files exist): `spotifyEmbedPath`, `utils/cn`, `syncLogs`, `youtubeApi`, `artistRowMapper`, `featureFlags`, `accreditations`, `labelMessages`, `artistReplies`, `journalistDownloads`, `r2Utils`, `platformUrlParser`.
+Tested Modules (unit test files exist): `spotifyEmbedPath`, `utils/cn`, `syncLogs`, `youtubeApi`, `artistRowMapper`, `featureFlags`, `accreditations`, `labelMessages`, `artistReplies`, `journalistDownloads`, `r2Utils`, `platformUrlParser`, `slugify`, `ipRateLimit`.
 
 Database Schema Management
 ⛔ MIGRATION SCRIPTS ARE STRICTLY AND ABSOLUTELY FORBIDDEN. Never create files in `supabase/migrations/` or any incremental SQL patch files. Every agent or developer who creates a migration script violates this rule and must immediately delete it and move the change into `supabase/reset.sql`.

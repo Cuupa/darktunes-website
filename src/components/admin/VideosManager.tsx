@@ -277,7 +277,7 @@ export function VideosManager() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} aria-labelledby="videos-form-dialog-title" className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="videos-form-dialog-title" data-lenis-prevent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle id="videos-form-dialog-title">{editingVideo ? 'Edit Video' : 'New Video'}</DialogTitle>
           </DialogHeader>

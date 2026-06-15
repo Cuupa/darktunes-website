@@ -62,7 +62,7 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
     if (!subscriber) {
       return NextResponse.redirect(new URL(errorUrl, req.url))
     }
-    console.log(`[newsletter/unsubscribe] ${subscriber.email} unsubscribed.`)
+    // Intentionally not logging the email address to avoid PII in server logs
   } catch (err) {
     console.error('[newsletter/unsubscribe] DB error:', err instanceof Error ? err.message : err)
     return NextResponse.redirect(new URL(errorUrl, req.url))

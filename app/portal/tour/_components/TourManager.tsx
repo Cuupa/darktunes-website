@@ -14,6 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Dictionary } from '@/i18n/types'
 import type { Concert } from '@/types'
@@ -41,6 +51,7 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('announced')
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const eventInputRef = useRef<HTMLInputElement>(null)
 
   const withToken = async () => {
@@ -117,8 +128,10 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
     setForm(EMPTY_FORM)
   }
 
-  const remove = async (id: string) => {
-    if (!window.confirm(dict.tour_delete_confirm)) return
+  const confirmRemove = async () => {
+    if (!deleteTarget) return
+    const id = deleteTarget
+    setDeleteTarget(null)
     try {
       const token = await withToken()
       const res = await fetch(`/api/portal/concerts?id=${id}`, {
@@ -142,6 +155,26 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{dict.tour_delete_confirm}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {dict.tour_delete}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{dict.tour_cancel_edit}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmRemove()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {dict.tour_delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
 
       <form onSubmit={submit} className="rounded-lg border border-border p-4 grid gap-3 md:grid-cols-2">
@@ -220,7 +253,7 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="outline" onClick={() => startEdit(concert)}>
                 {dict.tour_edit}
               </Button>
-              <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="destructive" onClick={() => void remove(concert.id)}>
+              <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="destructive" onClick={() => setDeleteTarget(concert.id)}>
                 {dict.tour_delete}
               </Button>
             </div>

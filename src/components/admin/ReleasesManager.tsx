@@ -641,7 +641,7 @@ export function ReleasesManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} aria-labelledby="releases-form-dialog-title" className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="releases-form-dialog-title" data-lenis-prevent className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle id="releases-form-dialog-title">{editingRelease ? 'Edit Release' : 'New Release'}</DialogTitle>
           </DialogHeader>
@@ -673,7 +673,7 @@ export function ReleasesManager() {
 
       {/* Sync error details dialog */}
       <Dialog open={!!syncResult && syncResult.totalErrors > 0} onOpenChange={(open) => !open && setSyncResult(null)}>
-        <DialogContent aria-labelledby="releases-sync-errors-title" className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent aria-labelledby="releases-sync-errors-title" data-lenis-prevent className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle id="releases-sync-errors-title">Sync Errors ({syncResult?.totalErrors ?? 0})</DialogTitle>
             <DialogDescription>
@@ -701,7 +701,7 @@ export function ReleasesManager() {
 
       {/* Release Checklist Dialog */}
       <Dialog open={!!checklistRelease} onOpenChange={(open) => !open && setChecklistRelease(null)}>
-        <DialogContent aria-labelledby="checklist-dialog-title" className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent aria-labelledby="checklist-dialog-title" data-lenis-prevent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle id="checklist-dialog-title">
               Release Checklist — {checklistRelease?.title}

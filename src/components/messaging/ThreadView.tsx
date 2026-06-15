@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 import { StarFour } from '@phosphor-icons/react'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { ArtistReply, LabelMessage } from '@/types'
@@ -23,8 +23,7 @@ interface ThreadViewProps {
 }
 
 function sanitizeHtml(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html)
+  return sanitizeHtmlSafe(html)
 }
 
 export function ThreadView({
@@ -157,6 +156,7 @@ export function ThreadView({
                     <div className="mt-4 space-y-4 border-t border-border pt-4">
                       {message.bodyHtml ? (
                         <div
+                          suppressHydrationWarning
                           className="prose prose-invert max-w-none break-words"
                           dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
                         />
@@ -171,6 +171,7 @@ export function ThreadView({
                               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Artist reply</p>
                               {reply.bodyHtml ? (
                                 <div
+                                  suppressHydrationWarning
                                   className="prose prose-invert max-w-none break-words text-sm"
                                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(reply.bodyHtml) }}
                                 />

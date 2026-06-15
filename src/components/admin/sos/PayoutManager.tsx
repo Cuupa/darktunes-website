@@ -4,8 +4,7 @@ import { useMemo, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { FileDown, AlertTriangle, CheckCircle } from 'lucide-react'
-import { Bank, Warning } from '@phosphor-icons/react'
+import { DownloadSimple, Warning, CheckCircle, Bank } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ArtistRevenue, LabelArtist, LabelInfo } from '@/lib/sos/types'
 import { isValidIBAN, maskIBAN } from '@/lib/sos/iban-validator'
@@ -166,7 +165,7 @@ export function PayoutManager({
             </div>
             {invalidRows.length > 0 && (
               <div className="flex items-center gap-1.5">
-                <AlertTriangle size={14} className="text-red-400" />
+                <Warning size={14} className="text-red-400" />
                 <span className="text-muted-foreground">{invalidRows.length} ohne / ungültige IBAN</span>
               </div>
             )}
@@ -190,7 +189,7 @@ export function PayoutManager({
               onClick={handleExport}
               disabled={syncedSelected.size === 0}
             >
-              <FileDown size={14} />
+              <DownloadSimple size={14} />
               SEPA XML exportieren
             </Button>
           </div>
@@ -284,7 +283,7 @@ export function PayoutManager({
                           </span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/15 text-red-400 border border-red-500/25">
-                            <AlertTriangle size={10} />Ungültig
+                            <Warning size={10} weight="bold" />Ungültig
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25">

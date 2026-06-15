@@ -39,7 +39,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **External API rate limiting** — all calls to external APIs (iTunes, Spotify, Discogs, Songkick) go through `withExponentialBackoff()` from `src/lib/rateLimiter.ts`. This prevents runaway requests and provides graceful handling of HTTP 429 / 5xx responses.
 - **External API keys** (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `DISCOGS_TOKEN`, `SONGKICK_API_KEY`) are server-side only — never prefixed with `NEXT_PUBLIC_` and never sent to the browser.
 - **Image caching** — external cover art images are downloaded server-side and uploaded to Cloudflare R2. The browser only ever loads images from R2 (via wsrv.nl proxy). External image URLs are never stored in the database or sent to the browser.
-- **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content, but every client-side render path sanitizes the HTML with DOMPurify before using `dangerouslySetInnerHTML`, reducing XSS risk in the admin inbox and artist portal.
+- **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content. Every render path sanitizes the HTML with `sanitizeHtml()` from `src/lib/sanitizeHtml.ts`, which applies a regex-based server-safe pass during SSR and delegates to DOMPurify on the client, before using `dangerouslySetInnerHTML`. This covers both the initial server-rendered response and the client hydration, reducing XSS risk across the admin inbox, artist portal, and all other rich-text surfaces (bio fields, privacy policy, about page).
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
 
 ## CSRF Protection
@@ -51,13 +51,18 @@ Do NOT add manual CSRF token middleware — it would conflict with Server Action
 
 ## Rate Limiting on Public Endpoints
 
-The following public endpoints have no rate limiting beyond application-layer
-guards — they are protected by:
-- `/api/newsletter`: silent success on duplicate email (anti-enumeration)
-- `/api/contact`: honeypot field (`_gotcha`) in the form; Zod validates input
-- `/api/journalist-applications`: no rate limit — consider adding IP-based limiting
+The following public endpoints are protected by an in-memory sliding-window
+IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 
-TODO: Add Vercel Edge Rate Limiting or Upstash Redis rate limiting to these routes.
+| Route | Limit | Window | Notes |
+|---|---|---|---|
+| `/api/contact` | 5 requests | 10 minutes | + honeypot field |
+| `/api/newsletter` | 3 requests | 10 minutes | + silent success on duplicate email |
+| `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
+
+**Limitation**: the in-memory store is per-instance and not shared across
+Vercel serverless pods. For stricter enforcement, pair with a Vercel WAF or
+Upstash Redis rate limiter.
 
 ## Upload Size Limits (enforced in Route Handlers)
 

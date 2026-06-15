@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { Copy, Check, Download, CalendarBlank, Quotes } from '@phosphor-icons/react'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -75,8 +76,9 @@ export function PressPageClient({ dict, photos, concerts, profile, artistName }:
                 </CardHeader>
                 <CardContent>
                   <div
+                    suppressHydrationWarning
                     className="prose prose-invert prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: bio.text }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
                   />
                 </CardContent>
               </Card>

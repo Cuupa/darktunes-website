@@ -4,8 +4,17 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { FileDown, FileText, Table2, Archive, Search, Loader2 } from 'lucide-react'
-import { EnvelopeSimple, PaperPlaneTilt } from '@phosphor-icons/react'
+import {
+  DownloadSimple,
+  FileText,
+  Table,
+  Archive,
+  MagnifyingGlass,
+  CircleNotch,
+  EnvelopeSimple,
+  PaperPlaneTilt,
+} from '@phosphor-icons/react'
+import { toast } from 'sonner'
 import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig } from '@/lib/sos/types'
 import { buildMailtoLink } from '@/lib/sos/utils'
 
@@ -80,7 +89,7 @@ export function ReportingPanel({
       const artistEmail = roster?.email ?? ''
       const template = labelInfo?.emailTemplate ?? ''
       if (!template) {
-        alert(`No e-mail template configured. Please add one in Branding > E-Mail-Anschreiben.`)
+        toast.error('No e-mail template configured. Please add one in Branding > E-Mail-Anschreiben.')
         return
       }
       const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.finalAmount)
@@ -248,11 +257,11 @@ export function ReportingPanel({
             disabled={selectedCount === 0 || !onPublishToPortal || isPublishingSelected}
             onClick={() => void publishSelected()}
           >
-            {isPublishingSelected ? <Loader2 size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
+            {isPublishingSelected ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
             Publish Selected
           </Button>
           <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={revenues.length === 0} onClick={onDownloadAll}>
-            <FileDown size={14} />
+            <DownloadSimple size={14} />
             Export All
           </Button>
         </div>
@@ -261,7 +270,7 @@ export function ReportingPanel({
       <div className="px-6 py-4 border-b border-white/5">
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <div className="relative max-w-sm flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Filter by artist…"
@@ -285,7 +294,7 @@ export function ReportingPanel({
       <div className="overflow-x-auto flex-1">
         {revenues.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
-            <FileDown size={32} className="opacity-30" />
+            <DownloadSimple size={32} className="opacity-30" />
             <p className="text-sm">No revenue data yet. Upload a CSV to get started.</p>
           </div>
         ) : (
@@ -388,7 +397,7 @@ export function ReportingPanel({
                             disabled={publishingArtists.has(r.artist)}
                           >
                             {publishingArtists.has(r.artist) ? (
-                              <Loader2 size={13} className="animate-spin" />
+                              <CircleNotch size={13} className="animate-spin" />
                             ) : (
                               <PaperPlaneTilt size={13} />
                             )}
@@ -406,7 +415,7 @@ export function ReportingPanel({
                           PDF
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 px-2 gap-1 text-xs" onClick={() => onDownloadExcel(r.artist)} title={`Download Excel for ${r.artist}`}>
-                          <Table2 size={13} />
+                          <Table size={13} />
                           Excel
                         </Button>
                       </div>

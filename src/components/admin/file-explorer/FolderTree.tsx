@@ -92,7 +92,7 @@ export function FolderTree({ folders, currentFolderId, onNavigate, onCreateRootF
           <Plus size={18} aria-hidden="true" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3" data-lenis-prevent>
         <div className="space-y-2">
           <button type="button" className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted', currentFolderId === null && 'bg-primary/10 text-primary')} onClick={() => onNavigate(null)}>
             <FolderSimple size={18} className="text-primary" aria-hidden="true" />

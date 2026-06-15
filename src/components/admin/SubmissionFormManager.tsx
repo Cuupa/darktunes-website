@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { SubmissionFormField } from '@/types'
@@ -24,6 +34,7 @@ export function SubmissionFormManager() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [addingNew, setAddingNew] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [newField, setNewField] = useState<Partial<SubmissionFormField>>({
     fieldType: 'text',
     isRequired: false,
@@ -76,8 +87,10 @@ export function SubmissionFormManager() {
     }
   }
 
-  const deleteField = async (id: string) => {
-    if (!confirm('Delete this field?')) return
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    const id = deleteTarget
+    setDeleteTarget(null)
     setSaving(id)
     try {
       const token = await getToken()
@@ -102,6 +115,26 @@ export function SubmissionFormManager() {
 
   return (
     <div className="space-y-4">
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Field</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this field? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmDelete()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Tabs value={formType} onValueChange={(v) => setFormType(v as FormType)}>
         <TabsList>
           <TabsTrigger value="release">Release Form</TabsTrigger>
@@ -172,7 +205,7 @@ export function SubmissionFormManager() {
                             size="sm"
                             className="h-7 text-xs"
                             disabled={saving === field.id}
-                            onClick={() => void deleteField(field.id)}
+                            onClick={() => setDeleteTarget(field.id)}
                           >
                             Delete
                           </Button>

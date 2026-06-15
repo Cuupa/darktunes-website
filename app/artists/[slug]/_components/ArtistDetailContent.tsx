@@ -35,7 +35,7 @@ import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/t
 import type { Dictionary, Locale } from '@/i18n/types'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 
 interface ArtistDetailContentProps {
   artist: Artist
@@ -396,7 +396,7 @@ export function ArtistDetailContent({
                       [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h3]:font-semibold
                       [&_a]:text-accent [&_a]:underline [&_strong]:text-foreground"
                     dangerouslySetInnerHTML={{
-                      __html: typeof window !== 'undefined' ? DOMPurify.sanitize(artist.bio) : artist.bio,
+                      __html: sanitizeHtml(artist.bio),
                     }}
                   />
                 ) : (
