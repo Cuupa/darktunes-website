@@ -84,6 +84,7 @@ echo ""
 echo "  — Newsletter / email delivery (optional) —"
 optional_env "RESEND_API_KEY"      "Resend API key (used by contact mail + newsletter DOI flow)"
 optional_env "RESEND_FROM_EMAIL"   "Verified sender email for Resend-powered emails"
+optional_env "LABEL_NOTIFICATION_EMAIL" "Label inbox for artist submission notifications (release/video)"
 optional_env "NEXT_PUBLIC_SITE_URL" "Public site URL used to build confirmation links (e.g. https://darktunes.com)"
 echo ""
 

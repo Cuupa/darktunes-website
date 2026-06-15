@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   ToggleRight,
   FileText,
+  Calendar,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -33,6 +34,7 @@ const PressManager = lazy(() => import('./PressManager').then((m) => ({ default:
 const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager').then((m) => ({ default: m.ReleaseSubmissionsManager })))
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
+const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
 
 function TabFallback() {
   return (
@@ -53,6 +55,7 @@ type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'accreditations' | 'press' | 'statements'
   | 'release-submissions' | 'video-submissions' | 'submission-form'
+  | 'events'
 
 interface TabDef {
   value: TabValue
@@ -67,6 +70,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'releases',       label: 'Releases',           adminOnly: false, icon: MusicNotes },
   { value: 'news',           label: 'News',               adminOnly: false, icon: Newspaper },
   { value: 'videos',         label: 'Videos',             adminOnly: false, icon: VideoCamera },
+  { value: 'events',         label: 'Events',             adminOnly: false, icon: Calendar },
   { value: 'assets',         label: 'Assets',             adminOnly: true,  icon: ImageIcon },
   { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
   { value: 'press',          label: 'Press Portal',       adminOnly: true,  icon: Newspaper },
@@ -84,6 +88,7 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   releases:        { title: 'Releases Management',               description: 'Manage music releases, albums, EPs, and singles' },
   news:            { title: 'News Management',                   description: 'Create and manage news posts and announcements' },
   videos:          { title: 'Videos Management',                 description: 'Manage music videos and YouTube content' },
+  events:          { title: 'Live Shows Management',             description: 'Manage concert and tour dates for any artist. Select an artist to edit their schedule on behalf of the label.' },
   assets:          { title: 'Assets Management',                 description: 'Upload and manage images, covers, and media files' },
   accreditations:  { title: 'Accreditations',                    description: 'Review journalist accreditation requests and approve or reject them.' },
   press:           { title: 'Press Portal',                      description: 'Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.' },
@@ -240,6 +245,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               releases:        <ReleasesManager />,
               news:            <NewsManager />,
               videos:          <VideosManager />,
+              events:          <AdminConcertsManager />,
               assets:          <AssetsManager />,
               accreditations:  <AccreditationsManager />,
               press:           <PressManager />,

@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
 
 interface NavItem {
   label: string
@@ -130,24 +131,27 @@ export function AdminSidebarNav() {
       {/* Mobile header — only visible below md breakpoint */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
-              <List size={20} aria-hidden="true" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-56 p-0">
-            <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
-            <div className="flex h-full flex-col bg-card">
-              <div className="px-4 py-5 border-b border-border">
-                <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
-                <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+        <div className="flex items-center gap-2">
+          {user?.id && <EditorNotificationBell userId={user.id} />}
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
+                <List size={20} aria-hidden="true" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-56 p-0">
+              <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
+              <div className="flex h-full flex-col bg-card">
+                <div className="px-4 py-5 border-b border-border">
+                  <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+                </div>
+                {renderNavLinks(() => setMobileOpen(false))}
+                {renderFooter()}
               </div>
-              {renderNavLinks(() => setMobileOpen(false))}
-              {renderFooter()}
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       {/* Desktop sidebar — hidden below md */}
@@ -156,9 +160,12 @@ export function AdminSidebarNav() {
         aria-label="Admin navigation"
       >
         {/* Brand header */}
-        <div className="px-4 py-5 border-b border-border">
-          <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
-          <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+        <div className="px-4 py-5 border-b border-border flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+            <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+          </div>
+          {user?.id && <EditorNotificationBell userId={user.id} />}
         </div>
 
         {renderNavLinks()}

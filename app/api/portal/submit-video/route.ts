@@ -4,6 +4,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createVideoSubmission } from '@/lib/api/videoSubmissions'
+import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -56,14 +57,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     notes: body.notes ?? null,
   })
 
-  // Notify editors
+  // Notify editors and admins
   const serviceRole = await createServiceRoleSupabaseClient()
-  const { data: editorProfiles } = await serviceRole
+  const { data: recipientProfiles } = await serviceRole
     .from('users')
     .select('id')
-    .eq('role', 'editor')
+    .in('role', ['admin', 'editor'])
 
-  const recipients = (editorProfiles ?? []).map((profile) => ({
+  const recipients = (recipientProfiles ?? []).map((profile) => ({
     recipient_id: profile.id,
     type: 'artist_video_submission',
     entity_type: 'video_submission',
@@ -76,6 +77,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (recipients.length > 0) {
     await serviceRole.from('editor_notifications').insert(recipients)
   }
+
+  // Send label notification email (fire-and-forget; failure does not block the response)
+  const resendApiKey = process.env.RESEND_API_KEY ?? ''
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL ?? ''
+  const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+  void sendSubmissionNotificationEmail(
+    {
+      type: 'video',
+      title: submission.title,
+      artistName: artist.name,
+      submittedAt: new Date().toISOString(),
+      adminUrl: `${siteUrl}/admin`,
+    },
+    { resendApiKey, resendFromEmail, labelNotificationEmail, fetch },
+  ).catch((err: unknown) =>
+    console.error('[submit-video] Email notification error:', err instanceof Error ? err.message : err),
+  )
 
   return NextResponse.json({ submissionId: submission.id })
 })

@@ -6,6 +6,7 @@ import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
+import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -102,13 +103,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     form_data: body.formData ?? null,
   })
 
-  // Notify editors (reuse the already-created serviceRole client)
-  const { data: editorProfiles } = await serviceRole
+  // Notify editors and admins (insert in-app notification rows)
+  const { data: recipientProfiles } = await serviceRole
     .from('users')
     .select('id')
-    .eq('role', 'editor')
+    .in('role', ['admin', 'editor'])
 
-  const recipients = (editorProfiles ?? []).map((profile) => ({
+  const recipients = (recipientProfiles ?? []).map((profile) => ({
     recipient_id: profile.id,
     type: 'artist_release_submission',
     entity_type: 'release_submission',
@@ -121,6 +122,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (recipients.length > 0) {
     await serviceRole.from('editor_notifications').insert(recipients)
   }
+
+  // Send label notification email (fire-and-forget; failure does not block the response)
+  const resendApiKey = process.env.RESEND_API_KEY ?? ''
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL ?? ''
+  const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+  void sendSubmissionNotificationEmail(
+    {
+      type: 'release',
+      title: submission.title,
+      artistName: artist.name,
+      submittedAt: new Date().toISOString(),
+      adminUrl: `${siteUrl}/admin`,
+    },
+    { resendApiKey, resendFromEmail, labelNotificationEmail, fetch },
+  ).catch((err: unknown) =>
+    console.error('[submit-release] Email notification error:', err instanceof Error ? err.message : err),
+  )
 
   // Update idempotency key with the created resource ID (non-blocking)
   if (body.idempotencyKey) {
