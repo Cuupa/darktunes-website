@@ -112,11 +112,12 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     tiktok_url,
     facebook_url,
     soundcloud_url,
-    // bio, genres, founding_year are stored on artists (single source of truth);
+    // bio, genres, founding_year, and hometown are stored on artists (single source of truth);
     // extract them here so they are NOT passed to upsertArtistProfile.
     bio,
     genres,
     founding_year,
+    hometown,
     ...profileFields
   } = d
 
@@ -140,6 +141,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (bio !== undefined) artistUpdate.bio = bio ?? ''
   if (genres !== undefined) artistUpdate.genres = genres
   if (founding_year !== undefined) artistUpdate.founding_year = founding_year
+  if (hometown !== undefined) artistUpdate.hometown = hometown
   if (website_url !== undefined) artistUpdate.website_url = website_url
   if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
   if (youtube_url !== undefined) artistUpdate.youtube_url = youtube_url
