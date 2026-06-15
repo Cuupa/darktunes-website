@@ -95,8 +95,11 @@ export function useReleases() {
         const text = await res.text()
         throw new Error(`Sync failed: ${text}`)
       }
-      const result = (await res.json()) as SyncAllResult
-      return result
+      const raw = (await res.json()) as Record<string, unknown>
+      // New async queue format: { queued, total, message }
+      if ('queued' in raw) return null
+      // Legacy direct-result format: { results, totalErrors, … }
+      return raw as unknown as SyncAllResult
     } finally {
       setIsSyncing(false)
       setSyncProgress(0)

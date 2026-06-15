@@ -88,11 +88,38 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
     byRelease.get(row.release_id)!.push(row.artists)
   }
 
-  return releases.map((r) => ({
-    ...r,
-    artists: byRelease.get(r.id) ?? undefined,
-    artistName: byRelease.get(r.id)?.[0]?.name ?? r.artistName,
-  }))
+  // Releases that have no junction-table entry but do have a legacy artist_id
+  // (e.g. created by the iTunes sync) need a direct artist lookup as a fallback.
+  const missingArtistIds = releases
+    .filter((r) => !byRelease.has(r.id) && r.artistId)
+    .map((r) => r.artistId as string)
+    .filter((id, i, arr) => arr.indexOf(id) === i) // deduplicate
+
+  let artistMap = new Map<string, { id: string; name: string; slug: string }>()
+  if (missingArtistIds.length > 0) {
+    const { data: artistRows } = await db
+      .from('artists')
+      .select('id, name, slug')
+      .in('id', missingArtistIds)
+    artistMap = new Map((artistRows ?? []).map((a) => [a.id, a]))
+  }
+
+  return releases.map((r) => {
+    const junctionArtists = byRelease.get(r.id)
+    if (junctionArtists) {
+      return {
+        ...r,
+        artists: junctionArtists,
+        artistName: junctionArtists[0]?.name ?? r.artistName,
+      }
+    }
+    const fallback = r.artistId ? artistMap.get(r.artistId) : undefined
+    return {
+      ...r,
+      artists: fallback ? [fallback] : undefined,
+      artistName: fallback?.name ?? r.artistName,
+    }
+  })
 }
 
 export async function getReleasesByArtistId(db: DbClient, artistId: string): Promise<Release[]> {

@@ -117,12 +117,15 @@ describe('getPublicReleases', () => {
     const releaseBuilder = makeBuilder([mockReleaseRow], null)
     // Third call (release_artists junction): no multi-artist data
     const junctionBuilder = makeBuilder([], null)
+    // Fourth call (fallback artists lookup): maps legacy artist_id
+    const fallbackArtistBuilder = makeBuilder([{ id: 'art-001', name: 'Artist One', slug: 'artist-one' }], null)
 
     const db = {
       from: vi.fn()
         .mockReturnValueOnce(artistBuilder)
         .mockReturnValueOnce(releaseBuilder)
-        .mockReturnValueOnce(junctionBuilder),
+        .mockReturnValueOnce(junctionBuilder)
+        .mockReturnValueOnce(fallbackArtistBuilder),
     } as unknown as DbClient
 
     const result = await getPublicReleases(db)
