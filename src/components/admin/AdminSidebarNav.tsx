@@ -7,6 +7,10 @@
  * Uses usePathname() for active-state highlighting and useAuthContext()
  * to hide admin-only sections from editors.
  *
+ * Navigation is structured in labelled groups (CONTENT, SUBMISSIONS, PRESS,
+ * MANAGEMENT, SYSTEM). Groups whose items are all hidden for the current role
+ * are not rendered. The Dashboard link sits above all groups without a label.
+ *
  * On mobile (< md) the sidebar is hidden; a hamburger button in the layout
  * header opens this nav inside a Sheet drawer.
  */
@@ -17,17 +21,27 @@ import { useCallback, useState } from 'react'
 import { useAuthContext } from '@/contexts/AuthContext'
 import {
   SquaresFour,
-  MusicNotes,
+  Microphone,
+  VinylRecord,
+  Newspaper,
+  FilmStrip,
+  CalendarBlank,
+  UploadSimple,
+  VideoCamera,
+  IdentificationCard,
+  Briefcase,
+  Receipt,
+  FolderOpen,
   Wallet,
   ChatCircle,
   MegaphoneSimple,
-  Users,
+  UsersThree,
   ToggleRight,
+  Palette,
   Gear,
   Cpu,
   SignOut,
   List,
-  Palette,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -43,17 +57,58 @@ interface NavItem {
   adminOnly: boolean
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',     href: '/admin',            icon: SquaresFour, adminOnly: false },
-  { label: 'Content',       href: '/admin/content',    icon: MusicNotes,  adminOnly: false },
-  { label: 'Accounting',    href: '/admin/accounting', icon: Wallet,      adminOnly: true  },
-  { label: 'Messages',      href: '/admin/messages',   icon: ChatCircle,  adminOnly: true  },
-  { label: 'Promo Log',     href: '/admin/promo-log',  icon: MegaphoneSimple, adminOnly: false },
-  { label: 'Users',         href: '/admin/users',      icon: Users,       adminOnly: true  },
-  { label: 'Feature Flags', href: '/admin/features',   icon: ToggleRight, adminOnly: true  },
-  { label: 'Colors',        href: '/admin/colors',     icon: Palette,     adminOnly: true  },
-  { label: 'Settings',      href: '/admin/settings',   icon: Gear,        adminOnly: true  },
-  { label: 'System',        href: '/admin/system',     icon: Cpu,         adminOnly: true  },
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+const DASHBOARD_ITEM: NavItem = { label: 'Dashboard', href: '/admin', icon: SquaresFour, adminOnly: false }
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'CONTENT',
+    items: [
+      { label: 'Artists',  href: '/admin/artists',  icon: Microphone,    adminOnly: false },
+      { label: 'Releases', href: '/admin/releases', icon: VinylRecord,   adminOnly: false },
+      { label: 'News',     href: '/admin/news',     icon: Newspaper,     adminOnly: false },
+      { label: 'Videos',   href: '/admin/videos',   icon: FilmStrip,     adminOnly: false },
+      { label: 'Events',   href: '/admin/events',   icon: CalendarBlank, adminOnly: false },
+    ],
+  },
+  {
+    label: 'SUBMISSIONS',
+    items: [
+      { label: 'Release Submissions', href: '/admin/release-submissions', icon: UploadSimple, adminOnly: false },
+      { label: 'Video Submissions',   href: '/admin/video-submissions',   icon: VideoCamera,  adminOnly: false },
+    ],
+  },
+  {
+    label: 'PRESS',
+    items: [
+      { label: 'Accreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
+      { label: 'Press Portal',   href: '/admin/press',          icon: Briefcase,          adminOnly: true },
+    ],
+  },
+  {
+    label: 'MANAGEMENT',
+    items: [
+      { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
+      { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
+      { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
+      { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
+      { label: 'Promo Log',   href: '/admin/promo-log',   icon: MegaphoneSimple, adminOnly: false },
+      { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
+    ],
+  },
+  {
+    label: 'SYSTEM',
+    items: [
+      { label: 'Feature Flags', href: '/admin/features', icon: ToggleRight, adminOnly: true },
+      { label: 'Colors',        href: '/admin/colors',   icon: Palette,     adminOnly: true },
+      { label: 'Settings',      href: '/admin/settings', icon: Gear,        adminOnly: true },
+      { label: 'System',        href: '/admin/system',   icon: Cpu,         adminOnly: true },
+    ],
+  },
 ]
 
 export function AdminSidebarNav() {
@@ -83,34 +138,51 @@ export function AdminSidebarNav() {
     return pathname.startsWith(href)
   }
 
-  const visibleItems = NAV_ITEMS.filter(canSee)
+  const renderNavItem = (item: NavItem, onNavigate?: () => void) => {
+    const Icon = item.icon
+    const active = isActive(item.href)
+    return (
+      <li key={item.href}>
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+            active
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+          aria-current={active ? 'page' : undefined}
+        >
+          <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
+          {item.label}
+        </Link>
+      </li>
+    )
+  }
 
   const renderNavLinks = (onNavigate?: () => void) => (
     <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent aria-label="Admin sections">
-      <ul className="space-y-0.5">
-        {visibleItems.map((item) => {
-          const Icon = item.icon
-          const active = isActive(item.href)
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-                aria-current={active ? 'page' : undefined}
-              >
-                <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
-                {item.label}
-              </Link>
-            </li>
-          )
-        })}
+      {/* Dashboard — above all groups, no group label */}
+      <ul className="space-y-0.5 mb-2">
+        {canSee(DASHBOARD_ITEM) && renderNavItem(DASHBOARD_ITEM, onNavigate)}
       </ul>
+
+      {/* Grouped navigation items */}
+      {NAV_GROUPS.map((group) => {
+        const visibleItems = group.items.filter(canSee)
+        if (visibleItems.length === 0) return null
+        return (
+          <div key={group.label}>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-3 pt-4 pb-1">
+              {group.label}
+            </p>
+            <ul className="space-y-0.5">
+              {visibleItems.map((item) => renderNavItem(item, onNavigate))}
+            </ul>
+          </div>
+        )
+      })}
     </nav>
   )
 

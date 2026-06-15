@@ -5,6 +5,10 @@
  *
  * Catches rendering errors that escape the root layout (e.g. errors in
  * layout.tsx itself). Must include its own <html> and <body> tags.
+ *
+ * Special case — ChunkLoadError:
+ *   Same stale-chunk problem as app/error.tsx.  After a Vercel re-deploy the
+ *   old chunk hashes are gone; we detect the error and hard-reload silently.
  */
 
 import { useEffect } from 'react'
@@ -14,10 +18,31 @@ interface GlobalErrorProps {
   reset: () => void
 }
 
+/** Returns true when the error is caused by a stale webpack chunk (post-deploy). */
+function isChunkLoadError(error: Error): boolean {
+  return (
+    error.name === 'ChunkLoadError' ||
+    error.message.includes('Loading chunk') ||
+    error.message.includes('Failed to fetch dynamically imported module')
+  )
+}
+
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
-    console.error('[GlobalError]', error)
+    // Stale chunk after a new deployment → hard reload fetches the new manifest.
+    if (isChunkLoadError(error)) {
+      window.location.reload()
+      return
+    }
+
+    // In development surface the full error; in production keep the console clean.
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[GlobalError]', error)
+    }
   }, [error])
+
+  // Nothing to render while the reload is in-flight.
+  if (isChunkLoadError(error)) return <html lang="en"><body /></html>
 
   return (
     <html lang="en">

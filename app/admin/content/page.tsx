@@ -1,15 +1,14 @@
 /**
- * app/admin/content/page.tsx — Content Management
+ * app/admin/content/page.tsx
  *
- * Hosts the existing AdminDashboard (Artists, Releases, News, Videos,
- * Release/Video Submissions, etc.) at the /admin/content route.
- * The ?tab= query param still works exactly as before.
+ * Legacy redirect — the tab-based content management area has been replaced
+ * by individual sidebar routes (/admin/artists, /admin/releases, etc.).
  */
 
 export const dynamic = 'force-dynamic'
 
-import { AdminDashboardWrapper } from '../_components/AdminDashboardWrapper'
+import { redirect } from 'next/navigation'
 
 export default function AdminContentPage() {
-  return <AdminDashboardWrapper standalone={false} />
+  redirect('/admin/artists')
 }
