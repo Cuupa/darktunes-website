@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArtistForm, type ArtistFormData } from '@/components/admin/forms/ArtistForm'
+import { PromoLogManager } from '@/components/admin/PromoLogManager'
 import { useArtists } from '@/hooks/useArtists'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Artist } from '@/types'
@@ -208,6 +209,18 @@ export default function ArtistEditPage() {
             </CardHeader>
             <CardContent>
               <ArtistForm value={formValue} onChange={handleSave} isLoading={isSaving} artistId={artistId} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Promo-Logbuch — marketing activities timeline */}
+        {!isLoading && artist && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Marketing Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PromoLogManager artistId={artistId} artistName={artist.name} />
             </CardContent>
           </Card>
         )}

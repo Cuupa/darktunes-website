@@ -338,6 +338,20 @@ export interface ArtistAsset {
   createdAt: string
 }
 
+/** A single marketing activity documented by the label for an artist. */
+export interface PromoLogEntry {
+  id: string
+  artistId: string
+  actionDate: string
+  description: string
+  budgetAmount: number | null
+  budgetCurrency: string
+  proofUrl: string | null
+  proofR2Key: string | null
+  createdBy: string | null
+  createdAt: string
+}
+
 export interface SpotifyPlaylistEntry {
   label: string
   uri: string
