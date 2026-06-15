@@ -270,7 +270,9 @@ export function ReleasesManager() {
     try {
       const result = await syncAllReleases()
       if (!result) {
-        toast.info('Sync skipped — Supabase not configured')
+        toast.info(
+          'Sync jobs wurden eingereiht. Verarbeitung läuft im Hintergrund (alle 5 Minuten via Cron).',
+        )
         return
       }
       const totalSynced = result.results.reduce(
