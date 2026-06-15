@@ -1,7 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getSalesStatementsByArtistId, createSalesStatement } from './salesStatements'
+import {
+  getSalesStatementsByArtistId,
+  createSalesStatement,
+  getSalesStatementById,
+  approveSalesStatement,
+  updateSalesStatementStatus,
+  getSalesSummariesForAdmin,
+} from './salesStatements'
 
 type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
@@ -116,5 +123,98 @@ describe('createSalesStatement', () => {
         period: 'Q3-2024',
       }),
     ).rejects.toThrow('No data returned from createSalesStatement')
+  })
+})
+
+describe('getSalesStatementById', () => {
+  it('returns the mapped statement when found', async () => {
+    const db = makeMockDb(mockStatementRow)
+    const result = await getSalesStatementById(db, 'stmt-uuid-1')
+    expect(result).not.toBeNull()
+    expect(result!.id).toBe('stmt-uuid-1')
+    expect(result!.status).toBe('draft')
+  })
+
+  it('returns null when not found (PGRST116)', async () => {
+    const db = makeMockDb(null, { code: 'PGRST116', message: 'not found' })
+    const result = await getSalesStatementById(db, 'nonexistent')
+    expect(result).toBeNull()
+  })
+
+  it('throws on other database error', async () => {
+    const db = makeMockDb(null, { code: '42501', message: 'permission denied' })
+    await expect(getSalesStatementById(db, 'stmt-uuid-1')).rejects.toThrow('permission denied')
+  })
+})
+
+describe('approveSalesStatement', () => {
+  it('updates status to label_approved and returns mapped domain object', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+      label_notes: 'Looks good.',
+      label_approved_at: '2024-04-02T12:00:00Z',
+    }
+    const db = makeMockDb(approvedRow)
+    const result = await approveSalesStatement(db, 'stmt-uuid-1', 'Looks good.')
+    expect(result.status).toBe('label_approved')
+    expect(result.labelNotes).toBe('Looks good.')
+    expect(result.labelApprovedAt).toBe('2024-04-02T12:00:00Z')
+  })
+
+  it('works without notes', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+      label_notes: null,
+      label_approved_at: '2024-04-02T12:00:00Z',
+    }
+    const db = makeMockDb(approvedRow)
+    const result = await approveSalesStatement(db, 'stmt-uuid-1')
+    expect(result.status).toBe('label_approved')
+    expect(result.labelNotes).toBeUndefined()
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'update failed' })
+    await expect(approveSalesStatement(db, 'stmt-uuid-1')).rejects.toThrow('update failed')
+  })
+})
+
+describe('updateSalesStatementStatus', () => {
+  it('updates and returns the mapped domain object with new status', async () => {
+    const acknowledgedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'acknowledged',
+    }
+    const db = makeMockDb(acknowledgedRow)
+    const result = await updateSalesStatementStatus(db, 'stmt-uuid-1', 'acknowledged')
+    expect(result.status).toBe('acknowledged')
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'update error' })
+    await expect(
+      updateSalesStatementStatus(db, 'stmt-uuid-1', 'acknowledged'),
+    ).rejects.toThrow('update error')
+  })
+})
+
+describe('getSalesSummariesForAdmin', () => {
+  it('returns all statements unfiltered', async () => {
+    const db = makeMockDb([mockStatementRow, { ...mockStatementRow, id: 'stmt-uuid-2' }])
+    const result = await getSalesSummariesForAdmin(db)
+    expect(result).toHaveLength(2)
+  })
+
+  it('returns empty array when no statements', async () => {
+    const db = makeMockDb([])
+    const result = await getSalesSummariesForAdmin(db)
+    expect(result).toEqual([])
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'query failed' })
+    await expect(getSalesSummariesForAdmin(db)).rejects.toThrow('query failed')
   })
 })
