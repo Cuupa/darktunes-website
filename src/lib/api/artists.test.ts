@@ -105,7 +105,7 @@ describe('getArtists', () => {
     const db = makeMockDb([{ ...mockArtistRow, name: 'Mötley Crüe ß', slug: '   ' }])
     const result = await getArtists(db)
     expect(result).toHaveLength(1)
-    expect(result[0].slug).toBe('motley-crue-ss')
+    expect(result[0].slug).toBe('moetley-cruee-ss')
   })
 
   it('throws on error', async () => {

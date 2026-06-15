@@ -84,20 +84,26 @@ export default function NewsEditPage() {
       })
       // Update junction table: replace all entries for this post
       const supabase = createBrowserSupabaseClient()
-      await supabase
+      const { error: deleteError } = await supabase
         .from('news_post_artists' as const)
         .delete()
         .eq('news_post_id', post.id)
+      if (deleteError) throw new Error(deleteError.message)
       if ((data.artistIds ?? []).length > 0) {
         const inserts = (data.artistIds ?? []).map((artistId, i) => ({
           news_post_id: post.id,
           artist_id: artistId,
           sort_order: i,
         }))
-        await supabase.from('news_post_artists' as const).insert(inserts)
+        const { error: insertError } = await supabase
+          .from('news_post_artists' as const)
+          .insert(inserts)
+        if (insertError) throw new Error(insertError.message)
       }
       toast.success('News post saved')
       router.push('/admin/content?tab=news')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save news post')
     } finally {
       setIsSaving(false)
     }

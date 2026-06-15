@@ -68,13 +68,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       throw new ApiError(502, 'Failed to send email')
     }
   } else {
-    // Log contact submission when email service is not configured
-    console.log('[contact] New submission (email not configured):', {
-      name,
-      email,
-      topic,
-      message: message.slice(0, 80),
-    })
+    // Log that a submission was received without exposing personal data
+    console.log('[contact] New submission received (email service not configured)')
   }
 
   return NextResponse.json({ success: true })

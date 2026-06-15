@@ -49,7 +49,7 @@ import { MessageRulesManager } from '@/components/messaging/MessageRulesManager'
 import { ExternalEmailComposer } from '@/components/messaging/ExternalEmailComposer'
 import { AttachmentViewer } from '@/components/messaging/AttachmentViewer'
 import { useAuthContext } from '@/contexts/AuthContext'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,8 +99,7 @@ function rowToReply(row: ReplyRow): ArtistReply {
 }
 
 function sanitizeHtml(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html)
+  return sanitizeHtmlSafe(html)
 }
 
 function formatDate(iso: string): string {
@@ -643,6 +642,7 @@ export function MessagesManager() {
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }}>
               {selectedMessage.bodyHtml ? (
                 <div
+                  suppressHydrationWarning
                   className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedMessage.bodyHtml) }}
                 />
@@ -676,6 +676,7 @@ export function MessagesManager() {
                           </div>
                           {reply.bodyHtml ? (
                             <div
+                              suppressHydrationWarning
                               className="prose prose-sm prose-invert max-w-none text-sm"
                               dangerouslySetInnerHTML={{ __html: sanitizeHtml(reply.bodyHtml) }}
                             />

@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import Image from 'next/image'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -118,8 +118,7 @@ interface EPKPreviewProps {
 // ---------------------------------------------------------------------------
 
 function sanitize(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html, {
+  return sanitizeHtml(html, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'a', 'code', 'hr'],
     ALLOWED_ATTR: ['href', 'target', 'rel'],
   })
@@ -135,6 +134,7 @@ function BioBlock({ html, plain }: { html?: string; plain?: string }) {
   if (isHtml(content)) {
     return (
       <div
+        suppressHydrationWarning
         className="prose prose-invert prose-sm max-w-none"
         dangerouslySetInnerHTML={{ __html: sanitize(content) }}
       />

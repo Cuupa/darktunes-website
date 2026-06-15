@@ -59,9 +59,15 @@ const BASE_ROW: ArtistRow = {
  */
 function toSlugFromForm(name: string): string {
   return name
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/Ä/g, 'ae')
+    .replace(/Ö/g, 'oe')
+    .replace(/Ü/g, 'ue')
+    .replace(/ß/g, 'ss')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')

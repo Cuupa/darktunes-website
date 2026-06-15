@@ -12,10 +12,19 @@ import type { Artist } from '@/types'
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 export function rowToArtist(row: ArtistRow): Artist {
+  // Must match toSlug() in ArtistForm.tsx / NewsForm.tsx exactly so that artists
+  // without a stored slug get the same URL whether navigated to from the public
+  // site or resolved via the admin form.
   const fallbackSlug = row.name
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/Ä/g, 'ae')
+    .replace(/Ö/g, 'oe')
+    .replace(/Ü/g, 'ue')
+    .replace(/ß/g, 'ss')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')

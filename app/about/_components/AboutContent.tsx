@@ -6,8 +6,8 @@ import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { MarkdownContent } from '@/components/MarkdownContent'
-import DOMPurify from 'dompurify'
 import { processHtmlImages } from '@/lib/imageUtils'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import {
   InstagramLogo, YoutubeLogo, SpotifyLogo,
 } from '@phosphor-icons/react'
@@ -86,7 +86,9 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
                 [&_strong]:text-foreground [&_strong]:font-semibold
                 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-muted-foreground"
               dangerouslySetInnerHTML={{
-                __html: typeof window !== 'undefined' ? processHtmlImages(DOMPurify.sanitize(bodyHtml)) : bodyHtml,
+                __html: sanitizeHtml(
+                  typeof window !== 'undefined' ? processHtmlImages(bodyHtml) : bodyHtml,
+                ),
               }}
             />
           ) : (

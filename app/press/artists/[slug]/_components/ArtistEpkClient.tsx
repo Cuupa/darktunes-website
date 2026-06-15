@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 import DOMPurify from 'dompurify'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -31,8 +32,7 @@ interface ArtistEpkClientProps {
 }
 
 function sanitizeHtml(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html)
+  return sanitizeHtmlSafe(html)
 }
 
 function stripHtmlTags(html: string): string {
@@ -144,8 +144,8 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
                 </CardHeader>
                 <CardContent>
                   <div
+                    suppressHydrationWarning
                     className="text-sm leading-relaxed text-muted-foreground [&_p]:mb-2 [&_p:last-child]:mb-0"
-                    // bio HTML is admin-authored content sanitized via DOMPurify
                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
                   />
                 </CardContent>

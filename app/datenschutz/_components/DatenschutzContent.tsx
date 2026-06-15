@@ -2,7 +2,7 @@
 
 import { marked } from 'marked'
 import { useMemo } from 'react'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 
 interface DatenschutzContentProps {
   content: string
@@ -18,10 +18,9 @@ function isHtml(str: string) {
  * Supports both HTML (produced by TiptapEditor) and legacy Markdown.
  * Isolated as a minimal 'use client' leaf so the parent RSC stays server-rendered.
  *
- * DOMPurify requires the browser DOM API and is not available during SSR/SSG.
- * We guard the call so the server returns the raw (trusted, server-generated)
- * HTML; the client sanitizes on hydration. suppressHydrationWarning silences the
- * harmless attribute diff that can occur when DOMPurify strips stray attributes.
+ * sanitizeHtml() runs a regex-based sanitizer on the server (SSR) and delegates
+ * to DOMPurify on the client for comprehensive XSS protection on both render paths.
+ * suppressHydrationWarning silences any minor attribute diff between the two passes.
  */
 export function DatenschutzContent({ content }: DatenschutzContentProps) {
   const html = useMemo(() => {
@@ -32,8 +31,7 @@ export function DatenschutzContent({ content }: DatenschutzContentProps) {
           const result = marked.parse(content, { async: false })
           return typeof result === 'string' ? result : ''
         })()
-    if (typeof window === 'undefined') return raw
-    return DOMPurify.sanitize(raw)
+    return sanitizeHtml(raw)
   }, [content])
 
   return (
