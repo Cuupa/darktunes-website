@@ -1,14 +1,10 @@
 'use client'
 
-/**
- * src/components/admin/StatementsManager.tsx
- *
- * Read-only admin overview of all uploaded Statement-of-Sales PDFs.
- * Displays artist name, period, amount, filename, and upload timestamp
- * sorted by newest first.
- */
-
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -20,20 +16,38 @@ import {
 } from '@/components/ui/table'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
+type StatementStatus = 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+
 type StatementRow = {
   id: string
   artist_id: string
   filename: string
   period: string
   amount_eur: number | null
+  status: StatementStatus
+  label_notes: string | null
   created_at: string
   artists: { name: string }
+}
+
+function badgeVariant(status: StatementStatus): 'default' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'acknowledged':
+      return 'default'
+    case 'label_approved':
+      return 'secondary'
+    default:
+      return 'outline'
+  }
 }
 
 export function StatementsManager() {
   const [statements, setStatements] = useState<StatementRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [noteEditorId, setNoteEditorId] = useState<string | null>(null)
+  const [notesById, setNotesById] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +65,8 @@ export function StatementsManager() {
           filename,
           period,
           amount_eur,
+          status,
+          label_notes,
           created_at,
           artists!inner(name)
         `)
@@ -64,38 +80,85 @@ export function StatementsManager() {
         return
       }
 
-      setStatements((data ?? []) as StatementRow[])
+      const rows = (data ?? []) as StatementRow[]
+      setStatements(rows)
+      setNotesById(
+        rows.reduce<Record<string, string>>((acc, row) => {
+          acc[row.id] = row.label_notes ?? ''
+          return acc
+        }, {}),
+      )
       setLoading(false)
     }
 
     void fetchStatements()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const handleApprove = async (statementId: string) => {
+    setApprovingId(statementId)
+
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) throw new Error('Missing session')
+
+      const response = await fetch(`/api/admin/sales-statements/${statementId}/approve`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: ['Bearer', session.access_token].join(' '),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes: notesById[statementId] || undefined }),
+      })
+
+      const json = (await response.json().catch(() => null)) as
+        | { statement?: { status: StatementStatus; labelNotes?: string } ; error?: string }
+        | null
+
+      const approvedStatement = json?.statement
+      if (!response.ok || !approvedStatement) {
+        throw new Error(json?.error ?? 'Approval failed')
+      }
+
+      setStatements((current) => current.map((statement) => {
+        if (statement.id !== statementId) return statement
+        return {
+          ...statement,
+          status: approvedStatement.status,
+          label_notes: approvedStatement.labelNotes ?? notesById[statementId] ?? null,
+        }
+      }))
+      setNoteEditorId(null)
+      toast.success('Statement approved')
+    } catch (approvalError) {
+      toast.error(approvalError instanceof Error ? approvalError.message : 'Approval failed')
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   if (loading) {
     return (
-      <div className="space-y-2" aria-busy="true" aria-label="Loading statements">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+      <div aria-busy="true" aria-label="Loading statements" className="space-y-2">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Skeleton key={index} className="h-10 w-full" />
         ))}
       </div>
     )
   }
 
   if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load statements: {error}
-      </p>
-    )
+    return <p className="text-sm text-destructive">Failed to load statements: {error}</p>
   }
 
   if (statements.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-4 text-center">
-        No statements uploaded yet.
-      </p>
-    )
+    return <p className="py-4 text-center text-sm text-muted-foreground">No statements uploaded yet.</p>
   }
 
   return (
@@ -105,26 +168,53 @@ export function StatementsManager() {
           <TableRow>
             <TableHead>Artist Name</TableHead>
             <TableHead>Period</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Amount (EUR)</TableHead>
             <TableHead>Filename</TableHead>
             <TableHead>Created At</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {statements.map((stmt) => (
-            <TableRow key={stmt.id}>
-              <TableCell>{stmt.artists.name}</TableCell>
-              <TableCell>{stmt.period}</TableCell>
+          {statements.map((statement) => (
+            <TableRow key={statement.id}>
+              <TableCell>{statement.artists.name}</TableCell>
+              <TableCell>{statement.period}</TableCell>
               <TableCell>
-                {stmt.amount_eur !== null
-                  ? `€${stmt.amount_eur.toFixed(2)}`
-                  : '—'}
+                <Badge variant={badgeVariant(statement.status)}>{statement.status}</Badge>
               </TableCell>
+              <TableCell>{statement.amount_eur !== null ? `€${statement.amount_eur.toFixed(2)}` : '—'}</TableCell>
               <TableCell>
-                <span className="font-mono text-xs">{stmt.filename}</span>
+                <span className="font-mono text-xs">{statement.filename}</span>
               </TableCell>
-              <TableCell>
-                {new Date(stmt.created_at).toLocaleString()}
+              <TableCell>{new Date(statement.created_at).toLocaleString()}</TableCell>
+              <TableCell className="space-y-2 text-right">
+                <div className="flex justify-end gap-2">
+                  {statement.status === 'draft' && (
+                    <Button
+                      disabled={approvingId === statement.id}
+                      onClick={() => handleApprove(statement.id)}
+                      size="sm"
+                    >
+                      Approve
+                    </Button>
+                  )}
+                  <Button onClick={() => setNoteEditorId((current) => current === statement.id ? null : statement.id)} size="sm" variant="outline">
+                    Reject / Notes
+                  </Button>
+                </div>
+                {noteEditorId === statement.id && (
+                  <Input
+                    aria-label={`Label notes for ${statement.period}`}
+                    className="ml-auto max-w-xs"
+                    placeholder="Internal label notes"
+                    value={notesById[statement.id] ?? ''}
+                    onChange={(event) => setNotesById((current) => ({
+                      ...current,
+                      [statement.id]: event.target.value,
+                    }))}
+                  />
+                )}
               </TableCell>
             </TableRow>
           ))}

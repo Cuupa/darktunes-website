@@ -1,22 +1,24 @@
-/**
- * app/api/portal/invoices/route.ts
- *
- * GET  — list artist invoices (paginated)
- * POST — create invoice, generate PDF, upload to R2, email to client
- */
-
+import { randomUUID } from 'crypto'
+import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { NextRequest, NextResponse } from 'next/server'
-import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
+import {
+  createArtistInvoice,
+  createSosLinkedInvoice,
+  getArtistInvoiceByStatementId,
+  listArtistInvoices,
+  updateInvoice,
+} from '@/lib/api/artistInvoices'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { listArtistInvoices, createArtistInvoice } from '@/lib/api/artistInvoices'
+import { getSalesStatementById, updateSalesStatementStatus } from '@/lib/api/salesStatements'
+import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 import { generateInvoiceNumber } from '@/lib/portal/invoiceNumber'
 import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
-import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
+import { LABEL_BILLING_PARTY, LABEL_CLIENT_EMAIL } from '@/lib/portal/labelBilling'
 import { createR2Client } from '@/lib/r2Utils'
-import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { randomUUID } from 'crypto'
-import { z } from 'zod'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const lineItemSchema = z.object({
   description: z.string().min(1).max(500),
@@ -26,26 +28,34 @@ const lineItemSchema = z.object({
 
 const createInvoiceSchema = z.object({
   artist_id: z.string().uuid(),
+  artist_invoice_number: z.string().trim().min(1).max(100),
   client_name: z.string().min(1).max(500),
   client_email: z.string().email(),
   client_address: z.string().max(1000).optional(),
+  statement_id: z.string().uuid().optional(),
   line_items: z.array(lineItemSchema).min(1),
   currency: z.string().length(3).default('EUR'),
   tax_rate_pct: z.number().min(0).max(100).default(19),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   issued_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  notes: z.string().max(4000).optional(),
   send_email: z.boolean().default(true),
   send_to_label: z.boolean().default(false),
 })
 
-// ── GET /api/portal/invoices ──────────────────────────────────────────────
+function getLineItemSubtotal(lineItems: Array<{ qty: number; unit_price_cents: number }>): number {
+  return lineItems.reduce((sum, lineItem) => sum + lineItem.qty * lineItem.unit_price_cents, 0)
+}
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) throw new ApiError(401, 'Missing authorization token')
 
   const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   const artistId = req.nextUrl.searchParams.get('artist_id')
@@ -59,82 +69,120 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   return NextResponse.json({ invoices, total, page })
 })
 
-// ── POST /api/portal/invoices ─────────────────────────────────────────────
-
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) throw new ApiError(401, 'Missing authorization token')
 
   const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
   if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
 
   const body: unknown = await req.json()
   const parsed = createInvoiceSchema.safeParse(body)
-  if (!parsed.success) throw new ApiError(400, parsed.error.issues.map((e) => e.message).join('; '))
-
-  const d = parsed.data
-
-  // Verify artist ownership
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, d.artist_id)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'Forbidden')
-    throw err
+  if (!parsed.success) {
+    throw new ApiError(400, parsed.error.issues.map((issue) => issue.message).join('; '))
   }
+
+  const input = parsed.data
+  const artist = await resolvePortalArtist(supabase, user.id, input.artist_id)
   if (!artist) throw new ApiError(403, 'Forbidden')
+
+  const billingProfile = await getBillingProfile(supabase, artist.id)
+  if (!billingProfile || !isBillingProfileComplete(billingProfile)) {
+    throw new ApiError(422, 'Billing profile is incomplete')
+  }
 
   const { serverEnv } = await import('@/lib/env.server')
 
-  // Generate invoice number
-  const invoiceNumber = await generateInvoiceNumber(supabase, d.artist_id)
-  const issuedDate = d.issued_date ?? new Date().toISOString().slice(0, 10)
+  const statement = input.statement_id
+    ? await getSalesStatementById(supabase, input.statement_id, artist.id)
+    : null
 
-  // Create DB row first (to get ID)
-  const invoice = await createArtistInvoice(supabase, {
-    artistId: d.artist_id,
-    invoiceNumber,
-    clientName: d.client_name,
-    clientEmail: d.client_email,
-    clientAddress: d.client_address,
-    lineItems: d.line_items.map((li) => ({
-      description: li.description,
-      qty: li.qty,
-      unit_price_cents: li.unit_price_cents,
-    })),
-    currency: d.currency,
-    taxRatePct: d.tax_rate_pct,
-    dueDate: d.due_date,
+  if (input.statement_id && !statement) {
+    throw new ApiError(404, 'Statement not found')
+  }
+
+  if (statement && !['label_approved', 'artist_notified'].includes(statement.status)) {
+    throw new ApiError(422, 'Statement is not ready for invoice creation')
+  }
+
+  if (statement && statement.amountEur === undefined) {
+    throw new ApiError(422, 'Statement amount is missing')
+  }
+
+  if (statement) {
+    const existingLinkedInvoice = await getArtistInvoiceByStatementId(supabase, artist.id, statement.id)
+    if (existingLinkedInvoice) {
+      throw new ApiError(409, 'An invoice for this statement already exists')
+    }
+
+    const expectedSubtotal = Math.round((statement.amountEur ?? 0) * 100)
+    const submittedSubtotal = getLineItemSubtotal(input.line_items)
+    if (submittedSubtotal !== expectedSubtotal) {
+      throw new ApiError(422, 'Statement-linked invoice amount does not match the approved statement')
+    }
+  }
+
+  const issuedDate = input.issued_date ?? new Date().toISOString().slice(0, 10)
+  const internalInvoiceNumber = await generateInvoiceNumber(supabase, artist.id)
+  const effectiveTaxRate = billingProfile.isSmallBusiness ? 0 : input.tax_rate_pct
+
+  const invoicePayload = {
+    artistId: artist.id,
+    invoiceNumber: internalInvoiceNumber,
+    artistInvoiceNumber: input.artist_invoice_number,
+    clientName: input.client_name,
+    clientEmail: input.client_email,
+    clientAddress: input.client_address,
+    lineItems: input.line_items,
+    currency: input.currency,
+    taxRatePct: effectiveTaxRate,
+    dueDate: input.due_date,
     issuedDate,
-  })
+    notes: input.notes,
+  }
 
-  // Generate PDF
+  const invoice = statement
+    ? await createSosLinkedInvoice(supabase, { ...invoicePayload, statementId: statement.id })
+    : await createArtistInvoice(supabase, invoicePayload)
+
   const pdfBytes = generateInvoicePdf({
-    invoiceNumber,
+    invoiceNumber: input.artist_invoice_number,
     issuedDate,
-    dueDate: d.due_date,
-    artistName: artist.name,
-    clientName: d.client_name,
-    clientEmail: d.client_email,
-    clientAddress: d.client_address,
-    lineItems: d.line_items.map((li) => ({
-      description: li.description,
-      qty: li.qty,
-      unitPriceCents: li.unit_price_cents,
+    dueDate: input.due_date,
+    artist: {
+      name: billingProfile.legalName,
+      street: billingProfile.street,
+      postalCode: billingProfile.postalCode,
+      city: billingProfile.city,
+      country: billingProfile.country,
+      taxNumber: billingProfile.taxNumber,
+      vatId: billingProfile.vatId,
+      email: billingProfile.paypalEmail,
+    },
+    label: LABEL_BILLING_PARTY,
+    sosReference: statement ? statement.period : undefined,
+    sosPeriod: statement?.period,
+    lineItems: input.line_items.map((lineItem) => ({
+      description: lineItem.description,
+      qty: lineItem.qty,
+      unitPriceCents: lineItem.unit_price_cents,
     })),
-    currency: d.currency,
-    taxRatePct: d.tax_rate_pct,
+    currency: input.currency,
+    taxRatePct: effectiveTaxRate,
+    isSmallBusiness: billingProfile.isSmallBusiness,
+    notes: input.notes,
   })
 
-  // Upload PDF to R2
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
     serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
-  const key = `invoices/${d.artist_id}/${randomUUID()}.pdf`
+  const key = `invoices/${artist.id}/${randomUUID()}.pdf`
   await s3.send(
     new PutObjectCommand({
       Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
@@ -144,23 +192,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ContentLength: pdfBytes.byteLength,
     }),
   )
-  const pdfUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
 
-  // Update DB row with PDF URL + status
-  const { updateInvoice } = await import('@/lib/api/artistInvoices')
-  const updated = await updateInvoice(supabase, invoice.id, d.artist_id, {
+  const pdfUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
+  const updatedInvoice = await updateInvoice(supabase, invoice.id, artist.id, {
     pdf_url: pdfUrl,
-    status: d.send_email ? 'sent' : 'draft',
+    status: input.send_email ? 'sent' : 'draft',
   })
 
-  // Send email to client
-  if (d.send_email) {
+  if (statement?.status === 'label_approved') {
+    await updateSalesStatementStatus(supabase, statement.id, 'acknowledged')
+  }
+
+  if (input.send_email) {
     await sendInvoiceEmail(
       {
         artistName: artist.name,
-        invoiceNumber,
-        clientEmail: d.client_email,
-        clientName: d.client_name,
+        invoiceNumber: input.artist_invoice_number,
+        clientEmail: input.client_email,
+        clientName: input.client_name,
         pdfUrl,
       },
       {
@@ -171,28 +220,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     )
   }
 
-  // Optionally send a copy to the label
-  if (d.send_to_label) {
-    const { getSiteSettings } = await import('@/lib/api/siteSettings')
-    const siteSettings = await getSiteSettings(supabase)
-    const labelEmail = siteSettings.contactEmail
-    if (labelEmail) {
-      await sendInvoiceEmail(
-        {
-          artistName: artist.name,
-          invoiceNumber,
-          clientEmail: labelEmail,
-          clientName: siteSettings.labelName ?? 'Label',
-          pdfUrl,
-        },
-        {
-          resendApiKey: serverEnv.RESEND_API_KEY ?? '',
-          resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? '',
-          fetch: globalThis.fetch,
-        },
-      )
-    }
+  if (input.send_to_label && input.client_email !== LABEL_CLIENT_EMAIL) {
+    await sendInvoiceEmail(
+      {
+        artistName: artist.name,
+        invoiceNumber: input.artist_invoice_number,
+        clientEmail: LABEL_CLIENT_EMAIL,
+        clientName: LABEL_BILLING_PARTY.name,
+        pdfUrl,
+      },
+      {
+        resendApiKey: serverEnv.RESEND_API_KEY ?? '',
+        resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? '',
+        fetch: globalThis.fetch,
+      },
+    )
   }
 
-  return NextResponse.json({ invoice: updated, pdf_url: pdfUrl }, { status: 201 })
+  return NextResponse.json({ invoice: updatedInvoice, pdf_url: pdfUrl }, { status: 201 })
 })

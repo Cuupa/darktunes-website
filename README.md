@@ -8,7 +8,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
-- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission, tour manager, marketing assets, rich-text messages with replies + realtime inbox updates, account settings)
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission, tour manager, marketing assets, rich-text messages with replies + realtime inbox updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, account settings)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
@@ -96,6 +96,7 @@ npm run dev
 
 ```bash
 npm run lint
+npx tsc --noEmit
 npm run test
 npm run test:e2e
 npm run perf:test

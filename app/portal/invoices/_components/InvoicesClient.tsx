@@ -1,18 +1,13 @@
 'use client'
 
-/**
- * app/portal/invoices/_components/InvoicesClient.tsx
- *
- * Main invoices page client component — renders the invoice list and
- * the new-invoice form.
- */
-
 import { useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Plus, DownloadSimple, FileText } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import {
   Table,
   TableBody,
@@ -21,79 +16,95 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
-import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
-import { InvoiceForm } from './InvoiceForm'
+import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { ArtistInvoice } from '@/lib/api/artistInvoices'
+import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
+import { InvoiceForm } from './InvoiceForm'
 
 interface InvoicesClientProps {
+  artistId: string
+  billingProfile: ArtistBillingProfile | null
+  billingProfileComplete: boolean
   dict: Dictionary['portal']
   invoices: ArtistInvoice[]
-  artistId: string
+  statement: SalesStatement | null
 }
 
-function statusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusBadgeVariant(status: ArtistInvoice['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
-    case 'paid': return 'default'
-    case 'sent': return 'secondary'
-    case 'cancelled': return 'destructive'
-    default: return 'outline'
+    case 'paid':
+      return 'default'
+    case 'sent':
+      return 'secondary'
+    case 'cancelled':
+      return 'destructive'
+    default:
+      return 'outline'
   }
 }
 
-function statusLabel(status: string, dict: Dictionary['portal']): string {
+function statusLabel(status: ArtistInvoice['status'], dict: Dictionary['portal']): string {
   switch (status) {
-    case 'draft': return dict.invoice_status_draft
-    case 'sent': return dict.invoice_status_sent
-    case 'paid': return dict.invoice_status_paid
-    case 'cancelled': return dict.invoice_status_cancelled
-    default: return status
+    case 'draft':
+      return dict.invoice_status_draft
+    case 'sent':
+      return dict.invoice_status_sent
+    case 'paid':
+      return dict.invoice_status_paid
+    case 'cancelled':
+      return dict.invoice_status_cancelled
+    default:
+      return status
   }
 }
 
-export function InvoicesClient({ dict, invoices: initialInvoices, artistId }: InvoicesClientProps) {
+export function InvoicesClient({
+  artistId,
+  billingProfile,
+  billingProfileComplete,
+  dict,
+  invoices: initialInvoices,
+  statement,
+}: InvoicesClientProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [invoices, setInvoices] = useState<ArtistInvoice[]>(initialInvoices)
-  const [showForm, setShowForm] = useState(false)
-  const [markingPaid, setMarkingPaid] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(Boolean(statement))
+
+  const clearStatementQuery = () => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete('statement')
+    router.replace(nextParams.size > 0 ? `${pathname}?${nextParams.toString()}` : pathname)
+  }
 
   const handleNewInvoice = (invoice: ArtistInvoice) => {
     setInvoices((prev) => [invoice, ...prev])
     setShowForm(false)
-    toast.success(dict.invoice_sent_success)
+    clearStatementQuery()
+    toast.success(invoice.status === 'sent' ? dict.invoice_sent_success : dict.invoice_save_success)
   }
 
-  const handleMarkPaid = async (invoiceId: string) => {
-    setMarkingPaid(invoiceId)
-    try {
-      const supabase = createBrowserSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { toast.error(dict.profile_error); return }
-
-      const res = await fetch(`/api/portal/invoices/${invoiceId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: ['Bearer', session.access_token].join(' '),
-        },
-        body: JSON.stringify({ artist_id: artistId, status: 'paid' }),
-      })
-      if (!res.ok) throw new Error('Failed to update')
-      const json = await res.json() as { invoice: ArtistInvoice }
-      setInvoices((prev) => prev.map((inv) => inv.id === invoiceId ? json.invoice : inv))
-      toast.success(dict.invoice_status_paid)
-    } catch {
-      toast.error(dict.profile_error)
-    } finally {
-      setMarkingPaid(null)
+  const handleCancel = () => {
+    setShowForm(false)
+    if (statement) {
+      clearStatementQuery()
     }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{dict.invoices_heading}</h1>
-        <Button onClick={() => setShowForm((v) => !v)} size="sm" className="gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{dict.invoices_heading}</h1>
+          {statement && (
+            <p className="text-sm text-muted-foreground">
+              SOS {statement.period} — {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(statement.amountEur ?? 0)}
+            </p>
+          )}
+        </div>
+        <Button className="gap-2" onClick={() => setShowForm((current) => !current)} size="sm">
           <Plus size={16} aria-hidden="true" />
           {dict.invoice_new}
         </Button>
@@ -101,80 +112,66 @@ export function InvoicesClient({ dict, invoices: initialInvoices, artistId }: In
 
       {showForm && (
         <InvoiceForm
-          dict={dict}
           artistId={artistId}
+          billingProfile={billingProfile}
+          billingProfileComplete={billingProfileComplete}
+          dict={dict}
+          onCancel={handleCancel}
           onSuccess={handleNewInvoice}
-          onCancel={() => setShowForm(false)}
+          statement={statement ?? undefined}
         />
       )}
 
       {invoices.length === 0 ? (
-        <PortalEmptyState
-          icon={FileText}
-          heading={dict.invoices_heading}
-          description={dict.invoice_new}
-        />
+        <PortalEmptyState icon={FileText} heading={dict.invoices_heading} description={dict.invoice_noData} />
       ) : (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{dict.invoices_heading}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent className="overflow-x-auto p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">{dict.invoice_number ?? '#'}</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.invoice_number}</TableHead>
                   <TableHead>{dict.invoice_client}</TableHead>
                   <TableHead className="whitespace-nowrap">{dict.invoice_total}</TableHead>
-                  <TableHead className="whitespace-nowrap">{dict.invoice_status_draft}</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
                   <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((inv) => {
-                  const subtotal = inv.lineItems.reduce((s, li) => s + li.qty * li.unit_price_cents, 0)
-                  const tax = Math.round(subtotal * (inv.taxRatePct / 100))
+                {invoices.map((invoice) => {
+                  const subtotal = invoice.lineItems.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0)
+                  const tax = Math.round(subtotal * (invoice.taxRatePct / 100))
                   const total = (subtotal + tax) / 100
+
                   return (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
-                      <TableCell>{inv.clientName}</TableCell>
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-mono text-sm">
+                        {invoice.artistInvoiceNumber ?? invoice.invoiceNumber}
+                      </TableCell>
+                      <TableCell>{invoice.clientName}</TableCell>
                       <TableCell>
-                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: inv.currency }).format(total)}
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(total)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusBadgeVariant(inv.status)}>
-                          {statusLabel(inv.status, dict)}
-                        </Badge>
+                        <Badge variant={statusBadgeVariant(invoice.status)}>{statusLabel(invoice.status, dict)}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {inv.pdfUrl ? (
-                            <Button asChild variant="outline" size="sm">
-                              <a href={inv.pdfUrl} target="_blank" rel="noreferrer" className="gap-1">
-                                <DownloadSimple size={14} aria-hidden="true" />
-                                {dict.invoice_download_pdf}
-                              </a>
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" disabled className="gap-1 opacity-50">
+                        {invoice.pdfUrl ? (
+                          <Button asChild size="sm" variant="outline">
+                            <a className="gap-1" href={invoice.pdfUrl} rel="noreferrer" target="_blank">
                               <DownloadSimple size={14} aria-hidden="true" />
-                              {dict.invoice_no_pdf}
-                            </Button>
-                          )}
-                          {inv.status === 'sent' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={markingPaid === inv.id}
-                              onClick={() => handleMarkPaid(inv.id)}
-                            >
-                              {markingPaid === inv.id
-                                ? <Spinner size={14} className="animate-spin" aria-hidden="true" />
-                                : dict.invoice_status_paid}
-                            </Button>
-                          )}
-                        </div>
+                              {dict.invoice_download_pdf}
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button className="gap-1 opacity-50" disabled size="sm" variant="ghost">
+                            <DownloadSimple size={14} aria-hidden="true" />
+                            {dict.invoice_no_pdf}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

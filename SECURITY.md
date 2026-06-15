@@ -24,7 +24,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 
 ## Security Practices
 
-- **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`) enforce artist-scoped RLS using `EXISTS (SELECT 1 FROM artists WHERE id = artist_id AND user_id = auth.uid())` (or equivalent artist ownership checks) — security enforced at the database layer, not just middleware.
+- **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_profiles`, `artist_billing_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`, `artist_invoices`) enforce artist-scoped RLS using ownership checks via `artist_members` — security is enforced at the database layer, not just middleware.
 - **Multi-tenant isolation**: `artists.user_id` links each artist to a Supabase Auth user. Artists can only access their own rows — even if the client manipulates requests, RLS at the DB layer prevents cross-tenant data access.
 - **Environment variables** containing secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `NEXT_PUBLIC_` and are therefore never exposed to the browser. Client-safe variables use the `NEXT_PUBLIC_` prefix.
 - **Supabase anon key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) is intentionally public (client-side) but is scoped by RLS policies.
@@ -32,6 +32,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Service-role key** (`SUPABASE_SERVICE_ROLE_KEY`) bypasses RLS — it is used exclusively in route handlers for token verification and must never be exposed to the client.
 - **Admin asset management APIs** (`/api/admin/assets`, `/api/admin/assets/folders`, `/api/admin/assets/batch`) all reuse the shared admin/editor auth helpers. Destructive deletes remove R2 objects before deleting database records, reducing orphaned-file risk.
 - **Presigned URLs** for private R2 PDFs expire in 300 seconds (5 minutes). URLs are generated in a Server Action; R2 credentials and the raw R2 object key are never sent to the browser.
+- **Billing profile enforcement**: the portal invoice API returns HTTP 422 until `artist_billing_profiles` contains the minimum legal invoice fields (name, address, country, and tax number or VAT ID). This prevents incomplete or non-compliant invoice PDFs from being generated.
 - **Admin + Portal route protection** is enforced by Next.js Edge Middleware (`middleware.ts`). Auth checks happen server-side at the edge before any page HTML is rendered, preventing client-side flicker attacks.
 - **Artist auto-sync** (`POST /api/sync-artist`) validates `Authorization: Bearer <token>` via `supabase.auth.getUser()` before running any sync logic. R2 credentials are never exposed to the browser.
 - **YouTube sync auth** (`POST /api/sync-youtube`) accepts either an admin/user Bearer token (validated via `supabase.auth.getUser()`) or a Vercel cron request (`x-vercel-cron: 1`). If `CRON_SECRET` is configured, cron requests must also present `Authorization: Bearer <CRON_SECRET>`.

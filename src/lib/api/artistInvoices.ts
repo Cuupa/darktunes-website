@@ -1,18 +1,9 @@
-/**
- * src/lib/api/artistInvoices.ts
- *
- * Data Access Layer for the `artist_invoices` table.
- */
-
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
 type DbClient = SupabaseClient<Database>
 type InvoiceRow = Database['public']['Tables']['artist_invoices']['Row']
-
-// ---------------------------------------------------------------------------
-// Domain types
-// ---------------------------------------------------------------------------
+type InvoiceStatus = InvoiceRow['status']
 
 export interface InvoiceLineItem {
   description: string
@@ -24,46 +15,69 @@ export interface ArtistInvoice {
   id: string
   artistId: string
   invoiceNumber: string
+  artistInvoiceNumber: string | undefined
+  statementId: string | undefined
   clientName: string
   clientEmail: string
   clientAddress: string | undefined
   lineItems: InvoiceLineItem[]
   currency: string
   taxRatePct: number
-  status: string
+  status: InvoiceStatus
   dueDate: string
   issuedDate: string
+  notes: string | undefined
   pdfUrl: string | undefined
   createdAt: string
   updatedAt: string
 }
 
+export interface CreateInvoiceData {
+  artistId: string
+  invoiceNumber: string
+  artistInvoiceNumber?: string
+  clientName: string
+  clientEmail: string
+  clientAddress?: string
+  lineItems: InvoiceLineItem[]
+  currency?: string
+  taxRatePct?: number
+  dueDate: string
+  issuedDate: string
+  notes?: string
+}
+
+export interface CreateSosLinkedInvoiceData extends CreateInvoiceData {
+  statementId: string
+}
+
 function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
-  const lineItems: InvoiceLineItem[] = Array.isArray(row.line_items)
-    ? (row.line_items as unknown as InvoiceLineItem[])
-    : []
   return {
     id: row.id,
     artistId: row.artist_id,
     invoiceNumber: row.invoice_number,
+    artistInvoiceNumber: row.artist_invoice_number ?? undefined,
+    statementId: row.statement_id ?? undefined,
     clientName: row.client_name,
     clientEmail: row.client_email,
     clientAddress: row.client_address ?? undefined,
-    lineItems,
+    lineItems: Array.isArray(row.line_items) ? row.line_items : [],
     currency: row.currency ?? 'EUR',
     taxRatePct: Number(row.tax_rate_pct ?? 19),
     status: row.status ?? 'draft',
     dueDate: row.due_date ?? '',
     issuedDate: row.issued_date ?? '',
+    notes: row.notes ?? undefined,
     pdfUrl: row.pdf_url ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
 
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
+function normaliseOptional(value?: string): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
 
 export async function listArtistInvoices(
   supabase: DbClient,
@@ -100,25 +114,32 @@ export async function getArtistInvoice(
     .eq('artist_id', artistId)
     .single()
 
-  if (error) return null
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Failed to get invoice: ${error.message}`)
+  }
+
   return rowToArtistInvoice(data)
 }
 
-// ---------------------------------------------------------------------------
-// Mutations
-// ---------------------------------------------------------------------------
+export async function getArtistInvoiceByStatementId(
+  supabase: DbClient,
+  artistId: string,
+  statementId: string,
+): Promise<ArtistInvoice | null> {
+  const { data, error } = await supabase
+    .from('artist_invoices')
+    .select('*')
+    .eq('artist_id', artistId)
+    .eq('statement_id', statementId)
+    .single()
 
-export interface CreateInvoiceData {
-  artistId: string
-  invoiceNumber: string
-  clientName: string
-  clientEmail: string
-  clientAddress?: string
-  lineItems: InvoiceLineItem[]
-  currency?: string
-  taxRatePct?: number
-  dueDate: string
-  issuedDate: string
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Failed to get linked invoice: ${error.message}`)
+  }
+
+  return rowToArtistInvoice(data)
 }
 
 export async function createArtistInvoice(
@@ -130,14 +151,16 @@ export async function createArtistInvoice(
     .insert({
       artist_id: data.artistId,
       invoice_number: data.invoiceNumber,
+      artist_invoice_number: normaliseOptional(data.artistInvoiceNumber),
       client_name: data.clientName,
       client_email: data.clientEmail,
-      client_address: data.clientAddress ?? null,
-      line_items: data.lineItems as unknown as Database['public']['Tables']['artist_invoices']['Insert']['line_items'],
+      client_address: normaliseOptional(data.clientAddress),
+      line_items: data.lineItems,
       currency: data.currency ?? 'EUR',
       tax_rate_pct: data.taxRatePct ?? 19.0,
       due_date: data.dueDate,
       issued_date: data.issuedDate,
+      notes: normaliseOptional(data.notes),
       status: 'draft',
     })
     .select()
@@ -147,11 +170,45 @@ export async function createArtistInvoice(
   return rowToArtistInvoice(row)
 }
 
+export async function createSosLinkedInvoice(
+  supabase: DbClient,
+  data: CreateSosLinkedInvoiceData,
+): Promise<ArtistInvoice> {
+  const { data: row, error } = await supabase
+    .from('artist_invoices')
+    .insert({
+      artist_id: data.artistId,
+      invoice_number: data.invoiceNumber,
+      artist_invoice_number: normaliseOptional(data.artistInvoiceNumber),
+      statement_id: data.statementId,
+      client_name: data.clientName,
+      client_email: data.clientEmail,
+      client_address: normaliseOptional(data.clientAddress),
+      line_items: data.lineItems,
+      currency: data.currency ?? 'EUR',
+      tax_rate_pct: data.taxRatePct ?? 19.0,
+      due_date: data.dueDate,
+      issued_date: data.issuedDate,
+      notes: normaliseOptional(data.notes),
+      status: 'draft',
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(`Failed to create linked invoice: ${error.message}`)
+  return rowToArtistInvoice(row)
+}
+
 export async function updateInvoice(
   supabase: DbClient,
   id: string,
   artistId: string,
-  updates: Partial<{ status: 'draft' | 'sent' | 'paid' | 'cancelled'; pdf_url: string }>,
+  updates: Partial<{
+    status: InvoiceStatus
+    pdf_url: string
+    notes: string | null
+    artist_invoice_number: string | null
+  }>,
 ): Promise<ArtistInvoice> {
   const { data: row, error } = await supabase
     .from('artist_invoices')

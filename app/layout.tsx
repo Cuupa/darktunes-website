@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Oxanium, Roboto_Slab, JetBrains_Mono } from 'next/font/google'
+import type { CSSProperties } from 'react'
 import { Providers } from './_components/Providers'
 import { NavHidingWrapper } from './_components/ConditionalSiteHeader'
 import { SiteHeader } from './_components/SiteHeader'
@@ -12,26 +12,11 @@ import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { WebVitals } from './web-vitals'
 import './globals.css'
 
-const oxanium = Oxanium({
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
-  variable: '--font-sans',
-  display: 'swap',
-})
-
-const robotoSlab = Roboto_Slab({
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-  variable: '--font-serif',
-  display: 'swap',
-})
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
-  variable: '--font-mono',
-  display: 'swap',
-})
+const fontVariables: CSSProperties = {
+  ['--font-sans' as string]: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  ['--font-serif' as string]: 'Georgia, Cambria, "Times New Roman", serif',
+  ['--font-mono' as string]: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+}
 
 function getFaviconMimeType(url: string): string {
   if (url.endsWith('.svg')) return 'image/svg+xml'
@@ -95,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const settings = await getCachedSiteSettings().catch(() => null)
 
   return (
-    <html lang={locale} className={`${oxanium.variable} ${robotoSlab.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
+    <html lang={locale} style={fontVariables} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
       <head>
         {/* PWA meta — prevents white flash and styles the status bar */}
         <meta name="mobile-web-app-capable" content="yes" />

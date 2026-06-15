@@ -1086,13 +1086,16 @@ CREATE INDEX IF NOT EXISTS idx_streaming_stats_period    ON public.streaming_sta
 -- TABLE: sales_statements  (royalty PDFs stored in R2)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.sales_statements (
-  id          UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
-  artist_id   UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
-  filename    TEXT           NOT NULL,
-  r2_key      TEXT           NOT NULL UNIQUE,
-  period      TEXT           NOT NULL,
-  amount_eur  NUMERIC(10, 2),
-  created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+  id                 UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id          UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  filename           TEXT           NOT NULL,
+  r2_key             TEXT           NOT NULL UNIQUE,
+  period             TEXT           NOT NULL,
+  amount_eur         NUMERIC(10, 2),
+  status             TEXT           NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'label_approved', 'artist_notified', 'acknowledged')),
+  label_notes        TEXT,
+  label_approved_at  TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sales_statements_artist_id  ON public.sales_statements (artist_id);
@@ -2005,8 +2008,8 @@ CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
 -- Allows admins full access to all sales statements
 CREATE POLICY "sales_statements: admin all" ON public.sales_statements
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: release_checklists
@@ -3013,21 +3016,24 @@ CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_
 -- TABLE: artist_invoices  (performance fee / remix invoices, portal-managed)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artist_invoices (
-  id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  artist_id         UUID         NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
-  invoice_number    TEXT         NOT NULL,
-  client_name       TEXT         NOT NULL,
-  client_email      TEXT         NOT NULL,
-  client_address    TEXT,
-  line_items        JSONB        NOT NULL DEFAULT '[]',
-  currency          VARCHAR(3)   NOT NULL DEFAULT 'EUR',
-  tax_rate_pct      NUMERIC(5,2) NOT NULL DEFAULT 19.00,
-  status            TEXT         NOT NULL DEFAULT 'draft',
-  due_date          DATE,
-  issued_date       DATE         NOT NULL DEFAULT CURRENT_DATE,
-  pdf_url           TEXT,
-  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id              UUID         NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  invoice_number         TEXT         NOT NULL,
+  artist_invoice_number  TEXT,
+  statement_id           UUID         REFERENCES public.sales_statements (id) ON DELETE SET NULL,
+  client_name            TEXT         NOT NULL,
+  client_email           TEXT         NOT NULL,
+  client_address         TEXT,
+  line_items             JSONB        NOT NULL DEFAULT '[]',
+  currency               VARCHAR(3)   NOT NULL DEFAULT 'EUR',
+  tax_rate_pct           NUMERIC(5,2) NOT NULL DEFAULT 19.00,
+  status                 TEXT         NOT NULL DEFAULT 'draft',
+  due_date               DATE,
+  issued_date            DATE         NOT NULL DEFAULT CURRENT_DATE,
+  notes                  TEXT,
+  pdf_url                TEXT,
+  created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   UNIQUE (artist_id, invoice_number)
 );
 
@@ -3068,6 +3074,67 @@ CREATE POLICY "artist_invoices: artist write own" ON public.artist_invoices
 
 DROP POLICY IF EXISTS "artist_invoices: admin all" ON public.artist_invoices;
 CREATE POLICY "artist_invoices: admin all" ON public.artist_invoices
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_billing_profiles  (artist legal invoicing master data)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_billing_profiles (
+  id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id          UUID         NOT NULL UNIQUE REFERENCES public.artists (id) ON DELETE CASCADE,
+  legal_name         TEXT         NOT NULL DEFAULT '',
+  street             TEXT         NOT NULL DEFAULT '',
+  postal_code        TEXT         NOT NULL DEFAULT '',
+  city               TEXT         NOT NULL DEFAULT '',
+  country            TEXT         NOT NULL DEFAULT 'DE',
+  tax_number         TEXT,
+  vat_id             TEXT,
+  is_small_business  BOOLEAN      NOT NULL DEFAULT FALSE,
+  iban               TEXT,
+  bic                TEXT,
+  paypal_email       TEXT,
+  created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_billing_profiles_artist_id ON public.artist_billing_profiles (artist_id);
+
+DROP TRIGGER IF EXISTS trg_artist_billing_profiles_updated_at ON public.artist_billing_profiles;
+CREATE TRIGGER trg_artist_billing_profiles_updated_at
+  BEFORE UPDATE ON public.artist_billing_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.artist_billing_profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_billing_profiles: artist read own" ON public.artist_billing_profiles;
+CREATE POLICY "artist_billing_profiles: artist read own" ON public.artist_billing_profiles
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_billing_profiles.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_billing_profiles: artist write own" ON public.artist_billing_profiles;
+CREATE POLICY "artist_billing_profiles: artist write own" ON public.artist_billing_profiles
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_billing_profiles.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_billing_profiles.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "artist_billing_profiles: admin all" ON public.artist_billing_profiles;
+CREATE POLICY "artist_billing_profiles: admin all" ON public.artist_billing_profiles
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
@@ -3381,6 +3448,24 @@ DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_sum
 CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- ALTER TABLE guards for schema parity on existing databases
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'
+  CHECK (status IN ('draft', 'label_approved', 'artist_notified', 'acknowledged'));
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS label_notes TEXT;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS label_approved_at TIMESTAMPTZ;
+
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS statement_id UUID REFERENCES public.sales_statements(id) ON DELETE SET NULL;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS artist_invoice_number TEXT;
 
 -- =============================================================================
 -- TABLE: promo_log_entries

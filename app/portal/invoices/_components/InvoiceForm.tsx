@@ -1,21 +1,21 @@
 'use client'
 
-/**
- * app/portal/invoices/_components/InvoiceForm.tsx
- *
- * Multi-line-item invoice creation form.
- */
-
-import { useState } from 'react'
+import Link from 'next/link'
+import { useMemo, useState } from 'react'
+import { Info, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash } from '@phosphor-icons/react'
+import { Textarea } from '@/components/ui/textarea'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
+import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { ArtistInvoice } from '@/lib/api/artistInvoices'
+import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
+import { LABEL_CLIENT_ADDRESS, LABEL_CLIENT_EMAIL, LABEL_CLIENT_NAME } from '@/lib/portal/labelBilling'
 
 interface LineItem {
   description: string
@@ -24,85 +24,128 @@ interface LineItem {
 }
 
 interface InvoiceFormProps {
-  dict: Dictionary['portal']
   artistId: string
+  billingProfile: ArtistBillingProfile | null
+  billingProfileComplete: boolean
+  dict: Dictionary['portal']
   onSuccess: (invoice: ArtistInvoice) => void
   onCancel: () => void
+  statement?: SalesStatement
 }
 
-export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceFormProps) {
-  const [clientName, setClientName] = useState('')
-  const [clientEmail, setClientEmail] = useState('')
-  const [clientAddress, setClientAddress] = useState('')
+function buildStatementLineItem(statement?: SalesStatement): LineItem[] {
+  if (!statement) {
+    return [{ description: '', qty: 1, unit_price_cents: 0 }]
+  }
+
+  return [{
+    description: `Musikalische Dienstleistungen gemäß Statement of Sales ${statement.period}`,
+    qty: 1,
+    unit_price_cents: Math.round((statement.amountEur ?? 0) * 100),
+  }]
+}
+
+export function InvoiceForm({
+  artistId,
+  billingProfile,
+  billingProfileComplete,
+  dict,
+  onSuccess,
+  onCancel,
+  statement,
+}: InvoiceFormProps) {
+  const isStatementLinked = Boolean(statement)
+  const [artistInvoiceNumber, setArtistInvoiceNumber] = useState('')
+  const [clientName, setClientName] = useState(isStatementLinked ? LABEL_CLIENT_NAME : '')
+  const [clientEmail, setClientEmail] = useState(isStatementLinked ? LABEL_CLIENT_EMAIL : '')
+  const [clientAddress, setClientAddress] = useState(isStatementLinked ? LABEL_CLIENT_ADDRESS : '')
   const [dueDate, setDueDate] = useState('')
   const [currency, setCurrency] = useState('EUR')
-  const [taxRatePct, setTaxRatePct] = useState(19)
+  const [taxRatePct, setTaxRatePct] = useState(billingProfile?.isSmallBusiness ? 0 : 19)
+  const [notes, setNotes] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
   const [sendToLabel, setSendToLabel] = useState(true)
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { description: '', qty: 1, unit_price_cents: 0 },
-  ])
+  const [lineItems, setLineItems] = useState<LineItem[]>(buildStatementLineItem(statement))
   const [submitting, setSubmitting] = useState(false)
 
-  const addLineItem = () =>
-    setLineItems((prev) => [...prev, { description: '', qty: 1, unit_price_cents: 0 }])
-
-  const removeLineItem = (idx: number) =>
-    setLineItems((prev) => prev.filter((_, i) => i !== idx))
-
-  const updateLineItem = (idx: number, field: keyof LineItem, value: string | number) =>
-    setLineItems((prev) =>
-      prev.map((item, i) =>
-        i === idx ? { ...item, [field]: value } : item,
-      ),
-    )
-
-  const subtotal = lineItems.reduce((s, li) => s + li.qty * li.unit_price_cents, 0)
+  const subtotal = useMemo(
+    () => lineItems.reduce((sum, lineItem) => sum + lineItem.qty * lineItem.unit_price_cents, 0),
+    [lineItems],
+  )
   const tax = Math.round(subtotal * (taxRatePct / 100))
   const total = subtotal + tax
 
-  const formatCents = (cents: number) =>
-    new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(cents / 100)
+  const formatCents = (cents: number) => new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency,
+  }).format(cents / 100)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!clientName || !clientEmail || !dueDate) {
-      toast.error(dict.invoice_client + ' is required')
+  const addLineItem = () => setLineItems((current) => [...current, { description: '', qty: 1, unit_price_cents: 0 }])
+  const removeLineItem = (index: number) => setLineItems((current) => current.filter((_, currentIndex) => currentIndex !== index))
+  const updateLineItem = (index: number, field: keyof LineItem, value: string | number) => {
+    setLineItems((current) => current.map((item, currentIndex) => {
+      if (currentIndex !== index) return item
+      return { ...item, [field]: value }
+    }))
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!billingProfileComplete) {
+      toast.error(dict.invoice_billing_incomplete)
       return
     }
+
+    if (!artistInvoiceNumber.trim() || !clientName.trim() || !clientEmail.trim() || !dueDate) {
+      toast.error(dict.invoice_error)
+      return
+    }
+
     setSubmitting(true)
+
     try {
       const supabase = createBrowserSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { toast.error(dict.profile_error); return }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-      const res = await fetch('/api/portal/invoices', {
+      if (!session) throw new Error(dict.profile_error)
+
+      const response = await fetch('/api/portal/invoices', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: ['Bearer', session.access_token].join(' '),
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           artist_id: artistId,
+          artist_invoice_number: artistInvoiceNumber,
           client_name: clientName,
           client_email: clientEmail,
           client_address: clientAddress || undefined,
+          statement_id: statement?.id,
           line_items: lineItems,
           currency,
           tax_rate_pct: taxRatePct,
           due_date: dueDate,
+          notes,
           send_email: sendEmail,
           send_to_label: sendToLabel,
         }),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error((err as { error?: string }).error ?? 'Failed to create invoice')
+
+      const json = (await response.json().catch(() => null)) as
+        | { invoice?: ArtistInvoice; error?: string }
+        | null
+
+      if (!response.ok || !json?.invoice) {
+        throw new Error(json?.error ?? dict.invoice_error)
       }
-      const json = await res.json() as { invoice: ArtistInvoice }
+
       onSuccess(json.invoice)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.profile_error)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : dict.invoice_error)
     } finally {
       setSubmitting(false)
     }
@@ -114,59 +157,95 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
         <CardTitle className="text-base">{dict.invoice_new}</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Client details */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="inv-client-name">{dict.invoice_client}</Label>
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          {!billingProfileComplete && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <div className="flex items-start gap-3">
+                <WarningCircle className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
+                <div className="space-y-2">
+                  <p className="font-medium">{dict.invoice_billing_incomplete}</p>
+                  <p className="text-amber-50/90">{dict.billing_completeness_hint}</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/portal/billing">{dict.invoice_billing_cta}</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {statement && (
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                <Info size={16} aria-hidden="true" />
+                {dict.invoice_statement_reference}
+              </div>
+              <p>SOS {statement.period}</p>
+              <p>{dict.invoice_locked_amount}: {formatCents(Math.round((statement.amountEur ?? 0) * 100))}</p>
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="artist-invoice-number">{dict.invoice_artist_invoice_number}</Label>
               <Input
-                id="inv-client-name"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
+                id="artist-invoice-number"
                 required
-                placeholder="Booker GmbH"
+                value={artistInvoiceNumber}
+                onChange={(event) => setArtistInvoiceNumber(event.target.value)}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="inv-client-email">E-Mail</Label>
+            <div className="space-y-2">
+              <Label htmlFor="invoice-due-date">{dict.invoice_due_date}</Label>
               <Input
-                id="inv-client-email"
-                type="email"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
+                id="invoice-due-date"
+                type="date"
                 required
-                placeholder="booker@example.com"
-              />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="inv-client-address">Address</Label>
-              <Input
-                id="inv-client-address"
-                value={clientAddress}
-                onChange={(e) => setClientAddress(e.target.value)}
-                placeholder="Street, City, Country"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
               />
             </div>
           </div>
 
-          {/* Dates + currency */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
-              <Label htmlFor="inv-due-date">Due Date</Label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="invoice-client-name">{dict.invoice_client_name}</Label>
               <Input
-                id="inv-due-date"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                id="invoice-client-name"
                 required
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                readOnly={isStatementLinked}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="inv-currency">Currency</Label>
+            <div className="space-y-2">
+              <Label htmlFor="invoice-client-email">{dict.invoice_client_email}</Label>
+              <Input
+                id="invoice-client-email"
+                required
+                type="email"
+                value={clientEmail}
+                onChange={(event) => setClientEmail(event.target.value)}
+                readOnly={isStatementLinked}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="invoice-client-address">{dict.invoice_client_address}</Label>
+              <Input
+                id="invoice-client-address"
+                value={clientAddress}
+                onChange={(event) => setClientAddress(event.target.value)}
+                readOnly={isStatementLinked}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="invoice-currency">{dict.invoice_currency}</Label>
               <select
-                id="inv-currency"
+                id="invoice-currency"
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                onChange={(event) => setCurrency(event.target.value)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="EUR">EUR</option>
@@ -174,79 +253,77 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
                 <option value="GBP">GBP</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="inv-tax">Tax %</Label>
+            <div className="space-y-2">
+              <Label htmlFor="invoice-tax-rate">{dict.invoice_tax_rate}</Label>
               <Input
-                id="inv-tax"
+                id="invoice-tax-rate"
                 type="number"
                 min={0}
                 max={100}
                 step={0.1}
+                disabled={billingProfile?.isSmallBusiness}
                 value={taxRatePct}
-                onChange={(e) => setTaxRatePct(parseFloat(e.target.value) || 0)}
+                onChange={(event) => setTaxRatePct(parseFloat(event.target.value) || 0)}
               />
             </div>
           </div>
 
-          {/* Line items */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>{dict.invoice_line_items}</Label>
-              <Button type="button" size="sm" variant="outline" onClick={addLineItem} className="gap-1">
-                <Plus size={14} aria-hidden="true" />
-                Add
-              </Button>
+              {!isStatementLinked && (
+                <Button className="gap-1" onClick={addLineItem} size="sm" type="button" variant="outline">
+                  <Plus size={14} aria-hidden="true" />
+                  {dict.invoice_line_add}
+                </Button>
+              )}
             </div>
-            {lineItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_80px_100px_36px] gap-2 items-start sm:items-center">
+            {lineItems.map((item, index) => (
+              <div key={index} className="grid items-start gap-2 sm:grid-cols-[1fr_90px_140px_44px]">
                 <Input
-                  className="col-span-1 sm:col-span-1"
-                  placeholder="Description"
-                  value={item.description}
-                  onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
+                  placeholder={dict.invoice_line_description}
                   required
+                  value={item.description}
+                  onChange={(event) => updateLineItem(index, 'description', event.target.value)}
                 />
-                <div className="flex gap-2 sm:contents">
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="Qty"
-                    value={item.qty}
-                    onChange={(e) => updateLineItem(idx, 'qty', parseInt(e.target.value, 10) || 1)}
-                    className="w-20 sm:w-auto"
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="Price (cents)"
-                    value={item.unit_price_cents}
-                    onChange={(e) => updateLineItem(idx, 'unit_price_cents', parseInt(e.target.value, 10) || 0)}
-                    className="w-28 sm:w-auto"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={lineItems.length === 1}
-                    onClick={() => removeLineItem(idx)}
-                    aria-label="Remove line item"
-                  >
-                    <Trash size={14} aria-hidden="true" />
-                  </Button>
-                </div>
+                <Input
+                  type="number"
+                  min={1}
+                  disabled={isStatementLinked}
+                  placeholder={dict.invoice_line_qty}
+                  value={item.qty}
+                  onChange={(event) => updateLineItem(index, 'qty', parseInt(event.target.value, 10) || 1)}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  disabled={isStatementLinked}
+                  placeholder={dict.invoice_line_unit_price}
+                  value={item.unit_price_cents}
+                  onChange={(event) => updateLineItem(index, 'unit_price_cents', parseInt(event.target.value, 10) || 0)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={isStatementLinked || lineItems.length === 1}
+                  onClick={() => removeLineItem(index)}
+                  aria-label={dict.invoice_line_remove}
+                >
+                  <Trash size={14} aria-hidden="true" />
+                </Button>
               </div>
             ))}
           </div>
 
-          {/* Totals preview */}
-          <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
+          <div className="space-y-1 border-t pt-3 text-sm text-muted-foreground">
             <div className="flex justify-between">
-              <span>Subtotal</span>
+              <span>{dict.invoice_subtotal}</span>
               <span>{formatCents(subtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Tax ({taxRatePct}%)</span>
+              <span>{dict.invoice_tax} ({taxRatePct.toFixed(2)}%)</span>
               <span>{formatCents(tax)}</span>
             </div>
             <div className="flex justify-between font-semibold text-foreground">
@@ -255,35 +332,42 @@ export function InvoiceForm({ dict, artistId, onSuccess, onCancel }: InvoiceForm
             </div>
           </div>
 
-          {/* Send email toggle */}
-          <div className="flex items-center gap-2">
-            <input
-              id="inv-send-email"
-              type="checkbox"
-              checked={sendEmail}
-              onChange={(e) => setSendEmail(e.target.checked)}
-              className="h-4 w-4 rounded border-border"
+          <div className="space-y-2">
+            <Label htmlFor="invoice-notes">{dict.invoice_notes}</Label>
+            <Textarea
+              id="invoice-notes"
+              rows={4}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
             />
-            <Label htmlFor="inv-send-email">{dict.invoice_send}</Label>
           </div>
 
-          {/* Send copy to label */}
-          <div className="flex items-center gap-2">
-            <input
-              id="inv-send-to-label"
-              type="checkbox"
-              checked={sendToLabel}
-              onChange={(e) => setSendToLabel(e.target.checked)}
-              className="h-4 w-4 rounded border-border"
-            />
-            <Label htmlFor="inv-send-to-label">{dict.invoice_send_to_label}</Label>
+          <div className="flex flex-col gap-3 rounded-lg border border-border p-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                checked={sendEmail}
+                className="h-4 w-4 rounded border-border"
+                onChange={(event) => setSendEmail(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{dict.invoice_send}</span>
+            </label>
+            <label className={cn('flex items-center gap-2', isStatementLinked && 'opacity-70')}>
+              <input
+                checked={sendToLabel}
+                className="h-4 w-4 rounded border-border"
+                onChange={(event) => setSendToLabel(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{dict.invoice_send_to_label}</span>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button onClick={onCancel} type="button" variant="ghost">
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button disabled={submitting || !artistId || !billingProfileComplete} type="submit">
               {submitting ? 'Creating…' : dict.invoice_send}
             </Button>
           </div>
