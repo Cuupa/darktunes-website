@@ -9,11 +9,11 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { MegaphoneSimple } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getArtists } from '@/lib/api/artists'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { PromoLogManager } from '@/components/admin/PromoLogManager'
+import { AdminPageShell } from '../_components/AdminPageShell'
 import { PromoLogArtistSelector } from './_components/PromoLogArtistSelector'
 
 async function PromoLogContent({
@@ -31,16 +31,6 @@ async function PromoLogContent({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <MegaphoneSimple size={24} aria-hidden="true" />
-          Promo Log
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Document label marketing work per artist and keep the portal timeline up to date.
-        </p>
-      </div>
-
       <PromoLogArtistSelector artists={artists} activeArtistId={activeArtist?.id ?? null} />
 
       {activeArtist ? (
@@ -60,10 +50,13 @@ export default function PromoLogPage({
   searchParams: Promise<{ artistId?: string }>
 }) {
   return (
-    <div className="max-w-4xl p-6">
+    <AdminPageShell
+      title="Promo Log"
+      description="Document label marketing work per artist and keep the portal timeline up to date."
+    >
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
         <PromoLogContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </AdminPageShell>
   )
 }
