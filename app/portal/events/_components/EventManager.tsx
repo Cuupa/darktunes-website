@@ -44,6 +44,18 @@ interface EventManagerProps {
   allArtists?: Artist[]
   /** Published news posts available to link */
   newsPosts?: Pick<NewsPost, 'id' | 'title'>[]
+  /**
+   * Override the base API path used for concert CRUD.
+   * Defaults to "/api/portal/concerts" (artist portal).
+   * Admin managers pass "/api/admin/concerts" instead.
+   */
+  concertsApiPath?: string
+  /**
+   * Hide the ICS calendar export button.
+   * The ICS endpoint is portal-specific; set this to true when using
+   * the component in the admin area.
+   */
+  hideIcsExport?: boolean
 }
 
 type Status = 'announced' | 'confirmed' | 'cancelled'
@@ -80,7 +92,7 @@ function resolveTypeInfo(eventType: string): { preset: EventType; custom: string
   return { preset: 'custom', custom: eventType }
 }
 
-export function EventManager({ dict, concerts, artistId, allArtists = [], newsPosts = [] }: EventManagerProps) {
+export function EventManager({ dict, concerts, artistId, allArtists = [], newsPosts = [], concertsApiPath = '/api/portal/concerts', hideIcsExport = false }: EventManagerProps) {
   const [items, setItems] = useState(concerts)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -152,14 +164,14 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     setSaving(true)
     try {
       const token = await withToken()
-      const res = await fetch('/api/portal/concerts', {
+      const res = await fetch(concertsApiPath, {
         method: editingId ? 'PATCH' : 'POST',
         headers: {
           Authorization: 'Bearer ' + token,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...(editingId ? { id: editingId } : {}),
+          ...(editingId ? { id: editingId } : { artistId }),
           eventName: form.eventName,
           concertDate: form.concertDate,
           concertTime: form.concertTime || null,
@@ -234,7 +246,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     if (!window.confirm(dict.tour_delete_confirm)) return
     try {
       const token = await withToken()
-      const res = await fetch(`/api/portal/concerts?id=${id}`, {
+      const res = await fetch(`${concertsApiPath}?id=${id}`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + token },
       })
@@ -319,7 +331,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
-        {items.length > 0 && (
+        {items.length > 0 && !hideIcsExport && (
           <Button variant="outline" size="sm" className="min-h-[44px] gap-2" onClick={exportIcs}>
             <CalendarBlank size={16} aria-hidden="true" />
             {dict.tour_export_ics}
