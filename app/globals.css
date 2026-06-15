@@ -21,7 +21,7 @@
   h1,
   h2,
   h3 {
-    font-family: var(--font-family-body, var(--font-sans)), sans-serif;
+    font-family: var(--font-family-heading, var(--font-family-body, var(--font-sans))), sans-serif;
     font-size: var(--heading-size, 2.5rem);
   }
 }
@@ -53,7 +53,13 @@
   /* ── Theme engine extension tokens ─────────────────────────────────────── */
   /* Overridden by ThemeStyleInjector when admin sets values. */
   --font-family-body: inherit;
+  --font-family-heading: inherit;
   --heading-size: 2.5rem;
+  --body-size: 1rem;
+  --body-weight: 400;
+  --heading-weight: 700;
+  --line-height-body: 1.5;
+  --letter-spacing-body: normal;
   --glass-blur: 12px;
   --glass-opacity: 0.15;
   --animation-duration: 0.4s;
