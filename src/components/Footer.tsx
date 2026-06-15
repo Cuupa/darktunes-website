@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@phosphor-icons/react'
-import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { SiteSettings } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
@@ -14,8 +13,6 @@ interface FooterProps {
 }
 
 export function Footer({ siteSettings, dict }: FooterProps) {
-  const handleSmoothScroll = useSmoothScrollToAnchor()
-
   return (
     <footer className="border-t border-border bg-background overflow-x-hidden">
       <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
@@ -63,19 +60,28 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                 </li>
                 )}
                 <li>
-                  <a href="#releases" onClick={(e) => handleSmoothScroll(e, '#releases')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
+                  <Link
+                    href="/releases"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
+                  >
                     {dict.releasesLink}
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#news" onClick={(e) => handleSmoothScroll(e, '#news')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
+                  <Link
+                    href="/news"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
+                  >
                     {dict.newsLink}
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#videos" onClick={(e) => handleSmoothScroll(e, '#videos')} className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
+                  <Link
+                    href="/videos"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
+                  >
                     {dict.videosLink}
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <Link href="/events" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">

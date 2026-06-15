@@ -19,10 +19,6 @@ vi.mock('framer-motion', () => ({
   useReducedMotion: () => true,
 }))
 
-vi.mock('@/components/ConsentGate', () => ({
-  ConsentGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
 vi.mock('@/components/animations/LenisProvider', () => ({
   useLenis: () => undefined,
 }))
@@ -36,21 +32,16 @@ vi.mock('@/components/ui/button', () => ({
 }))
 
 describe('SpotifyMultiPlayer', () => {
-  it('loads Spotify iframe only after click-to-load activation', () => {
+  it('loads Spotify iframe immediately without any activation step', () => {
     render(
       <SpotifyMultiPlayer
         playlists={[{ uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6', label: 'Label Playlist' }]}
-        loadLabel="Load Spotify"
       />,
     )
 
-    expect(screen.queryByTitle(/Spotify playlist:/i)).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Load Spotify/i }))
-
     const iframe = screen.getByTitle('Spotify playlist: Label Playlist')
     expect(iframe).toBeInTheDocument()
-    expect(iframe).toHaveAttribute('loading', 'lazy')
+    expect(iframe).toHaveAttribute('loading', 'eager')
   })
 
   it('renders only the active playlist iframe and updates src on tab change', () => {
@@ -60,11 +51,8 @@ describe('SpotifyMultiPlayer', () => {
           { uri: 'spotify:playlist:37i9dQZF1DWWqNV5cS50j6', label: 'One' },
           { uri: 'spotify:playlist:37i9dQZF1DX4WYpdgoIcn6', label: 'Two' },
         ]}
-        loadLabel="Load Spotify"
       />,
     )
-
-    fireEvent.click(screen.getByRole('button', { name: /Load Spotify/i }))
 
     let iframes = screen.getAllByTitle(/Spotify playlist:/i)
     expect(iframes).toHaveLength(1)

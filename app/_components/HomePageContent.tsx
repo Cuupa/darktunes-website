@@ -151,11 +151,6 @@ export function HomePageContent({
               </motion.div>
               <SpotifyMultiPlayer
                 playlists={playlists}
-                placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-                loadLabel={dict.consent.spotifyBtnLabel}
-                gateTitle={dict.consent.spotifyTitle}
-                gateText={dict.consent.gateText}
-                privacyPolicyLabel={dict.consent.privacyLink}
               />
             </div>
           </section>

@@ -22,11 +22,11 @@ export const DEFAULT_SECTION_ORDER: HomepageSection[] = [
 
 export const SECTION_CONFIG: SectionConfig[] = [
   { id: 'home', labelKey: 'home', href: '#hero', routeType: 'anchor' },
-  { id: 'releases', labelKey: 'releases', href: '#releases', routeType: 'anchor' },
+  { id: 'releases', labelKey: 'releases', href: '/releases', routeType: 'internal' },
   { id: 'spotify', labelKey: 'spotify', href: '#spotify-player', routeType: 'anchor' },
-  { id: 'videos', labelKey: 'videos', href: '#videos', routeType: 'anchor' },
+  { id: 'videos', labelKey: 'videos', href: '/videos', routeType: 'internal' },
   { id: 'concerts', labelKey: 'tour', href: '#concerts', routeType: 'anchor' },
-  { id: 'news', labelKey: 'news', href: '#news', routeType: 'anchor' },
+  { id: 'news', labelKey: 'news', href: '/news', routeType: 'internal' },
   { id: 'newsletter', labelKey: 'newsletter', href: '#newsletter', routeType: 'anchor' },
   { id: 'artists', labelKey: 'artists', href: '/artists', routeType: 'internal' },
   { id: 'about', labelKey: 'about', href: '/about', routeType: 'internal' },
