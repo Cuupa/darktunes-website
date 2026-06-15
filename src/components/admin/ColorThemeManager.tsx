@@ -50,6 +50,7 @@ import type { ThemeConfig, ThemeEffects, ThemeTypography } from '@/config/themeC
 import { EffectsTab } from '@/components/admin/theme-tabs/EffectsTab'
 import { TypographyTab } from '@/components/admin/theme-tabs/TypographyTab'
 import { ThemesTab } from '@/components/admin/theme-tabs/ThemesTab'
+import { GOOGLE_FONT_URL_MAP } from '../../../app/_components/ThemeStyleInjector'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -314,6 +315,19 @@ function buildPreviewCss(draft: ThemeDraft): string {
     rules.push(`  --gradient-accent: linear-gradient(${draft.accentDir || '135deg'}, ${draft.accentFrom}, ${draft.accentTo});`)
   }
 
+  // ── Typography ────────────────────────────────────────────────────────────
+  const typo = draft.typography
+  if (typo) {
+    if (typo.fontFamily)    rules.push(`  --font-family-body: '${typo.fontFamily}', sans-serif;`)
+    if (typo.headingFamily) rules.push(`  --font-family-heading: '${typo.headingFamily}', sans-serif;`)
+    if (typo.headingSize)   rules.push(`  --heading-size: ${typo.headingSize};`)
+    if (typo.bodySize)      rules.push(`  --body-size: ${typo.bodySize};`)
+    if (typo.bodyWeight)    rules.push(`  --body-weight: ${typo.bodyWeight};`)
+    if (typo.headingWeight) rules.push(`  --heading-weight: ${typo.headingWeight};`)
+    if (typo.lineHeight)    rules.push(`  --line-height-body: ${typo.lineHeight};`)
+    if (typo.letterSpacing) rules.push(`  --letter-spacing-body: ${typo.letterSpacing};`)
+  }
+
   return rules.length > 0 ? `:root {\n${rules.join('\n')}\n}` : ''
 }
 
@@ -352,6 +366,32 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     dispatch({ type: 'SET_DRAFT', draft: next })
     originalDraft.current = next
   }, [value])
+
+  // ── Dynamically load Google Fonts for typography live-preview ────────────
+  useEffect(() => {
+    const fontsToLoad = new Set<string>()
+    const { fontFamily, headingFamily } = draft.typography
+    if (fontFamily && GOOGLE_FONT_URL_MAP[fontFamily])       fontsToLoad.add(fontFamily)
+    if (headingFamily && GOOGLE_FONT_URL_MAP[headingFamily]) fontsToLoad.add(headingFamily)
+
+    if (fontsToLoad.size === 0) return
+
+    const families = Array.from(fontsToLoad).map((f) => GOOGLE_FONT_URL_MAP[f]).join('&family=')
+    const href = `https://fonts.googleapis.com/css2?family=${families}&display=swap`
+
+    const existingLink = document.head.querySelector('link[data-ctm-font]')
+    if (existingLink) existingLink.remove()
+
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = href
+    link.setAttribute('data-ctm-font', 'true')
+    document.head.appendChild(link)
+
+    return () => {
+      link.remove()
+    }
+  }, [draft.typography.fontFamily, draft.typography.headingFamily])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
