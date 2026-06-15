@@ -242,5 +242,68 @@ export function useExports(
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
 
-  return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected }
+  const handlePublishToPortal = useCallback(
+    async (artist: string) => {
+      const artistData = processedData.find(d => d.artist === artist)
+      if (!artistData) {
+        toast.error(`No data found for artist "${artist}"`)
+        return
+      }
+
+      const artistInfo = artistInfoMap.get(artist.toLowerCase())
+
+      try {
+        if (!artistInfo?.artistId || !isValidArtistId(artistInfo.artistId)) {
+          throw new Error(`Artist "${artist}" is not linked to a valid portal artist ID`)
+        }
+
+        if (sosWebhookUrl.trim() === '' || sosWebhookSecret.trim() === '') {
+          throw new Error('SOS webhook URL and secret are required')
+        }
+
+        const currentYear = new Date().getFullYear()
+        const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
+        const artistSlug = artist.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4) || '0001'
+        const invoiceNumber = `${prefix}-${currentYear}-${artistSlug}`
+
+        const blob = await generatePDF(
+          artistData,
+          labelInfo,
+          periodStart || undefined,
+          periodEnd || undefined,
+          invoiceNumber,
+          pdfSettings,
+          emailOptions,
+          artistInfo,
+          compilationFilters
+        )
+
+        const filename = `${createSafeFilename(artist)}_statement.pdf`
+        const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
+        const result = await uploadStatementPdf(
+          {
+            artistId: artistInfo.artistId,
+            filename,
+            period: validPeriod,
+            amountEur: artistData.finalPayout,
+          },
+          blob,
+          sosWebhookUrl,
+          sosWebhookSecret
+        )
+
+        if (!result.success) {
+          throw new Error(result.error ?? 'Failed to publish statement to portal')
+        }
+
+        toast.success('Statement published to portal')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        toast.error(message)
+      }
+    },
+    [processedData, artistInfoMap, sosWebhookUrl, sosWebhookSecret, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters]
+  )
+
+  return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal }
 }
