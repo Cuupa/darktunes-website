@@ -5,6 +5,13 @@
  *
  * Catches rendering errors in the page tree below the root layout.
  * Shows a user-friendly message with a retry button.
+ *
+ * Special case — ChunkLoadError:
+ *   After a new Vercel deployment the old JS chunk hashes no longer exist on
+ *   the CDN.  Any browser tab that was open before the deploy will hit 404s
+ *   when webpack tries to lazy-load those chunks.  The only reliable fix is a
+ *   hard page reload so the browser fetches the current HTML and new chunk
+ *   manifest.  We detect this silently and reload without showing an error UI.
  */
 
 import { useEffect } from 'react'
@@ -17,10 +24,31 @@ interface ErrorPageProps {
   reset: () => void
 }
 
+/** Returns true when the error is caused by a stale webpack chunk (post-deploy). */
+function isChunkLoadError(error: Error): boolean {
+  return (
+    error.name === 'ChunkLoadError' ||
+    error.message.includes('Loading chunk') ||
+    error.message.includes('Failed to fetch dynamically imported module')
+  )
+}
+
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    console.error('[ErrorBoundary]', error)
+    // Stale chunk after a new deployment → hard reload fetches the new manifest.
+    if (isChunkLoadError(error)) {
+      window.location.reload()
+      return
+    }
+
+    // In development surface the full error; in production keep the console clean.
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[ErrorBoundary]', error)
+    }
   }, [error])
+
+  // Nothing to render while the reload is in-flight.
+  if (isChunkLoadError(error)) return null
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
