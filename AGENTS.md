@@ -209,7 +209,7 @@ Async Sync Queue (`sync_queue` table):
 Idempotency Keys (`idempotency_keys` table):
   Financial and submission endpoints accept an optional `idempotencyKey` (UUID) in the request body.
   DAL: `src/lib/api/idempotency.ts` exports `checkAndClaimIdempotencyKey(db, key, resourceType)` (atomic INSERT ... ON CONFLICT DO NOTHING) and `updateIdempotencyKeyResourceId(db, key, id)`.
-  Applied to: `/api/webhooks/sos/confirm`, `/api/portal/submit-release`.
+  Applied to: `/api/portal/submit-release`.
   Keys older than 24h are cleaned up on each check. Only service-role client can access this table (no public RLS).
 
 Spotify Sync Notes:
@@ -360,14 +360,13 @@ Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
   Both charts are loaded lazily via `next/dynamic` (`ssr: false`) to exclude Recharts from the initial bundle.
   Data fetch follows IoC: the Server Component fetches both `getStreamingStatsByArtistId` and `getSalesStatementsByArtistId` in parallel (`Promise.all`) and passes results as props to the leaf client components.
 
-SOS Webhook (Statement of Sales PDF Upload)
-The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.
-Step 1 — POST /api/webhooks/sos: Validates API key, validates metadata (artistId, filename, period, amountEur?), verifies artist exists via service-role client, generates an R2 key (`statements/{artistId}/{uuid}_{filename}`), returns a 15-minute presigned R2 PUT URL.
-Step 2 — POST /api/webhooks/sos/confirm: Validates API key, validates payload (r2Key, artistId, filename, period, amountEur?), inserts a `sales_statements` DB row via service-role client (bypasses RLS), returns `{ statementId }`.
-Authentication: Both endpoints check `Authorization: Bearer <SOS_WEBHOOK_SECRET>` against the `SOS_WEBHOOK_SECRET` environment variable. Return 503 if the variable is unset; 401 on mismatch.
+SOS (Statement of Sales) — Direct Server Action Upload
+Statement-of-Sales PDFs are uploaded directly via the `uploadStatement` Server Action in `app/portal/statements/_actions/uploadStatement.ts`. Authentication is via the caller’s Supabase session (admin or editor role required) — no external webhook or shared secret is needed.
+The Server Action: (1) verifies admin/editor role via `createServerSupabaseClient` + `getUserRoleWithClient`, (2) generates an R2 key (`statements/{artistId}/{uuid}_{filename}`), (3) generates a 15-minute presigned R2 PUT URL via `generatePresignedUploadUrl`, (4) uploads the PDF blob (received as Base64) directly to R2, (5) calls `createSalesStatement()` with the service-role client to bypass RLS, (6) calls `sendStatementNotification()` non-blocking.
 DAL: `createSalesStatement(db, data)` in `src/lib/api/salesStatements.ts` inserts the record. MUST be called with a service-role client to bypass RLS.
-Duplicate handling: If the r2Key already exists (unique constraint), the confirm endpoint returns 409 — the SOS generator should treat this as a no-op.
-Email notification: After a successful `sales_statements` insert, the confirm route calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. The email is sent via Resend API to `artist.email` with period, optional amount, and a CTA button linking to `/portal/statements`. This call is wrapped in a try/catch — failure is logged with `[SOS confirm]` prefix but does NOT block the 201 response (graceful degradation). Skipped silently when `RESEND_API_KEY` is not set.
+PDF encoding: The client hook (`useSosExports`) converts the PDF Blob to Base64 via `blobToBase64()` (uses `blob.arrayBuffer()` + `btoa`) before calling the Server Action — Server Actions do not support raw Blob transfer.
+Validation helpers: `isValidArtistId` and `isValidPeriod` live in `src/lib/sos/validation.ts`.
+Email notification: After a successful `sales_statements` insert, the Server Action calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. Failure is logged but does NOT block the response (graceful degradation). Skipped silently when `RESEND_API_KEY` is not set.
 Admin statements overview: `StatementsManager` component (`src/components/admin/StatementsManager.tsx`) provides a read-only table in the Admin dashboard (Statements tab, admin-only) showing all `sales_statements` rows joined with `artists.name`. Columns: Artist Name, Period, Amount (EUR), Filename (monospace), Created At. Sorted newest first.
 
 Submission Notifications (artist portal → admin)
@@ -399,8 +398,6 @@ Required env vars are split into two groups:
      BANDSINTOWN_API_KEY
   - Optional (YouTube sync):
      YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID, CRON_SECRET
-  - Optional (SOS webhook — required for receiving PDF statements from the SOS generator):
-     SOS_WEBHOOK_SECRET
   - Optional (Newsletter DOI — required for sending Double Opt-In confirmation emails):
      RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL
   - Optional (MailerLite — adds verified subscribers to the marketing list after DOI confirmation):
@@ -658,7 +655,8 @@ DAL calls. Write operations from the React client context run exclusively as
 |---|---|---|
 | Portal forms (artist, profile, checklist) | Server Action (`"use server"`) | `src/actions/portal/*.ts` |
 | Admin forms (artists, releases, news) | Route Handler + JWT ****** `/api/admin/artists`, `/api/admin/releases` |
-| External systems (cron, webhooks, SOS) | Route Handler | `/api/sync`, `/api/webhooks/sos/*` |
+| External systems (cron, webhooks) | Route Handler | `/api/sync`, `/api/webhooks/*` |
+| SOS statement upload | Server Action (`"use server"`) | `app/portal/statements/_actions/uploadStatement.ts` |
 | Public reads | RSC + `unstable_cache` | `app/artists/[slug]/page.tsx` |
 
 **Why admin writes use Route Handlers (not Server Actions):** The Admin UI

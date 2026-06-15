@@ -271,8 +271,6 @@ function SosGeneratorPanel() {
       labelArtists,
       emailConfig,
       compilationFilters,
-      appDefaults.sosWebhookUrl ?? '',
-      appDefaults.sosWebhookSecret ?? '',
     )
 
   const hasData = revenues.length > 0

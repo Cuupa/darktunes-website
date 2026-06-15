@@ -97,10 +97,6 @@ echo "  — Cache revalidation webhook (optional but recommended) —"
 optional_env "REVALIDATE_SECRET" "Shared secret for POST /api/revalidate Supabase webhooks"
 echo ""
 
-echo "  — SOS webhook (optional — required for Statement of Sales PDF upload) —"
-optional_env "SOS_WEBHOOK_SECRET" "API key for POST /api/webhooks/sos from the SOS PDF generator"
-echo ""
-
 echo "  — Contact form (optional — email delivery via Resend) —"
 optional_env "CONTACT_EMAIL" "Email recipient for POST /api/contact form submissions"
 echo ""
