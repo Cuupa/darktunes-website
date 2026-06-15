@@ -87,17 +87,17 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Accreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
       { label: 'Press Portal',   href: '/admin/press',          icon: Briefcase,          adminOnly: true },
-      { label: 'Statements',     href: '/admin/statements',     icon: Receipt,            adminOnly: true },
     ],
   },
   {
     label: 'MANAGEMENT',
     items: [
-      { label: 'Assets',     href: '/admin/assets',     icon: FolderOpen,     adminOnly: true  },
-      { label: 'Accounting', href: '/admin/accounting', icon: Wallet,         adminOnly: true  },
-      { label: 'Messages',   href: '/admin/messages',   icon: ChatCircle,     adminOnly: true  },
-      { label: 'Promo Log',  href: '/admin/promo-log',  icon: MegaphoneSimple, adminOnly: false },
-      { label: 'Users',      href: '/admin/users',      icon: UsersThree,     adminOnly: true  },
+      { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
+      { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
+      { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
+      { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
+      { label: 'Promo Log',   href: '/admin/promo-log',   icon: MegaphoneSimple, adminOnly: false },
+      { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
     ],
   },
   {
