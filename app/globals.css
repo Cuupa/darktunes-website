@@ -91,6 +91,10 @@
 .glow-card {
   position: relative;
   overflow: hidden;
+  /* Pre-promote to a compositor layer so hover transforms and the
+     ::before gradient transition are handled entirely by the GPU,
+     preventing main-thread repaints during scroll. */
+  will-change: transform;
 }
 
 .glow-card::before {

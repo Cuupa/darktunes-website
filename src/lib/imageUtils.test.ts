@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getOptimizedImageUrl, getSquareThumbnail } from './imageUtils'
+import { getOptimizedImageUrl, getSquareThumbnail, processHtmlImages } from './imageUtils'
 
 describe('getOptimizedImageUrl', () => {
   it('returns an empty string for empty input', () => {
@@ -47,5 +47,41 @@ describe('getSquareThumbnail', () => {
     const result = getSquareThumbnail('https://cdn.example.com/img.jpg', 150)
     expect(result).toContain('w=150')
     expect(result).toContain('h=150')
+  })
+})
+
+describe('processHtmlImages', () => {
+  it('returns empty string unchanged', () => {
+    expect(processHtmlImages('')).toBe('')
+  })
+
+  it('rewrites img src through wsrv.nl', () => {
+    const html = '<p><img src="https://cdn.example.com/photo.jpg" alt="test"></p>'
+    const result = processHtmlImages(html)
+    expect(result).toContain('wsrv.nl')
+    expect(result).toContain('output=webp')
+    expect(result).toContain(encodeURIComponent('https://cdn.example.com/photo.jpg'))
+  })
+
+  it('leaves already-proxied wsrv.nl URLs untouched', () => {
+    const proxied = 'https://wsrv.nl/?url=https%3A%2F%2Fcdn.example.com%2Fimg.jpg&w=800&output=webp&maxage=31d'
+    const html = `<img src="${proxied}">`
+    expect(processHtmlImages(html)).toBe(html)
+  })
+
+  it('leaves data: URIs untouched', () => {
+    const html = '<img src="data:image/png;base64,abc123">'
+    expect(processHtmlImages(html)).toBe(html)
+  })
+
+  it('uses supplied width', () => {
+    const html = '<img src="https://cdn.example.com/img.jpg">'
+    const result = processHtmlImages(html, 400)
+    expect(result).toContain('w=400')
+  })
+
+  it('does not alter non-img content', () => {
+    const html = '<p>Hello world</p>'
+    expect(processHtmlImages(html)).toBe(html)
   })
 })

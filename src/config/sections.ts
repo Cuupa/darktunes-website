@@ -25,7 +25,7 @@ export const SECTION_CONFIG: SectionConfig[] = [
   { id: 'releases', labelKey: 'releases', href: '/releases', routeType: 'internal' },
   { id: 'spotify', labelKey: 'spotify', href: '#spotify-player', routeType: 'anchor' },
   { id: 'videos', labelKey: 'videos', href: '/videos', routeType: 'internal' },
-  { id: 'concerts', labelKey: 'tour', href: '#concerts', routeType: 'anchor' },
+  { id: 'concerts', labelKey: 'tour', href: '/events', routeType: 'internal' },
   { id: 'news', labelKey: 'news', href: '/news', routeType: 'internal' },
   { id: 'newsletter', labelKey: 'newsletter', href: '#newsletter', routeType: 'anchor' },
   { id: 'artists', labelKey: 'artists', href: '/artists', routeType: 'internal' },

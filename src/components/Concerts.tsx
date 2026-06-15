@@ -21,7 +21,7 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
   const prefersReducedMotion = useReducedMotion()
 
   return (
-    <section id="concerts" className="py-24 px-4 lg:px-16 scroll-mt-36">
+    <section id="events" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
         <motion.div
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
