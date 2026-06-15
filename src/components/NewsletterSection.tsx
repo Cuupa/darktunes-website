@@ -42,7 +42,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : 0.15 }}
-          className="relative rounded-sm border border-border overflow-hidden"
+          className="relative rounded-sm border border-border overflow-hidden bg-card"
           style={{ boxShadow: '0 0 40px rgba(73,54,135,0.15)' }}
         >
           {/* Subtle top accent line */}
@@ -52,10 +52,10 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
             src="https://darkmerch.com/pages/newsletter"
             title={dict.heading}
             width="100%"
-            height="600"
+            height="260"
             loading="lazy"
+            scrolling="no"
             className="block w-full border-0"
-            style={{ minHeight: '500px' }}
           />
         </motion.div>
       </div>
