@@ -40,6 +40,10 @@ export interface ArtistProfile {
   onboardingCompleted: boolean
   // EPK customisation
   epkTheme: string
+  epkLayout: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
+  epkOrientation: 'portrait' | 'landscape'
+  epkBgImageUrl: string | undefined
+  epkBgOpacity: number
   epkSectionsOrder: string[]
   epkSectionsHidden: string[]
   epkPasswordHash: string | undefined
@@ -70,6 +74,10 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     riderHospitalityUrl: row.rider_hospitality_url ?? undefined,
     onboardingCompleted: row.onboarding_completed ?? false,
     epkTheme: row.epk_theme ?? 'default',
+    epkLayout: (row.epk_layout as ArtistProfile['epkLayout'] | null) ?? 'classic',
+    epkOrientation: (row.epk_orientation as ArtistProfile['epkOrientation'] | null) ?? 'portrait',
+    epkBgImageUrl: row.epk_bg_image_url ?? undefined,
+    epkBgOpacity: row.epk_bg_opacity ?? 20,
     epkSectionsOrder: row.epk_sections_order ?? [],
     epkSectionsHidden: row.epk_sections_hidden ?? [],
     epkPasswordHash: row.epk_password_hash ?? undefined,

@@ -437,6 +437,10 @@ export interface Database {
           rider_hospitality_url: string | null
           onboarding_completed: boolean
           epk_theme: string
+          epk_layout: string
+          epk_orientation: string
+          epk_bg_image_url: string | null
+          epk_bg_opacity: number
           epk_sections_order: string[]
           epk_sections_hidden: string[]
           epk_password_hash: string | null
@@ -461,6 +465,10 @@ export interface Database {
           rider_hospitality_url?: string | null
           onboarding_completed?: boolean
           epk_theme?: string
+          epk_layout?: string
+          epk_orientation?: string
+          epk_bg_image_url?: string | null
+          epk_bg_opacity?: number
           epk_sections_order?: string[]
           epk_sections_hidden?: string[]
           epk_password_hash?: string | null
@@ -485,6 +493,10 @@ export interface Database {
           rider_hospitality_url?: string | null
           onboarding_completed?: boolean
           epk_theme?: string
+          epk_layout?: string
+          epk_orientation?: string
+          epk_bg_image_url?: string | null
+          epk_bg_opacity?: number
           epk_sections_order?: string[]
           epk_sections_hidden?: string[]
           epk_password_hash?: string | null

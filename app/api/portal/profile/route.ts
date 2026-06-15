@@ -57,6 +57,10 @@ const profileBodySchema = z.object({
   rider_hospitality_url: z.string().url().nullable().optional(),
   // EPK customisation
   epk_theme: z.string().max(50).optional(),
+  epk_layout: z.enum(['classic', 'magazine', 'minimal', 'full-bleed']).optional(),
+  epk_orientation: z.enum(['portrait', 'landscape']).optional(),
+  epk_bg_image_url: z.string().url().nullable().optional(),
+  epk_bg_opacity: z.number().int().min(0).max(100).optional(),
   epk_sections_order: z.array(z.string()).optional(),
   epk_sections_hidden: z.array(z.string()).optional(),
   // EPK password protection — client sends plaintext prefixed with __plain__

@@ -93,6 +93,10 @@ export function usePortalProfileForm({
     epkPasswordSections: string[]
     epkPasswordRaw?: string | null
     epkCustomThemeTokens: Record<string, string>
+    epkLayout: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
+    epkOrientation: 'portrait' | 'landscape'
+    epkBgImageUrl?: string
+    epkBgOpacity: number
   }>({
     epkTheme: initialProfile?.epkTheme ?? 'default',
     epkSectionsOrder: initialProfile?.epkSectionsOrder?.length ? initialProfile.epkSectionsOrder : ['header','quote','bio','gallery','info','contacts','riders','links'],
@@ -100,6 +104,10 @@ export function usePortalProfileForm({
     epkPasswordSections: initialProfile?.epkPasswordSections ?? [],
     epkPasswordRaw: undefined,
     epkCustomThemeTokens: initialProfile?.epkCustomThemeTokens ?? {},
+    epkLayout: initialProfile?.epkLayout ?? 'classic',
+    epkOrientation: initialProfile?.epkOrientation ?? 'portrait',
+    epkBgImageUrl: initialProfile?.epkBgImageUrl,
+    epkBgOpacity: initialProfile?.epkBgOpacity ?? 20,
   })
 
   // Gallery photos (managed separately from the main form)
@@ -232,6 +240,10 @@ export function usePortalProfileForm({
     epkPasswordSections: string[]
     epkPasswordHash: string | undefined
     epkCustomThemeTokens: Record<string, string>
+    epkLayout: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
+    epkOrientation: 'portrait' | 'landscape'
+    epkBgImageUrl: string | undefined
+    epkBgOpacity: number
   }>) => {
     setEpkSettings((prev) => {
       // Extract raw password from the __plain__ sentinel
@@ -251,6 +263,10 @@ export function usePortalProfileForm({
         ...(updates.epkSectionsHidden !== undefined ? { epkSectionsHidden: updates.epkSectionsHidden } : {}),
         ...(updates.epkPasswordSections !== undefined ? { epkPasswordSections: updates.epkPasswordSections } : {}),
         ...(updates.epkCustomThemeTokens !== undefined ? { epkCustomThemeTokens: updates.epkCustomThemeTokens } : {}),
+        ...(updates.epkLayout !== undefined ? { epkLayout: updates.epkLayout } : {}),
+        ...(updates.epkOrientation !== undefined ? { epkOrientation: updates.epkOrientation } : {}),
+        ...('epkBgImageUrl' in updates ? { epkBgImageUrl: updates.epkBgImageUrl } : {}),
+        ...(updates.epkBgOpacity !== undefined ? { epkBgOpacity: updates.epkBgOpacity } : {}),
         epkPasswordRaw,
       }
     })
@@ -310,6 +326,10 @@ export function usePortalProfileForm({
           epk_custom_theme_tokens: Object.keys(epkSettings.epkCustomThemeTokens).length > 0
             ? epkSettings.epkCustomThemeTokens
             : null,
+          epk_layout: epkSettings.epkLayout,
+          epk_orientation: epkSettings.epkOrientation,
+          epk_bg_image_url: epkSettings.epkBgImageUrl ?? null,
+          epk_bg_opacity: epkSettings.epkBgOpacity,
           ...(epkSettings.epkPasswordRaw !== undefined ? { epk_password_raw: epkSettings.epkPasswordRaw } : {}),
         },
         session.access_token,

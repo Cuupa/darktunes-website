@@ -51,7 +51,7 @@ import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
 import { EPKThemeProvider, useEPKTheme } from '@/lib/epk/EPKThemeContext'
 import type { EPKSectionId } from '@/lib/epk/themes'
-import { DEFAULT_SECTIONS_ORDER } from '@/lib/epk/themes'
+import { DEFAULT_SECTIONS_ORDER, EPK_THEMES } from '@/lib/epk/themes'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,6 +89,10 @@ export interface EPKData {
   epkSectionsHidden?: string[]
   /** Custom color tokens used when epkTheme === 'custom' */
   epkCustomThemeTokens?: Record<string, string>
+  epkLayout?: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
+  epkOrientation?: 'portrait' | 'landscape'
+  epkBgImageUrl?: string
+  epkBgOpacity?: number
   // password protection
   epkPasswordSections?: string[]
   epkPasswordHash?: string
@@ -109,8 +113,13 @@ interface EPKPreviewProps {
   epkPasswordHash?: string
   epkPasswordSections?: string[]
   epkCustomThemeTokens?: Record<string, string>
+  epkLayout?: EPKData['epkLayout']
+  epkOrientation?: EPKData['epkOrientation']
+  epkBgImageUrl?: string
+  epkBgOpacity?: number
+  documentRef?: React.RefObject<HTMLElement | null>
   /** Called when theme/section/password settings change */
-  onSettingsChange?: (updates: Partial<Pick<EPKData, 'epkTheme' | 'epkSectionsOrder' | 'epkSectionsHidden' | 'epkPasswordSections' | 'epkPasswordHash' | 'epkCustomThemeTokens'>>) => void
+  onSettingsChange?: (updates: Partial<Pick<EPKData, 'epkTheme' | 'epkSectionsOrder' | 'epkSectionsHidden' | 'epkPasswordSections' | 'epkPasswordHash' | 'epkCustomThemeTokens' | 'epkLayout' | 'epkOrientation' | 'epkBgImageUrl' | 'epkBgOpacity'>>) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -184,41 +193,107 @@ const SECTION_LABEL_KEYS: Record<EPKSectionId, keyof Dictionary['portal']> = {
 
 function SectionHeader({ data }: { data: EPKData }) {
   const theme = useEPKTheme()
+  const layout = data.epkLayout ?? 'classic'
   const genres = data.genres
     ? data.genres.split(',').map((g) => g.trim()).filter(Boolean)
     : []
-  return (
-    <div style={theme.header}>
-      {data.photoUrl && (
-        <div style={{
-          position: 'relative',
-          width: 96,
-          height: 96,
-          flexShrink: 0,
-          borderRadius: '50%',
-          overflow: 'hidden',
-          border: `2px solid ${theme.accent}40`,
-        }}>
-          <Image
-            src={data.photoUrl}
-            alt={`${data.artistName} – artist photo`}
-            fill
-            className="object-cover"
-            sizes="96px"
-          />
+  const imageFrame = data.photoUrl ? (
+    <div style={{
+      position: 'relative',
+      width: 96,
+      height: 96,
+      flexShrink: 0,
+      borderRadius: layout === 'minimal' ? '0.5rem' : '50%',
+      overflow: 'hidden',
+      border: `2px solid ${theme.accent}40`,
+    }}>
+      <Image
+        src={data.photoUrl}
+        alt={`${data.artistName} – artist photo`}
+        fill
+        className="object-cover"
+        sizes="96px"
+      />
+    </div>
+  ) : null
+
+  const headerText = (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      {layout !== 'minimal' && <p style={theme.headerLabel}>Electronic Press Kit</p>}
+      <h1
+        style={{
+          ...theme.artistName,
+          ...(layout === 'minimal'
+            ? { textAlign: 'center', fontSize: '2.2rem', marginBottom: '0.5rem' }
+            : {}),
+        }}
+      >
+        {data.artistName}
+      </h1>
+      {genres.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.375rem',
+            marginTop: '0.5rem',
+            justifyContent: layout === 'minimal' ? 'center' : 'flex-start',
+          }}
+        >
+          {genres.map((g) => (
+            <span key={g} style={theme.badge}>{g}</span>
+          ))}
         </div>
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={theme.headerLabel}>Electronic Press Kit</p>
-        <h1 style={theme.artistName}>{data.artistName}</h1>
-        {genres.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', marginTop: '0.5rem' }}>
-            {genres.map((g) => (
-              <span key={g} style={theme.badge}>{g}</span>
-            ))}
-          </div>
-        )}
+    </div>
+  )
+
+  if (layout === 'minimal') {
+    return (
+      <div style={{ ...theme.header, justifyContent: 'center', textAlign: 'center', background: 'transparent' }}>
+        {headerText}
       </div>
+    )
+  }
+
+  if (layout === 'magazine') {
+    return (
+      <div style={{ ...theme.header, alignItems: 'stretch' }}>
+        <div style={{ width: '34%', minWidth: 180, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {imageFrame}
+          {data.hometown ? <p style={{ fontSize: '0.78rem', margin: 0, ...theme.mutedText }}>{data.hometown}</p> : null}
+          {data.foundingYear ? <p style={{ fontSize: '0.78rem', margin: 0, ...theme.mutedText }}>{data.foundingYear}</p> : null}
+        </div>
+        <div style={{ width: '66%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {headerText}
+        </div>
+      </div>
+    )
+  }
+
+  if (layout === 'full-bleed') {
+    const headerBgOpacity = Math.min(100, Math.max(0, data.epkBgOpacity ?? 40)) / 100
+    return (
+      <div
+        style={{
+          ...theme.header,
+          minHeight: 180,
+          alignItems: 'flex-end',
+          background: data.epkBgImageUrl
+            ? `linear-gradient(rgba(0,0,0,${headerBgOpacity}), rgba(0,0,0,${headerBgOpacity})), url(${data.epkBgImageUrl}) center / cover no-repeat`
+            : theme.header.background,
+        }}
+      >
+        {imageFrame}
+        {headerText}
+      </div>
+    )
+  }
+
+  return (
+    <div style={theme.header}>
+      {imageFrame}
+      {headerText}
     </div>
   )
 }
@@ -425,8 +500,19 @@ function SectionGallery({ data, dict }: { data: EPKData; dict: Dictionary['porta
 // EPK Document — theme-aware, section-ordered
 // ---------------------------------------------------------------------------
 
-function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData }) {
+function EPKDocument({
+  dict,
+  data,
+  documentRef,
+}: {
+  dict: Dictionary['portal']
+  data: EPKData
+  documentRef?: React.RefObject<HTMLElement | null>
+}) {
   const theme = useEPKTheme()
+  const layout = data.epkLayout ?? 'classic'
+  const orientation = data.epkOrientation ?? 'portrait'
+  const bgOpacity = Math.min(100, Math.max(0, data.epkBgOpacity ?? (layout === 'full-bleed' ? 40 : 20)))
   const sectionsOrder = (data.epkSectionsOrder ?? DEFAULT_SECTIONS_ORDER) as EPKSectionId[]
   const sectionsHidden = new Set(data.epkSectionsHidden ?? [])
 
@@ -448,14 +534,51 @@ function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData
 
   const headerNode = !sectionsHidden.has('header') ? sectionMap.header : null
   const bodyNodes = renderOrder.filter((id) => id !== 'header').map((id) => sectionMap[id]).filter(Boolean)
+  const articleStyle: React.CSSProperties = {
+    ...theme.article,
+    position: 'relative',
+    overflow: 'hidden',
+    aspectRatio: orientation === 'landscape' ? '297 / 210' : '210 / 297',
+    width: '100%',
+  }
+
+  const bodyStyle: React.CSSProperties = {
+    ...theme.body,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.75rem',
+    ...(orientation === 'landscape' ? { padding: '1.25rem 2.5rem' } : {}),
+  }
 
   return (
-    <article className="epk-document" style={theme.article}>
-      {headerNode}
-      <div style={{ ...theme.body, display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <article id="epk-document-root" ref={documentRef} className="epk-document" style={articleStyle}>
+      {data.epkBgImageUrl ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+            opacity: bgOpacity / 100,
+            pointerEvents: 'none',
+            ...(theme.backgroundImageStyle ?? {}),
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={data.epkBgImageUrl}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+      ) : null}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {headerNode}
+      </div>
+      <div style={{ ...bodyStyle, position: 'relative', zIndex: 1 }}>
         {bodyNodes}
       </div>
-      <div style={theme.footer}>
+      <div style={{ ...theme.footer, position: 'relative', zIndex: 1 }}>
         {data.labelLogoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -468,7 +591,8 @@ function EPKDocument({ dict, data }: { dict: Dictionary['portal']; data: EPKData
             {data.labelName ?? 'Electronic Press Kit'}
           </p>
         )}
-        <p style={theme.footerText}>{new Date().getFullYear()}</p>      </div>
+        <p style={theme.footerText}>{new Date().getFullYear()}</p>
+      </div>
     </article>
   )
 }
@@ -487,12 +611,13 @@ interface EPKModalProps {
 export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
   const titleId = useId()
   const [downloading, setDownloading] = useState(false)
+  const modalDocumentRef = useRef<HTMLElement | null>(null)
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloading(true)
     try {
       const { generateEpkPdf } = await import('./epkPdf')
-      await generateEpkPdf(data)
+      await generateEpkPdf(data, modalDocumentRef)
     } catch {
       toast.error(dict.profile_error)
     } finally {
@@ -509,7 +634,7 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <DialogContent
-        className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0"
+        className="max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[92vh] p-0 gap-0"
         aria-labelledby={titleId}
       >
         <DialogTitle id={titleId} className="sr-only">
@@ -537,9 +662,9 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
             </Button>
           </div>
         </div>
-        <div className="p-4 sm:p-6 epk-print-area">
+        <div className="overflow-y-auto max-h-[70vh] p-4 sm:p-6 epk-print-area">
           <EPKThemeProvider themeId={data.epkTheme} customTokens={data.epkCustomThemeTokens}>
-            <EPKDocument dict={dict} data={data} />
+            <EPKDocument dict={dict} data={data} documentRef={modalDocumentRef} />
           </EPKThemeProvider>
         </div>
       </DialogContent>
@@ -564,11 +689,24 @@ function EPKThemeSelector({
   customTokens?: Record<string, string>
   onCustomTokenChange?: (key: string, val: string) => void
 }) {
-  const themes = [
-    { id: 'default',      label: dict.epk_theme_default },
-    { id: 'blade-runner', label: dict.epk_theme_blade_runner },
-    { id: 'custom',       label: dict.epk_theme_custom },
-  ]
+  const themeKeys = Object.keys(EPK_THEMES)
+  const themeLabels: Record<string, string> = {
+    default: dict.epk_theme_default,
+    'blade-runner': dict.epk_theme_blade_runner,
+    'neon-underground': dict.epk_theme_neon_underground,
+    'industrial-grey': dict.epk_theme_industrial_grey,
+    'midnight-forest': dict.epk_theme_midnight_forest,
+    'crimson-cult': dict.epk_theme_crimson_cult,
+    synthwave: dict.epk_theme_synthwave,
+    'print-clean': dict.epk_theme_print_clean,
+    custom: dict.epk_theme_custom,
+  }
+  const themes = [...themeKeys, 'custom'].map((id) => ({
+    id,
+    label: themeLabels[id] ?? id,
+    swatchBg: id === 'custom' ? (customTokens?.bg ?? '#1a1a1a') : (EPK_THEMES[id]?.article.background as string | undefined) ?? '#1a1a1a',
+    swatchAccent: id === 'custom' ? (customTokens?.accent ?? '#ffffff') : EPK_THEMES[id]?.accent ?? '#ffffff',
+  }))
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
       <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -590,9 +728,11 @@ function EPKThemeSelector({
           >
             <span
               aria-hidden="true"
-              className="inline-block w-4 h-4 rounded flex-shrink-0"
-              style={{ background: t.id === 'blade-runner' ? '#000' : t.id === 'custom' ? (customTokens?.bg ?? '#1a1a1a') : '#1a1a1a', border: '1px solid #ffffff40' }}
-            />
+              className="inline-flex w-4 h-4 rounded flex-shrink-0 border border-white/25 items-center justify-center"
+              style={{ background: t.swatchBg }}
+            >
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: t.swatchAccent }} />
+            </span>
             {t.label}
           </button>
         ))}
@@ -622,6 +762,183 @@ function EPKThemeSelector({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Orientation / Layout / Background panels
+// ---------------------------------------------------------------------------
+
+function EPKOrientationPanel({
+  dict,
+  value,
+  onChange,
+}: {
+  dict: Dictionary['portal']
+  value: 'portrait' | 'landscape'
+  onChange: (value: 'portrait' | 'landscape') => void
+}) {
+  const options: Array<{ id: 'portrait' | 'landscape'; label: string; glyph: string }> = [
+    { id: 'portrait', label: dict.epk_orientation_portrait, glyph: '📄' },
+    { id: 'landscape', label: dict.epk_orientation_landscape, glyph: '📄↔' },
+  ]
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {dict.epk_orientation_label}
+      </Label>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={value === option.id}
+            onClick={() => onChange(option.id)}
+            className={[
+              'inline-flex min-w-[44px] min-h-[44px] items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+              value === option.id
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-card text-muted-foreground hover:bg-muted',
+            ].join(' ')}
+          >
+            <span aria-hidden="true">{option.glyph}</span>
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EPKLayoutPanel({
+  dict,
+  value,
+  onChange,
+}: {
+  dict: Dictionary['portal']
+  value: NonNullable<EPKData['epkLayout']>
+  onChange: (value: NonNullable<EPKData['epkLayout']>) => void
+}) {
+  const options: Array<{ id: NonNullable<EPKData['epkLayout']>; label: string }> = [
+    { id: 'classic', label: dict.epk_layout_classic },
+    { id: 'magazine', label: dict.epk_layout_magazine },
+    { id: 'minimal', label: dict.epk_layout_minimal },
+    { id: 'full-bleed', label: dict.epk_layout_full_bleed },
+  ]
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {dict.epk_layout_label}
+      </Label>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={value === option.id}
+            onClick={() => onChange(option.id)}
+            className={[
+              'rounded-md border p-2 text-left transition-colors',
+              value === option.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted',
+            ].join(' ')}
+          >
+            <div className="rounded border border-border bg-background/70 p-2 h-14">
+              {option.id === 'classic' && (
+                <div className="h-full flex flex-col gap-1">
+                  <div className="h-3 rounded bg-muted" />
+                  <div className="h-2 rounded bg-muted/70" />
+                  <div className="h-2 rounded bg-muted/70 w-3/4" />
+                </div>
+              )}
+              {option.id === 'magazine' && (
+                <div className="h-full grid grid-cols-[1fr_1.5fr] gap-1">
+                  <div className="rounded bg-muted h-full" />
+                  <div className="flex flex-col gap-1">
+                    <div className="h-2 rounded bg-muted/70" />
+                    <div className="h-2 rounded bg-muted/70" />
+                    <div className="h-2 rounded bg-muted/70 w-5/6" />
+                  </div>
+                </div>
+              )}
+              {option.id === 'minimal' && (
+                <div className="h-full flex items-center justify-center">
+                  <div className="h-2 w-3/4 rounded bg-muted/70" />
+                </div>
+              )}
+              {option.id === 'full-bleed' && (
+                <div className="h-full rounded bg-gradient-to-r from-muted to-muted/40 flex items-end p-1">
+                  <div className="h-2 w-1/2 rounded bg-background/70" />
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-xs font-medium">{option.label}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EPKBackgroundPanel({
+  dict,
+  data,
+  onSettingsChange,
+}: {
+  dict: Dictionary['portal']
+  data: EPKData
+  onSettingsChange?: EPKPreviewProps['onSettingsChange']
+}) {
+  const selectedBg = data.epkBgImageUrl ?? ''
+  const bgOpacity = data.epkBgOpacity ?? 20
+  const gallery = data.photoGallery ?? []
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {dict.epk_bg_label}
+      </Label>
+      <div className="space-y-2">
+        <Label htmlFor="epk-bg-select" className="text-xs text-muted-foreground">
+          {dict.epk_bg_pick_from_gallery}
+        </Label>
+        <select
+          id="epk-bg-select"
+          value={selectedBg}
+          onChange={(event) => onSettingsChange?.({ epkBgImageUrl: event.target.value || undefined })}
+          className="w-full h-9 rounded-md border border-input bg-background px-2 text-xs"
+        >
+          <option value="">—</option>
+          {gallery.map((url) => (
+            <option key={url} value={url}>{url}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="epk-bg-opacity" className="text-xs text-muted-foreground">
+          {dict.epk_bg_opacity}: {bgOpacity}%
+        </Label>
+        <input
+          id="epk-bg-opacity"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={bgOpacity}
+          onChange={(event) => onSettingsChange?.({ epkBgOpacity: Number(event.target.value) })}
+          className="w-full"
+        />
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onSettingsChange?.({ epkBgImageUrl: undefined })}
+      >
+        {dict.epk_bg_clear}
+      </Button>
     </div>
   )
 }
@@ -818,7 +1135,23 @@ function EPKPasswordPanel({
 // EPKPreview — inline preview panel (used inside Profile page)
 // ---------------------------------------------------------------------------
 
-export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder, epkSectionsHidden, epkPasswordHash, epkPasswordSections, epkCustomThemeTokens, onSettingsChange }: EPKPreviewProps) {
+export function EPKPreview({
+  dict,
+  data,
+  artistSlug,
+  epkTheme,
+  epkSectionsOrder,
+  epkSectionsHidden,
+  epkPasswordHash,
+  epkPasswordSections,
+  epkCustomThemeTokens,
+  epkLayout,
+  epkOrientation,
+  epkBgImageUrl,
+  epkBgOpacity,
+  onSettingsChange,
+  documentRef,
+}: EPKPreviewProps) {
   // Merge prop overrides into data for display
   const effectiveData: EPKData = {
     ...data,
@@ -828,6 +1161,10 @@ export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder,
     ...(epkPasswordHash !== undefined ? { epkPasswordHash } : {}),
     ...(epkPasswordSections !== undefined ? { epkPasswordSections } : {}),
     ...(epkCustomThemeTokens !== undefined ? { epkCustomThemeTokens } : {}),
+    ...(epkLayout !== undefined ? { epkLayout } : {}),
+    ...(epkOrientation !== undefined ? { epkOrientation } : {}),
+    ...(epkBgImageUrl !== undefined ? { epkBgImageUrl } : {}),
+    ...(epkBgOpacity !== undefined ? { epkBgOpacity } : {}),
   }
   void artistSlug
   const [modalOpen, setModalOpen] = useState(false)
@@ -851,6 +1188,21 @@ export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder,
         </Button>
       </div>
 
+      <EPKOrientationPanel
+        dict={dict}
+        value={effectiveData.epkOrientation ?? 'portrait'}
+        onChange={(value) => onSettingsChange?.({ epkOrientation: value })}
+      />
+      <EPKLayoutPanel
+        dict={dict}
+        value={effectiveData.epkLayout ?? 'classic'}
+        onChange={(value) => onSettingsChange?.({ epkLayout: value })}
+      />
+      <EPKBackgroundPanel
+        dict={dict}
+        data={effectiveData}
+        onSettingsChange={onSettingsChange}
+      />
       <EPKThemeSelector
         dict={dict}
         value={effectiveData.epkTheme ?? 'default'}
@@ -863,7 +1215,7 @@ export function EPKPreview({ dict, data, artistSlug, epkTheme, epkSectionsOrder,
 
       <div className="rounded-lg border border-border bg-card/50 p-4">
         <EPKThemeProvider themeId={effectiveData.epkTheme} customTokens={effectiveData.epkCustomThemeTokens}>
-          <EPKDocument dict={dict} data={effectiveData} />
+          <EPKDocument dict={dict} data={effectiveData} documentRef={documentRef} />
         </EPKThemeProvider>
       </div>
 
