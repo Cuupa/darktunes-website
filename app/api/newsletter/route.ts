@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { createPendingSubscriber } from '@/lib/api/newsletter'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -21,6 +22,11 @@ function getServiceClient() {
 }
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  // 3 subscription attempts per 10 minutes per IP
+  if (checkRateLimit(getClientIp(request), 3, 10 * 60_000).limited) {
+    throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
+  }
+
   let body: unknown
   try {
     body = await request.json()

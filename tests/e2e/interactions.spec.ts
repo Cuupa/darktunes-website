@@ -196,11 +196,11 @@ test.describe('Video Modal', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 3. Artist modal — open via card click
+// 3. Artist navigation — card click navigates to artist detail page
 // ---------------------------------------------------------------------------
 
-test.describe('Artist Modal', () => {
-  test('opens when an artist card is clicked', async ({ page }) => {
+test.describe('Artist Navigation', () => {
+  test('navigates to artist detail page when a card is clicked', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
 
@@ -213,18 +213,18 @@ test.describe('Artist Modal', () => {
 
     await artistSection.scrollIntoViewIfNeeded()
 
-    // Click the first artist card.
-    const firstCard = artistSection.locator('[class*="cursor-pointer"]').first()
-    const cardCount = await firstCard.count()
-    if (cardCount === 0) {
-      test.skip(true, 'No clickable artist cards found')
+    // Artist cards are <Link href="/artists/[slug]"> elements.
+    const firstLink = artistSection.locator('a[href^="/artists/"]').first()
+    const linkCount = await firstLink.count()
+    if (linkCount === 0) {
+      test.skip(true, 'No artist links found')
       return
     }
 
-    await firstCard.click()
+    await firstLink.click()
 
-    // An artist modal dialog should appear.
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible({ timeout: 5_000 })
+    // Navigation should land on /artists/* — no modal, a full page load.
+    await page.waitForURL(/\/artists\//, { timeout: 5_000 })
+    expect(page.url()).toMatch(/\/artists\//)
   })
 })

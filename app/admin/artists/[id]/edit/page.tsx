@@ -146,14 +146,19 @@ export default function ArtistEditPage() {
       if (data.spotifyId && data.spotifyId !== artist.spotifyId) {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
-          void fetch('/api/sync-artist', {
+          fetch('/api/sync-artist', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: 'Bearer ' + session.access_token,
             },
             body: JSON.stringify({ artistId: artist.id }),
-          }).then(() => toast.success('Release sync triggered'))
+          }).then(res => {
+            if (!res.ok) throw new Error(`Sync failed (${res.status})`)
+            toast.success('Release sync triggered')
+          }).catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Release sync failed')
+          })
         }
       }
 

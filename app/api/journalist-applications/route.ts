@@ -14,6 +14,56 @@ import {
   createJournalistApplication,
 } from '@/lib/api/journalistApplications'
 import { z } from 'zod'
+import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+
+const ApplySchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+  outlet: z.string().min(1),
+  message: z.string().optional(),
+})
+
+export const GET = withErrorHandler(async () => {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new ApiError(401, 'Unauthorized')
+
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
+
+  const db = await createServiceRoleSupabaseClient()
+  const applications = await getJournalistApplications(db)
+  return NextResponse.json({ applications })
+})
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  // 3 applications per 30 minutes per IP
+  if (checkRateLimit(getClientIp(req), 3, 30 * 60_000).limited) {
+    throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
+  }
+
+  const body = await req.json()
+  const { email, name, outlet, message } = ApplySchema.parse(body)
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Use service-role so the insert can bypass the user_id RLS check when unauthenticated
+  const db = await createServiceRoleSupabaseClient()
+  const application = await createJournalistApplication(db, {
+    email,
+    name,
+    outlet,
+    message: message ?? null,
+    user_id: user?.id ?? null,
+  })
+  return NextResponse.json({ application }, { status: 201 })
+})
+
 
 const ApplySchema = z.object({
   email: z.string().email(),

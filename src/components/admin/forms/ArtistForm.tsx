@@ -24,6 +24,7 @@ import {
   Trash,
 } from '@phosphor-icons/react'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
+import { toSlug } from '@/lib/slugify'
 import { AssetPicker } from '../file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
@@ -226,22 +227,6 @@ export interface ArtistFormData {
  *              name + slug are read-only; Business / Sync-IDs tabs hidden
  */
 export type ArtistFormMode = 'admin' | 'artist'
-
-function toSlug(name: string): string {
-  return name
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'ae')
-    .replace(/Ö/g, 'oe')
-    .replace(/Ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritical marks
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-}
 
 /** Thin indeterminate bar shown during async API calls. */
 function IndeterminateBar() {

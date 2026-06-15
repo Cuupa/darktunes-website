@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -23,6 +24,11 @@ const contactSchema = z.object({
 })
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  // 5 requests per 10 minutes per IP
+  if (checkRateLimit(getClientIp(request), 5, 10 * 60_000).limited) {
+    throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
+  }
+
   const body: unknown = await request.json()
   const parsed = contactSchema.safeParse(body)
 

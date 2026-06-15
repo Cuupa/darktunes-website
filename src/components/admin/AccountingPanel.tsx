@@ -331,7 +331,7 @@ function SosGeneratorPanel() {
               <BookmarkSimple size={13} /> Presets
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-lenis-prevent>
             <SheetHeader>
               <SheetTitle>Rule Presets</SheetTitle>
             </SheetHeader>
@@ -359,7 +359,7 @@ function SosGeneratorPanel() {
               <DownloadSimple size={13} /> Workspace
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-lenis-prevent>
             <SheetHeader>
               <SheetTitle>Workspace Import / Export</SheetTitle>
             </SheetHeader>

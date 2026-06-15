@@ -527,7 +527,7 @@ export function ArtistsManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} aria-labelledby="artists-form-dialog-title" className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} aria-labelledby="artists-form-dialog-title" data-lenis-prevent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle id="artists-form-dialog-title">{editingArtist ? 'Edit Artist' : 'New Artist'}</DialogTitle>
           </DialogHeader>

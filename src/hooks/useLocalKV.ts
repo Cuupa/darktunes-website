@@ -24,8 +24,12 @@ export function useLocalKV<T = string>(
   key: string,
   initialValue?: T
 ): readonly [T | undefined, Setter<T>, Deleter, boolean] {
+  // Capture initialValue once on mount so effects that reference it don't need
+  // it in their dependency arrays (the intent is "use this default only once").
+  const initialValueRef = useRef<T | undefined>(initialValue)
+
   const [value, setLocalValue] = useState<T | undefined>(() =>
-    cache.has(key) ? (cache.get(key) as T) : initialValue
+    cache.has(key) ? (cache.get(key) as T) : initialValueRef.current
   )
   // isLoaded becomes true once the IndexedDB read has resolved (regardless of
   // whether a stored value was found), preventing race conditions where the
@@ -38,13 +42,12 @@ export function useLocalKV<T = string>(
   useEffect(() => {
     if (!subscribers.has(key)) subscribers.set(key, new Set())
     const refresh = () => {
-      setLocalValue(cache.has(key) ? (cache.get(key) as T) : initialValue)
+      setLocalValue(cache.has(key) ? (cache.get(key) as T) : initialValueRef.current)
     }
     subscribers.get(key)!.add(refresh)
     return () => {
       subscribers.get(key)!.delete(refresh)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   // Load from IndexedDB on mount (or when key changes).
@@ -56,10 +59,10 @@ export function useLocalKV<T = string>(
         cache.set(key, stored)
         setLocalValue(stored)
         notify(key)
-      } else if (initialValue !== undefined) {
+      } else if (initialValueRef.current !== undefined) {
         // Persist the default value so future reads are consistent.
-        cache.set(key, initialValue)
-        set(key, initialValue).catch(err => {
+        cache.set(key, initialValueRef.current)
+        set(key, initialValueRef.current).catch(err => {
           console.warn(`[useLocalKV] Failed to persist default value for "${key}":`, err)
         })
       }
@@ -70,7 +73,6 @@ export function useLocalKV<T = string>(
       setIsLoaded(true) // Still mark as loaded so callers are not stuck waiting.
     })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   const setter: Setter<T> = useCallback(

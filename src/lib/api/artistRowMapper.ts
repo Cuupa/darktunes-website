@@ -8,31 +8,15 @@
 
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
+import { toSlug } from '@/lib/slugify'
 
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 export function rowToArtist(row: ArtistRow): Artist {
-  // Must match toSlug() in ArtistForm.tsx / NewsForm.tsx exactly so that artists
-  // without a stored slug get the same URL whether navigated to from the public
-  // site or resolved via the admin form.
-  const fallbackSlug = row.name
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'ae')
-    .replace(/Ö/g, 'oe')
-    .replace(/Ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-
   return {
     id: row.id,
     name: row.name,
-    slug: (row.slug ?? '').trim() || fallbackSlug,
+    slug: (row.slug ?? '').trim() || toSlug(row.name),
     bio: row.bio ?? '',
     genres: row.genres,
     imageUrl: row.image_url ?? '',

@@ -19,6 +19,7 @@ import {
 import { ImageUploadButton } from './ImageUploadButton'
 import { AssetPicker } from '@/components/admin/file-explorer/AssetPicker'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
+import { toSlug } from '@/lib/slugify'
 
 export interface NewsFormData {
   title: string
@@ -44,22 +45,6 @@ export interface NewsFormData {
   heroSecondaryBtnLabel: string
   heroSecondaryBtnAction: '' | 'link' | 'scroll' | 'none'
   heroSecondaryBtnHref: string
-}
-
-function toSlug(text: string): string {
-  return text
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'ae')
-    .replace(/Ö/g, 'oe')
-    .replace(/Ü/g, 'ue')
-    .replace(/ß/g, 'ss')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
 }
 
 type Props = AdminPanelProps<NewsFormData>

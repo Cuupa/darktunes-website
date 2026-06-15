@@ -51,13 +51,18 @@ Do NOT add manual CSRF token middleware — it would conflict with Server Action
 
 ## Rate Limiting on Public Endpoints
 
-The following public endpoints have no rate limiting beyond application-layer
-guards — they are protected by:
-- `/api/newsletter`: silent success on duplicate email (anti-enumeration)
-- `/api/contact`: honeypot field (`_gotcha`) in the form; Zod validates input
-- `/api/journalist-applications`: no rate limit — consider adding IP-based limiting
+The following public endpoints are protected by an in-memory sliding-window
+IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 
-TODO: Add Vercel Edge Rate Limiting or Upstash Redis rate limiting to these routes.
+| Route | Limit | Window | Notes |
+|---|---|---|---|
+| `/api/contact` | 5 requests | 10 minutes | + honeypot field |
+| `/api/newsletter` | 3 requests | 10 minutes | + silent success on duplicate email |
+| `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
+
+**Limitation**: the in-memory store is per-instance and not shared across
+Vercel serverless pods. For stricter enforcement, pair with a Vercel WAF or
+Upstash Redis rate limiter.
 
 ## Upload Size Limits (enforced in Route Handlers)
 
