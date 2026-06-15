@@ -252,7 +252,7 @@ src/
 ├── hooks/                    # Custom React hooks (useArtists, useReleases, …)
 ├── lib/                      # Business logic, API clients, utilities
 │   ├── api/                  # Data Access Layer — one file per table
-│   │   ├── artistProfiles.ts # EPK profile DAL (artist_profiles table)
+│   │   ├── artistProfiles.ts # EPK profile DAL (artist_epks table)
 │   │   ├── streamingStats.ts # Streaming stats DAL (streaming_stats table)
 │   │   ├── salesStatements.ts# Royalty statements DAL (sales_statements table)
 │   │   └── artistRowMapper.ts# Shared ArtistRow → Artist domain mapper
