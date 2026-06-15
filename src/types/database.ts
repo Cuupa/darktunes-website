@@ -1774,6 +1774,53 @@ export interface Database {
           }
         ]
       }
+      promo_log_entries: {
+        Row: {
+          id: string
+          artist_id: string
+          action_date: string
+          description: string
+          budget_amount: number | null
+          budget_currency: string
+          proof_url: string | null
+          proof_r2_key: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          action_date: string
+          description: string
+          budget_amount?: number | null
+          budget_currency?: string
+          proof_url?: string | null
+          proof_r2_key?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          action_date?: string
+          description?: string
+          budget_amount?: number | null
+          budget_currency?: string
+          proof_url?: string | null
+          proof_r2_key?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_log_entries_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       journalist_downloads: {
         Row: {
           id: string

@@ -12,6 +12,7 @@ import {
   FileText,
   Files,
   List,
+  CalendarDots,
   MapPin,
   MegaphoneSimple,
   MusicNotes,
@@ -69,6 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/portal/profile', label: 'profile', icon: User },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
+      { href: '/portal/calendar', label: 'calendar', icon: CalendarDots, flag: 'artist.calendar' },
       { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
       { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
     ],

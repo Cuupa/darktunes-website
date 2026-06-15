@@ -114,6 +114,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "portal_msg_folders: artist own",
   "press_photos: admin all",
   "press_photos: public read",
+  "promo_log: admin all",
+  "promo_log: artist read",
   "promo_tracks: admin all",
   "promo_tracks: journalist read",
   "rbac_audit_log: admin insert",
@@ -210,6 +212,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "portal_message_folders",
   "portal_messages",
   "press_photos",
+  "promo_log_entries",
   "promo_tracks",
   "rbac_audit_log",
   "release_artists",
@@ -425,6 +428,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "press_photos": [
     "press_photos: admin all",
     "press_photos: public read",
+  ],
+  "promo_log_entries": [
+    "promo_log: admin all",
+    "promo_log: artist read",
   ],
   "promo_tracks": [
     "promo_tracks: admin all",

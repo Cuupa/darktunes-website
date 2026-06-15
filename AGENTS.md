@@ -343,7 +343,7 @@ Presigned URL pattern: `src/lib/portal/presignedUrl.ts` exposes two injectable f
   - `generatePresignedUploadUrl(r2Key, contentType, deps)` — 15-minute PUT URL for the SOS PDF generator to upload directly to R2, bypassing Vercel's 4.5 MB body limit (`PresignedUploadUrlDeps`)
   The Server Action `app/portal/statements/_actions/presignedUrl.ts` wires real deps for artist-facing downloads.
 Photo upload: `app/api/portal/upload-photo/route.ts` accepts `multipart/form-data`, verifies auth, confirms artist ownership, then uploads to `profile-photos/{artistId}/{uuid}.{ext}` in R2. Max 5 MB, image types only.
-Release submission: `POST /api/portal/submit-release` creates a new release with `is_visible = FALSE` (pending admin approval). Optional cover uploads use `POST /api/portal/upload-release-cover` (max 5 MB images) into `release-covers/{artistId}/`.
+Release submission: `POST /api/portal/submit-release` creates a new release with `is_visible = FALSE` (pending admin approval). Optional cover uploads use `POST /api/portal/upload-release-cover` (max 5 MB images) into `release-covers/{artistId}/`. After a successful insert, the route fires a fire-and-forget call to `sendSubmissionNotificationEmail()` (see Submission Notifications below) and creates `editor_notifications` rows for all admins and editors so the bell icon in the admin sidebar highlights the new submission.
 Artist-owned marketing uploads: `POST /api/portal/upload-asset` stores files in `artist-assets/{artistId}/` and inserts into `artist_assets`; `DELETE /api/portal/upload-asset` deletes own rows. Allowed MIME types: JPEG, PNG, WebP, PDF, ZIP (max 20 MB).
 Label replies: `artist_replies` stores artist-side responses to inbox messages. The portal uses `sendPortalReply` Server Action + `src/lib/api/artistReplies.ts`.
 Messaging upgrade: `label_messages` supports `body_html`, `read_at`, `starred`, `deleted_at`, and a generated `search_vector`; `artist_replies` supports `body_html` + `deleted_at`; admin-only `message_templates` stores reusable rich-text subjects/bodies. Admin messaging UI is split into `src/components/messaging/*` (RichTextEditor, MessageComposer, MessageSearch, MessageActions, ThreadView), and all rendered message HTML must be sanitized with DOMPurify in client components.
@@ -363,6 +363,19 @@ DAL: `createSalesStatement(db, data)` in `src/lib/api/salesStatements.ts` insert
 Duplicate handling: If the r2Key already exists (unique constraint), the confirm endpoint returns 409 — the SOS generator should treat this as a no-op.
 Email notification: After a successful `sales_statements` insert, the confirm route calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. The email is sent via Resend API to `artist.email` with period, optional amount, and a CTA button linking to `/portal/statements`. This call is wrapped in a try/catch — failure is logged with `[SOS confirm]` prefix but does NOT block the 201 response (graceful degradation). Skipped silently when `RESEND_API_KEY` is not set.
 Admin statements overview: `StatementsManager` component (`src/components/admin/StatementsManager.tsx`) provides a read-only table in the Admin dashboard (Statements tab, admin-only) showing all `sales_statements` rows joined with `artists.name`. Columns: Artist Name, Period, Amount (EUR), Filename (monospace), Created At. Sorted newest first.
+
+Submission Notifications (artist portal → admin)
+When an artist submits a release or video, two notification paths are triggered in parallel:
+1. In-app bell: `editor_notifications` rows are inserted for every user with role `admin` or `editor` (query uses `.in('role', ['admin', 'editor'])`). The `EditorNotificationBell` component in `AdminSidebarNav` highlights unread notifications — it is shown in both the desktop sidebar brand header and the mobile header.
+2. Email: `sendSubmissionNotificationEmail()` in `src/lib/email/sendSubmissionNotificationEmail.ts` sends an HTML notification via Resend to `LABEL_NOTIFICATION_EMAIL`. Follows the same non-throwing, fire-and-forget pattern as `sendStatementNotification.ts` — failure is logged but never blocks the portal response. Silently skipped when `RESEND_API_KEY` or `LABEL_NOTIFICATION_EMAIL` are unset.
+The `sendSubmissionNotificationEmail` function is dependency-injected (`SendSubmissionEmailDeps`) to remain fully testable without network calls. 7 unit tests in `src/lib/email/sendSubmissionNotificationEmail.test.ts`.
+
+Admin Live Shows (EventManager in admin context)
+`EventManager` (`app/portal/events/_components/EventManager.tsx`) accepts two optional props:
+  - `concertsApiPath?: string` (default: `/api/portal/concerts`) — the API base URL for CRUD operations. Set to `/api/admin/concerts` in the admin context.
+  - `hideIcsExport?: boolean` (default: `false`) — hides the ICS export button (portal-specific, not applicable in admin).
+`AdminConcertsManager` (`src/components/admin/AdminConcertsManager.tsx`) wraps `EventManager` with an artist-selector dropdown so admins can manage concerts for any artist. It is rendered under the **Events** tab of `AdminDashboard` (Calendar icon, visible to both admins and editors).
+Admin concerts API (`app/api/admin/concerts/route.ts`) uses `verifyAdminOrEditor` + `extractBearerToken`. POST requires `artistId` in the request body (unlike the portal route which resolves the artist from the session cookie). The concerts table RLS already allows admins and editors to insert/update/delete any row — no schema changes were needed.
 
 Vercel Deployment
 Install script: scripts/vercel-install.sh runs npm ci and validates all required environment variables.

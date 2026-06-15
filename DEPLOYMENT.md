@@ -174,6 +174,7 @@ These variables are shared between the **Supabase Edge Function** (`newsletter-c
 - `RESEND_API_KEY`: API key from https://resend.com — used to send DOI confirmation emails and contact-form emails.
 - `RESEND_FROM_EMAIL`: Verified sender address, e.g. `noreply@darktunes.com`. Must be a domain verified in Resend.
 - `NEXT_PUBLIC_SITE_URL`: The public site URL without trailing slash (e.g. `https://darktunes.com`) — used to build the confirmation link inside the email. Also set this as a Vercel env var (with the `NEXT_PUBLIC_` prefix) so the confirmation page can be rendered.
+- `LABEL_NOTIFICATION_EMAIL`: Label inbox address that receives an email whenever an artist submits a release or video via the portal. Leave blank to disable submission notification emails (they are silently skipped if this variable is unset).
 
 ### Newsletter — MailerLite sync (optional — marketing list)
 After DOI confirmation, verified subscribers are pushed to MailerLite server-to-server via `GET /api/newsletter/verify`. Both vars are optional — omit to store subscribers in Supabase only.

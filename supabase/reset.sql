@@ -2243,6 +2243,7 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
   ('artist.invoices', 'Artist Invoices', TRUE, 'artist'),
   ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
+  ('artist.calendar', 'Artist Release Calendar', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
@@ -3466,6 +3467,48 @@ ALTER TABLE public.artist_invoices
 ALTER TABLE public.artist_invoices
   ADD COLUMN IF NOT EXISTS artist_invoice_number TEXT;
 
+-- =============================================================================
+-- TABLE: promo_log_entries
+-- Label-documented marketing activities shown to the linked artist as a
+-- chronological read-only timeline.  Admins/editors write; artists read.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.promo_log_entries (
+  id               UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id        UUID           NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  action_date      DATE           NOT NULL,
+  description      TEXT           NOT NULL,
+  budget_amount    NUMERIC(12, 2),
+  budget_currency  TEXT           NOT NULL DEFAULT 'EUR',
+  proof_url        TEXT,
+  proof_r2_key     TEXT,
+  created_by       UUID           REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_log_artist_id ON public.promo_log_entries (artist_id, action_date DESC);
+
+ALTER TABLE public.promo_log_entries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "promo_log: admin all"   ON public.promo_log_entries;
+DROP POLICY IF EXISTS "promo_log: artist read" ON public.promo_log_entries;
+
+-- Admins and editors can manage all entries
+CREATE POLICY "promo_log: admin all" ON public.promo_log_entries
+  FOR ALL
+  USING  (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- Artists can read only their own entries (strict data isolation)
+CREATE POLICY "promo_log: artist read" ON public.promo_log_entries
+  FOR SELECT
+  USING (
+    artist_id IN (
+      SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()
+    )
+  );
+
+-- =============================================================================
 -- Backfill claims for all existing users
 DO $$
 DECLARE
