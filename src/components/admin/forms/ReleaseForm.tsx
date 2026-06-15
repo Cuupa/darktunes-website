@@ -302,7 +302,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
-                  <SelectItem value="#concerts">Concerts</SelectItem>
+                  <SelectItem value="#events">Events</SelectItem>
                   <SelectItem value="#news">News</SelectItem>
                   <SelectItem value="#newsletter">Newsletter</SelectItem>
                 </SelectContent>
@@ -368,7 +368,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
                 <SelectContent>
                   <SelectItem value="#releases">Releases</SelectItem>
                   <SelectItem value="#videos">Videos</SelectItem>
-                  <SelectItem value="#concerts">Concerts</SelectItem>
+                  <SelectItem value="#events">Events</SelectItem>
                   <SelectItem value="#news">News</SelectItem>
                   <SelectItem value="#newsletter">Newsletter</SelectItem>
                 </SelectContent>

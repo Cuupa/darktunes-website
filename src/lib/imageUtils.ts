@@ -39,3 +39,27 @@ export function getSquareThumbnail(url: string, size: number): string {
   if (!url) return ''
   return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${size}&h=${size}&fit=cover&output=webp&maxage=31d`
 }
+
+/**
+ * Rewrites every `<img src="...">` in an HTML string so that images are served
+ * through wsrv.nl at a capped width (default: 800 px) in WebP format.
+ *
+ * Designed for use with rich-text content authored in TipTap or similar editors
+ * (news posts, about page body) where images may be full-resolution originals.
+ * Already-proxied wsrv.nl URLs are left untouched to avoid double-encoding.
+ *
+ * @param html  - Raw HTML string (should already be DOMPurify-sanitised)
+ * @param width - Max output width in pixels (default: 800)
+ * @returns     - HTML string with optimised image src attributes
+ */
+export function processHtmlImages(html: string, width = 800): string {
+  if (!html) return html
+  // Replace src attributes that are NOT already pointing at wsrv.nl
+  return html.replace(
+    /(<img\b[^>]*?\bsrc=")([^"]+)(")/gi,
+    (match, before, src, after) => {
+      if (src.startsWith('https://wsrv.nl') || src.startsWith('data:')) return match
+      return `${before}${getOptimizedImageUrl(src, width)}${after}`
+    },
+  )
+}

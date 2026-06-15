@@ -68,7 +68,7 @@ function VideoCard({
           src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
           alt={`${video.title} – video thumbnail`}
           fill
-          className={`object-cover group-hover:scale-110 transition-[transform,opacity] duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`object-cover transform-gpu group-hover:scale-110 transition-[transform,opacity] duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
           onLoad={() => setImgLoaded(true)}
         />
