@@ -354,6 +354,12 @@ Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 wor
 Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements, Messages (`/portal/messages`). Settings (`/portal/settings`) is always visible (not flag-gated).
 Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'acknowledged'` after successful creation.
 
+Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
+  - **Streaming** tab: monthly stream counts from `streaming_stats`, rendered by `StreamingChart` / `StreamingChartInner` using Recharts.
+  - **Einnahmen** (Earnings) tab: royalty earnings from `sales_statements`, rendered by `EarningsChart` / `EarningsChartInner`. Shows KPI cards (total earned, last payout, pending count) and a bar chart of `amount_eur` per `period`. The default tab can be pre-selected via the `?tab=earnings` query param.
+  Both charts are loaded lazily via `next/dynamic` (`ssr: false`) to exclude Recharts from the initial bundle.
+  Data fetch follows IoC: the Server Component fetches both `getStreamingStatsByArtistId` and `getSalesStatementsByArtistId` in parallel (`Promise.all`) and passes results as props to the leaf client components.
+
 SOS Webhook (Statement of Sales PDF Upload)
 The external SOS PDF generator (https://sos-generator-for-mu.vercel.app/) uses a 2-step presigned URL flow to deliver PDFs to R2 without hitting Vercel's 4.5 MB body limit.
 Step 1 — POST /api/webhooks/sos: Validates API key, validates metadata (artistId, filename, period, amountEur?), verifies artist exists via service-role client, generates an R2 key (`statements/{artistId}/{uuid}_{filename}`), returns a 15-minute presigned R2 PUT URL.
