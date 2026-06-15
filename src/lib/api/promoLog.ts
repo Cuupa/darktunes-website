@@ -53,6 +53,30 @@ export async function deletePromoLogEntry(db: DbClient, id: string): Promise<voi
   if (error) throw new Error(error.message)
 }
 
+export async function updatePromoLogEntry(
+  db: DbClient,
+  id: string,
+  data: {
+    action_date?: string
+    description?: string
+    budget_amount?: number | null
+    budget_currency?: string
+    proof_url?: string | null
+    proof_r2_key?: string | null
+  },
+): Promise<PromoLogEntry> {
+  const { data: updated, error } = await db
+    .from('promo_log_entries')
+    .update(data)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  if (!updated) throw new Error('No data returned from updatePromoLogEntry')
+  return rowToPromoLogEntry(updated)
+}
+
 /** Returns the proof_r2_key for a specific entry so the caller can clean up R2. */
 export async function getPromoLogEntryR2Key(
   db: DbClient,
