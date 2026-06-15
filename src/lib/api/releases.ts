@@ -226,6 +226,37 @@ export async function deleteRelease(db: DbClient, id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Calendar query: returns all visible, non-promo releases whose artist is also
+ * visible. Includes artist names via the junction table.
+ * Used by the Artist Portal Release Calendar.
+ */
+export async function getAllVisibleReleasesForCalendar(db: DbClient): Promise<Release[]> {
+  const { data: hiddenArtistRows, error: hiddenErr } = await db
+    .from('artists')
+    .select('id')
+    .eq('is_visible', false)
+  if (hiddenErr) throw new Error(hiddenErr.message)
+
+  const hiddenIds = (hiddenArtistRows ?? []).map((a) => a.id)
+
+  let builder = db
+    .from('releases')
+    .select('*')
+    .eq('is_visible', true)
+    .eq('is_promo', false)
+    .order('release_date', { ascending: true })
+
+  if (hiddenIds.length > 0) {
+    builder = builder.or(`artist_id.is.null,artist_id.not.in.(${hiddenIds.join(',')})`)
+  }
+
+  const { data, error } = await builder
+  if (error) throw new Error(error.message)
+  const releases = (data ?? []).map(rowToRelease)
+  return attachReleaseArtists(db, releases)
+}
+
 export async function upsertReleaseByItunesId(
   db: DbClient,
   releaseData: ReleaseInsert,
