@@ -331,6 +331,10 @@ export interface AppDefaults {
     darkmerch?: number
     physical?: number
   }
+  /** Optional SOS portal webhook endpoint used for direct statement publishing. */
+  sosWebhookUrl?: string
+  /** Shared secret for SOS webhook authentication. */
+  sosWebhookSecret?: string
 }
 
 /**

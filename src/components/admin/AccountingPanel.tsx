@@ -260,7 +260,7 @@ function SosGeneratorPanel() {
   }, [releaseTitlesByArtistIncFeaturing])
 
   // Export handlers — now passes emailConfig
-  const { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected } =
+  const { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal } =
     useExports(
       processedData,
       labelInfo,
@@ -271,6 +271,8 @@ function SosGeneratorPanel() {
       labelArtists,
       emailConfig,
       compilationFilters,
+      appDefaults.sosWebhookUrl ?? '',
+      appDefaults.sosWebhookSecret ?? '',
     )
 
   const hasData = revenues.length > 0
@@ -436,6 +438,7 @@ function SosGeneratorPanel() {
               appDefaults={appDefaults}
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
+              onPublishToPortal={handlePublishToPortal}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">

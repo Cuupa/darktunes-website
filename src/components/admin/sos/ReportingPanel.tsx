@@ -4,8 +4,8 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { FileDown, FileText, Table2, Archive, Search } from 'lucide-react'
-import { EnvelopeSimple } from '@phosphor-icons/react'
+import { FileDown, FileText, Table2, Archive, Search, Loader2 } from 'lucide-react'
+import { EnvelopeSimple, PaperPlaneTilt } from '@phosphor-icons/react'
 import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig } from '@/lib/sos/types'
 import { buildMailtoLink } from '@/lib/sos/utils'
 
@@ -21,6 +21,7 @@ interface ReportingPanelProps {
   emailConfig?: Partial<EmailConfig>
   periodStart?: string
   periodEnd?: string
+  onPublishToPortal?: (artist: string) => Promise<void>
 }
 
 function fmtEur(value: number) {
@@ -29,7 +30,7 @@ function fmtEur(value: number) {
 
 const ARTIST_CELL_RESERVED_PX = 32
 const COL_WIDTH_CHECKBOX = 56
-const COL_WIDTH_ACTIONS = 120
+const COL_WIDTH_ACTIONS = 200
 
 type ColId = 'artist' | 'totalRevenue' | 'payout'
 type SortMode = 'payout' | 'artist-asc' | 'artist-desc'
@@ -60,8 +61,11 @@ export function ReportingPanel({
   emailConfig,
   periodStart,
   periodEnd,
+  onPublishToPortal,
 }: ReportingPanelProps) {
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
+  const [publishingArtists, setPublishingArtists] = useState<Set<string>>(new Set())
+  const [isPublishingSelected, setIsPublishingSelected] = useState(false)
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
 
@@ -94,6 +98,14 @@ export function ReportingPanel({
     },
     [labelArtists, labelInfo, appDefaults, emailConfig, period]
   )
+
+  const artistInfoMap = useMemo(() => {
+    const map = new Map<string, LabelArtist>()
+    for (const artist of labelArtists) {
+      map.set(artist.name.toLowerCase(), artist)
+    }
+    return map
+  }, [labelArtists])
 
   const [colOrder, setColOrder] = useState<ColId[]>(INITIAL_COLUMNS.map(c => c.id))
   const [colWidths, setColWidths] = useState<Record<ColId, number>>(
@@ -176,6 +188,38 @@ export function ReportingPanel({
 
   function exportSelected() { onDownloadSelected(Array.from(selectedArtists)) }
 
+  const publishArtist = useCallback(
+    async (artist: string) => {
+      if (!onPublishToPortal) return
+      setPublishingArtists(prev => new Set(prev).add(artist))
+      try {
+        await onPublishToPortal(artist)
+      } finally {
+        setPublishingArtists(prev => {
+          const next = new Set(prev)
+          next.delete(artist)
+          return next
+        })
+      }
+    },
+    [onPublishToPortal]
+  )
+
+  const publishSelected = useCallback(
+    async () => {
+      if (!onPublishToPortal || selectedArtists.size === 0) return
+      setIsPublishingSelected(true)
+      try {
+        for (const artist of selectedArtists) {
+          await publishArtist(artist)
+        }
+      } finally {
+        setIsPublishingSelected(false)
+      }
+    },
+    [onPublishToPortal, publishArtist, selectedArtists]
+  )
+
   const selectedCount = selectedArtists.size
   const orderedCols = colOrder.map(id => INITIAL_COLUMNS.find(c => c.id === id)!).filter(Boolean)
 
@@ -196,6 +240,16 @@ export function ReportingPanel({
           <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={selectedCount === 0} onClick={exportSelected}>
             <Archive size={14} />
             Export Selected to ZIP
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs"
+            disabled={selectedCount === 0 || !onPublishToPortal || isPublishingSelected}
+            onClick={() => void publishSelected()}
+          >
+            {isPublishingSelected ? <Loader2 size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
+            Publish Selected
           </Button>
           <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={revenues.length === 0} onClick={onDownloadAll}>
             <FileDown size={14} />
@@ -324,6 +378,23 @@ export function ReportingPanel({
                     })}
                     <td className="py-3 text-right px-4">
                       <div className="flex items-center justify-end gap-1.5">
+                        {onPublishToPortal && !!artistInfoMap.get(r.artist.toLowerCase())?.artistId?.trim() && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 gap-1 text-xs"
+                            onClick={() => void publishArtist(r.artist)}
+                            title={`Publish statement for ${r.artist}`}
+                            disabled={publishingArtists.has(r.artist)}
+                          >
+                            {publishingArtists.has(r.artist) ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <PaperPlaneTilt size={13} />
+                            )}
+                            Publish
+                          </Button>
+                        )}
                         {labelInfo?.emailTemplate && (
                           <Button size="sm" variant="ghost" className="h-7 px-2 gap-1 text-xs" onClick={() => handleSendEmail(r)} title={`Send e-mail to ${r.artist}`}>
                             <EnvelopeSimple size={13} />
