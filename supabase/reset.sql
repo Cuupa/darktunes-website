@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   provider   TEXT             NOT NULL DEFAULT 'email',
   full_name  TEXT,
   is_active  BOOLEAN          NOT NULL DEFAULT TRUE,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT NOW()
 );
@@ -397,6 +398,18 @@ CREATE TABLE IF NOT EXISTS public.artists (
   image_position_x FLOAT               DEFAULT 50,
   image_position_y FLOAT               DEFAULT 50,
   image_scale      FLOAT               DEFAULT 1,
+  -- Social media / shop links
+  facebook_url     TEXT,
+  twitter_url      TEXT,
+  tiktok_url       TEXT,
+  bandcamp_url     TEXT,
+  shop_url         TEXT,
+  soundcloud_url   TEXT,
+  -- Branding & platform metadata
+  logo_url         TEXT,
+  platform_links   JSONB,
+  storage_quota_bytes BIGINT DEFAULT NULL,
+  smart_links      JSONB DEFAULT '[]'::JSONB,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -609,6 +622,14 @@ CREATE TABLE IF NOT EXISTS public.releases (
   -- Optional hero customisation per release
   promo_text      TEXT,
   hero_bg_url     TEXT,
+  -- Hero button overrides (primary + secondary)
+  hero_primary_btn_label   TEXT,
+  hero_primary_btn_action  TEXT,
+  hero_primary_btn_href    TEXT,
+  hero_secondary_btn_label TEXT,
+  hero_secondary_btn_action TEXT,
+  hero_secondary_btn_href  TEXT,
+  guest_artists            TEXT,
   created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
@@ -677,6 +698,15 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   embargo_until TIMESTAMPTZ,
   media_contact TEXT,
   release_category TEXT,
+  -- Hero background image (separate from cover image_url)
+  hero_bg_url  TEXT,
+  -- Hero button overrides (primary + secondary)
+  hero_primary_btn_label   TEXT,
+  hero_primary_btn_action  TEXT,
+  hero_primary_btn_href    TEXT,
+  hero_secondary_btn_label TEXT,
+  hero_secondary_btn_action TEXT,
+  hero_secondary_btn_href  TEXT,
   published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -797,6 +827,11 @@ CREATE TABLE IF NOT EXISTS public.assets (
   r2_key            TEXT    NOT NULL UNIQUE,
   public_url        TEXT    NOT NULL,
   uploaded_by       UUID    REFERENCES public.users (id) ON DELETE SET NULL,
+  folder_id         UUID    REFERENCES public.asset_folders (id) ON DELETE SET NULL,
+  artist_id         UUID    REFERENCES public.artists (id) ON DELETE SET NULL,
+  tags              TEXT[]  NOT NULL DEFAULT '{}',
+  sha256_hash       TEXT,
+  release_id        UUID    REFERENCES public.releases (id) ON DELETE SET NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -880,9 +915,16 @@ CREATE TABLE IF NOT EXISTS public.concerts (
   venue_city      TEXT,
   venue_country   TEXT,
   concert_date    DATE        NOT NULL,
+  event_time      TIME,
+  event_type      TEXT        NOT NULL DEFAULT 'gig',
   ticket_url      TEXT,
+  trailer_url     TEXT,
+  venue_lat       FLOAT8,
+  venue_lng       FLOAT8,
+  venue_osm_id    TEXT,
   songkick_id     TEXT        UNIQUE,
   bandsintown_id  TEXT        UNIQUE,
+  news_post_id    UUID        REFERENCES public.news_posts (id) ON DELETE SET NULL,
   status          TEXT        NOT NULL DEFAULT 'ok',
   created_by      UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
   source          TEXT        NOT NULL DEFAULT 'admin',
@@ -1026,6 +1068,21 @@ CREATE TABLE IF NOT EXISTS public.artist_epks (
   epk_gallery_photos      TEXT[]  NOT NULL DEFAULT '{}',
   epk_custom_theme_tokens JSONB            DEFAULT NULL,
   custom_links            JSONB            DEFAULT NULL,
+  -- Contact details for booking and press inquiries
+  booking_contact         TEXT,
+  press_contact           TEXT,
+  -- Technical/stage rider documents (R2 URLs)
+  rider_stage_plot_url    TEXT,
+  rider_technical_url     TEXT,
+  rider_hospitality_url   TEXT,
+  -- Onboarding and EPK customisation
+  onboarding_completed    BOOLEAN NOT NULL DEFAULT FALSE,
+  epk_theme               TEXT    NOT NULL DEFAULT 'default',
+  epk_sections_order      TEXT[]  NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'],
+  epk_sections_hidden     TEXT[]  NOT NULL DEFAULT '{}',
+  -- Password-protect sensitive EPK sections
+  epk_password_hash       TEXT,
+  epk_password_sections   TEXT[]  NOT NULL DEFAULT '{}',
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -1240,6 +1297,11 @@ CREATE TABLE IF NOT EXISTS public.label_messages (
   read_at       TIMESTAMPTZ,
   starred       BOOLEAN     NOT NULL DEFAULT FALSE,
   deleted_at    TIMESTAMPTZ,
+  -- Email client metadata
+  sender_email    TEXT,
+  is_external     BOOLEAN     NOT NULL DEFAULT FALSE,
+  forwarded_from  UUID        REFERENCES public.label_messages (id) ON DELETE SET NULL,
+  has_attachments BOOLEAN     NOT NULL DEFAULT FALSE,
   search_vector TSVECTOR GENERATED ALWAYS AS (
     to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
   ) STORED,
@@ -1458,8 +1520,6 @@ ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS facebook_url;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS founding_year;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS hometown;
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS photo_url;
-ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
-
 ALTER TABLE public.artist_epks DROP COLUMN IF EXISTS soundcloud_url;
 
 
