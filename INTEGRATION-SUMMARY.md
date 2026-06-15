@@ -176,7 +176,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Generic cache revalidation webhook | ✅ Implemented | `POST /api/revalidate` with `REVALIDATE_SECRET` — for Supabase webhooks |
 | Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
 | Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |
-| Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form with bio_short/medium/long + photo upload via R2 |
+| Artist Portal — EPK profile editor | ✅ Implemented | `artist_epks` table + RLS + profile form with bio_short/medium/long, theme/layout/orientation/background settings, and photo upload via R2 |
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + status workflow + StatementsTable + presigned URL Server Action (5 min TTL) |
 | Artist Portal — billing profiles | ✅ Implemented | `/portal/billing` + `artist_billing_profiles` + completeness gating for invoice creation |

@@ -10,7 +10,7 @@ Access the artist portal at `/portal`. Artists sign in with their own Supabase A
 
 Portal features:
 - **EPK Profile Editor** (`/portal/profile`) — artists edit bio, genres, social links, press quote, and upload a profile photo. The photo upload goes server-side via `/api/portal/upload-photo` (no CORS issues).
-- **EPK PDF Export** (`/portal/profile`) — artists can generate a print-ready EPK using the "Download EPK as PDF" action (browser print-to-PDF flow).
+- **EPK PDF Export** (`/portal/profile`) — artists can generate a print-ready EPK via html2canvas + jsPDF so the downloaded PDF mirrors the live EPK preview (themes, layout, background image, orientation, and clickable links).
 - **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
 - **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. Approved statements surface a **“Rechnung erstellen”** CTA that deep-links into the invoice flow for that exact statement.
 - **Billing Profile** (`/portal/billing`) — artists manage legal invoice master data (`artist_billing_profiles`): legal name, address, Steuernummer / USt-IdNr., Kleinunternehmer flag, and payout details. Invoice creation is blocked until the profile is complete.

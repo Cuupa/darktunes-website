@@ -24,7 +24,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 
 ## Security Practices
 
-- **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_profiles`, `artist_billing_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`, `artist_invoices`) enforce artist-scoped RLS using ownership checks via `artist_members` — security is enforced at the database layer, not just middleware.
+- **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_epks`, `artist_billing_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`, `artist_invoices`) enforce artist-scoped RLS using ownership checks via `artist_members` — security is enforced at the database layer, not just middleware.
 - **Multi-tenant isolation**: `artists.user_id` links each artist to a Supabase Auth user. Artists can only access their own rows — even if the client manipulates requests, RLS at the DB layer prevents cross-tenant data access.
 - **Environment variables** containing secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `NEXT_PUBLIC_` and are therefore never exposed to the browser. Client-safe variables use the `NEXT_PUBLIC_` prefix.
 - **Supabase anon key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) is intentionally public (client-side) but is scoped by RLS policies.

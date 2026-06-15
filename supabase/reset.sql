@@ -1078,6 +1078,10 @@ CREATE TABLE IF NOT EXISTS public.artist_epks (
   -- Onboarding and EPK customisation
   onboarding_completed    BOOLEAN NOT NULL DEFAULT FALSE,
   epk_theme               TEXT    NOT NULL DEFAULT 'default',
+  epk_layout              TEXT    NOT NULL DEFAULT 'classic',
+  epk_orientation         TEXT    NOT NULL DEFAULT 'portrait',
+  epk_bg_image_url        TEXT,
+  epk_bg_opacity          INTEGER NOT NULL DEFAULT 20,
   epk_sections_order      TEXT[]  NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'],
   epk_sections_hidden     TEXT[]  NOT NULL DEFAULT '{}',
   -- Password-protect sensitive EPK sections
@@ -1106,6 +1110,10 @@ ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS rider_hospitality_url TE
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS onboarding_completed  BOOLEAN NOT NULL DEFAULT FALSE;
 -- EPK Theme & Section customisation
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_theme             TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_layout            TEXT NOT NULL DEFAULT 'classic';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_orientation       TEXT NOT NULL DEFAULT 'portrait';
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_bg_image_url      TEXT;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_bg_opacity        INTEGER NOT NULL DEFAULT 20;
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_order    TEXT[] NOT NULL DEFAULT ARRAY['header','quote','bio','info','contacts','riders','links'];
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_hidden   TEXT[] NOT NULL DEFAULT '{}';
 -- EPK Password protection for sensitive sections

@@ -42,8 +42,20 @@ describe('getEPKTheme', () => {
 })
 
 describe('EPK_THEMES', () => {
-  it('contains at least two themes', () => {
-    expect(Object.keys(EPK_THEMES).length).toBeGreaterThanOrEqual(2)
+  it('contains all built-in themes', () => {
+    expect(Object.keys(EPK_THEMES)).toEqual(
+      expect.arrayContaining([
+        'default',
+        'blade-runner',
+        'neon-underground',
+        'industrial-grey',
+        'midnight-forest',
+        'crimson-cult',
+        'synthwave',
+        'print-clean',
+      ]),
+    )
+    expect(Object.keys(EPK_THEMES)).toHaveLength(8)
   })
 
   it('all themes have required token fields', () => {

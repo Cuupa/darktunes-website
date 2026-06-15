@@ -86,6 +86,10 @@ const mockProfileRow: ArtistProfileRow = {
   rider_hospitality_url: null,
   onboarding_completed: false,
   epk_theme: 'default',
+  epk_layout: 'classic',
+  epk_orientation: 'portrait',
+  epk_bg_image_url: null,
+  epk_bg_opacity: 20,
   epk_sections_order: [],
   epk_sections_hidden: [],
   epk_password_hash: null,
@@ -148,6 +152,9 @@ describe('getArtistProfileByArtistId', () => {
     expect(result).not.toBeNull()
     expect(result?.artistId).toBe('artist-uuid')
     expect(result?.pressQuote).toBe('"Outstanding!" — Darkroom Magazine')
+    expect(result?.epkLayout).toBe('classic')
+    expect(result?.epkOrientation).toBe('portrait')
+    expect(result?.epkBgOpacity).toBe(20)
   })
 
   it('returns null when profile not found (PGRST116)', async () => {

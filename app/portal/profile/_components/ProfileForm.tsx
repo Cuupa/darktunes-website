@@ -87,6 +87,7 @@ interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
 
 function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
   const [pdfDownloading, setPdfDownloading] = React.useState(false)
+  const epkDocumentRef = React.useRef<HTMLElement | null>(null)
   const {
     form,
     photoUrl,
@@ -142,6 +143,10 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     photoGallery: galleryPhotos,
     labelName: labelName ?? undefined,
     labelLogoUrl: labelLogoUrl ?? undefined,
+    epkLayout: epkSettings.epkLayout,
+    epkOrientation: epkSettings.epkOrientation,
+    epkBgImageUrl: epkSettings.epkBgImageUrl,
+    epkBgOpacity: epkSettings.epkBgOpacity,
   }
 
   // ---------------------------------------------------------------------------
@@ -184,7 +189,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               setPdfDownloading(true)
               try {
                 const { generateEpkPdf } = await import('./epkPdf')
-                await generateEpkPdf(epkData)
+                await generateEpkPdf(epkData, epkDocumentRef)
               } catch {
                 // toast is not in scope here — the EPKModal handles error display
               } finally {
@@ -617,6 +622,11 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               epkPasswordHash={epkSettings.epkPasswordRaw ? `__plain__${epkSettings.epkPasswordRaw}` : undefined}
               epkPasswordSections={epkSettings.epkPasswordSections}
               epkCustomThemeTokens={epkSettings.epkCustomThemeTokens}
+              epkLayout={epkSettings.epkLayout}
+              epkOrientation={epkSettings.epkOrientation}
+              epkBgImageUrl={epkSettings.epkBgImageUrl}
+              epkBgOpacity={epkSettings.epkBgOpacity}
+              documentRef={epkDocumentRef}
               onSettingsChange={handleEpkSettingsChange}
             />
           </TabsContent>
@@ -636,4 +646,3 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     </div>
   )
 }
-
