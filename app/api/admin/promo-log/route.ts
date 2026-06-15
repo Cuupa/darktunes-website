@@ -23,6 +23,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   getPromoLogEntries,
   createPromoLogEntry,
+  updatePromoLogEntry,
   deletePromoLogEntry,
   getPromoLogEntryR2Key,
 } from '@/lib/api/promoLog'
@@ -38,6 +39,16 @@ const createSchema = z.object({
   description: z.string().min(1).max(1000),
   budgetAmount: z.number().nonnegative().nullable().optional(),
   budgetCurrency: z.string().length(3).toUpperCase().optional().default('EUR'),
+  proofUrl: z.string().url().nullable().optional(),
+  proofR2Key: z.string().nullable().optional(),
+})
+
+const updateSchema = z.object({
+  id: z.string().uuid(),
+  actionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z.string().min(1).max(1000).optional(),
+  budgetAmount: z.number().nonnegative().nullable().optional(),
+  budgetCurrency: z.string().length(3).toUpperCase().optional(),
   proofUrl: z.string().url().nullable().optional(),
   proofR2Key: z.string().nullable().optional(),
 })
@@ -125,4 +136,32 @@ export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextRes
   }
 
   return NextResponse.json({ success: true })
+})
+
+export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  const token = extractBearerToken(req.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    throw new ApiError(400, 'Invalid JSON body')
+  }
+
+  const parsed = updateSchema.parse(body)
+  const { id, actionDate, description, budgetAmount, budgetCurrency, proofUrl, proofR2Key } = parsed
+
+  const updateData: Parameters<typeof updatePromoLogEntry>[2] = {}
+  if (actionDate !== undefined) updateData.action_date = actionDate
+  if (description !== undefined) updateData.description = description
+  if (budgetAmount !== undefined) updateData.budget_amount = budgetAmount
+  if (budgetCurrency !== undefined) updateData.budget_currency = budgetCurrency
+  if (proofUrl !== undefined) updateData.proof_url = proofUrl
+  if (proofR2Key !== undefined) updateData.proof_r2_key = proofR2Key
+
+  const supabase = await createServerSupabaseClient()
+  const entry = await updatePromoLogEntry(supabase, id, updateData)
+
+  return NextResponse.json({ entry })
 })

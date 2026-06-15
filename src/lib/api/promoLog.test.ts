@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getPromoLogEntries,
   createPromoLogEntry,
+  updatePromoLogEntry,
   deletePromoLogEntry,
   getPromoLogEntryR2Key,
 } from './promoLog'
@@ -122,6 +123,45 @@ describe('promoLog DAL', () => {
     it('throws on DB error', async () => {
       const db = makeMockDb(null, { message: 'Delete error' })
       await expect(deletePromoLogEntry(db, 'entry-1')).rejects.toThrow('Delete error')
+    })
+  })
+
+  describe('updatePromoLogEntry', () => {
+    it('returns the updated entry', async () => {
+      const updatedRow = { ...row, description: 'Updated description', budget_amount: 500 }
+      const db = makeMockDb(updatedRow)
+      const entry = await updatePromoLogEntry(db, 'entry-1', {
+        description: 'Updated description',
+        budget_amount: 500,
+      })
+      expect(entry.id).toBe('entry-1')
+      expect(entry.description).toBe('Updated description')
+      expect(entry.budgetAmount).toBe(500)
+    })
+
+    it('returns entry with null proof when cleared', async () => {
+      const rowNoProof = { ...row, proof_url: null, proof_r2_key: null }
+      const db = makeMockDb(rowNoProof)
+      const entry = await updatePromoLogEntry(db, 'entry-1', {
+        proof_url: null,
+        proof_r2_key: null,
+      })
+      expect(entry.proofUrl).toBeNull()
+      expect(entry.proofR2Key).toBeNull()
+    })
+
+    it('throws when no data returned', async () => {
+      const db = makeMockDb(null, null)
+      await expect(updatePromoLogEntry(db, 'entry-1', { description: 'Test' })).rejects.toThrow(
+        'No data returned from updatePromoLogEntry',
+      )
+    })
+
+    it('throws on DB error', async () => {
+      const db = makeMockDb(null, { message: 'Update error' })
+      await expect(updatePromoLogEntry(db, 'entry-1', { description: 'Test' })).rejects.toThrow(
+        'Update error',
+      )
     })
   })
 

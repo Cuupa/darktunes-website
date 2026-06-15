@@ -17,6 +17,7 @@ import {
   Camera,
   CurrencyEur,
   Image as ImageIcon,
+  PencilSimple,
   PlusCircle,
   Spinner,
   Trash,
@@ -37,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { PromoLogEntry } from '@/types'
 
 interface PromoLogManagerProps {
@@ -78,6 +80,9 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [uploadingProof, setUploadingProof] = useState(false)
+
+  // Edit mode
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   // Form state
   const [actionDate, setActionDate] = useState(() => new Date().toISOString().split('T')[0] ?? '')
@@ -199,7 +204,33 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   }
 
   // ---------------------------------------------------------------------------
-  // Submit new entry
+  // Edit an existing entry (populate form)
+  // ---------------------------------------------------------------------------
+  function handleEdit(entry: PromoLogEntry) {
+    setEditingId(entry.id)
+    setActionDate(entry.actionDate)
+    setDescription(entry.description)
+    setBudgetAmount(entry.budgetAmount != null ? String(entry.budgetAmount) : '')
+    setBudgetCurrency((entry.budgetCurrency as (typeof CURRENCIES)[number]) ?? 'EUR')
+    setProofUrl(entry.proofUrl ?? null)
+    setProofR2Key(entry.proofR2Key ?? null)
+    setProofPreview(entry.proofUrl ?? null)
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null)
+    setActionDate(() => new Date().toISOString().split('T')[0] ?? '')
+    setDescription('')
+    setBudgetAmount('')
+    setBudgetCurrency('EUR')
+    setProofUrl(null)
+    setProofR2Key(null)
+    setProofPreview(null)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submit: create or update
   // ---------------------------------------------------------------------------
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -219,30 +250,62 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
         throw new Error('Invalid budget amount')
       }
 
-      const res = await fetch('/api/admin/promo-log', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          artistId,
-          actionDate,
-          description: description.trim(),
-          budgetAmount: parsedBudget,
-          budgetCurrency,
-          proofUrl,
-          proofR2Key,
-        }),
-      })
+      if (editingId) {
+        // Update existing entry via PATCH
+        const res = await fetch('/api/admin/promo-log', {
+          method: 'PATCH',
+          headers: {
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: editingId,
+            actionDate,
+            description: description.trim(),
+            budgetAmount: parsedBudget,
+            budgetCurrency,
+            proofUrl,
+            proofR2Key,
+          }),
+        })
 
-      if (!res.ok) {
-        const err = (await res.json()) as { error?: string }
-        throw new Error(err.error ?? 'Failed to save entry')
+        if (!res.ok) {
+          const err = (await res.json()) as { error?: string }
+          throw new Error(err.error ?? 'Failed to update entry')
+        }
+
+        const { entry } = (await res.json()) as { entry: PromoLogEntry }
+        setEntries((prev) => prev.map((e) => (e.id === editingId ? entry : e)))
+        setEditingId(null)
+        toast.success('Marketing activity updated.')
+      } else {
+        // Create new entry via POST
+        const res = await fetch('/api/admin/promo-log', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            artistId,
+            actionDate,
+            description: description.trim(),
+            budgetAmount: parsedBudget,
+            budgetCurrency,
+            proofUrl,
+            proofR2Key,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = (await res.json()) as { error?: string }
+          throw new Error(err.error ?? 'Failed to save entry')
+        }
+
+        const { entry } = (await res.json()) as { entry: PromoLogEntry }
+        setEntries((prev) => [entry, ...prev])
+        toast.success('Marketing activity logged.')
       }
-
-      const { entry } = (await res.json()) as { entry: PromoLogEntry }
-      setEntries((prev) => [entry, ...prev])
 
       // Reset form
       setDescription('')
@@ -250,7 +313,6 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       setProofUrl(null)
       setProofR2Key(null)
       setProofPreview(null)
-      toast.success('Marketing activity logged.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -304,7 +366,9 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <PlusCircle size={18} aria-hidden="true" />
-            Log Marketing Activity{artistName ? ` — ${artistName}` : ''}
+            {editingId
+              ? `Edit Activity${artistName ? ` — ${artistName}` : ''}`
+              : `Log Marketing Activity${artistName ? ` — ${artistName}` : ''}`}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -447,14 +511,26 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
                 />
               </div>
 
-              <Button type="submit" disabled={saving || uploadingProof} className="w-full sm:w-auto">
-                {saving ? (
-                  <Spinner size={16} className="mr-2 animate-spin" aria-label="Saving" />
-                ) : (
-                  <PlusCircle size={16} className="mr-2" aria-hidden="true" />
+              <div className="flex flex-wrap gap-3">
+                <Button type="submit" disabled={saving || uploadingProof} className="w-full sm:w-auto">
+                  {saving ? (
+                    <Spinner size={16} className="mr-2 animate-spin" aria-label="Saving" />
+                  ) : (
+                    <PlusCircle size={16} className="mr-2" aria-hidden="true" />
+                  )}
+                  {saving ? 'Saving…' : editingId ? 'Update Activity' : 'Log Activity'}
+                </Button>
+                {editingId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
                 )}
-                {saving ? 'Saving…' : 'Log Activity'}
-              </Button>
+              </div>
             </form>
           </div>
         </CardContent>
@@ -487,11 +563,11 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
                       href={entry.proofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 rounded overflow-hidden border border-border"
+                      className="shrink-0 overflow-hidden rounded border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       aria-label="View proof screenshot"
                     >
                       <Image
-                        src={entry.proofUrl}
+                        src={getOptimizedImageUrl(entry.proofUrl, 160)}
                         alt="Proof screenshot"
                         width={80}
                         height={60}
@@ -519,21 +595,32 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
                     <p className="text-sm whitespace-pre-wrap break-words">{entry.description}</p>
                   </div>
 
-                  {/* Delete */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={deletingId === entry.id}
-                    onClick={() => void handleDelete(entry.id)}
-                    aria-label="Delete marketing activity"
-                    className="shrink-0 text-muted-foreground hover:text-destructive min-w-[36px] min-h-[36px]"
-                  >
-                    {deletingId === entry.id ? (
-                      <Spinner size={14} className="animate-spin" aria-label="Deleting" />
-                    ) : (
-                      <Trash size={16} aria-hidden="true" />
-                    )}
-                  </Button>
+                  {/* Edit + Delete */}
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEdit(entry)}
+                      aria-label="Edit marketing activity"
+                      className="min-h-[36px] min-w-[36px] text-muted-foreground hover:text-foreground"
+                    >
+                      <PencilSimple size={14} aria-hidden="true" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={deletingId === entry.id}
+                      onClick={() => void handleDelete(entry.id)}
+                      aria-label="Delete marketing activity"
+                      className="min-h-[36px] min-w-[36px] text-muted-foreground hover:text-destructive"
+                    >
+                      {deletingId === entry.id ? (
+                        <Spinner size={14} className="animate-spin" aria-label="Deleting" />
+                      ) : (
+                        <Trash size={16} aria-hidden="true" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
