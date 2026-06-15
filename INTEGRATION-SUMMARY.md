@@ -20,7 +20,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
-- **Vitest** unit test suite (`npm test`) — 488 tests passing (51 test files)
+- **Vitest** unit test suite (`npm test`) — 847 tests passing (80 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -42,6 +42,7 @@
 - `assets.ts` — asset mapping, folder/artist filtering, search, update/move, SHA-256 lookup, and batch delete helpers
 - `assetFolders.ts` — folder CRUD plus breadcrumb/path helpers for the admin file explorer
 - `siteSettings.ts` — `getSiteSettings` (returns typed `SiteSettings`), `upsertSiteSetting`, `upsertSiteSettings` (batch)
+- `artistBillingProfiles.ts` — billing master data for legal invoicing (`artist_billing_profiles`) plus completeness checks for portal invoice gating
 - Each DAL function receives `SupabaseClient<Database>` as first arg; fully unit-tested
 
 ### React Hooks (`src/hooks/`)
@@ -78,6 +79,9 @@
 - `createSalesStatement(db, data)` DAL function in `src/lib/api/salesStatements.ts`.
 - `generatePresignedUploadUrl(r2Key, contentType, deps)` in `src/lib/portal/presignedUrl.ts` (15-min PUT URL).
 - Bypasses Vercel's 4.5 MB request body limit — PDFs go directly from SOS generator → R2.
+- `sales_statements` now carries workflow state (`draft`, `label_approved`, `artist_notified`, `acknowledged`) plus internal label notes and approval timestamps for the admin approval flow.
+- `artist_billing_profiles` stores artist invoicing master data and is required before any portal invoice can be created.
+- SOS-linked invoices store `statement_id`, `artist_invoice_number`, and optional notes; the portal creates §14 UStG-ready PDFs and marks approved statements as acknowledged after invoice creation.
 
 ### File Upload (Next.js Route Handler)
 - `app/api/upload/route.ts` — POST Route Handler that:
@@ -174,7 +178,9 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |
 | Artist Portal — EPK profile editor | ✅ Implemented | `artist_profiles` table + RLS + Profile form with bio_short/medium/long + photo upload via R2 |
 | Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
-| Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + StatementsTable + presigned URL Server Action (5 min TTL) |
+| Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + status workflow + StatementsTable + presigned URL Server Action (5 min TTL) |
+| Artist Portal — billing profiles | ✅ Implemented | `/portal/billing` + `artist_billing_profiles` + completeness gating for invoice creation |
+| Artist Portal — SOS-linked invoices | ✅ Implemented | `/portal/invoices?statement=...` pre-fills approved SOS amounts, stores artist invoice numbers, and generates §14 UStG-ready PDFs |
 | Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — artists can list/create/delete own concerts (RLS-protected) |
 | Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` + empty-state CTA |
 | Artist Portal — release submission | ✅ Implemented | `/portal/releases/new` + `POST /api/portal/submit-release` (`is_visible=false` pending admin approval) + optional cover upload via `POST /api/portal/upload-release-cover` |

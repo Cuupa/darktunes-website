@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Dictionary } from '@/i18n/types'
 import type { Artist } from '@/types'
@@ -84,6 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' },
       { href: '/portal/invoices', label: 'invoices_heading', icon: Receipt, flag: 'artist.invoices' },
+      { href: '/portal/billing', label: 'billing_heading', icon: Files },
     ],
   },
   {
@@ -167,12 +169,12 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
                   key={href}
                   href={navHref(href)}
                   onClick={onNavigate}
-                  className={[
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  className={cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
                       ? 'portal-nav-active bg-primary/20 text-primary'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  ].join(' ')}
+                  )}
                 >
                   <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
                   <span className="truncate">{dict[label as keyof typeof dict] as string}</span>

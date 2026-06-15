@@ -1,17 +1,53 @@
-/**
- * src/lib/portal/invoicePdf.ts
- *
- * Server-safe PDF invoice generator using jspdf + jspdf-autotable.
- *
- * No DOM Image API is used — only text and table primitives, which are
- * safe to call in a Node.js / Edge runtime (Next.js API route).
- *
- * Returns a Uint8Array of the PDF binary, ready for upload to R2.
- */
+type JsPdfTextOptions = { align?: 'left' | 'center' | 'right' }
+type AutoTableTextAlignment = 'left' | 'center' | 'right'
 
-// jspdf works in Node.js when no image/canvas APIs are used
+type AutoTableOptions = {
+  startY: number
+  head: string[][]
+  body: string[][]
+  margin: { left: number; right: number }
+  headStyles: {
+    fillColor: [number, number, number]
+    textColor: [number, number, number]
+    fontStyle: 'bold' | 'normal'
+    fontSize: number
+  }
+  bodyStyles: {
+    fillColor: [number, number, number]
+    textColor: [number, number, number]
+    fontSize: number
+    lineColor: [number, number, number]
+    lineWidth: number
+  }
+  columnStyles: Record<number, { cellWidth: number; halign?: AutoTableTextAlignment }>
+}
+
+type JsPdfDocument = {
+  setFillColor: (color: string) => void
+  rect: (x: number, y: number, width: number, height: number, style: string) => void
+  setFont: (font: string, style: 'bold' | 'normal') => void
+  setFontSize: (size: number) => void
+  setTextColor: (color: string) => void
+  text: (text: string, x: number, y: number, options?: JsPdfTextOptions) => void
+  setDrawColor: (color: string) => void
+  setLineWidth: (width: number) => void
+  line: (x1: number, y1: number, x2: number, y2: number) => void
+  output: (type: 'arraybuffer') => ArrayBuffer
+}
+
+type AutoTableDocument = JsPdfDocument & {
+  autoTable: (options: AutoTableOptions) => void
+  lastAutoTable?: { finalY: number }
+}
+
+type JsPdfConstructor = new (options: {
+  orientation: 'portrait'
+  unit: 'mm'
+  format: 'a4'
+}) => JsPdfDocument
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { jsPDF } = require('jspdf')
+const { jsPDF } = require('jspdf') as { jsPDF: JsPdfConstructor }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('jspdf-autotable')
 
@@ -21,177 +57,244 @@ export interface InvoiceLineItem {
   unitPriceCents: number
 }
 
+export interface BillingParty {
+  name: string
+  street: string
+  postalCode: string
+  city: string
+  country: string
+  taxNumber?: string
+  vatId?: string
+  email?: string
+}
+
 export interface InvoicePdfOptions {
   invoiceNumber: string
-  issuedDate: string   // ISO date string
-  dueDate: string      // ISO date string
-  artistName: string
-  artistEmail?: string
-  clientName: string
-  clientEmail?: string
-  clientAddress?: string
+  issuedDate: string
+  dueDate?: string
+  artist: BillingParty
+  label: BillingParty
+  sosReference?: string
+  sosPeriod?: string
   lineItems: InvoiceLineItem[]
   currency: string
   taxRatePct: number
+  isSmallBusiness: boolean
+  notes?: string
 }
 
 function formatCurrency(cents: number, currency: string): string {
   return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency })
 }
 
-/**
- * Generate a PDF invoice and return the raw bytes as a Uint8Array.
- */
-export function generateInvoicePdf(opts: InvoicePdfOptions): Uint8Array {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const doc = new (jsPDF as any)({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+function formatDate(date: string | undefined): string {
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('de-DE').format(new Date(date))
+}
 
-  const BG = '#000000'
-  const FG = '#FFFFFF'
-  const ACCENT = '#F0F0F0'
-  const MUTED = '#888888'
-  const PAGE_W = 210
-  const MARGIN = 20
+function buildPartyLines(party: BillingParty): string[] {
+  const lines = [
+    party.name,
+    party.street,
+    `${party.postalCode} ${party.city}`.trim(),
+    party.country,
+  ].filter((line) => line.trim().length > 0)
 
-  // ── Background ──────────────────────────────────────────────────────────
-  doc.setFillColor(BG)
-  doc.rect(0, 0, PAGE_W, 297, 'F')
+  if (party.taxNumber?.trim()) {
+    lines.push(`Steuernummer: ${party.taxNumber.trim()}`)
+  }
 
-  // ── Header ───────────────────────────────────────────────────────────────
+  if (party.vatId?.trim()) {
+    lines.push(`USt-IdNr.: ${party.vatId.trim()}`)
+  }
+
+  if (party.email?.trim()) {
+    lines.push(party.email.trim())
+  }
+
+  return lines
+}
+
+function drawTextLines(
+  doc: AutoTableDocument,
+  lines: string[],
+  startX: number,
+  startY: number,
+  color: string,
+): number {
+  doc.setTextColor(color)
+  let y = startY
+
+  for (const line of lines) {
+    doc.text(line, startX, y)
+    y += 5
+  }
+
+  return y
+}
+
+export function generateInvoicePdf(options: InvoicePdfOptions): Uint8Array {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as AutoTableDocument
+
+  const pageWidth = 210
+  const pageHeight = 297
+  const margin = 18
+  const bg = '#101010'
+  const fg = '#FFFFFF'
+  const muted = '#A0A0A0'
+  const line = '#383838'
+
+  doc.setFillColor(bg)
+  doc.rect(0, 0, pageWidth, pageHeight, 'F')
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(22)
-  doc.setTextColor(FG)
-  doc.text('darkTunes', MARGIN, 24)
+  doc.setTextColor(fg)
+  doc.text('RECHNUNG', margin, 24)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(MUTED)
-  doc.text('Music Group', MARGIN, 30)
+  doc.setTextColor(muted)
+  doc.text('darkTunes Music Group — Artist Portal', margin, 30)
 
-  // ── Invoice title ────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(FG)
-  doc.text('INVOICE', PAGE_W - MARGIN, 24, { align: 'right' })
+  doc.setFontSize(16)
+  doc.setTextColor(fg)
+  doc.text(options.invoiceNumber, pageWidth - margin, 24, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(MUTED)
-  doc.text(opts.invoiceNumber, PAGE_W - MARGIN, 30, { align: 'right' })
+  doc.setTextColor(muted)
+  doc.text(`Rechnungsdatum: ${formatDate(options.issuedDate)}`, pageWidth - margin, 30, { align: 'right' })
+  doc.text(`Fällig am: ${formatDate(options.dueDate)}`, pageWidth - margin, 35, { align: 'right' })
 
-  // ── Divider ───────────────────────────────────────────────────────────────
-  doc.setDrawColor(ACCENT)
-  doc.setLineWidth(0.3)
-  doc.line(MARGIN, 36, PAGE_W - MARGIN, 36)
+  doc.setDrawColor(line)
+  doc.setLineWidth(0.35)
+  doc.line(margin, 40, pageWidth - margin, 40)
 
-  // ── From / To block ───────────────────────────────────────────────────────
-  let y = 44
-  doc.setFontSize(8)
-  doc.setTextColor(MUTED)
-  doc.text('FROM', MARGIN, y)
-  doc.text('TO', 110, y)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(muted)
+  doc.text('VON', margin, 49)
+  doc.text('AN', 112, 49)
 
-  y += 5
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
-  doc.setTextColor(FG)
-  doc.text(opts.artistName, MARGIN, y)
-  doc.text(opts.clientName, 110, y)
+  const fromBottom = drawTextLines(doc, buildPartyLines(options.artist), margin, 56, fg)
+  const toBottom = drawTextLines(doc, buildPartyLines(options.label), 112, 56, fg)
+  let cursorY = Math.max(fromBottom, toBottom) + 6
 
-  if (opts.artistEmail) {
-    y += 5
+  if (options.sosReference?.trim()) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(fg)
+    doc.text('Leistungsbeschreibung', margin, cursorY)
+
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
-    doc.setTextColor(MUTED)
-    doc.text(opts.artistEmail, MARGIN, y)
-  }
-  if (opts.clientEmail || opts.clientAddress) {
-    doc.setFontSize(9)
-    doc.setTextColor(MUTED)
-    if (opts.clientEmail) doc.text(opts.clientEmail, 110, y)
-    if (opts.clientAddress) {
-      y += 5
-      doc.text(opts.clientAddress, 110, y)
+    doc.setTextColor(muted)
+    doc.text(
+      `Musikalische Dienstleistungen gemäß Statement of Sales ${options.sosReference.trim()}`,
+      margin,
+      cursorY + 6,
+    )
+
+    if (options.sosPeriod?.trim()) {
+      doc.text(`Abrechnungszeitraum: ${options.sosPeriod.trim()}`, margin, cursorY + 11)
+      cursorY += 17
+    } else {
+      cursorY += 12
     }
   }
 
-  // ── Dates ─────────────────────────────────────────────────────────────────
-  y += 10
-  doc.setFontSize(9)
-  doc.setTextColor(MUTED)
-  doc.text(`Issued: ${opts.issuedDate}`, MARGIN, y)
-  doc.text(`Due: ${opts.dueDate}`, MARGIN + 60, y)
-
-  // ── Line items table ──────────────────────────────────────────────────────
-  const tableHead = [['Description', 'Qty', 'Unit Price', 'Total']]
-  const tableBody = opts.lineItems.map((item) => [
-    item.description,
-    String(item.qty),
-    formatCurrency(item.unitPriceCents, opts.currency),
-    formatCurrency(item.qty * item.unitPriceCents, opts.currency),
-  ])
-
-  const subtotalCents = opts.lineItems.reduce((s, i) => s + i.qty * i.unitPriceCents, 0)
-  const taxCents = Math.round(subtotalCents * (opts.taxRatePct / 100))
+  const subtotalCents = options.lineItems.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0)
+  const taxCents = Math.round(subtotalCents * (options.taxRatePct / 100))
   const totalCents = subtotalCents + taxCents
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(doc as any).autoTable({
-    startY: y + 8,
-    head: tableHead,
-    body: tableBody,
-    margin: { left: MARGIN, right: MARGIN },
+  doc.autoTable({
+    startY: cursorY,
+    head: [['Beschreibung', 'Menge', 'Einzelpreis', 'Gesamt']],
+    body: options.lineItems.map((item) => [
+      item.description,
+      String(item.qty),
+      formatCurrency(item.unitPriceCents, options.currency),
+      formatCurrency(item.qty * item.unitPriceCents, options.currency),
+    ]),
+    margin: { left: margin, right: margin },
     headStyles: {
-      fillColor: [20, 20, 20],
-      textColor: [200, 200, 200],
+      fillColor: [41, 41, 41],
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 9,
     },
     bodyStyles: {
-      fillColor: [10, 10, 10],
-      textColor: [220, 220, 220],
+      fillColor: [16, 16, 16],
+      textColor: [240, 240, 240],
       fontSize: 9,
-      lineColor: [40, 40, 40],
+      lineColor: [56, 56, 56],
       lineWidth: 0.1,
     },
     columnStyles: {
       0: { cellWidth: 90 },
-      1: { cellWidth: 15, halign: 'center' },
+      1: { cellWidth: 20, halign: 'center' },
       2: { cellWidth: 35, halign: 'right' },
       3: { cellWidth: 35, halign: 'right' },
     },
   })
 
-  // ── Totals block ──────────────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const finalY: number = (doc as any).lastAutoTable.finalY + 6
-  const totalsX = PAGE_W - MARGIN - 70
-  const valX = PAGE_W - MARGIN
+  const tableBottom = (doc.lastAutoTable?.finalY ?? cursorY) + 8
+  const totalsLabelX = pageWidth - margin - 60
+  const totalsValueX = pageWidth - margin
 
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(MUTED)
-  doc.text('Subtotal', totalsX, finalY)
-  doc.setTextColor(FG)
-  doc.text(formatCurrency(subtotalCents, opts.currency), valX, finalY, { align: 'right' })
+  doc.setTextColor(muted)
+  doc.text('Nettobetrag', totalsLabelX, tableBottom)
+  doc.setTextColor(fg)
+  doc.text(formatCurrency(subtotalCents, options.currency), totalsValueX, tableBottom, { align: 'right' })
 
-  doc.setTextColor(MUTED)
-  doc.text(`Tax (${opts.taxRatePct}%)`, totalsX, finalY + 6)
-  doc.setTextColor(FG)
-  doc.text(formatCurrency(taxCents, opts.currency), valX, finalY + 6, { align: 'right' })
+  doc.setTextColor(muted)
+  doc.text(`Umsatzsteuer (${options.taxRatePct.toFixed(2)}%)`, totalsLabelX, tableBottom + 6)
+  doc.setTextColor(fg)
+  doc.text(formatCurrency(taxCents, options.currency), totalsValueX, tableBottom + 6, { align: 'right' })
 
-  doc.setDrawColor(ACCENT)
-  doc.line(totalsX, finalY + 9, valX, finalY + 9)
+  doc.setDrawColor(line)
+  doc.line(totalsLabelX, tableBottom + 9, totalsValueX, tableBottom + 9)
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(FG)
-  doc.text('Total', totalsX, finalY + 14)
-  doc.text(formatCurrency(totalCents, opts.currency), valX, finalY + 14, { align: 'right' })
+  doc.setFontSize(11)
+  doc.setTextColor(fg)
+  doc.text('Gesamtbetrag', totalsLabelX, tableBottom + 15)
+  doc.text(formatCurrency(totalCents, options.currency), totalsValueX, tableBottom + 15, { align: 'right' })
 
-  // ── Footer ────────────────────────────────────────────────────────────────
+  let footerY = tableBottom + 28
+
+  if (options.notes?.trim()) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(fg)
+    doc.text('Notizen', margin, footerY)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(muted)
+    doc.text(options.notes.trim(), margin, footerY + 6)
+    footerY += 16
+  }
+
+  if (options.isSmallBusiness) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(muted)
+    doc.text('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', margin, footerY)
+    footerY += 6
+  }
+
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.setTextColor(MUTED)
-  doc.text('darkTunes Music Group — artist.portal', MARGIN, 285)
-  doc.text(opts.invoiceNumber, PAGE_W - MARGIN, 285, { align: 'right' })
+  doc.setTextColor(muted)
+  doc.text('Vielen Dank für die Zusammenarbeit.', margin, Math.min(footerY + 6, pageHeight - 14))
+  doc.text(options.invoiceNumber, pageWidth - margin, pageHeight - 12, { align: 'right' })
 
-  return doc.output('arraybuffer') as Uint8Array
+  return new Uint8Array(doc.output('arraybuffer'))
 }

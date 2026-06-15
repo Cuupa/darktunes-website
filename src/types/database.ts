@@ -497,11 +497,67 @@ export interface Database {
         }
         Relationships: []
       }
+      artist_billing_profiles: {
+        Row: {
+          id: string
+          artist_id: string
+          legal_name: string
+          street: string
+          postal_code: string
+          city: string
+          country: string
+          tax_number: string | null
+          vat_id: string | null
+          is_small_business: boolean
+          iban: string | null
+          bic: string | null
+          paypal_email: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          legal_name?: string
+          street?: string
+          postal_code?: string
+          city?: string
+          country?: string
+          tax_number?: string | null
+          vat_id?: string | null
+          is_small_business?: boolean
+          iban?: string | null
+          bic?: string | null
+          paypal_email?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          legal_name?: string
+          street?: string
+          postal_code?: string
+          city?: string
+          country?: string
+          tax_number?: string | null
+          vat_id?: string | null
+          is_small_business?: boolean
+          iban?: string | null
+          bic?: string | null
+          paypal_email?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       artist_invoices: {
         Row: {
           id: string
           artist_id: string
           invoice_number: string
+          artist_invoice_number: string | null
+          statement_id: string | null
           client_name: string
           client_email: string
           client_address: string | null
@@ -511,6 +567,7 @@ export interface Database {
           status: 'draft' | 'sent' | 'paid' | 'cancelled'
           due_date: string | null
           issued_date: string
+          notes: string | null
           pdf_url: string | null
           created_at: string
           updated_at: string
@@ -519,6 +576,8 @@ export interface Database {
           id?: string
           artist_id: string
           invoice_number: string
+          artist_invoice_number?: string | null
+          statement_id?: string | null
           client_name: string
           client_email: string
           client_address?: string | null
@@ -528,6 +587,7 @@ export interface Database {
           status?: 'draft' | 'sent' | 'paid' | 'cancelled'
           due_date?: string | null
           issued_date?: string
+          notes?: string | null
           pdf_url?: string | null
           created_at?: string
           updated_at?: string
@@ -536,6 +596,8 @@ export interface Database {
           id?: string
           artist_id?: string
           invoice_number?: string
+          artist_invoice_number?: string | null
+          statement_id?: string | null
           client_name?: string
           client_email?: string
           client_address?: string | null
@@ -545,6 +607,7 @@ export interface Database {
           status?: 'draft' | 'sent' | 'paid' | 'cancelled'
           due_date?: string | null
           issued_date?: string
+          notes?: string | null
           pdf_url?: string | null
           created_at?: string
           updated_at?: string
@@ -625,6 +688,9 @@ export interface Database {
           r2_key: string
           period: string
           amount_eur: number | null
+          status: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          label_notes: string | null
+          label_approved_at: string | null
           created_at: string
         }
         Insert: {
@@ -634,6 +700,9 @@ export interface Database {
           r2_key: string
           period: string
           amount_eur?: number | null
+          status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          label_notes?: string | null
+          label_approved_at?: string | null
           created_at?: string
         }
         Update: {
@@ -643,6 +712,9 @@ export interface Database {
           r2_key?: string
           period?: string
           amount_eur?: number | null
+          status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          label_notes?: string | null
+          label_approved_at?: string | null
           created_at?: string
         }
         Relationships: []

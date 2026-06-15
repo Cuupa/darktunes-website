@@ -12,7 +12,9 @@ Portal features:
 - **EPK Profile Editor** (`/portal/profile`) — artists edit bio, genres, social links, press quote, and upload a profile photo. The photo upload goes server-side via `/api/portal/upload-photo` (no CORS issues).
 - **EPK PDF Export** (`/portal/profile`) — artists can generate a print-ready EPK using the "Download EPK as PDF" action (browser print-to-PDF flow).
 - **Streaming Analytics** (`/portal/analytics`) — artists view their monthly platform stream counts in a Recharts bar chart. Admins manage the underlying `streaming_stats` data.
-- **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. The Server Action generates the URL; the raw R2 object key and credentials never reach the browser.
+- **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. Approved statements surface a **“Rechnung erstellen”** CTA that deep-links into the invoice flow for that exact statement.
+- **Billing Profile** (`/portal/billing`) — artists manage legal invoice master data (`artist_billing_profiles`): legal name, address, Steuernummer / USt-IdNr., Kleinunternehmer flag, and payout details. Invoice creation is blocked until the profile is complete.
+- **Invoices** (`/portal/invoices`) — artists create invoices either manually or directly from an approved Statement of Sales. SOS-linked invoices lock the approved amount, store the artist’s own bookkeeping number, and generate a dark-themed §14 UStG-ready PDF.
 - **Tour Manager** (`/portal/tour`) — artists can create/delete their own concert entries (announced/confirmed/cancelled).
 - **Release Submission** (`/portal/releases/new`) — artists can submit new releases for admin review (`is_visible=false` until approved), including optional cover upload via `/api/portal/upload-release-cover`.
 - **Marketing Assets** (`/portal/marketing`) — artists can download assigned assets via short-lived presigned URLs and upload/delete their own assets via `/api/portal/upload-asset`.
@@ -45,6 +47,7 @@ WHERE slug = 'artist-slug';
 - **Messages (admin-only)**: Rich-text **Messages** tab for artist inbox communication (`label_messages`); supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions
 - **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
 - **Logs (admin-only)**: **Logs** tab with three sub-views — Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filters, and pagination.
+- **Statement Approval Workflow**: the Statements tab now shows statement workflow status (`draft`, `label_approved`, `artist_notified`, `acknowledged`) and lets admins/editors approve draft statements with optional internal label notes before artists generate linked invoices.
 - **Roles & Permissions (admin-only)**: **Roles & Permissions** tab to configure per-role content permissions (`can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`) stored in the dedicated `role_permissions` PostgreSQL table. Changes are enforced by backend API routes and PostgreSQL RLS policies — the admin role always retains full access and cannot be restricted.
 - **Videos Management**: Manage music videos and YouTube content
 - **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.

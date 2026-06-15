@@ -203,6 +203,8 @@ After DOI confirmation, verified subscribers are pushed to MailerLite server-to-
 - [ ] SSL certificate active
 - [ ] Test admin login
 - [ ] Test artist portal login at `/portal`
+- [ ] Test portal billing profile save at `/portal/billing`
+- [ ] Test SOS statement approval in `/admin` and invoice creation from `/portal/statements`
 - [ ] Test file upload
 - [ ] Test artist "Sync Now" button (iTunes releases import)
 - [ ] Check sync_logs table for any errors

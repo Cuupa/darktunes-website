@@ -35,6 +35,9 @@ const mockStatementRow: SalesStatementRow = {
   r2_key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
   period: 'Q1-2024',
   amount_eur: 1234.56,
+  status: 'draft',
+  label_notes: null,
+  label_approved_at: null,
   created_at: '2024-04-01T00:00:00Z',
 }
 
