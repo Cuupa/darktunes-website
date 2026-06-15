@@ -2240,6 +2240,7 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
   ('artist.invoices', 'Artist Invoices', TRUE, 'artist'),
   ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
+  ('artist.calendar', 'Artist Release Calendar', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
