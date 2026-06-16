@@ -199,7 +199,7 @@ export function ArtistsManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingArtist] = useState<Artist | null>(null)
+  const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)

@@ -77,8 +77,8 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
   if (error) {
     // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
     // migration hasn't run) so that SSG/ISR prerendering is never blocked.
+    // byRelease remains empty → all releases fall through to the legacy artist_id fallback below.
     console.warn(`release_artists lookup skipped: ${error.message}`)
-    return releases
   }
 
   const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
