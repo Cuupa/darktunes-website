@@ -569,6 +569,49 @@ Color Theme Admin (ColorThemeManager)
 - `ThemeStyleInjector` (app/_components/ThemeStyleInjector.tsx) handles the SSR side: it injects the SAVED theme as a `<style>` tag in `<head>` at server-render time to prevent FOUC. ColorThemeManager handles the live preview only.
 - `handleCancel` restores the original draft in one `dispatch({ type: 'SET_DRAFT', draft: originalDraft.current })` call — no imperative cleanup needed.
 - `handleSave` diffs the draft against `value` props and calls `onChange` with only the changed fields.
+- After a successful save, `handleSave` posts `{ type: 'theme-updated' }` to `BroadcastChannel('theme-updates')` so any open public-site tabs pick up the new theme within ~1 second.
+- ColorThemeManager NO LONGER owns a Google Font loading useEffect — that responsibility was moved to `TypographyTab` so the font tab is self-contained and standalone-safe.
+
+Typography System (state-of-the-art)
+`ThemeTypography` (src/config/themeConfig.ts) exposes the following CSS tokens, all admin-configurable:
+  - `fontFamily`           → `--font-family-body`
+  - `headingFamily`        → `--font-family-heading`
+  - `serifFamily`          → `--font-serif` (dedicated serif/accent override; if unset, inherits body font)
+  - `headingSize`          → `--heading-size` (h1 base size in rem)
+  - `headingScale`         → `--heading-scale` (ratio; h2 = h1×scale, h3 = h1×scale²)
+  - `bodySize`             → `--body-size`
+  - `bodyWeight`           → `--body-weight`
+  - `headingWeight`        → `--heading-weight`
+  - `lineHeight`           → `--line-height-body`
+  - `lineHeightHeading`    → `--line-height-heading`
+  - `letterSpacing`        → `--letter-spacing-body`
+  - `letterSpacingHeading` → `--letter-spacing-heading`
+
+`--font-serif` wiring (critical): The Tailwind `font-serif` utility maps to `font-family: var(--font-serif)`. There are 27+ usages in Hero, Artist bios, MarkdownContent, etc. ThemeStyleInjector emits `--font-serif` as follows:
+  - `serifFamily` set → `--font-serif: 'serifFamily', serif` (dedicated accent typeface)
+  - `serifFamily` empty + `fontFamily` set → `--font-serif: var(--font-family-body)` (all serif elements follow body font)
+  - Both empty → token not emitted (falls back to globals.css default: `var(--font-family-body, Georgia, serif)`)
+  ⛔ Do NOT restore `--font-serif` as an inline style on `<html>` in layout.tsx — inline styles override ThemeStyleInjector's `<style>` tag.
+
+`buildGoogleFontSpec(fontName, weights)` (exported from ThemeStyleInjector.tsx):
+  - Converts a font name + weight array into a Google Fonts CSS2 API family spec fragment
+  - Strips CSS fallback stacks (splits on `,`), strips surrounding quotes
+  - Returns `null` for empty strings and http/https URLs
+  - Auto-constructs URL for unknown names (`spaces → +`) — any valid Google Font works without a map entry
+  - Always includes 400 as safety weight; deduplicates and sorts weights numerically
+  - Used by both ThemeStyleInjector (SSR) and TypographyTab (client-side preview font loading)
+
+Font loading strategy:
+  - ThemeStyleInjector (SSR): emits `<link rel="stylesheet">` + `<link rel="preconnect">` for configured fonts; weight-subsets to only bodyWeight + headingWeight (reduces CSS payload ~60% vs. loading 300;400;500;600;700).
+  - Adds `<link rel="preload" as="style">` for the primary body font weight to improve FCP.
+  - TypographyTab (client): owns a self-contained `useEffect` that calls `loadGoogleFonts()` whenever body/heading/serif font selection changes. Works standalone in any context (Storybook, testbed, future refactors) without depending on a parent's useEffect.
+
+Real-time cross-tab theme sync:
+  - `src/components/ThemeBroadcastListener.tsx` is a `"use client"` component (returns null) mounted in `app/_components/Providers.tsx`.
+  - It opens `BroadcastChannel('theme-updates')` and calls `router.refresh()` when it receives `{ type: 'theme-updated' }`.
+  - The admin tab that triggered the save does NOT receive its own broadcast (BroadcastChannel sender exclusion is spec behaviour).
+  - Gracefully skips when BroadcastChannel is unsupported (private Safari, some Webviews).
+  - NEVER add a second ThemeBroadcastListener instance.
 
 Press & Media Ecosystem
 Public EPK page: `app/press/page.tsx` (Server Component) fetches press_photos, artist profile bios (short/medium/long), concerts, and press_quote from Supabase. All photo display URLs pass through `getOptimizedImageUrl()` (wsrv.nl proxy); download links point to the original R2 public CDN URL.

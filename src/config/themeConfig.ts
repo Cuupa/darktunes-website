@@ -19,14 +19,18 @@
  *   colors.border        → --border
  *   gradients.heroFrom/heroTo/heroDir  → --gradient-hero   (computed)
  *   gradients.accentFrom/accentTo/accentDir → --gradient-accent (computed)
- *   typography.fontFamily    → --font-family-body
- *   typography.headingFamily → --font-family-heading
- *   typography.headingSize   → --heading-size
- *   typography.bodySize      → --body-size
- *   typography.bodyWeight    → --body-weight
- *   typography.headingWeight → --heading-weight
- *   typography.lineHeight    → --line-height-body
- *   typography.letterSpacing → --letter-spacing-body
+ *   typography.fontFamily          → --font-family-body
+ *   typography.headingFamily       → --font-family-heading
+ *   typography.serifFamily         → --font-serif (also wires font-serif Tailwind utility)
+ *   typography.headingSize         → --heading-size  (h1 base)
+ *   typography.headingScale        → --heading-scale (h2 = h1×scale, h3 = h1×scale²)
+ *   typography.bodySize            → --body-size
+ *   typography.bodyWeight          → --body-weight
+ *   typography.headingWeight       → --heading-weight
+ *   typography.lineHeight          → --line-height-body
+ *   typography.lineHeightHeading   → --line-height-heading
+ *   typography.letterSpacing       → --letter-spacing-body
+ *   typography.letterSpacingHeading→ --letter-spacing-heading
  *   glass.blur           → --glass-blur
  *   glass.opacity        → --glass-opacity
  *   animation.duration   → --animation-duration
@@ -74,6 +78,7 @@ export interface ThemeTypography {
   /**
    * Body font-family string, e.g. "Inter".
    * When set to a known Google Font name, ThemeStyleInjector injects a <link> tag.
+   * Accepts unknown names too — they are auto-resolved via the Google Fonts CSS2 API.
    * CSS token: --font-family-body
    */
   fontFamily?: string
@@ -83,10 +88,24 @@ export interface ThemeTypography {
    */
   headingFamily?: string
   /**
+   * Serif / Accent font-family (e.g. "Playfair Display").
+   * When set, overrides --font-serif so all font-serif Tailwind usages
+   * (Hero subheadings, artist bios, markdown body, section subtitles) use this font.
+   * When unset, --font-serif falls back to var(--font-family-body).
+   * CSS token: --font-serif
+   */
+  serifFamily?: string
+  /**
    * Base heading (h1) size, e.g. "3rem".
    * CSS token: --heading-size
    */
   headingSize?: string
+  /**
+   * Heading scale ratio (0.5–1.0).  h2 = h1 × scale; h3 = h1 × scale².
+   * Defaults to 0.8 when unset.
+   * CSS token: --heading-scale  (h2/h3 calculated via CSS calc())
+   */
+  headingScale?: string
   /**
    * Body base font size, e.g. "1rem" or "16px".
    * CSS token: --body-size
@@ -108,10 +127,20 @@ export interface ThemeTypography {
    */
   lineHeight?: string
   /**
+   * Heading line-height, e.g. "1.2".
+   * CSS token: --line-height-heading
+   */
+  lineHeightHeading?: string
+  /**
    * Body letter-spacing, e.g. "0.01em".
    * CSS token: --letter-spacing-body
    */
   letterSpacing?: string
+  /**
+   * Heading letter-spacing, e.g. "-0.02em".
+   * CSS token: --letter-spacing-heading
+   */
+  letterSpacingHeading?: string
 }
 
 // ── Effects ───────────────────────────────────────────────────────────────────

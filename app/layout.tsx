@@ -14,7 +14,6 @@ import './globals.css'
 
 const fontVariables: CSSProperties = {
   ['--font-sans' as string]: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  ['--font-serif' as string]: 'Georgia, Cambria, "Times New Roman", serif',
   ['--font-mono' as string]: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
 }
 

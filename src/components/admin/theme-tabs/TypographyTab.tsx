@@ -6,18 +6,22 @@
  * Comprehensive typography settings tab for the Color Theme Manager.
  *
  * Controls:
- *  - Body font family  (50+ Google Fonts + custom URL)
- *  - Heading font family (can differ from body, e.g. Orbitron headings + DM Sans body)
+ *  - Body font family      (50+ Google Fonts + custom name or URL)
+ *  - Heading font family   (can differ from body, e.g. Orbitron headings + DM Sans body)
+ *  - Serif / Accent font   (overrides --font-serif Tailwind utility)
+ *  - Heading scale ratio   (h2 = h1 × scale; h3 = h1 × scale²)
+ *  - Heading base size     (h1)
  *  - Body font size
- *  - Heading base size
  *  - Body font weight
  *  - Heading font weight
- *  - Line height
- *  - Letter spacing
- *  - Live preview panel
+ *  - Body line height
+ *  - Heading line height
+ *  - Body letter spacing
+ *  - Heading letter spacing
+ *  - Live preview panel    (self-contained — loads Google Fonts independently)
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { TextAa } from '@phosphor-icons/react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -25,6 +29,7 @@ import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ThemeTypography } from '@/config/themeConfig'
+import { buildGoogleFontSpec } from '../../../app/_components/ThemeStyleInjector'
 
 // ── Font lists ────────────────────────────────────────────────────────────────
 
@@ -102,6 +107,29 @@ function isCustomFont(val: string): boolean {
   return !!val && !FONT_OPTIONS.some((o) => o.value === val) && val !== 'custom'
 }
 
+// ── Google Font loader (self-contained) ───────────────────────────────────────
+// TypographyTab owns its own font-loading side-effect so it works standalone
+// in any context (Storybook, test-bed, future refactors) without depending
+// on a parent's useEffect.
+
+function loadGoogleFonts(fonts: Array<{ name: string; weights: string[] }>) {
+  const specs = fonts
+    .map(({ name, weights }) => buildGoogleFontSpec(name, weights))
+    .filter((s): s is string => s !== null)
+  if (specs.length === 0) return
+
+  const href = `https://fonts.googleapis.com/css2?family=${specs.join('&family=')}&display=swap`
+  const existing = document.head.querySelector<HTMLLinkElement>('link[data-ctm-font]')
+  if (existing?.href === href) return // already loaded
+  existing?.remove()
+
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = href
+  link.setAttribute('data-ctm-font', 'true')
+  document.head.appendChild(link)
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface TypographyTabProps {
@@ -116,27 +144,37 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
   const {
     fontFamily = '',
     headingFamily = '',
+    serifFamily = '',
     headingSize = '3',
+    headingScale = '0.8',
     bodySize = '1',
     bodyWeight = '400',
     headingWeight = '700',
     lineHeight = '1.6',
+    lineHeightHeading = '1.2',
     letterSpacing = '0',
+    letterSpacingHeading = '0',
   } = typography
 
-  // Determine if current values are custom
-  const bodyIsCustom = isCustomFont(fontFamily)
+  // Determine if current values are custom (not in predefined list)
+  const bodyIsCustom    = isCustomFont(fontFamily)
   const headingIsCustom = isCustomFont(headingFamily)
+  const serifIsCustom   = isCustomFont(serifFamily)
 
-  const [bodySelectVal, setBodySelectVal] = useState(() => bodyIsCustom ? 'custom' : (fontFamily || '__default__'))
+  const [bodySelectVal,    setBodySelectVal]    = useState(() => bodyIsCustom    ? 'custom' : (fontFamily    || '__default__'))
   const [headingSelectVal, setHeadingSelectVal] = useState(() => headingIsCustom ? 'custom' : (headingFamily || '__inherit__'))
-  const [customBodyFont, setCustomBodyFont] = useState(() => bodyIsCustom ? fontFamily : '')
+  const [serifSelectVal,   setSerifSelectVal]   = useState(() => serifIsCustom   ? 'custom' : (serifFamily   || '__body__'))
+  const [customBodyFont,    setCustomBodyFont]    = useState(() => bodyIsCustom    ? fontFamily    : '')
   const [customHeadingFont, setCustomHeadingFont] = useState(() => headingIsCustom ? headingFamily : '')
+  const [customSerifFont,   setCustomSerifFont]   = useState(() => serifIsCustom   ? serifFamily   : '')
 
-  const headingSizeNum = parseFloat(headingSize) || 3
-  const bodySizeNum    = parseFloat(bodySize)    || 1
-  const lineHeightNum  = parseFloat(lineHeight)  || 1.6
-  const letterSpNum    = parseFloat(letterSpacing) || 0
+  const headingSizeNum      = parseFloat(headingSize)       || 3
+  const headingScaleNum     = parseFloat(headingScale)      || 0.8
+  const bodySizeNum         = parseFloat(bodySize)          || 1
+  const lineHeightNum       = parseFloat(lineHeight)        || 1.6
+  const lineHeightHeadNum   = parseFloat(lineHeightHeading) || 1.2
+  const letterSpNum         = parseFloat(letterSpacing)        || 0
+  const letterSpHeadNum     = parseFloat(letterSpacingHeading) || 0
 
   function patch(partial: Partial<ThemeTypography>) {
     onChange({ ...typography, ...partial })
@@ -164,28 +202,64 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
     }
   }
 
-  // Effective font names for preview
-  const effectiveBodyFont    = bodySelectVal === 'custom' ? customBodyFont : bodySelectVal
+  function handleSerifFontSelect(val: string) {
+    setSerifSelectVal(val)
+    if (val === '__body__') {
+      setCustomSerifFont('')
+      patch({ serifFamily: '' })
+    } else if (val !== 'custom') {
+      setCustomSerifFont('')
+      patch({ serifFamily: val })
+    }
+  }
+
+  // ── Self-contained Google Fonts loader ────────────────────────────────────
+  // Loads fonts whenever the selected families change. This keeps TypographyTab
+  // self-contained — it works in isolation without a parent useEffect.
+  const effectiveBodyFont    = bodySelectVal    === 'custom' ? customBodyFont    : bodySelectVal
   const effectiveHeadingFont = headingSelectVal === 'custom' ? customHeadingFont : headingSelectVal
+  const effectiveSerifFont   = serifSelectVal   === 'custom' ? customSerifFont   : serifSelectVal
+
+  useEffect(() => {
+    const fonts: Array<{ name: string; weights: string[] }> = []
+    if (effectiveBodyFont    && effectiveBodyFont    !== '__default__') fonts.push({ name: effectiveBodyFont,    weights: [bodyWeight, '400'] })
+    if (effectiveHeadingFont && effectiveHeadingFont !== '__inherit__') fonts.push({ name: effectiveHeadingFont, weights: [headingWeight, '700'] })
+    if (effectiveSerifFont   && effectiveSerifFont   !== '__body__')    fonts.push({ name: effectiveSerifFont,   weights: [bodyWeight, '400'] })
+    if (fonts.length > 0) loadGoogleFonts(fonts)
+  }, [effectiveBodyFont, effectiveHeadingFont, effectiveSerifFont, bodyWeight, headingWeight])
+
+  // ── Preview styles ────────────────────────────────────────────────────────
+  const bodyFF = effectiveBodyFont && effectiveBodyFont !== '__default__'
+    ? `'${effectiveBodyFont}', sans-serif`
+    : 'inherit'
+  const headFF = (effectiveHeadingFont && effectiveHeadingFont !== '__inherit__')
+    ? `'${effectiveHeadingFont}', sans-serif`
+    : bodyFF
 
   const previewStyle: React.CSSProperties = {
-    fontFamily: effectiveBodyFont ? `'${effectiveBodyFont}', sans-serif` : 'inherit',
-    fontSize:   `${bodySizeNum}rem`,
-    fontWeight: bodyWeight as React.CSSProperties['fontWeight'],
-    lineHeight: lineHeightNum,
+    fontFamily:    bodyFF,
+    fontSize:      `${bodySizeNum}rem`,
+    fontWeight:    bodyWeight as React.CSSProperties['fontWeight'],
+    lineHeight:    lineHeightNum,
     letterSpacing: `${letterSpNum}em`,
   }
 
   const previewHeadingStyle: React.CSSProperties = {
-    fontFamily: effectiveHeadingFont
-      ? `'${effectiveHeadingFont}', sans-serif`
-      : effectiveBodyFont
-        ? `'${effectiveBodyFont}', sans-serif`
-        : 'inherit',
-    fontSize:   `${headingSizeNum}rem`,
-    fontWeight: headingWeight as React.CSSProperties['fontWeight'],
-    lineHeight: 1.2,
-    letterSpacing: `${letterSpNum}em`,
+    fontFamily:    headFF,
+    fontSize:      `${headingSizeNum}rem`,
+    fontWeight:    headingWeight as React.CSSProperties['fontWeight'],
+    lineHeight:    lineHeightHeadNum,
+    letterSpacing: `${letterSpHeadNum}em`,
+  }
+
+  const previewH2Style: React.CSSProperties = {
+    ...previewHeadingStyle,
+    fontSize: `${headingSizeNum * headingScaleNum}rem`,
+  }
+
+  const previewH3Style: React.CSSProperties = {
+    ...previewHeadingStyle,
+    fontSize: `${headingSizeNum * headingScaleNum * headingScaleNum}rem`,
   }
 
   const categorised = FONT_OPTIONS.reduce<Record<string, typeof FONT_OPTIONS>>((acc, opt) => {
@@ -197,9 +271,10 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Override site typography. Font families load from Google Fonts when a named option is selected.
+        Override site typography. Font families are loaded from Google Fonts as you change the selection.
         CSS tokens: <code className="font-mono text-accent text-xs">--font-family-body</code>,{' '}
-        <code className="font-mono text-accent text-xs">--font-family-heading</code>.
+        <code className="font-mono text-accent text-xs">--font-family-heading</code>,{' '}
+        <code className="font-mono text-accent text-xs">--font-serif</code>.
       </p>
 
       {/* ── Body Font ────────────────────────────────────────────────── */}
@@ -208,7 +283,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
           <TextAa size={16} weight="duotone" aria-hidden="true" className="text-muted-foreground" />
           <Label className="text-sm font-medium">Body Font Family</Label>
         </div>
-        <Select value={bodySelectVal} onValueChange={handleBodyFontSelect}>
+        <Select value={bodySelectVal} onValueChange={handleBodyFontSelect} disabled={disabled}>
           <SelectTrigger aria-label="Body font family">
             <SelectValue placeholder="Select body font…" />
           </SelectTrigger>
@@ -225,7 +300,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
         </Select>
         {bodySelectVal === 'custom' && (
           <Input
-            placeholder="e.g. Exo 2, or full CSS font-family string"
+            placeholder="Google Font name (e.g. Exo 2) or https://fonts.googleapis.com/… URL"
             value={customBodyFont}
             onChange={(e) => {
               setCustomBodyFont(e.target.value)
@@ -233,7 +308,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
             }}
             className="font-mono text-sm"
             disabled={disabled}
-            aria-label="Custom body font name"
+            aria-label="Custom body font name or URL"
           />
         )}
         <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--font-family-body</code></p>
@@ -246,7 +321,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
           <TextAa size={16} weight="duotone" aria-hidden="true" className="text-muted-foreground" />
           <Label className="text-sm font-medium">Heading Font Family</Label>
         </div>
-        <Select value={headingSelectVal} onValueChange={handleHeadingFontSelect}>
+        <Select value={headingSelectVal} onValueChange={handleHeadingFontSelect} disabled={disabled}>
           <SelectTrigger aria-label="Heading font family">
             <SelectValue placeholder="Same as body…" />
           </SelectTrigger>
@@ -264,7 +339,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
         </Select>
         {headingSelectVal === 'custom' && (
           <Input
-            placeholder="e.g. Orbitron"
+            placeholder="Google Font name (e.g. Orbitron) or full URL"
             value={customHeadingFont}
             onChange={(e) => {
               setCustomHeadingFont(e.target.value)
@@ -272,10 +347,76 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
             }}
             className="font-mono text-sm"
             disabled={disabled}
-            aria-label="Custom heading font name"
+            aria-label="Custom heading font name or URL"
           />
         )}
         <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--font-family-heading</code>. Falls back to body font.</p>
+      </div>
+      <Separator />
+
+      {/* ── Serif / Accent Font ──────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <TextAa size={16} weight="duotone" aria-hidden="true" className="text-muted-foreground" />
+          <Label className="text-sm font-medium">Serif / Accent Font</Label>
+        </div>
+        <Select value={serifSelectVal} onValueChange={handleSerifFontSelect} disabled={disabled}>
+          <SelectTrigger aria-label="Serif / accent font family">
+            <SelectValue placeholder="Follows body font…" />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value="__body__">Follows body font (default)</SelectItem>
+            {Object.entries(categorised).filter(([cat]) => cat !== 'Default').map(([cat, opts]) => (
+              <React.Fragment key={cat}>
+                <div className="px-2 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{cat}</div>
+                {opts.filter((o) => o.value !== '').map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </React.Fragment>
+            ))}
+          </SelectContent>
+        </Select>
+        {serifSelectVal === 'custom' && (
+          <Input
+            placeholder="Google Font name (e.g. Playfair Display) or full URL"
+            value={customSerifFont}
+            onChange={(e) => {
+              setCustomSerifFont(e.target.value)
+              patch({ serifFamily: e.target.value })
+            }}
+            className="font-mono text-sm"
+            disabled={disabled}
+            aria-label="Custom serif / accent font name or URL"
+          />
+        )}
+        <p className="text-xs text-muted-foreground">
+          CSS token: <code className="font-mono">--font-serif</code>. Used by Hero subheadings, artist bios,
+          MarkdownContent, section subtitles. When unset, inherits the body font.
+        </p>
+      </div>
+      <Separator />
+
+      {/* ── Heading Scale Ratio ──────────────────────────────────────── */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Heading Scale Ratio</Label>
+        <div className="flex items-center gap-3">
+          <Slider
+            min={0.5}
+            max={1.0}
+            step={0.01}
+            value={[headingScaleNum]}
+            onValueChange={([v]) => patch({ headingScale: `${v.toFixed(2)}` })}
+            aria-label="Heading scale ratio"
+            className="flex-1"
+            disabled={disabled}
+          />
+          <span className="w-14 text-right font-mono text-sm text-muted-foreground tabular-nums">{headingScaleNum.toFixed(2)}×</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          CSS token: <code className="font-mono">--heading-scale</code>.
+          h2 = h1 × scale ({(headingSizeNum * headingScaleNum).toFixed(2)}rem);
+          h3 = h1 × scale² ({(headingSizeNum * headingScaleNum * headingScaleNum).toFixed(2)}rem).
+        </p>
       </div>
       <Separator />
 
@@ -291,10 +432,11 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
             onValueChange={([v]) => patch({ headingSize: `${v}rem` })}
             aria-label="Base heading size"
             className="flex-1"
+            disabled={disabled}
           />
           <span className="w-14 text-right font-mono text-sm text-muted-foreground tabular-nums">{headingSizeNum.toFixed(3)}rem</span>
         </div>
-        <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--heading-size</code>. Applied to h1/h2/h3 via scale.</p>
+        <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--heading-size</code>. h2/h3 derived via scale ratio above.</p>
       </div>
       <Separator />
 
@@ -310,6 +452,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
             onValueChange={([v]) => patch({ bodySize: `${v}rem` })}
             aria-label="Body font size"
             className="flex-1"
+            disabled={disabled}
           />
           <span className="w-14 text-right font-mono text-sm text-muted-foreground tabular-nums">{bodySizeNum.toFixed(3)}rem</span>
         </div>
@@ -321,7 +464,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-sm font-medium">Body Font Weight</Label>
-          <Select value={bodyWeight} onValueChange={(v) => patch({ bodyWeight: v })}>
+          <Select value={bodyWeight} onValueChange={(v) => patch({ bodyWeight: v })} disabled={disabled}>
             <SelectTrigger aria-label="Body font weight">
               <SelectValue />
             </SelectTrigger>
@@ -335,7 +478,7 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
         </div>
         <div className="space-y-2">
           <Label className="text-sm font-medium">Heading Font Weight</Label>
-          <Select value={headingWeight} onValueChange={(v) => patch({ headingWeight: v })}>
+          <Select value={headingWeight} onValueChange={(v) => patch({ headingWeight: v })} disabled={disabled}>
             <SelectTrigger aria-label="Heading font weight">
               <SelectValue />
             </SelectTrigger>
@@ -350,41 +493,81 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
       </div>
       <Separator />
 
-      {/* ── Line Height ──────────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Line Height (body)</Label>
-        <div className="flex items-center gap-3">
-          <Slider
-            min={1}
-            max={2.5}
-            step={0.05}
-            value={[lineHeightNum]}
-            onValueChange={([v]) => patch({ lineHeight: `${v}` })}
-            aria-label="Body line height"
-            className="flex-1"
-          />
-          <span className="w-14 text-right font-mono text-sm text-muted-foreground tabular-nums">{lineHeightNum.toFixed(2)}</span>
+      {/* ── Line Heights ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Line Height (body)</Label>
+          <div className="flex items-center gap-3">
+            <Slider
+              min={1}
+              max={2.5}
+              step={0.05}
+              value={[lineHeightNum]}
+              onValueChange={([v]) => patch({ lineHeight: `${v}` })}
+              aria-label="Body line height"
+              className="flex-1"
+              disabled={disabled}
+            />
+            <span className="w-12 text-right font-mono text-sm text-muted-foreground tabular-nums">{lineHeightNum.toFixed(2)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">CSS: <code className="font-mono">--line-height-body</code></p>
         </div>
-        <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--line-height-body</code>. Unitless ratio (1 = tight, 1.6 = comfortable).</p>
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Line Height (headings)</Label>
+          <div className="flex items-center gap-3">
+            <Slider
+              min={0.9}
+              max={2}
+              step={0.05}
+              value={[lineHeightHeadNum]}
+              onValueChange={([v]) => patch({ lineHeightHeading: `${v}` })}
+              aria-label="Heading line height"
+              className="flex-1"
+              disabled={disabled}
+            />
+            <span className="w-12 text-right font-mono text-sm text-muted-foreground tabular-nums">{lineHeightHeadNum.toFixed(2)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">CSS: <code className="font-mono">--line-height-heading</code></p>
+        </div>
       </div>
       <Separator />
 
       {/* ── Letter Spacing ───────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Letter Spacing (body)</Label>
-        <div className="flex items-center gap-3">
-          <Slider
-            min={-0.05}
-            max={0.2}
-            step={0.005}
-            value={[letterSpNum]}
-            onValueChange={([v]) => patch({ letterSpacing: `${v.toFixed(3)}` })}
-            aria-label="Body letter spacing"
-            className="flex-1"
-          />
-          <span className="w-16 text-right font-mono text-sm text-muted-foreground tabular-nums">{letterSpNum.toFixed(3)}em</span>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Letter Spacing (body)</Label>
+          <div className="flex items-center gap-3">
+            <Slider
+              min={-0.05}
+              max={0.2}
+              step={0.005}
+              value={[letterSpNum]}
+              onValueChange={([v]) => patch({ letterSpacing: `${v.toFixed(3)}` })}
+              aria-label="Body letter spacing"
+              className="flex-1"
+              disabled={disabled}
+            />
+            <span className="w-16 text-right font-mono text-sm text-muted-foreground tabular-nums">{letterSpNum.toFixed(3)}em</span>
+          </div>
+          <p className="text-xs text-muted-foreground">CSS: <code className="font-mono">--letter-spacing-body</code></p>
         </div>
-        <p className="text-xs text-muted-foreground">CSS token: <code className="font-mono">--letter-spacing-body</code>. In em units relative to font-size.</p>
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Letter Spacing (headings)</Label>
+          <div className="flex items-center gap-3">
+            <Slider
+              min={-0.1}
+              max={0.3}
+              step={0.005}
+              value={[letterSpHeadNum]}
+              onValueChange={([v]) => patch({ letterSpacingHeading: `${v.toFixed(3)}` })}
+              aria-label="Heading letter spacing"
+              className="flex-1"
+              disabled={disabled}
+            />
+            <span className="w-16 text-right font-mono text-sm text-muted-foreground tabular-nums">{letterSpHeadNum.toFixed(3)}em</span>
+          </div>
+          <p className="text-xs text-muted-foreground">CSS: <code className="font-mono">--letter-spacing-heading</code></p>
+        </div>
       </div>
       <Separator />
 
@@ -392,8 +575,14 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
       <div className="space-y-3">
         <Label className="text-sm font-medium">Live Preview</Label>
         <div className="rounded-lg border border-border bg-card p-5 space-y-3 overflow-hidden">
-          <p style={previewHeadingStyle} className="text-foreground leading-tight">
-            The Quick Brown Fox
+          <p style={previewHeadingStyle} className="text-foreground">
+            Heading h1 — The Quick Brown Fox
+          </p>
+          <p style={previewH2Style} className="text-foreground">
+            Heading h2 — Jumps Over the Lazy Dog
+          </p>
+          <p style={previewH3Style} className="text-foreground/80">
+            Heading h3 — AaBbCcDdEeFfGg 0123456789
           </p>
           <p style={previewStyle} className="text-foreground/80">
             AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz 0123456789
@@ -404,9 +593,6 @@ export function TypographyTab({ typography, onChange, disabled = false }: Typogr
             ornare suscipit.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Note: preview uses browser-cached fonts. Save &amp; reload to see Google Fonts in effect.
-        </p>
       </div>
     </div>
   )
