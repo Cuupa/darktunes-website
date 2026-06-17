@@ -12,22 +12,33 @@
  * fallback for color and gradient tokens.
  *
  * CSS token map:
- *   colors.primary       → --primary
- *   colors.secondary     → --secondary
- *   colors.background    → --background
- *   colors.foreground    → --foreground
- *   colors.card          → --card
- *   colors.muted         → --muted
- *   colors.accent        → --accent
- *   colors.border        → --border
- *   gradients.*          → --gradient-hero, --gradient-accent (computed)
- *   typography.fontFamily → --font-family-body
- *   typography.headingSize → --heading-size
- *   glass.blur           → --glass-blur
- *   glass.opacity        → --glass-opacity
- *   animation.duration   → --animation-duration
+ *   colors.primary                 → --primary
+ *   colors.secondary               → --secondary
+ *   colors.background              → --background
+ *   colors.foreground              → --foreground
+ *   colors.card                    → --card
+ *   colors.muted                   → --muted
+ *   colors.accent                  → --accent
+ *   colors.border                  → --border
+ *   gradients.*                    → --gradient-hero, --gradient-accent (computed)
+ *   typography.fontFamily          → --font-family-body
+ *   typography.headingFamily       → --font-family-heading
+ *   typography.serifFamily         → --font-serif  (wires all font-serif Tailwind usages)
+ *   typography.headingSize         → --heading-size
+ *   typography.headingScale        → --heading-scale (h2/h3 via CSS calc())
+ *   typography.bodySize            → --body-size
+ *   typography.bodyWeight          → --body-weight
+ *   typography.headingWeight       → --heading-weight
+ *   typography.lineHeight          → --line-height-body
+ *   typography.lineHeightHeading   → --line-height-heading
+ *   typography.letterSpacing       → --letter-spacing-body
+ *   typography.letterSpacingHeading→ --letter-spacing-heading
+ *   glass.blur                     → --glass-blur
+ *   glass.opacity                  → --glass-opacity
+ *   animation.duration             → --animation-duration
  */
 
+import React from 'react'
 import type { ThemeConfig } from '@/config/themeConfig'
 
 // ── Flat-field legacy interface (kept for backward compatibility) ─────────────
@@ -51,11 +62,12 @@ export interface ThemeColors {
   themeConfig?: ThemeConfig
 }
 
-// ── Google Font lookup ────────────────────────────────────────────────────────
+// ── Google Font helpers ───────────────────────────────────────────────────────
 
 /**
  * Maps a CSS font-family name to the Google Fonts CSS2 API URL fragment.
- * Add new entries as needed; names must match what ThemeConfig.typography.fontFamily stores.
+ * Add new entries as needed; names must match what ThemeConfig.typography stores.
+ * Values are bare family specs — weights are added dynamically by `buildFontSpec`.
  */
 export const GOOGLE_FONT_URL_MAP: Record<string, string> = {
   Inter:              'Inter:wght@300;400;500;600;700',
@@ -105,6 +117,49 @@ export const GOOGLE_FONT_URL_MAP: Record<string, string> = {
   Inconsolata:        'Inconsolata:wght@300;400;600;700',
   'IBM Plex Mono':    'IBM+Plex+Mono:wght@300;400;600;700',
   'IBM Plex Sans':    'IBM+Plex+Sans:wght@300;400;500;600;700',
+}
+
+/**
+ * Build a minimal Google Fonts weight spec for the given font name.
+ * When specific weights are provided, requests only those (plus 400 as safety
+ * fallback) — reducing the number of font-file round-trips.
+ *
+ * For unknown font names, auto-constructs a URL from the name alone so that
+ * admins can type any valid Google Font name without needing a map entry.
+ *
+ * @param fontName   Font family name as stored in ThemeConfig (e.g. "DM Sans")
+ * @param weights    Desired numeric weights (e.g. ["400","700"])
+ * @returns          Google Fonts CSS2 API family spec fragment, or null
+ */
+export function buildGoogleFontSpec(fontName: string, weights: string[] = []): string | null {
+  if (!fontName || !fontName.trim()) return null
+
+  // Strip CSS fallback stacks — only take the first font name
+  const cleanName = fontName.split(',')[0].trim().replace(/^['"]|['"]$/g, '')
+  if (!cleanName) return null
+
+  // Resolve URL-encoded family name
+  const mapEntry = GOOGLE_FONT_URL_MAP[cleanName]
+  const urlFamilyName = mapEntry
+    ? mapEntry.split(':')[0]                   // e.g. "DM+Sans"
+    : cleanName.replace(/ /g, '+')             // auto-encode unknown names
+
+  // Build minimal weight spec when weights are known
+  const uniqueWeights = [...new Set(['400', ...weights.filter(Boolean)])].sort((a, b) => +a - +b)
+  const weightSpec = `wght@${uniqueWeights.join(';')}`
+
+  return `${urlFamilyName}:${weightSpec}`
+}
+
+/**
+ * Returns true when `fontName` is a recognisable Google Font (either in
+ * GOOGLE_FONT_URL_MAP or a non-empty, non-URL string that can be tried on GF).
+ */
+export function isGoogleFont(fontName: string): boolean {
+  if (!fontName || !fontName.trim()) return false
+  if (fontName.startsWith('http')) return false         // full URL — not a GF name
+  const clean = fontName.split(',')[0].trim().replace(/^['"]|['"]$/g, '')
+  return !!clean
 }
 
 type LegacyColorKey = keyof Omit<ThemeColors, 'themeConfig'>
@@ -181,12 +236,26 @@ export function ThemeStyleInjector(props: ThemeColors) {
   if (typo) {
     if (notEmpty(typo.fontFamily))    declarations.push(`  --font-family-body: '${typo.fontFamily}', sans-serif;`)
     if (notEmpty(typo.headingFamily)) declarations.push(`  --font-family-heading: '${typo.headingFamily}', sans-serif;`)
-    if (notEmpty(typo.headingSize))   declarations.push(`  --heading-size: ${typo.headingSize};`)
-    if (notEmpty(typo.bodySize))      declarations.push(`  --body-size: ${typo.bodySize};`)
-    if (notEmpty(typo.bodyWeight))    declarations.push(`  --body-weight: ${typo.bodyWeight};`)
-    if (notEmpty(typo.headingWeight)) declarations.push(`  --heading-weight: ${typo.headingWeight};`)
-    if (notEmpty(typo.lineHeight))    declarations.push(`  --line-height-body: ${typo.lineHeight};`)
-    if (notEmpty(typo.letterSpacing)) declarations.push(`  --letter-spacing-body: ${typo.letterSpacing};`)
+
+    // --font-serif wiring: dedicated serifFamily takes highest precedence;
+    // otherwise, when a body font is configured, inherit it so all font-serif
+    // Tailwind usages (Hero, bios, MarkdownContent, subtitles) follow the
+    // admin-chosen typeface instead of the hard-wired Georgia fallback.
+    if (notEmpty(typo.serifFamily)) {
+      declarations.push(`  --font-serif: '${typo.serifFamily}', serif;`)
+    } else if (notEmpty(typo.fontFamily)) {
+      declarations.push(`  --font-serif: var(--font-family-body);`)
+    }
+
+    if (notEmpty(typo.headingSize))            declarations.push(`  --heading-size: ${typo.headingSize};`)
+    if (notEmpty(typo.headingScale))           declarations.push(`  --heading-scale: ${typo.headingScale};`)
+    if (notEmpty(typo.bodySize))               declarations.push(`  --body-size: ${typo.bodySize};`)
+    if (notEmpty(typo.bodyWeight))             declarations.push(`  --body-weight: ${typo.bodyWeight};`)
+    if (notEmpty(typo.headingWeight))          declarations.push(`  --heading-weight: ${typo.headingWeight};`)
+    if (notEmpty(typo.lineHeight))             declarations.push(`  --line-height-body: ${typo.lineHeight};`)
+    if (notEmpty(typo.lineHeightHeading))      declarations.push(`  --line-height-heading: ${typo.lineHeightHeading};`)
+    if (notEmpty(typo.letterSpacing))          declarations.push(`  --letter-spacing-body: ${typo.letterSpacing};`)
+    if (notEmpty(typo.letterSpacingHeading))   declarations.push(`  --letter-spacing-heading: ${typo.letterSpacingHeading};`)
   }
 
   // ── Glass (themeConfig only) ─────────────────────────────────────────────
@@ -240,25 +309,59 @@ export function ThemeStyleInjector(props: ThemeColors) {
 
   const fontFamily     = typo?.fontFamily
   const headingFamily  = typo?.headingFamily
+  const serifFamily    = typo?.serifFamily
+  const bodyWeight     = typo?.bodyWeight
+  const headingWeight  = typo?.headingWeight
   const hasDeclarations = declarations.length > 0
 
   // ── Google Font links (SSR-safe — rendered into <head> by RootLayout) ────
-  const fontLinks: React.ReactNode[] = []
-  const fontsToLoad = new Set<string>()
-  if (notEmpty(fontFamily) && GOOGLE_FONT_URL_MAP[fontFamily])    fontsToLoad.add(fontFamily)
-  if (notEmpty(headingFamily) && GOOGLE_FONT_URL_MAP[headingFamily]) fontsToLoad.add(headingFamily)
+  // Collects (fontName → weights[]) pairs; deduplicates when body == heading.
+  const fontWeightMap = new Map<string, Set<string>>()
 
-  if (fontsToLoad.size > 0) {
-    const families = Array.from(fontsToLoad).map((f) => GOOGLE_FONT_URL_MAP[f]).join('&family=')
-    fontLinks.push(
-      <link key="gf-preconnect" rel="preconnect" href="https://fonts.googleapis.com" />,
-      <link key="gf-preconnect-origin" rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />,
-      <link
-        key="gf-stylesheet"
-        rel="stylesheet"
-        href={`https://fonts.googleapis.com/css2?family=${families}&display=swap`}
-      />,
-    )
+  function addFontLoad(name: string | undefined, weights: string[]) {
+    if (!name || !name.trim()) return
+    const clean = name.split(',')[0].trim().replace(/^['"]|['"]$/g, '')
+    if (!clean || clean.startsWith('http')) return
+    if (!fontWeightMap.has(clean)) fontWeightMap.set(clean, new Set(['400']))
+    const set = fontWeightMap.get(clean)!
+    weights.forEach((w) => w && set.add(w))
+  }
+
+  // Only request the weights actually used in the design (subsetting)
+  addFontLoad(fontFamily,    [bodyWeight ?? '400'])
+  addFontLoad(headingFamily, [headingWeight ?? '700'])
+  addFontLoad(serifFamily,   [bodyWeight ?? '400', headingWeight ?? '700'])
+
+  const fontLinks: React.ReactNode[] = []
+
+  if (fontWeightMap.size > 0) {
+    const specs = Array.from(fontWeightMap.entries())
+      .map(([name, wSet]) => buildGoogleFontSpec(name, Array.from(wSet)))
+      .filter((s): s is string => s !== null)
+
+    if (specs.length > 0) {
+      const families = specs.join('&family=')
+      const fontsUrl = `https://fonts.googleapis.com/css2?family=${families}&display=swap`
+
+      fontLinks.push(
+        <link key="gf-preconnect"        rel="preconnect" href="https://fonts.googleapis.com" />,
+        <link key="gf-preconnect-origin" rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />,
+        <link key="gf-stylesheet"        rel="stylesheet" href={fontsUrl} />,
+      )
+
+      // Preload primary body weight for faster FCP
+      const primarySpec = buildGoogleFontSpec(fontFamily ?? '', [bodyWeight ?? '400'])
+      if (primarySpec) {
+        fontLinks.push(
+          <link
+            key="gf-preload"
+            rel="preload"
+            as="style"
+            href={`https://fonts.googleapis.com/css2?family=${primarySpec}&display=swap`}
+          />,
+        )
+      }
+    }
   }
 
   // ── Custom CSS (raw injection from admin) ────────────────────────────────

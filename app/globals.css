@@ -29,9 +29,19 @@
     font-size: var(--heading-size, 2.5rem);
   }
 
+  h2 {
+    font-size: var(--heading-size-h2, calc(var(--heading-size, 2.5rem) * var(--heading-scale, 0.8)));
+  }
+
+  h3 {
+    font-size: var(--heading-size-h3, calc(var(--heading-size, 2.5rem) * var(--heading-scale, 0.8) * var(--heading-scale, 0.8)));
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-family-heading, var(--font-family-body, var(--font-sans))), sans-serif;
     font-weight: var(--heading-weight, 700);
+    line-height: var(--line-height-heading, 1.2);
+    letter-spacing: var(--letter-spacing-heading, normal);
   }
 }
 
@@ -63,12 +73,22 @@
   /* Overridden by ThemeStyleInjector when admin sets values. */
   --font-family-body: var(--font-sans);
   --font-family-heading: var(--font-sans);
+  /* --font-serif points to the body font so all font-serif Tailwind usages
+     (Hero, artist bios, MarkdownContent, section subtitles) follow the
+     admin-configured typeface. Overridden via ThemeStyleInjector when the
+     admin picks a dedicated "Serif / Accent" font. */
+  --font-serif: var(--font-family-body, Georgia, Cambria, "Times New Roman", serif);
   --heading-size: 2.5rem;
+  --heading-scale: 0.8;
+  --heading-size-h2: calc(var(--heading-size) * var(--heading-scale));
+  --heading-size-h3: calc(var(--heading-size) * var(--heading-scale) * var(--heading-scale));
   --body-size: 1rem;
   --body-weight: 400;
   --heading-weight: 700;
   --line-height-body: 1.5;
+  --line-height-heading: 1.2;
   --letter-spacing-body: normal;
+  --letter-spacing-heading: normal;
   --glass-blur: 12px;
   --glass-opacity: 0.15;
   --animation-duration: 0.4s;
