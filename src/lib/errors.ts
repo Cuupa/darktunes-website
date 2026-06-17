@@ -75,6 +75,7 @@ async function persistErrorToDb(
   source: string,
   message: string,
   details: Record<string, unknown>,
+  level: 'error' | 'warn' | 'info' = 'error',
 ): Promise<void> {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -87,7 +88,7 @@ async function persistErrorToDb(
     const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
     await db.from('app_logs').insert({
       source,
-      level: 'error',
+      level,
       message,
       details,
     })
@@ -116,21 +117,35 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
     try {
       return await handler(req)
     } catch (err) {
+      const routePath = (() => {
+        try { return new URL(req.url).pathname } catch { return req.url }
+      })()
+
       if (err instanceof ApiError) {
+        if (err.status >= 500) {
+          void persistErrorToDb('api', err.message, {
+            path: routePath,
+            method: req.method,
+            code: err.code ?? null,
+            status: err.status,
+          })
+        }
         return buildErrorResponse(err.message, err.status, err.code)
       }
 
       if (err instanceof ZodError) {
         const message = err.issues.map((e) => e.message).join('; ')
+        void persistErrorToDb('api', `Validation error: ${message}`, {
+          path: routePath,
+          method: req.method,
+          issues: err.issues,
+        }, 'warn')
         return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
       }
 
       // Unknown error — log server-side and persist to app_logs
       console.error('[withErrorHandler] Unhandled route error:', err)
       const errMessage = err instanceof Error ? err.message : String(err)
-      const routePath = (() => {
-        try { return new URL(req.url).pathname } catch { return req.url }
-      })()
       void persistErrorToDb('api', errMessage, {
         path: routePath,
         method: req.method,
