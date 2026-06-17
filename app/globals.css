@@ -16,6 +16,10 @@
     font-family: var(--font-family-body, var(--font-sans)), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
       'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji',
       'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    font-size: var(--body-size, 1rem);
+    font-weight: var(--body-weight, 400);
+    line-height: var(--line-height-body, 1.5);
+    letter-spacing: var(--letter-spacing-body, normal);
   }
 
   h1,
@@ -23,6 +27,11 @@
   h3 {
     font-family: var(--font-family-heading, var(--font-family-body, var(--font-sans))), sans-serif;
     font-size: var(--heading-size, 2.5rem);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-heading, var(--font-family-body, var(--font-sans))), sans-serif;
+    font-weight: var(--heading-weight, 700);
   }
 }
 
@@ -52,8 +61,8 @@
   --z-global-fx: 9996;
   /* ── Theme engine extension tokens ─────────────────────────────────────── */
   /* Overridden by ThemeStyleInjector when admin sets values. */
-  --font-family-body: inherit;
-  --font-family-heading: inherit;
+  --font-family-body: var(--font-sans);
+  --font-family-heading: var(--font-sans);
   --heading-size: 2.5rem;
   --body-size: 1rem;
   --body-weight: 400;
@@ -174,7 +183,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4'[...]
   background-repeat: repeat;
   background-size: 300px 300px;
   opacity: var(--vfx-noise-opacity, 0.03);
@@ -199,7 +208,7 @@
   inset: 0;
   /* 300 × 300 fractalNoise: medium-high frequency + 4 octaves gives enough
      variation to dither gradient bands without becoming visible as texture. */
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4'[...]
   background-size: 300px 300px;
   background-repeat: repeat;
   mix-blend-mode: soft-light;
@@ -401,19 +410,6 @@ html[data-fx-scroll-reveal] [data-reveal][data-revealed] {
     transform: none;
     transition: none;
   }
-}
-
-/* ── Extended typography CSS vars fallbacks ──────────────────────────────── */
-body {
-  font-family: var(--font-family-body, inherit);
-  font-size:   var(--body-size, 1rem);
-  font-weight: var(--body-weight, 400);
-  line-height: var(--line-height-body, 1.5);
-  letter-spacing: var(--letter-spacing-body, normal);
-}
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-family-heading, var(--font-family-body, inherit));
-  font-weight: var(--heading-weight, 700);
 }
 
 /* Hides the native scrollbar on horizontally-scrollable swipe containers
