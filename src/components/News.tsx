@@ -41,7 +41,7 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
         >
           <div>
             <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-            <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+            <p className="text-xl text-muted-foreground">{dict.subheading}</p>
           </div>
           <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
             <Link href="/news">
@@ -85,7 +85,7 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
                   <h3 className="text-xl font-bold mb-3 group-hover:text-accent transition-colors leading-tight line-clamp-2">
                     {post.title}
                   </h3>
-                  <p className="text-muted-foreground mb-4 font-serif leading-relaxed text-sm line-clamp-3 flex-1">
+                  <p className="text-muted-foreground mb-4 leading-relaxed text-sm line-clamp-3 flex-1">
                     {post.excerpt}
                   </p>
                   <span

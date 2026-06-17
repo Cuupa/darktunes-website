@@ -34,7 +34,7 @@ export default async function NewsPage() {
           <h1 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight uppercase">
             {dict.newsPage.heading}
           </h1>
-          <p className="text-xl text-muted-foreground font-serif">{dict.newsPage.subheading}</p>
+          <p className="text-xl text-muted-foreground">{dict.newsPage.subheading}</p>
         </div>
 
         <NewsList posts={posts} dict={dict.newsPage} />

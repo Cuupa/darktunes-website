@@ -41,7 +41,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-muted-foreground">
         <Newspaper size={48} weight="thin" />
-        <p className="text-center font-serif">{dict.noNews}</p>
+        <p className="text-center">{dict.noNews}</p>
       </div>
     )
   }
@@ -84,7 +84,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
                   </Link>
                 </h2>
                 {featuredPost.excerpt && (
-                  <p className="mb-6 font-serif leading-relaxed text-muted-foreground lg:text-lg">
+                  <p className="mb-6 leading-relaxed text-muted-foreground lg:text-lg">
                     {featuredPost.excerpt}
                   </p>
                 )}
@@ -133,7 +133,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
                   </Link>
                 </h2>
                 {post.excerpt && (
-                  <p className="flex-1 font-serif text-sm leading-relaxed text-muted-foreground line-clamp-3">
+                  <p className="flex-1 text-sm leading-relaxed text-muted-foreground line-clamp-3">
                     {post.excerpt}
                   </p>
                 )}
