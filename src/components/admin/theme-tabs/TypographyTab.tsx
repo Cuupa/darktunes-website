@@ -29,7 +29,7 @@ import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ThemeTypography } from '@/config/themeConfig'
-import { buildGoogleFontSpec } from '../../../app/_components/ThemeStyleInjector'
+import { buildGoogleFontSpec } from '../../../../app/_components/ThemeStyleInjector'
 
 // ── Font lists ────────────────────────────────────────────────────────────────
 
