@@ -59,7 +59,7 @@ Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber. Des
 
 Diese Website wird bei einem externen Dienstleister gehostet (Hoster). Die personenbezogenen Daten, die auf dieser Website erfasst werden, werden auf den Servern des Hosters gespeichert. Hierbei kann es sich v. a. um IP-Adressen, Kontaktanfragen, Meta- und Kommunikationsdaten, Vertragsdaten, Kontaktdaten, Namen, Websitezugriffe und sonstige Daten, die über eine Website generiert werden, handeln.
 
-Unsere Anwendung nutzt Supabase (Supabase Inc., USA) für Datenbank und Realtime-Updates. Dabei werden WebSocket-Verbindungen hergestellt, die Ihre IP-Adresse übertragen. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Datenschutzerklärung: https://supabase.com/privacy
+Unsere Anwendung nutzt Supabase (Supabase Inc., USA) für Datenbank und Realtime-Updates. Dabei werden WebSocket-Verbindungen hergestellt, die Ihre IP-Adresse übertragen. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer sicheren und funktionalen Bereitstellung unseres Online-Angebots).
 
 ## 3. Allgemeine Hinweise und Pflichtinformationen
 
@@ -83,15 +83,15 @@ Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger
 
 ## 4. Externe Medien und Einbettungen
 
-Diese Website kann externe Inhalte von Drittanbietern einbetten (z.B. Spotify, YouTube). Diese Inhalte werden erst nach Ihrer ausdrücklichen Zustimmung geladen. Vor der Zustimmung werden nur Platzhalter angezeigt. Durch Ihre Zustimmung stimmen Sie der Übermittlung von Daten an die jeweiligen Drittanbieter zu.
+Diese Website kann externe Inhalte von Drittanbietern einbetten (z.B. Spotify, YouTube). Diese Inhalte werden erst nach Ihrer ausdrücklichen Zustimmung geladen. Vor der Zustimmung werden nur Platzhalter angezeigt.
 
-**Spotify**: Bei der Nutzung des Spotify-Einbettungsplayers gelten die Datenschutzbestimmungen der Spotify AB, Regeringsgatan 19, 111 53 Stockholm, Schweden. Weitere Informationen unter: https://www.spotify.com/de/legal/privacy-policy/
+**Spotify**: Bei der Nutzung des Spotify-Einbettungsplayers gelten die Datenschutzbestimmungen der Spotify AB, Regeringsgatan 19, 111 53 Stockholm, Schweden.
 
-**YouTube**: Bei der Nutzung von YouTube-Videos gelten die Datenschutzbestimmungen der Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland. Weitere Informationen unter: https://policies.google.com/privacy
+**YouTube**: Bei der Nutzung von YouTube-Videos gelten die Datenschutzbestimmungen der Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.
 
 ## 5. Newsletter
 
-Wenn Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind. Weitere Daten werden nicht bzw. nur auf freiwilliger Basis erhoben. Diese Daten verwenden wir ausschließlich für den Versand der angeforderten Informationen und geben diese nicht an Dritte weiter.
+Wenn Sie den auf der Website angebotenen Newsletter beziehen möchten, benötigen wir von Ihnen eine E-Mail-Adresse sowie Informationen, welche uns die Überprüfung gestatten, dass Sie der Inhaber der angegebenen E-Mail-Adresse sind und mit dem Empfang des Newsletters einverstanden sind.
 
 Sie können Ihre Einwilligung jederzeit widerrufen, indem Sie uns eine E-Mail an ${settings.impressumEmail} senden oder den Abmelde-Link in jeder Newsletter-E-Mail nutzen.
 
@@ -106,7 +106,7 @@ Akkreditierte Journalisten können Pressefotos und Promo-Tracks herunterladen. W
 ## 8. Plugins und Tools
 
 ### Schriftarten (Google Fonts)
-Diese Seite nutzt zur einheitlichen Darstellung von Schriftarten so genannte Web Fonts, die von Google bereitgestellt werden. Die Google Fonts sind lokal eingebunden, sodass keine Verbindung zu Servern von Google stattfindet.
+Diese Website verwendet für die einheitliche Darstellung von Schriftarten Web Fonts. Je nach im CMS ausgewählter Theme-Konfiguration können diese Schriftarten von Google Fonts nachgeladen werden. Dabei kann es zu einer Verbindung mit Servern von Google kommen, wobei insbesondere Ihre IP-Adresse und technische Metadaten an Google übermittelt werden können. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer konsistenten und ansprechenden Darstellung der Website) beziehungsweise – sofern eine entsprechende Einwilligungslösung eingesetzt wird – Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO.
 `.trim()
 }
 
@@ -123,9 +123,9 @@ Data processing on this website is carried out by the website operator. You can 
 
 ## 2. Hosting
 
-This website is hosted by an external service provider (host). Personal data collected on this website is stored on the host's servers. This may include IP addresses, contact requests, metadata and communications data, contract data, contact details, names, website access data, and other data generated through a website.
+This website is hosted by an external service provider (host). Personal data collected on this website is stored on the host's servers. This may include IP addresses, contact requests, metadata and communication data, contract data, contact details, names, website access logs, and other data generated via a website.
 
-Our application uses Supabase (Supabase Inc., USA) for database storage and real-time updates. This involves establishing WebSocket connections that transmit your IP address. Legal basis: Art. 6(1)(b) GDPR (performance of contract). Privacy policy: https://supabase.com/privacy
+Our application uses Supabase (Supabase Inc., USA) for database storage and real-time updates. This involves establishing WebSocket connections that transmit your IP address. Legal basis: Art. 6(1)(f) GDPR (legitimate interest in a secure and functional provision of our online offering).
 
 ## 3. General Information and Mandatory Disclosures
 
@@ -149,15 +149,15 @@ You have the right to receive information about the origin, recipient, and purpo
 
 ## 4. External Media and Embeds
 
-This website may embed external content from third-party providers (e.g. Spotify, YouTube). This content is only loaded after your explicit consent. Before consent, only placeholders are displayed. By giving your consent, you agree to data being transmitted to the respective third-party providers.
+This website may embed external content from third-party providers (e.g. Spotify, YouTube). This content is only loaded after your explicit consent. Before consent, only placeholders are displayed.
 
-**Spotify**: When using the Spotify embed player, the privacy policy of Spotify AB, Regeringsgatan 19, 111 53 Stockholm, Sweden applies. More information at: https://www.spotify.com/legal/privacy-policy/
+**Spotify**: When using the Spotify embed player, the privacy policy of Spotify AB, Regeringsgatan 19, 111 53 Stockholm, Sweden applies.
 
-**YouTube**: When using YouTube videos, the privacy policy of Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland applies. More information at: https://policies.google.com/privacy
+**YouTube**: When using YouTube videos, the privacy policy of Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland applies.
 
 ## 5. Newsletter
 
-If you would like to receive the newsletter offered on the website, we require an email address from you as well as information that allows us to verify that you are the owner of the email address provided and that you agree to receive the newsletter. Further data will not be collected or only on a voluntary basis. We use this data exclusively for sending the requested information and do not pass it on to third parties.
+If you would like to receive the newsletter offered on the website, we require an email address from you as well as information that allows us to verify that you are the owner of the email address provided and that you consent to receiving the newsletter.
 
 You can revoke your consent at any time by sending us an email to ${settings.impressumEmail} or by using the unsubscribe link included in every newsletter email.
 
@@ -172,7 +172,7 @@ Accredited journalists may download press photos and promo tracks. We store down
 ## 8. Plugins and Tools
 
 ### Web Fonts
-This website uses web fonts for uniform font rendering. The fonts are hosted locally, so no connection to Google's servers takes place.
+This website uses web fonts for uniform font rendering. Depending on the theme configuration selected in the CMS, fonts may be loaded from Google Fonts. This may result in a connection to Google servers and the transmission of your IP address and technical metadata to Google. The legal basis is Art. 6(1)(f) GDPR (legitimate interest in a consistent and visually appealing presentation of the website) or, if a consent solution is used for this purpose, your consent pursuant to Art. 6(1)(a) GDPR.
 `.trim()
 }
 
