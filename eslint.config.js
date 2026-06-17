@@ -17,6 +17,16 @@ const config = [
       },
     },
     rules: {
+      // Allow _underscore-prefixed identifiers to be intentionally unused
+      // (e.g. deprecated stub function parameters, destructuring with ignored slots).
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'react-hooks/immutability': 'off',
       'react-hooks/incompatible-library': 'off',
       'react-hooks/preserve-manual-memoization': 'off',

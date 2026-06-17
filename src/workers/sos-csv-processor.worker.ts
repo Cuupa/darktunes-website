@@ -299,7 +299,6 @@ function runProcess(config: WorkerProcessConfig): void {
     // destructuring them out and spreading the remaining safe fields.
     // TypeScript structural compatibility ensures SafeProcessedArtistData
     // receives every field from ProcessedArtistData except `transactions`.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const processedData: SafeProcessedArtistData[] = artistData.map(({ transactions: _transactions, ...safe }) => safe)
 
     // Build the featuring-aware release-titles map while we still have all

@@ -3,7 +3,6 @@ import type { NewsPost, Release, SiteSettings } from '@/types'
 export function selectHeroItems(
   releases: Release[],
   news: NewsPost[],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _siteSettings?: Pick<SiteSettings, 'heroContentType' | 'heroFeaturedId'>,
 ): (Release | NewsPost)[] {
   const featuredReleases = releases.filter((r) => r.featured && r.isVisible && !r.isPromo)

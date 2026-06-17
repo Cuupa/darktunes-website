@@ -88,46 +88,6 @@ const EMPTY_FORM: ArtistFormData = {
   imageScale: 1,
 }
 
-function artistToFormData(artist: Artist): ArtistFormData {
-  return {
-    name: artist.name,
-    slug: artist.slug,
-    bio: artist.bio ?? '',
-    genres: artist.genres.join(', '),
-    imageUrl: artist.imageUrl ?? '',
-    logoUrl: artist.logoUrl ?? '',
-    spotifyUrl: artist.spotifyUrl ?? '',
-    appleMusicUrl: artist.appleMusicUrl ?? '',
-    instagramUrl: artist.instagramUrl ?? '',
-    youtubeUrl: artist.youtubeUrl ?? '',
-    websiteUrl: artist.websiteUrl ?? '',
-    country: artist.country ?? '',
-    foundedYear: artist.foundedYear ? String(artist.foundedYear) : '',
-    email: artist.email ?? '',
-    vatNumber: artist.vatNumber ?? '',
-    featured: artist.featured,
-    isEuNonGerman: artist.isEuNonGerman ?? false,
-    isVisible: artist.isVisible,
-    notes: artist.notes ?? '',
-    spotifyId: artist.spotifyId ?? '',
-    discogsId: artist.discogsId ?? '',
-    songkickId: artist.songkickId ?? '',
-    bandsintownId: artist.bandsintownId ?? '',
-    facebookUrl: artist.facebookUrl ?? '',
-    twitterUrl: artist.twitterUrl ?? '',
-    tiktokUrl: artist.tiktokUrl ?? '',
-    bandcampUrl: artist.bandcampUrl ?? '',
-    shopUrl: artist.shopUrl ?? '',
-    storageQuotaMb: artist.storageQuotaBytes != null
-      ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
-      : '',
-    smartLinks: artist.smartLinks ?? [],
-    imagePositionX: artist.imagePositionX ?? 50,
-    imagePositionY: artist.imagePositionY ?? 50,
-    imageScale: artist.imageScale ?? 1,
-  }
-}
-
 function formDataToInsert(data: ArtistFormData): ArtistInsert {
   const quotaMb = data.storageQuotaMb ? parseInt(data.storageQuotaMb, 10) : null
   return {
@@ -199,7 +159,6 @@ export function ArtistsManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingArtist, setEditingArtist] = useState<Artist | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -211,7 +170,7 @@ export function ArtistsManager() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(0)
 
-  const formValue = editingArtist ? artistToFormData(editingArtist) : EMPTY_FORM
+  const formValue = EMPTY_FORM
 
   // Derived: filtered + sorted + paginated list
   const filtered = useMemo(() => {
@@ -529,9 +488,9 @@ export function ArtistsManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined} aria-labelledby="artists-form-dialog-title" data-lenis-prevent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle id="artists-form-dialog-title">{editingArtist ? 'Edit Artist' : 'New Artist'}</DialogTitle>
+            <DialogTitle id="artists-form-dialog-title">New Artist</DialogTitle>
           </DialogHeader>
-          <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} artistId={editingArtist?.id} />
+          <ArtistForm value={formValue} onChange={handleSave} isLoading={isMutating} />
         </DialogContent>
       </Dialog>
 
