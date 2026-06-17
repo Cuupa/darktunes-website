@@ -28,7 +28,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Multi-tenant isolation**: `artists.user_id` links each artist to a Supabase Auth user. Artists can only access their own rows — even if the client manipulates requests, RLS at the DB layer prevents cross-tenant data access.
 - **Environment variables** containing secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `NEXT_PUBLIC_` and are therefore never exposed to the browser. Client-safe variables use the `NEXT_PUBLIC_` prefix.
 - **Supabase anon key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) is intentionally public (client-side) but is scoped by RLS policies.
-- **File uploads** go through Next.js Route Handlers (`app/api/upload/route.ts`, `app/api/portal/upload-photo/route.ts`, `app/api/portal/upload-release-cover/route.ts`, `app/api/portal/upload-asset/route.ts`) — R2 credentials are never accessible from the browser. The admin upload route requires `admin` or `editor` role, computes a SHA-256 hash to deduplicate identical files, and creates the `assets` row server-side. Portal uploads enforce strict type/size limits (profile and release cover images max 5 MB; artist assets max 20 MB and limited MIME types).
+- **File uploads** go through Next.js Route Handlers (`app/api/upload/route.ts`, `app/api/portal/upload-photo/route.ts`, `app/api/portal/upload-release-cover/route.ts`, `app/api/portal/upload-asset/route.ts`, `app/api/portal/documents/upload/route.ts`) — R2 credentials are never accessible from the browser. The admin upload route requires `admin` or `editor` role, computes a SHA-256 hash to deduplicate identical files, and creates the `assets` row server-side. Portal uploads enforce strict type/size limits (profile and release cover images max 5 MB; artist assets and documents max 20 MB; limited MIME types). The documents upload only accepts `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
 - **Service-role key** (`SUPABASE_SERVICE_ROLE_KEY`) bypasses RLS — it is used exclusively in route handlers for token verification and must never be exposed to the client.
 - **Admin asset management APIs** (`/api/admin/assets`, `/api/admin/assets/folders`, `/api/admin/assets/batch`) all reuse the shared admin/editor auth helpers. Destructive deletes remove R2 objects before deleting database records, reducing orphaned-file risk.
 - **Presigned URLs** for private R2 PDFs expire in 300 seconds (5 minutes). URLs are generated in a Server Action; R2 credentials and the raw R2 object key are never sent to the browser.
@@ -70,8 +70,9 @@ Upstash Redis rate limiter.
 |---|---|
 | `/api/upload` (admin assets) | 50 MB |
 | `/api/portal/upload-photo` | 5 MB |
-| `/api/portal/upload-release-cover` | 10 MB |
-| `/api/portal/upload-asset` | 50 MB |
+| `/api/portal/upload-release-cover` | 5 MB |
+| `/api/portal/upload-asset` | 20 MB |
+| `/api/portal/documents/upload` | 20 MB (PDF/DOCX) |
 
 
 - Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

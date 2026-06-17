@@ -653,6 +653,23 @@ This review is MANDATORY at the end of EVERY agent session.
   6. WCAG accessibility violations: ~12 fix commits
   7. Merge conflicts / lockfile drift: ~15 commits
 
+### 2026-06-17 — ESLint violations sweep + full documentation update
+
+**ESLint `argsIgnorePattern` was missing from the base config:**
+Next.js's default ESLint config does NOT inherit `_`-prefixed parameter ignoring. The `argsIgnorePattern: '^_'` rule must be explicitly added as an override in `eslint.config.js`. Before this fix, all `_`-prefixed function parameters (deprecated stubs, unused destructured props, unused catch bindings) produced warnings. Adding the rule also caused previously manual `// eslint-disable-next-line @typescript-eslint/no-unused-vars` directives to become stale — ESLint itself emits "Unused eslint-disable directive" warnings for them. Always remove stale directives after adding a matching `*IgnorePattern` rule.
+
+**Dead state in `ArtistsManager.tsx`:**
+`editingArtist` / `setEditingArtist` was vestigial from before editing moved to `/admin/artists/[id]/edit`. The setter was declared but never called, so the state was always `null`. Removing it required deleting `artistToFormData()` (a function that was only ever referenced in the now-removed conditional expression), hardcoding `formValue = EMPTY_FORM`, and hardcoding the dialog title "New Artist". Pattern: when a state setter appears in a component but is never called, the feature that relied on it has moved and the state should be removed entirely.
+
+**Intentionally unused props should use `_` prefix in destructuring, not in the interface:**
+`DocumentVault.tsx` receives `artistId` from its parent (the API derives it from the session cookie, not the prop). The fix was to rename to `_artistId` in the destructuring only — not in the prop interface or the parent call site. This documents the intent without losing the type contract.
+
+**Documentation hygiene: AGENTS.md gap vs. actual codebase:**
+After this maintenance session, AGENTS.md was found to be missing several major features: Document Vault (`artist_documents`), Video Submission portal, Accounting admin tab, System admin tab (Maintenance), and the Supabase Read Replica client. These were undocumented because they were implemented in separate feature sessions without back-filling the living spec. Rule: every feature session MUST update AGENTS.md before the PR is created (already in AGENTS.md "Agent Workflow Requirements" — but was not being enforced).
+
+**Upload size discrepancy in SECURITY.md:**
+SECURITY.md listed `/api/portal/upload-release-cover` as 10 MB and `/api/portal/upload-asset` as 50 MB. The actual route constants were `MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024` (5 MB) and `MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024` (20 MB). Always derive size limits from source code constants, not from memory.
+
 ---
 
-*Last updated: 2026-06-17 | Session count: 1 | Total commits analysed: 853*
+*Last updated: 2026-06-17 | Session count: 2 | Total commits analysed: 853+*

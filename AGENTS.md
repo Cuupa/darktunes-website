@@ -351,7 +351,7 @@ Admin asset visibility: `AssetsManager` (admin Assets tab) shows both the genera
 IoC in portal: Every portal page is a Server Component that fetches data and passes it as props to a `"use client"` leaf component. Leaf components never call `fetch` or Supabase directly.
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
-Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Marketing (`/portal/marketing`), Statements, Messages (`/portal/messages`). Settings (`/portal/settings`) is always visible (not flag-gated).
+Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Calendar (`/portal/calendar`), Marketing (`/portal/marketing`), Documents (`/portal/documents`), Interviews (`/portal/interviews`), Statements, Messages (`/portal/messages`), Help (`/portal/help`). Settings (`/portal/settings`) is always visible (not flag-gated). Onboarding (`/portal/onboarding`) is shown only for new artists who have not completed the first-run wizard.
 Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'acknowledged'` after successful creation.
 
 Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
@@ -359,6 +359,46 @@ Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
   - **Einnahmen** (Earnings) tab: royalty earnings from `sales_statements`, rendered by `EarningsChart` / `EarningsChartInner`. Shows KPI cards (total earned, last payout, pending count) and a bar chart of `amount_eur` per `period`. The default tab can be pre-selected via the `?tab=earnings` query param.
   Both charts are loaded lazily via `next/dynamic` (`ssr: false`) to exclude Recharts from the initial bundle.
   Data fetch follows IoC: the Server Component fetches both `getStreamingStatsByArtistId` and `getSalesStatementsByArtistId` in parallel (`Promise.all`) and passes results as props to the leaf client components.
+
+Document Vault (Artist Portal)
+`/portal/documents` — artists upload and manage PDF/DOCX contracts, GEMA registration forms, and royalty splits documents.
+Table: `artist_documents` — columns: `id`, `artist_id`, `filename`, `original_filename`, `r2_key`, `file_size`, `mime_type`, `created_at`. RLS: artists can only read/insert/delete their own rows.
+Upload: `POST /api/portal/documents/upload` — accepts `multipart/form-data`, verifies auth, confirms artist ownership, uploads to `artist-documents/{artistId}/{uuid}_{filename}` in R2, inserts `artist_documents` row. Max 20 MB. Allowed MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+Delete: `DELETE /api/portal/documents/[id]` — verifies auth and artist ownership (via RLS), deletes R2 object first, then deletes DB row.
+Download: documents are served as short-lived presigned R2 GET URLs generated in a Server Action — the raw R2 key is never sent to the browser.
+Client component: `app/portal/documents/_components/DocumentVault.tsx`. The `artistId` prop is received for type safety but the upload API derives the artist from the session cookie — the prop is intentionally not forwarded to the API (rename to `_artistId` in destructuring if ESLint flags it).
+
+Video Submission Portal
+`/portal/releases/videos/new` — artists submit new video entries for admin review.
+Submission creates a `videos` row with `is_visible = FALSE` (pending admin approval). The route fires `sendSubmissionNotificationEmail()` and creates `editor_notifications` rows for all admins and editors.
+Admin review: `app/admin/video-submissions/page.tsx` renders `VideoSubmissionsManager` — lists all `is_visible=false` video rows, lets admins approve (set `is_visible=true`) or reject (delete) each submission.
+API: `POST /api/portal/submit-video` (artist auth, creates pending video row); `PATCH /api/admin/video-submissions/[id]` (admin/editor auth, approve or reject).
+
+Admin Accounting Tab
+`/admin/accounting` — admin-only route with two tabs:
+  - **SOS Generator**: Upload royalty statement PDFs for any artist directly from the admin panel. Runs the `uploadStatement` Server Action (same action as the portal flow). Requires admin/editor session.
+  - **Statement History**: Read-only table of all `sales_statements` rows (same data as `StatementsManager` in the admin dashboard), sorted newest-first. Shows artist name, period, amount (EUR), filename, and status.
+
+Admin System Tab (Health, Logs, Maintenance)
+`/admin/system` — admin-only route with multiple sub-sections:
+  - **Health dashboard**: sync queue stats, DB connectivity, Vercel cron status.
+  - **Audit Log**: all `sync_logs` entries with full-text search, `api_source` filter, and `status` filter.
+  - **Error Log**: failed and partial sync runs (`sync_logs.status IN ('error','partial')`).
+  - **App Errors**: `app_logs` entries with `level = 'error'` or `level = 'warn'`.
+  - **Media Library**: R2 media file browser (`/api/admin/media` routes), separate from the Assets asset manager.
+  - **Maintenance panel** (`MaintenanceManager.tsx`): destructive one-shot admin operations:
+      - `POST /api/admin/maintenance/clear-logs` — truncates `sync_logs` older than N days.
+      - `POST /api/admin/maintenance/purge-releases` — deletes orphaned releases (`artist_id IS NULL`).
+      - `POST /api/admin/maintenance/reset-checklists` — deletes all `release_checklists` rows for a given artist.
+      - `POST /api/admin/maintenance/clear-accreditations` — deletes pending `accreditation_requests` older than N days.
+      - `POST /api/admin/maintenance/reset-accreditations` — resets a journalist's accreditation status.
+      - `POST /api/admin/maintenance/clear-stats` — deletes `streaming_stats` rows for a given artist + period.
+  All maintenance routes require admin/editor auth via `verifyAdminOrEditor`. All are wrapped with `withErrorHandler`.
+
+Supabase Read Replica Client
+`src/lib/supabase/replica.ts` exports `createReplicaSupabaseClient()`.
+When `SUPABASE_REPLICA_URL` and `SUPABASE_REPLICA_ANON_KEY` are set (Supabase Pro plan, configure via Dashboard → Database → Replicas), this client is used for read-heavy queries: portal analytics charts, admin health dashboard, admin logs, SOS CSV exports. Falls back silently to the primary DB via `createBrowserSupabaseClient()` / `createServerSupabaseClient()` when env vars are unset — safe for all environments.
+Never use the replica client for write operations (INSERT/UPDATE/DELETE) — it is read-only. Never use it inside `unstable_cache` callbacks (use the cookie-free anon client there instead).
 
 SOS (Statement of Sales) — Direct Server Action Upload
 Statement-of-Sales PDFs are uploaded directly via the `uploadStatement` Server Action in `app/portal/statements/_actions/uploadStatement.ts`. Authentication is via the caller’s Supabase session (admin or editor role required) — no external webhook or shared secret is needed.
@@ -404,6 +444,8 @@ Required env vars are split into two groups:
      MAILERLITE_API_KEY, MAILERLITE_GROUP_ID
   - Optional (ISR webhook revalidation — required for Supabase webhook-triggered cache busting):
      REVALIDATE_SECRET
+  - Optional (Supabase Read Replica — Supabase Pro plan; routes heavy analytics reads off the primary DB):
+     SUPABASE_REPLICA_URL, SUPABASE_REPLICA_ANON_KEY
 Configure all variables in Vercel Dashboard → Project → Settings → Environment Variables.
 See DEPLOYMENT.md for full variable descriptions and setup instructions.
 
@@ -796,14 +838,15 @@ ALL R2 keys MUST be stored in the corresponding DB column (`r2_key`) so that
 `deleteObjectFromR2(r2Key)` can clean up when the DB record is deleted.
 
 Key prefixes (NEVER deviate):
-  artists/{artistId}/{uuid}.{ext}           → artist images / logos
-  releases/{releaseId}/{uuid}.{ext}          → release cover art
-  profile-photos/{artistId}/{uuid}.{ext}     → portal profile photos
-  release-covers/{artistId}/{uuid}.{ext}     → portal-submitted release covers
-  statements/{artistId}/{filename}           → SOS royalty PDFs
-  artist-assets/{artistId}/{uuid}.{ext}      → artist-uploaded marketing files
-  press-kit/{category}/{uuid}.{ext}          → EPK assets (press photos, etc.)
-  promo-tracks/{uuid}.{ext}                  → journalist promo audio
+  artists/{artistId}/{uuid}.{ext}                         → artist images / logos
+  releases/{releaseId}/{uuid}.{ext}                        → release cover art
+  profile-photos/{artistId}/{uuid}.{ext}                   → portal profile photos
+  release-covers/{artistId}/{uuid}.{ext}                   → portal-submitted release covers
+  statements/{artistId}/{filename}                         → SOS royalty PDFs
+  artist-assets/{artistId}/{uuid}.{ext}                    → artist-uploaded marketing files
+  artist-documents/{artistId}/{uuid}_{originalFilename}    → portal document vault (PDF/DOCX contracts, GEMA, splits)
+  press-kit/{category}/{uuid}.{ext}                        → EPK assets (press photos, etc.)
+  promo-tracks/{uuid}.{ext}                                → journalist promo audio
 
 ## Naming Conventions
 
