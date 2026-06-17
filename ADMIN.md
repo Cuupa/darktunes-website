@@ -38,23 +38,26 @@ WHERE slug = 'artist-slug';
 
 - **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
 - **Role-Based Access Control**: Admin and Editor roles with different permissions
-- **User Management** *(admin-only)*: View all registered users, change their roles (admin / editor / journalist / user), ban/unban accounts, delete users, and link/unlink artists — no raw SQL required. Accessible via the **Users** tab (only visible to admins).
-- **Artists Management**: Create, read, update, and delete artist profiles. The artist form now includes five additional URL fields: **Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, and a **Shop URL** (Darkmerch or Shopify link). It also includes an **Assets** tab plus image/logo **Asset Picker** buttons so editors can reuse uploaded R2 assets without pasting URLs manually. These links appear as clickable icons in the public artist cards and artist detail surfaces.
-- **Releases Management**: Manage music releases with iTunes API integration
-- **News Management**: Create and publish news posts and announcements
-- **Feature Flags (admin-only)**: New **Feature Flags** tab to toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`)
-- **Admin Dashboard**: Tab state is persisted to the URL as a `?tab=` query param — tabs are bookmarkable and support browser back/forward navigation
-- **Messages (admin-only)**: Rich-text **Messages** tab for artist inbox communication (`label_messages`); supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions
-- **Promo Log**: Dedicated `/admin/promo-log` section for admins and editors to create, review, and delete artist-specific marketing activity entries that artists see read-only in their `/portal/marketing` timeline.
-- **Accreditations (admin-only)**: New **Accreditations** tab to review and approve/reject journalist accreditation requests (`accreditation_requests`)
-- **Logs (admin-only)**: **Logs** tab with three sub-views — Audit Log (all `sync_logs` entries), Error Log (failed/partial sync runs), and App Errors (`app_logs`). Supports full-text search, source/status filters, and pagination.
-- **Statement Approval Workflow**: the Statements tab now shows statement workflow status (`draft`, `label_approved`, `artist_notified`, `acknowledged`) and lets admins/editors approve draft statements with optional internal label notes before artists generate linked invoices.
-- **Roles & Permissions (admin-only)**: **Roles & Permissions** tab to configure per-role content permissions (`can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`) stored in the dedicated `role_permissions` PostgreSQL table. Changes are enforced by backend API routes and PostgreSQL RLS policies — the admin role always retains full access and cannot be restricted.
-- **Videos Management**: Manage music videos and YouTube content
-- **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash.
-- **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes
+- **User Management** *(admin-only)*: View all registered users, change their roles (admin / editor / journalist / user), ban/unban accounts, delete users, and link/unlink artists — no raw SQL required. Accessible via `/admin/users` (only visible to admins).
+- **Artists Management**: Create, read, update, and delete artist profiles. The artist form includes social/shop URL fields (**Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, **Shop URL**), an **Assets** tab, and image/logo **Asset Picker** buttons. Editing an existing artist navigates to the dedicated `/admin/artists/[id]/edit` route. Creating a new artist opens a dialog on `/admin/artists`.
+- **Releases Management**: Manage music releases with iTunes API integration, Odesli smart-link resolution, and promo-flag control.
+- **News Management**: Create and publish news posts and announcements. Optionally associate a news post with a specific artist (`news_posts.artist_id`). Toggle **Press-only** visibility (`is_press_only`).
+- **Feature Flags** *(admin-only)*: Toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`). Also toggle global `site_settings` feature flags via **FeatureTogglesManager**.
+- **Messages** *(admin-only)*: Rich-text label inbox (`label_messages`) at `/admin/messages`; supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions.
+- **Promo Log**: `/admin/promo-log` — admins and editors create, review, and delete artist-specific marketing activity entries. Artists see these read-only in `/portal/marketing`.
+- **Accreditations** *(admin-only)*: `/admin/accreditations` — review and approve/reject journalist accreditation requests (`accreditation_requests`).
+- **Release Submissions**: `/admin/release-submissions` — review and approve/reject release submissions from artists (submitted via `/portal/releases/new` with `is_visible=false`).
+- **Video Submissions**: `/admin/video-submissions` — review and approve/reject video submissions from artists (submitted via `/portal/releases/videos/new`).
+- **Accounting** *(admin-only)*: `/admin/accounting` — Tab A: SOS Generator (create and upload royalty statement PDFs for any artist directly from the admin, authenticated via the admin's Supabase session). Tab B: Statement History (read-only table of all `sales_statements` rows).
+- **System** *(admin-only)*: `/admin/system` — Health dashboard (queue stats, DB connectivity), Audit Log (`sync_logs`), Error Log (failed sync runs), App Errors (`app_logs`), Media Library, and Maintenance tasks (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats). Supports full-text search, source/status filters, and pagination.
+- **Logs** included in System tab: Audit Log (all `sync_logs` entries), Error Log (failed/partial), App Errors (`app_logs`).
+- **Statement Approval Workflow**: Statements tab (within Accounting) shows workflow status (`draft`, `label_approved`, `artist_notified`, `acknowledged`) and lets admins/editors approve draft statements with optional internal notes before artists generate linked invoices.
+- **Roles & Permissions** *(admin-only)*: Configure per-role content permissions (`can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`) stored in `role_permissions`. Also supports **Custom Roles** via `/api/admin/roles/custom` and **Permission Definitions** via `/api/admin/roles/permissions-def`. Changes are enforced at API, RLS, and frontend layers.
+- **Videos Management**: Manage music videos and YouTube content.
+- **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash. A parallel **Media Library** (`/api/admin/media`) handles non-asset media files with the same folder structure.
+- **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes.
 - **Visual Effects**: Configure the dark-industrial overlay effects (noise/grain opacity, CRT scanlines toggle, vignette intensity) from the **Admin → Color Theme** page (Effects tab) — changes go live immediately via ISR cache revalidation.
-- **Legal / DSGVO (New)**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
+- **Legal / DSGVO**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
 
 ## Setup
 
@@ -197,11 +200,17 @@ The Press Portal admin features are in the Admin Dashboard under the **Press** t
 - **Journalist Applications**: Review and approve/reject journalist accreditation requests
 - **Accreditations**: Grant/revoke journalist portal access
 
-## Statements (Admin-only tab)
+## Statements (Admin-only — Accounting tab)
 
-`StatementsManager` is a read-only table listing all `sales_statements` rows across
-all artists. Admins can verify which statements have been uploaded by the SOS generator.
-Statements are delivered via the SOS webhook — do NOT upload PDFs manually here.
+`StatementsManager` is a read-only table in `/admin/accounting` (Statement History tab) listing all `sales_statements` rows across all artists. Admins and editors can verify which royalty PDFs have been uploaded.
+
+The **SOS Generator** tab in the same Accounting page lets admins upload royalty PDFs directly from the admin panel. The upload flow runs as a `"use server"` Next.js Server Action (`app/portal/statements/_actions/uploadStatement.ts`) that:
+1. Verifies the caller's admin/editor session via cookie-based Supabase auth.
+2. Generates a presigned R2 PUT URL and uploads the PDF from the browser directly to R2.
+3. Inserts the `sales_statements` row with the service-role client to bypass RLS.
+4. Sends an email notification to the artist via Resend (non-blocking, silently skipped when `RESEND_API_KEY` is not set).
+
+**Do NOT** use a webhook or external HTTP POST to upload statements — the Server Action is the only supported upload path.
 
 ## Monitoring Cron Jobs
 

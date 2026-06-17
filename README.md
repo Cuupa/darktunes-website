@@ -8,12 +8,12 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
-- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission, tour manager, marketing assets, rich-text messages with replies + realtime inbox updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, account settings)
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission + checklist, video submission, tour manager, marketing assets, document vault, label inbox with rich-text replies + realtime updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, interview requests, onboarding wizard, calendar, help FAQ, account settings)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
-- **Admin panel** – full CMS at `/admin` (CRUD for artists, releases, news, videos, assets; folder-based asset explorer with search/bulk actions; artist asset picker; Artist Auto-Sync; Skeleton loading)
-- **Artist Auto-Sync** – "Sync Now" per artist triggers iTunes release import, R2 cover art caching, and Supabase upsert
+- **Admin panel** – full CMS at `/admin` (sidebar navigation with dedicated pages for artists, releases, news, videos, assets, events, messages, accreditations, promo log, release submissions, video submissions, accounting/SOS generator, system/health/logs, color theme, features, settings, users)
+- **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Odesli), R2 cover art caching, and Supabase upsert via async sync queue (`sync_queue` table, processed every 5 min by Vercel cron)
 - **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; Vercel cron can trigger daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
 - **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
@@ -66,6 +66,7 @@ npm run dev
 | `npm run build` | Production build (`next build`) |
 | `npm run preview` | Preview the production build locally (`next start`) |
 | `npm run lint` | Run ESLint |
+| `npm run ci` | Full CI check: lint → tsc → test → build |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:e2e` | Run Playwright E2E & visual regression tests |
@@ -95,6 +96,7 @@ npm run dev
 ### Local QA commands
 
 ```bash
+npm run ci          # full atomic check: lint → tsc → test → build
 npm run lint
 npx tsc --noEmit
 npm run test
@@ -163,6 +165,13 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `CRON_SECRET` | Optional secret for Vercel cron requests to `POST /api/sync-youtube` (Bearer token) |
 | `CONTACT_EMAIL` | Email address for contact form submissions (defaults to `info@darktunes.com`) |
 
+### Supabase Read Replica (optional — Supabase Pro plan)
+
+| Variable | Description |
+|---|---|
+| `SUPABASE_REPLICA_URL` | Supabase read-replica URL (Pro plan). Routes heavy analytics/reporting queries away from the primary DB. Falls back to primary when unset. |
+| `SUPABASE_REPLICA_ANON_KEY` | Anon key for the read replica. |
+
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 ---
@@ -216,31 +225,127 @@ app/                          # Next.js App Router entry points
 ├── _components/              # App-level client wrappers
 │   ├── HomePageContent.tsx   # "use client" home page shell (receives data as props)
 │   └── Providers.tsx         # Lenis + Toaster + ErrorBoundary (client)
-├── admin/                    # Protected admin routes
-│   ├── layout.tsx            # Admin route layout
-│   ├── page.tsx              # Admin dashboard (force-dynamic, server renders client shell)
-│   ├── login/page.tsx        # Login page (force-dynamic)
-│   └── _components/          # Client wrappers for admin pages
+├── admin/                    # Protected admin routes — each feature has a dedicated page
+│   ├── layout.tsx            # Admin route layout (sidebar + auth gate)
+│   ├── page.tsx              # Admin overview (redirect to first tab)
+│   ├── login/page.tsx        # Login page
+│   ├── artists/              # Artist CRUD + invite
+│   ├── releases/             # Release management
+│   ├── news/                 # News CRUD (new + [id]/edit)
+│   ├── videos/               # Video management
+│   ├── assets/               # Folder-based Asset Explorer
+│   ├── events/               # Concert/Event management (AdminConcertsManager)
+│   ├── messages/             # Rich-text label inbox
+│   ├── accreditations/       # Journalist accreditation review
+│   ├── promo-log/            # Promo activity timeline
+│   ├── release-submissions/  # Review + approve artist release submissions
+│   ├── video-submissions/    # Review + approve artist video submissions
+│   ├── accounting/           # SOS generator + statement history
+│   ├── statements/           # (legacy — redirects to accounting)
+│   ├── system/               # Health dashboard, Logs, Media, Maintenance
+│   ├── press/                # Press portal management (photos, promo tracks, applications)
+│   ├── colors/               # CI Color Theme editor
+│   ├── features/             # Feature flags (global toggles + portal/journalist flags)
+│   ├── settings/             # Site settings CMS (global, social, SEO, hero, legal)
+│   └── users/                # User management + artist linking (admin-only)
 ├── portal/                   # Multi-tenant Artist Portal routes (/portal/*)
 │   ├── layout.tsx            # Portal layout (server, renders sidebar)
-│   ├── page.tsx              # Dashboard overview (force-dynamic)
+│   ├── page.tsx              # Dashboard overview
 │   ├── login/page.tsx        # Artist portal login
-│   ├── profile/page.tsx      # EPK profile editor (Server Component + ProfileForm client)
-│   ├── analytics/page.tsx    # Streaming analytics (Server Component + StreamingChart client)
-│   ├── statements/page.tsx   # Royalty statements (Server Component + StatementsTable client)
-│   ├── releases/new/page.tsx # Artist release submission form
-│   └── settings/page.tsx     # Account settings (password + locale switch)
+│   ├── onboarding/           # First-run onboarding wizard
+│   ├── profile/              # EPK profile editor + PDF export
+│   ├── analytics/            # Streaming analytics + earnings charts
+│   ├── releases/             # Release management + checklist + submission form
+│   │   ├── new/              # Submit new release
+│   │   ├── submissions/      # Track own submission status
+│   │   └── videos/new/       # Submit new video
+│   ├── statements/           # Royalty statements (presigned R2 download)
+│   ├── billing/              # Billing profile (invoice master data)
+│   ├── invoices/             # Create + download invoices (SOS-linked or manual)
+│   ├── tour/                 # Tour date management
+│   ├── marketing/            # Promo log view + artist-owned asset uploads
+│   ├── messages/             # Label inbox + rich-text replies
+│   ├── documents/            # Document Vault (contracts, GEMA, split agreements)
+│   ├── calendar/             # Unified calendar view
+│   ├── interviews/           # Interview request management
+│   ├── help/                 # Help & FAQ
+│   └── settings/             # Password update + locale switch
+├── press/                    # Journalist-facing routes
+│   ├── page.tsx              # Public EPK / press landing page
+│   ├── apply/                # Journalist application form
+│   ├── artists/[slug]/       # Journalist-facing artist EPK page
+│   ├── releases/[slug]/      # Journalist-facing release press page
+│   ├── login/page.tsx        # Journalist login
+│   └── dashboard/            # Protected journalist dashboard
+│       ├── promo-pool/       # Journalist promo track player
+│       ├── press-kit/        # EPK asset downloads
+│       ├── press-releases/   # Embargo-aware press releases
+│       ├── accreditation/    # Accreditation status + request
+│       ├── interviews/       # Interview request flow
+│       ├── contact/          # Contact label
+│       ├── profile/          # Journalist profile
+│       └── download-history/ # Download audit log
 └── api/
-    ├── upload/route.ts       # Admin upload Route Handler (R2 upload + SHA-256 dedupe + asset row create)
-    ├── sync-artist/route.ts  # Artist auto-sync trigger Route Handler
-    ├── admin/assets/         # Asset explorer APIs (list/search, folders, batch delete)
+    ├── upload/route.ts                    # Admin asset upload (R2 + SHA-256 dedupe)
+    ├── sync-artist/route.ts               # Single-artist sync trigger
+    ├── sync/route.ts                      # Enqueue async sync jobs for all artists
+    ├── process-sync-queue/route.ts        # Claim + process one sync job (Vercel cron)
+    ├── sync-youtube/route.ts              # YouTube channel video sync (Vercel cron)
+    ├── revalidate/route.ts                # ISR cache busting (Supabase webhook)
+    ├── revalidate-content/route.ts        # Targeted entity revalidation
+    ├── revalidate-site-settings/route.ts  # Site-settings ISR revalidation
+    ├── newsletter/                        # DOI subscribe / verify / unsubscribe
+    ├── contact/route.ts                   # Contact form (Resend delivery)
+    ├── exchange-rates/route.ts            # Live EUR exchange rates for invoices
+    ├── health/route.ts                    # Health check endpoint
+    ├── log-error/route.ts                 # Client-side error reporting (app_logs)
+    ├── vitals/route.ts                    # Core Web Vitals RUM ingestion
+    ├── journalist-applications/           # Journalist application CRUD
+    ├── account/                           # Account export + deletion (GDPR)
+    ├── upload-epk/route.ts                # Presigned EPK asset upload (R2)
+    ├── upload-media/route.ts              # Presigned media upload (R2)
+    ├── admin/
+    │   ├── artists/                       # Artist CRUD + Spotify/iTunes prefill + Discogs enrich
+    │   ├── assets/                        # File explorer APIs (list, folders, batch, storage stats)
+    │   ├── media/                         # Media library APIs (list, folders, batch)
+    │   ├── concerts/route.ts              # Admin concert management (any artist)
+    │   ├── feature-flags/[id]/route.ts    # Toggle portal/journalist feature flags
+    │   ├── users/                         # User management (role, ban, delete, link-artist, invite)
+    │   ├── roles/                         # Role permissions + custom roles CRUD
+    │   ├── sales-statements/              # Statement approval workflow
+    │   ├── release-submissions/           # Review + approve artist release submissions
+    │   ├── video-submissions/             # Review + approve artist video submissions
+    │   ├── promo-log/                     # Promo log CRUD + proof upload
+    │   ├── sos/                           # SOS presets + period summaries
+    │   ├── submission-form-schema/        # Configurable release/video submission schemas
+    │   ├── maintenance/                   # Maintenance tasks (clear logs, purge releases, etc.)
+    │   ├── cleanup-orphaned-releases/     # Delete releases where artist_id IS NULL
+    │   ├── enrich-artist-discogs/         # Manual Discogs artist profile fetch
+    │   ├── fetch-artist-image/            # Auto-fetch artist image from Spotify
+    │   ├── fetch-youtube-info/            # YouTube video metadata lookup
+    │   ├── prefill-artist/               # Spotify artist data prefill
+    │   ├── prefill-artist-itunes/        # Apple Music artist data prefill
+    │   ├── resolve-release-smart-link/   # Odesli smart-link resolution
+    │   ├── rbac-audit/route.ts            # RBAC audit report
+    │   └── send-external-email/          # Admin-triggered outbound email
     └── portal/
-        ├── upload-photo/route.ts         # Portal: profile photo upload to R2
-        ├── upload-release-cover/route.ts # Portal: release cover upload to R2
-        ├── upload-asset/route.ts         # Portal: artist-owned asset upload/delete
-        ├── submit-release/route.ts       # Portal: create release submission (is_visible=false)
-        └── profile/route.ts              # Portal: upsert artist EPK profile
-middleware.ts                 # Edge Middleware — auth for /admin/* and /portal/*
+        ├── submit-release/route.ts        # Create release submission (is_visible=false)
+        ├── submit-video/route.ts          # Create video submission
+        ├── upload-photo/route.ts          # Profile photo upload to R2
+        ├── upload-release-cover/route.ts  # Release cover upload to R2 (max 5 MB)
+        ├── upload-asset/route.ts          # Artist-owned asset upload/delete (max 20 MB)
+        ├── upload-rider/route.ts          # Technical rider upload
+        ├── profile/route.ts               # Upsert artist EPK profile
+        ├── billing-profile/route.ts       # Billing profile upsert
+        ├── checklist/route.ts             # Release checklist item toggle
+        ├── concerts/                      # Artist concert CRUD + ICS export
+        ├── documents/                     # Document Vault upload/download/delete
+        ├── invoices/                      # Invoice CRUD + PDF generation
+        ├── messages/                      # Portal messages (inbox, send, folders, per-message)
+        ├── release-submissions/           # Artist release submission status
+        ├── video-submissions/             # Artist video submission status
+        └── interview-requests/            # Interview request management
+middleware.ts                 # Edge Middleware — auth for /admin/*, /portal/*, /press/dashboard/*
 src/
 ├── components/               # UI components (Header, Hero, Releases, Artists, …)
 │   ├── admin/                # Admin panel + manager components ("use client")
@@ -248,30 +353,34 @@ src/
 │   │   └── forms/            # Admin CRUD form components
 │   ├── animations/           # LenisProvider ("use client")
 │   └── ui/                   # Shadcn/Radix primitives
-├── contexts/                 # React context providers ("use client")
 ├── hooks/                    # Custom React hooks (useArtists, useReleases, …)
 ├── lib/                      # Business logic, API clients, utilities
-│   ├── api/                  # Data Access Layer — one file per table
-│   │   ├── artistProfiles.ts # EPK profile DAL (artist_epks table)
-│   │   ├── streamingStats.ts # Streaming stats DAL (streaming_stats table)
-│   │   ├── salesStatements.ts# Royalty statements DAL (sales_statements table)
+│   ├── api/                  # Data Access Layer — one file per DB table
+│   │   ├── artistProfiles.ts # EPK profile DAL + resolvePortalArtist
+│   │   ├── streamingStats.ts # Streaming stats DAL
+│   │   ├── salesStatements.ts# Royalty statements DAL
+│   │   ├── artistDocuments.ts# Document Vault DAL
 │   │   └── artistRowMapper.ts# Shared ArtistRow → Artist domain mapper
-│   ├── portal/               # Portal-specific utilities
-│   │   └── presignedUrl.ts   # Dependency-injected presigned URL generator
-│   ├── sync/                 # Artist sync service (syncArtist.ts)
-│   ├── rateLimiter.ts        # HttpError + withExponentialBackoff
+│   ├── sync/                 # Multi-API sync engine (iTunes, Spotify, Discogs, Odesli, …)
+│   ├── portal/               # Portal utilities (presigned URLs)
+│   ├── email/                # Email sending utilities (Resend)
+│   ├── sos/                  # SOS validation + CSV processor
+│   ├── supabase/
+│   │   ├── server.ts         # Server client (cookies-based)
+│   │   ├── client.ts         # Browser client
+│   │   └── replica.ts        # Read-replica client (falls back to primary)
+│   ├── rateLimiter.ts        # withExponentialBackoff + HttpError
 │   ├── imageUtils.ts         # wsrv.nl proxy helpers
-│   ├── r2Utils.ts            # R2 image upload helper
-│   ├── itunesApi.ts          # iTunes Search API client
-│   ├── env.server.ts         # Server-side Zod env validation (for Route Handlers)
-│   └── supabase/
-│       ├── server.ts         # Supabase server client (@supabase/ssr, reads cookies)
-│       └── client.ts         # Supabase browser client (@supabase/ssr)
-└── types/                    # TypeScript types (incl. database.ts)
+│   ├── r2Utils.ts            # R2 upload/delete helpers
+│   ├── slugify.ts            # Canonical toSlug (German umlauts → ASCII)
+│   └── env.server.ts         # Zod server-side env validation
+├── workers/                  # Web Workers (image processing, SOS CSV)
+└── types/                    # TypeScript types (database.ts, users.ts, …)
 supabase/
-└── reset.sql                 # Single idempotent SQL script — full schema source of truth
+├── reset.sql                 # Single idempotent SQL script — full schema source of truth
+└── functions/                # Supabase Edge Functions (Deno runtime)
 scripts/
-└── vercel-install.sh         # Vercel build hook
+└── vercel-install.sh         # Vercel build hook (npm ci + env var validation)
 ```
 
 ---

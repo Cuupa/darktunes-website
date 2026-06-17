@@ -203,6 +203,18 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Shopify/Darkmerch shop link | ✅ Implemented | `shopifyStoreUrl` in `SiteSettings` (`site_settings` KV key `shopify_store_url`); conditional display in Footer |
 | YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID`, supports daily Vercel cron and maps videos to artists via `videos.artist_id` title matching |
 | ContentPagination component | ✅ Implemented | `src/components/ContentPagination.tsx` — reusable shadcn-based paginator with ellipsis support |
+| Artist Portal — Document Vault | ✅ Implemented | `/portal/documents` — artists upload and manage PDF/DOCX contracts, GEMA forms, and splits documents; stored in R2 under `artist-documents/{artistId}/`; `artist_documents` table with RLS; `POST /api/portal/documents/upload` (20 MB max); `DELETE /api/portal/documents/[id]` |
+| Artist Portal — Calendar | ✅ Implemented | `/portal/calendar` — tour date / event calendar view for the artist's own concerts |
+| Artist Portal — Interviews | ✅ Implemented | `/portal/interviews` — artist-facing interview request management and scheduling |
+| Artist Portal — Onboarding Wizard | ✅ Implemented | `/portal/onboarding` — first-run wizard guiding new artists through profile setup, photo upload, and social links |
+| Artist Portal — Help / FAQ | ✅ Implemented | `/portal/help` — FAQ and contact form for artist support requests |
+| Artist Portal — Video Submission | ✅ Implemented | `/portal/releases/videos/new` — artists submit new video entries for admin review (`is_visible=false`); stored in `videos` table pending admin approval in `/admin/video-submissions` |
+| Admin — Accounting tab | ✅ Implemented | `/admin/accounting` — SOS Generator (upload royalty PDFs for any artist via `uploadStatement` Server Action) + Statement History table (`sales_statements`); admin/editor only |
+| Admin — System tab | ✅ Implemented | `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, Media Library, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats) |
+| Admin — Release Submissions | ✅ Implemented | `/admin/release-submissions` — review and approve/reject artist-submitted releases (`is_visible=false` → `is_visible=true`) |
+| Admin — Video Submissions | ✅ Implemented | `/admin/video-submissions` — review and approve/reject artist-submitted videos |
+| Supabase Read Replica | ✅ Implemented | `src/lib/supabase/replica.ts` — `createReplicaSupabaseClient()` uses `SUPABASE_REPLICA_URL` / `SUPABASE_REPLICA_ANON_KEY`; analytics queries, admin health dashboard, SOS CSV export routed to replica; silent fallback to primary when env vars unset |
+| Admin Maintenance API routes | ✅ Implemented | `POST /api/admin/maintenance/clear-logs`, `purge-releases`, `reset-checklists`, `clear-accreditations`, `reset-accreditations`, `clear-stats` — all require admin/editor auth |
 
 ---
 

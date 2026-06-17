@@ -182,6 +182,10 @@ After DOI confirmation, verified subscribers are pushed to MailerLite server-to-
 ### ISR Webhook Revalidation (optional — Supabase-triggered cache busting)
 - `REVALIDATE_SECRET`: A random, high-entropy ****** checked by `POST /api/revalidate`. Required when you configure Supabase webhooks to call this endpoint after DB writes so the ISR cache is busted automatically. Generate with `openssl rand -hex 32`. Share this value with the Supabase webhook configuration (Authorization header value).
 
+### Supabase Read Replica (optional — Supabase Pro plan)
+- `SUPABASE_REPLICA_URL`: Connection URL for a Supabase read replica (configure via Supabase Dashboard → Database → Replicas). When set, heavy analytics queries (portal analytics charts, admin health/logs dashboard, SOS CSV exports) are routed here to reduce load on the primary DB. Falls back silently to the primary DB when unset — safe for development and Starter plan deployments.
+- `SUPABASE_REPLICA_ANON_KEY`: Anon key for the read replica. Must be set alongside `SUPABASE_REPLICA_URL`.
+
 > ⚠️ **Important for Next.js:** `NEXT_PUBLIC_*` variables must be set in the Vercel project settings for **both** the Production and Preview environments before the first build. Next.js embeds these at compile time. Missing variables will cause the Supabase client to fall back to a placeholder and Supabase features will be disabled at runtime.
 
 ---
@@ -257,7 +261,10 @@ and DOI confirmation emails will never be delivered.
 
 After deployment, verify that Vercel cron jobs are active:
 1. Vercel Dashboard → Project → **Cron Jobs** tab.
-2. Confirm both cron entries appear: `/api/sync-youtube` (daily 06:00 UTC) and `/api/sync` (daily 03:00 UTC).
+2. Confirm all three cron entries appear:
+   - `/api/sync-youtube` — daily 06:00 UTC (YouTube channel sync)
+   - `/api/sync` — daily 03:00 UTC (enqueues async artist sync jobs)
+   - `/api/process-sync-queue` — every 5 minutes (claims and processes one pending sync job)
 3. Check **Last execution** timestamp and status after 24 hours.
 4. If a cron fails: Admin Panel → **Logs** tab → **Error Log** → filter by `api_source`.
 

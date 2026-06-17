@@ -391,7 +391,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     return () => {
       link.remove()
     }
-  }, [draft.typography.fontFamily, draft.typography.headingFamily])
+  }, [draft.typography, draft.typography.fontFamily, draft.typography.headingFamily])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
