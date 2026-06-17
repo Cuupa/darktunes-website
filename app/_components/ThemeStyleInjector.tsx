@@ -137,6 +137,8 @@ export function buildGoogleFontSpec(fontName: string, weights: string[] = []): s
   // Strip CSS fallback stacks — only take the first font name
   const cleanName = fontName.split(',')[0].trim().replace(/^['"]|['"]$/g, '')
   if (!cleanName) return null
+  // Full URL passthrough — not a Google Font name
+  if (cleanName.startsWith('http')) return null
 
   // Resolve URL-encoded family name
   const mapEntry = GOOGLE_FONT_URL_MAP[cleanName]

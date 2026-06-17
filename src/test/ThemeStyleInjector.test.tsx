@@ -14,7 +14,7 @@ import React from 'react'
 // Relative import from app/ into src/ test — intentional (see vitest.config.ts note)
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — path outside @/ alias, resolved by relative import
-import { ThemeStyleInjector } from '../../app/_components/ThemeStyleInjector'
+import { ThemeStyleInjector, buildGoogleFontSpec, GOOGLE_FONT_URL_MAP } from '../../app/_components/ThemeStyleInjector'
 import type { ThemeColors } from '../../app/_components/ThemeStyleInjector'
 import type { ThemeConfig } from '@/config/themeConfig'
 
@@ -27,6 +27,19 @@ function renderStyle(colors: ThemeColors) {
 function renderFull(colors: ThemeColors) {
   const { container } = render(<ThemeStyleInjector {...colors} />)
   return container
+}
+
+// ── Helper: minimal config with colors ───────────────────────────────────────
+function makeConfig(typography: ThemeConfig['typography']): ThemeColors {
+  return {
+    themeConfig: {
+      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
+      gradients: {},
+      typography,
+      glass: {},
+      animation: {},
+    },
+  }
 }
 
 describe('ThemeStyleInjector', () => {
@@ -105,26 +118,12 @@ describe('ThemeStyleInjector', () => {
   })
 
   it('emits --font-family-body from themeConfig.typography.fontFamily', () => {
-    const config: ThemeConfig = {
-      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
-      gradients: {},
-      typography: { fontFamily: 'Inter' },
-      glass: {},
-      animation: {},
-    }
-    const css = renderStyle({ themeConfig: config })
+    const css = renderStyle(makeConfig({ fontFamily: 'Inter' }))
     expect(css).toContain("--font-family-body: 'Inter', sans-serif")
   })
 
   it('emits --heading-size from themeConfig.typography.headingSize', () => {
-    const config: ThemeConfig = {
-      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
-      gradients: {},
-      typography: { headingSize: '3.5rem' },
-      glass: {},
-      animation: {},
-    }
-    const css = renderStyle({ themeConfig: config })
+    const css = renderStyle(makeConfig({ headingSize: '3.5rem' }))
     expect(css).toContain('--heading-size: 3.5rem')
   })
 
@@ -154,14 +153,7 @@ describe('ThemeStyleInjector', () => {
   })
 
   it('injects Google Font link tags when fontFamily is a known Google Font', () => {
-    const config: ThemeConfig = {
-      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
-      gradients: {},
-      typography: { fontFamily: 'Inter' },
-      glass: {},
-      animation: {},
-    }
-    const container = renderFull({ themeConfig: config })
+    const container = renderFull(makeConfig({ fontFamily: 'Inter' }))
     const links = container.querySelectorAll('link')
     expect(links.length).toBeGreaterThanOrEqual(1)
     const hrefs = Array.from(links).map((l) => l.getAttribute('href') ?? '')
@@ -169,15 +161,8 @@ describe('ThemeStyleInjector', () => {
     expect(hrefs.some((h) => h.startsWith(googleFontsUrl))).toBe(true)
   })
 
-  it('does NOT inject Google Font links for unknown font family', () => {
-    const config: ThemeConfig = {
-      colors: { primary: '#aaa', secondary: '#bbb', background: '#000', foreground: '#fff', card: '#111', muted: '#222', accent: '#333', border: '#444' },
-      gradients: {},
-      typography: { fontFamily: "'My Custom Font', sans-serif" },
-      glass: {},
-      animation: {},
-    }
-    const container = renderFull({ themeConfig: config })
+  it('does NOT inject Google Font links when fontFamily starts with http (raw CSS URL)', () => {
+    const container = renderFull(makeConfig({ fontFamily: 'https://fonts.example.com/custom.css' }))
     const links = container.querySelectorAll('link')
     const hasGoogleFont = Array.from(links).some((l) => {
       const href = l.getAttribute('href') ?? ''
@@ -185,5 +170,138 @@ describe('ThemeStyleInjector', () => {
     })
     expect(hasGoogleFont).toBe(false)
   })
+
+  // ── --font-serif wiring ────────────────────────────────────────────────────
+
+  it('emits --font-serif with dedicated serifFamily when set', () => {
+    const css = renderStyle(makeConfig({ serifFamily: 'Playfair Display' }))
+    expect(css).toContain("--font-serif: 'Playfair Display', serif")
+  })
+
+  it('emits --font-serif: var(--font-family-body) when only fontFamily is set', () => {
+    const css = renderStyle(makeConfig({ fontFamily: 'Inter' }))
+    expect(css).toContain('--font-serif: var(--font-family-body)')
+  })
+
+  it('does NOT emit --font-serif when neither fontFamily nor serifFamily is set', () => {
+    const css = renderStyle(makeConfig({ headingSize: '3rem' }))
+    expect(css).not.toContain('--font-serif')
+  })
+
+  it('serifFamily takes precedence over fontFamily for --font-serif', () => {
+    const css = renderStyle(makeConfig({ fontFamily: 'Inter', serifFamily: 'Cormorant Garamond' }))
+    expect(css).toContain("--font-serif: 'Cormorant Garamond', serif")
+    expect(css).not.toContain('var(--font-family-body)')
+  })
+
+  // ── New typography tokens ──────────────────────────────────────────────────
+
+  it('emits --heading-scale from themeConfig.typography.headingScale', () => {
+    const css = renderStyle(makeConfig({ headingScale: '0.8' }))
+    expect(css).toContain('--heading-scale: 0.8')
+  })
+
+  it('emits --line-height-heading from themeConfig.typography.lineHeightHeading', () => {
+    const css = renderStyle(makeConfig({ lineHeightHeading: '1.15' }))
+    expect(css).toContain('--line-height-heading: 1.15')
+  })
+
+  it('emits --letter-spacing-heading from themeConfig.typography.letterSpacingHeading', () => {
+    const css = renderStyle(makeConfig({ letterSpacingHeading: '-0.02' }))
+    expect(css).toContain('--letter-spacing-heading: -0.02')
+  })
+
+  it('emits all new typography tokens together', () => {
+    const css = renderStyle(makeConfig({
+      fontFamily: 'DM Sans',
+      headingFamily: 'Syne',
+      serifFamily: 'Spectral',
+      headingSize: '3.5rem',
+      headingScale: '0.75',
+      bodySize: '1.125rem',
+      bodyWeight: '400',
+      headingWeight: '700',
+      lineHeight: '1.7',
+      lineHeightHeading: '1.1',
+      letterSpacing: '0.01',
+      letterSpacingHeading: '-0.03',
+    }))
+    expect(css).toContain("--font-family-body: 'DM Sans', sans-serif")
+    expect(css).toContain("--font-family-heading: 'Syne', sans-serif")
+    expect(css).toContain("--font-serif: 'Spectral', serif")
+    expect(css).toContain('--heading-size: 3.5rem')
+    expect(css).toContain('--heading-scale: 0.75')
+    expect(css).toContain('--body-size: 1.125rem')
+    expect(css).toContain('--body-weight: 400')
+    expect(css).toContain('--heading-weight: 700')
+    expect(css).toContain('--line-height-body: 1.7')
+    expect(css).toContain('--line-height-heading: 1.1')
+    expect(css).toContain('--letter-spacing-body: 0.01')
+    expect(css).toContain('--letter-spacing-heading: -0.03')
+  })
 })
+
+// ── buildGoogleFontSpec ──────────────────────────────────────────────────────
+
+describe('buildGoogleFontSpec', () => {
+  it('returns null for empty string', () => {
+    expect(buildGoogleFontSpec('')).toBeNull()
+  })
+
+  it('returns null for whitespace-only string', () => {
+    expect(buildGoogleFontSpec('   ')).toBeNull()
+  })
+
+  it('always includes 400 as safety fallback weight', () => {
+    const spec = buildGoogleFontSpec('Inter', ['700'])
+    expect(spec).toContain('400')
+    expect(spec).toContain('700')
+  })
+
+  it('deduplicates weights', () => {
+    const spec = buildGoogleFontSpec('Inter', ['400', '400', '700'])
+    // Should contain wght@400;700 (no duplicates)
+    expect(spec).toBe('Inter:wght@400;700')
+  })
+
+  it('sorts weights numerically', () => {
+    const spec = buildGoogleFontSpec('Inter', ['700', '300'])
+    expect(spec).toBe('Inter:wght@300;400;700')
+  })
+
+  it('uses GOOGLE_FONT_URL_MAP name for known fonts', () => {
+    // DM Sans maps to 'DM+Sans' in the URL map
+    const dmSansEntry = GOOGLE_FONT_URL_MAP['DM Sans']
+    expect(dmSansEntry).toBeDefined()
+    const spec = buildGoogleFontSpec('DM Sans', ['400'])
+    expect(spec).toContain('DM+Sans')
+  })
+
+  it('auto-encodes unknown font names (spaces → +)', () => {
+    const spec = buildGoogleFontSpec('My Custom Font', ['400'])
+    expect(spec).toContain('My+Custom+Font')
+  })
+
+  it('strips CSS fallback stacks — uses only first font name', () => {
+    const spec = buildGoogleFontSpec('Inter, sans-serif', ['400'])
+    expect(spec).toContain('Inter')
+    expect(spec).not.toContain('sans-serif')
+  })
+
+  it('strips surrounding quotes from font names', () => {
+    const spec = buildGoogleFontSpec("'Playfair Display'", ['400'])
+    expect(spec).toContain('Playfair+Display')
+    expect(spec).not.toContain("'")
+  })
+
+  it('returns null for http URL (not a Google Font name)', () => {
+    expect(buildGoogleFontSpec('https://fonts.example.com/font.css')).toBeNull()
+  })
+
+  it('produces a valid family spec fragment for a well-known font', () => {
+    const spec = buildGoogleFontSpec('Orbitron', ['400', '700'])
+    expect(spec).toBe('Orbitron:wght@400;700')
+  })
+})
+
 
