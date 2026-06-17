@@ -1,10 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ApiError, withErrorHandler, buildApiError } from './errors'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getErrorMessage } from './clientErrors'
 import { ERROR_MESSAGES } from './errorCodes'
 import type { Dictionary } from '@/i18n/types'
+
+const mockInsert = vi.fn()
+const mockFrom = vi.fn(() => ({ insert: mockInsert }))
+const mockCreateClient = vi.fn(() => ({ from: mockFrom }))
+
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: mockCreateClient,
+}))
 
 // Minimal mock dictionary with the errors namespace
 const mockDict = {
@@ -36,6 +44,10 @@ const mockDict = {
 
 function makeRequest(method = 'GET'): NextRequest {
   return new NextRequest('http://localhost/api/test', { method })
+}
+
+async function flushAsyncWork(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 describe('ApiError', () => {
@@ -85,6 +97,16 @@ describe('buildApiError', () => {
 })
 
 describe('withErrorHandler', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('passes through a successful response unchanged', async () => {
     const handler = withErrorHandler(async () =>
       NextResponse.json({ ok: true }, { status: 200 }),
@@ -104,6 +126,8 @@ describe('withErrorHandler', () => {
     const body = await res.json()
     expect(body.error).toBe('Forbidden')
     expect(body.status).toBe(403)
+    await flushAsyncWork()
+    expect(mockInsert).not.toHaveBeenCalled()
   })
 
   it('catches ApiError with code and includes it in the response', async () => {
@@ -129,6 +153,38 @@ describe('withErrorHandler', () => {
     const body = await res.json()
     expect(body.code).toBe('VALIDATION_ERROR')
     expect(body.error).toContain('valid email address')
+    await flushAsyncWork()
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'api',
+      level: 'warn',
+      message: expect.stringContaining('Validation error:'),
+      details: expect.objectContaining({
+        path: '/api/test',
+        method: 'GET',
+        issues: expect.any(Array),
+      }),
+    }))
+  })
+
+  it('logs ApiError with status >= 500 to app_logs', async () => {
+    const handler = withErrorHandler(async () => {
+      throw new ApiError(500, 'Internal failure', 'SERVER_ERROR')
+    })
+
+    const res = await handler(makeRequest('POST'))
+    expect(res.status).toBe(500)
+    await flushAsyncWork()
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'api',
+      level: 'error',
+      message: 'Internal failure',
+      details: expect.objectContaining({
+        path: '/api/test',
+        method: 'POST',
+        code: 'SERVER_ERROR',
+        status: 500,
+      }),
+    }))
   })
 
   it('catches unknown errors and returns 500 with SERVER_ERROR code (never raw message)', async () => {

@@ -17,6 +17,9 @@ const SystemHealthWidget = lazy(() =>
 const LogsManager = lazy(() =>
   import('@/components/admin/LogsManager').then((m) => ({ default: m.LogsManager })),
 )
+const MaintenanceManager = lazy(() =>
+  import('@/components/admin/MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })),
+)
 
 export function AdminSystemWrapper() {
   const { session } = useAuthContext()
@@ -27,12 +30,16 @@ export function AdminSystemWrapper() {
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="health">Health &amp; Logs</TabsTrigger>
           <TabsTrigger value="logs">Log Manager</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
         <TabsContent value="health">
           <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
         </TabsContent>
         <TabsContent value="logs">
           <LogsManager />
+        </TabsContent>
+        <TabsContent value="maintenance">
+          <MaintenanceManager />
         </TabsContent>
       </Tabs>
     </Suspense>
