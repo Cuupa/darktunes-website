@@ -9,12 +9,81 @@ interface PageSlice {
   endPx: number
 }
 
+interface SrcsetCandidate {
+  url: string
+  score: number
+}
+
 function getOrientation(data: EPKData): 'portrait' | 'landscape' {
   return data.epkOrientation === 'landscape' ? 'landscape' : 'portrait'
 }
 
 function getTargetNode(containerRef: RefObject<HTMLElement | null>): HTMLElement | null {
   return containerRef.current ?? document.getElementById('epk-document-root')
+}
+
+function resolveImageUrl(url: string): string {
+  try {
+    const absoluteUrl = new URL(url, window.location.href)
+    if (absoluteUrl.pathname === '/_next/image') {
+      const originalUrl = absoluteUrl.searchParams.get('url')
+      if (originalUrl) {
+        return new URL(originalUrl, window.location.href).toString()
+      }
+    }
+    return absoluteUrl.toString()
+  } catch {
+    return url
+  }
+}
+
+function parseSrcsetCandidate(candidate: string): SrcsetCandidate | null {
+  const [url, descriptor] = candidate.trim().split(/\s+/, 2)
+  if (!url) return null
+
+  const score = descriptor?.endsWith('w')
+    ? Number.parseInt(descriptor, 10)
+    : descriptor?.endsWith('x')
+      ? Math.round(Number.parseFloat(descriptor) * 1000)
+      : 0
+
+  return { url: resolveImageUrl(url), score: Number.isFinite(score) ? score : 0 }
+}
+
+function getResolvedImageSource(img: HTMLImageElement): string | null {
+  const srcset = img.getAttribute('srcset')
+  if (srcset) {
+    const bestCandidate = srcset
+      .split(',')
+      .map(parseSrcsetCandidate)
+      .filter((candidate): candidate is SrcsetCandidate => candidate !== null)
+      .sort((a, b) => b.score - a.score)[0]
+
+    if (bestCandidate) return bestCandidate.url
+  }
+
+  const src = img.getAttribute('src') ?? img.currentSrc ?? img.src
+  return src ? resolveImageUrl(src) : null
+}
+
+function resetCloneScroll(node: HTMLElement): void {
+  let current: HTMLElement | null = node
+  while (current) {
+    current.scrollTop = 0
+    current.scrollLeft = 0
+    current = current.parentElement
+  }
+}
+
+function prepareClonedImages(clonedTarget: HTMLElement): void {
+  clonedTarget.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+    const resolvedSource = getResolvedImageSource(img)
+    img.crossOrigin = 'anonymous'
+    img.removeAttribute('srcset')
+    if (resolvedSource) {
+      img.src = resolvedSource
+    }
+  })
 }
 
 function createPageCanvas(source: HTMLCanvasElement, startY: number, height: number): HTMLCanvasElement {
@@ -68,19 +137,41 @@ export async function generateEpkPdf(
   const wrapper = target.parentElement
   const originalWrapperPadding = wrapper?.style.padding ?? ''
   const originalTargetMargin = target.style.margin
+  const originalAspectRatio = target.style.aspectRatio
+  const computedBackgroundColor = window.getComputedStyle(target).backgroundColor
+  const backgroundColor = computedBackgroundColor
+  && computedBackgroundColor !== 'rgba(0, 0, 0, 0)'
+  && computedBackgroundColor !== 'transparent'
+    ? computedBackgroundColor
+    : '#101010'
 
   if (wrapper) wrapper.style.padding = '0'
   target.style.margin = '0'
+  target.style.aspectRatio = 'unset'
 
   try {
     const canvas = await html2canvas(target, {
       scale: 2,
       useCORS: true,
       allowTaint: false,
-      backgroundColor: null,
+      backgroundColor,
       logging: false,
-      scrollX: 0,
+      imageTimeout: 0,
+      scrollX: -window.scrollX,
       scrollY: -window.scrollY,
+      onclone: (clonedDocument) => {
+        const clonedTarget = target.id
+          ? clonedDocument.getElementById(target.id)
+          : clonedDocument.querySelector<HTMLElement>('.epk-document')
+        if (!clonedTarget) return
+
+        clonedDocument.documentElement.scrollTop = 0
+        clonedDocument.documentElement.scrollLeft = 0
+        clonedDocument.body.scrollTop = 0
+        clonedDocument.body.scrollLeft = 0
+        resetCloneScroll(clonedTarget)
+        prepareClonedImages(clonedTarget)
+      },
     })
 
     const jsPDF = await loadJsPdf()
@@ -101,9 +192,9 @@ export async function generateEpkPdf(
     slices.forEach((slice, pageIndex) => {
       const sliceCanvas = createPageCanvas(canvas, slice.startPx, slice.endPx - slice.startPx)
       const imageHeightMm = sliceCanvas.height * mmPerPx
-      const imageData = sliceCanvas.toDataURL('image/jpeg', 0.82)
+      const imageData = sliceCanvas.toDataURL('image/jpeg', 0.92)
       if (pageIndex > 0) doc.addPage()
-      doc.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, imageHeightMm, undefined, 'MEDIUM')
+      doc.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, imageHeightMm, undefined, 'FAST')
     })
 
     const rootRect = target.getBoundingClientRect()
@@ -139,6 +230,7 @@ export async function generateEpkPdf(
     doc.save(`epk-${safeName}.pdf`)
   } finally {
     target.style.margin = originalTargetMargin
+    target.style.aspectRatio = originalAspectRatio
     if (wrapper) wrapper.style.padding = originalWrapperPadding
   }
 }
