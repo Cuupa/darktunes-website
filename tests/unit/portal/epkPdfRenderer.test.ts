@@ -1,12 +1,13 @@
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import html2canvas from 'html2canvas'
-import { generateEpkPdf } from './epkPdfRenderer'
-import type { EPKData } from './EPKPreview'
+import { generateEpkPdf } from '../../../app/portal/profile/_components/epkPdfRenderer'
+import type { EPKData } from '../../../app/portal/profile/_components/EPKPreview'
 
 const {
   addImageMock,
-  addPageMock,
-  setPageMock,
+  _addPageMock,
+  _setPageMock,
   linkMock,
   saveMock,
   jsPdfMock,
@@ -16,21 +17,23 @@ const {
   const setPageMock = vi.fn()
   const linkMock = vi.fn()
   const saveMock = vi.fn()
-  const jsPdfMock = vi.fn(() => ({
-    internal: {
-      pageSize: {
-        getWidth: () => 210,
-        getHeight: () => 297,
+  const jsPdfMock = vi.fn(function JsPdfMock() {
+    return {
+      internal: {
+        pageSize: {
+          getWidth: () => 210,
+          getHeight: () => 297,
+        },
       },
-    },
-    addImage: addImageMock,
-    addPage: addPageMock,
-    setPage: setPageMock,
-    link: linkMock,
-    save: saveMock,
-  }))
+      addImage: addImageMock,
+      addPage: addPageMock,
+      setPage: setPageMock,
+      link: linkMock,
+      save: saveMock,
+    }
+  })
 
-  return { addImageMock, addPageMock, setPageMock, linkMock, saveMock, jsPdfMock }
+  return { addImageMock, _addPageMock: addPageMock, _setPageMock: setPageMock, linkMock, saveMock, jsPdfMock }
 })
 
 vi.mock('html2canvas', () => ({
@@ -57,7 +60,7 @@ describe('generateEpkPdf', () => {
 
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
       drawImage: vi.fn(),
-    })) as typeof HTMLCanvasElement.prototype.getContext
+    })) as unknown as typeof HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/jpeg;base64,mock')
 
     Object.defineProperty(window, 'scrollX', { value: 18, configurable: true })
