@@ -66,6 +66,7 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
         artistName: items[0]?.artistName ?? '',
         eventName: data.event_name,
         venueName: data.venue_name,
+        venueAddress: data.venue_address ?? null,
         venueCity: data.venue_city,
         venueCountry: data.venue_country,
         concertDate: data.concert_date,

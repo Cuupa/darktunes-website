@@ -62,7 +62,8 @@
     "checkBack": "Schau bald wieder vorbei.",
     "viewAll": "Alle Events",
     "filterArtist": "Alle Künstler",
-    "filterCountry": "Alle Länder"
+    "filterCountry": "Alle Länder",
+    "navLink": "Navigation"
   },
   "spotify": {
     "heading": "SPOTIFY",
@@ -163,7 +164,7 @@
     "profile_bio": "Biografie",
     "profile_photo": "Profilfoto",
     "profile_photo_upload": "Neues Foto hochladen",
-    "profile_genres": "Genres (kommagetrennt)",
+    "profile_genres": "Genres",
     "profile_website": "Website-URL",
     "profile_instagram": "Instagram-URL",
     "profile_youtube": "YouTube-URL",
@@ -251,6 +252,8 @@
     "tour_share_unsupported": "Teilen auf diesem Gerät nicht unterstützt.",
     "tour_export_ics": "Kalender exportieren (.ics)",
     "tour_export_ics_error": "Kalender-Export fehlgeschlagen.",
+    "tour_address": "Straße / Adresse",
+    "tour_nav_link": "Navigation",
     "tour_osm_lookup": "Venue auf Karte suchen",
     "tour_osm_loading": "Suche läuft…",
     "tour_osm_found": "Venue auf Karte gefunden",

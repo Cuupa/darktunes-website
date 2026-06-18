@@ -20,7 +20,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { MapPin, Share, CalendarBlank, YoutubeLogo, MusicNotes, Newspaper } from '@phosphor-icons/react'
+import { MapPin, Share, CalendarBlank, YoutubeLogo, MusicNotes, Newspaper, NavigationArrow } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,6 +35,7 @@ import {
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Dictionary } from '@/i18n/types'
 import type { Concert, Artist, NewsPost } from '@/types'
+import { COUNTRIES } from '@/lib/countries'
 
 interface EventManagerProps {
   dict: Dictionary['portal']
@@ -73,6 +74,7 @@ const EMPTY_FORM = {
   eventType: 'gig' as string,
   customType: '',
   venueName: '',
+  venueAddress: '',
   venueCity: '',
   venueCountry: '',
   venueLat: null as number | null,
@@ -117,7 +119,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
 
   /** Look up venue via Nominatim and store coordinates */
   const lookupVenue = useCallback(async () => {
-    const query = [form.venueName, form.venueCity, form.venueCountry].filter(Boolean).join(', ')
+    const query = [form.venueAddress, form.venueName, form.venueCity, form.venueCountry].filter(Boolean).join(', ')
     if (!query) return
     setOsmLoading(true)
     setOsmMapUrl(null)
@@ -143,7 +145,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     } finally {
       setOsmLoading(false)
     }
-  }, [form.venueName, form.venueCity, form.venueCountry, dict])
+  }, [form.venueAddress, form.venueName, form.venueCity, form.venueCountry, dict])
 
   /** Refresh OSM map when coordinates are already stored on load */
   useEffect(() => {
@@ -177,6 +179,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
           concertTime: form.concertTime || null,
           eventType: getEffectiveType(),
           venueName: form.venueName || null,
+          venueAddress: form.venueAddress || null,
           venueCity: form.venueCity || null,
           venueCountry: form.venueCountry || null,
           venueLat: form.venueLat,
@@ -222,6 +225,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
       eventType: preset,
       customType: custom,
       venueName: concert.venueName ?? '',
+      venueAddress: concert.venueAddress ?? '',
       venueCity: concert.venueCity ?? '',
       venueCountry: concert.venueCountry ?? '',
       venueLat: concert.venueLat ?? null,
@@ -413,15 +417,28 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
             onChange={(e) => setForm((v) => ({ ...v, venueName: e.target.value }))}
           />
           <Input
+            placeholder={dict.tour_address}
+            value={form.venueAddress}
+            onChange={(e) => setForm((v) => ({ ...v, venueAddress: e.target.value }))}
+          />
+          <Input
             placeholder={dict.tour_city}
             value={form.venueCity}
             onChange={(e) => setForm((v) => ({ ...v, venueCity: e.target.value }))}
           />
-          <Input
-            placeholder={dict.tour_country}
+          <Select
             value={form.venueCountry}
-            onChange={(e) => setForm((v) => ({ ...v, venueCountry: e.target.value }))}
-          />
+            onValueChange={(val) => setForm((v) => ({ ...v, venueCountry: val }))}
+          >
+            <SelectTrigger aria-label={dict.tour_country}>
+              <SelectValue placeholder={dict.tour_country} />
+            </SelectTrigger>
+            <SelectContent>
+              {COUNTRIES.map((c) => (
+                <SelectItem key={c.code} value={c.name}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {/* OSM lookup */}
           <div className="flex items-end">
@@ -439,8 +456,33 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
           </div>
         </div>
 
-        {/* OSM map preview */}
-        {osmMapUrl && (
+        {/* OSM map preview + navigation link */}
+        {osmMapUrl && form.venueLat && form.venueLng && (
+          <div className="space-y-2">
+            <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
+              <iframe
+                title="Venue map preview"
+                src={osmMapUrl}
+                width="100%"
+                height="200"
+                loading="lazy"
+                className="block"
+                aria-label="OpenStreetMap venue preview"
+              />
+            </div>
+            <a
+              href={`https://maps.google.com/maps?q=${form.venueLat},${form.venueLng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
+              aria-label={dict.tour_nav_link}
+            >
+              <NavigationArrow size={16} aria-hidden="true" />
+              {dict.tour_nav_link}
+            </a>
+          </div>
+        )}
+        {osmMapUrl && (!form.venueLat || !form.venueLng) && (
           <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
             <iframe
               title="Venue map preview"
@@ -584,11 +626,23 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               <p className="text-sm text-muted-foreground mt-0.5">
                 {concert.concertDate.slice(0, 10)}
                 {concert.eventTime && ` · ${concert.eventTime.slice(0, 5)}`}
-                {[concert.venueName, concert.venueCity, concert.venueCountry].filter(Boolean).length > 0 && (
-                  <> · {[concert.venueName, concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')}</>
+                {[concert.venueName, concert.venueAddress, concert.venueCity, concert.venueCountry].filter(Boolean).length > 0 && (
+                  <> · {[concert.venueName, concert.venueAddress, concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')}</>
                 )}
                 {' · '}{getStatusLabel(concert.status)}
               </p>
+              {concert.venueLat && concert.venueLng && (
+                <a
+                  href={`https://maps.google.com/maps?q=${concert.venueLat},${concert.venueLng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline mt-0.5"
+                  aria-label={dict.tour_nav_link}
+                >
+                  <NavigationArrow size={12} aria-hidden="true" />
+                  {dict.tour_nav_link}
+                </a>
+              )}
               {concert.featuredArtists && concert.featuredArtists.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   +{' '}{concert.featuredArtists.map((a) => a.name).join(', ')}

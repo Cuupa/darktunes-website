@@ -62,7 +62,8 @@
     "checkBack": "Check back soon for new dates.",
     "viewAll": "All Events",
     "filterArtist": "All Artists",
-    "filterCountry": "All Countries"
+    "filterCountry": "All Countries",
+    "navLink": "Navigate"
   },
   "spotify": {
     "heading": "SPOTIFY",
@@ -163,7 +164,7 @@
     "profile_bio": "Biography",
     "profile_photo": "Profile Photo",
     "profile_photo_upload": "Upload new photo",
-    "profile_genres": "Genres (comma-separated)",
+    "profile_genres": "Genres",
     "profile_website": "Website URL",
     "profile_instagram": "Instagram URL",
     "profile_youtube": "YouTube URL",
@@ -251,6 +252,8 @@
     "tour_share_unsupported": "Sharing not supported on this device.",
     "tour_export_ics": "Export calendar (.ics)",
     "tour_export_ics_error": "Failed to export calendar.",
+    "tour_address": "Street address",
+    "tour_nav_link": "Navigate",
     "tour_osm_lookup": "Look up venue on map",
     "tour_osm_loading": "Looking up…",
     "tour_osm_found": "Venue found on map",

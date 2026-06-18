@@ -73,6 +73,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "editor_notifications: admin manage",
   "editor_notifications: editor read own",
   "editor_notifications: editor update own",
+  "genres_read_public",
+  "genres_write_admin",
   "interview_requests: artist read own",
   "interview_requests: artist update own",
   "interview_requests: journalist manage own",
@@ -194,6 +196,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "custom_roles",
   "editor_activity_log",
   "editor_notifications",
+  "genres",
   "idempotency_keys",
   "interview_requests",
   "journalist_applications",
@@ -353,6 +356,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "editor_notifications: admin manage",
     "editor_notifications: editor read own",
     "editor_notifications: editor update own",
+  ],
+  "genres": [
+    "genres_read_public",
+    "genres_write_admin",
   ],
   "interview_requests": [
     "interview_requests: artist read own",

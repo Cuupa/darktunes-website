@@ -139,6 +139,27 @@ export interface Database {
         }
         Relationships: []
       }
+      genres: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       idempotency_keys: {
         Row: {
           key: string
@@ -851,6 +872,7 @@ export interface Database {
           artist_id: string | null
           event_name: string
           venue_name: string | null
+          venue_address: string | null
           venue_city: string | null
           venue_country: string | null
           concert_date: string
@@ -875,6 +897,7 @@ export interface Database {
           artist_id?: string | null
           event_name: string
           venue_name?: string | null
+          venue_address?: string | null
           venue_city?: string | null
           venue_country?: string | null
           concert_date: string
@@ -899,6 +922,7 @@ export interface Database {
           artist_id?: string | null
           event_name?: string
           venue_name?: string | null
+          venue_address?: string | null
           venue_city?: string | null
           venue_country?: string | null
           concert_date?: string

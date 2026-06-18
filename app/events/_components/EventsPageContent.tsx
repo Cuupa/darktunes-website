@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Ticket, FunnelSimple } from '@phosphor-icons/react'
+import { Calendar, MapPin, Ticket, FunnelSimple, NavigationArrow } from '@phosphor-icons/react'
 import type { Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -131,7 +131,6 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
         <div className="space-y-4">
           {filtered.map((concert, index) => {
             const isCancelled = concert.status === 'cancelled'
-            const location = [concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')
             return (
               <motion.div
                 key={concert.id}
@@ -159,9 +158,23 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                       </div>
                       <p className="text-2xl font-bold tracking-tight">{concert.artistName}</p>
                       <p className="text-muted-foreground">{concert.eventName}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin size={16} />
-                        <span>{[concert.venueName, location].filter(Boolean).join(' · ')}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin size={16} aria-hidden="true" />
+                          <span>{[concert.venueName, concert.venueAddress, concert.venueCity, concert.venueCountry].filter(Boolean).join(' · ')}</span>
+                        </div>
+                        {concert.venueLat && concert.venueLng && (
+                          <a
+                            href={`https://maps.google.com/maps?q=${concert.venueLat},${concert.venueLng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-accent hover:underline ml-6"
+                            aria-label={`${concert.eventName} – ${dict.navLink}`}
+                          >
+                            <NavigationArrow size={12} aria-hidden="true" />
+                            {dict.navLink}
+                          </a>
+                        )}
                       </div>
                     </div>
 

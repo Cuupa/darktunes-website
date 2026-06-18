@@ -17,6 +17,7 @@ import {
   FileText,
   Calendar,
   Wrench,
+  Tag,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -37,6 +38,7 @@ const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').t
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
 const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
 const MaintenanceManager = lazy(() => import('./MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })))
+const GenresManager = lazy(() => import('./GenresManager').then((m) => ({ default: m.GenresManager })))
 
 function TabFallback() {
   return (
@@ -57,7 +59,7 @@ type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'accreditations' | 'press' | 'statements'
   | 'release-submissions' | 'video-submissions' | 'submission-form'
-  | 'events' | 'maintenance'
+  | 'events' | 'genres' | 'maintenance'
 
 interface TabDef {
   value: TabValue
@@ -73,6 +75,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'news',           label: 'News',               adminOnly: false, icon: Newspaper },
   { value: 'videos',         label: 'Videos',             adminOnly: false, icon: VideoCamera },
   { value: 'events',         label: 'Events',             adminOnly: false, icon: Calendar },
+  { value: 'genres',         label: 'Genres',             adminOnly: false, icon: Tag },
   { value: 'assets',         label: 'Assets',             adminOnly: true,  icon: ImageIcon },
   { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
   { value: 'press',          label: 'Press Portal',       adminOnly: true,  icon: Newspaper },
@@ -92,6 +95,7 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   news:            { title: 'News Management',                   description: 'Create and manage news posts and announcements' },
   videos:          { title: 'Videos Management',                 description: 'Manage music videos and YouTube content' },
   events:          { title: 'Live Shows Management',             description: 'Manage concert and tour dates for any artist. Select an artist to edit their schedule on behalf of the label.' },
+  genres:          { title: 'Genre Catalogue',                    description: 'Manage the central genre list used for artist tagging. Genres added here are available as a pick-list in all artist forms.' },
   assets:          { title: 'Assets Management',                 description: 'Upload and manage images, covers, and media files' },
   accreditations:  { title: 'Accreditations',                    description: 'Review journalist accreditation requests and approve or reject them.' },
   press:           { title: 'Press Portal',                      description: 'Manage journalist applications, press kit assets, promo tracks, accreditations, and portal analytics.' },
@@ -250,6 +254,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               news:            <NewsManager />,
               videos:          <VideosManager />,
               events:          <AdminConcertsManager />,
+              genres:          <GenresManager />,
               assets:          <AssetsManager />,
               accreditations:  <AccreditationsManager />,
               press:           <PressManager />,

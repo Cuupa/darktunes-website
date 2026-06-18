@@ -31,6 +31,8 @@ import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import { useDict } from '@/contexts/DictContext'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
+import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
+import type { Genre } from '@/lib/api/genres'
 
 // ── Image Position Editor ────────────────────────────────────────────────────
 
@@ -259,6 +261,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
   const [assetPickerTarget, setAssetPickerTarget] = useState<'imageUrl' | 'logoUrl' | null>(null)
+  const [genreCatalogue, setGenreCatalogue] = useState<Genre[]>([])
   const smartLinks = watch('smartLinks')
 
   const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs
@@ -266,6 +269,14 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   useEffect(() => {
     reset(value)
   }, [value, reset])
+
+  // Load genre catalogue once on mount
+  useEffect(() => {
+    fetch('/api/admin/genres')
+      .then((r) => (r.ok ? (r.json() as Promise<Genre[]>) : Promise.resolve([])))
+      .then((data) => setGenreCatalogue(data))
+      .catch(() => setGenreCatalogue([]))
+  }, [])
 
   const name = watch('name')
   const slugValue = watch('slug')
@@ -535,11 +546,25 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="genres">
-              Genres{' '}
-              <span className="text-muted-foreground text-xs font-normal">(comma-separated)</span>
-            </Label>
-            <Input id="genres" {...register('genres')} placeholder="e.g. Industrial, EBM, Darkwave" disabled={isLoading} />
+            <Label>Genres</Label>
+            <Controller
+              name="genres"
+              control={control}
+              render={({ field }) => {
+                const selected = field.value
+                  ? field.value.split(',').map((g) => g.trim()).filter(Boolean)
+                  : []
+                return (
+                  <GenreTagPicker
+                    value={selected}
+                    onChange={(names) => field.onChange(names.join(', '))}
+                    genres={genreCatalogue}
+                    disabled={isLoading}
+                    placeholder="Search genres…"
+                  />
+                )
+              }}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
