@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Sidebar } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useArtists } from '@/hooks/useArtists'
 import { useFileExplorer } from '@/hooks/useFileExplorer'
@@ -36,6 +38,7 @@ export function FileExplorer({ className }: { className?: string }) {
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
   const [tagsAsset, setTagsAsset] = useState<Asset | null>(null)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   const artistNames = useMemo(
     () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
@@ -266,50 +269,113 @@ export function FileExplorer({ className }: { className?: string }) {
 
   return (
     <>
-      <ResizablePanelGroup direction="horizontal" className={cn('h-[calc(100vh-10rem)] rounded-lg border border-border bg-background', className)}>
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-          <FolderTree
-            folders={explorer.allFolders}
-            currentFolderId={explorer.currentFolderId}
-            onNavigate={navigate}
-            onCreateRootFolder={() => void createFolder(null)}
-          />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={80}>
-          <div className="flex h-full flex-col">
-            <ExplorerToolbar
-              searchQuery={explorer.searchQuery}
-              onSearchChange={explorer.setSearchQuery}
-              searchInputRef={searchInputRef}
-              viewMode={explorer.viewMode}
-              onViewModeChange={explorer.setViewMode}
-              sortField={explorer.sortField}
-              sortDir={explorer.sortDir}
-              onSortChange={explorer.setSort}
-              itemCount={displayedFolders.length + displayedAssets.length}
-              selectedCount={explorer.selectedIds.size}
-              onCreateFolder={() => void createFolder(explorer.currentFolderId)}
-              onDeleteSelected={() => void deleteSelected()}
-              onUpload={() => uploadRef.current?.openPicker()}
-              authToken={explorer.token}
+      {/* Desktop: resizable side-by-side panels */}
+      <div className={cn('hidden md:flex h-[calc(100vh-10rem)]', className)}>
+        <ResizablePanelGroup direction="horizontal" className="rounded-lg border border-border bg-background w-full">
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+            <FolderTree
+              folders={explorer.allFolders}
+              currentFolderId={explorer.currentFolderId}
+              onNavigate={navigate}
+              onCreateRootFolder={() => void createFolder(null)}
             />
-            <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
-            <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
-              {explorer.viewMode === 'grid' ? (
-                <FileGrid {...sharedGridListProps} />
-              ) : (
-                <FileList
-                  {...sharedGridListProps}
-                  sortField={explorer.sortField}
-                  sortDir={explorer.sortDir}
-                  onSortChange={explorer.setSort}
-                />
-              )}
-            </UploadDropZone>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={80}>
+            <div className="flex h-full flex-col">
+              <ExplorerToolbar
+                searchQuery={explorer.searchQuery}
+                onSearchChange={explorer.setSearchQuery}
+                searchInputRef={searchInputRef}
+                viewMode={explorer.viewMode}
+                onViewModeChange={explorer.setViewMode}
+                sortField={explorer.sortField}
+                sortDir={explorer.sortDir}
+                onSortChange={explorer.setSort}
+                itemCount={displayedFolders.length + displayedAssets.length}
+                selectedCount={explorer.selectedIds.size}
+                onCreateFolder={() => void createFolder(explorer.currentFolderId)}
+                onDeleteSelected={() => void deleteSelected()}
+                onUpload={() => uploadRef.current?.openPicker()}
+                authToken={explorer.token}
+              />
+              <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+              <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
+                {explorer.viewMode === 'grid' ? (
+                  <FileGrid {...sharedGridListProps} />
+                ) : (
+                  <FileList
+                    {...sharedGridListProps}
+                    sortField={explorer.sortField}
+                    sortDir={explorer.sortDir}
+                    onSortChange={explorer.setSort}
+                  />
+                )}
+              </UploadDropZone>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+
+      {/* Mobile: stacked layout with collapsible folder tree */}
+      <div className={cn('flex md:hidden flex-col rounded-lg border border-border bg-background h-[calc(100vh-8rem)]', className)}>
+        {/* Mobile toolbar row: sidebar toggle + search/sort */}
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setMobileSidebarOpen((prev) => !prev)}
+            aria-label={mobileSidebarOpen ? 'Hide folders' : 'Show folders'}
+            aria-expanded={mobileSidebarOpen}
+          >
+            <Sidebar size={18} aria-hidden="true" />
+          </Button>
+          <ExplorerToolbar
+            searchQuery={explorer.searchQuery}
+            onSearchChange={explorer.setSearchQuery}
+            searchInputRef={searchInputRef}
+            viewMode={explorer.viewMode}
+            onViewModeChange={explorer.setViewMode}
+            sortField={explorer.sortField}
+            sortDir={explorer.sortDir}
+            onSortChange={explorer.setSort}
+            itemCount={displayedFolders.length + displayedAssets.length}
+            selectedCount={explorer.selectedIds.size}
+            onCreateFolder={() => void createFolder(explorer.currentFolderId)}
+            onDeleteSelected={() => void deleteSelected()}
+            onUpload={() => uploadRef.current?.openPicker()}
+            authToken={explorer.token}
+          />
+        </div>
+        {/* Collapsible folder tree */}
+        {mobileSidebarOpen && (
+          <div className="max-h-48 overflow-y-auto border-b border-border" data-lenis-prevent>
+            <FolderTree
+              folders={explorer.allFolders}
+              currentFolderId={explorer.currentFolderId}
+              onNavigate={(id) => { navigate(id); setMobileSidebarOpen(false) }}
+              onCreateRootFolder={() => void createFolder(null)}
+            />
           </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        )}
+        <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
+            {explorer.viewMode === 'grid' ? (
+              <FileGrid {...sharedGridListProps} />
+            ) : (
+              <FileList
+                {...sharedGridListProps}
+                sortField={explorer.sortField}
+                sortDir={explorer.sortDir}
+                onSortChange={explorer.setSort}
+              />
+            )}
+          </UploadDropZone>
+        </div>
+      </div>
 
       <AssetPreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
       <TagsEditorDialog

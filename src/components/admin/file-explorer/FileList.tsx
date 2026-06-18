@@ -112,14 +112,14 @@ export function FileList({
             <TableHead>
               <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort('name')}>Name {renderSortIcon('name')}</button>
             </TableHead>
-            <TableHead>
+            <TableHead className="hidden md:table-cell">
               <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort('type')}>Type {renderSortIcon('type')}</button>
             </TableHead>
-            <TableHead>
+            <TableHead className="hidden md:table-cell">
               <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort('size')}>Size {renderSortIcon('size')}</button>
             </TableHead>
-            <TableHead>Artist</TableHead>
-            <TableHead>
+            <TableHead className="hidden md:table-cell">Artist</TableHead>
+            <TableHead className="hidden md:table-cell">
               <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort('date')}>Date {renderSortIcon('date')}</button>
             </TableHead>
           </TableRow>
