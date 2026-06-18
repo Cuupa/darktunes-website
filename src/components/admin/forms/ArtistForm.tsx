@@ -553,11 +553,11 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="imageUrl">Image URL</Label>
-              <div className="flex gap-2 items-start">
-                <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} className="flex-1" />
+              <Input id="imageUrl" {...register('imageUrl')} disabled={isLoading} />
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('imageUrl')}>
                   Open Asset Picker
                 </Button>
@@ -582,8 +582,8 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 Logo / Wordmark URL{' '}
                 <span className="text-muted-foreground text-xs font-normal">(hover effect)</span>
               </Label>
-              <div className="flex gap-2 items-start">
-                <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} className="flex-1" />
+              <Input id="logoUrl" {...register('logoUrl')} disabled={isLoading} />
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setAssetPickerTarget('logoUrl')}>
                   Open Asset Picker
                 </Button>

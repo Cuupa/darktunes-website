@@ -410,14 +410,14 @@ export function ReleasesManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card">
+      <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-card sm:flex-row sm:items-center">
         <div className="flex-1">
           <p className="text-sm font-medium">Sync All APIs</p>
           <p className="text-xs text-muted-foreground">
             Aggregate releases from iTunes · Spotify · Discogs for all artists
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {syncResult && syncResult.totalErrors > 0 && (
             <Button
               variant="outline"

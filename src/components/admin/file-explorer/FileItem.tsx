@@ -100,14 +100,14 @@ export function FileItem({
         'rounded-lg border border-border bg-card/60 transition-colors',
         viewMode === 'grid'
           ? 'flex min-h-40 flex-col gap-3 p-3'
-          : 'grid min-h-14 grid-cols-[28px_56px_minmax(0,1fr)_140px_110px_120px_110px] items-center gap-3 px-3 py-2',
+          : 'grid min-h-14 grid-cols-[28px_48px_minmax(0,1fr)] items-center gap-2 px-3 py-2 md:grid-cols-[28px_56px_minmax(0,1fr)_140px_110px_120px_110px] md:gap-3',
         selected && 'border-primary bg-primary/10',
       )}
       onClick={(event) => onSelect(event.metaKey || event.ctrlKey || event.shiftKey)}
       onDoubleClick={onPreview}
     >
       {viewMode === 'list' && <div className="size-4 rounded-full border border-border" aria-hidden="true" />}
-      <div className={cn(viewMode === 'list' ? 'w-14' : 'w-full')}>
+      <div className={cn(viewMode === 'list' ? 'w-12 md:w-14' : 'w-full')}>
         <FilePreview asset={asset} />
       </div>
       <div className="min-w-0 flex-1 space-y-1">
@@ -138,8 +138,10 @@ export function FileItem({
           </button>
         )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{asset.mimeType}</span>
-          <span>{formatBytes(asset.sizeBytes)}</span>
+          {/* On mobile show size inline; on desktop the dedicated size column shows it */}
+          <span className="md:hidden">{formatBytes(asset.sizeBytes)}</span>
+          <span className="hidden md:inline">{asset.mimeType}</span>
+          <span className="hidden md:inline">{formatBytes(asset.sizeBytes)}</span>
           {asset.tags.length > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-0.5 text-secondary">
               <Tag size={10} aria-hidden="true" />
@@ -149,11 +151,11 @@ export function FileItem({
         </div>
         {viewMode === 'grid' && isAudioAsset(asset) ? <InlineAudioPlayer src={asset.publicUrl} /> : null}
       </div>
-      {viewMode === 'list' && <span className="truncate text-sm text-muted-foreground">{artistName ?? '—'}</span>}
-      {viewMode === 'list' && <span className="text-sm text-muted-foreground">{formatBytes(asset.sizeBytes)}</span>}
-      {viewMode === 'list' && <span className="text-sm text-muted-foreground">{formatDate(asset.createdAt)}</span>}
+      {viewMode === 'list' && <span className="hidden truncate text-sm text-muted-foreground md:block">{artistName ?? '—'}</span>}
+      {viewMode === 'list' && <span className="hidden text-sm text-muted-foreground md:block">{formatBytes(asset.sizeBytes)}</span>}
+      {viewMode === 'list' && <span className="hidden text-sm text-muted-foreground md:block">{formatDate(asset.createdAt)}</span>}
       {viewMode === 'list' && (
-        <div className="text-right text-xs text-muted-foreground">
+        <div className="hidden text-right text-xs text-muted-foreground md:block">
           {isAudioAsset(asset) ? <InlineAudioPlayer src={asset.publicUrl} /> : asset.mimeType.split('/')[1] ?? asset.mimeType}
         </div>
       )}
