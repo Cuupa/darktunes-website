@@ -19,6 +19,10 @@ import type { RiderType } from '@/lib/api/portalProfile'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+import { compressImage } from '@/lib/imageResizer'
+
+/** Portal photo upload hard limit at /api/portal/upload-photo (5 MB). */
+export const PORTAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024
 
 // ---------------------------------------------------------------------------
 // Zod schema (shared with ProfileForm so both stay in sync)
@@ -147,8 +151,8 @@ export function usePortalProfileForm({
   // -------------------------------------------------------------------------
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const raw = e.target.files?.[0]
+    if (!raw) return
 
     setUploadProgress(0)
     try {
@@ -159,6 +163,11 @@ export function usePortalProfileForm({
         toast.error(dict.profile_photoError)
         return
       }
+
+      // Auto-compress to stay within the 5 MB portal upload limit
+      const file = raw.size > PORTAL_PHOTO_MAX_BYTES
+        ? await compressImage(raw, { maxSizeBytes: PORTAL_PHOTO_MAX_BYTES })
+        : raw
 
       const url = await uploadArtistPhoto(artistId, file, session.access_token, setUploadProgress)
       setPhotoUrl(url)
@@ -205,13 +214,17 @@ export function usePortalProfileForm({
   // -------------------------------------------------------------------------
 
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const raw = e.target.files?.[0]
+    if (!raw) return
     setGalleryUploading(true)
     try {
       const supabase = createBrowserSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { toast.error(dict.profile_photoError); return }
+      // Auto-compress to stay within the 5 MB portal upload limit
+      const file = raw.size > PORTAL_PHOTO_MAX_BYTES
+        ? await compressImage(raw, { maxSizeBytes: PORTAL_PHOTO_MAX_BYTES })
+        : raw
       // Reuse the same upload endpoint — filename collision avoidance via timestamp
       const renamedFile = new File([file], `gallery-${Date.now()}-${file.name}`, { type: file.type })
       const url = await uploadArtistPhoto(artistId, renamedFile, session.access_token, () => {})

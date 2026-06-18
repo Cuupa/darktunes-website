@@ -4,6 +4,7 @@
  * Uploads the selected file to /api/upload (requires admin/editor auth)
  * and calls onUploaded with the resulting public URL.
  * Shows a real upload-progress bar via XHR.
+ * Large images are automatically compressed client-side before uploading.
  */
 
 import { useRef, useState } from 'react'
@@ -16,6 +17,10 @@ import { toast } from 'sonner'
 import { useDict } from '@/contexts/DictContext'
 import type { ApiErrorResponse } from '@/lib/errors'
 import { getErrorMessage } from '@/lib/clientErrors'
+import { compressImage, formatFileSize } from '@/lib/imageResizer'
+
+/** 20 MB client-side soft limit before compression; hard server limit is at the Vercel/R2 layer. */
+const CLIENT_MAX_SIZE_BYTES = 20 * 1024 * 1024
 
 interface ImageUploadButtonProps {
   /** Called with the R2 public URL once the upload succeeds. */
@@ -28,6 +33,8 @@ interface ImageUploadButtonProps {
   endpoint?: string
   /** When provided, the uploaded asset is automatically assigned to this artist and placed in their folder. */
   artistId?: string
+  /** Max upload size to show in the hint label. Defaults to CLIENT_MAX_SIZE_BYTES. */
+  maxSizeBytes?: number
 }
 
 export function ImageUploadButton({
@@ -36,6 +43,7 @@ export function ImageUploadButton({
   label = 'Upload image',
   endpoint = '/api/upload',
   artistId,
+  maxSizeBytes = CLIENT_MAX_SIZE_BYTES,
 }: ImageUploadButtonProps) {
   const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
@@ -45,13 +53,18 @@ export function ImageUploadButton({
   const isUploading = uploadProgress !== null && uploadProgress < 100
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const raw = e.target.files?.[0]
+    if (!raw) return
 
     setUploadProgress(0)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
+
+      // Auto-compress if the image is over the per-request threshold
+      const file = raw.size > maxSizeBytes
+        ? await compressImage(raw, { maxSizeBytes })
+        : raw
 
       const formData = new FormData()
       formData.append('file', file)
@@ -142,6 +155,10 @@ export function ImageUploadButton({
           aria-label="Upload progress"
         />
       )}
+      <p className="text-[11px] text-muted-foreground leading-tight">
+        Max {formatFileSize(maxSizeBytes)} — larger images are compressed automatically
+      </p>
     </div>
   )
 }
+

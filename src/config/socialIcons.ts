@@ -16,23 +16,23 @@ import {
   FacebookLogo,
   TwitterLogo,
   TiktokLogo,
-  MusicNote,
   DiscordLogo,
   TelegramLogo,
   LinkedinLogo,
   GithubLogo,
   SoundcloudLogo,
 } from '@phosphor-icons/react'
-import type { Icon } from '@phosphor-icons/react'
+import type { ElementType } from 'react'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
 
-export const SOCIAL_ICON_MAP: Record<string, Icon> = {
+export const SOCIAL_ICON_MAP: Record<string, ElementType> = {
   InstagramLogo,
   YoutubeLogo,
   SpotifyLogo,
   FacebookLogo,
   TwitterLogo,
   TiktokLogo,
-  BandcampLogo: MusicNote,
+  BandcampLogo: BandcampIcon,
   DiscordLogo,
   TelegramLogo,
   LinkedinLogo,
