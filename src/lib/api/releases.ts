@@ -14,6 +14,13 @@ interface JunctionArtist {
   artists: { id: string; name: string; slug: string } | null
 }
 
+/**
+ * Maximum number of UUIDs to include in a single `.in()` filter.
+ * Each UUID is 36 chars + separators; keeping batches at 50 keeps the
+ * generated query-string well under typical URL-length limits (~2 KB).
+ */
+const RELEASE_ARTISTS_BATCH_SIZE = 50
+
 function rowToRelease(row: ReleaseRow): Release {
   return {
     id: row.id,
@@ -63,26 +70,38 @@ function rowToRelease(row: ReleaseRow): Release {
 
 /**
  * Attach the full artist list from the release_artists junction table.
+ *
+ * IDs are sent in batches of RELEASE_ARTISTS_BATCH_SIZE to avoid generating
+ * URLs that exceed browser / PostgREST limits when many releases are loaded
+ * at once (e.g. the admin Releases Manager).
  */
 async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<Release[]> {
   if (releases.length === 0) return releases
   const ids = releases.map((r) => r.id)
 
-  const { data, error } = await (db as DbClient)
-    .from('release_artists' as const)
-    .select('release_id, sort_order, artists(id, name, slug)')
-    .in('release_id', ids)
-    .order('sort_order', { ascending: true })
+  // Split IDs into fixed-size batches and fetch each one sequentially.
+  const allRows: (JunctionArtist & { release_id: string })[] = []
+  for (let i = 0; i < ids.length; i += RELEASE_ARTISTS_BATCH_SIZE) {
+    const batch = ids.slice(i, i + RELEASE_ARTISTS_BATCH_SIZE)
+    const { data, error } = await (db as DbClient)
+      .from('release_artists' as const)
+      .select('release_id, sort_order, artists(id, name, slug)')
+      .in('release_id', batch)
+      .order('sort_order', { ascending: true })
 
-  if (error) {
-    // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
-    // migration hasn't run) so that SSG/ISR prerendering is never blocked.
-    // byRelease remains empty → all releases fall through to the legacy artist_id fallback below.
-    console.warn(`release_artists lookup skipped: ${error.message}`)
+    if (error) {
+      // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
+      // migration hasn't run) so that SSG/ISR prerendering is never blocked.
+      // byRelease remains empty → all releases fall through to the legacy artist_id fallback below.
+      console.warn(`release_artists lookup skipped: ${error.message}`)
+      break
+    }
+
+    allRows.push(...((data ?? []) as unknown as (JunctionArtist & { release_id: string })[]))
   }
 
   const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
-  for (const row of (data ?? []) as unknown as (JunctionArtist & { release_id: string })[]) {
+  for (const row of allRows) {
     if (!row.artists) continue
     if (!byRelease.has(row.release_id)) byRelease.set(row.release_id, [])
     byRelease.get(row.release_id)!.push(row.artists)
