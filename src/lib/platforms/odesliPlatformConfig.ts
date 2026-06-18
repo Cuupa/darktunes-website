@@ -16,6 +16,7 @@ import {
   Globe,
 } from '@phosphor-icons/react'
 import type { ElementType } from 'react'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
 
 export interface PlatformConfig {
   label: string
@@ -37,7 +38,7 @@ export const ODESLI_PLATFORM_CONFIG: Record<string, PlatformConfig> = {
   amazonMusic:  { label: 'Amazon Music',  bg: '#25D1DA', textColor: 'text-black',  icon: MusicNote   },
   pandora:      { label: 'Pandora',       bg: '#005483', textColor: 'text-white',  icon: MusicNote   },
   soundcloud:   { label: 'SoundCloud',    bg: '#FF5500', textColor: 'text-white',  icon: MusicNote   },
-  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: MusicNote   },
+  bandcamp:     { label: 'Bandcamp',      bg: '#1DA0C3', textColor: 'text-white',  icon: BandcampIcon },
   napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote   },
   audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote   },
   anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote   },

@@ -31,6 +31,7 @@ import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import { ShareButton } from './ShareButton'
@@ -131,7 +132,7 @@ export function ArtistDetailContent({
     { url: artist.facebookUrl, icon: FacebookLogo, label: `${artist.name} on Facebook` },
     { url: artist.twitterUrl, icon: TwitterLogo, label: `${artist.name} on X (Twitter)` },
     { url: artist.tiktokUrl, icon: TiktokLogo, label: `${artist.name} on TikTok` },
-    { url: artist.bandcampUrl, icon: MusicNote, label: `${artist.name} on Bandcamp` },
+    { url: artist.bandcampUrl, icon: BandcampIcon, label: `${artist.name} on Bandcamp` },
     { url: artist.websiteUrl, icon: Globe, label: `${artist.name} official website` },
   ]
 
@@ -255,6 +256,21 @@ export function ArtistDetailContent({
                 </div>
               </div>
 
+              {/* Artist logo — shown below the name when a dedicated logo image exists */}
+              {artist.logoUrl && (
+                <div className="pt-1">
+                  <Image
+                    src={getOptimizedImageUrl(artist.logoUrl, 320)}
+                    alt={`${artist.name} – logo`}
+                    width={200}
+                    height={80}
+                    className="h-12 w-auto object-contain brightness-0 invert opacity-80"
+                    unoptimized
+                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                  />
+                </div>
+              )}
+
               {/* Action buttons */}
               <div className="flex flex-wrap gap-3 pt-2">
                 {/* Per-platform streaming buttons from Odesli, or fallback to individual URL fields */}
@@ -273,6 +289,7 @@ export function ArtistDetailContent({
                     if (artist.spotifyUrl)    fallback.push({ key: 'spotify',    url: artist.spotifyUrl })
                     if (artist.appleMusicUrl) fallback.push({ key: 'appleMusic', url: artist.appleMusicUrl })
                     if (artist.youtubeUrl)    fallback.push({ key: 'youtube',    url: artist.youtubeUrl })
+                    if (artist.bandcampUrl)   fallback.push({ key: 'bandcamp',   url: artist.bandcampUrl })
                     return fallback
                   })()
 

@@ -29,6 +29,10 @@ import type { Dictionary } from '@/i18n/types'
 import { saveOnboardingStep, completeOnboarding, skipOnboarding } from '../_actions/onboarding'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { uploadArtistPhoto } from '@/lib/api/portalProfile'
+import { compressImage, formatFileSize } from '@/lib/imageResizer'
+
+/** Must match the server-side limit in /api/portal/upload-photo. */
+const ONBOARDING_PHOTO_MAX_BYTES = 5 * 1024 * 1024
 
 interface OnboardingWizardProps {
   dict: Dictionary['portal']
@@ -95,8 +99,8 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
 
   const handlePhotoChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
+      const raw = e.target.files?.[0]
+      if (!raw) return
       setUploadProgress(0)
       try {
         const supabase = createBrowserSupabaseClient()
@@ -104,6 +108,10 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
           data: { session },
         } = await supabase.auth.getSession()
         if (!session?.access_token) throw new Error('Not authenticated')
+        // Auto-compress to stay within the 5 MB portal upload limit
+        const file = raw.size > ONBOARDING_PHOTO_MAX_BYTES
+          ? await compressImage(raw, { maxSizeBytes: ONBOARDING_PHOTO_MAX_BYTES })
+          : raw
         const url = await uploadArtistPhoto(artistId, file, session.access_token, (pct) =>
           setUploadProgress(pct),
         )
@@ -249,6 +257,9 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
                     <Camera size={16} aria-hidden="true" />
                     {isUploading ? `${uploadProgress}%` : dict.profile_photo_upload}
                   </Button>
+                  <p className="text-[11px] text-muted-foreground">
+                    Max {formatFileSize(ONBOARDING_PHOTO_MAX_BYTES)} — larger images are compressed automatically
+                  </p>
                   {photoUrl && (
                     <p className="text-sm text-green-500 flex items-center gap-1">
                       <CheckCircle size={14} aria-hidden="true" />

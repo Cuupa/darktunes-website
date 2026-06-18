@@ -44,6 +44,8 @@ import type { Dictionary } from '@/i18n/types'
 import { EPKPreview } from './EPKPreview'
 import type { EPKData } from './EPKPreview'
 import { usePortalProfileForm } from '@/hooks/usePortalProfileForm'
+import { PORTAL_PHOTO_MAX_BYTES } from '@/hooks/usePortalProfileForm'
+import { formatFileSize } from '@/lib/imageResizer'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -277,6 +279,9 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
                   {uploadProgress !== null && (
                     <Progress value={uploadProgress} className="h-1 w-48" aria-label="Upload progress" />
                   )}
+                  <p className="text-[11px] text-muted-foreground">
+                   Max {formatFileSize(PORTAL_PHOTO_MAX_BYTES)} — larger images are compressed automatically
+                  </p>
                 </div>
               </CardContent>
             </Card>

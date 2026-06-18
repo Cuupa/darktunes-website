@@ -14,11 +14,11 @@ import {
   FacebookLogo,
   TwitterLogo,
   TiktokLogo,
-  MusicNote,
   ShoppingBag,
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { getSquareThumbnail } from '@/lib/imageUtils'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -255,7 +255,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           aria-label={`${artist.name} on Bandcamp`}
                           className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
-                          <MusicNote size={20} weight="fill" aria-hidden="true" />
+                          <BandcampIcon size={20} aria-hidden="true" />
                         </a>
                       )}
                       {artist.shopUrl && (
