@@ -631,6 +631,8 @@ export interface Concert {
   artistName: string
   eventName: string
   venueName: string | null
+  /** Street address of the venue */
+  venueAddress: string | null
   venueCity: string | null
   venueCountry: string | null
   concertDate: string

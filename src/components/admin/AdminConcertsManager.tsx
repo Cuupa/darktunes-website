@@ -88,6 +88,7 @@ export function AdminConcertsManager() {
           artistName: '',
           eventName: row.event_name,
           venueName: row.venue_name,
+          venueAddress: row.venue_address ?? null,
           venueCity: row.venue_city,
           venueCountry: row.venue_country,
           concertDate: row.concert_date,

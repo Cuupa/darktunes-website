@@ -364,6 +364,51 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ---------------------------------------------------------------------------
+-- TABLE: genres  (centrally managed genre catalogue)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.genres (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL UNIQUE,
+  slug       TEXT        NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Seed default genres (idempotent)
+INSERT INTO public.genres (name, slug) VALUES
+  ('Industrial',    'industrial'),
+  ('EBM',           'ebm'),
+  ('Darkwave',      'darkwave'),
+  ('Synthpop',      'synthpop'),
+  ('Gothic Rock',   'gothic-rock'),
+  ('Dark Electro',  'dark-electro'),
+  ('Aggrotech',     'aggrotech'),
+  ('Power Noise',   'power-noise'),
+  ('Death Rock',    'death-rock'),
+  ('New Wave',      'new-wave'),
+  ('Post-Punk',     'post-punk'),
+  ('Ambient',       'ambient'),
+  ('Dark Ambient',  'dark-ambient'),
+  ('Noise',         'noise'),
+  ('Techno',        'techno'),
+  ('House',         'house'),
+  ('Metal',         'metal'),
+  ('Black Metal',   'black-metal'),
+  ('Electronic',    'electronic'),
+  ('Experimental',  'experimental')
+ON CONFLICT (slug) DO NOTHING;
+
+-- RLS
+ALTER TABLE public.genres ENABLE ROW LEVEL SECURITY;
+-- Public read
+DROP POLICY IF EXISTS "genres_read_public" ON public.genres;
+CREATE POLICY "genres_read_public" ON public.genres
+  FOR SELECT USING (true);
+-- Admin/editor insert/update/delete
+DROP POLICY IF EXISTS "genres_write_admin" ON public.genres;
+CREATE POLICY "genres_write_admin" ON public.genres
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
 -- TABLE: artists
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artists (
@@ -912,6 +957,7 @@ CREATE TABLE IF NOT EXISTS public.concerts (
   artist_id       UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
   event_name      TEXT        NOT NULL,
   venue_name      TEXT,
+  venue_address   TEXT,
   venue_city      TEXT,
   venue_country   TEXT,
   concert_date    DATE        NOT NULL,
@@ -942,6 +988,7 @@ ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_lat FLOAT8;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_lng FLOAT8;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_osm_id TEXT;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS news_post_id UUID REFERENCES public.news_posts(id) ON DELETE SET NULL;
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS venue_address TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_concerts_artist_id    ON public.concerts (artist_id);
 CREATE INDEX IF NOT EXISTS idx_concerts_concert_date ON public.concerts (concert_date ASC);

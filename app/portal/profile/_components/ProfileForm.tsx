@@ -45,6 +45,8 @@ import { EPKPreview } from './EPKPreview'
 import type { EPKData } from './EPKPreview'
 import { usePortalProfileForm } from '@/hooks/usePortalProfileForm'
 import { PORTAL_PHOTO_MAX_BYTES } from '@/hooks/usePortalProfileForm'
+import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
+import type { Genre } from '@/lib/api/genres'
 import { formatFileSize } from '@/lib/imageResizer'
 
 // ---------------------------------------------------------------------------
@@ -89,6 +91,7 @@ interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
 
 function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
   const [pdfDownloading, setPdfDownloading] = React.useState(false)
+  const [genreCatalogue, setGenreCatalogue] = React.useState<Genre[]>([])
   const epkDocumentRef = React.useRef<HTMLElement | null>(null)
   const {
     form,
@@ -113,6 +116,14 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
 
   const { fields: customLinkFields, append: appendCustomLink, remove: removeCustomLink } =
     useFieldArray({ control: form.control, name: 'custom_links' })
+
+  // Load genre catalogue
+  React.useEffect(() => {
+    fetch('/api/admin/genres')
+      .then((r) => (r.ok ? (r.json() as Promise<Genre[]>) : Promise.resolve([])))
+      .then((data) => setGenreCatalogue(data))
+      .catch(() => setGenreCatalogue([]))
+  }, [])
 
   // ---------------------------------------------------------------------------
   // Build live EPK data from form watch
@@ -335,12 +346,23 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="genres">{dict.profile_genres}</Label>
-                  <Input
-                    id="genres"
-                    className="bg-muted border-border"
-                    placeholder="Darkpop, EBM, Industrial"
-                    {...form.register('genres')}
+                  <Label>{dict.profile_genres}</Label>
+                  <Controller
+                    control={form.control}
+                    name="genres"
+                    render={({ field }) => {
+                      const selected = field.value
+                        ? field.value.split(',').map((g: string) => g.trim()).filter(Boolean)
+                        : []
+                      return (
+                        <GenreTagPicker
+                          value={selected}
+                          onChange={(names) => field.onChange(names.join(', '))}
+                          genres={genreCatalogue}
+                          className="bg-muted border-border"
+                        />
+                      )
+                    }}
                   />
                 </div>
 
