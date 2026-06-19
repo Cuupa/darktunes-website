@@ -180,12 +180,13 @@ export function ArtistDetailContent({
 
           {/* Two-column hero on desktop: photo | metadata */}
           <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-12 items-start">
-            {/* Artist photo */}
+            {/* Artist photo + logo (left column) */}
+            <div className="flex flex-col gap-4 w-full max-w-xs lg:w-64 xl:w-72 shrink-0">
             <motion.div
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-              className="w-full max-w-xs lg:w-64 xl:w-72 shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
+              className="w-full rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               {getSquareThumbnail(artist.imageUrl, 600) ? (
                 <Image
@@ -214,6 +215,22 @@ export function ArtistDetailContent({
                 </span>
               </div>
             </motion.div>
+
+            {/* Artist logo — shown below the photo when a dedicated logo image exists */}
+            {artist.logoUrl && (
+              <div className="flex items-center justify-center px-4 py-3 rounded-xl bg-card/60 border border-border/40">
+                <Image
+                  src={getOptimizedImageUrl(artist.logoUrl, 480)}
+                  alt={`${artist.name} – logo`}
+                  width={320}
+                  height={120}
+                  className="h-20 w-auto max-w-full object-contain brightness-0 invert opacity-90"
+                  unoptimized
+                  onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
+                />
+              </div>
+            )}
+            </div>
 
             {/* Metadata */}
             <motion.div
@@ -255,21 +272,6 @@ export function ArtistDetailContent({
                   ))}
                 </div>
               </div>
-
-              {/* Artist logo — shown below the name when a dedicated logo image exists */}
-              {artist.logoUrl && (
-                <div className="pt-1">
-                  <Image
-                    src={getOptimizedImageUrl(artist.logoUrl, 320)}
-                    alt={`${artist.name} – logo`}
-                    width={200}
-                    height={80}
-                    className="h-12 w-auto object-contain brightness-0 invert opacity-80"
-                    unoptimized
-                    onError={(e) => { e.currentTarget.style.display = 'none' }}
-                  />
-                </div>
-              )}
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-3 pt-2">

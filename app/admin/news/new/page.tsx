@@ -85,7 +85,7 @@ export default function NewsNewPage() {
         }
       }
       toast.success(`Created "${data.title}"`)
-      router.push('/admin/content?tab=news')
+      router.push('/admin/news')
     } finally {
       setIsSaving(false)
     }

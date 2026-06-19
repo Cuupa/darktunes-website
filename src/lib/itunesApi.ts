@@ -30,7 +30,29 @@ function upgradeArtworkUrl(url: string): string {
 export async function searchItunesArtist(
   artistName: string,
   fetchFn: typeof fetch = globalThis.fetch,
+  /** When provided, skip the name-search step and look up this iTunes artist ID directly.
+   *  This prevents fetching the wrong artist when multiple artists share the same name. */
+  itunesArtistId?: string,
 ): Promise<iTunesRelease[]> {
+  // --- Direct lookup by numeric artist ID (preferred when Apple Music URL is set) ---
+  if (itunesArtistId) {
+    const lookupResponse = await fetchFn(
+      `https://itunes.apple.com/lookup?id=${encodeURIComponent(itunesArtistId)}&entity=album&limit=200`,
+    )
+    if (!lookupResponse.ok) {
+      throw new Error(`iTunes API error: ${lookupResponse.status}`)
+    }
+    const lookupData = (await lookupResponse.json()) as iTunesLookupResponse
+    return lookupData.results
+      .filter((result) => result.wrapperType === 'collection')
+      .map((result) => ({
+        ...result,
+        artworkUrl100: upgradeArtworkUrl(result.artworkUrl100),
+        artworkUrl600: result.artworkUrl600 ? upgradeArtworkUrl(result.artworkUrl600) : result.artworkUrl600,
+      }))
+  }
+
+  // --- Name-based search fallback ---
   const encodedArtist = encodeURIComponent(artistName)
   const searchResponse = await fetchFn(
     `https://itunes.apple.com/search?term=${encodedArtist}&entity=musicArtist&attribute=artistTerm&limit=5`,

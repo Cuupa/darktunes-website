@@ -349,6 +349,7 @@ export interface Database {
           platform_links: Record<string, string> | null
           storage_quota_bytes: number | null
           smart_links: Array<{ label: string; url: string }> | null
+          bandsintown_api_key: string | null
           image_position_x: number | null
           image_position_y: number | null
           image_scale: number | null
@@ -392,6 +393,7 @@ export interface Database {
           platform_links?: Record<string, string> | null
           storage_quota_bytes?: number | null
           smart_links?: Array<{ label: string; url: string }> | null
+          bandsintown_api_key?: string | null
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null
@@ -435,6 +437,7 @@ export interface Database {
           platform_links?: Record<string, string> | null
           storage_quota_bytes?: number | null
           smart_links?: Array<{ label: string; url: string }> | null
+          bandsintown_api_key?: string | null
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null

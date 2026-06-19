@@ -43,6 +43,7 @@ export function rowToArtist(row: ArtistRow): Artist {
     discogsId: row.discogs_id ?? undefined,
     songkickId: row.songkick_id ?? undefined,
     bandsintownId: row.bandsintown_id ?? undefined,
+    bandsintownApiKey: row.bandsintown_api_key ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
     isVisible: row.is_visible,
     logoUrl: row.logo_url ?? undefined,

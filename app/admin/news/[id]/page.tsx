@@ -101,7 +101,7 @@ export default function NewsEditPage() {
         if (insertError) throw new Error(insertError.message)
       }
       toast.success('News post saved')
-      router.push('/admin/content?tab=news')
+      router.push('/admin/news')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save news post')
     } finally {

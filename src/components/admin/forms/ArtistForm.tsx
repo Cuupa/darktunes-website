@@ -210,6 +210,7 @@ export interface ArtistFormData {
   discogsId: string
   songkickId: string
   bandsintownId: string
+  bandsintownApiKey: string
   /** Storage quota in MB (empty string = no limit / system default). Admin-only field. */
   storageQuotaMb: string
   /** Custom smart links for the artist profile (e.g. Linktree-style). */
@@ -971,6 +972,16 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   id="bandsintownId"
                   {...register('bandsintownId')}
                   placeholder="e.g. Artist Name or id:12345"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="bandsintownApiKey">Bandsintown API Key (per artist)</Label>
+                <Input
+                  id="bandsintownApiKey"
+                  {...register('bandsintownApiKey')}
+                  placeholder="Leave blank to use the global API key"
+                  type="password"
                   disabled={isLoading}
                 />
               </div>

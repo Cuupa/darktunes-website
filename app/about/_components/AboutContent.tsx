@@ -9,10 +9,24 @@ import { MarkdownContent } from '@/components/MarkdownContent'
 import { processHtmlImages } from '@/lib/imageUtils'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import {
-  InstagramLogo, YoutubeLogo, SpotifyLogo,
+  InstagramLogo, YoutubeLogo, SpotifyLogo, FacebookLogo, TwitterLogo,
+  TiktokLogo, Globe, MusicNote,
 } from '@phosphor-icons/react'
-import type { SiteSettings, Artist, NewsPost } from '@/types'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import type { SiteSettings, Artist, NewsPost, CustomSocialLink } from '@/types'
 import type { Dictionary } from '@/i18n/types'
+
+const SOCIAL_ICON_MAP: Record<string, React.ElementType> = {
+  InstagramLogo,
+  YoutubeLogo,
+  SpotifyLogo,
+  FacebookLogo,
+  TwitterLogo,
+  TiktokLogo,
+  Globe,
+  MusicNote,
+  BandcampIcon,
+}
 
 interface AboutContentProps {
   siteSettings: SiteSettings | null
@@ -44,11 +58,17 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
     { label: 'News Posts', value: news.length },
   ]
 
-  const socialLinks = [
-    { url: siteSettings?.instagramUrl, icon: InstagramLogo, label: 'Instagram' },
-    { url: siteSettings?.youtubeUrl, icon: YoutubeLogo, label: 'YouTube' },
-    { url: siteSettings?.spotifyUrl, icon: SpotifyLogo, label: 'Spotify' },
-  ].filter((s) => s.url)
+  const socialLinks: Array<{ url: string; icon: React.ElementType; label: string }> = [
+    siteSettings?.instagramUrl ? { url: siteSettings.instagramUrl, icon: InstagramLogo, label: 'Instagram' } : null,
+    siteSettings?.youtubeUrl   ? { url: siteSettings.youtubeUrl,   icon: YoutubeLogo,   label: 'YouTube' }   : null,
+    siteSettings?.spotifyUrl   ? { url: siteSettings.spotifyUrl,   icon: SpotifyLogo,   label: 'Spotify' }   : null,
+    // customSocialLinks from admin CMS
+    ...((siteSettings?.customSocialLinks ?? []) as CustomSocialLink[]).map((link) => ({
+      url: link.url,
+      icon: SOCIAL_ICON_MAP[link.icon] ?? Globe,
+      label: link.label,
+    })),
+  ].filter((s): s is { url: string; icon: React.ElementType; label: string } => s !== null && Boolean(s.url))
 
   return (
     <div className="container mx-auto px-4 lg:px-16 pt-36 pb-24 space-y-20">
