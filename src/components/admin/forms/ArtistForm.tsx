@@ -261,11 +261,12 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const [isPrefillingSpotify, setIsPrefillingSpotify] = useState(false)
   const [isPrefillingItunes, setIsPrefillingItunes] = useState(false)
   const [isEnrichingDiscogs, setIsEnrichingDiscogs] = useState(false)
+  const [isSyncingBandsintown, setIsSyncingBandsintown] = useState(false)
   const [assetPickerTarget, setAssetPickerTarget] = useState<'imageUrl' | 'logoUrl' | null>(null)
   const [genreCatalogue, setGenreCatalogue] = useState<Genre[]>([])
   const smartLinks = watch('smartLinks')
 
-  const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs
+  const isAnyAsyncRunning = isFetchingImage || isPrefillingSpotify || isPrefillingItunes || isEnrichingDiscogs || isSyncingBandsintown
 
   useEffect(() => {
     reset(value)
@@ -311,6 +312,8 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const spotifyUrl = watch('spotifyUrl')
   const appleMusicUrl = watch('appleMusicUrl')
   const discogsId = watch('discogsId')
+  const bandsintownId = watch('bandsintownId')
+  const bandsintownApiKey = watch('bandsintownApiKey')
 
   const handleFetchImage = async () => {
     if (!spotifyId && !discogsId) {
@@ -423,6 +426,38 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
       setIsEnrichingDiscogs(false)
+    }
+  }
+
+  const handleSyncBandsintown = async () => {
+    if (!artistId || !bandsintownId.trim() || !bandsintownApiKey.trim()) return
+    setIsSyncingBandsintown(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+      const res = await fetch('/api/admin/sync-artist-bandsintown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          artistId,
+          bandsintownId: bandsintownId.trim(),
+          bandsintownApiKey: bandsintownApiKey.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorResponse
+        throw new Error(getErrorMessage(body, dict))
+      }
+      const { concertsUpserted } = (await res.json()) as { concertsUpserted: number }
+      toast.success(
+        concertsUpserted === 0
+          ? 'Bandsintown sync complete — no upcoming events found'
+          : `Bandsintown sync complete — ${concertsUpserted} concert${concertsUpserted !== 1 ? 's' : ''} imported`,
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+    } finally {
+      setIsSyncingBandsintown(false)
     }
   }
 
@@ -973,17 +1008,49 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   {...register('bandsintownId')}
                   placeholder="e.g. Artist Name or id:12345"
                   disabled={isLoading}
+                  autoComplete="off"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 col-span-2">
                 <Label htmlFor="bandsintownApiKey">Bandsintown API Key (per artist)</Label>
-                <Input
-                  id="bandsintownApiKey"
-                  {...register('bandsintownApiKey')}
-                  placeholder="Leave blank to use the global API key"
-                  type="password"
-                  disabled={isLoading}
-                />
+                <div className="flex gap-2 items-start">
+                  <Input
+                    id="bandsintownApiKey"
+                    {...register('bandsintownApiKey')}
+                    placeholder="Leave blank to use the global API key"
+                    type="password"
+                    disabled={isLoading}
+                    autoComplete="new-password"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => void handleSyncBandsintown()}
+                    disabled={
+                      isLoading ||
+                      isSyncingBandsintown ||
+                      !bandsintownId.trim() ||
+                      !bandsintownApiKey.trim() ||
+                      !artistId
+                    }
+                    title={
+                      !artistId
+                        ? 'Save the artist first to enable sync'
+                        : 'Sync upcoming concerts from Bandsintown'
+                    }
+                  >
+                    {isSyncingBandsintown ? (
+                      <ArrowsClockwise size={14} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ArrowsClockwise size={14} aria-hidden="true" />
+                    )}
+                    Sync now
+                  </Button>
+                </div>
+                {isSyncingBandsintown && <IndeterminateBar />}
               </div>
             </div>
           </TabsContent>
