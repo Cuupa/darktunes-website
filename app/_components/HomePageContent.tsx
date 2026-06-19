@@ -184,6 +184,8 @@ export function HomePageContent({
                 ...(siteSettings.concertsSectionSubheading && { subheading: siteSettings.concertsSectionSubheading }),
               }}
               locale={locale}
+              concertsPerPage={siteSettings.concertsPerPage}
+              concertsLinkToPage={siteSettings.concertsLinkToPage}
             />
           </div>
         )

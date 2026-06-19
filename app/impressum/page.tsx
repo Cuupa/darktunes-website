@@ -81,6 +81,8 @@ export default async function ImpressumPage() {
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
+        concertsPerPage: 8,
+        concertsLinkToPage: false,
         featureToggles: { promoPool: true, editorTools: true },
       }),
     ),

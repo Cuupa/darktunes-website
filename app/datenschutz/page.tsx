@@ -216,6 +216,8 @@ export default async function DatenschutzPage() {
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
+        concertsPerPage: 8,
+        concertsLinkToPage: false,
         featureToggles: { promoPool: true, editorTools: true },
       }),
     ),

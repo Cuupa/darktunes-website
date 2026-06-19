@@ -453,6 +453,10 @@ export interface SiteSettings {
   videosPerPage: number
   /** When true, the Videos section on the homepage shows only the first page and links to /videos for all videos. */
   videosLinkToPage: boolean
+  /** Number of concerts shown per page in the Events section. Default: 8. */
+  concertsPerPage: number
+  /** When true, the Events section on the homepage shows only the first page and links to /events for all events. */
+  concertsLinkToPage: boolean
   /** Auto-advance interval for the releases carousel in ms. 0 = disabled. Default 0. */
   carouselAutoplayMs: number
   /** Feature flags: enable/disable portal modules globally. */

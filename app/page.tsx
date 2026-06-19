@@ -89,6 +89,8 @@ const getCachedSiteSettings = unstable_cache(
         carouselAutoplayMs: 0,
         videosPerPage: 9,
         videosLinkToPage: false,
+        concertsPerPage: 8,
+        concertsLinkToPage: false,
         homepageNewsCount: 3,
         featureToggles: { promoPool: true, editorTools: true },
       }),
