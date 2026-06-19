@@ -710,6 +710,7 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_action T
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS guest_artists             TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS bandcamp_url             TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smartlink_url            TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
@@ -984,6 +985,7 @@ CREATE TABLE IF NOT EXISTS public.concerts (
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS bandsintown_id TEXT UNIQUE;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'admin';
+ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ok';
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS event_time TIME;
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'gig';
 ALTER TABLE public.concerts ADD COLUMN IF NOT EXISTS trailer_url TEXT;
