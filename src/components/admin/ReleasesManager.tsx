@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
 import { useDict } from '@/contexts/DictContext'
@@ -148,6 +149,11 @@ export function ReleasesManager() {
   const [resolvingSmartLinkId, setResolvingSmartLinkId] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
   const [isCleaningUp, setIsCleaningUp] = useState(false)
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
   // Checklist dialog
   const [checklistRelease, setChecklistRelease] = useState<Release | null>(null)
@@ -368,6 +374,48 @@ export function ReleasesManager() {
     }
   }
 
+  const handleToggleFeatured = async (release: Release) => {
+    try {
+      await updateRelease(release.id, { featured: !release.featured })
+      toast.success(`"${release.title}" ${!release.featured ? 'featured' : 'unfeatured'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+    }
+  }
+
+  const toggleSelectRelease = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginated.length && paginated.length > 0) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(paginated.map((r) => r.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setIsBulkDeleting(true)
+    let deleted = 0
+    for (const id of selectedIds) {
+      try {
+        await deleteRelease(id)
+        deleted++
+      } catch {
+        // continue deleting others
+      }
+    }
+    toast.success(`Deleted ${deleted} release${deleted !== 1 ? 's' : ''}`)
+    setSelectedIds(new Set())
+    setBulkDeleteConfirm(false)
+    setIsBulkDeleting(false)
+  }
+
   const openChecklist = async (release: Release) => {
     setChecklistRelease(release)
     setChecklistLoading(true)
@@ -488,6 +536,12 @@ export function ReleasesManager() {
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {releases.length}</p>
+        {selectedIds.size > 0 && (
+          <Button size="sm" variant="destructive" onClick={() => setBulkDeleteConfirm(true)} className="gap-2">
+            <Trash size={16} weight="bold" />
+            Delete {selectedIds.size} selected
+          </Button>
+        )}
         <Button size="sm" onClick={openNew} className="gap-2">
           <Plus size={16} weight="bold" />
           New Release
@@ -498,6 +552,13 @@ export function ReleasesManager() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={paginated.length > 0 && selectedIds.size === paginated.length}
+                onCheckedChange={toggleSelectAll}
+                aria-label="Select all on this page"
+              />
+            </TableHead>
             <TableHead>
               <button type="button" className="hover:text-foreground" onClick={() => { setSortField('title'); setSortDir(sortField === 'title' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
                 Title <SortIcon field="title" />
@@ -527,19 +588,26 @@ export function ReleasesManager() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                 Loading…
               </TableCell>
             </TableRow>
           ) : paginated.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                 {search ? `No releases match "${search}".` : 'No releases yet. Click "New Release" or sync from iTunes.'}
               </TableCell>
             </TableRow>
           ) : (
             paginated.map((release) => (
-              <TableRow key={release.id}>
+              <TableRow key={release.id} className={selectedIds.has(release.id) ? 'bg-muted/40' : undefined}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedIds.has(release.id)}
+                    onCheckedChange={() => toggleSelectRelease(release.id)}
+                    aria-label={`Select ${release.title}`}
+                  />
+                </TableCell>
                 <TableCell className="font-medium">{release.title}</TableCell>
                 <TableCell>
                   {release.artistName}
@@ -572,7 +640,11 @@ export function ReleasesManager() {
                   </button>
                 </TableCell>
                 <TableCell>
-                  {release.featured && <Badge variant="secondary">Featured</Badge>}
+                  <Switch
+                    checked={release.featured}
+                    onCheckedChange={() => void handleToggleFeatured(release)}
+                    aria-label={`Toggle featured for ${release.title}`}
+                  />
                 </TableCell>
                 <TableCell>
                   {release.isPromo && <Badge variant="secondary">Promo</Badge>}
@@ -673,7 +745,27 @@ export function ReleasesManager() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Sync error details dialog */}
+      {/* Bulk delete confirmation dialog */}
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={(open) => !open && setBulkDeleteConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Release{selectedIds.size !== 1 ? 's' : ''}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} selected release{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleBulkDelete()}
+              disabled={isBulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isBulkDeleting ? 'Deleting…' : `Delete ${selectedIds.size}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Dialog open={!!syncResult && syncResult.totalErrors > 0} onOpenChange={(open) => !open && setSyncResult(null)}>
         <DialogContent aria-labelledby="releases-sync-errors-title" data-lenis-prevent className="sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>

@@ -45,6 +45,18 @@ function deriveReleaseType(trackCount: number): 'single' | 'ep' | 'album' {
 }
 
 /**
+ * Extracts the numeric iTunes artist ID from an Apple Music URL.
+ * e.g. "https://music.apple.com/us/artist/name/1234567890" → "1234567890"
+ * Returns null when the URL is not an Apple Music artist URL.
+ */
+function extractItunesArtistId(appleMusicUrl: string | null | undefined): string | null {
+  if (!appleMusicUrl) return null
+  // Apple Music artist URLs end with a numeric ID segment
+  const match = appleMusicUrl.match(/\/artist\/[^/]+\/(\d+)(?:[?#].*)?$/)
+  return match?.[1] ?? null
+}
+
+/**
  * Syncs one artist: fetches releases from iTunes, caches cover art in R2,
  * upserts releases to Supabase, and writes a sync_logs entry.
  *
@@ -58,7 +70,7 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
   // 1. Fetch artist from DB
   const { data: artistRow, error: artistErr } = await db
     .from('artists')
-    .select('id, name')
+    .select('id, name, apple_music_url')
     .eq('id', artistId)
     .single()
 
@@ -67,11 +79,17 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
     return { artistId, releasesUpserted: 0, errors: [msg] }
   }
 
+  // Try to extract an iTunes artist numeric ID from the Apple Music URL.
+  // e.g. https://music.apple.com/us/artist/name/1234567 → "1234567"
+  // When present we do a direct lookup (avoids fetching the wrong artist
+  // when multiple artists share the same name on iTunes).
+  const itunesArtistId = extractItunesArtistId(artistRow.apple_music_url)
+
   // 2. Fetch iTunes releases with exponential backoff
   let itunesReleases: Awaited<ReturnType<typeof searchItunesArtist>> = []
   try {
     itunesReleases = await withExponentialBackoff(() =>
-      searchItunesArtist(artistRow.name, fetchFn),
+      searchItunesArtist(artistRow.name, fetchFn, itunesArtistId ?? undefined),
     )
   } catch (err) {
     errors.push(`iTunes fetch failed: ${err instanceof Error ? err.message : String(err)}`)

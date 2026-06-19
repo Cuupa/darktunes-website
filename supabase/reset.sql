@@ -455,6 +455,7 @@ CREATE TABLE IF NOT EXISTS public.artists (
   platform_links   JSONB,
   storage_quota_bytes BIGINT DEFAULT NULL,
   smart_links      JSONB DEFAULT '[]'::JSONB,
+  bandsintown_api_key TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -482,6 +483,7 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS smart_links JSONB DEFAULT '[
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_x FLOAT DEFAULT 50;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_y FLOAT DEFAULT 50;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_scale      FLOAT DEFAULT 1;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandsintown_api_key TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);

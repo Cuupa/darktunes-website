@@ -374,7 +374,11 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   }
 
   // 5. Bandsintown sync — upcoming concerts (second source)
-  if ((!onlyApi || onlyApi === 'bandsintown') && bandsintownApiKey) {
+  // Run the Bandsintown block if: the API is requested AND at least one of these is true:
+  //   - a global bandsintownApiKey was provided (used as fallback)
+  //   - at least one artist has a per-artist bandsintown_api_key set
+  const hasBandsintownKey = !!bandsintownApiKey || artists.some((a) => !!a.bandsintown_api_key)
+  if ((!onlyApi || onlyApi === 'bandsintown') && hasBandsintownKey) {
     const bandsintownResult: ApiSyncResult = {
       api: 'bandsintown',
       artistsProcessed: 0,
@@ -386,11 +390,14 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
     for (const artist of artists) {
       if (!artist.bandsintown_id) continue
+      // Use per-artist key first, then fall back to global key
+      const effectiveKey = artist.bandsintown_api_key ?? bandsintownApiKey
+      if (!effectiveKey) continue
       bandsintownResult.artistsProcessed++
 
       try {
         const concerts = await withExponentialBackoff(() =>
-          fetchBandsintownArtistEvents(artist.bandsintown_id!, bandsintownApiKey, fetchFn),
+          fetchBandsintownArtistEvents(artist.bandsintown_id!, effectiveKey, fetchFn),
         )
 
         if (concerts.length > 0) {
