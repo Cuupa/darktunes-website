@@ -635,6 +635,7 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
       <DialogContent
         className="max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[92vh] p-0 gap-0"
         aria-labelledby={titleId}
+        aria-describedby={undefined}
       >
         <DialogTitle id={titleId} className="sr-only">
           {dict.profile_epk_preview_heading} — {data.artistName}
@@ -661,7 +662,7 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
             </Button>
           </div>
         </div>
-        <div className="overflow-y-auto max-h-[70vh] p-4 sm:p-6 epk-print-area">
+        <div data-lenis-prevent className="overflow-y-auto max-h-[70vh] p-4 sm:p-6 epk-print-area">
           <EPKThemeProvider themeId={data.epkTheme} customTokens={data.epkCustomThemeTokens}>
             <EPKDocument dict={dict} data={data} />
           </EPKThemeProvider>

@@ -25,26 +25,40 @@ import type { EPKData } from './EPKPreview'
 // Font registration
 // ---------------------------------------------------------------------------
 
-Font.register({
-  family: 'Inter',
-  fonts: [
-    {
-      src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-400-normal.woff2',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-400-italic.woff2',
-      fontWeight: 400,
-      fontStyle: 'italic',
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-700-normal.woff2',
-      fontWeight: 700,
-    },
-  ],
-})
+let fontsRegistered = false
+let pdfFontFamily = 'Helvetica'
 
-Font.registerHyphenationCallback((word) => [word])
+function ensurePdfFontsRegistered(): void {
+  if (fontsRegistered) return
+  try {
+    Font.register({
+      family: 'Inter',
+      fonts: [
+        {
+          src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-400-normal.woff2',
+          fontWeight: 400,
+        },
+        {
+          src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-400-italic.woff2',
+          fontWeight: 400,
+          fontStyle: 'italic',
+        },
+        {
+          src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-700-normal.woff2',
+          fontWeight: 700,
+        },
+      ],
+    })
+    Font.registerHyphenationCallback((word) => [word])
+    pdfFontFamily = 'Inter'
+  } catch {
+    pdfFontFamily = 'Helvetica'
+  } finally {
+    fontsRegistered = true
+  }
+}
+
+ensurePdfFontsRegistered()
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -69,7 +83,7 @@ const T = {
 const styles = StyleSheet.create({
   page: {
     backgroundColor: T.bg,
-    fontFamily: 'Inter',
+    fontFamily: pdfFontFamily,
     paddingTop: 40,
     paddingBottom: 48,
     paddingHorizontal: 40,
