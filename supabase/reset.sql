@@ -709,6 +709,7 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  T
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS guest_artists             TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS bandcamp_url             TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
