@@ -77,6 +77,7 @@ const EMPTY_FORM: ArtistFormData = {
   songkickId: '',
   bandsintownId: '',
   bandsintownApiKey: '',
+  facebookUrl: '',
   twitterUrl: '',
   tiktokUrl: '',
   bandcampUrl: '',
