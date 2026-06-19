@@ -19,12 +19,16 @@ export async function generateEpkPdf(data: EPKData): Promise<void> {
 
   const safeName = data.artistName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
   const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `epk-${safeName}.pdf`
   try {
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `epk-${safeName}.pdf`
+    // Appending to the DOM is required in Firefox and some Chromium versions
+    // for a programmatic click on an <a download> element to trigger a save.
+    document.body.appendChild(anchor)
     anchor.click()
   } finally {
+    document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
   }
 }

@@ -48,6 +48,7 @@ import { PORTAL_PHOTO_MAX_BYTES } from '@/hooks/usePortalProfileForm'
 import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
 import type { Genre } from '@/lib/api/genres'
 import { formatFileSize } from '@/lib/imageResizer'
+import { toast } from 'sonner'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -203,7 +204,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
                 const { generateEpkPdf } = await import('./epkPdf')
                 await generateEpkPdf(epkData)
               } catch {
-                // toast is not in scope here — the EPKModal handles error display
+              toast.error(dict.profile_error)
               } finally {
                 setPdfDownloading(false)
               }
