@@ -61,6 +61,31 @@ function ensurePdfFontsRegistered(): void {
 ensurePdfFontsRegistered()
 
 // ---------------------------------------------------------------------------
+// Image proxy helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrites R2 and Supabase Storage image URLs to go through the server-side
+ * `/api/portal/proxy-image` route so that @react-pdf/renderer can fetch them
+ * without CORS errors (R2 public buckets do not return CORS headers).
+ */
+function toProxiedUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    const parsed = new URL(url)
+    if (
+      /^[^.]+\.r2\.dev$/.test(parsed.hostname) ||
+      /^[^.]+\.supabase\.co$/.test(parsed.hostname)
+    ) {
+      return `/api/portal/proxy-image?url=${encodeURIComponent(url)}`
+    }
+  } catch {
+    // Not a valid absolute URL — return as-is (e.g. a data: URI).
+  }
+  return url
+}
+
+// ---------------------------------------------------------------------------
 // Design tokens
 // ---------------------------------------------------------------------------
 
@@ -371,7 +396,7 @@ function HeroSection({ data }: { data: EPKData }) {
       {data.photoUrl ? (
         // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt prop
         <Image
-          src={data.photoUrl}
+          src={toProxiedUrl(data.photoUrl)}
           style={styles.heroPhoto}
         />
       ) : null}
@@ -554,7 +579,7 @@ function GallerySection({ data }: { data: EPKData }) {
         <View style={styles.galleryGrid}>
           {photos.map((url, i) => (
             // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt prop
-            <Image key={`${url}-${i}`} src={url} style={styles.galleryImage} />
+            <Image key={`${url}-${i}`} src={toProxiedUrl(url)} style={styles.galleryImage} />
           ))}
         </View>
       </View>
@@ -568,7 +593,7 @@ function FooterSection({ data }: { data: EPKData }) {
     <View style={styles.footer} fixed>
       {data.labelLogoUrl ? (
         // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt prop
-        <Image src={data.labelLogoUrl} style={styles.footerLogo} />
+        <Image src={toProxiedUrl(data.labelLogoUrl)} style={styles.footerLogo} />
       ) : (
         <Text style={styles.footerText}>{data.labelName ?? 'Electronic Press Kit'}</Text>
       )}
