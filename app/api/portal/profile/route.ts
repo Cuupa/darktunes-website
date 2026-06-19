@@ -19,6 +19,7 @@ import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
 
 type ArtistUpdate = Database['public']['Tables']['artists']['Update']
+type NullableUrl = string | null | undefined
 
 /** Hash a plaintext password using scrypt. Returns `salt:hash` hex string. */
 function hashPassword(plain: string): string {
@@ -33,33 +34,38 @@ const profileBodySchema = z.object({
   bio_short: z.string().max(6000).nullable().optional(),
   bio_medium: z.string().max(12000).nullable().optional(),
   bio_long: z.string().max(30000).nullable().optional(),
-  photo_url: z.string().url().nullable().optional(),
+  photo_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   genres: z.array(z.string()).optional(),
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Accepted here so the form submits a single payload; written to artists only.
-  website_url: z.string().url().nullable().optional(),
-  instagram_url: z.string().url().nullable().optional(),
-  youtube_url: z.string().url().nullable().optional(),
-  bandcamp_url: z.string().url().nullable().optional(),
-  spotify_url: z.string().url().nullable().optional(),
-  apple_music_url: z.string().url().nullable().optional(),
-  tiktok_url: z.string().url().nullable().optional(),
-  facebook_url: z.string().url().nullable().optional(),
+  website_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  instagram_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  youtube_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  bandcamp_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  spotify_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  apple_music_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  tiktok_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  facebook_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   press_quote: z.string().max(1000).nullable().optional(),
   founding_year: z.number().int().min(1900).max(2100).nullable().optional(),
   hometown: z.string().max(200).nullable().optional(),
   booking_contact: z.string().max(500).nullable().optional(),
   press_contact: z.string().max(500).nullable().optional(),
-  soundcloud_url: z.string().url().nullable().optional(),
-  custom_links: z.array(z.object({ label: z.string(), url: z.string() })).nullable().optional(),
-  rider_stage_plot_url: z.string().url().nullable().optional(),
-  rider_technical_url: z.string().url().nullable().optional(),
-  rider_hospitality_url: z.string().url().nullable().optional(),
+  soundcloud_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  custom_links: z.array(
+    z.object({
+      label: z.string(),
+      url: z.union([z.string().url(), z.literal(''), z.null()]),
+    }),
+  ).nullable().optional(),
+  rider_stage_plot_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  rider_technical_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  rider_hospitality_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   // EPK customisation
   epk_theme: z.string().max(50).optional(),
   epk_layout: z.enum(['classic', 'magazine', 'minimal', 'full-bleed']).optional(),
   epk_orientation: z.enum(['portrait', 'landscape']).optional(),
-  epk_bg_image_url: z.string().url().nullable().optional(),
+  epk_bg_image_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   epk_bg_opacity: z.number().int().min(0).max(100).optional(),
   epk_sections_order: z.array(z.string()).optional(),
   epk_sections_hidden: z.array(z.string()).optional(),
@@ -67,9 +73,11 @@ const profileBodySchema = z.object({
   epk_password_raw: z.string().max(200).nullable().optional(),
   epk_password_sections: z.array(z.string()).optional(),
   // EPK gallery + custom theme
-  epk_gallery_photos: z.array(z.string().url()).optional(),
+  epk_gallery_photos: z.array(z.union([z.string().url(), z.literal(''), z.null()])).optional(),
   epk_custom_theme_tokens: z.record(z.string(), z.string()).nullable().optional(),
 })
+
+const normalizeUrl = (v: NullableUrl): string | null => (v === '' ? null : v ?? null)
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
   // 1. Authenticate
@@ -116,6 +124,13 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     tiktok_url,
     facebook_url,
     soundcloud_url,
+    photo_url,
+    rider_stage_plot_url,
+    rider_technical_url,
+    rider_hospitality_url,
+    epk_bg_image_url,
+    custom_links,
+    epk_gallery_photos,
     // bio, genres, founding_year, and hometown are stored on artists (single source of truth);
     // extract them here so they are NOT passed to upsertArtistProfile.
     bio,
@@ -131,8 +146,25 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     epkPasswordHash = profileFields.epk_password_raw ? hashPassword(profileFields.epk_password_raw) : null
   }
 
+  const normalizedCustomLinks = custom_links == null
+    ? custom_links
+    : custom_links
+      .map((link) => ({ ...link, url: normalizeUrl(link.url) }))
+      .filter((link): link is { label: string; url: string } => link.url !== null)
+
+  const normalizedGalleryPhotos = epk_gallery_photos
+    ?.map((url) => normalizeUrl(url))
+    .filter((url): url is string => url !== null)
+
   const profileData = {
     ...profileFields,
+    ...(photo_url !== undefined ? { photo_url: normalizeUrl(photo_url) } : {}),
+    ...(rider_stage_plot_url !== undefined ? { rider_stage_plot_url: normalizeUrl(rider_stage_plot_url) } : {}),
+    ...(rider_technical_url !== undefined ? { rider_technical_url: normalizeUrl(rider_technical_url) } : {}),
+    ...(rider_hospitality_url !== undefined ? { rider_hospitality_url: normalizeUrl(rider_hospitality_url) } : {}),
+    ...(epk_bg_image_url !== undefined ? { epk_bg_image_url: normalizeUrl(epk_bg_image_url) } : {}),
+    ...(custom_links !== undefined ? { custom_links: normalizedCustomLinks } : {}),
+    ...(epk_gallery_photos !== undefined ? { epk_gallery_photos: normalizedGalleryPhotos } : {}),
     // Remove the raw password field; replace with hashed version
     epk_password_raw: undefined,
     ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
@@ -146,15 +178,15 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (genres !== undefined) artistUpdate.genres = genres
   if (founding_year !== undefined) artistUpdate.founding_year = founding_year
   if (hometown !== undefined) artistUpdate.hometown = hometown
-  if (website_url !== undefined) artistUpdate.website_url = website_url
-  if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
-  if (youtube_url !== undefined) artistUpdate.youtube_url = youtube_url
-  if (bandcamp_url !== undefined) artistUpdate.bandcamp_url = bandcamp_url
-  if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
-  if (apple_music_url !== undefined) artistUpdate.apple_music_url = apple_music_url
-  if (tiktok_url !== undefined) artistUpdate.tiktok_url = tiktok_url
-  if (facebook_url !== undefined) artistUpdate.facebook_url = facebook_url
-  if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = soundcloud_url
+  if (website_url !== undefined) artistUpdate.website_url = normalizeUrl(website_url)
+  if (instagram_url !== undefined) artistUpdate.instagram_url = normalizeUrl(instagram_url)
+  if (youtube_url !== undefined) artistUpdate.youtube_url = normalizeUrl(youtube_url)
+  if (bandcamp_url !== undefined) artistUpdate.bandcamp_url = normalizeUrl(bandcamp_url)
+  if (spotify_url !== undefined) artistUpdate.spotify_url = normalizeUrl(spotify_url)
+  if (apple_music_url !== undefined) artistUpdate.apple_music_url = normalizeUrl(apple_music_url)
+  if (tiktok_url !== undefined) artistUpdate.tiktok_url = normalizeUrl(tiktok_url)
+  if (facebook_url !== undefined) artistUpdate.facebook_url = normalizeUrl(facebook_url)
+  if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
 
   await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
 
