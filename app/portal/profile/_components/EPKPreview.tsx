@@ -611,13 +611,12 @@ interface EPKModalProps {
 export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
   const titleId = useId()
   const [downloading, setDownloading] = useState(false)
-  const modalDocumentRef = useRef<HTMLElement | null>(null)
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloading(true)
     try {
       const { generateEpkPdf } = await import('./epkPdf')
-      await generateEpkPdf(data, modalDocumentRef)
+      await generateEpkPdf(data)
     } catch {
       toast.error(dict.profile_error)
     } finally {
@@ -664,7 +663,7 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
         </div>
         <div className="overflow-y-auto max-h-[70vh] p-4 sm:p-6 epk-print-area">
           <EPKThemeProvider themeId={data.epkTheme} customTokens={data.epkCustomThemeTokens}>
-            <EPKDocument dict={dict} data={data} documentRef={modalDocumentRef} />
+            <EPKDocument dict={dict} data={data} />
           </EPKThemeProvider>
         </div>
       </DialogContent>

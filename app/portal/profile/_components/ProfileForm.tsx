@@ -92,7 +92,6 @@ interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
 function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
   const [pdfDownloading, setPdfDownloading] = React.useState(false)
   const [genreCatalogue, setGenreCatalogue] = React.useState<Genre[]>([])
-  const epkDocumentRef = React.useRef<HTMLElement | null>(null)
   const {
     form,
     photoUrl,
@@ -202,7 +201,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               setPdfDownloading(true)
               try {
                 const { generateEpkPdf } = await import('./epkPdf')
-                await generateEpkPdf(epkData, epkDocumentRef)
+                await generateEpkPdf(epkData)
               } catch {
                 // toast is not in scope here — the EPKModal handles error display
               } finally {
@@ -653,7 +652,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               epkOrientation={epkSettings.epkOrientation}
               epkBgImageUrl={epkSettings.epkBgImageUrl}
               epkBgOpacity={epkSettings.epkBgOpacity}
-              documentRef={epkDocumentRef}
+              documentRef={undefined}
               onSettingsChange={handleEpkSettingsChange}
             />
           </TabsContent>
