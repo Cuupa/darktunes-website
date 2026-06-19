@@ -158,6 +158,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   // Track whether the user just performed a drag gesture so we can suppress
   // the synthetic click that Embla/pointer fires after a swipe.
   const isDragging = useRef(false)
+  // True only while a pointer/touch is physically held down on the carousel.
+  // Used to distinguish user-initiated scroll (drag) from programmatic scrolls
+  // (autoplay, prev/next buttons, dot navigation) so we never block clicks
+  // that happen after a non-drag scroll settles.
+  const isPointerDown = useRef(false)
 
   // Pre-compute all date strings once — avoids repeated toLocaleDateString() on every swipe
   const formattedDates = useMemo(
@@ -271,15 +276,22 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   // Set isDragging=true when a drag starts, reset after click has had a chance to fire
   useEffect(() => {
     if (!emblaApi) return
-    const onPointerDown = () => { isDragging.current = false }
+    const onPointerDown = () => {
+      isPointerDown.current = true
+      isDragging.current = false
+    }
+    const onPointerUp = () => { isPointerDown.current = false }
     const onSettle = () => { setTimeout(() => { isDragging.current = false }, 50) }
-    // Embla doesn't have a dedicated dragStart event, so we detect via scroll
-    const onDragScroll = () => { isDragging.current = true }
+    // Only mark as dragging when the pointer is actually held down — this prevents
+    // autoplay / programmatic scrolls (prev/next/dot) from blocking subsequent clicks.
+    const onDragScroll = () => { if (isPointerDown.current) isDragging.current = true }
     emblaApi.on('pointerDown', onPointerDown)
+    emblaApi.on('pointerUp', onPointerUp)
     emblaApi.on('settle', onSettle)
     emblaApi.on('scroll', onDragScroll)
     return () => {
       emblaApi.off('pointerDown', onPointerDown)
+      emblaApi.off('pointerUp', onPointerUp)
       emblaApi.off('settle', onSettle)
       emblaApi.off('scroll', onDragScroll)
     }

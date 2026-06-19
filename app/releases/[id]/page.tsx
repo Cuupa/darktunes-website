@@ -25,6 +25,7 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getReleaseById } from '@/lib/api/releases'
+import { getArtistById } from '@/lib/api/artists'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ReleaseDetailContent } from './_components/ReleaseDetailContent'
 import { buildMusicAlbumSchema, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -60,6 +61,17 @@ function makeGetRelease(id: string) {
   )
 }
 
+function makeGetArtist(artistId: string) {
+  return unstable_cache(
+    async () => {
+      const client = createPublicSupabaseClient()
+      return getArtistById(client, artistId)
+    },
+    [`artist-by-id-${artistId}`],
+    { revalidate: 60, tags: ['artists', `artist-${artistId}`] },
+  )
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const release = await makeGetRelease(id)().catch(() => null)
@@ -82,14 +94,17 @@ export default async function ReleaseDetailPage({ params }: Props) {
     getLocale(),
   ])
   if (!release) notFound()
-  const dict = await getDictionary(locale)
+  const [dict, artist] = await Promise.all([
+    getDictionary(locale),
+    release.artistId ? makeGetArtist(release.artistId)().catch(() => null) : Promise.resolve(null),
+  ])
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildMusicAlbumSchema({ release })) }}
       />
-      <ReleaseDetailContent release={release} dict={dict.releaseDetail} locale={locale} />
+      <ReleaseDetailContent release={release} artist={artist} dict={dict.releaseDetail} locale={locale} />
     </>
   )
 }
