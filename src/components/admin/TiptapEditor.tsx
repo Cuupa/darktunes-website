@@ -57,6 +57,10 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
+        // StarterKit v3 bundles Link and Underline; disable them here so the
+        // explicitly configured extensions below do not create duplicates.
+        link: false,
+        underline: false,
       }),
       Link.configure({
         openOnClick: false,
