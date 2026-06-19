@@ -297,11 +297,11 @@ export function InvoiceForm({
                 <Input
                   type="number"
                   min={0}
-                  step={1}
+                  step={0.01}
                   disabled={isStatementLinked}
                   placeholder={dict.invoice_line_unit_price}
-                  value={item.unit_price_cents}
-                  onChange={(event) => updateLineItem(index, 'unit_price_cents', parseInt(event.target.value, 10) || 0)}
+                  value={item.unit_price_cents / 100}
+                  onChange={(event) => updateLineItem(index, 'unit_price_cents', Math.round(parseFloat(event.target.value) * 100) || 0)}
                 />
                 <Button
                   type="button"

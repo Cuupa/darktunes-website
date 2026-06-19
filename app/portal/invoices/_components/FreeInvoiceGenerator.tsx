@@ -406,14 +406,14 @@ export function FreeInvoiceGenerator({ billingProfile, dict }: FreeInvoiceGenera
                       updateLineItem(index, 'qty', parseInt(e.target.value, 10) || 1)
                     }
                   />
-                  <Input
+                    <Input
                     type="number"
                     min={0}
-                    step={1}
+                    step={0.01}
                     placeholder={dict.invoice_line_unit_price}
-                    value={item.unitPriceCents}
+                    value={item.unitPriceCents / 100}
                     onChange={(e) =>
-                      updateLineItem(index, 'unitPriceCents', parseInt(e.target.value, 10) || 0)
+                      updateLineItem(index, 'unitPriceCents', Math.round(parseFloat(e.target.value) * 100) || 0)
                     }
                   />
                   <Button
