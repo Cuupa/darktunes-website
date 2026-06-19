@@ -1,11 +1,13 @@
 'use client'
 
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Ticket, ArrowRight } from '@phosphor-icons/react'
+import { Input } from '@/components/ui/input'
+import { Calendar, MapPin, Ticket, ArrowRight, ArrowLeft, MagnifyingGlass } from '@phosphor-icons/react'
 import type { Concert } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -14,11 +16,43 @@ interface ConcertsProps extends SectionProps {
   concerts: Concert[]
   dict: Dictionary['concerts']
   locale: Locale
+  /** Number of concerts per page (default: 8). */
+  concertsPerPage?: number
+  /** When true, show only the first page and add a "View all" link to /events. */
+  concertsLinkToPage?: boolean
 }
 
-export function Concerts({ concerts, dict, locale }: ConcertsProps) {
+export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concertsLinkToPage = false }: ConcertsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
+  const [page, setPage] = useState(1)
+  const [query, setQuery] = useState('')
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const filteredConcerts = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return concerts
+    return concerts.filter(
+      (c) =>
+        (c.artistName?.toLowerCase().includes(q) ?? false) ||
+        (c.eventName?.toLowerCase().includes(q) ?? false) ||
+        (c.venueName?.toLowerCase().includes(q) ?? false) ||
+        (c.venueCity?.toLowerCase().includes(q) ?? false),
+    )
+  }, [concerts, query])
+
+  const perPage = Math.max(1, concertsPerPage)
+  const totalPages = Math.ceil(filteredConcerts.length / perPage)
+  const effectiveTotalPages = concertsLinkToPage ? 1 : totalPages
+  const currentPage = Math.min(page, Math.max(1, effectiveTotalPages))
+  const pageConcerts = filteredConcerts.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  // Reset to first page when the search query changes
+  useEffect(() => { setPage(1) }, [query])
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+  }, [currentPage])
 
   return (
     <section id="events" className="py-24 px-4 lg:px-16 scroll-mt-36">
@@ -44,7 +78,28 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
           )}
         </motion.div>
 
-        {concerts.length === 0 ? (
+        {/* Search input */}
+        <div className="relative mb-8 max-w-sm">
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={dict.searchPlaceholder}
+            className="pl-9"
+            aria-label={dict.searchPlaceholder}
+          />
+        </div>
+
+        {filteredConcerts.length === 0 && concerts.length > 0 ? (
+          <p className="text-center text-muted-foreground font-mono py-12">
+            {dict.noResults}
+          </p>
+        ) : concerts.length === 0 ? (
           <motion.div
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -57,8 +112,8 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
             </Card>
           </motion.div>
         ) : (
-          <div className="space-y-4">
-            {concerts.map((concert, index) => {
+          <div ref={listRef} className="space-y-4">
+            {pageConcerts.map((concert, index) => {
               const isCancelled = concert.status === 'cancelled'
               const location = [concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')
               return (
@@ -113,6 +168,42 @@ export function Concerts({ concerts, dict, locale }: ConcertsProps) {
                 </motion.div>
               )
             })}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {(effectiveTotalPages > 1 || concertsLinkToPage) && (
+          <div className="flex items-center justify-center gap-4 mt-12">
+            {effectiveTotalPages > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  aria-label="Previous page"
+                >
+                  <ArrowLeft size={18} aria-hidden="true" />
+                </Button>
+                <span className="text-sm text-muted-foreground font-mono">
+                  {currentPage} / {effectiveTotalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage((p) => Math.min(effectiveTotalPages, p + 1))}
+                  disabled={currentPage >= effectiveTotalPages}
+                  aria-label="Next page"
+                >
+                  <ArrowRight size={18} aria-hidden="true" />
+                </Button>
+              </>
+            )}
+            {concertsLinkToPage && filteredConcerts.length > perPage && (
+              <Button asChild variant="outline" size="lg" className="min-w-[160px]">
+                <Link href="/events">{dict.viewAll ?? 'View all events'}</Link>
+              </Button>
+            )}
           </div>
         )}
       </div>

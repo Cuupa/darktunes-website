@@ -63,7 +63,9 @@
     "viewAll": "Alle Events",
     "filterArtist": "Alle Künstler",
     "filterCountry": "Alle Länder",
-    "navLink": "Navigation"
+    "navLink": "Navigation",
+    "searchPlaceholder": "Events nach Künstler oder Venue suchen…",
+    "noResults": "Keine Events gefunden."
   },
   "spotify": {
     "heading": "SPOTIFY",
