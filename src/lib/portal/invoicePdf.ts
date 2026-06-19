@@ -33,10 +33,6 @@ type JsPdfDocument = {
   setLineWidth: (width: number) => void
   line: (x1: number, y1: number, x2: number, y2: number) => void
   output: (type: 'arraybuffer') => ArrayBuffer
-}
-
-type AutoTableDocument = JsPdfDocument & {
-  autoTable: (options: AutoTableOptions) => void
   lastAutoTable?: { finalY: number }
 }
 
@@ -48,8 +44,12 @@ type JsPdfConstructor = new (options: {
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { jsPDF } = require('jspdf') as { jsPDF: JsPdfConstructor }
+// jspdf-autotable v5 does not patch the jsPDF prototype in Node.js (no window),
+// so we use the standalone autoTable(doc, options) function instead of doc.autoTable().
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-require('jspdf-autotable')
+const { autoTable: autoTableFn } = require('jspdf-autotable') as {
+  autoTable: (doc: JsPdfDocument, options: AutoTableOptions) => void
+}
 
 export interface InvoiceLineItem {
   description: string
@@ -116,7 +116,7 @@ function buildPartyLines(party: BillingParty): string[] {
 }
 
 function drawTextLines(
-  doc: AutoTableDocument,
+  doc: JsPdfDocument,
   lines: string[],
   startX: number,
   startY: number,
@@ -134,7 +134,7 @@ function drawTextLines(
 }
 
 export function generateInvoicePdf(options: InvoicePdfOptions): Uint8Array {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as AutoTableDocument
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const pageWidth = 210
   const pageHeight = 297
@@ -211,7 +211,7 @@ export function generateInvoicePdf(options: InvoicePdfOptions): Uint8Array {
   const taxCents = Math.round(subtotalCents * (options.taxRatePct / 100))
   const totalCents = subtotalCents + taxCents
 
-  doc.autoTable({
+  autoTableFn(doc, {
     startY: cursorY,
     head: [['Beschreibung', 'Menge', 'Einzelpreis', 'Gesamt']],
     body: options.lineItems.map((item) => [
