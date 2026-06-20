@@ -315,6 +315,16 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const bandsintownId = watch('bandsintownId')
   const bandsintownApiKey = watch('bandsintownApiKey')
 
+  // Auto-fill Bandsintown Artist ID with the artist name while user hasn't manually changed it
+  const lastAutoBandsintownId = useRef(name)
+  useEffect(() => {
+    if (mode === 'artist') return
+    if (!bandsintownId || bandsintownId === lastAutoBandsintownId.current) {
+      setValue('bandsintownId', name)
+      lastAutoBandsintownId.current = name
+    }
+  }, [name, bandsintownId, setValue, mode])
+
   const handleFetchImage = async () => {
     if (!spotifyId && !discogsId) {
       toast.error('Enter a Spotify ID or Discogs ID first')

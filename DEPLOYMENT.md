@@ -164,7 +164,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 ### YouTube Video Sync (optional — sync channel videos)
 - `YOUTUBE_API_KEY`: Google Cloud API key with YouTube Data API v3 enabled. See https://console.developers.google.com → Enable YouTube Data API v3.
 - `YOUTUBE_CHANNEL_ID`: Your YouTube channel ID (starts with `UC`). Used by `POST /api/sync-youtube` to fetch and upsert the latest videos.
-- `CRON_SECRET`: Optional Bearer token for Vercel cron calls to `POST /api/sync-youtube`. If set, cron requests must send `Authorization: Bearer <CRON_SECRET>`.
+- `CRON_SECRET`: Optional shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync-youtube`, and `/api/sync-api`. If set, callers must send `Authorization: ****** `****** Also required by the `trigger-sync` Supabase Edge Function (see below).
 
 ### Newsletter Double Opt-In (optional — confirmation email delivery)
 These variables are shared between the **Supabase Edge Function** (`newsletter-confirm`) and the Next.js app. Configure `RESEND_*` both as Supabase Edge Function secrets (for DOI emails) and in Vercel when you want the contact form Route Handler to send mail.
@@ -245,6 +245,63 @@ Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
 
 Without these secrets, the `newsletter-confirm` Edge Function will fail silently
 and DOI confirmation emails will never be delivered.
+
+### `trigger-sync` Edge Function (API Sync Trigger)
+
+The `trigger-sync` Edge Function lets all data sync operations be triggered from
+Supabase (scheduled Supabase Cron, Database Webhooks, or manual HTTP calls)
+**independently of Vercel Cron Jobs**.
+
+```bash
+# Deploy the trigger-sync Edge Function
+supabase functions deploy trigger-sync --project-ref <your-project-ref>
+```
+
+Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
+- `SITE_URL` — your production Next.js URL (e.g. `https://darktunes.com`)
+- `CRON_SECRET` — same value as your Vercel `CRON_SECRET` env var
+
+#### Supported sync types
+
+| `type` value  | Next.js route called   | What it does                          |
+|---------------|------------------------|---------------------------------------|
+| `all`         | `POST /api/sync`       | Enqueue full sync for all artists     |
+| `youtube`     | `POST /api/sync-youtube` | Sync YouTube channel videos         |
+| `itunes`      | `POST /api/sync-api`   | Sync iTunes releases for all artists  |
+| `spotify`     | `POST /api/sync-api`   | Sync Spotify releases                 |
+| `discogs`     | `POST /api/sync-api`   | Sync Discogs releases                 |
+| `songkick`    | `POST /api/sync-api`   | Sync Songkick concert dates           |
+| `bandsintown` | `POST /api/sync-api`   | Sync Bandsintown concerts (per-artist key) |
+| `odesli`      | `POST /api/sync-api`   | Resolve Odesli smart links            |
+
+#### Usage examples
+
+**Manual HTTP call:**
+```bash
+curl -X POST \
+  'https://<project>.supabase.co/functions/v1/trigger-sync?type=bandsintown' \
+  -H 'Authorization: ****** <SUPABASE_ANON_KEY>'
+```
+
+**Supabase Cron (Dashboard → Database → Cron Jobs):**
+```
+Path:     /trigger-sync?type=all
+Schedule: 0 3 * * *   # daily at 03:00 UTC
+```
+
+**Supabase Database Webhook (triggers after specific DB events):**
+```
+URL:     https://<project>.supabase.co/functions/v1/trigger-sync
+Method:  POST
+Headers: Authorization: ****** <SUPABASE_ANON_KEY>
+Body:    { "type": "bandsintown" }
+```
+
+> **Bandsintown sync note:** The `bandsintown` sync type iterates through every
+> artist in the database that has **both** `bandsintown_id` **and** `bandsintown_api_key`
+> (per-artist field) set. Artists missing either field are silently skipped.
+> No global `BANDSINTOWN_API_KEY` env var is required — the per-artist key is
+> used exclusively.
 
 ---
 

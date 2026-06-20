@@ -192,12 +192,22 @@ Release deduplication: `src/lib/sync/deduplication.ts` merges Spotify + Discogs 
 `syncAllReleases()` in `useReleases.ts` returns the full `SyncAllResult` (typed import from `src/lib/sync/syncAll.ts`). `ReleasesManager` parses the result: on success shows a toast with total items synced; on errors shows a warning toast and a "View Errors" button that opens a dialog with per-API error details.
 
 Cron Jobs (Vercel):
-  Three cron jobs are configured in `vercel.json`:
+  Three cron jobs can be configured in `vercel.json`:
   - `/api/sync-youtube` — daily at 06:00 UTC: fetches latest YouTube channel videos.
   - `/api/sync` — daily at 03:00 UTC: enqueues async sync jobs for all artists into `sync_queue` and returns immediately.
   - `/api/process-sync-queue` — every 5 minutes: picks one pending job from `sync_queue`, syncs that artist (iTunes), marks it done/failed. maxDuration: 60s.
-  All routes accept either a ****** (manual trigger) or a Vercel cron call (`x-vercel-cron: 1` header) optionally guarded by `CRON_SECRET` env var.
+  All routes accept either a ****** (manual trigger), a Vercel cron call (`x-vercel-cron: 1` header),
+  or a CRON_SECRET ****** (from a Supabase Edge Function or external scheduler) — all optionally guarded by `CRON_SECRET` env var.
   The `isValidCronSecret` helper uses `timingSafeEqual` to prevent timing attacks.
+
+Supabase Sync Triggers (`supabase/functions/trigger-sync/index.ts`):
+  The `trigger-sync` Supabase Edge Function is an alternative to Vercel Cron Jobs.
+  It accepts a `type` query parameter or JSON body field with one of these values:
+  `all`, `youtube`, `itunes`, `spotify`, `discogs`, `songkick`, `bandsintown`, `odesli`.
+  It then calls the corresponding Next.js sync route using `CRON_SECRET` authentication.
+  Required Edge Function secrets: `SITE_URL` (Next.js app URL) and `CRON_SECRET` (must match Vercel env var).
+  Can be scheduled via Supabase Cron (Dashboard → Database → Cron Jobs) or triggered by a Database Webhook.
+  Deploy with: `supabase functions deploy trigger-sync --project-ref <ref>`
 
 Async Sync Queue (`sync_queue` table):
   `POST /api/sync` enqueues one row per artist with `status='pending'` — it does NOT run the sync inline.
@@ -457,7 +467,9 @@ Verification: `GET /api/newsletter/verify?token=<uuid>` looks up the pending row
 Anti-enumeration: duplicate email submissions return a silent success — the user is never told whether the address is already registered.
 Legacy REST fallback: `POST /api/newsletter` (Route Handler) still accepts subscriptions for server-to-server integrations and testing; it follows the same pending+token pattern.
 DAL: `createPendingSubscriber(db, email, token, name?)` and `verifySubscriberToken(db, token)` in `src/lib/api/newsletter.ts`. Both require a service-role client to bypass RLS.
-Edge Function secrets (set in Supabase Dashboard → Edge Functions → Secrets): RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL.
+Edge Function secrets (set in Supabase Dashboard → Edge Functions → Secrets):
+  - `newsletter-confirm`: RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL.
+  - `trigger-sync`: SITE_URL (your Next.js production URL), CRON_SECRET (must match Vercel env var).
 
 Responsive Design & Layout Integrity
 MANDATORY: All UI components MUST follow the rules below.
