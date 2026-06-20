@@ -5,19 +5,29 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Calendar,
   ArrowLeft,
   LinkSimple,
   Globe,
+  SpotifyLogo,
+  InstagramLogo,
+  YoutubeLogo,
+  FacebookLogo,
+  TwitterLogo,
+  TiktokLogo,
+  MusicNote,
 } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
-import type { Release } from '@/types'
+import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import type { Release, Artist } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ReleaseDetailContentProps {
   release: Release
+  artist?: Artist | null
   dict: Dictionary['releaseDetail']
   locale: Locale
 }
@@ -39,7 +49,7 @@ interface ReleaseDetailContentProps {
  * platform buttons are rendered for all available services (Deezer, Tidal,
  * Amazon Music, etc.) rather than only Spotify and Apple Music.
  */
-export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailContentProps) {
+export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseDetailContentProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
   const formattedDate = new Date(release.releaseDate).toLocaleDateString(dateLocale, {
@@ -192,6 +202,61 @@ export function ReleaseDetailContent({ release, dict, locale }: ReleaseDetailCon
                   </div>
                 )}
               </div>
+
+              {/* Promo / description text */}
+              {release.promoText && (
+                <div className="pt-2 border-t border-border/40">
+                  <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
+                    {dict.promoText}
+                  </p>
+                  <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
+                    {release.promoText}
+                  </p>
+                </div>
+              )}
+
+              {/* Artist social links */}
+              {artist && (() => {
+                const socialLinks = [
+                  { url: artist.spotifyUrl,    icon: SpotifyLogo,    label: `${artist.name} on Spotify` },
+                  { url: artist.appleMusicUrl, icon: MusicNote,      label: `${artist.name} on Apple Music` },
+                  { url: artist.instagramUrl,  icon: InstagramLogo,  label: `${artist.name} on Instagram` },
+                  { url: artist.youtubeUrl,    icon: YoutubeLogo,    label: `${artist.name} on YouTube` },
+                  { url: artist.facebookUrl,   icon: FacebookLogo,   label: `${artist.name} on Facebook` },
+                  { url: artist.twitterUrl,    icon: TwitterLogo,    label: `${artist.name} on X (Twitter)` },
+                  { url: artist.tiktokUrl,     icon: TiktokLogo,     label: `${artist.name} on TikTok` },
+                  { url: artist.bandcampUrl,   icon: BandcampIcon,   label: `${artist.name} on Bandcamp` },
+                  { url: artist.websiteUrl,    icon: Globe,          label: `${artist.name} official website` },
+                ].filter((s) => s.url)
+                if (socialLinks.length === 0) return null
+                return (
+                  <div className="pt-2 border-t border-border/40">
+                    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                      {dict.artistConnect}
+                    </p>
+                    <TooltipProvider>
+                      <div className="flex flex-wrap gap-2">
+                        {socialLinks.map(({ url, icon: Icon, label }) => (
+                          <Tooltip key={label}>
+                            <TooltipTrigger asChild>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={label}
+                                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                              >
+                                <Icon size={20} weight="fill" aria-hidden="true" />
+                              </a>
+                            </TooltipTrigger>
+                            <TooltipContent>{label}</TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    </TooltipProvider>
+                  </div>
+                )
+              })()}
             </motion.div>
           </div>
         </div>

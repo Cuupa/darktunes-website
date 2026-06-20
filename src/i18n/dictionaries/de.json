@@ -125,7 +125,9 @@
   "releaseDetail": {
     "backToReleases": "Alle Releases",
     "featured": "Featured",
-    "listenEverywhere": "Überall anhören"
+    "listenEverywhere": "Überall anhören",
+    "promoText": "Über diesen Release",
+    "artistConnect": "Dem Künstler folgen"
   },
   "artistDetail": {
     "backToArtists": "Zurück zu Künstlern",

@@ -125,7 +125,9 @@
   "releaseDetail": {
     "backToReleases": "All Releases",
     "featured": "Featured",
-    "listenEverywhere": "Listen Everywhere"
+    "listenEverywhere": "Listen Everywhere",
+    "promoText": "About",
+    "artistConnect": "Follow the Artist"
   },
   "artistDetail": {
     "backToArtists": "Back to Artists",
@@ -650,7 +652,7 @@
     "statements_status_approved": "Approved",
     "statements_status_notified": "Notified",
     "statements_status_acknowledged": "Acknowledged",
-    "statements_create_invoice": "Create invoice", 
+    "statements_create_invoice": "Create invoice",
     "documents": "Documents",
     "documents_heading": "Document Vault",
     "documents_desc": "Secure storage for contracts, split agreements, and GEMA filings.",
