@@ -42,7 +42,7 @@ async function verifyToken(token: string): Promise<void> {
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  // 1. Authenticate
+  // 1. Authenticate — accept Vercel cron, CRON_SECRET Bearer, or user ******
   const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
   const cronSecret = process.env.CRON_SECRET
@@ -50,6 +50,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
       throw new ApiError(401, 'Invalid cron secret')
     }
+  } else if (cronSecret && isValidCronSecret(authHeader, cronSecret)) {
+    // CRON_SECRET ****** allowed for Supabase Edge Functions and external schedulers
   } else {
     if (!authHeader.startsWith('Bearer ')) {
       throw new ApiError(401, 'Missing or invalid Authorization header')

@@ -30,7 +30,7 @@ const BASE_ROW: ArtistRow = {
   discogs_id: null,
   songkick_id: null,
   bandsintown_id: null,
-  last_synced_at: null,
+  bandsintown_api_key: null,  last_synced_at: null,
   user_id: null,
   facebook_url: null,
   twitter_url: null,
