@@ -15,9 +15,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { isValidCronSecret } from '@/lib/cronAuth'
 import { enqueueArtistSyncJobs } from '@/lib/api/syncQueue'
 import type { ServerEnv } from '@/lib/env.server'
 
@@ -27,14 +27,6 @@ export const maxDuration = 300
 // ---------------------------------------------------------------------------
 // Auth helpers
 // ---------------------------------------------------------------------------
-
-function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
-  const expected = `Bearer ${cronSecret}`
-  const authBuffer = Buffer.from(authHeader, 'utf-8')
-  const expectedBuffer = Buffer.from(expected, 'utf-8')
-  if (authBuffer.length !== expectedBuffer.length) return false
-  return timingSafeEqual(authBuffer, expectedBuffer)
-}
 
 async function verifyToken(token: string, env: ServerEnv): Promise<void> {
   const admin = createClient(

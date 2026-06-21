@@ -19,41 +19,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { claimNextSyncJob, markSyncJobDone, markSyncJobFailed } from '@/lib/api/syncQueue'
 import { syncArtist } from '@/lib/sync/syncArtist'
-import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import { createSyncUploadFn } from '@/lib/r2Utils'
+import { isValidCronSecret } from '@/lib/cronAuth'
 
 // One artist sync must finish within 60 seconds
 export const maxDuration = 60
-
-function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
-  const expected = `Bearer ${cronSecret}`
-  const authBuffer = Buffer.from(authHeader, 'utf-8')
-  const expectedBuffer = Buffer.from(expected, 'utf-8')
-  if (authBuffer.length !== expectedBuffer.length) return false
-  return timingSafeEqual(authBuffer, expectedBuffer)
-}
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { serverEnv } = await import('@/lib/env.server')
 
   // Authenticate — accept Vercel cron header or CRON_SECRET bearer token
-  const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
   const { CRON_SECRET: cronSecret } = serverEnv
-
-  if (isCron) {
-    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Unauthorized')
-    }
-  } else {
-    // Allow manual trigger from admin with a valid cron secret
-    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Unauthorized')
-    }
+  if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
+    throw new ApiError(401, 'Unauthorized')
   }
 
   // Set up service-role DB client
@@ -75,22 +58,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   // Set up R2 upload helper
-  const {
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-    CLOUDFLARE_R2_BUCKET_NAME,
-    CLOUDFLARE_R2_PUBLIC_URL,
-  } = serverEnv
-
-  const s3 = createR2Client(
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  const uploadFn = createSyncUploadFn(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+    serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
-
-  const uploadFn = (imageUrl: string, keyPrefix: string) =>
-    uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
 
   // Process the job — syncArtist never throws; errors go into result.errors
   try {
