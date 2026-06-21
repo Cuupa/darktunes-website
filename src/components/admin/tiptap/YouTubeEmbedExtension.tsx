@@ -21,26 +21,38 @@ import type { NodeViewProps } from '@tiptap/react'
  *   https://youtu.be/VIDEO_ID
  *   https://www.youtube.com/embed/VIDEO_ID
  *   https://www.youtube-nocookie.com/embed/VIDEO_ID
+ *   https://www.youtube.com/shorts/VIDEO_ID
+ *   https://www.youtube.com/v/VIDEO_ID
  */
 export function extractYouTubeId(url: string): string | null {
   const trimmed = url.trim()
+  const isVideoId = (value: string): boolean => /^[A-Za-z0-9_-]{11}$/.test(value)
+
   try {
-    const parsed = new URL(trimmed)
+    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+    const hostname = parsed.hostname.replace(/^www\./, '').toLowerCase()
+
     // youtu.be/<id>
-    if (parsed.hostname === 'youtu.be') {
-      return parsed.pathname.slice(1).split('?')[0] || null
+    if (hostname === 'youtu.be') {
+      const shortId = parsed.pathname.slice(1).split('/')[0]
+      return isVideoId(shortId) ? shortId : null
     }
-    // youtube.com/watch?v=<id>
-    const v = parsed.searchParams.get('v')
-    if (v) return v
-    // youtube.com/embed/<id>
-    const embedMatch = parsed.pathname.match(/\/embed\/([^/?]+)/)
-    if (embedMatch) return embedMatch[1]
+
+    // youtube.com/watch?v=<id> and variants
+    if (hostname === 'youtube.com' || hostname === 'm.youtube.com' || hostname === 'youtube-nocookie.com') {
+      const v = parsed.searchParams.get('v')
+      if (v && isVideoId(v)) return v
+
+      // youtube.com/embed/<id>, /shorts/<id>, /v/<id>
+      const pathMatch = parsed.pathname.match(/\/(?:embed|shorts|v)\/([A-Za-z0-9_-]{11})(?:[/?]|$)/)
+      if (pathMatch) return pathMatch[1]
+    }
   } catch {
     // fall through
   }
+
   // bare ID (11-char alphanumeric)
-  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed
+  if (isVideoId(trimmed)) return trimmed
   return null
 }
 
@@ -105,7 +117,27 @@ export const YouTubeEmbedExtension = Node.create({
         getAttrs: (node) => {
           if (typeof node === 'string') return {}
           const el = node as HTMLElement
-          return { 'data-video-id': el.getAttribute('data-video-id') ?? null }
+          const attributeId = el.getAttribute('data-video-id')
+          if (attributeId && extractYouTubeId(attributeId)) {
+            return { 'data-video-id': attributeId }
+          }
+
+          const iframeSrc = el.querySelector('iframe')?.getAttribute('src')
+          const fallbackId = iframeSrc ? extractYouTubeId(iframeSrc) : null
+          if (fallbackId) return { 'data-video-id': fallbackId }
+
+          return false
+        },
+      },
+      {
+        tag: 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"], iframe[src*="youtu.be"]',
+        getAttrs: (node) => {
+          if (typeof node === 'string') return false
+          const el = node as HTMLElement
+          const src = el.getAttribute('src')
+          const videoId = src ? extractYouTubeId(src) : null
+          if (!videoId) return false
+          return { 'data-video-id': videoId }
         },
       },
     ]

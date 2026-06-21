@@ -577,6 +577,38 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   )}
                 />
               </Field>
+
+              {/* SubmitHub Section */}
+              <div className="space-y-4 pt-4 border-t border-border">
+                <div>
+                  <p className="text-sm font-semibold">SubmitHub Section</p>
+                  <p className="text-xs text-muted-foreground">Shown on the About page as a music submission CTA.</p>
+                </div>
+                <Field id="submitHubUrl" label="SubmitHub Playlister URL" error={errors.submitHubUrl?.message}>
+                  <Input
+                    id="submitHubUrl"
+                    placeholder="https://www.submithub.com/playlister/your-profile"
+                    {...register('submitHubUrl')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+                <Field id="submitHubLabel" label="SubmitHub Button Label (optional)" error={errors.submitHubLabel?.message}>
+                  <Input
+                    id="submitHubLabel"
+                    placeholder="Submit Your Music"
+                    {...register('submitHubLabel')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+                <Field id="submitHubDescription" label="SubmitHub Section Description (optional)" error={errors.submitHubDescription?.message}>
+                  <Input
+                    id="submitHubDescription"
+                    placeholder="Send us your demo…"
+                    {...register('submitHubDescription')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -629,33 +661,6 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   id="shopifyStoreUrl"
                   placeholder="https://your-store.myshopify.com"
                   {...register('shopifyStoreUrl')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
-              <Field id="submitHubUrl" label="SubmitHub Playlister URL" error={errors.submitHubUrl?.message}>
-                <Input
-                  id="submitHubUrl"
-                  placeholder="https://www.submithub.com/playlister/your-profile"
-                  {...register('submitHubUrl')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
-              <Field id="submitHubLabel" label="SubmitHub Button Label (optional, overrides default)" error={errors.submitHubLabel?.message}>
-                <Input
-                  id="submitHubLabel"
-                  placeholder="Submit Your Music"
-                  {...register('submitHubLabel')}
-                  disabled={isSubmitting}
-                />
-              </Field>
-
-              <Field id="submitHubDescription" label="SubmitHub Section Description (optional)" error={errors.submitHubDescription?.message}>
-                <Input
-                  id="submitHubDescription"
-                  placeholder="Send us your demo…"
-                  {...register('submitHubDescription')}
                   disabled={isSubmitting}
                 />
               </Field>
