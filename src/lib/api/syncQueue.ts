@@ -114,7 +114,7 @@ export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
     .update({
       status: 'running',
       started_at: new Date().toISOString(),
-      attempt_count: db.rpc as unknown as number, // placeholder — handled below
+      // attempt_count is incremented separately below
     })
     .eq('id', jobId)
     .eq('status', 'pending') // optimistic lock — prevent double-claim
@@ -167,7 +167,7 @@ export async function markSyncJobFailed(
       status: willRetry ? 'pending' : 'failed',
       finished_at: willRetry ? null : new Date().toISOString(),
       error_message: errorMessage,
-      scheduled_at: willRetry ? scheduledAt : undefined,
+      ...(willRetry ? { scheduled_at: scheduledAt } : {}),
     })
     .eq('id', jobId)
 

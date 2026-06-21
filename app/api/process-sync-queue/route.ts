@@ -101,6 +101,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     })
 
     if (result.errors && result.errors.length > 0) {
+      // job.attemptCount reflects the incremented value after claimNextSyncJob
       await markSyncJobFailed(db, job.id, result.errors.join('; '), job.attemptCount)
     } else {
       await markSyncJobDone(db, job.id)
