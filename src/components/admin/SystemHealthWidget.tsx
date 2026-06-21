@@ -126,7 +126,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const handleForceSync = async () => {
     setSyncing(true)
     try {
-      const res = await fetch('/api/sync', {
+      const resQueue = await fetch('/api/sync/queue', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${bearerToken}`,
@@ -134,24 +134,30 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         },
       })
 
-      const data: unknown = await res.json()
+      const dataQueue: unknown = await resQueue.json()
 
-      if (!res.ok) {
-        const errorData = data as { error?: string }
-        throw new Error(errorData.error ?? `Sync failed with status ${res.status}`)
-      }
+      const resExecute = await fetch('/api/sync/execute', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
 
-      const result = data as { totalErrors: number; results: Array<{ api: string; releasesUpserted: number; errors: string[] }> }
+      const dataExecute: unknown = await resExecute.json()
 
-      if (result.totalErrors === 0) {
+      const resultQueue = dataQueue as { totalErrors: number; results: Array<{ api: string; releasesUpserted: number; errors: string[] }> }
+      const resultExecute = dataExecute as { totalErrors: number; results: Array<{ api: string; releasesUpserted: number; errors: string[] }> }
+
+      if (resultQueue.totalErrors === 0 && resultExecute.totalErrors === 0) {
         toast.success('Sync completed successfully across all APIs.')
       } else {
         toast.warning(
-          `Sync completed with ${result.totalErrors} error(s). Check the console for details.`,
+          `Sync completed with ${resultQueue.totalErrors} error(s). Check the console for details.`,
         )
       }
 
-      // Refresh health data after sync
+      // Refresh health dataQueue after sync
       await fetchHealth()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

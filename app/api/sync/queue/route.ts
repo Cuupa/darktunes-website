@@ -1,7 +1,7 @@
 /**
  * app/api/sync/route.ts — Manual "sync all artists" trigger
  *
- * POST /api/sync
+ * POST /api/sync/queue
  * Auth: Supabase session token (Bearer) or Vercel Cron (x-vercel-cron: 1)
  *
  * Enqueues async sync jobs for every artist in the database into the
@@ -24,10 +24,6 @@ import type { ServerEnv } from '@/lib/env.server'
 // Route-segment config: allow up to 300 seconds on Vercel Pro.
 export const maxDuration = 300
 
-// ---------------------------------------------------------------------------
-// Auth helpers
-// ---------------------------------------------------------------------------
-
 async function verifyToken(token: string, env: ServerEnv): Promise<void> {
   const admin = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -38,30 +34,23 @@ async function verifyToken(token: string, env: ServerEnv): Promise<void> {
   if (error || !data.user) throw new ApiError(401, 'Unauthorized')
 }
 
-// ---------------------------------------------------------------------------
-// Route Handler
-// ---------------------------------------------------------------------------
-
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { serverEnv } = await import('@/lib/env.server')
 
-  // 1. Authenticate — accept either a Vercel cron call or a user token
-  const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
   const { CRON_SECRET: cronSecret } = serverEnv
-  if (isCron) {
-    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Unauthorized')
-    }
-  } else {
-    if (!authHeader.startsWith('Bearer ')) {
-      throw new ApiError(401, 'Missing or invalid Authorization header')
-    }
-    await verifyToken(authHeader.slice(7), serverEnv)
+
+  if (!authHeader.startsWith('Bearer ')) {
+    throw new ApiError(401, 'Missing or invalid Authorization header')
+  }
+  if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
+    throw new ApiError(401, 'Unauthorized')
   }
 
+  await verifyToken(authHeader.slice(7), serverEnv)
+
   // 2. Load all artist IDs
-  const db = createClient<Database>(
+    const db = createClient<Database>(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } },
@@ -78,12 +67,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   const artistIds = (artists ?? []).map((a) => a.id)
 
-  // 3. Enqueue one job per artist (skips artists already queued)
   const queued = await enqueueArtistSyncJobs(db, artistIds, 'full')
 
   return NextResponse.json({
     queued,
     total: artistIds.length,
-    message: queued + ' sync job(s) enqueued. Processing runs via cron every 5 minutes.',
+    message: queued + ' sync job(s) enqueued.',
   })
 })

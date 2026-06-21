@@ -154,27 +154,50 @@ serve(async (req: Request) => {
     // Dispatch to the appropriate Next.js sync route
     let targetUrl: string
     let requestBody: Record<string, string> | undefined
+    let response: Response
 
     if (syncType === 'all') {
-      targetUrl = `${siteUrl}/api/sync`
-    } else if (syncType === 'youtube') {
-      targetUrl = `${siteUrl}/api/sync-youtube`
-    } else if (syncType === 'process-queue') {
-      targetUrl = `${siteUrl}/api/process-sync-queue`
-      // No requestBody needed — the processor picks the next pending job itself
-    } else {
-      targetUrl = `${siteUrl}/api/sync-api`
-      requestBody = { apiSource: syncType }
-    }
+      targetUrl = `${siteUrl}/api/sync/queue`
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
+      })
 
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
-    })
+      targetUrl = `${siteUrl}/api/sync/execute`
+
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
+      })
+
+    } else {
+      if (syncType === 'youtube') {
+        targetUrl = `${siteUrl}/api/sync-youtube`
+      } else if (syncType === 'process-queue') {
+        targetUrl = `${siteUrl}/api/process-sync-queue`
+        // No requestBody needed — the processor picks the next pending job itself
+      } else {
+        targetUrl = `${siteUrl}/api/sync-api`
+        requestBody = {apiSource: syncType}
+      }
+
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
+      })
+    }
 
     const responseBody: unknown = await response.json()
 

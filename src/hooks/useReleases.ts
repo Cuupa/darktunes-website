@@ -85,12 +85,20 @@ export function useReleases() {
       } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
 
-      const res = await fetch('/api/sync', {
+      const resQueue = await fetch('/api/sync/queue', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       })
+
+      const res = await fetch('/api/sync/execute', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
       if (!res.ok) {
         const text = await res.text()
         throw new Error(`Sync failed: ${text}`)
