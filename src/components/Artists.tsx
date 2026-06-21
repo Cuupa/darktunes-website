@@ -132,7 +132,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                 variants={prefersReducedMotion ? undefined : itemVariants}
               >
                 <Card
-                  className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full relative"
+                  className="glow-card group bg-card border-border overflow-hidden hover:border-primary/50 transition-all duration-300 h-full relative cursor-pointer"
                 >
                   {/* Stretched link — navigates to artist detail page. Social icons sit above via z-[2]. */}
                   <Link
@@ -180,14 +180,14 @@ export function Artists({ artists, dict }: ArtistsProps) {
                     <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">
                       {artist.bio}
                     </p>
-                    <div className="relative z-[2] flex flex-wrap gap-2">
+                    <div className="relative z-[2] flex flex-wrap gap-2 pointer-events-none">
                       {artist.spotifyUrl && (
                         <a
                           href={artist.spotifyUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on Spotify`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <SpotifyLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -198,7 +198,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on Instagram`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <InstagramLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -209,7 +209,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on YouTube`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <YoutubeLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -220,7 +220,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on Facebook`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <FacebookLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -231,7 +231,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on X (Twitter)`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <TwitterLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -242,7 +242,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on TikTok`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <TiktokLogo size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -253,7 +253,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} on Bandcamp`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <BandcampIcon size={20} aria-hidden="true" />
                         </a>
@@ -264,7 +264,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} merch shop`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
                         >
                           <ShoppingBag size={20} weight="fill" aria-hidden="true" />
                         </a>
@@ -275,7 +275,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} official website`}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
+                          className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                         >
                           <Globe size={20} weight="fill" aria-hidden="true" />
                         </a>
