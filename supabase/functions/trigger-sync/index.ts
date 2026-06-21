@@ -24,7 +24,6 @@
  * 1. Scheduled via Supabase Cron (Dashboard → Database → Cron Jobs):
  *      Path:    /trigger-sync?type=all
  *      Method:  POST
- *      Schedule: 0 3 * * * (daily at 03:00 UTC)
  *
  * 2. Triggered via Supabase Database Webhook (Dashboard → Database → Webhooks):
  *      URL:     https://<project>.supabase.co/functions/v1/trigger-sync
@@ -35,7 +34,6 @@
  * 3. Scheduled for queue processing (every 5 minutes):
  *      Path:    /trigger-sync?type=process-queue
  *      Method:  POST
- *      Schedule: */5 * * * * (every 5 minutes)
  *      Note: Each invocation processes exactly one job. Schedule frequently enough
  *            to drain the queue in a reasonable time.
  *
