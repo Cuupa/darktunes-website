@@ -84,8 +84,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     const distInSlides = diffToTarget * Math.max(1, snapCount - 1)
     const abs = Math.abs(distInSlides)
 
-    // Set pointerEvents on the outer slide node (not the 3D-transformed inner)
-    // so the browser's hit-test area matches the visual layout position.
     const slideNode = slideNodes[snapIndex] as HTMLElement | null
     const inner = slideNode?.firstElementChild as HTMLElement | null
     if (!inner || !slideNode) return
@@ -94,6 +92,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
       inner.style.filter = ''
+      inner.style.pointerEvents = 'none'
       slideNode.style.pointerEvents = 'none'
       return
     }
@@ -103,6 +102,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       inner.style.transform = ''
       inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
+      inner.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
       slideNode.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
       return
     }
@@ -117,10 +117,14 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     inner.style.opacity = String(Math.max(0, opacity))
     const blurPx = Math.min(3, abs * 1.2)
     inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
-    // Only the centre slide (abs < 0.5) is fully interactive; side slides are
-    // decorative and must not intercept pointer events meant for the front card.
-    // pointerEvents is set on the outer slideNode (which is NOT 3D-transformed)
-    // so the browser hit-test box aligns with the user's cursor position.
+    // Only the centre slide (abs < 0.5) is fully interactive; side slides must
+    // not intercept pointer events meant for the front card.
+    // pointer-events is set on BOTH the outer slideNode and the 3D-transformed
+    // inner element: with preserve-3d Chrome resolves hit-tests directly on the
+    // 3D surface (inner) rather than cascading from the parent (slideNode), so
+    // setting it only on slideNode leaves inner's pointer-events as 'auto' and
+    // side slides still intercept clicks on the active centre card.
+    inner.style.pointerEvents = abs < 0.5 ? '' : 'none'
     slideNode.style.pointerEvents = abs < 0.5 ? '' : 'none'
   })
 }
@@ -147,13 +151,18 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
  *   still serving as a natural LRU image cache via the browser's own cache.
  *
  * 3D CSS architecture (avoids the preserve-3d / overflow-hidden flattening trap):
- * - `perspective` lives on an outer wrapper div — NOT on the overflow-hidden
- *   Embla viewport.  This keeps the 3D context intact.
- * - `overflow-hidden` is on the Embla viewport (clips card edges only).
+ * - `overflow-hidden` lives on the outermost wrapper to clip horizontal overflow
+ *   at the page level.  Per the CSS Transforms spec, overflow:hidden forces the
+ *   used value of transform-style to 'flat', but this only affects that single
+ *   element — NOT its children.  All inner elements keep their own preserve-3d.
+ * - `perspective` lives one level below the overflow wrapper so the 3D context
+ *   is established outside the flattened element.
+ * - The Embla viewport uses `overflow-visible` so rotated side cards are not
+ *   clipped at the scroll boundary.
  * - `transform-style: preserve-3d` is propagated through every intermediate
- *   element in the chain: outer overflow div → perspective div → embla viewport
- *   → flex container → slide outer div → slide inner div.  Any gap in this
- *   chain would flatten the 3D context and eliminate the trapez perspective.
+ *   element in the chain: perspective div → embla viewport → flex container
+ *   → slide outer div → slide inner div.  Any gap in this chain would flatten
+ *   the 3D context and eliminate the perspective depth effect.
  */
 export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
