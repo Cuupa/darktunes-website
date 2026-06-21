@@ -17,6 +17,7 @@
  *   songkick     — sync Songkick concerts        (POST /api/sync-api, apiSource: songkick)
  *   bandsintown  — sync Bandsintown concerts     (POST /api/sync-api, apiSource: bandsintown)
  *   odesli       — resolve Odesli smart links    (POST /api/sync-api, apiSource: odesli)
+ *   process-queue — process one job from sync_queue  (POST /api/process-sync-queue)
  *
  * Usage options:
  *
@@ -31,7 +32,14 @@
  *      Headers: Authorization: ******
  *      Body:    { "type": "bandsintown" }
  *
- * 3. Manual HTTP call:
+ * 3. Scheduled for queue processing (every 5 minutes):
+ *      Path:    /trigger-sync?type=process-queue
+ *      Method:  POST
+ *      Schedule: */5 * * * * (every 5 minutes)
+ *      Note: Each invocation processes exactly one job. Schedule frequently enough
+ *            to drain the queue in a reasonable time.
+ *
+ * 4. Manual HTTP call:
  *      curl -X POST \
  *        'https://<project>.supabase.co/functions/v1/trigger-sync?type=youtube' \
  *        -H 'Authorization: ******'
@@ -58,6 +66,7 @@ type SyncType =
   | 'songkick'
   | 'bandsintown'
   | 'odesli'
+  | 'process-queue'
 
 const VALID_TYPES = new Set<SyncType>([
   'all',
@@ -68,6 +77,7 @@ const VALID_TYPES = new Set<SyncType>([
   'songkick',
   'bandsintown',
   'odesli',
+  'process-queue',
 ])
 
 function isValidSyncType(value: string): value is SyncType {
@@ -149,6 +159,9 @@ serve(async (req: Request) => {
       targetUrl = `${siteUrl}/api/sync`
     } else if (syncType === 'youtube') {
       targetUrl = `${siteUrl}/api/sync-youtube`
+    } else if (syncType === 'process-queue') {
+      targetUrl = `${siteUrl}/api/process-sync-queue`
+      // No requestBody needed — the processor picks the next pending job itself
     } else {
       targetUrl = `${siteUrl}/api/sync-api`
       requestBody = { apiSource: syncType }
