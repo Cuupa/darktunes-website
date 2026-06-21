@@ -38,14 +38,47 @@ function rowToConcert(row: ConcertRowWithArtist): Concert {
 
 export async function getConcertsByArtistId(db: DbClient, artistId: string): Promise<Concert[]> {
   const today = new Date().toISOString().split('T')[0]
-  const { data, error } = await db
+
+  // Step 1: collect concert IDs where this artist is featured in the junction table
+  const { data: junctionRows, error: junctionError } = await db
+    .from('concert_artists')
+    .select('concert_id')
+    .eq('artist_id', artistId)
+  if (junctionError) throw new Error(junctionError.message)
+
+  const featuredConcertIds = (junctionRows ?? []).map((r) => r.concert_id)
+
+  // Step 2: fetch concerts by primary artist_id OR by featured concert IDs.
+  // A single .or() string is used in both cases to keep the builder type consistent.
+  const orFilter =
+    featuredConcertIds.length > 0
+      ? `artist_id.eq.${artistId},id.in.(${featuredConcertIds.join(',')})`
+      : `artist_id.eq.${artistId}`
+
+  // Store in a let variable before awaiting so TypeScript preserves the Result type
+  // (same pattern as getPublicConcerts; direct-chain await loses the generic)
+  let builder = db
     .from('concerts')
     .select('*, artists(name)')
-    .eq('artist_id', artistId)
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
+  builder = builder.or(orFilter)
+
+  const { data, error } = await builder
+
   if (error) throw new Error(error.message)
-  const concerts = (data ?? []).map(rowToConcert)
+
+  // Map to domain type first (same pattern as getConcerts / getPublicConcerts),
+  // then deduplicate in case the artist is both primary and in concert_artists.
+  const seen = new Set<string>()
+  const concerts = (data ?? [])
+    .map(rowToConcert)
+    .filter((c) => {
+      if (seen.has(c.id)) return false
+      seen.add(c.id)
+      return true
+    })
+
   return attachConcertArtists(db, concerts)
 }
 
