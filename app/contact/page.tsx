@@ -21,6 +21,9 @@ export default async function ContactPage() {
   const dict = await getDictionary(locale)
   const c = dict.contact
   const submitHubUrl = settings?.submitHubUrl || SUBMITHUB_URL_FALLBACK
+  const submitHubHeading = settings?.submitHubSectionHeading || c.submitMusicHeading
+  const submitHubDescription = settings?.submitHubDescription || c.submitMusicDescription
+  const submitHubButtonLabel = settings?.submitHubLabel || c.submitMusicButton
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -46,9 +49,9 @@ export default async function ContactPage() {
 
         {/* Submit Music section */}
         <section className="rounded-xl border border-primary/30 bg-card/60 p-8 space-y-4">
-          <h2 className="text-2xl font-bold uppercase tracking-wider">{c.submitMusicHeading}</h2>
+          <h2 className="text-2xl font-bold uppercase tracking-wider">{submitHubHeading}</h2>
           <p className="text-muted-foreground font-serif leading-relaxed">
-            {c.submitMusicDescription}
+            {submitHubDescription}
           </p>
           <a
             href={submitHubUrl}
@@ -56,7 +59,7 @@ export default async function ContactPage() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-bold uppercase tracking-wider hover:bg-primary/90 transition-all hover:scale-105"
           >
-            {c.submitMusicButton}
+            {submitHubButtonLabel}
             <ArrowSquareOut size={18} weight="bold" />
           </a>
         </section>
