@@ -67,6 +67,21 @@ export async function uploadUrlToR2(
 }
 
 /**
+ * Creates an uploadToR2 function wired to the given R2 credentials.
+ * Used by sync route handlers to avoid duplicating R2 client setup.
+ */
+export function createSyncUploadFn(
+  accountId: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  bucket: string,
+  r2PublicUrl: string,
+): (imageUrl: string, keyPrefix: string) => Promise<string> {
+  const s3 = createR2Client(accountId, accessKeyId, secretAccessKey)
+  return (imageUrl, keyPrefix) => uploadUrlToR2(imageUrl, s3, bucket, r2PublicUrl, keyPrefix)
+}
+
+/**
  * Deletes a single object from R2 by its key.
  *
  * @param r2Key - The object key to delete (e.g. 'uploads/uuid.jpg')

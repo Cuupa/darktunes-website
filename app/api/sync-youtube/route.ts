@@ -13,23 +13,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { isValidCronSecret } from '@/lib/cronAuth'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
 // Fetching and upserting up to 200 YouTube videos can take longer than the default timeout.
 export const maxDuration = 300
-
-function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
-  const expected = `Bearer ${cronSecret}`
-  const authBuffer = Buffer.from(authHeader, 'utf-8')
-  const expectedBuffer = Buffer.from(expected, 'utf-8')
-  if (authBuffer.length !== expectedBuffer.length) return false
-  return timingSafeEqual(authBuffer, expectedBuffer)
-}
 
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

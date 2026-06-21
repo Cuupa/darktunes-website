@@ -18,20 +18,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import { timingSafeEqual } from 'node:crypto'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
+import { isValidCronSecret } from '@/lib/cronAuth'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
-
-function isValidCronSecret(authHeader: string, cronSecret: string): boolean {
-  const expected = `Bearer ${cronSecret}`
-  const authBuffer = Buffer.from(authHeader, 'utf-8')
-  const expectedBuffer = Buffer.from(expected, 'utf-8')
-  if (authBuffer.length !== expectedBuffer.length) return false
-  return timingSafeEqual(authBuffer, expectedBuffer)
-}
 
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

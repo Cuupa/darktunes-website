@@ -17,20 +17,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
+import type { ServerEnv } from '@/lib/env.server'
 import { syncArtist } from '@/lib/sync/syncArtist'
-import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
+import { createSyncUploadFn } from '@/lib/r2Utils'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
 // Auth helper
 // ---------------------------------------------------------------------------
 
-async function verifyToken(token: string): Promise<string> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw buildApiError('CONFIG_ERROR', 500)
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+async function verifyToken(token: string, env: ServerEnv): Promise<string> {
+  const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data.user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
   return data.user.id
@@ -41,12 +40,14 @@ async function verifyToken(token: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
+  const { serverEnv } = await import('@/lib/env.server')
+
   // 1. Authenticate
   const authHeader = request.headers.get('authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
     throw buildApiError('AUTH_TOKEN_MISSING', 401)
   }
-  await verifyToken(authHeader.slice(7))
+  await verifyToken(authHeader.slice(7), serverEnv)
 
   // 2. Parse body
   let artistId: string | undefined
@@ -63,46 +64,22 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Missing required field: artistId')
   }
 
-  // 3. Validate R2 configuration
-  const {
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-    CLOUDFLARE_R2_BUCKET_NAME,
-    CLOUDFLARE_R2_PUBLIC_URL,
-    NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-  } = process.env
-
-  if (
-    !CLOUDFLARE_R2_ACCOUNT_ID ||
-    !CLOUDFLARE_R2_ACCESS_KEY_ID ||
-    !CLOUDFLARE_R2_SECRET_ACCESS_KEY ||
-    !CLOUDFLARE_R2_BUCKET_NAME ||
-    !CLOUDFLARE_R2_PUBLIC_URL
-  ) {
-    throw buildApiError('CONFIG_ERROR', 500)
-  }
-
-  if (!NEXT_PUBLIC_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw buildApiError('CONFIG_ERROR', 500)
-  }
-
-  // 4. Wire up dependencies
-  const db = createClient<Database>(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false },
-  })
-
-  const s3 = createR2Client(
-    CLOUDFLARE_R2_ACCOUNT_ID,
-    CLOUDFLARE_R2_ACCESS_KEY_ID,
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  // 3. Wire up dependencies
+  const db = createClient<Database>(
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } },
   )
 
-  const uploadFn = (imageUrl: string, keyPrefix: string) =>
-    uploadUrlToR2(imageUrl, s3, CLOUDFLARE_R2_BUCKET_NAME, CLOUDFLARE_R2_PUBLIC_URL, keyPrefix)
+  const uploadFn = createSyncUploadFn(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+    serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
+  )
 
-  // 5. Run sync (never throws — errors are in SyncResult.errors)
+  // 4. Run sync (never throws — errors are in SyncResult.errors)
   const result = await syncArtist(artistId, {
     db,
     fetch: globalThis.fetch,
