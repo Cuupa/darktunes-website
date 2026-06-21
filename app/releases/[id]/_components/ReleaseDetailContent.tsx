@@ -22,6 +22,7 @@ import {
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import { ShareButton } from '@/components/ShareButton'
 import type { Release, Artist } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -201,6 +202,20 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Share button */}
+              <div className="pt-1">
+                <ShareButton
+                  title={release.title}
+                  text={`${release.artistName} — ${release.title}`}
+                  labels={{
+                    share: dict.share,
+                    shareSuccess: dict.shareSuccess,
+                    shareLinkCopied: dict.shareLinkCopied,
+                    shareError: dict.shareError,
+                  }}
+                />
               </div>
 
               {/* Promo / description text */}

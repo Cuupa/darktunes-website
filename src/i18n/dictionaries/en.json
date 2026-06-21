@@ -127,7 +127,11 @@
     "featured": "Featured",
     "listenEverywhere": "Listen Everywhere",
     "promoText": "About",
-    "artistConnect": "Follow the Artist"
+    "artistConnect": "Follow the Artist",
+    "share": "Share",
+    "shareSuccess": "Shared!",
+    "shareLinkCopied": "Link copied!",
+    "shareError": "Could not share"
   },
   "artistDetail": {
     "backToArtists": "Back to Artists",
@@ -847,7 +851,11 @@
     "subheading": "Stay updated with the latest from darkTunes Music Group",
     "readMore": "Read More",
     "backToNews": "← Back to News",
-    "noNews": "No news posts yet."
+    "noNews": "No news posts yet.",
+    "share": "Share",
+    "shareSuccess": "Shared!",
+    "shareLinkCopied": "Link copied!",
+    "shareError": "Could not share"
   },
   "about": {
     "heading": "ABOUT",

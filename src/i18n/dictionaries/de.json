@@ -127,7 +127,11 @@
     "featured": "Featured",
     "listenEverywhere": "Überall anhören",
     "promoText": "Über diesen Release",
-    "artistConnect": "Dem Künstler folgen"
+    "artistConnect": "Dem Künstler folgen",
+    "share": "Teilen",
+    "shareSuccess": "Geteilt!",
+    "shareLinkCopied": "Link kopiert!",
+    "shareError": "Teilen fehlgeschlagen"
   },
   "artistDetail": {
     "backToArtists": "Zurück zu Künstlern",
@@ -847,7 +851,11 @@
     "subheading": "Bleib auf dem Laufenden mit den neuesten Nachrichten von darkTunes Music Group",
     "readMore": "Weiterlesen",
     "backToNews": "← Zurück zu den News",
-    "noNews": "Noch keine News-Beiträge vorhanden."
+    "noNews": "Noch keine News-Beiträge vorhanden.",
+    "share": "Teilen",
+    "shareSuccess": "Geteilt!",
+    "shareLinkCopied": "Link kopiert!",
+    "shareError": "Teilen fehlgeschlagen"
   },
   "about": {
     "heading": "ABOUT",
