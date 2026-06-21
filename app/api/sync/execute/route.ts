@@ -17,6 +17,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     const {serverEnv} = await import('@/lib/env.server')
 
     const authHeader = request.headers.get('authorization') ?? ''
+    const force = request.headers.get('force') ?? ''
+
     const {CRON_SECRET: cronSecret} = serverEnv
     if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
         throw new ApiError(401, 'Unauthorized')
@@ -40,7 +42,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     waitUntil((async () => {
 
         const startTime = Date.now()
-        while (Date.now() - startTime < TIME_BUDGET_MS) {
+        while (Date.now() - startTime < TIME_BUDGET_MS || force) {
             const job = await claimNextSyncJob(db)
             if (!job) {
                 break
