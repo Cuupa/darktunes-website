@@ -197,7 +197,7 @@ Cron Jobs (Vercel):
   - `/api/sync` — daily at 03:00 UTC: enqueues async sync jobs for all artists into `sync_queue` and returns immediately.
   - `/api/process-sync-queue` — every 5 minutes: picks one pending job from `sync_queue`, syncs that artist (iTunes), marks it done/failed. maxDuration: 60s.
   All routes accept either a ****** (manual trigger), a Vercel cron call (`x-vercel-cron: 1` header),
-  or a CRON_SECRET ****** (from a Supabase Edge Function or external scheduler) — all optionally guarded by `CRON_SECRET` env var.
+  or a CRON_SECRET ****** (from a Supabase Edge Function or external scheduler) — all require `CRON_SECRET` env var (mandatory).
   The `isValidCronSecret` helper uses `timingSafeEqual` to prevent timing attacks.
 
 Supabase Sync Triggers (`supabase/functions/trigger-sync/index.ts`):
