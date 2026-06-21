@@ -65,22 +65,21 @@ ensurePdfFontsRegistered()
 // ---------------------------------------------------------------------------
 
 /**
- * Rewrites R2 and Supabase Storage image URLs to go through the server-side
+ * Rewrites all absolute HTTP/HTTPS image URLs to go through the server-side
  * `/api/portal/proxy-image` route so that @react-pdf/renderer can fetch them
- * without CORS errors (R2 public buckets do not return CORS headers).
+ * without CORS errors. This covers R2, Supabase Storage, Vercel Blob Storage,
+ * and any other external CDN hostname. Relative paths and `data:` URIs are
+ * returned as-is.
  */
 function toProxiedUrl(url: string | undefined): string | undefined {
   if (!url) return undefined
   try {
     const parsed = new URL(url)
-    if (
-      /^[^.]+\.r2\.dev$/.test(parsed.hostname) ||
-      /^[^.]+\.supabase\.co$/.test(parsed.hostname)
-    ) {
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
       return `/api/portal/proxy-image?url=${encodeURIComponent(url)}`
     }
   } catch {
-    // Not a valid absolute URL — return as-is (e.g. a data: URI).
+    // Not a valid absolute URL (e.g. relative path or data: URI) — return as-is.
   }
   return url
 }
