@@ -60,6 +60,8 @@ describe('generateEpkPdf', () => {
     anchorClicked = false
     downloadAttr = null
 
+    vi.useFakeTimers()
+
     // Stub URL API
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn((blob: Blob) => {
@@ -92,6 +94,7 @@ describe('generateEpkPdf', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   it('calls pdf(), converts to blob, and triggers a download', async () => {
@@ -108,6 +111,8 @@ describe('generateEpkPdf', () => {
   it('revokes the object URL after triggering the download', async () => {
     await generateEpkPdf(baseData())
 
+    // Revocation is delayed by 10 s so the browser can start the download.
+    vi.advanceTimersByTime(10_000)
     expect(revokedObjectUrl).toBe('blob:mock-url')
   })
 
@@ -135,7 +140,8 @@ describe('generateEpkPdf', () => {
       return a
     })
 
-    // The function should not throw because revokeObjectURL is in a finally block
+    // On error the renderer revokes immediately (no setTimeout) to prevent a
+    // memory leak, and re-throws so the caller knows the download failed.
     await expect(generateEpkPdf(baseData())).rejects.toThrow('click failed')
     expect(revokedObjectUrl).toBe('blob:mock-url')
   })

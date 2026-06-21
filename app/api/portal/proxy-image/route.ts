@@ -4,25 +4,29 @@
  * Server-side image proxy for the Artist Portal EPK PDF generator.
  *
  * @react-pdf/renderer fetches images client-side via the browser Fetch API.
- * Cloudflare R2 public buckets do not return `Access-Control-Allow-Origin`
- * headers, so the browser blocks those cross-origin fetches. This route
- * fetches the image server-side (no CORS restriction applies) and pipes it
- * back to the client.
+ * External image hosts (Cloudflare R2, Supabase Storage, Vercel Blob, etc.)
+ * may not return `Access-Control-Allow-Origin` headers, so the browser blocks
+ * those cross-origin fetches. This route fetches the image server-side (no
+ * CORS restriction applies) and pipes it back to the client.
  *
  * Security:
  *   - Only authenticated portal users may call this endpoint (Supabase session).
  *   - The `url` parameter is validated against an allowlist of trusted hostnames
- *     (`*.r2.dev` and `*.supabase.co`) to prevent Server-Side Request Forgery.
+ *     to prevent Server-Side Request Forgery (SSRF). Permitted patterns cover
+ *     Cloudflare R2 (`*.r2.dev`), Supabase Storage (`*.supabase.co`), and
+ *     Vercel Blob Storage (`*.vercel-storage.com`).
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-/** Hostnames that are allowed to be proxied. */
+/** Hostnames that are allowed to be proxied. Covers Cloudflare R2, Supabase Storage, and Vercel Blob Storage. */
 const ALLOWED_HOSTNAME_PATTERNS: RegExp[] = [
   /^[^.]+\.r2\.dev$/,
   /^[^.]+\.supabase\.co$/,
+  /^[^.]+\.public\.blob\.vercel-storage\.com$/,
+  /^[^.]+\.blob\.vercel-storage\.com$/,
 ]
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
