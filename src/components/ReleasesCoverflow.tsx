@@ -84,14 +84,17 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     const distInSlides = diffToTarget * Math.max(1, snapCount - 1)
     const abs = Math.abs(distInSlides)
 
-    const inner = slideNodes[snapIndex]?.firstElementChild as HTMLElement | null
-    if (!inner) return
+    // Set pointerEvents on the outer slide node (not the 3D-transformed inner)
+    // so the browser's hit-test area matches the visual layout position.
+    const slideNode = slideNodes[snapIndex] as HTMLElement | null
+    const inner = slideNode?.firstElementChild as HTMLElement | null
+    if (!inner || !slideNode) return
 
     // Early-exit: slides beyond the tween cutoff are invisible — skip DOM work
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
       inner.style.filter = ''
-      inner.style.pointerEvents = 'none'
+      slideNode.style.pointerEvents = 'none'
       return
     }
 
@@ -100,7 +103,7 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       inner.style.transform = ''
       inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
-      inner.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
+      slideNode.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
       return
     }
 
@@ -116,7 +119,9 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
     // Only the centre slide (abs < 0.5) is fully interactive; side slides are
     // decorative and must not intercept pointer events meant for the front card.
-    inner.style.pointerEvents = abs < 0.5 ? '' : 'none'
+    // pointerEvents is set on the outer slideNode (which is NOT 3D-transformed)
+    // so the browser hit-test box aligns with the user's cursor position.
+    slideNode.style.pointerEvents = abs < 0.5 ? '' : 'none'
   })
 }
 
