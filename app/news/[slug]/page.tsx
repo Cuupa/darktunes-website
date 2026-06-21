@@ -13,6 +13,7 @@ import { getNewsPostBySlug } from '@/lib/api/news'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
+import { ShareButton } from '@/components/ShareButton'
 import { NewsBodyClient } from './_components/NewsBodyClient'
 
 interface Props {
@@ -111,6 +112,19 @@ export default async function NewsDetailPage({ params }: Props) {
         <h1 className="text-4xl lg:text-5xl font-bold mt-3 mb-6 tracking-tight leading-tight">
           {post.title}
         </h1>
+
+        <div className="mb-6">
+          <ShareButton
+            title={post.title}
+            text={post.excerpt ?? undefined}
+            labels={{
+              share: dict.newsPage.share,
+              shareSuccess: dict.newsPage.shareSuccess,
+              shareLinkCopied: dict.newsPage.shareLinkCopied,
+              shareError: dict.newsPage.shareError,
+            }}
+          />
+        </div>
 
         {post.excerpt && (
           <p className="text-xl text-muted-foreground font-serif leading-relaxed mb-8 border-l-2 border-primary pl-4">
