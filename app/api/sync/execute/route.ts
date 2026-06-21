@@ -7,9 +7,11 @@ import {claimNextSyncJob, markSyncJobDone, markSyncJobFailed} from '@/lib/api/sy
 import {syncArtist} from '@/lib/sync/syncArtist'
 import {createSyncUploadFn} from '@/lib/r2Utils'
 import {isValidCronSecret} from '@/lib/cronAuth'
+import { waitUntil } from '@vercel/functions'
 
-const startTime = Date.now()
 const TIME_BUDGET_MS = 50_000
+
+export const maxDuration = 60
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
     const {serverEnv} = await import('@/lib/env.server')
@@ -34,48 +36,41 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
     )
 
-    // Claim the next pending job (atomic — prevents double-processing
-    const results: Array<{
-        jobId: string
-        artistId: string | null
-        status: 'done' | 'failed' | 'skipped'
-        error?: string
-    }> = []
 
-    while (Date.now() - startTime < TIME_BUDGET_MS) {
-        const job = await claimNextSyncJob(db)
-        if (!job) {
-            break
-        }
+    waitUntil((async () => {
 
-        if (!job.artistId) {
-            await markSyncJobFailed(db, job.id, 'Job has no artist_id', job.attemptCount)
-            results.push({jobId: job.id, artistId: null, status: 'skipped', error: 'Job has no artist_id'})
-            continue
-        }
-
-        try {
-            const result = await syncArtist(job.artistId, {
-                db,
-                fetch: globalThis.fetch,
-                uploadToR2: uploadFn,
-            })
-
-            if (result.errors && result.errors.length > 0) {
-                await markSyncJobFailed(db, job.id, result.errors.join('; '), job.attemptCount)
-                results.push({ jobId: job.id, artistId: job.artistId, status: 'failed', error: result.errors.join('\n\n') })
-            } else {
-                await markSyncJobDone(db, job.id)
-                revalidateTag('releases')
-                revalidateTag('artists')
-                results.push({jobId: job.id, artistId: null, status: 'done'})
+        const startTime = Date.now()
+        while (Date.now() - startTime < TIME_BUDGET_MS) {
+            const job = await claimNextSyncJob(db)
+            if (!job) {
+                break
             }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err)
-            await markSyncJobFailed(db, job.id, message, job.attemptCount)
-            results.push({ jobId: job.id, artistId: job.artistId, status: 'failed', error: message })
-        }
-    }
 
-    return NextResponse.json(results)
+            if (!job.artistId) {
+                await markSyncJobFailed(db, job.id, 'Job has no artist_id', job.attemptCount)
+                continue
+            }
+
+            try {
+                const result = await syncArtist(job.artistId, {
+                    db,
+                    fetch: globalThis.fetch,
+                    uploadToR2: uploadFn,
+                })
+
+                if (result.errors && result.errors.length > 0) {
+                    await markSyncJobFailed(db, job.id, result.errors.join('; '), job.attemptCount)
+                } else {
+                    await markSyncJobDone(db, job.id)
+                    revalidateTag('releases')
+                    revalidateTag('artists')
+                }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err)
+                await markSyncJobFailed(db, job.id, message, job.attemptCount)
+            }
+        }
+    })())
+
+    return NextResponse.json( {accepted: true })
 })

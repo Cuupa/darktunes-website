@@ -44,7 +44,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(401, 'Missing or invalid Authorization header')
   }
   if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-    throw new ApiError(401, 'Unauthorized ' + cronSecret + ' ' + authHeader)
+    console.error('401 Unauthorized', 'cronSecret:', cronSecret, 'authHeader:', authHeader)
+    throw new ApiError(401, 'Unauthorized')
   }
 
   await verifyToken(authHeader.slice(7), serverEnv)
