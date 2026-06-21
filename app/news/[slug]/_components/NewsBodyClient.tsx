@@ -17,7 +17,7 @@ interface NewsBodyClientProps {
 }
 
 export function NewsBodyClient({ content }: NewsBodyClientProps) {
-  const sanitized = processHtmlImages(DOMPurify.sanitize(content))
+  const sanitized = processHtmlImages(DOMPurify.sanitize(content, { ADD_ATTR: ['target'] }))
   return (
     <div
       className="prose prose-invert prose-sm max-w-none"

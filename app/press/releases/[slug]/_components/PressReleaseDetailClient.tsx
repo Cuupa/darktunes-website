@@ -79,7 +79,7 @@ export function PressReleaseDetailClient({ post, dict }: PressReleaseDetailClien
 
         <article className="rounded-3xl border border-border bg-card/60 p-6">
           {post.content.trimStart().startsWith('<') ? (
-            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }} />
+            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content, { ADD_ATTR: ['target'] }) }} />
           ) : (
             <MarkdownContent content={post.content} className="max-w-none" />
           )}

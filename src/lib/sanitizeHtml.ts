@@ -19,6 +19,8 @@
 
 import DOMPurify from 'dompurify'
 
+type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
+
 // ---------------------------------------------------------------------------
 // Server-side regex sanitizer
 // ---------------------------------------------------------------------------
@@ -69,7 +71,7 @@ function serverSanitize(html: string): string {
 export function sanitizeHtml(
   html: string,
   // Use Parameters to match exactly what DOMPurify.sanitize accepts
-  options?: Parameters<typeof DOMPurify.sanitize>[1],
+  options?: SanitizeOptions,
 ): string {
   if (!html) return ''
 
@@ -79,5 +81,10 @@ export function sanitizeHtml(
   }
 
   // Client: full DOMPurify sanitization
-  return DOMPurify.sanitize(html, options)
+  const addAttr = Array.isArray(options?.ADD_ATTR) ? options.ADD_ATTR : []
+  const mergedOptions: SanitizeOptions = {
+    ...options,
+    ADD_ATTR: ['target', ...addAttr.filter((attr) => attr !== 'target')],
+  }
+  return DOMPurify.sanitize(html, mergedOptions)
 }
