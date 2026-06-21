@@ -19,6 +19,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
   return {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
@@ -33,6 +34,23 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
 
 function makeMockDb(data: unknown = null, error: unknown = null): DbClient {
   return { from: vi.fn().mockReturnValue(makeBuilder(data, error)) } as unknown as DbClient
+}
+
+/**
+ * Creates a mock DbClient where the first `from()` call returns junctionData/junctionError
+ * and all subsequent calls return concertData/concertError. Used for the two-step
+ * getConcertsByArtistId query (junction lookup + concerts fetch).
+ */
+function makeTwoStepMockDb(
+  junctionData: unknown,
+  concertData: unknown,
+  junctionError: unknown = null,
+  concertError: unknown = null,
+): DbClient {
+  const fromMock = vi.fn()
+    .mockReturnValueOnce(makeBuilder(junctionData, junctionError))
+    .mockReturnValue(makeBuilder(concertData, concertError))
+  return { from: fromMock } as unknown as DbClient
 }
 
 const mockConcerts: ConcertRowWithArtist[] = [
@@ -114,21 +132,47 @@ describe('getConcerts', () => {
 
 describe('getConcertsByArtistId', () => {
   it('returns an empty array when no concerts exist for the artist', async () => {
-    const db = makeMockDb([])
+    const db = makeTwoStepMockDb([], [])
     await expect(getConcertsByArtistId(db, 'artist-1')).resolves.toEqual([])
   })
 
-  it('returns only concerts for the requested artist', async () => {
-    const artistConcerts: ConcertRow[] = [mockConcerts[0]]
-    const db = makeMockDb(artistConcerts)
+  it('returns concerts where the artist is the primary artist', async () => {
+    const db = makeTwoStepMockDb([], [mockConcerts[0]])
     const result = await getConcertsByArtistId(db, 'artist-1')
     expect(result).toHaveLength(1)
     expect(result[0].artistId).toBe('artist-1')
   })
 
-  it('throws on database error', async () => {
-    const db = makeMockDb(null, { message: 'Artist concert query failed', code: 'PGRST001' })
+  it('returns concerts where the artist is featured in concert_artists but is not the primary artist', async () => {
+    // artist-3 is not the primary artist on concert-ok but appears in concert_artists
+    const db = makeTwoStepMockDb(
+      [{ concert_id: 'concert-ok' }],
+      [mockConcerts[1]],
+    )
+    const result = await getConcertsByArtistId(db, 'artist-3')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('concert-ok')
+  })
+
+  it('deduplicates when artist is both primary and featured in concert_artists', async () => {
+    // artist-1 is the primary artist AND appears in concert_artists for concert-cancelled
+    const db = makeTwoStepMockDb(
+      [{ concert_id: 'concert-cancelled' }],
+      [mockConcerts[0], mockConcerts[0]], // OR query could return the same row twice
+    )
+    const result = await getConcertsByArtistId(db, 'artist-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('concert-cancelled')
+  })
+
+  it('throws on junction table database error', async () => {
+    const db = makeTwoStepMockDb(null, null, { message: 'Artist concert query failed', code: 'PGRST001' })
     await expect(getConcertsByArtistId(db, 'artist-1')).rejects.toThrow('Artist concert query failed')
+  })
+
+  it('throws on concerts database error', async () => {
+    const db = makeTwoStepMockDb([], null, null, { message: 'Concerts query failed', code: 'PGRST001' })
+    await expect(getConcertsByArtistId(db, 'artist-1')).rejects.toThrow('Concerts query failed')
   })
 })
 
