@@ -38,7 +38,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
     )
 
-
     waitUntil((async () => {
 
         const startTime = Date.now()
