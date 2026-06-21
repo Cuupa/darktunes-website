@@ -22,13 +22,15 @@ export async function generateEpkPdf(data: EPKData): Promise<void> {
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `epk-${safeName}.pdf`
-  try {
-    // Appending to the DOM is required in Firefox and some Chromium versions
-    // for a programmatic click on an <a download> element to trigger a save.
-    document.body.appendChild(anchor)
-    anchor.click()
-  } finally {
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
-  }
+
+  // Appending to the DOM is required in Firefox and some Chromium versions
+  // for a programmatic click on an <a download> element to trigger a save.
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+
+  // Delay revocation so the browser has time to start the download before
+  // the blob URL is invalidated. Revoking immediately in a finally block
+  // caused the browser to fail fetching the blob (0 B transferred).
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
