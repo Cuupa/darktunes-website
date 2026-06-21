@@ -4,7 +4,7 @@
  * POST /api/sync-youtube
  * Auth:
  *   - Bearer <supabase-access-token>
- *   - OR Vercel cron request (x-vercel-cron: 1), optionally guarded by CRON_SECRET
+ *   - OR Vercel cron request (x-vercel-cron: 1) — CRON_SECRET required
  *
  * Fetches the latest videos from the configured YouTube channel and upserts
  * them into the `videos` table.
@@ -47,8 +47,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const authHeader = request.headers.get('authorization') ?? ''
   const cronSecret = process.env.CRON_SECRET
   if (isCron) {
-    if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Invalid cron secret')
+    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
+      throw new ApiError(401, 'Unauthorized')
     }
   } else if (cronSecret && isValidCronSecret(authHeader, cronSecret)) {
     // CRON_SECRET ****** allowed for Supabase Edge Functions and external schedulers

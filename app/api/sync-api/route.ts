@@ -50,8 +50,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const cronSecret = process.env.CRON_SECRET
 
   if (isCron) {
-    if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Invalid cron secret')
+    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
+      throw new ApiError(401, 'Unauthorized')
     }
   } else if (cronSecret && isValidCronSecret(authHeader, cronSecret)) {
     // CRON_SECRET ****** allowed for Supabase Edge Functions and external schedulers

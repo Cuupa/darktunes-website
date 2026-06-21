@@ -58,8 +58,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const authHeader = request.headers.get('authorization') ?? ''
   const { CRON_SECRET: cronSecret } = serverEnv
   if (isCron) {
-    if (cronSecret && !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Invalid cron secret')
+    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
+      throw new ApiError(401, 'Unauthorized')
     }
   } else {
     if (!authHeader.startsWith('Bearer ')) {
