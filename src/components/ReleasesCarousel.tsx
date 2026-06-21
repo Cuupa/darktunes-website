@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import type { MouseEvent, PointerEvent } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -17,7 +18,7 @@ interface ReleasesCarouselProps {
 }
 
 const CARD_PERSPECTIVE = 1200
-const DRAG_THRESHOLD = 5
+const DRAG_THRESHOLD = 8
 
 export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -26,8 +27,9 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
   const [direction, setDirection] = useState<1 | -1>(1)
   const total = releases.length
 
-  // Track drag state to prevent link clicks from firing after a real drag gesture
-  const isDragging = useRef(false)
+  const pointerDownX = useRef<number | null>(null)
+  const pointerDownY = useRef<number | null>(null)
+  const didDrag = useRef(false)
 
   const goTo = useCallback(
     (index: number, dir: 1 | -1) => {
@@ -47,23 +49,38 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
     setCurrentIndex((prev) => (prev + 1) % total)
   }
 
-  const handleDragStart = () => {
-    isDragging.current = false
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    pointerDownX.current = e.clientX
+    pointerDownY.current = e.clientY
+    didDrag.current = false
   }
 
-  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
-    if (Math.abs(info.offset.x) > DRAG_THRESHOLD) {
-      isDragging.current = true
-      if (info.offset.x < -50) handleNext()
-      else if (info.offset.x > 50) handlePrev()
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (pointerDownX.current === null || pointerDownY.current === null) return
+
+    const dx = Math.abs(e.clientX - pointerDownX.current)
+    const dy = Math.abs(e.clientY - pointerDownY.current)
+
+    if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+      didDrag.current = true
     }
   }
 
-  const handleLinkClick = (e: React.MouseEvent) => {
-    if (isDragging.current) {
+  const handlePointerUp = () => {
+    pointerDownX.current = null
+    pointerDownY.current = null
+  }
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+    if (info.offset.x < -50) handleNext()
+    else if (info.offset.x > 50) handlePrev()
+  }
+
+  const handleLinkClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (didDrag.current) {
       e.preventDefault()
       e.stopPropagation()
-      isDragging.current = false
+      didDrag.current = false
     }
   }
 
@@ -111,7 +128,10 @@ export function ReleasesCarousel({ releases, dict, locale }: ReleasesCarouselPro
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
-            onDragStart={handleDragStart}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onDragEnd={handleDragEnd}
             className="cursor-grab active:cursor-grabbing"
             style={{ transformStyle: 'preserve-3d' }}
