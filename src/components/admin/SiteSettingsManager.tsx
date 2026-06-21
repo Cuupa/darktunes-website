@@ -121,6 +121,7 @@ const schema = z.object({
   submitHubUrl: z.string().url('Must be a valid URL').or(z.literal('')).optional().default(''),
   submitHubLabel: z.string().optional().default(''),
   submitHubDescription: z.string().optional().default(''),
+  submitHubSectionHeading: z.string().optional().default(''),
   showAboutInHeader: z.boolean().optional().default(true),
   showAboutInFooter: z.boolean().optional().default(true),
   aboutNavLabel: z.string().optional().default('About'),
@@ -592,6 +593,14 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     disabled={isSubmitting}
                   />
                 </Field>
+                <Field id="submitHubSectionHeading" label="Submit Music — Überschrift (optional, überschreibt i18n-Standard)">
+                  <Input
+                    id="submitHubSectionHeading"
+                    placeholder="Musik einreichen / Submit Your Music"
+                    {...register('submitHubSectionHeading')}
+                    disabled={isSubmitting}
+                  />
+                </Field>
                 <Field id="submitHubLabel" label="SubmitHub Button Label (optional)" error={errors.submitHubLabel?.message}>
                   <Input
                     id="submitHubLabel"
@@ -600,10 +609,11 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                     disabled={isSubmitting}
                   />
                 </Field>
-                <Field id="submitHubDescription" label="SubmitHub Section Description (optional)" error={errors.submitHubDescription?.message}>
-                  <Input
+                <Field id="submitHubDescription" label="Submit Music — Beschreibungstext (optional, überschreibt i18n-Standard)" error={errors.submitHubDescription?.message}>
+                  <Textarea
                     id="submitHubDescription"
-                    placeholder="Send us your demo…"
+                    placeholder="Du bist Künstler oder Band und möchtest deine Musik vorstellen?…"
+                    rows={3}
                     {...register('submitHubDescription')}
                     disabled={isSubmitting}
                   />

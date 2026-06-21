@@ -537,6 +537,8 @@ export interface SiteSettings {
   submitHubLabel?: string
   /** Override description for the SubmitHub section (falls back to i18n key). */
   submitHubDescription?: string
+  /** Override heading for the Submit Music section on the contact page (falls back to i18n key). */
+  submitHubSectionHeading?: string
   /** Whether the About link should appear in the global header navigation. */
   showAboutInHeader?: boolean
   /** Whether the About link should appear in the global footer navigation. */
