@@ -41,7 +41,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     waitUntil((async () => {
 
         const startTime = Date.now()
-        while (Date.now() - startTime < TIME_BUDGET_MS || force) {
+        while (Date.now() - startTime < TIME_BUDGET_MS || force === '1') {
             const job = await claimNextSyncJob(db)
             if (!job) {
                 break
