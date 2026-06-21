@@ -1,17 +1,3 @@
-/**
- * app/api/sync/route.ts — Manual "sync all artists" trigger
- *
- * POST /api/sync/queue
- * Auth: Supabase session token (Bearer) or Vercel Cron (x-vercel-cron: 1)
- *
- * Enqueues async sync jobs for every artist in the database into the
- * sync_queue table. The actual per-artist processing runs in small chunks
- * via POST /api/process-sync-queue (Vercel cron: every 5 minutes) so that no
- * single request exceeds Vercel's timeout limits.
- *
- * This endpoint returns immediately after enqueuing — it does not wait for
- * the sync to complete. The Admin Health dashboard shows queue progress.
- */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -43,12 +29,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   if (!authHeader.startsWith('Bearer ')) {
     throw new ApiError(401, 'Missing or invalid Authorization header')
   }
-  if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-    console.error('401 Unauthorized', 'cronSecret:', cronSecret, 'authHeader:', authHeader)
-    throw new ApiError(401, 'Unauthorized')
-  }
+  const isCronAuthorized = Boolean(cronSecret && isValidCronSecret(authHeader, cronSecret))
 
-  await verifyToken(authHeader.slice(7), serverEnv)
+  if (!isCronAuthorized) {
+    await verifyToken(authHeader.slice(7), serverEnv)
+  }
 
   // 2. Load all artist IDs
     const db = createClient<Database>(
