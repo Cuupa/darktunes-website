@@ -34,9 +34,6 @@ const VIRTUAL_BUFFER = 3
  * event — it NEVER touches React state, so there are zero component
  * re-renders on scroll.  All visual work is done by the GPU compositor via
  * `transform` and `opacity` (hardware-accelerated properties only).
- *
- * Performance: slides further than TWEEN_CUTOFF units from the active slide
- * are skipped immediately — only the 7 centre slides receive DOM mutations.
  */
 const TWEEN_CUTOFF = VIRTUAL_BUFFER
 const ROTATION_DEGREES_PER_SLIDE = 55
@@ -46,9 +43,11 @@ const MIN_SCALE = 0.4
 const OPACITY_FACTOR_PER_SLIDE = 0.35
 
 /**
- * Calculates wrapped slide distance in a looping carousel and returns whether
- * a slide index is currently inside the active virtual-render buffer window.
+ * Max pointer travel distance (px) between pointerdown and click that still
+ * counts as a tap rather than a drag. Real taps move < 2 px; 5 px is safe.
  */
+const DRAG_CLICK_THRESHOLD = 5
+
 function isWithinVirtualBuffer(index: number, centre: number, total: number): boolean {
   if (total <= 1) return true
   const directDistance = Math.abs(index - centre)
@@ -66,8 +65,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
   snapList.forEach((scrollSnap, snapIndex) => {
     let diffToTarget = scrollSnap - scrollProgress
 
-    // Official Embla loop-point correction: adjust diffToTarget when the
-    // carousel wraps around so that boundary slides animate correctly.
     if (engine.options.loop) {
       engine.slideLooper.loopPoints.forEach((loopItem) => {
         const target = loopItem.target()
@@ -79,8 +76,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       })
     }
 
-    // Convert the normalised scroll diff → "slide units"
-    // (1 unit = one snap interval — gives clean integer values at rest)
     const distInSlides = diffToTarget * Math.max(1, snapCount - 1)
     const abs = Math.abs(distInSlides)
 
@@ -88,7 +83,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     const inner = slideNode?.firstElementChild as HTMLElement | null
     if (!inner || !slideNode) return
 
-    // Early-exit: slides beyond the tween cutoff are invisible — skip DOM work
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
       inner.style.filter = ''
@@ -98,7 +92,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     }
 
     if (prefersReducedMotion) {
-      // Reduced motion: no rotation or depth, just a slight opacity fade
       inner.style.transform = ''
       inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
@@ -107,7 +100,6 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       return
     }
 
-    // 3D coverflow interpolation — GPU-only properties (transform + opacity)
     const rotateY = -distInSlides * ROTATION_DEGREES_PER_SLIDE
     const translateZ = -(abs * Z_OFFSET_PER_SLIDE)
     const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_FACTOR_PER_SLIDE)
@@ -117,68 +109,20 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     inner.style.opacity = String(Math.max(0, opacity))
     const blurPx = Math.min(3, abs * 1.2)
     inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
-    // Only the centre slide (abs < 0.5) is fully interactive; side slides must
-    // not intercept pointer events meant for the front card.
-    // pointer-events is set on BOTH the outer slideNode and the 3D-transformed
-    // inner element: with preserve-3d Chrome resolves hit-tests directly on the
-    // 3D surface (inner) rather than cascading from the parent (slideNode), so
-    // setting it only on slideNode leaves inner's pointer-events as 'auto' and
-    // side slides still intercept clicks on the active centre card.
     inner.style.pointerEvents = abs < 0.5 ? '' : 'none'
     slideNode.style.pointerEvents = abs < 0.5 ? '' : 'none'
   })
 }
 
-/**
- * ReleasesCoverflow — a hardware-accelerated 3D Embla coverflow gallery with
- * **virtual slide windowing** for large catalogues.
- *
- * Performance design:
- * - Embla is the scroll engine (~5 KB, physics-based, zero injected CSS).
- * - Scroll-driven transforms are applied via direct DOM mutation in the
- *   `on('scroll')` callback — never via React state, never causing re-renders.
- * - Only `selectedIndex` (for the metadata panel and dot nav) lives in state;
- *   it is updated lazily via `on('select')`.
- *
- * Virtual windowing:
- * - All slide *containers* are rendered so Embla can compute the full carousel
- *   width correctly (they are lightweight empty <div> elements).
- * - Only slides within VIRTUAL_BUFFER positions of the active index have their
- *   actual image / link content rendered. Off-window slides are empty divs.
- * - When the selected index changes, `renderedIndices` expands the window in
- *   the appropriate direction.  Once an index enters the window it is never
- *   evicted (set semantics), capping peak DOM size at ~7 rich nodes while
- *   still serving as a natural LRU image cache via the browser's own cache.
- *
- * 3D CSS architecture (avoids the preserve-3d / overflow-hidden flattening trap):
- * - `overflow-hidden` lives on the outermost wrapper to clip horizontal overflow
- *   at the page level.  Per the CSS Transforms spec, overflow:hidden forces the
- *   used value of transform-style to 'flat', but this only affects that single
- *   element — NOT its children.  All inner elements keep their own preserve-3d.
- * - `perspective` lives one level below the overflow wrapper so the 3D context
- *   is established outside the flattened element.
- * - The Embla viewport uses `overflow-visible` so rotated side cards are not
- *   clipped at the scroll boundary.
- * - `transform-style: preserve-3d` is propagated through every intermediate
- *   element in the chain: perspective div → embla viewport → flex container
- *   → slide outer div → slide inner div.  Any gap in this chain would flatten
- *   the 3D context and eliminate the perspective depth effect.
- */
 export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const prefersReducedMotion = useReducedMotion() ?? false
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const total = releases.length
 
-  // Track whether the user just performed a drag gesture so we can suppress
-  // the synthetic click that Embla/pointer fires after a swipe.
-  const isDragging = useRef(false)
-  // True only while a pointer/touch is physically held down on the carousel.
-  // Used to distinguish user-initiated scroll (drag) from programmatic scrolls
-  // (autoplay, prev/next buttons, dot navigation) so we never block clicks
-  // that happen after a non-drag scroll settles.
-  const isPointerDown = useRef(false)
+  // Synchronous drag detection: record pointer position at pointerdown,
+  // measure distance at click time. No shared flags, no timeouts, no Embla events.
+  const pointerDownPos = useRef<{ x: number; y: number } | null>(null)
 
-  // Pre-compute all date strings once — avoids repeated toLocaleDateString() on every swipe
   const formattedDates = useMemo(
     () =>
       releases.map((r) =>
@@ -197,22 +141,15 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     dragFree: false,
   })
 
-  // React state only for the selected index — drives the metadata panel and
-  // dot indicators.  Scroll progress itself never enters React state.
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [imageLoadedById, setImageLoadedById] = useState<Record<string, boolean>>({})
 
-  /** Marks one cover image as loaded while preserving state identity if unchanged. */
   const markImageLoaded = useCallback((releaseId: string) => {
     setImageLoadedById((prev) =>
       prev[releaseId] ? prev : { ...prev, [releaseId]: true },
     )
   }, [])
 
-  /**
-   * Stable initial window helper — extracts the setup logic so both the
-   * initialiser and the reset effect can share the same computation.
-   */
   const buildInitialWindow = useCallback(
     (count: number) => {
       const s = new Set<number>()
@@ -222,41 +159,22 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     [],
   )
 
-  /**
-   * Virtual window: a Set of indices whose slide *content* is currently
-   * rendered in the DOM.  We grow the window as the user navigates but never
-   * shrink it, so previously seen covers stay cached in the browser and
-   * re-appear instantly when the user swipes back.
-   */
   const [renderedIndices, setRenderedIndices] = useState<ReadonlySet<number>>(() =>
     buildInitialWindow(total),
   )
 
-  /**
-   * Compute a stable identity key for the releases array so we can detect
-   * when the parent passes a completely different filtered set.  Using a
-   * derived string here is O(n) on the first render but avoids creating a
-   * closure over a full array in the effect dependency.
-   */
   const releasesKey = useMemo(
     () => releases.map((r) => r.id).join(','),
     [releases],
   )
 
-  /**
-   * When the releases array changes (e.g. a new search filter is applied),
-   * reset virtual-window state and scroll back to slide 0.  This prevents
-   * stale indices from a previous catalogue from polluting the Set and
-   * ensures the active-release metadata panel is always in sync.
-   */
   useEffect(() => {
     setSelectedIndex(0)
     setRenderedIndices(buildInitialWindow(total))
-    emblaApi?.scrollTo(0, true /* jump, no animation */)
+    emblaApi?.scrollTo(0, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [releasesKey])
 
-  /** Expand the rendered window around `centre` by VIRTUAL_BUFFER either side. */
   const expandWindow = useCallback(
     (centre: number) => {
       setRenderedIndices((prev) => {
@@ -287,36 +205,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     tweenSlides(emblaApi, prefersReducedMotion)
   }, [emblaApi, prefersReducedMotion, expandWindow])
 
-  // Set isDragging=true when a drag starts, reset after click has had a chance to fire
-  useEffect(() => {
-    if (!emblaApi) return
-    const onPointerDown = () => {
-      isPointerDown.current = true
-      isDragging.current = false
-    }
-    const onPointerUp = () => { isPointerDown.current = false }
-    const onSettle = () => { setTimeout(() => { isDragging.current = false }, 50) }
-    // Only mark as dragging when the pointer is actually held down — this prevents
-    // autoplay / programmatic scrolls (prev/next/dot) from blocking subsequent clicks.
-    const onDragScroll = () => { if (isPointerDown.current) isDragging.current = true }
-    emblaApi.on('pointerDown', onPointerDown)
-    emblaApi.on('pointerUp', onPointerUp)
-    emblaApi.on('settle', onSettle)
-    emblaApi.on('scroll', onDragScroll)
-    return () => {
-      emblaApi.off('pointerDown', onPointerDown)
-      emblaApi.off('pointerUp', onPointerUp)
-      emblaApi.off('settle', onSettle)
-      emblaApi.off('scroll', onDragScroll)
-    }
-  }, [emblaApi])
-
   useEffect(() => {
     if (!emblaApi) return
     emblaApi.on('scroll', onTween)
     emblaApi.on('select', onSelect)
     emblaApi.on('reInit', onSelect)
-    // Apply initial transforms on mount
     onSelect()
     return () => {
       emblaApi.off('scroll', onTween)
@@ -362,23 +255,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onFocus={() => { isPaused.current = true }}
       onBlur={() => { isPaused.current = false }}
     >
-      {/*
-        Outer wrapper clips horizontal overflow at the section level so the page
-        never scrolls sideways, while the inner Embla viewport is overflow-visible
-        so that perspective-rotated adjacent slides are FULLY visible and not
-        cropped at the viewport edge.
-
-        Layout:
-          [outer overflow-hidden] ← page-level horizontal clip
-            [perspective wrapper] ← 3D context
-              [emblaRef overflow-visible] ← Embla scrolls this but clips nothing
-                [flex container] ← translated by Embla
-      */}
       <div className="overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
         <div style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}>
-          {/* Embla viewport: overflow-visible so rotated side cards are not clipped */}
           <div ref={emblaRef} className="overflow-visible" style={{ transformStyle: 'preserve-3d' }}>
-            {/* Embla container: Embla translates this element for scrolling */}
             <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
               {releases.map((release, index) => {
                 const isActive = release.id === activeRelease?.id
@@ -387,20 +266,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 return (
                   <div
                     key={release.id}
-                    // Narrower slides so adjacent cards fit in the visible area.
-                    // With overflow-visible the neighbours are no longer cropped.
-                    // Mobile-first: 60vw → tablet 42vw → desktop 26vw / cap 440px.
                     className="flex-none w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] px-3"
                     style={{ transformStyle: 'preserve-3d' }}
                   >
-                    {/*
-                      Inner wrapper: receives 3D transforms (rotateY, scale, translate3d)
-                      via direct DOM mutation in tweenSlides(). Never re-renders on scroll.
-
-                      Virtual windowing: off-window slides render an empty placeholder
-                      that preserves Embla's layout calculation (same dimensions as
-                      a real slide) without loading the image.
-                    */}
                     <div
                       style={{
                         transformStyle: 'preserve-3d',
@@ -416,11 +284,22 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                           draggable={false}
                           tabIndex={isActive ? 0 : -1}
                           className="block w-full cursor-pointer touch-manipulation"
+                          onPointerDown={(e) => {
+                            pointerDownPos.current = { x: e.clientX, y: e.clientY }
+                          }}
                           onClick={(e) => {
-                            // Suppress navigation if the user just dragged/swiped
-                            if (isDragging.current) {
-                              e.preventDefault()
-                              e.stopPropagation()
+                            // Synchronous drag check: measure distance from pointerdown.
+                            // If the pointer moved more than DRAG_CLICK_THRESHOLD px,
+                            // it was a swipe — suppress navigation. Otherwise allow it.
+                            if (pointerDownPos.current) {
+                              const dx = e.clientX - pointerDownPos.current.x
+                              const dy = e.clientY - pointerDownPos.current.y
+                              pointerDownPos.current = null
+                              if (Math.sqrt(dx * dx + dy * dy) > DRAG_CLICK_THRESHOLD) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                return
+                              }
                             }
                           }}
                         >
@@ -455,7 +334,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               onLoad={() => markImageLoaded(release.id)}
                               unoptimized
                             />
-                            {/* Cinematic gradient overlay on centre card */}
                             {isActive && (
                               <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
                             )}
@@ -467,8 +345,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                           </div>
                         </Link>
                       ) : (
-                        /* Lightweight placeholder — maintains slide dimensions so
-                           Embla measures the full carousel width correctly. */
                         <div
                           className="aspect-square rounded-lg bg-muted/20 border border-border/20"
                           aria-hidden="true"
@@ -483,9 +359,13 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </div>
       </div>
 
-      {/* ── Active Release Metadata ────────────────────────────────────────── */}
+      {/* ── Active Release Metadata — also navigates to the release page ── */}
       {activeRelease && (
-        <div className="text-center mt-6 px-4 space-y-1.5 min-h-[90px]">
+        <Link
+          href={`/releases/${activeRelease.id}`}
+          className="block text-center mt-6 px-4 space-y-1.5 min-h-[90px] hover:opacity-80 transition-opacity"
+          aria-label={`${activeRelease.title} – details`}
+        >
           <Badge
             variant="outline"
             className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground"
@@ -504,10 +384,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             <Calendar size={12} weight="bold" aria-hidden="true" />
             {formattedDates[selectedIndex]}
           </p>
-        </div>
+        </Link>
       )}
 
-      {/* ── Navigation Controls ────────────────────────────────────────────── */}
+      {/* ── Navigation Controls ─────────────────────────────────────────── */}
       {total > 1 && (
         <div className="flex items-center justify-center gap-6 mt-4">
           <button
@@ -518,7 +398,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             <CaretLeft size={20} weight="bold" aria-hidden="true" />
           </button>
 
-          {/* Dot indicators — max 12 to keep the row tidy */}
           <div className="flex gap-1.5" role="group" aria-label="Release dots">
             {releases.slice(0, 12).map((r, i) => (
               <button
