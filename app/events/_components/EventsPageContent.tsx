@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -156,8 +157,16 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                           </Badge>
                         )}
                       </div>
-                      <p className="text-2xl font-bold tracking-tight">{concert.artistName}</p>
-                      <p className="text-muted-foreground">{concert.eventName}</p>
+                      <p className="text-2xl font-bold tracking-tight">
+                        <Link href={`/events/${concert.id}`} className="hover:text-accent transition-colors">
+                          {concert.artistName}
+                        </Link>
+                      </p>
+                      <p className="text-muted-foreground">
+                        <Link href={`/events/${concert.id}`} className="hover:text-accent transition-colors">
+                          {concert.eventName}
+                        </Link>
+                      </p>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MapPin size={16} aria-hidden="true" />
