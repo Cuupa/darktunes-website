@@ -131,12 +131,16 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     if (autoplayMs > 0) swiperRef.current?.autoplay?.start()
   }, [autoplayMs])
 
-  const handleFocusIn = useCallback(() => {
-    if (autoplayMs > 0) swiperRef.current?.autoplay?.stop()
+  const handleFocusIn = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (autoplayMs > 0 && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      swiperRef.current?.autoplay?.stop()
+    }
   }, [autoplayMs])
 
-  const handleBlurOut = useCallback(() => {
-    if (autoplayMs > 0) swiperRef.current?.autoplay?.start()
+  const handleBlurOut = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (autoplayMs > 0 && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      swiperRef.current?.autoplay?.start()
+    }
   }, [autoplayMs])
 
   if (total === 0) return null
@@ -212,19 +216,26 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 >
                   {/* Fix 3: skeleton shown until image loads */}
                   {!loadedIds.has(release.id) && (
-                    <div className="absolute inset-0 animate-pulse bg-muted" />
+                    <div className="absolute inset-0 animate-pulse bg-muted z-0" />
                   )}
                   <Image
                     src={getSquareThumbnail(release.coverArt, 600)}
                     alt={`${release.title} by ${release.artistName} – cover art`}
                     fill
                     sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
-                    className="object-cover"
+                    className="object-cover relative z-10"
                     loading="lazy"
                     decoding="async"
                     draggable={false}
                     unoptimized
-                    onLoad={() => setLoadedIds((prev) => new Set(prev).add(release.id))}
+                    onLoad={() =>
+                      setLoadedIds((prev) => {
+                        if (prev.has(release.id)) return prev
+                        const next = new Set(prev)
+                        next.add(release.id)
+                        return next
+                      })
+                    }
                   />
                   {release.featured && (
                     <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
