@@ -144,7 +144,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             spotify.clientId,
             spotify.clientSecret,
             fetchFn,
-          ),
+          ), 5, 1000,
         )
 
         // Fetch Discogs releases for deduplication (if token available)
