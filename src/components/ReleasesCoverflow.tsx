@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Keyboard } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -31,15 +31,9 @@ const DOTS_THRESHOLD = 50
 
 /**
  * Static Swiper configurations defined outside the component.
- * Keeping these as module-level constants ensures their object references never
- * change between renders, so Swiper never tears down and rebuilds its internal
- * modules unnecessarily.
  *
  * scale: 0.92 — Swiper scales inactive slides synchronously with the swipe
- * gesture. Previously this was done with Tailwind `scale-[0.92]` + a 300 ms
- * CSS transition, which caused Swiper to read an in-flight (wrong) slide width
- * when computing the centred position, pushing the active cover off-centre
- * after the first swipe.
+ * gesture, avoiding the layout-recalculation that a CSS transition would cause.
  */
 const COVERFLOW_EFFECT = {
   rotate: 0,
@@ -52,18 +46,6 @@ const COVERFLOW_EFFECT = {
 
 const KEYBOARD_CONFIG = { enabled: true }
 
-/**
- * Virtual buffer — keep 3 slides rendered before and after the visible area.
- * Without this, the Virtual module removes off-screen slides too aggressively,
- * which collapses the total scroll width and causes centeredSlides to lose
- * the midpoint on every swipe.
- */
-const VIRTUAL_CONFIG = {
-  enabled: true,
-  addSlidesBefore: 3,
-  addSlidesAfter: 3,
-}
-
 // ---------------------------------------------------------------------------
 // SlideContent — isolated sub-component
 // ---------------------------------------------------------------------------
@@ -71,9 +53,7 @@ const VIRTUAL_CONFIG = {
  * Encapsulates each slide's image + skeleton + badge so that image `onLoad`
  * events update local state ONLY inside this component, not the parent.
  *
- * NOTE: scale classes have been removed. Scaling is now handled by Swiper via
- * coverflowEffect.scale so it stays in sync with the drag gesture and never
- * causes a layout-recalculation mid-animation.
+ * Scale classes have been removed — scaling is handled by coverflowEffect.scale.
  */
 function SlideContent({
   release,
@@ -186,13 +166,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     }
   }, [])
 
-  /** Fix pointer-down position for 5 px drag threshold */
   const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     isDragging.current = false
     pointerStart.current = { x: event.clientX, y: event.clientY }
   }, [])
 
-  /** Only mark as dragging once pointer moves > 5 px from start */
   const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (pointerStart.current) {
       const dx = event.clientX - pointerStart.current.x
@@ -226,15 +204,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     [handleNext, handlePrev],
   )
 
-  /**
-   * Virtual module is incompatible with loop mode, so we always use
-   * `slideTo` (not `slideToLoop`). goToIndex has no dependency on total.
-   */
   const goToIndex = useCallback((index: number) => {
     swiperRef.current?.slideTo(index)
   }, [])
 
-  /** Pause autoplay on hover/focus; resume on leave/blur */
   const handleMouseEnter = useCallback(() => {
     if (autoplayMs > 0) swiperRef.current?.autoplay?.stop()
   }, [autoplayMs])
@@ -255,10 +228,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     }
   }, [autoplayMs])
 
-  /**
-   * Memoized autoplay config — prevents Swiper from destroying and rebuilding
-   * its Autoplay module on every render.
-   */
   const autoplayConfig = useMemo(
     () =>
       autoplayMs > 0 && !prefersReducedMotion
@@ -287,11 +256,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onBlur={handleBlurOut}
     >
       <div className="relative overflow-clip" data-lenis-prevent>
+        {/*
+          Virtual module removed. The `vw` unit was causing Swiper's internal
+          pixel math to disagree with CSS (vw includes scrollbar width, Swiper's
+          container measurement does not), leading to a growing centring offset
+          after the first swipe. Switching to `%` units makes both measurements
+          identical. Without Virtual, all slides are in the DOM but each
+          SlideContent manages its own image-load state locally, so there is no
+          render storm from the parent.
+        */}
         <Swiper
-          modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
+          modules={[EffectCoverflow, Keyboard, Autoplay]}
           effect="coverflow"
           centeredSlides
-          virtual={VIRTUAL_CONFIG}
           grabCursor
           keyboard={KEYBOARD_CONFIG}
           autoplay={autoplayConfig}
@@ -304,17 +281,16 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             setDisplayIndex(swiper.activeIndex)
           }}
           onSlideChange={(swiper) => {
-            // Record immediately (no re-render) so the overlay link href stays
-            // correct during the animation.
+            // Store index immediately with no re-render so the overlay link
+            // href is always up to date during the animation.
             pendingIndexRef.current = swiper.activeIndex
           }}
           onSlideChangeTransitionEnd={(swiper) => {
-            // Flush to React state only after Swiper has finished animating.
+            // Commit to React state only after animation is complete.
             setDisplayIndex(swiper.activeIndex)
           }}
           onTransitionEnd={(swiper) => {
-            // Guard for programmatic slideTo with speed=0 where
-            // onSlideChangeTransitionEnd may not fire.
+            // Guard for programmatic slideTo with speed=0.
             setDisplayIndex(swiper.activeIndex)
           }}
           className="pb-2"
@@ -322,8 +298,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           {releases.map((release, index) => (
             <SwiperSlide
               key={release.id}
-              virtualIndex={index}
-              className="!w-[60vw] md:!w-[42vw] lg:!w-[26vw] max-w-[440px]"
+              className="!w-[60%] md:!w-[42%] lg:!w-[26%] max-w-[440px]"
             >
               {({ isActive }) => (
                 <SlideContent
@@ -339,13 +314,16 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           ))}
         </Swiper>
 
-        {/* Invisible overlay Link covering the active (centred) slide */}
+        {/*
+          Overlay Link uses % units to match the slide width exactly —
+          both measurements now reference the same container width.
+        */}
         <Link
           href={`/releases/${activeRelease.id}`}
           aria-label={`${activeRelease.title} by ${activeRelease.artistName} – ${dict.openReleaseAriaSuffix}`}
           onClick={handleOverlayClick}
           draggable={false}
-          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 aspect-square w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 aspect-square w-[60%] md:w-[42%] lg:w-[26%] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         />
       </div>
 
@@ -384,7 +362,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             <CaretLeft size={20} weight="bold" aria-hidden="true" />
           </button>
 
-          {/* Only show dot indicators when total ≤ DOTS_THRESHOLD */}
           {total <= DOTS_THRESHOLD && (
             <div className="flex items-center gap-1.5" role="group" aria-label={dict.releaseDotsAriaLabel}>
               {releases.slice(0, MAX_DOTS).map((release, index) => (
@@ -424,7 +401,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </div>
       )}
 
-      {/* Always render the x / total counter */}
       <p className="mt-2 text-center text-xs font-mono text-muted-foreground">
         {displayIndex + 1} / {total}
       </p>
