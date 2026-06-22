@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -31,26 +31,36 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const total = releases.length
   const prefersReducedMotion = useReducedMotion() ?? false
   const swiperRef = useRef<SwiperType | null>(null)
-  const overlayRef = useRef<HTMLAnchorElement>(null)
+  const isDragging = useRef(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [formattedDates, setFormattedDates] = useState<string[]>([])
 
-  const formattedDates = useMemo(() => {
+  useEffect(() => {
     const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
-    return releases.map((release) =>
-      new Date(release.releaseDate).toLocaleDateString(dateLocale, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      }),
+    setFormattedDates(
+      releases.map((release) =>
+        new Date(release.releaseDate).toLocaleDateString(dateLocale, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+      ),
     )
   }, [locale, releases])
 
-  const disableOverlay = useCallback(() => {
-    if (overlayRef.current) overlayRef.current.style.pointerEvents = 'none'
+  const handlePointerDown = useCallback(() => {
+    isDragging.current = false
   }, [])
 
-  const enableOverlay = useCallback(() => {
-    if (overlayRef.current) overlayRef.current.style.pointerEvents = ''
+  const handlePointerMove = useCallback(() => {
+    isDragging.current = true
+  }, [])
+
+  const handleOverlayClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    if (isDragging.current) {
+      event.preventDefault()
+      isDragging.current = false
+    }
   }, [])
 
   const handlePrev = useCallback(() => swiperRef.current?.slidePrev(), [])
@@ -58,8 +68,13 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'ArrowLeft') { event.preventDefault(); handlePrev() }
-      if (event.key === 'ArrowRight') { event.preventDefault(); handleNext() }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        handlePrev()
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        handleNext()
+      }
     },
     [handleNext, handlePrev],
   )
@@ -67,7 +82,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const goToIndex = useCallback(
     (index: number) => {
       if (!swiperRef.current) return
-      total > 2 ? swiperRef.current.slideToLoop(index) : swiperRef.current.slideTo(index)
+      if (total > 2) {
+        swiperRef.current.slideToLoop(index)
+      } else {
+        swiperRef.current.slideTo(index)
+      }
     },
     [total],
   )
@@ -88,18 +107,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       aria-label={dict.coverflowRegionLabel}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onPointerDown={disableOverlay}
-      onPointerUp={enableOverlay}
-      onPointerCancel={enableOverlay}
-      onTouchStart={disableOverlay}
-      onTouchEnd={enableOverlay}
-      onTouchCancel={enableOverlay}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
     >
-      {/*
-        overflow-hidden clips the 3D-rotated neighbour slides so they don't
-        push the layout. position:relative lets the overlay Link sit inside.
-      */}
-      <div className="relative overflow-hidden" data-lenis-prevent>
+      <div className="relative overflow-clip" data-lenis-prevent>
         <Swiper
           modules={[EffectCoverflow, Virtual, Keyboard, Autoplay]}
           effect="coverflow"
@@ -165,15 +176,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           ))}
         </Swiper>
 
-        {/*
-          Invisible overlay Link — centred with translate so it always sits
-          exactly over the active slide regardless of container size.
-          pointer-events disabled during drag (onPointerDown above), restored on up/cancel.
-        */}
         <Link
-          ref={overlayRef}
           href={`/releases/${activeRelease.id}`}
           aria-label={`${activeRelease.title} by ${activeRelease.artistName} – ${dict.openReleaseAriaSuffix}`}
+          onClick={handleOverlayClick}
           draggable={false}
           className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 aspect-square w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         />
@@ -197,7 +203,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </p>
         <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-mono text-muted-foreground">
           <Calendar size={12} weight="bold" aria-hidden="true" />
-          {formattedDates[activeIndex]}
+          {formattedDates[activeIndex] ?? ''}
         </p>
       </Link>
 
