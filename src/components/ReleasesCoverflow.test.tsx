@@ -173,8 +173,8 @@ describe('ReleasesCoverflow', () => {
       name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
     })
 
-    fireEvent.pointerDown(region)
-    fireEvent.pointerMove(region)
+    fireEvent.pointerDown(region, { clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(region, { clientX: 10, clientY: 10 })
 
     const dragClick = createEvent.click(overlayLink)
     fireEvent(overlayLink, dragClick)
