@@ -34,6 +34,12 @@ const DOTS_THRESHOLD = 50
  * Keeping these as module-level constants ensures their object references never
  * change between renders, so Swiper never tears down and rebuilds its internal
  * modules unnecessarily.
+ *
+ * scale: 0.92 — Swiper scales inactive slides synchronously with the swipe
+ * gesture. Previously this was done with Tailwind `scale-[0.92]` + a 300 ms
+ * CSS transition, which caused Swiper to read an in-flight (wrong) slide width
+ * when computing the centred position, pushing the active cover off-centre
+ * after the first swipe.
  */
 const COVERFLOW_EFFECT = {
   rotate: 0,
@@ -41,9 +47,22 @@ const COVERFLOW_EFFECT = {
   depth: 120,
   modifier: 2.5,
   slideShadows: false,
+  scale: 0.92,
 }
 
 const KEYBOARD_CONFIG = { enabled: true }
+
+/**
+ * Virtual buffer — keep 3 slides rendered before and after the visible area.
+ * Without this, the Virtual module removes off-screen slides too aggressively,
+ * which collapses the total scroll width and causes centeredSlides to lose
+ * the midpoint on every swipe.
+ */
+const VIRTUAL_CONFIG = {
+  enabled: true,
+  addSlidesBefore: 3,
+  addSlidesAfter: 3,
+}
 
 // ---------------------------------------------------------------------------
 // SlideContent — isolated sub-component
@@ -51,6 +70,10 @@ const KEYBOARD_CONFIG = { enabled: true }
 /**
  * Encapsulates each slide's image + skeleton + badge so that image `onLoad`
  * events update local state ONLY inside this component, not the parent.
+ *
+ * NOTE: scale classes have been removed. Scaling is now handled by Swiper via
+ * coverflowEffect.scale so it stays in sync with the drag gesture and never
+ * causes a layout-recalculation mid-animation.
  */
 function SlideContent({
   release,
@@ -71,8 +94,8 @@ function SlideContent({
       className={cn(
         'relative aspect-square overflow-hidden rounded-lg border transition-all duration-300',
         isActive
-          ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100 scale-100'
-          : 'border-border opacity-60 scale-[0.92] cursor-pointer',
+          ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100'
+          : 'border-border opacity-60 cursor-pointer',
       )}
       onClick={isActive ? undefined : onActivate}
     >
@@ -110,13 +133,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const isDragging = useRef(false)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   /**
-   * pendingIndex is updated immediately when Swiper reports a slide change so
-   * the metadata overlay link always points to the correct slide even during
-   * the transition animation. displayIndex drives the visible metadata text and
-   * is only committed once the transition has fully settled
-   * (onSlideChangeTransitionEnd / onTransitionEnd), preventing the React
-   * re-render from interfering with Swiper's centeredSlides layout calculation
-   * mid-animation.
+   * pendingIndexRef is updated immediately when Swiper reports a slide change
+   * (zero re-render cost). displayIndex is only committed to React state once
+   * the transition has fully settled, preventing mid-animation re-renders from
+   * interfering with Swiper's centeredSlides layout calculation.
    */
   const pendingIndexRef = useRef(0)
   const [displayIndex, setDisplayIndex] = useState(0)
@@ -267,26 +287,11 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onBlur={handleBlurOut}
     >
       <div className="relative overflow-clip" data-lenis-prevent>
-        {/*
-          Virtual module ensures only the slides currently in the viewport
-          (plus a small buffer) are mounted in the DOM.
-
-          Note: Virtual is incompatible with loop mode — loop and
-          loopAdditionalSlides have been removed.
-
-          KEY BEHAVIOUR: onSlideChange records the new index into a ref
-          immediately (zero re-render cost) so the overlay link href is always
-          correct. The React state (displayIndex) is only flushed in
-          onSlideChangeTransitionEnd, after Swiper has finished animating and
-          committed its final CSS transform. This prevents the React re-render
-          from happening while Swiper is mid-animation, which was causing
-          centeredSlides to recalculate and shift the active cover off-centre.
-        */}
         <Swiper
           modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
           effect="coverflow"
           centeredSlides
-          virtual
+          virtual={VIRTUAL_CONFIG}
           grabCursor
           keyboard={KEYBOARD_CONFIG}
           autoplay={autoplayConfig}
@@ -299,21 +304,17 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             setDisplayIndex(swiper.activeIndex)
           }}
           onSlideChange={(swiper) => {
-            // Record the target index immediately (no re-render) so the
-            // overlay link is always up to date during the animation.
+            // Record immediately (no re-render) so the overlay link href stays
+            // correct during the animation.
             pendingIndexRef.current = swiper.activeIndex
           }}
           onSlideChangeTransitionEnd={(swiper) => {
             // Flush to React state only after Swiper has finished animating.
-            // This prevents a mid-animation re-render from shifting the cover.
             setDisplayIndex(swiper.activeIndex)
           }}
           onTransitionEnd={(swiper) => {
-            // Guard against edge cases (e.g. programmatic slideTo with speed=0)
-            // where onSlideChangeTransitionEnd might not fire.
-            if (pendingIndexRef.current !== swiper.activeIndex) {
-              pendingIndexRef.current = swiper.activeIndex
-            }
+            // Guard for programmatic slideTo with speed=0 where
+            // onSlideChangeTransitionEnd may not fire.
             setDisplayIndex(swiper.activeIndex)
           }}
           className="pb-2"
@@ -348,11 +349,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         />
       </div>
 
-      {/*
-        The animation is restarted via a ref + force-reflow useEffect (see
-        above) instead of `key={displayIndex}` which would destroy and recreate
-        this entire subtree on every slide change.
-      */}
       <div ref={metaRef} className="animate-in fade-in duration-200">
         <Link
           href={`/releases/${activeRelease.id}`}
