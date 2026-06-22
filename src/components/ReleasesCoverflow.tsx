@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
@@ -29,6 +29,85 @@ const MAX_DOTS = 12
 /** Hide dot indicators above this count; always show the numeric counter. */
 const DOTS_THRESHOLD = 50
 
+/**
+ * Static Swiper configurations defined outside the component.
+ * Keeping these as module-level constants ensures their object references never
+ * change between renders, so Swiper never tears down and rebuilds its internal
+ * modules unnecessarily.
+ */
+const COVERFLOW_EFFECT = {
+  rotate: 0,
+  stretch: 0,
+  depth: 120,
+  modifier: 2.5,
+  slideShadows: false,
+}
+
+const KEYBOARD_CONFIG = { enabled: true }
+
+// ---------------------------------------------------------------------------
+// SlideContent — isolated sub-component
+// ---------------------------------------------------------------------------
+/**
+ * Encapsulates each slide's image + skeleton + badge so that image `onLoad`
+ * events update local state ONLY inside this component, not the parent.
+ *
+ * Previously, image load events called `setLoadedIds` on the parent, which
+ * triggered a full re-render of the entire slide list on every load callback.
+ * With ~750 releases loading 15 images at once that caused a catastrophic
+ * render storm at startup.
+ */
+function SlideContent({
+  release,
+  isActive,
+  onActivate,
+  featuredLabel,
+}: {
+  release: Release
+  isActive: boolean
+  onActivate: () => void
+  featuredLabel: string
+}) {
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'relative aspect-square overflow-hidden rounded-lg border transition-all duration-300',
+        isActive
+          ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100 scale-100'
+          : 'border-border opacity-60 scale-[0.92] cursor-pointer',
+      )}
+      onClick={isActive ? undefined : onActivate}
+    >
+      {!isLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-muted z-0" />
+      )}
+      <Image
+        src={getSquareThumbnail(release.coverArt, 600)}
+        alt={`${release.title} by ${release.artistName} – cover art`}
+        fill
+        sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
+        className="object-cover relative z-10"
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        unoptimized
+        onLoad={() => setIsLoaded(true)}
+      />
+      {release.featured && (
+        <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+          {featuredLabel}
+        </Badge>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ReleasesCoverflow — main component
+// ---------------------------------------------------------------------------
 export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const total = releases.length
   const prefersReducedMotion = useReducedMotion() ?? false
@@ -36,15 +115,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const isDragging = useRef(false)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   /**
-   * RC2 fix: internal ref tracks the real index for Swiper navigation without
+   * Internal ref tracks the real index for Swiper navigation without
    * triggering a component-wide re-render. Only displayIndex (state) is set in
    * onSlideChange so the re-render scope is limited to the metadata section.
    */
   const activeIndexRef = useRef(0)
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
-  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set())
-  /** RC3 fix: ref used to restart the CSS fade animation without DOM remount */
+  /** Ref used to restart the CSS fade animation without DOM remount */
   const metaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -61,8 +139,8 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   }, [locale, releases])
 
   /**
-   * RC3 fix: restart the CSS fade-in animation on the metadata block whenever
-   * the displayed slide changes, without unmounting/remounting the DOM subtree.
+   * Restart the CSS fade-in animation on the metadata block whenever the
+   * displayed slide changes, without unmounting/remounting the DOM subtree.
    * The "force reflow" (reading offsetHeight) flushes the style change so the
    * browser treats the re-added class as a fresh animation start.
    */
@@ -132,7 +210,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   )
 
   /**
-   * RC1 fix: Virtual module is incompatible with loop mode, so we always use
+   * Virtual module is incompatible with loop mode, so we always use
    * `slideTo` (not `slideToLoop`). goToIndex has no dependency on total.
    */
   const goToIndex = useCallback((index: number) => {
@@ -160,14 +238,23 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     }
   }, [autoplayMs])
 
+  /**
+   * Memoized autoplay config — prevents Swiper from destroying and rebuilding
+   * its Autoplay module on every render caused by an inline object reference
+   * changing each cycle.
+   */
+  const autoplayConfig = useMemo(
+    () =>
+      autoplayMs > 0 && !prefersReducedMotion
+        ? { delay: autoplayMs, disableOnInteraction: false }
+        : false,
+    [autoplayMs, prefersReducedMotion],
+  )
+
   if (total === 0) return null
 
   const activeRelease = releases[displayIndex] ?? releases[0]
   const hiddenDotCount = Math.max(0, total - MAX_DOTS)
-  const autoplayConfig =
-    autoplayMs > 0 && !prefersReducedMotion
-      ? { delay: autoplayMs, disableOnInteraction: false }
-      : false
 
   return (
     <div
@@ -185,12 +272,10 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     >
       <div className="relative overflow-clip" data-lenis-prevent>
         {/*
-          RC1 fix: Virtual module ensures only the slides currently in the
-          viewport (plus a small buffer) are mounted in the DOM. Previously all
-          752 releases were rendered simultaneously, causing a catastrophic
-          initial render and Swiper lifecycle event storm.
+          Virtual module ensures only the slides currently in the viewport
+          (plus a small buffer) are mounted in the DOM.
 
-          RC1 note: Virtual is incompatible with loop mode — loop and
+          Note: Virtual is incompatible with loop mode — loop and
           loopAdditionalSlides have been removed.
         */}
         <Swiper
@@ -199,15 +284,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           centeredSlides
           virtual
           grabCursor
-          keyboard={{ enabled: true }}
+          keyboard={KEYBOARD_CONFIG}
           autoplay={autoplayConfig}
-          coverflowEffect={{
-            rotate: 0,
-            stretch: 0,
-            depth: 120,
-            modifier: 2.5,
-            slideShadows: false,
-          }}
+          coverflowEffect={COVERFLOW_EFFECT}
           speed={prefersReducedMotion ? 0 : 400}
           slidesPerView="auto"
           onSwiper={(swiper) => {
@@ -216,12 +295,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             setDisplayIndex(swiper.realIndex)
           }}
           onSlideChange={(swiper) => {
-            /**
-             * RC2 fix: update the ref immediately (no re-render cost), then
-             * only update state for the metadata section below the carousel.
-             * This prevents setDisplayIndex from triggering a re-render of the
-             * full Swiper tree on every slide change.
-             */
             activeIndexRef.current = swiper.realIndex
             setDisplayIndex(swiper.realIndex)
           }}
@@ -234,49 +307,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
               className="!w-[60vw] md:!w-[42vw] lg:!w-[26vw] max-w-[440px]"
             >
               {({ isActive }) => (
-                /* Inactive slides navigate to that slide on click; active slide
-                   uses the invisible Link overlay below for navigation. */
-                <div
-                  aria-hidden="true"
-                  className={cn(
-                    'relative aspect-square overflow-hidden rounded-lg border transition-all duration-300',
-                    isActive
-                      ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100 scale-100'
-                      : 'border-border opacity-60 scale-[0.92] cursor-pointer',
-                  )}
-                  onClick={isActive ? undefined : () => {
+                <SlideContent
+                  release={release}
+                  isActive={isActive}
+                  featuredLabel={dict.featured}
+                  onActivate={() => {
                     if (!isDragging.current) goToIndex(index)
                   }}
-                >
-                  {/* Skeleton shown until image loads */}
-                  {!loadedIds.has(release.id) && (
-                    <div className="absolute inset-0 animate-pulse bg-muted z-0" />
-                  )}
-                  <Image
-                    src={getSquareThumbnail(release.coverArt, 600)}
-                    alt={`${release.title} by ${release.artistName} – cover art`}
-                    fill
-                    sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
-                    className="object-cover relative z-10"
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                    unoptimized
-                    onLoad={() =>
-                      setLoadedIds((prev) => {
-                        if (prev.has(release.id)) return prev
-                        const next = new Set(prev)
-                        next.add(release.id)
-                        return next
-                      })
-                    }
-                  />
-                  {release.featured && (
-                    <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                      {dict.featured}
-                    </Badge>
-                  )}
-                </div>
+                />
               )}
             </SwiperSlide>
           ))}
@@ -292,9 +330,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       </div>
 
       {/*
-        RC3 fix: the animation is now restarted via a ref + force-reflow
-        useEffect (see above) instead of `key={displayIndex}` which would
-        destroy and recreate this entire subtree on every slide change.
+        The animation is restarted via a ref + force-reflow useEffect (see
+        above) instead of `key={displayIndex}` which would destroy and recreate
+        this entire subtree on every slide change.
       */}
       <div ref={metaRef} className="animate-in fade-in duration-200">
         <Link
