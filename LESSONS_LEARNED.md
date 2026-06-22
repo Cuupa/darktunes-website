@@ -670,6 +670,25 @@ After this maintenance session, AGENTS.md was found to be missing several major 
 **Upload size discrepancy in SECURITY.md:**
 SECURITY.md listed `/api/portal/upload-release-cover` as 10 MB and `/api/portal/upload-asset` as 50 MB. The actual route constants were `MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024` (5 MB) and `MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024` (20 MB). Always derive size limits from source code constants, not from memory.
 
+### 2026-06-22 — Swiper coverflow refactor
+
+**❌ Embla + 752 DOM nodes for virtual windowing is the wrong tool**
+Embla requires all slide *wrapper* elements in the DOM for its scroll math. Even with
+a `renderedIndices` virtual window for content, 752 empty `<div>` wrappers still existed
+in the DOM. Swiper's `Virtual` module is purpose-built for this and keeps only visible
+slides in the DOM.
+
+**❌ Custom pointer-events math to fix 3D click-through is fragile**
+Three separate attempts to fix click detection on the centre slide (setTimeout, drag flags,
+overlay div) each introduced new race conditions. The correct pattern: one invisible `<Link>`
+overlay over the centre, disabled with `style.pointerEvents = 'none'` during drag,
+re-enabled on `pointerup`. Zero math, zero race conditions.
+
+**Lesson:** For complex carousels with many items, use Swiper with `Virtual` + the
+appropriate effect module. Do not build virtual windowing on top of Embla manually.
+For click-through issues on 3D-transformed elements, use a separate overlay element
+rather than trying to manage pointer-events on the transformed elements themselves.
+
 ---
 
-*Last updated: 2026-06-17 | Session count: 2 | Total commits analysed: 853+*
+*Last updated: 2026-06-22 | Session count: 3 | Total commits analysed: 853+*
