@@ -139,8 +139,14 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.05 }}
               >
-                <Card className="bg-card border-border p-5 md:p-6">
-                  <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                <Card className="bg-card border-border p-5 md:p-6 relative group cursor-pointer hover:border-accent/50 transition-colors">
+                  {/* Invisible full-card overlay link — sits behind all content */}
+                  <Link
+                    href={`/events/${concert.id}`}
+                    aria-label={`${concert.artistName} – ${concert.eventName}`}
+                    className="absolute inset-0 z-0 rounded-[inherit]"
+                  />
+                  <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between relative z-10 pointer-events-none">
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm uppercase tracking-wider text-muted-foreground">
                         <Calendar size={16} />
@@ -158,14 +164,10 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                         )}
                       </div>
                       <p className="text-2xl font-bold tracking-tight">
-                        <Link href={`/events/${concert.id}`} className="hover:text-accent transition-colors">
-                          {concert.artistName}
-                        </Link>
+                        {concert.artistName}
                       </p>
                       <p className="text-muted-foreground">
-                        <Link href={`/events/${concert.id}`} className="hover:text-accent transition-colors">
-                          {concert.eventName}
-                        </Link>
+                        {concert.eventName}
                       </p>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -177,7 +179,7 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                             href={`https://maps.google.com/maps?q=${concert.venueLat},${concert.venueLng}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-accent hover:underline ml-6"
+                            className="inline-flex items-center gap-1 text-xs text-accent hover:underline ml-6 relative z-20 pointer-events-auto"
                             aria-label={`${concert.eventName} – ${dict.navLink}`}
                           >
                             <NavigationArrow size={12} aria-hidden="true" />
@@ -188,7 +190,7 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                     </div>
 
                     {concert.ticketUrl && (
-                      <Button asChild className="uppercase tracking-wider font-bold">
+                      <Button asChild className="uppercase tracking-wider font-bold relative z-20 pointer-events-auto">
                         <a
                           href={concert.ticketUrl}
                           target="_blank"
