@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { syncAll } from './syncAll'
+import { syncAll, syncSingleArtist } from './syncAll'
 import type { SyncAllDeps } from './syncAll'
 
 type DbClient = SupabaseClient<Database>
@@ -172,5 +172,99 @@ describe('syncAll', () => {
 
     const result = await syncAll(deps)
     expect(result.results.every((r) => r.api === 'itunes')).toBe(true)
+  })
+
+  it('filters artists by onlyArtistId when set', async () => {
+    const db = makeMockDb((table) => {
+      if (table === 'artists') return { data: [mockArtist], error: null }
+      return { data: [], error: null }
+    })
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ results: [] }),
+    })
+
+    const deps: SyncAllDeps = {
+      db,
+      fetch: fetchFn as typeof fetch,
+      uploadToR2: vi.fn().mockResolvedValue('https://cdn.example.com/image.jpg'),
+      onlyArtistId: mockArtist.id,
+    }
+
+    const result = await syncAll(deps)
+    // iTunes sync should process the one returned artist
+    const itunesResult = result.results.find((r) => r.api === 'itunes')
+    expect(itunesResult).toBeDefined()
+    expect(itunesResult?.artistsProcessed).toBe(1)
+  })
+})
+
+describe('syncSingleArtist', () => {
+  it('returns a SyncAllResult for the specified artist', async () => {
+    const db = makeMockDb((table) => {
+      if (table === 'artists') return { data: [mockArtist], error: null }
+      return { data: [], error: null }
+    })
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ results: [] }),
+    })
+    const deps: SyncAllDeps = {
+      db,
+      fetch: fetchFn as typeof fetch,
+      uploadToR2: vi.fn().mockResolvedValue('https://cdn.example.com/image.jpg'),
+    }
+
+    const result = await syncSingleArtist(mockArtist.id, 'full', deps)
+    expect(result).toHaveProperty('results')
+    expect(result).toHaveProperty('totalErrors')
+    // full jobType runs all configured APIs — at minimum iTunes
+    const itunesResult = result.results.find((r) => r.api === 'itunes')
+    expect(itunesResult).toBeDefined()
+    expect(itunesResult?.artistsProcessed).toBe(1)
+  })
+
+  it('maps spotify jobType to onlyApi=spotify, skipping iTunes', async () => {
+    const db = makeMockDb((table) => {
+      if (table === 'artists') return { data: [{ ...mockArtist, spotify_id: 'spot-1' }], error: null }
+      return { data: [], error: null }
+    })
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ results: [] }),
+    })
+    // No spotify credentials → spotify block is also skipped, but iTunes must not run
+    const deps: SyncAllDeps = {
+      db,
+      fetch: fetchFn as typeof fetch,
+      uploadToR2: vi.fn(),
+    }
+
+    const result = await syncSingleArtist(mockArtist.id, 'spotify', deps)
+    expect(result.results.find((r) => r.api === 'itunes')).toBeUndefined()
+  })
+
+  it('maps discogs jobType to onlyApi=discogs, skipping iTunes', async () => {
+    const db = makeMockDb((table) => {
+      if (table === 'artists') return { data: [{ ...mockArtist, discogs_id: 'disc-1' }], error: null }
+      return { data: [], error: null }
+    })
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ results: [] }),
+    })
+    // No discogsToken → discogs block skipped, but iTunes must not run
+    const deps: SyncAllDeps = {
+      db,
+      fetch: fetchFn as typeof fetch,
+      uploadToR2: vi.fn(),
+    }
+
+    const result = await syncSingleArtist(mockArtist.id, 'discogs', deps)
+    expect(result.results.find((r) => r.api === 'itunes')).toBeUndefined()
   })
 })

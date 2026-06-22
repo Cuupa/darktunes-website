@@ -7,7 +7,7 @@ import {claimNextSyncJob, markSyncJobDone, markSyncJobFailed} from '@/lib/api/sy
 import {createSyncUploadFn} from '@/lib/r2Utils'
 import {isValidCronSecret} from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
-import {syncAll} from "@/lib/sync/syncAll";
+import {syncSingleArtist} from "@/lib/sync/syncAll"
 
 const TIME_BUDGET_MS = 50_000
 
@@ -24,18 +24,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         throw new ApiError(401, 'Unauthorized')
     }
 
-    const body = (await request.json()) as { apiSource?: string }
-    const { apiSource } = body
-    if (!apiSource) {
-        throw new ApiError(400, 'Missing required field: apiSource')
-    }
-
     const {
-        CLOUDFLARE_R2_ACCOUNT_ID,
-        CLOUDFLARE_R2_ACCESS_KEY_ID,
-        CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-        CLOUDFLARE_R2_BUCKET_NAME,
-        CLOUDFLARE_R2_PUBLIC_URL,
         SPOTIFY_CLIENT_ID,
         SPOTIFY_CLIENT_SECRET,
         DISCOGS_TOKEN,
@@ -72,7 +61,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
             }
 
             try {
-                const result = await syncAll({
+                await syncSingleArtist(job.artistId, job.jobType, {
                     db,
                     fetch: globalThis.fetch,
                     uploadToR2: uploadFn,
@@ -83,9 +72,9 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
                     discogsToken: DISCOGS_TOKEN,
                     songkickApiKey: SONGKICK_API_KEY,
                     bandsintownApiKey: BANDSINTOWN_API_KEY,
-                    onlyApi: apiSource,
                 })
 
+                await markSyncJobDone(db, job.id)
                 revalidateTag('releases')
                 revalidateTag('artists')
                 revalidateTag('concerts')

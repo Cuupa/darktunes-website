@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
-import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react'
+import type { AnchorHTMLAttributes, KeyboardEvent, MouseEvent, PointerEvent } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -43,12 +43,14 @@ function SlideContent({
   release,
   isActive,
   onActivate,
+  onOverlayClick,
   featuredLabel,
   openAriaLabel,
 }: {
   release: Release
   isActive: boolean
   onActivate: () => void
+  onOverlayClick: AnchorHTMLAttributes<HTMLAnchorElement>['onClick']
   featuredLabel: string
   openAriaLabel: string
 }) {
@@ -91,6 +93,7 @@ function SlideContent({
         <Link
           href={`/releases/${release.id}`}
           aria-label={openAriaLabel}
+          onClick={onOverlayClick}
           className="absolute inset-0 z-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent rounded-lg"
           draggable={false}
         />
@@ -169,6 +172,15 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
   const handlePrev = useCallback(() => swiperRef.current?.slidePrev(), [])
   const handleNext = useCallback(() => swiperRef.current?.slideNext(), [])
+  const handleOverlayClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    if (isDragging.current) {
+      event.preventDefault()
+      isDragging.current = false
+    }
+  }, [])
+  const handlePointerEnd = useCallback(() => {
+    pointerStart.current = null
+  }, [])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -229,6 +241,8 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocusIn}
@@ -256,6 +270,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           onActiveIndexChange={(swiper) => {
             setDisplayIndex(swiper.activeIndex)
           }}
+          onSlideChangeTransitionEnd={(swiper) => {
+            setDisplayIndex(swiper.activeIndex)
+          }}
           className="pb-2"
         >
           {releases.map((release, index) => (
@@ -264,6 +281,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 <SlideContent
                   release={release}
                   isActive={isActive}
+                  onOverlayClick={handleOverlayClick}
                   featuredLabel={dict.featured}
                   openAriaLabel={`${release.title} by ${release.artistName} – ${dict.openReleaseAriaSuffix}`}
                   onActivate={() => {
