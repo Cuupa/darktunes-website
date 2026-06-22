@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Keyboard } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -112,9 +112,8 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     >
       <div className="relative overflow-clip" data-lenis-prevent>
         <Swiper
-          modules={[EffectCoverflow, Virtual, Keyboard, Autoplay]}
+          modules={[EffectCoverflow, Keyboard, Autoplay]}
           effect="coverflow"
-          virtual
           centeredSlides
           loop={total > 2}
           grabCursor
@@ -138,10 +137,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           }}
           className="pb-2"
         >
-          {releases.map((release, index) => (
+          {releases.map((release) => (
             <SwiperSlide
               key={release.id}
-              virtualIndex={index}
               className="!w-[60vw] md:!w-[42vw] lg:!w-[26vw] max-w-[440px]"
             >
               {({ isActive }) => (
