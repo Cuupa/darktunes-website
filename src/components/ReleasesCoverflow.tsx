@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Keyboard } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -26,15 +26,8 @@ export interface ReleasesCoverflowProps {
 }
 
 const MAX_DOTS = 12
-/** Hide dot indicators above this count; always show the numeric counter. */
 const DOTS_THRESHOLD = 50
 
-/**
- * Static Swiper configurations defined outside the component.
- *
- * scale: 0.92 — Swiper scales inactive slides synchronously with the swipe
- * gesture, avoiding the layout-recalculation that a CSS transition would cause.
- */
 const COVERFLOW_EFFECT = {
   rotate: 0,
   stretch: 0,
@@ -46,82 +39,81 @@ const COVERFLOW_EFFECT = {
 
 const KEYBOARD_CONFIG = { enabled: true }
 
-// ---------------------------------------------------------------------------
-// SlideContent — isolated sub-component
-// ---------------------------------------------------------------------------
-/**
- * Encapsulates each slide's image + skeleton + badge so that image `onLoad`
- * events update local state ONLY inside this component, not the parent.
- *
- * Scale classes have been removed — scaling is handled by coverflowEffect.scale.
- */
 function SlideContent({
   release,
   isActive,
   onActivate,
   featuredLabel,
+  openAriaLabel,
 }: {
   release: Release
   isActive: boolean
   onActivate: () => void
   featuredLabel: string
+  openAriaLabel: string
 }) {
   const [isLoaded, setIsLoaded] = useState(false)
 
   return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        'relative aspect-square overflow-hidden rounded-lg border transition-all duration-300',
-        isActive
-          ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100'
-          : 'border-border opacity-60 cursor-pointer',
-      )}
-      onClick={isActive ? undefined : onActivate}
-    >
-      {!isLoaded && (
-        <div className="absolute inset-0 animate-pulse bg-muted z-0" />
-      )}
-      <Image
-        src={getSquareThumbnail(release.coverArt, 600)}
-        alt={`${release.title} by ${release.artistName} – cover art`}
-        fill
-        sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
-        className="object-cover relative z-10"
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-        unoptimized
-        onLoad={() => setIsLoaded(true)}
-      />
-      {release.featured && (
-        <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-          {featuredLabel}
-        </Badge>
+    <div className="relative aspect-square w-full h-full group">
+      <div
+        aria-hidden="true"
+        className={cn(
+          'absolute inset-0 overflow-hidden rounded-lg border transition-all duration-300',
+          isActive
+            ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)] opacity-100'
+            : 'border-border opacity-60',
+        )}
+      >
+        {!isLoaded && (
+          <div className="absolute inset-0 animate-pulse bg-muted z-0" />
+        )}
+        <Image
+          src={getSquareThumbnail(release.coverArt, 600)}
+          alt={`${release.title} by ${release.artistName} – cover art`}
+          fill
+          sizes="(max-width: 768px) 70vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover relative z-10"
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          unoptimized
+          onLoad={() => setIsLoaded(true)}
+        />
+        {release.featured && (
+          <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm z-20">
+            {featuredLabel}
+          </Badge>
+        )}
+      </div>
+
+      {isActive ? (
+        <Link
+          href={`/releases/${release.id}`}
+          aria-label={openAriaLabel}
+          className="absolute inset-0 z-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent rounded-lg"
+          draggable={false}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={onActivate}
+          aria-label="Bring to center"
+          className="absolute inset-0 z-30 w-full h-full cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent rounded-lg"
+        />
       )}
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// ReleasesCoverflow — main component
-// ---------------------------------------------------------------------------
 export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
   const total = releases.length
   const prefersReducedMotion = useReducedMotion() ?? false
   const swiperRef = useRef<SwiperType | null>(null)
   const isDragging = useRef(false)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
-  /**
-   * pendingIndexRef is updated immediately when Swiper reports a slide change
-   * (zero re-render cost). displayIndex is only committed to React state once
-   * the transition has fully settled, preventing mid-animation re-renders from
-   * interfering with Swiper's centeredSlides layout calculation.
-   */
-  const pendingIndexRef = useRef(0)
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
-  /** Ref used to restart the CSS fade animation without DOM remount */
   const metaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -137,20 +129,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     )
   }, [locale, releases])
 
-  /**
-   * Restart the CSS fade-in animation on the metadata block whenever the
-   * displayed slide changes, without unmounting/remounting the DOM subtree.
-   */
   useEffect(() => {
     const el = metaRef.current
     if (!el) return
     el.classList.remove('animate-in', 'fade-in', 'duration-200')
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    void el.offsetHeight // force reflow to restart animation
+    void el.offsetHeight
     el.classList.add('animate-in', 'fade-in', 'duration-200')
   }, [displayIndex])
 
-  /** Debounced resize handler — keeps Swiper layout in sync */
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
     const handleResize = () => {
@@ -178,13 +164,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       if (Math.hypot(dx, dy) > 5) {
         isDragging.current = true
       }
-    }
-  }, [])
-
-  const handleOverlayClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
-    if (isDragging.current) {
-      event.preventDefault()
-      isDragging.current = false
     }
   }, [])
 
@@ -243,7 +222,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
   return (
     <div
-      className="relative py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      className="relative py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-w-6xl mx-auto"
       role="region"
       aria-label={dict.coverflowRegionLabel}
       tabIndex={0}
@@ -256,19 +235,8 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onBlur={handleBlurOut}
     >
       <div className="relative overflow-clip" data-lenis-prevent>
-        {/*
-          Virtual is kept with addSlidesBefore/After: 5 so only ~11 slides are
-          in the DOM at any time — preventing the render storm with 750+ releases.
-          The object form (vs boolean `virtual`) keeps enough slides buffered
-          around the active index so Swiper can correctly calculate track width
-          for centeredSlides without drift.
-          Slide and overlay widths use `%` instead of `vw` so both measurements
-          reference the same container width (vw includes the scrollbar, Swiper's
-          container does not, causing a ~17 px offset per swipe with vw).
-        */}
         <Swiper
-          modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
-          virtual={{ addSlidesBefore: 5, addSlidesAfter: 5 }}
+          modules={[EffectCoverflow, Keyboard, Autoplay]}
           effect="coverflow"
           centeredSlides
           grabCursor
@@ -276,37 +244,28 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           autoplay={autoplayConfig}
           coverflowEffect={COVERFLOW_EFFECT}
           speed={prefersReducedMotion ? 0 : 400}
-          slidesPerView="auto"
+          breakpoints={{
+            0: { slidesPerView: 1.5 },
+            768: { slidesPerView: 2.5 },
+            1024: { slidesPerView: 3.5 },
+          }}
           onSwiper={(swiper) => {
             swiperRef.current = swiper
-            pendingIndexRef.current = swiper.activeIndex
             setDisplayIndex(swiper.activeIndex)
           }}
-          onSlideChange={(swiper) => {
-            // Store index immediately with no re-render so the overlay link
-            // href is always up to date during the animation.
-            pendingIndexRef.current = swiper.activeIndex
-          }}
-          onSlideChangeTransitionEnd={(swiper) => {
-            // Commit to React state only after animation is complete.
-            setDisplayIndex(swiper.activeIndex)
-          }}
-          onTransitionEnd={(swiper) => {
-            // Guard for programmatic slideTo with speed=0.
+          onActiveIndexChange={(swiper) => {
             setDisplayIndex(swiper.activeIndex)
           }}
           className="pb-2"
         >
           {releases.map((release, index) => (
-            <SwiperSlide
-              key={release.id}
-              className="!w-[60%] md:!w-[42%] lg:!w-[26%] max-w-[440px]"
-            >
+            <SwiperSlide key={release.id}>
               {({ isActive }) => (
                 <SlideContent
                   release={release}
                   isActive={isActive}
                   featuredLabel={dict.featured}
+                  openAriaLabel={`${release.title} by ${release.artistName} – ${dict.openReleaseAriaSuffix}`}
                   onActivate={() => {
                     if (!isDragging.current) goToIndex(index)
                   }}
@@ -315,18 +274,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             </SwiperSlide>
           ))}
         </Swiper>
-
-        {/*
-          Overlay Link uses % units to match the slide width exactly —
-          both measurements now reference the same container width.
-        */}
-        <Link
-          href={`/releases/${activeRelease.id}`}
-          aria-label={`${activeRelease.title} by ${activeRelease.artistName} – ${dict.openReleaseAriaSuffix}`}
-          onClick={handleOverlayClick}
-          draggable={false}
-          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 aspect-square w-[60%] md:w-[42%] lg:w-[26%] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        />
       </div>
 
       <div ref={metaRef} className="animate-in fade-in duration-200">
@@ -352,7 +299,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </Link>
       </div>
 
-      {/* ── Navigation ── */}
       {total > 1 && (
         <div className="mt-4 flex items-center justify-center gap-6">
           <button
