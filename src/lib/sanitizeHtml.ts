@@ -39,7 +39,7 @@ function serverSanitize(html: string): string {
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
       // Strip inherently dangerous block elements entirely
       .replace(
-        /<\/?(iframe|object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
+        /<\/?(object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
         '',
       )
       // Remove on* event handler attributes (onclick=, onerror=, etc.)
