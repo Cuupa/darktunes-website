@@ -61,6 +61,11 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
   const slideNodes = api.slideNodes()
   const snapList = api.scrollSnapList()
   const snapCount = snapList.length
+  // Use the exact integer snap index instead of a floating-point threshold so
+  // that pointer-events are always in sync with Embla's authoritative state.
+  // Any residual scroll offset after a swipe can no longer leave the centre
+  // slide permanently locked behind pointer-events:none.
+  const selectedSnap = api.selectedScrollSnap()
 
   snapList.forEach((scrollSnap, snapIndex) => {
     let diffToTarget = scrollSnap - scrollProgress
@@ -83,6 +88,13 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     const inner = slideNode?.firstElementChild as HTMLElement | null
     if (!inner || !slideNode) return
 
+    // Only the exact selected slide receives pointer events.  All others are
+    // locked out regardless of how close they are to centre.  This eliminates
+    // the hitbox-overlap issue (3D-rotated neighbours whose 2D bounding boxes
+    // extend over the centre) and the race condition where a sub-pixel residual
+    // offset kept the correct slide at pointer-events:none after settling.
+    const isSelected = snapIndex === selectedSnap
+
     if (abs > TWEEN_CUTOFF) {
       inner.style.opacity = '0'
       inner.style.filter = ''
@@ -95,8 +107,8 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
       inner.style.transform = ''
       inner.style.filter = ''
       inner.style.opacity = Math.abs(diffToTarget) < 0.15 ? '1' : '0.55'
-      inner.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
-      slideNode.style.pointerEvents = Math.abs(diffToTarget) < 0.15 ? '' : 'none'
+      inner.style.pointerEvents = isSelected ? '' : 'none'
+      slideNode.style.pointerEvents = isSelected ? '' : 'none'
       return
     }
 
@@ -109,8 +121,8 @@ function tweenSlides(api: EmblaCarouselType, prefersReducedMotion: boolean): voi
     inner.style.opacity = String(Math.max(0, opacity))
     const blurPx = Math.min(3, abs * 1.2)
     inner.style.filter = abs < 0.1 ? '' : `blur(${blurPx.toFixed(1)}px)`
-    inner.style.pointerEvents = abs < 0.5 ? '' : 'none'
-    slideNode.style.pointerEvents = abs < 0.5 ? '' : 'none'
+    inner.style.pointerEvents = isSelected ? '' : 'none'
+    slideNode.style.pointerEvents = isSelected ? '' : 'none'
   })
 }
 
@@ -210,11 +222,17 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     emblaApi.on('scroll', onTween)
     emblaApi.on('select', onSelect)
     emblaApi.on('reInit', onSelect)
+    // 'settle' fires once the snap animation has fully completed.  Without it a
+    // swipe that stops very close to (but not at) the snap point emits no further
+    // 'scroll' events, so pointer-events on the newly centred slide is never
+    // restored.  The settle handler guarantees one final clean tween call.
+    emblaApi.on('settle', onTween)
     onSelect()
     return () => {
       emblaApi.off('scroll', onTween)
       emblaApi.off('select', onSelect)
       emblaApi.off('reInit', onSelect)
+      emblaApi.off('settle', onTween)
     }
   }, [emblaApi, onTween, onSelect])
 
