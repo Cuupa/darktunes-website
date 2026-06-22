@@ -22,7 +22,7 @@ import DOMPurify from 'dompurify'
 type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
 
 // ---------------------------------------------------------------------------
-// Iframe-Allowlist — anpassen an tatsächlich genutzte Embed-Provider
+// Iframe-Allowlist
 // ---------------------------------------------------------------------------
 const ALLOWED_IFRAME_HOSTS = [
   'youtube.com',
@@ -37,21 +37,21 @@ function isAllowedIframeSrc(src: string): boolean {
     const url = new URL(src)
     return url.protocol === 'https:' && ALLOWED_IFRAME_HOSTS.includes(url.hostname)
   } catch {
-    return false // relative/ungültige URLs ablehnen
+    return false
   }
 }
 
-let iframeHookRegistered = false
-function ensureIframeHook(): void {
-  if (iframeHookRegistered) return
-  DOMPurify.addHook('uponSanitizeElement', (node, data) => {
-    if (data.tagName !== 'iframe') return
-    const src = (node as HTMLIFrameElement).getAttribute('src') || ''
+function stripDisallowedIframes(cleanHtml: string): string {
+  if (!cleanHtml.includes('<iframe')) return cleanHtml
+  const template = document.createElement('template')
+  template.innerHTML = cleanHtml
+  template.content.querySelectorAll('iframe').forEach((iframe) => {
+    const src = iframe.getAttribute('src') || ''
     if (!isAllowedIframeSrc(src)) {
-      node.parentNode?.removeChild(node)
+      iframe.remove()
     }
   })
-  iframeHookRegistered = true
+  return template.innerHTML
 }
 
 // ---------------------------------------------------------------------------
@@ -106,14 +106,12 @@ export function sanitizeHtml(
     return serverSanitize(html)
   }
 
-  ensureIframeHook()
-
   const addAttr = Array.isArray(options?.ADD_ATTR) ? options.ADD_ATTR : []
   const addTags = Array.isArray(options?.ADD_TAGS) ? options.ADD_TAGS : []
   const wantsIframe = addTags.includes('iframe')
 
   const iframeAttrs = wantsIframe
-    ? ['src', 'allow', 'allowfullscreen', 'frameborder', 'loading', 'title', 'width', 'height', 'referrerpolicy']
+    ? ['src', 'allow', 'allowfullscreen', 'frameborder', 'loading', 'title', 'width', 'height']
     : []
 
   const forbidAttr = Array.isArray(options?.FORBID_ATTR) ? options.FORBID_ATTR : []
@@ -127,5 +125,7 @@ export function sanitizeHtml(
     ],
     FORBID_ATTR: ['srcdoc', ...forbidAttr],
   }
-  return DOMPurify.sanitize(html, mergedOptions)
+
+  const clean = DOMPurify.sanitize(html, mergedOptions)
+  return wantsIframe ? stripDisallowedIframes(clean) : clean
 }
