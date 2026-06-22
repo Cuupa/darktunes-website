@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, EffectCoverflow, Keyboard } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -257,16 +257,18 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     >
       <div className="relative overflow-clip" data-lenis-prevent>
         {/*
-          Virtual module removed. The `vw` unit was causing Swiper's internal
-          pixel math to disagree with CSS (vw includes scrollbar width, Swiper's
-          container measurement does not), leading to a growing centring offset
-          after the first swipe. Switching to `%` units makes both measurements
-          identical. Without Virtual, all slides are in the DOM but each
-          SlideContent manages its own image-load state locally, so there is no
-          render storm from the parent.
+          Virtual is kept with addSlidesBefore/After: 5 so only ~11 slides are
+          in the DOM at any time — preventing the render storm with 750+ releases.
+          The object form (vs boolean `virtual`) keeps enough slides buffered
+          around the active index so Swiper can correctly calculate track width
+          for centeredSlides without drift.
+          Slide and overlay widths use `%` instead of `vw` so both measurements
+          reference the same container width (vw includes the scrollbar, Swiper's
+          container does not, causing a ~17 px offset per swipe with vw).
         */}
         <Swiper
-          modules={[EffectCoverflow, Keyboard, Autoplay]}
+          modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
+          virtual={{ addSlidesBefore: 5, addSlidesAfter: 5 }}
           effect="coverflow"
           centeredSlides
           grabCursor
