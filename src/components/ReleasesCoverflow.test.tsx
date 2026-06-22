@@ -1,7 +1,7 @@
 import type { AnchorHTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react'
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SwiperProps } from 'swiper/react'
 import enDict from '@/i18n/dictionaries/en.json'
 import type { Release } from '@/types'
@@ -77,7 +77,9 @@ vi.mock('swiper/react', () => ({
     mockedState.latestSwiperProps = props
     return <div data-testid="mock-swiper">{children}</div>
   },
-  SwiperSlide: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  SwiperSlide: ({ children }: { children?: ReactNode | ((state: { isActive: boolean }) => ReactNode) }) => (
+    <div>{typeof children === 'function' ? children({ isActive: true }) : children}</div>
+  ),
 }))
 
 const buildRelease = (id: string, title: string): Release => ({
@@ -106,6 +108,7 @@ describe('ReleasesCoverflow', () => {
   beforeEach(() => {
     mockedState.latestSwiperProps = null
     mockedState.reducedMotion = false
+    vi.restoreAllMocks()
   })
 
   it('renders without crashing with a list of releases', () => {
@@ -144,7 +147,25 @@ describe('ReleasesCoverflow', () => {
     expect(overlayLink).toHaveAttribute('href', `/releases/${releases[1].id}`)
   })
 
-  it('disables overlay pointer events on interaction and restores them when interaction ends', () => {
+  it('formats release dates on the client after render', async () => {
+    const toLocaleDateStringSpy = vi
+      .spyOn(Date.prototype, 'toLocaleDateString')
+      .mockReturnValue('client-formatted-date')
+
+    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('client-formatted-date')).toBeInTheDocument()
+    })
+
+    expect(toLocaleDateStringSpy).toHaveBeenCalledWith('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  })
+
+  it('prevents overlay navigation after a drag and allows it again on the next click', () => {
     render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
 
     const region = screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })
@@ -153,16 +174,28 @@ describe('ReleasesCoverflow', () => {
     })
 
     fireEvent.pointerDown(region)
-    expect(overlayLink).toHaveStyle({ pointerEvents: 'none' })
+    fireEvent.pointerMove(region)
 
-    fireEvent.pointerUp(region)
-    expect(overlayLink.style.pointerEvents).toBe('')
+    const dragClick = createEvent.click(overlayLink)
+    fireEvent(overlayLink, dragClick)
+    expect(dragClick.defaultPrevented).toBe(true)
 
-    fireEvent.touchStart(region)
-    expect(overlayLink).toHaveStyle({ pointerEvents: 'none' })
+    const nextClick = createEvent.click(overlayLink)
+    fireEvent(overlayLink, nextClick)
+    expect(nextClick.defaultPrevented).toBe(false)
 
-    fireEvent.touchEnd(region)
-    expect(overlayLink.style.pointerEvents).toBe('')
+    fireEvent.pointerDown(region)
+    const tapClick = createEvent.click(overlayLink)
+    fireEvent(overlayLink, tapClick)
+    expect(tapClick.defaultPrevented).toBe(false)
+  })
+
+  it('uses overflow-clip on the Swiper wrapper', () => {
+    const { container } = render(
+      <ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />,
+    )
+
+    expect(container.querySelector('[data-lenis-prevent]')).toHaveClass('overflow-clip')
   })
 
   it('sets Swiper speed to 0 when reduced motion is enabled', () => {

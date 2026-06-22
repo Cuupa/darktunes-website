@@ -124,8 +124,14 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
                   viewport={{ once: true }}
                   transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.08 }}
                 >
-                  <Card className="bg-card border-border p-5 md:p-6">
-                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <Card className="bg-card border-border p-5 md:p-6 relative group cursor-pointer hover:border-accent/50 transition-colors">
+                    {/* Invisible full-card overlay link — sits behind all content */}
+                    <Link
+                      href={`/events/${concert.id}`}
+                      aria-label={`${concert.artistName} – ${concert.eventName}`}
+                      className="absolute inset-0 z-0 rounded-[inherit]"
+                    />
+                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between relative z-10 pointer-events-none">
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-sm uppercase tracking-wider text-muted-foreground">
                           <Calendar size={16} />
@@ -151,7 +157,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
                       </div>
 
                       {concert.ticketUrl && (
-                        <Button asChild className="uppercase tracking-wider font-bold">
+                        <Button asChild className="uppercase tracking-wider font-bold relative z-20 pointer-events-auto">
                           <a
                             href={concert.ticketUrl}
                             target="_blank"
