@@ -22,6 +22,39 @@ import DOMPurify from 'dompurify'
 type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
 
 // ---------------------------------------------------------------------------
+// Iframe-Allowlist — anpassen an tatsächlich genutzte Embed-Provider
+// ---------------------------------------------------------------------------
+const ALLOWED_IFRAME_HOSTS = [
+  'youtube.com',
+  'youtube-nocookie.com',
+  'open.spotify.com',
+  'w.soundcloud.com',
+  'widget.bandsintown.com',
+]
+
+function isAllowedIframeSrc(src: string): boolean {
+  try {
+    const url = new URL(src)
+    return url.protocol === 'https:' && ALLOWED_IFRAME_HOSTS.includes(url.hostname)
+  } catch {
+    return false // relative/ungültige URLs ablehnen
+  }
+}
+
+let iframeHookRegistered = false
+function ensureIframeHook(): void {
+  if (iframeHookRegistered) return
+  DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+    if (data.tagName !== 'iframe') return
+    const src = (node as HTMLIFrameElement).getAttribute('src') || ''
+    if (!isAllowedIframeSrc(src)) {
+      node.parentNode?.removeChild(node)
+    }
+  })
+  iframeHookRegistered = true
+}
+
+// ---------------------------------------------------------------------------
 // Server-side regex sanitizer
 // ---------------------------------------------------------------------------
 
@@ -33,24 +66,18 @@ type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
 function serverSanitize(html: string): string {
   return (
     html
-      // Strip <script> elements including their content
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-      // Strip <style> elements including their content
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-      // Strip inherently dangerous block elements entirely
       .replace(
-        /<\/?(object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
+        /<\/?(iframe|object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
         '',
       )
-      // Remove on* event handler attributes (onclick=, onerror=, etc.)
       .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-      // Neutralise javascript: pseudo-protocol in href / src / action
       .replace(
         /(href|src|action|xlink:href)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi,
         '$1=""',
       )
       .replace(/(href|src|action|xlink:href)\s*=\s*javascript:[^\s>]*/gi, '$1=""')
-      // Neutralise data: URIs in href / src / action (images are safe, others are not)
       .replace(
         /(href|src|action)\s*=\s*(['"])\s*data:(?!image\/(?:png|jpe?g|gif|webp|svg\+xml))[^'"]*\2/gi,
         '$1=""',
@@ -76,15 +103,29 @@ export function sanitizeHtml(
   if (!html) return ''
 
   if (typeof window === 'undefined') {
-    // Server: apply the regex-based sanitizer
     return serverSanitize(html)
   }
 
-  // Client: full DOMPurify sanitization
+  ensureIframeHook()
+
   const addAttr = Array.isArray(options?.ADD_ATTR) ? options.ADD_ATTR : []
+  const addTags = Array.isArray(options?.ADD_TAGS) ? options.ADD_TAGS : []
+  const wantsIframe = addTags.includes('iframe')
+
+  const iframeAttrs = wantsIframe
+    ? ['src', 'allow', 'allowfullscreen', 'frameborder', 'loading', 'title', 'width', 'height', 'referrerpolicy']
+    : []
+
+  const forbidAttr = Array.isArray(options?.FORBID_ATTR) ? options.FORBID_ATTR : []
+
   const mergedOptions: SanitizeOptions = {
     ...options,
-    ADD_ATTR: ['target', ...addAttr.filter((attr) => attr !== 'target')],
+    ADD_ATTR: [
+      'target',
+      ...addAttr.filter((a) => a !== 'target'),
+      ...iframeAttrs.filter((a) => !addAttr.includes(a)),
+    ],
+    FORBID_ATTR: ['srcdoc', ...forbidAttr],
   }
   return DOMPurify.sanitize(html, mergedOptions)
 }

@@ -9,15 +9,15 @@
  * Isolated as a minimal 'use client' leaf so the parent RSC remains server-rendered.
  */
 
-import DOMPurify from 'dompurify'
 import { processHtmlImages } from '@/lib/imageUtils'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 
 interface NewsBodyClientProps {
   content: string
 }
 
 export function NewsBodyClient({ content }: NewsBodyClientProps) {
-  const sanitized = processHtmlImages(DOMPurify.sanitize(content, { ADD_ATTR: ['target'] }))
+  const sanitized = processHtmlImages(sanitizeHtml(content))
   return (
     <div
       className="prose prose-invert prose-sm max-w-none"
