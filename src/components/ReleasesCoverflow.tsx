@@ -109,6 +109,16 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const swiperRef = useRef<SwiperType | null>(null)
   const isDragging = useRef(false)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  /**
+   * pendingIndex is updated immediately when Swiper reports a slide change so
+   * the metadata overlay link always points to the correct slide even during
+   * the transition animation. displayIndex drives the visible metadata text and
+   * is only committed once the transition has fully settled
+   * (onSlideChangeTransitionEnd / onTransitionEnd), preventing the React
+   * re-render from interfering with Swiper's centeredSlides layout calculation
+   * mid-animation.
+   */
+  const pendingIndexRef = useRef(0)
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
   /** Ref used to restart the CSS fade animation without DOM remount */
@@ -264,11 +274,13 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           Note: Virtual is incompatible with loop mode — loop and
           loopAdditionalSlides have been removed.
 
-          IMPORTANT: we use swiper.activeIndex (not swiper.realIndex) to derive
-          displayIndex. With the Virtual module there is no loop offset, so
-          activeIndex and realIndex are always identical — but using activeIndex
-          is more explicit and prevents any future confusion if loop is ever
-          re-enabled.
+          KEY BEHAVIOUR: onSlideChange records the new index into a ref
+          immediately (zero re-render cost) so the overlay link href is always
+          correct. The React state (displayIndex) is only flushed in
+          onSlideChangeTransitionEnd, after Swiper has finished animating and
+          committed its final CSS transform. This prevents the React re-render
+          from happening while Swiper is mid-animation, which was causing
+          centeredSlides to recalculate and shift the active cover off-centre.
         */}
         <Swiper
           modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
@@ -283,14 +295,25 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           slidesPerView="auto"
           onSwiper={(swiper) => {
             swiperRef.current = swiper
-            // Use activeIndex — the visible centre slide — as the source of
-            // truth for the metadata block and overlay link.
+            pendingIndexRef.current = swiper.activeIndex
             setDisplayIndex(swiper.activeIndex)
           }}
           onSlideChange={(swiper) => {
-            // activeIndex is the index of the currently centred slide.
-            // realIndex equals activeIndex when loop mode is off (which it must
-            // be with Virtual), but being explicit avoids drift bugs.
+            // Record the target index immediately (no re-render) so the
+            // overlay link is always up to date during the animation.
+            pendingIndexRef.current = swiper.activeIndex
+          }}
+          onSlideChangeTransitionEnd={(swiper) => {
+            // Flush to React state only after Swiper has finished animating.
+            // This prevents a mid-animation re-render from shifting the cover.
+            setDisplayIndex(swiper.activeIndex)
+          }}
+          onTransitionEnd={(swiper) => {
+            // Guard against edge cases (e.g. programmatic slideTo with speed=0)
+            // where onSlideChangeTransitionEnd might not fire.
+            if (pendingIndexRef.current !== swiper.activeIndex) {
+              pendingIndexRef.current = swiper.activeIndex
+            }
             setDisplayIndex(swiper.activeIndex)
           }}
           className="pb-2"
@@ -315,6 +338,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           ))}
         </Swiper>
 
+        {/* Invisible overlay Link covering the active (centred) slide */}
         <Link
           href={`/releases/${activeRelease.id}`}
           aria-label={`${activeRelease.title} by ${activeRelease.artistName} – ${dict.openReleaseAriaSuffix}`}
