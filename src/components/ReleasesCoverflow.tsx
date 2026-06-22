@@ -45,37 +45,21 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     )
   }, [locale, releases])
 
-  const disableOverlayClick = useCallback(() => {
-    if (overlayRef.current) {
-      overlayRef.current.style.pointerEvents = 'none'
-    }
+  const disableOverlay = useCallback(() => {
+    if (overlayRef.current) overlayRef.current.style.pointerEvents = 'none'
   }, [])
 
-  const enableOverlayClick = useCallback(() => {
-    if (overlayRef.current) {
-      overlayRef.current.style.pointerEvents = ''
-    }
+  const enableOverlay = useCallback(() => {
+    if (overlayRef.current) overlayRef.current.style.pointerEvents = ''
   }, [])
 
-  const handlePrev = useCallback(() => {
-    swiperRef.current?.slidePrev()
-  }, [])
-
-  const handleNext = useCallback(() => {
-    swiperRef.current?.slideNext()
-  }, [])
+  const handlePrev = useCallback(() => swiperRef.current?.slidePrev(), [])
+  const handleNext = useCallback(() => swiperRef.current?.slideNext(), [])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        handlePrev()
-      }
-
-      if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        handleNext()
-      }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); handlePrev() }
+      if (event.key === 'ArrowRight') { event.preventDefault(); handleNext() }
     },
     [handleNext, handlePrev],
   )
@@ -83,26 +67,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const goToIndex = useCallback(
     (index: number) => {
       if (!swiperRef.current) return
-
-      if (total > 2) {
-        swiperRef.current.slideToLoop(index)
-        return
-      }
-
-      swiperRef.current.slideTo(index)
+      total > 2 ? swiperRef.current.slideToLoop(index) : swiperRef.current.slideTo(index)
     },
     [total],
   )
 
-  if (total === 0) {
-    return null
-  }
+  if (total === 0) return null
 
   const activeRelease = releases[activeIndex] ?? releases[0]
   const hiddenDotCount = Math.max(0, total - MAX_DOTS)
-  const autoplayConfig = autoplayMs > 0 && !prefersReducedMotion
-    ? { delay: autoplayMs, disableOnInteraction: false }
-    : false
+  const autoplayConfig =
+    autoplayMs > 0 && !prefersReducedMotion
+      ? { delay: autoplayMs, disableOnInteraction: false }
+      : false
 
   return (
     <div
@@ -111,17 +88,18 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       aria-label={dict.coverflowRegionLabel}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onPointerDown={disableOverlayClick}
-      onPointerUp={enableOverlayClick}
-      onPointerCancel={enableOverlayClick}
-      onTouchStart={disableOverlayClick}
-      onTouchEnd={enableOverlayClick}
-      onTouchCancel={enableOverlayClick}
+      onPointerDown={disableOverlay}
+      onPointerUp={enableOverlay}
+      onPointerCancel={enableOverlay}
+      onTouchStart={disableOverlay}
+      onTouchEnd={enableOverlay}
+      onTouchCancel={enableOverlay}
     >
-      <div
-        className="relative mx-auto w-full max-w-7xl"
-        data-lenis-prevent
-      >
+      {/*
+        overflow-hidden clips the 3D-rotated neighbour slides so they don't
+        push the layout. position:relative lets the overlay Link sit inside.
+      */}
+      <div className="relative overflow-hidden" data-lenis-prevent>
         <Swiper
           modules={[EffectCoverflow, Virtual, Keyboard, Autoplay]}
           effect="coverflow"
@@ -155,62 +133,82 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
               virtualIndex={index}
               className="!w-[60vw] md:!w-[42vw] lg:!w-[26vw] max-w-[440px]"
             >
-              <div
-                aria-hidden="true"
-                className="pointer-events-none relative aspect-square overflow-hidden rounded-lg border border-border"
-              >
-                <Image
-                  src={getSquareThumbnail(release.coverArt, 600)}
-                  alt={`${release.title} by ${release.artistName} – cover art`}
-                  fill
-                  sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
-                  className="object-cover"
-                  loading="lazy"
-                  decoding="async"
-                  draggable={false}
-                  unoptimized
-                />
-                {release.featured && (
-                  <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground">
-                    {dict.featured}
-                  </Badge>
-                )}
-              </div>
+              {({ isActive }) => (
+                <div
+                  aria-hidden="true"
+                  className={cn(
+                    'pointer-events-none relative aspect-square overflow-hidden rounded-lg border transition-colors duration-300',
+                    isActive
+                      ? 'border-accent/60 shadow-[0_8px_40px_-8px_rgba(73,54,135,0.6)]'
+                      : 'border-border',
+                  )}
+                >
+                  <Image
+                    src={getSquareThumbnail(release.coverArt, 600)}
+                    alt={`${release.title} by ${release.artistName} – cover art`}
+                    fill
+                    sizes="(max-width: 640px) 60vw, (max-width: 1024px) 42vw, 26vw"
+                    className="object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    unoptimized
+                  />
+                  {release.featured && (
+                    <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                      {dict.featured}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </SwiperSlide>
           ))}
         </Swiper>
 
+        {/*
+          Invisible overlay Link — centred with translate so it always sits
+          exactly over the active slide regardless of container size.
+          pointer-events disabled during drag (onPointerDown above), restored on up/cancel.
+        */}
         <Link
           ref={overlayRef}
           href={`/releases/${activeRelease.id}`}
           aria-label={`${activeRelease.title} by ${activeRelease.artistName} – ${dict.openReleaseAriaSuffix}`}
-          className="absolute inset-0 z-10 m-auto aspect-square w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          draggable={false}
+          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 aspect-square w-[60vw] md:w-[42vw] lg:w-[26vw] max-w-[440px] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         />
       </div>
 
-      <Link href={`/releases/${activeRelease.id}`} tabIndex={-1} aria-hidden="true" className="mt-6 block px-4 text-center">
-        <Badge variant="outline" className="uppercase tracking-widest">
+      {/* ── Active release metadata ── */}
+      <Link
+        href={`/releases/${activeRelease.id}`}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="mt-6 block px-4 text-center hover:opacity-80 transition-opacity"
+      >
+        <Badge variant="outline" className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground">
           {activeRelease.type}
         </Badge>
-        <h3 className="mt-2 text-xl font-bold text-foreground">{activeRelease.title}</h3>
+        <h3 className="mt-2 text-xl font-bold line-clamp-1 text-foreground">{activeRelease.title}</h3>
         <p className="mt-1 text-sm font-medium text-muted-foreground">
           {activeRelease.artists && activeRelease.artists.length > 0
-            ? activeRelease.artists.map((artist) => artist.name).join(', ')
+            ? activeRelease.artists.map((a) => a.name).join(', ')
             : activeRelease.artistName}
         </p>
-        <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-mono text-muted-foreground">
           <Calendar size={12} weight="bold" aria-hidden="true" />
           {formattedDates[activeIndex]}
         </p>
       </Link>
 
+      {/* ── Navigation ── */}
       {total > 1 && (
         <div className="mt-4 flex items-center justify-center gap-6">
           <button
             type="button"
             onClick={handlePrev}
             aria-label={dict.previousReleaseAriaLabel}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <CaretLeft size={20} weight="bold" aria-hidden="true" />
           </button>
@@ -225,22 +223,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 aria-label={dict.goToReleaseAriaLabelTemplate
                   .replace('{index}', String(index + 1))
                   .replace('{title}', release.title)}
-                className={cn(
-                  'min-h-[44px] min-w-[44px] rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent',
-                  'flex items-center justify-center',
-                )}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 <span
                   aria-hidden="true"
                   className={cn(
                     'h-2 rounded-full transition-all',
-                    index === activeIndex ? 'w-6 bg-accent' : 'w-2 bg-muted-foreground/40',
+                    index === activeIndex ? 'w-6 bg-accent' : 'w-2 bg-muted-foreground/40 hover:bg-muted-foreground/70',
                   )}
                 />
               </button>
             ))}
             {hiddenDotCount > 0 && (
-              <span className="pl-1 text-xs text-muted-foreground">+{hiddenDotCount}</span>
+              <span className="pl-1 text-xs font-mono text-muted-foreground">+{hiddenDotCount}</span>
             )}
           </div>
 
@@ -248,14 +243,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             type="button"
             onClick={handleNext}
             aria-label={dict.nextReleaseAriaLabel}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <CaretRight size={20} weight="bold" aria-hidden="true" />
           </button>
         </div>
       )}
 
-      <p className="mt-2 text-center text-xs text-muted-foreground">
+      <p className="mt-2 text-center text-xs font-mono text-muted-foreground">
         {activeIndex + 1} / {total}
       </p>
     </div>
