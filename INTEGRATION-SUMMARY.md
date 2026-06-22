@@ -20,7 +20,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
-- **Vitest** unit test suite (`npm test`) — 847 tests passing (80 test files)
+- **Vitest** unit test suite (`npm test`) — 990 tests passing (95 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
