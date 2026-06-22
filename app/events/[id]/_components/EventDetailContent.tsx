@@ -12,7 +12,6 @@ import {
   Ticket,
   NavigationArrow,
   Newspaper,
-  ArrowLeft,
   Users,
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
@@ -116,7 +115,6 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
           href="/events"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-8"
         >
-          <ArrowLeft size={14} aria-hidden="true" />
           {ed.backToEvents}
         </Link>
 
@@ -167,9 +165,9 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
 
           {/* Venue card */}
           {(concert.venueName || concert.venueCity) && (
-            <Card className="bg-card border-border p-6 space-y-3">
-              <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                <MapPin size={14} className="inline mr-1.5" aria-hidden="true" />
+            <Card className="bg-card border-border p-6 space-y-4">
+              <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <MapPin size={14} aria-hidden="true" />
                 Venue
               </h2>
               <p className="text-lg font-semibold">
@@ -177,18 +175,46 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
                   .filter(Boolean)
                   .join(' · ')}
               </p>
-              {concert.venueLat && concert.venueLng && (
-                <a
-                  href={`https://maps.google.com/maps?q=${concert.venueLat},${concert.venueLng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
-                  aria-label={`${concert.eventName} – ${d.navLink}`}
-                >
-                  <NavigationArrow size={12} aria-hidden="true" />
-                  {d.navLink}
-                </a>
-              )}
+
+              {/* Embedded OSM map — always shown when venue info is available */}
+              {(() => {
+                const query = encodeURIComponent(
+                  [concert.venueName, concert.venueAddress, concert.venueCity, concert.venueCountry]
+                    .filter(Boolean)
+                    .join(', ')
+                )
+                const osmSrc = concert.venueLat && concert.venueLng
+                  ? `https://www.openstreetmap.org/export/embed.html?bbox=${concert.venueLng - 0.01}%2C${concert.venueLat - 0.005}%2C${concert.venueLng + 0.01}%2C${concert.venueLat + 0.005}&layer=mapnik&marker=${concert.venueLat}%2C${concert.venueLng}`
+                  : `https://www.openstreetmap.org/export/embed.html?query=${query}&layer=mapnik`
+                const googleMapsHref = concert.venueLat && concert.venueLng
+                  ? `https://maps.google.com/maps?q=${concert.venueLat},${concert.venueLng}`
+                  : `https://maps.google.com/maps?q=${query}`
+                return (
+                  <>
+                    <div className="rounded-md overflow-hidden border border-border" style={{ height: 220 }}>
+                      <iframe
+                        title="Venue map"
+                        src={osmSrc}
+                        width="100%"
+                        height="220"
+                        loading="lazy"
+                        className="block"
+                        aria-label={`Map showing ${concert.venueName ?? concert.venueCity}`}
+                      />
+                    </div>
+                    <a
+                      href={googleMapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-accent hover:underline font-semibold"
+                      aria-label={`Open ${concert.venueName ?? concert.venueCity} in Google Maps`}
+                    >
+                      <NavigationArrow size={16} aria-hidden="true" />
+                      In Google Maps öffnen
+                    </a>
+                  </>
+                )
+              })()}
             </Card>
           )}
 
@@ -223,6 +249,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
               <ShareButton
                 title={`${concert.eventName} – ${concert.artistName}`}
                 text={`${concert.artistName} live ${locale === 'de' ? 'am' : 'on'} ${new Date(concert.concertDate).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' })}${concert.venueCity ? ` in ${concert.venueCity}` : ''}`}
+                size="lg"
                 labels={{
                   share: ed.share,
                   shareSuccess: ed.shareSuccess,
