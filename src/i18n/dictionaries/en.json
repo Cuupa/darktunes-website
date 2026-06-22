@@ -36,7 +36,13 @@
     "viewFullPage": "View Full Page",
     "streamingLinks": "Streaming Links",
     "previewTitle": "Preview",
-    "viewAll": "All Releases"
+    "viewAll": "All Releases",
+    "coverflowRegionLabel": "Releases coverflow",
+    "openReleaseAriaSuffix": "open release",
+    "previousReleaseAriaLabel": "Previous release",
+    "nextReleaseAriaLabel": "Next release",
+    "releaseDotsAriaLabel": "Release dots",
+    "goToReleaseAriaLabelTemplate": "Go to release {index}: {title}"
   },
   "news": {
     "heading": "NEWS",

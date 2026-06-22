@@ -694,15 +694,20 @@ Apple PWA meta tags (theme-color, apple-mobile-web-app-capable, apple-touch-icon
 Custom install prompt: `src/components/PWAInstallPrompt.tsx` — listens for `beforeinstallprompt` (Android/Chrome) and shows an on-brand banner after 3 seconds. iOS users see a manual "Share → Add to Home Screen" hint. Dismissal is persisted in localStorage (`pwa-install-dismissed`). Mounted once in `app/_components/Providers.tsx`.
 NEVER add a second `PWAInstallPrompt` instance. NEVER intercept admin/portal/press routes in the service worker.
 
-Gallery Performance (ReleasesCoverflow Virtual Windowing)
-`ReleasesCoverflow` supports catalogues of any size without degrading performance.
-All slide *containers* are rendered so Embla measures the full carousel width correctly (they are lightweight empty `<div>` elements with `aspect-square`).
-Only slides within `VIRTUAL_BUFFER = 3` positions of the active index have their actual image/link content rendered. Off-window slides render a placeholder `<div>`.
-The rendered window (`renderedIndices: Set<number>`) grows monotonically as the user navigates — once an index enters the window it is never evicted, acting as a natural browser image cache. Maximum DOM-heavy nodes at any time: 7.
-Images use `loading="lazy" decoding="async"` and pass through `getOptimizedImageUrl(url, 600)` (wsrv.nl → WebP).
-Artist images in `Artists.tsx` also use `loading="lazy" decoding="async"` + `getSquareThumbnail`.
+## Gallery Performance (ReleasesCoverflow — Swiper Virtual)
 
-3D Coverflow Clip Architecture: The outer wrapper has `overflow: hidden` to prevent horizontal page scroll. The Embla viewport div (emblaRef) uses `overflow: visible` so perspective-rotated adjacent slides are fully visible and not cropped at the viewport edge. The perspective (1200px) is on a middle wrapper between the two. This three-layer structure — [clip] → [perspective] → [embla-visible] — is required; do NOT collapse layers or move overflow-hidden onto the perspective/embla elements.
+`ReleasesCoverflow` uses **Swiper.js** (`swiper` npm package) with the `Virtual` and
+`EffectCoverflow` modules. Only the slides currently visible in the viewport are mounted
+in the DOM — the rest are virtualised by Swiper. This keeps the DOM lean regardless of
+catalogue size (752+ releases).
+
+The centre slide receives a single invisible `<Link>` overlay for navigation.
+Drag/swipe is handled by Swiper's native touch engine — no custom pointer-event maths.
+The overlay is temporarily disabled (`pointerEvents: 'none'`) during active drag and
+restored on `pointerup`/`pointercancel`.
+
+`embla-carousel-react` is retained as a dependency because `src/components/ui/carousel.tsx`
+(shadcn primitive) depends on it.
 
 robots.txt & llms.txt Maintenance
 Two auto-generated discovery files are served by Next.js at build/request time — no static files to edit manually:
