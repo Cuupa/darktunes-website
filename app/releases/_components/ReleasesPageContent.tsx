@@ -119,7 +119,7 @@ export function ReleasesPageContent({ releases, dict }: ReleasesPageContentProps
                   className="group relative block overflow-hidden rounded-lg bg-card border border-border hover:border-accent/50 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   aria-label={`${release.title} by ${release.artistName}`}
                 >
-                  <div className="relative aspect-square">
+                  <div className="relative aspect-square overflow-hidden">
                     {release.coverArt ? (
                       <Image
                         src={getSquareThumbnail(release.coverArt, 400)}
