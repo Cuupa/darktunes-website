@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button'
 interface ShareButtonProps {
   title: string
   text?: string
+  /** Visual size of the underlying Button. Defaults to `'sm'` for backward-compat. */
+  size?: 'sm' | 'default' | 'lg' | 'icon'
   /** i18n labels */
   labels: {
     share: string
@@ -26,7 +28,7 @@ interface ShareButtonProps {
   }
 }
 
-export function ShareButton({ title, text, labels }: ShareButtonProps) {
+export function ShareButton({ title, text, size, labels }: ShareButtonProps) {
   const [shared, setShared] = useState(false)
 
   const handleShare = async () => {
@@ -61,7 +63,7 @@ export function ShareButton({ title, text, labels }: ShareButtonProps) {
     <Button
       type="button"
       variant="outline"
-      size="sm"
+      size={size ?? 'sm'}
       onClick={handleShare}
       aria-label={labels.share}
       className="gap-1.5 border-border"
