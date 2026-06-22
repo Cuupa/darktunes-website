@@ -41,6 +41,45 @@ function isAllowedIframeSrc(src: string): boolean {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Server-side regex sanitizer
+// ---------------------------------------------------------------------------
+function sanitizeIframesServer(html: string): string {
+  return html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, (match) => {
+    const srcMatch = match.match(/\ssrc\s*=\s*(['"])([^'"]*)\1/i)
+    const src = srcMatch ? srcMatch[2] : ''
+    return isAllowedIframeSrc(src) ? match : ''
+  })
+}
+
+function serverSanitize(html: string): string {
+  let out = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+
+  out = sanitizeIframesServer(out) // erlaubte iframes bleiben, Rest wird entfernt
+
+  return out
+    .replace(
+      /<\/?(object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
+      '',
+    )
+    .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+    .replace(/\s+srcdoc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+    .replace(
+      /(href|src|action|xlink:href)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi,
+      '$1=""',
+    )
+    .replace(/(href|src|action|xlink:href)\s*=\s*javascript:[^\s>]*/gi, '$1=""')
+    .replace(
+      /(href|src|action)\s*=\s*(['"])\s*data:(?!image\/(?:png|jpe?g|gif|webp|svg\+xml))[^'"]*\2/gi,
+      '$1=""',
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Client-side post-process (nach DOMPurify, eigenes detached Fragment)
+// ---------------------------------------------------------------------------
 function stripDisallowedIframes(cleanHtml: string): string {
   if (!cleanHtml.includes('<iframe')) return cleanHtml
   const template = document.createElement('template')
@@ -55,51 +94,9 @@ function stripDisallowedIframes(cleanHtml: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Server-side regex sanitizer
-// ---------------------------------------------------------------------------
-
-/**
- * Removes the most common XSS vectors from an HTML string without requiring
- * a DOM environment.  Not a full parser — it is a defense-in-depth measure
- * intended to be used together with client-side DOMPurify.
- */
-function serverSanitize(html: string): string {
-  return (
-    html
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(
-        /<\/?(iframe|object|embed|applet|form|base|meta|link|input|button|select|textarea)\b[^>]*\/?>/gi,
-        '',
-      )
-      .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-      .replace(
-        /(href|src|action|xlink:href)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi,
-        '$1=""',
-      )
-      .replace(/(href|src|action|xlink:href)\s*=\s*javascript:[^\s>]*/gi, '$1=""')
-      .replace(
-        /(href|src|action)\s*=\s*(['"])\s*data:(?!image\/(?:png|jpe?g|gif|webp|svg\+xml))[^'"]*\2/gi,
-        '$1=""',
-      )
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-
-/**
- * Sanitize an HTML string safely on both server and client.
- *
- * Accepts an optional `options` object that is forwarded to DOMPurify on the
- * client (e.g. `{ ALLOWED_TAGS: [...] }`).
- */
-export function sanitizeHtml(
-  html: string,
-  // Use Parameters to match exactly what DOMPurify.sanitize accepts
-  options?: SanitizeOptions,
-): string {
+export function sanitizeHtml(html: string, options?: SanitizeOptions): string {
   if (!html) return ''
 
   if (typeof window === 'undefined') {
