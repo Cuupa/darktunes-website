@@ -353,7 +353,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                               unoptimized
                             />
                             {isActive && (
-                              <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent pointer-events-none" />
                             )}
                             {release.featured && (
                               <Badge className="absolute top-3 right-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
