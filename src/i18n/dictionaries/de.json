@@ -65,7 +65,18 @@
     "filterCountry": "Alle Länder",
     "navLink": "Navigation",
     "searchPlaceholder": "Events nach Künstler oder Venue suchen…",
-    "noResults": "Keine Events gefunden."
+    "noResults": "Keine Events gefunden.",
+    "eventDetail": {
+      "backToEvents": "← Alle Events",
+      "addToCalendar": "Zum Kalender hinzufügen",
+      "relatedNews": "Verwandter Artikel",
+      "readMore": "Artikel lesen",
+      "featuredArtists": "Line-up",
+      "share": "Teilen",
+      "shareSuccess": "Geteilt!",
+      "shareLinkCopied": "Link kopiert!",
+      "shareError": "Teilen fehlgeschlagen"
+    }
   },
   "spotify": {
     "heading": "SPOTIFY",
