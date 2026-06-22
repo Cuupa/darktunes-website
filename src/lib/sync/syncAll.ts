@@ -49,6 +49,11 @@ export interface SyncAllDeps extends SyncDeps {
    * Useful for per-API force-sync from the admin health widget.
    */
   onlyApi?: string
+  /**
+   * When set, only this single artist is fetched and processed.
+   * Used by the queue executor so each job processes exactly one artist.
+   */
+  onlyArtistId?: string
 }
 
 export interface ApiSyncResult {
@@ -74,11 +79,14 @@ export interface SyncAllResult {
  * Returns a consolidated result — never throws.
  */
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
-  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey, onlyApi } = deps
+  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey, onlyApi, onlyArtistId } = deps
   const results: ApiSyncResult[] = []
 
-  // 1. Fetch all artists
-  const { data: artists, error: artistsErr } = await db.from('artists').select('*')
+  // 1. Fetch artists — either all or just the one targeted by the queue job
+  const artistQuery = db.from('artists').select('*')
+  const { data: artists, error: artistsErr } = onlyArtistId
+    ? await artistQuery.eq('id', onlyArtistId)
+    : await artistQuery
   if (artistsErr || !artists) {
     return {
       results: [
@@ -594,6 +602,32 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     results,
     totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Single-artist queue entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Syncs one artist identified by `artistId` using the APIs implied by
+ * `jobType`.  This is the function called by the sync-queue executor
+ * (`app/api/sync/execute/route.ts`) for each queue job so that exactly
+ * one artist is processed per invocation.
+ *
+ * jobType → onlyApi mapping:
+ *   'spotify'  → only the Spotify block runs
+ *   'discogs'  → only the Discogs block runs
+ *   'full' / anything else → all configured APIs run
+ *   'youtube'  → handled by a separate route; treated as 'full' here as a fallback
+ */
+export async function syncSingleArtist(
+  artistId: string,
+  jobType: string,
+  deps: SyncAllDeps,
+): Promise<SyncAllResult> {
+  const onlyApi =
+    jobType === 'spotify' ? 'spotify' : jobType === 'discogs' ? 'discogs' : undefined
+  return syncAll({ ...deps, onlyArtistId: artistId, onlyApi })
 }
 
 // ---------------------------------------------------------------------------
