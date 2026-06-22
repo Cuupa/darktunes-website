@@ -24,7 +24,7 @@ type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
 // ---------------------------------------------------------------------------
 // Iframe-Allowlist
 // ---------------------------------------------------------------------------
-const ALLOWED_IFRAME_HOSTS = [
+const ALLOWED_IFRAME_DOMAINS = [
   'youtube.com',
   'youtube-nocookie.com',
   'open.spotify.com',
@@ -35,7 +35,10 @@ const ALLOWED_IFRAME_HOSTS = [
 function isAllowedIframeSrc(src: string): boolean {
   try {
     const url = new URL(src)
-    return url.protocol === 'https:' && ALLOWED_IFRAME_HOSTS.includes(url.hostname)
+    if (url.protocol !== 'https:') return false
+    return ALLOWED_IFRAME_DOMAINS.some(
+      (domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+    )
   } catch {
     return false
   }
