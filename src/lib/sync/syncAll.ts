@@ -234,6 +234,8 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       } catch (e) {
         const msg = String(e)
         if (msg.includes('429')) spotifyResult.rateLimited = true
+        if (msg.includes('Invalid limit')) spotifyResult.rateLimited = true
+
         spotifyResult.errors.push(`Spotify sync for ${artist.name}: ${msg}`)
       }
     }
