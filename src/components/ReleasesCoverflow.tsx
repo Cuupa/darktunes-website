@@ -116,14 +116,15 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           effect="coverflow"
           centeredSlides
           loop={total > 2}
+          loopAdditionalSlides={3}
           grabCursor
           keyboard={{ enabled: true }}
           autoplay={autoplayConfig}
           coverflowEffect={{
-            rotate: 50,
+            rotate: 0,
             stretch: 0,
             depth: 120,
-            modifier: 1,
+            modifier: 2.5,
             slideShadows: false,
           }}
           speed={prefersReducedMotion ? 0 : 400}
