@@ -169,7 +169,7 @@ export function ArtistDetailContent({
           <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/80 to-background" />
         </div>
 
-        <div className="relative z-10 container mx-auto px-4 lg:px-8 pt-36 pb-16">
+        <div className="relative z-10 container mx-auto max-w-7xl px-4 lg:px-8 pt-36 pb-16">
           <Link
             href="/artists"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
@@ -179,9 +179,9 @@ export function ArtistDetailContent({
           </Link>
 
           {/* Two-column hero on desktop: photo | metadata */}
-          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-12 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-start">
             {/* Artist photo + logo (left column) */}
-            <div className="flex flex-col gap-4 w-full max-w-xs lg:w-64 xl:w-72 shrink-0">
+            <div className="flex flex-col gap-4 w-full max-w-xs lg:w-80 xl:w-96 shrink-0">
             <motion.div
               initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -393,7 +393,7 @@ export function ArtistDetailContent({
       {/* ------------------------------------------------------------------ */}
       {/* Content below hero                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <div className="container mx-auto px-4 lg:px-8 pb-24 space-y-16">
+      <div className="container mx-auto max-w-7xl px-4 lg:px-8 pb-24 space-y-16">
 
         {/* Biography + Spotify side-by-side */}
         {(artist.bio || artist.spotifyId) && (
@@ -402,7 +402,7 @@ export function ArtistDetailContent({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
-            className="grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-10 items-start"
+            className="grid grid-cols-1 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_360px] gap-10 items-start"
           >
             {/* Biography */}
             {artist.bio && (
@@ -428,7 +428,7 @@ export function ArtistDetailContent({
 
             {/* Spotify embedded player */}
             {artist.spotifyId && (
-              <div className="lg:sticky lg:top-36">
+              <div className="lg:sticky lg:top-36 max-w-sm lg:max-w-none">
                 <h2 className="text-xl font-bold mb-4 tracking-tight text-foreground flex items-center gap-2">
                   <SpotifyLogo size={22} weight="fill" className="text-[#1DB954]" aria-hidden="true" />
                   {dict.listenOn}
@@ -690,7 +690,7 @@ export function ArtistDetailContent({
                   transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <ul className="space-y-4 list-none max-w-3xl">
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 list-none">
                     {news.map((post) => (
                       <li key={post.id}>
                         <Link
@@ -754,7 +754,7 @@ export function ArtistDetailContent({
                 {concerts.length === 0 ? (
                   <p className="text-foreground/70 font-serif">{dict.noShows}</p>
                 ) : (
-                  <ul className="space-y-3 list-none max-w-2xl">
+                  <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 list-none">
                     {concerts.map((concert) => (
                       <li
                         key={concert.id}
