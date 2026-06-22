@@ -97,11 +97,11 @@ const buildRelease = (id: string, title: string): Release => ({
 
 const releases = [buildRelease('release-1', 'Release One'), buildRelease('release-2', 'Release Two')]
 
-const triggerSlideChange = (nextRealIndex: number) => {
-  const callback = mockedState.latestSwiperProps?.onSlideChange
-  if (!callback) throw new Error('onSlideChange callback missing')
+const triggerSlideTransitionEnd = (nextActiveIndex: number) => {
+  const callback = mockedState.latestSwiperProps?.onSlideChangeTransitionEnd
+  if (!callback) throw new Error('onSlideChangeTransitionEnd callback missing')
 
-  callback({ realIndex: nextRealIndex } as never)
+  callback({ activeIndex: nextActiveIndex } as never)
 }
 
 describe('ReleasesCoverflow', () => {
@@ -133,11 +133,11 @@ describe('ReleasesCoverflow', () => {
     expect(overlayLink).toHaveAttribute('href', `/releases/${releases[0].id}`)
   })
 
-  it('updates overlay link href after slide change', () => {
+  it('updates overlay link href after slide transition ends', () => {
     render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
 
     act(() => {
-      triggerSlideChange(1)
+      triggerSlideTransitionEnd(1)
     })
 
     const overlayLink = screen.getByRole('link', {
