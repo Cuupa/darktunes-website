@@ -51,11 +51,6 @@ const KEYBOARD_CONFIG = { enabled: true }
 /**
  * Encapsulates each slide's image + skeleton + badge so that image `onLoad`
  * events update local state ONLY inside this component, not the parent.
- *
- * Previously, image load events called `setLoadedIds` on the parent, which
- * triggered a full re-render of the entire slide list on every load callback.
- * With ~750 releases loading 15 images at once that caused a catastrophic
- * render storm at startup.
  */
 function SlideContent({
   release,
@@ -114,12 +109,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const swiperRef = useRef<SwiperType | null>(null)
   const isDragging = useRef(false)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
-  /**
-   * Internal ref tracks the real index for Swiper navigation without
-   * triggering a component-wide re-render. Only displayIndex (state) is set in
-   * onSlideChange so the re-render scope is limited to the metadata section.
-   */
-  const activeIndexRef = useRef(0)
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
   /** Ref used to restart the CSS fade animation without DOM remount */
@@ -141,8 +130,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   /**
    * Restart the CSS fade-in animation on the metadata block whenever the
    * displayed slide changes, without unmounting/remounting the DOM subtree.
-   * The "force reflow" (reading offsetHeight) flushes the style change so the
-   * browser treats the re-added class as a fresh animation start.
    */
   useEffect(() => {
     const el = metaRef.current
@@ -240,8 +227,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
   /**
    * Memoized autoplay config — prevents Swiper from destroying and rebuilding
-   * its Autoplay module on every render caused by an inline object reference
-   * changing each cycle.
+   * its Autoplay module on every render.
    */
   const autoplayConfig = useMemo(
     () =>
@@ -277,6 +263,12 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
           Note: Virtual is incompatible with loop mode — loop and
           loopAdditionalSlides have been removed.
+
+          IMPORTANT: we use swiper.activeIndex (not swiper.realIndex) to derive
+          displayIndex. With the Virtual module there is no loop offset, so
+          activeIndex and realIndex are always identical — but using activeIndex
+          is more explicit and prevents any future confusion if loop is ever
+          re-enabled.
         */}
         <Swiper
           modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
@@ -291,12 +283,15 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           slidesPerView="auto"
           onSwiper={(swiper) => {
             swiperRef.current = swiper
-            activeIndexRef.current = swiper.realIndex
-            setDisplayIndex(swiper.realIndex)
+            // Use activeIndex — the visible centre slide — as the source of
+            // truth for the metadata block and overlay link.
+            setDisplayIndex(swiper.activeIndex)
           }}
           onSlideChange={(swiper) => {
-            activeIndexRef.current = swiper.realIndex
-            setDisplayIndex(swiper.realIndex)
+            // activeIndex is the index of the currently centred slide.
+            // realIndex equals activeIndex when loop mode is off (which it must
+            // be with Virtual), but being explicit avoids drift bugs.
+            setDisplayIndex(swiper.activeIndex)
           }}
           className="pb-2"
         >
