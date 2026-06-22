@@ -248,12 +248,14 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       onFocus={handleFocusIn}
       onBlur={handleBlurOut}
     >
-      <div className="relative overflow-clip" data-lenis-prevent>
+      <div className="relative overflow-clip" data-lenis-prevent style={{ touchAction: 'pan-y pinch-zoom' }}>
         <Swiper
           modules={[EffectCoverflow, Keyboard, Autoplay]}
           effect="coverflow"
           centeredSlides
           grabCursor
+          touchStartPreventDefault={false}
+          passiveListeners
           keyboard={KEYBOARD_CONFIG}
           autoplay={autoplayConfig}
           coverflowEffect={COVERFLOW_EFFECT}
