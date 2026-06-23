@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
-import type { AnchorHTMLAttributes, KeyboardEvent, MouseEvent, PointerEvent } from 'react'
+import type { AnchorHTMLAttributes, KeyboardEvent, MouseEvent } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -27,15 +27,6 @@ export interface ReleasesCoverflowProps {
 
 const MAX_DOTS = 12
 const DOTS_THRESHOLD = 50
-
-const COVERFLOW_EFFECT = {
-  rotate: 0,
-  stretch: 0,
-  depth: 120,
-  modifier: 2.5,
-  slideShadows: false,
-  scale: 0.92,
-}
 
 const KEYBOARD_CONFIG = { enabled: true }
 
@@ -68,19 +59,29 @@ function SlideContent({
         )}
       >
         {!isLoaded && (
-          <div className="absolute inset-0 animate-pulse bg-muted z-0" />
+          <div className="absolute inset-0 animate-pulse bg-muted z-0 flex items-center justify-center">
+            <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-accent rounded-full animate-spin" />
+          </div>
         )}
         <Image
           src={getSquareThumbnail(release.coverArt, 600)}
           alt={`${release.title} by ${release.artistName} – cover art`}
           fill
-          sizes="(max-width: 768px) 70vw, (max-width: 1024px) 45vw, 30vw"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 40vw, 30vw"
           className="object-cover relative z-10"
           loading="lazy"
           decoding="async"
           draggable={false}
-          unoptimized
           onLoad={() => setIsLoaded(true)}
+          onError={(e) => {
+            console.error('[ReleasesCoverflow] Image load failed:', release.id, release.coverArt)
+            e.currentTarget.style.display = 'none'
+            const skeleton = e.currentTarget.parentElement?.querySelector<HTMLElement>('.absolute.inset-0.animate-pulse')
+            if (skeleton) {
+              skeleton.style.display = 'flex'
+              skeleton.innerHTML = '<span class="m-auto text-xs text-muted-foreground">Failed to load</span>'
+            }
+          }}
         />
         {release.featured && (
           <Badge className="absolute right-3 top-3 bg-secondary/90 text-secondary-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm z-20">
@@ -114,7 +115,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const prefersReducedMotion = useReducedMotion() ?? false
   const swiperRef = useRef<SwiperType | null>(null)
   const isDragging = useRef(false)
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
   const metaRef = useRef<HTMLDivElement>(null)
@@ -155,20 +155,35 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     }
   }, [])
 
-  const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    isDragging.current = false
-    pointerStart.current = { x: event.clientX, y: event.clientY }
-  }, [])
+  // iOS-specific memory pressure detection
+  useEffect(() => {
+    if (typeof window === 'undefined') return
 
-  const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (pointerStart.current) {
-      const dx = event.clientX - pointerStart.current.x
-      const dy = event.clientY - pointerStart.current.y
-      if (Math.hypot(dx, dy) > 5) {
-        isDragging.current = true
-      }
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    if (!isIOS) return
+
+    console.log('[ReleasesCoverflow] iOS device detected, monitoring for memory issues')
+
+    const handleMemoryWarning = () => {
+      console.warn('[ReleasesCoverflow] Memory warning detected - attempting recovery')
+      if (autoplayMs > 0) swiperRef.current?.autoplay?.stop()
     }
-  }, [])
+
+    window.addEventListener('pagehide', handleMemoryWarning)
+
+    return () => {
+      window.removeEventListener('pagehide', handleMemoryWarning)
+    }
+  }, [autoplayMs])
+
+  // Initialization diagnostic logging
+  useEffect(() => {
+    console.log('[ReleasesCoverflow] Initialized with', releases.length, 'releases')
+    if (typeof window !== 'undefined') {
+      console.log('[ReleasesCoverflow] Device width:', window.innerWidth)
+      console.log('[ReleasesCoverflow] User agent:', navigator.userAgent)
+    }
+  }, [releases.length])
 
   const handlePrev = useCallback(() => swiperRef.current?.slidePrev(), [])
   const handleNext = useCallback(() => swiperRef.current?.slideNext(), [])
@@ -177,9 +192,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       event.preventDefault()
       isDragging.current = false
     }
-  }, [])
-  const handlePointerEnd = useCallback(() => {
-    pointerStart.current = null
   }, [])
 
   const handleKeyDown = useCallback(
@@ -227,6 +239,19 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     [autoplayMs, prefersReducedMotion],
   )
 
+  // Responsive coverflow effect: lighter 3D transforms on memory-constrained mobile devices
+  const coverflowEffect = useMemo(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    return {
+      rotate: 0,
+      stretch: 0,
+      depth: isMobile ? 80 : 120,
+      modifier: isMobile ? 1.8 : 2.5,
+      slideShadows: false,
+      scale: isMobile ? 0.94 : 0.92,
+    }
+  }, [])
+
   if (total === 0) return null
 
   const activeRelease = releases[displayIndex] ?? releases[0]
@@ -239,10 +264,6 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       aria-label={dict.coverflowRegionLabel}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocusIn}
@@ -256,24 +277,47 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
           grabCursor
           touchStartPreventDefault={false}
           passiveListeners
+          watchOverflow
+          threshold={10}
+          preventClicks={false}
+          preventClicksPropagation={false}
+          observer
+          observeParents
           keyboard={KEYBOARD_CONFIG}
           autoplay={autoplayConfig}
-          coverflowEffect={COVERFLOW_EFFECT}
+          coverflowEffect={coverflowEffect}
           speed={prefersReducedMotion ? 0 : 400}
           breakpoints={{
-            0: { slidesPerView: 1.5 },
-            768: { slidesPerView: 2.5 },
-            1024: { slidesPerView: 3.5 },
+            0: { slidesPerView: 1.2 },
+            640: { slidesPerView: 1.8 },
+            1024: { slidesPerView: 2.5 },
+            1280: { slidesPerView: 3.2 },
           }}
           onSwiper={(swiper) => {
             swiperRef.current = swiper
             setDisplayIndex(swiper.activeIndex)
+            console.log('[ReleasesCoverflow] Swiper initialized:', {
+              slidesCount: swiper.slides.length,
+              slidesPerView: swiper.params.slidesPerView,
+              activeIndex: swiper.activeIndex,
+            })
           }}
           onActiveIndexChange={(swiper) => {
             setDisplayIndex(swiper.activeIndex)
+            console.log('[ReleasesCoverflow] Slide changed to:', swiper.activeIndex)
           }}
           onSlideChangeTransitionEnd={(swiper) => {
             setDisplayIndex(swiper.activeIndex)
+          }}
+          onTouchStart={() => {
+            isDragging.current = false
+            console.log('[ReleasesCoverflow] Touch started')
+          }}
+          onTouchMove={() => {
+            isDragging.current = true
+          }}
+          onTouchEnd={() => {
+            console.log('[ReleasesCoverflow] Touch ended')
           }}
           className="pb-2"
         >

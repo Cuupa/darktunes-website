@@ -696,15 +696,33 @@ NEVER add a second `PWAInstallPrompt` instance. NEVER intercept admin/portal/pre
 
 ## Gallery Performance (ReleasesCoverflow — Swiper Virtual)
 
-`ReleasesCoverflow` uses **Swiper.js** (`swiper` npm package) with the `Virtual` and
-`EffectCoverflow` modules. Only the slides currently visible in the viewport are mounted
-in the DOM — the rest are virtualised by Swiper. This keeps the DOM lean regardless of
-catalogue size (752+ releases).
+`ReleasesCoverflow` uses **Swiper.js** (`swiper` npm package) with the `EffectCoverflow`,
+`Keyboard`, and `Autoplay` modules. (`Virtual` is NOT used — AGENTS.md was previously
+incorrect about this.)
 
-The centre slide receives a single invisible `<Link>` overlay for navigation.
-Drag/swipe is handled by Swiper's native touch engine — no custom pointer-event maths.
-The overlay is temporarily disabled (`pointerEvents: 'none'`) during active drag and
-restored on `pointerup`/`pointercancel`.
+Cover-art images are served through `getSquareThumbnail(url, 600)` (wsrv.nl proxy) and
+rendered via Next.js `<Image>` **without** `unoptimized` so Next.js applies WebP
+compression, keeping memory footprint low on iOS Safari.
+
+Drag detection is handled entirely via Swiper's native touch events:
+- `onTouchStart` — resets `isDragging` ref to `false`
+- `onTouchMove` — sets `isDragging` to `true` (movement detected)
+- `handleOverlayClick` — prevents navigation and resets `isDragging` when a click fires
+  during/after a drag
+
+No React-level `onPointerDown`/`onPointerMove` tracking exists on the container div —
+those were removed to eliminate conflicts with Swiper's internal touch engine.
+
+`coverflowEffect` is a `useMemo` computed at mount time: on viewports < 768 px the 3D
+depth/modifier/scale values are lighter (`depth: 80`, `modifier: 1.8`) to reduce GPU
+pressure on memory-constrained iOS devices.
+
+`slidesPerView` breakpoints: `0 → 1.2`, `640 → 1.8`, `1024 → 2.5`, `1280 → 3.2` —
+intentionally conservative on small screens to limit simultaneous images in memory.
+
+iOS diagnostic logging (prefixed `[ReleasesCoverflow]`) is emitted to the console on
+mount and on touch/slide events. An additional `useEffect` listens for the `pagehide`
+event on iOS devices and stops autoplay as a memory-pressure recovery measure.
 
 `embla-carousel-react` is retained as a dependency because `src/components/ui/carousel.tsx`
 (shadcn primitive) depends on it.
