@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 import DOMPurify from 'dompurify'
 import Image from 'next/image'
@@ -21,12 +22,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Artist, Concert } from '@/types'
-import type { ArtistProfile } from '@/lib/api/artistProfiles'
+import type { PublicArtistEpk } from '@/lib/api/publicArtistEpk'
 import type { PressPhoto } from '@/lib/api/pressPhotos'
+import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+import { EpkPublicViewer } from '@/components/epk-builder/EpkPublicViewer'
 
 interface ArtistEpkClientProps {
   artist: Artist
-  profile: ArtistProfile | null
+  profile: PublicArtistEpk['profile'] | null
+  canvasDocument: EpkDocumentV2 | null
   photos: PressPhoto[]
   concerts: Concert[]
 }
@@ -67,7 +71,36 @@ const SOCIAL_LINKS = [
   { key: 'bandcampUrl', label: 'Bandcamp', icon: MusicNotes },
 ] as const
 
-export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpkClientProps) {
+export function ArtistEpkClient({
+  artist,
+  profile,
+  canvasDocument,
+  photos,
+  concerts,
+}: ArtistEpkClientProps) {
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const showCanvasEpk = Boolean(canvasDocument && profile?.epkEditorMode === 'canvas')
+
+  const handleDownloadPressKitPdf = async () => {
+    if (!artist.slug) return
+    setExportingPdf(true)
+    try {
+      const res = await fetch(`/api/epk/press/${artist.slug}/export`)
+      if (!res.ok) throw new Error('export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${artist.name.replace(/\s+/g, '-').toLowerCase()}-press-kit.pdf`
+      anchor.click()
+      URL.revokeObjectURL(url)
+      toast.success('Press kit PDF downloaded')
+    } catch {
+      toast.error('PDF export failed')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
   const bios = [
     { label: 'Short Bio', text: profile?.bioShort },
     { label: 'Medium Bio', text: profile?.bioMedium },
@@ -132,6 +165,29 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
             />
           </div>
         </section>
+
+        {showCanvasEpk && canvasDocument && (
+          <section aria-labelledby="artist-canvas-epk" className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 id="artist-canvas-epk" className="text-2xl font-bold tracking-tight">
+                Press Kit Preview
+              </h2>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px] gap-2"
+                disabled={exportingPdf}
+                onClick={() => void handleDownloadPressKitPdf()}
+              >
+                <DownloadSimple size={16} weight="bold" aria-hidden="true" />
+                {exportingPdf ? 'Generating PDF…' : 'Download Press Kit PDF'}
+              </Button>
+            </div>
+            <div className="rounded-3xl border border-border bg-card/60 p-6">
+              <EpkPublicViewer document={canvasDocument} artistName={artist.name} />
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="artist-bios" className="space-y-4">
           <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">Bios</h2>

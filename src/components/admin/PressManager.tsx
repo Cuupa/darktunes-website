@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { CloudArrowUp, DownloadSimple, Headphones, Image as ImageIcon, Newspaper, TrendUp, Users, FolderOpen } from '@phosphor-icons/react'
+import { CloudArrowUp, DownloadSimple, Headphones, Image as ImageIcon, Layout, Newspaper, TrendUp, Users, FolderOpen } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getArtists } from '@/lib/api/artists'
 import { getPressPhotos, createPressPhoto, deletePressPhoto } from '@/lib/api/pressPhotos'
@@ -23,6 +23,7 @@ import { toast } from 'sonner'
 
 const AccreditationsManager = lazy(() => import('./AccreditationsManager').then((m) => ({ default: m.AccreditationsManager })))
 const MediaFileExplorer = lazy(() => import('./media-explorer/MediaFileExplorer').then((m) => ({ default: m.MediaFileExplorer })))
+const EpkTemplatesManager = lazy(() => import('./EpkTemplatesManager').then((m) => ({ default: m.EpkTemplatesManager })))
 
 function PanelFallback() {
   return <Skeleton className="h-40 w-full" />
@@ -188,6 +189,7 @@ export function PressManager() {
         <TabsTrigger value="media" className="gap-2"><FolderOpen size={16} weight="bold" aria-hidden="true" />Media</TabsTrigger>
         <TabsTrigger value="accreditations" className="gap-2"><Newspaper size={16} weight="bold" aria-hidden="true" />Accreditations</TabsTrigger>
         <TabsTrigger value="analytics" className="gap-2"><TrendUp size={16} weight="bold" aria-hidden="true" />Analytics</TabsTrigger>
+        <TabsTrigger value="epk-templates" className="gap-2"><Layout size={16} weight="bold" aria-hidden="true" />EPK Templates</TabsTrigger>
       </TabsList>
 
       <TabsContent value="applications">
@@ -343,6 +345,12 @@ export function PressManager() {
           <Card className="border-border bg-card/70"><CardHeader><CardTitle>Accreditations</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{accreditationCount}</p></CardContent></Card>
           <Card className="border-border bg-card/70 md:col-span-2 xl:col-span-4"><CardHeader><CardTitle>Total journalist downloads</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{downloadCount}</p></CardContent></Card>
         </div>
+      </TabsContent>
+
+      <TabsContent value="epk-templates">
+        <Suspense fallback={<PanelFallback />}>
+          <EpkTemplatesManager />
+        </Suspense>
       </TabsContent>
     </Tabs>
   )
