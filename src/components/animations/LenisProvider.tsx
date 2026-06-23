@@ -36,23 +36,20 @@ export function LenisProvider({ children }: LenisProviderProps) {
     <ReactLenis
       root
       options={{
-        // Bessere Performance + smooth
-        lerp: 0.12,                    // ← WICHTIG: statt nur duration
-        duration: 0.9,
+        // Optimierte Einstellungen für Mac Trackpad (besseres Momentum + weniger "Hängen")
+        lerp: 0.08,
+        duration: 0.55,
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-        
-        // Touch optimiert
-        touchMultiplier: 1.8,
+
+        // Wichtig für Mac Trackpads
+        syncTouch: true,
+        syncTouchLerp: 0.075,
         wheelMultiplier: 0.9,
-        
+        touchMultiplier: 1.3,
+
         infinite: false,
-        
-        // Deutlich performanter prevent
-        prevent: (node: Element) => {
-          // Schnellere Prüfung
-          return node.hasAttribute('data-lenis-prevent') || 
-                 !!node.closest('[data-lenis-prevent]')
-        },
+        prevent: (node: Element) =>
+          node.closest('[data-lenis-prevent]') !== null,
       }}
     >
       <ScrollLockObserver />
