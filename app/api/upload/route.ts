@@ -15,7 +15,7 @@
  */
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { createHash, randomUUID } from 'crypto'
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { extname } from 'path'
 import { eventBus } from '@/domain/events/eventBus'
@@ -24,6 +24,9 @@ import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+/** Maximum upload size for admin/editor users: 100 MB */
+const MAX_ADMIN_FILE_SIZE = 100 * 1024 * 1024
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
@@ -41,11 +44,21 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'No file found in request')
   }
 
+  if (file.size > MAX_ADMIN_FILE_SIZE) {
+    throw new ApiError(413, 'File too large (max 100 MB)')
+  }
+
   const folderId = (formData.get('folderId') as string | null) || null
   const artistId = (formData.get('artistId') as string | null) || null
-  const buffer = Buffer.from(await file.arrayBuffer())
   const mimeType = file.type || 'application/octet-stream'
-  const sha256Hash = createHash('sha256').update(buffer).digest('hex')
+
+  // Compute SHA-256 hash via Web Crypto API (async, non-blocking)
+  const ab = await file.arrayBuffer()
+  const hashBuf = await crypto.subtle.digest('SHA-256', ab)
+  const sha256Hash = Array.from(new Uint8Array(hashBuf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+
   const supabase = await createServerSupabaseClient()
 
   // When uploading from an artist context (e.g. artist edit form), auto-resolve
@@ -83,13 +96,14 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
 
+  // Stream file directly to R2 — avoids buffering an extra copy in Node.js memory
   await r2.send(
     new PutObjectCommand({
       Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
       Key: r2Key,
-      Body: buffer,
+      Body: file.stream(),
       ContentType: mimeType,
-      ContentLength: buffer.length,
+      ContentLength: file.size,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
@@ -100,7 +114,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     filename,
     original_filename: file.name,
     mime_type: mimeType,
-    size_bytes: buffer.length,
+    size_bytes: file.size,
     r2_key: r2Key,
     public_url: publicUrl,
     uploaded_by: userId,
@@ -110,7 +124,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     sha256_hash: sha256Hash,
   })
 
-  eventBus.emit({ type: 'asset.uploaded', r2Key, publicUrl, mimeType, sizeBytes: buffer.length })
+  eventBus.emit({ type: 'asset.uploaded', r2Key, publicUrl, mimeType, sizeBytes: file.size })
 
   return NextResponse.json({
     duplicate: false,
@@ -119,6 +133,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     r2Key,
     filename,
     mimeType,
-    sizeBytes: buffer.length,
+    sizeBytes: file.size,
   })
 })

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { createR2Client } from '@/lib/r2Utils'
+import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 import { createArtistAsset, deleteArtistAsset } from '@/lib/api/artistAssets'
 import { createAssetRecord } from '@/lib/api/assets'
 
@@ -38,15 +38,15 @@ async function uploadAssetToR2(
   const contentType = file.type || 'application/octet-stream'
   const ext = extFromMimeType(contentType)
   const key = `artist-assets/${artistId}/${randomUUID()}.${ext}`
-  const buffer = Buffer.from(await file.arrayBuffer())
 
+  // Stream file directly to R2 — avoids loading an extra copy into Node.js memory
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      Body: buffer,
+      Body: file.stream(),
       ContentType: contentType,
-      ContentLength: buffer.length,
+      ContentLength: file.size,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
@@ -139,29 +139,42 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Get artist's folder id (auto-created by DB trigger on artist insert)
   const folderId = await getOrCreateArtistFolder(supabase, artist.id)
 
-  // Insert into main assets table so admin file explorer can see portal uploads
-  await createAssetRecord(supabase, {
-    filename: file.name,
-    original_filename: file.name,
-    mime_type: file.type || 'application/octet-stream',
-    size_bytes: file.size,
-    r2_key: uploaded.key,
-    public_url: uploaded.url,
-    uploaded_by: userId,
-    folder_id: folderId,
-    artist_id: artist.id,
-  })
+  // Write DB records. On failure, delete the already-uploaded R2 object so it
+  // doesn't become an orphaned (cost-incurring) file in the bucket.
+  let asset
+  try {
+    // Insert into main assets table so admin file explorer can see portal uploads
+    await createAssetRecord(supabase, {
+      filename: file.name,
+      original_filename: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      size_bytes: file.size,
+      r2_key: uploaded.key,
+      public_url: uploaded.url,
+      uploaded_by: userId,
+      folder_id: folderId,
+      artist_id: artist.id,
+    })
 
-  const asset = await createArtistAsset(supabase, {
-    artist_id: artist.id,
-    filename: file.name,
-    original_filename: file.name,
-    mime_type: file.type || 'application/octet-stream',
-    size_bytes: file.size,
-    r2_key: uploaded.key,
-    public_url: uploaded.url,
-    label: typeof label === 'string' && label.trim() ? label.trim() : null,
-  })
+    asset = await createArtistAsset(supabase, {
+      artist_id: artist.id,
+      filename: file.name,
+      original_filename: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      size_bytes: file.size,
+      r2_key: uploaded.key,
+      public_url: uploaded.url,
+      label: typeof label === 'string' && label.trim() ? label.trim() : null,
+    })
+  } catch (dbErr) {
+    // Compensating transaction: remove the R2 object to avoid orphaned storage
+    try {
+      await deleteObjectFromR2(uploaded.key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
+    } catch {
+      console.error('[upload-asset] R2 rollback failed for key:', uploaded.key)
+    }
+    throw dbErr
+  }
 
   return NextResponse.json({ asset })
 })
