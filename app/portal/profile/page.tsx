@@ -55,6 +55,7 @@ async function ProfileContent({ searchParams }: { searchParams: Promise<{ artist
   return (
     <ProfileForm
       dict={dict.portal}
+      errors={dict.errors}
       artistId={artist?.id ?? null}
       artistName={artist?.name ?? null}
       artistSlug={artist?.slug ?? null}

@@ -15,7 +15,7 @@
  * Also contains <EPKModal> — a full-screen dialog view of the EPK.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import Image from 'next/image'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Button } from '@/components/ui/button'
@@ -551,7 +551,7 @@ function EPKDocument({
   }
 
   return (
-    <article id="epk-document-root" ref={documentRef} className="epk-document" style={articleStyle}>
+    <article data-epk-root className="epk-document" ref={documentRef} style={articleStyle}>
       {data.epkBgImageUrl ? (
         <div
           aria-hidden="true"
@@ -610,19 +610,21 @@ interface EPKModalProps {
 
 export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
   const titleId = useId()
+  const documentRef = useRef<HTMLElement>(null)
   const [downloading, setDownloading] = useState(false)
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloading(true)
     try {
-      const { generateEpkPdf } = await import('./epkPdf')
-      await generateEpkPdf(data)
-    } catch {
-      toast.error(dict.profile_error)
+      const { buildEpkPdfMessages, generateEpkPdf } = await import('./epkPdf')
+      await generateEpkPdf(data, buildEpkPdfMessages(dict), documentRef.current)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : dict.profile_epk_error_print_failed
+      toast.error(message || dict.profile_epk_error_print_failed)
     } finally {
       setDownloading(false)
     }
-  }, [data, dict.profile_error])
+  }, [data, dict])
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(window.location.href).then(() => {
@@ -652,19 +654,26 @@ export function EPKModal({ dict, data, open, onClose }: EPKModalProps) {
               variant="outline"
               onClick={() => void handleDownloadPdf()}
               disabled={downloading}
+              aria-busy={downloading}
               className="gap-1.5 text-xs"
             >
               <FilePdf size={13} aria-hidden="true" />
-              {downloading ? '…' : dict.profile_download_epk}
+              {downloading ? dict.profile_epk_downloading : dict.profile_download_epk}
             </Button>
-            <Button size="icon" variant="ghost" onClick={onClose} className="h-8 w-8" aria-label={dict.profile_epk_close_preview}>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onClose}
+              className="min-h-[44px] min-w-[44px]"
+              aria-label={dict.profile_epk_close_preview}
+            >
               <X size={16} aria-hidden="true" />
             </Button>
           </div>
         </div>
         <div data-lenis-prevent className="overflow-y-auto max-h-[70vh] p-4 sm:p-6 epk-print-area">
           <EPKThemeProvider themeId={data.epkTheme} customTokens={data.epkCustomThemeTokens}>
-            <EPKDocument dict={dict} data={data} />
+            <EPKDocument dict={dict} data={data} documentRef={documentRef} />
           </EPKThemeProvider>
         </div>
       </DialogContent>
@@ -1169,14 +1178,6 @@ export function EPKPreview({
   void artistSlug
   const [modalOpen, setModalOpen] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setModalOpen(false)
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
 
   return (
     <section ref={previewRef} className="epk-print-area space-y-4">
