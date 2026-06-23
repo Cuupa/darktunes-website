@@ -22,7 +22,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistsByUserId, getArtistProfileByArtistId, isProfileComplete } from '@/lib/api/artistProfiles'
+import { getArtistsByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
+import { shouldRedirectToOnboarding } from '@/lib/portal/onboardingGate'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalAccessGate } from './_components/PortalAccessGate'
@@ -176,19 +177,9 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   ])
   const unreadMessages = unreadMessagesResult.count ?? 0
 
-  // Redirect to onboarding if the artist profile is incomplete and the wizard
-  // has not been completed/skipped yet.  We skip the redirect when the user is
-  // already on the /portal/onboarding route to avoid a redirect loop.
-  const isOnOnboarding = currentPath.startsWith('/portal/onboarding')
-
-  if (
-    artist &&
-    !isOnOnboarding &&
-    artistProfile !== null &&
-    !artistProfile.onboardingCompleted &&
-    !isProfileComplete(artistProfile, artist)
-  ) {
-    redirect('/portal/onboarding')
+  if (shouldRedirectToOnboarding(artist, artistProfile, currentPath)) {
+    const onboardingUrl = artist ? `/portal/onboarding?artistId=${artist.id}` : '/portal/onboarding'
+    redirect(onboardingUrl)
   }
 
   return (

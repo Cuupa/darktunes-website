@@ -308,6 +308,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                     .replace('{index}', String(index + 1))
                     .replace('{title}', release.title)}
                   aria-pressed={index === displayIndex}
+                  aria-label={dict.goToReleaseAriaLabelTemplate.replace('{index}', String(index + 1)).replace('{title}', release.title)}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <span

@@ -18,6 +18,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { hasPortalArtistMembership } from '@/lib/portal/membership'
 
 const ADMIN_ROLES = new Set(['admin', 'editor'])
 
@@ -141,10 +142,17 @@ export async function middleware(request: NextRequest) {
     const isAdmin = profile?.role === 'admin'
 
     if (!isAdmin) {
-      // Extract artist_id from JWT app_metadata
-      const membership = user.app_metadata?.artist_id ? { artist_id: user.app_metadata.artist_id } : null
+      let hasMembership = false
+      try {
+        hasMembership = await hasPortalArtistMembership(supabase, user.id)
+      } catch {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.searchParams.set('error', 'no_artist')
+        return NextResponse.redirect(loginUrl)
+      }
 
-      if (!membership) {
+      if (!hasMembership) {
         const loginUrl = request.nextUrl.clone()
         loginUrl.pathname = '/login'
         loginUrl.searchParams.set('error', 'no_artist')

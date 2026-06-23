@@ -7,7 +7,10 @@ import {
   getArtistByUserId,
   getArtistsByUserId,
   resolvePortalArtist,
+  isProfileComplete,
+  type ArtistProfile,
 } from './artistProfiles'
+import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
 type ArtistProfileRow = Database['public']['Tables']['artist_epks']['Row']
@@ -282,5 +285,64 @@ describe('resolvePortalArtist', () => {
     const db = makeSequentialDb([{ data: null, error: null }])
     const result = await resolvePortalArtist(db, 'no-artist-user')
     expect(result).toBeNull()
+  })
+
+  it('returns null when artist row was deleted', async () => {
+    const db = makeSequentialDb([
+      { data: { artist_id: 'artist-uuid' }, error: null },
+      { data: null, error: { message: 'not found', code: 'PGRST116' } },
+    ])
+    const result = await resolvePortalArtist(db, 'auth-user-uuid', 'artist-uuid')
+    expect(result).toBeNull()
+  })
+})
+
+describe('isProfileComplete', () => {
+  const baseArtist = rowToArtist({ ...mockArtistRow, image_url: 'https://example.com/photo.jpg' })
+  const baseProfile: ArtistProfile = {
+    id: 'profile-uuid',
+    artistId: 'artist-uuid',
+    bioShort: 'Short bio',
+    bioMedium: undefined,
+    bioLong: undefined,
+    pressQuote: undefined,
+    bookingContact: undefined,
+    pressContact: undefined,
+    riderStagePlotUrl: undefined,
+    riderTechnicalUrl: undefined,
+    riderHospitalityUrl: undefined,
+    onboardingCompleted: false,
+    epkTheme: 'default',
+    epkLayout: 'classic',
+    epkOrientation: 'portrait',
+    epkBgImageUrl: undefined,
+    epkBgOpacity: 20,
+    epkSectionsOrder: [],
+    epkSectionsHidden: [],
+    epkPasswordHash: undefined,
+    epkPasswordSections: [],
+    epkGalleryPhotos: [],
+    epkCustomThemeTokens: {},
+    customLinks: [],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  }
+
+  it('returns false when profile or artist is null', () => {
+    expect(isProfileComplete(null, baseArtist)).toBe(false)
+    expect(isProfileComplete(baseProfile, null)).toBe(false)
+  })
+
+  it('returns true when photo, bio, and facebook link are present', () => {
+    const artist = rowToArtist({
+      ...mockArtistRow,
+      image_url: 'https://example.com/photo.jpg',
+      facebook_url: 'https://facebook.com/artist',
+    })
+    expect(isProfileComplete(baseProfile, artist)).toBe(true)
+  })
+
+  it('returns false when no social or streaming link is set', () => {
+    expect(isProfileComplete(baseProfile, baseArtist)).toBe(false)
   })
 })

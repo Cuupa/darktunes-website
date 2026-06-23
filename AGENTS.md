@@ -661,12 +661,15 @@ There are now two feature-flag systems:
 Enforcement: Portal and press dashboard nav/routes read `portal_feature_flags`; legacy promo-pool/editor gates still read `site_settings.feature_toggles`.
 
 Artist Portal Access Gate
+`middleware.ts` gates `/portal/*` (except `/portal/accept-invite`) by querying `artist_members` via `hasPortalArtistMembership()` in `src/lib/portal/membership.ts` — NOT JWT `app_metadata.artist_id`. Admins bypass the membership check.
 Portal layout (`app/portal/layout.tsx`) enforces role-based access BEFORE rendering the portal UI:
   - Roles `artist` or `admin` → portal accessible (user must also have a linked artist record).
   - Role `user` (unassigned/new) → `PortalAccessGate` component shown — explains how to request access.
   - Other roles (`editor`, `journalist`) → `PortalAccessGate` shown with role explanation.
 `PortalAccessGate` lives at `app/portal/_components/PortalAccessGate.tsx`.
 New users default to `user` role = zero portal/admin access until an Admin explicitly assigns a role and links their artist profile.
+Onboarding redirect: `shouldRedirectToOnboarding()` in `src/lib/portal/onboardingGate.ts` redirects to `/portal/onboarding?artistId=…` when no `artist_epks` row exists OR when `onboarding_completed` is false and `isProfileComplete()` returns false.
+Multi-artist context: all portal pages and onboarding server actions resolve the active artist via `resolvePortalArtist(db, userId, artistId)` using the `?artistId=` query param; `getArtistByUserId()` is deprecated for portal flows.
 
 Artist Preview
 `PortalSidebar` accepts `artistSlug: string | null`, `featureFlags: Record<string, boolean>`, and `unreadMessages: number` props from the layout Server Component.
