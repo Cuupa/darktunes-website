@@ -19,15 +19,24 @@ export default async function PressPage() {
   const supabase = await createServerSupabaseClient()
 
   const [artists, pressReleases, siteSettings] = await Promise.all([
-    getPublicArtists(supabase).catch(() => []),
-    getPressOnlyNewsPosts(supabase).then((posts) => posts.slice(0, 6)).catch(() => []),
-    getSiteSettings(supabase).catch(() => ({
-      labelName: 'darkTunes Music Group',
-      labelTagline: '',
-      contactEmail: 'info@darktunes.com',
-      impressumPhone: '',
-      impressumEmail: 'info@darktunes.com',
-    })),
+    getPublicArtists(supabase).catch((err: unknown) => {
+      console.error('[press/page] Failed to fetch artists:', err)
+      return []
+    }),
+    getPressOnlyNewsPosts(supabase).then((posts) => posts.slice(0, 6)).catch((err: unknown) => {
+      console.error('[press/page] Failed to fetch press releases:', err)
+      return []
+    }),
+    getSiteSettings(supabase).catch((err: unknown) => {
+      console.error('[press/page] Failed to fetch site settings:', err)
+      return {
+        labelName: 'darkTunes Music Group',
+        labelTagline: '',
+        contactEmail: 'info@darktunes.com',
+        impressumPhone: '',
+        impressumEmail: 'info@darktunes.com',
+      }
+    }),
   ])
 
   return (

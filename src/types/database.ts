@@ -1513,6 +1513,8 @@ export interface Database {
           name: string
           outlet: string
           message: string | null
+          website_url: string | null
+          reason: string | null
           status: 'pending' | 'approved' | 'rejected'
           reviewed_by: string | null
           reviewed_at: string | null
@@ -1525,6 +1527,8 @@ export interface Database {
           name: string
           outlet: string
           message?: string | null
+          website_url?: string | null
+          reason?: string | null
           status?: 'pending' | 'approved' | 'rejected'
           reviewed_by?: string | null
           reviewed_at?: string | null
@@ -1537,6 +1541,8 @@ export interface Database {
           name?: string
           outlet?: string
           message?: string | null
+          website_url?: string | null
+          reason?: string | null
           status?: 'pending' | 'approved' | 'rejected'
           reviewed_by?: string | null
           reviewed_at?: string | null

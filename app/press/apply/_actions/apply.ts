@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 async function sendPressApplicationNotification(data: {
   name: string
@@ -62,20 +62,39 @@ export async function submitPressApplication(data: {
       return { status: 'error', message: signUpError.message }
     }
     if (authData.user) {
-      await supabase.from('journalist_applications').insert({
+      const { error: insertError } = await supabase.from('journalist_applications').insert({
         user_id: authData.user.id,
         email: data.email,
         name: data.name,
         outlet: data.publication,
-        message: [data.website, data.reason].filter(Boolean).join('\n\n') || null,
+        website_url: data.website || null,
+        reason: data.reason || null,
       })
 
-      // Notify admin via email (fire-and-forget — don't fail the signup if this fails)
+      if (insertError) {
+        // Roll back the auth user to avoid orphaned accounts that can log in
+        // but have no application record and will never receive a status.
+        try {
+          const serviceRole = await createServiceRoleSupabaseClient()
+          await serviceRole.auth.admin.deleteUser(authData.user.id)
+        } catch (cleanupErr) {
+          console.error(
+            '[apply] Failed to clean up auth user after failed application insert:',
+            cleanupErr,
+          )
+        }
+        return { status: 'error', message: insertError.message }
+      }
+
+      // Notify admin via email. Failure is non-critical but must be logged
+      // so the label operator is aware when notifications stop working.
       await sendPressApplicationNotification({
         name: data.name,
         email: data.email,
         publication: data.publication,
-      }).catch(() => { /* non-critical */ })
+      }).catch((err: unknown) => {
+        console.error('[apply] Failed to send press application notification email:', err)
+      })
     }
     return { status: 'pending' }
   } catch {

@@ -198,7 +198,24 @@ export function PressManager() {
                 <div>
                   <p className="font-medium">{application.name} — {application.outlet}</p>
                   <p className="text-sm text-muted-foreground">{application.email}</p>
-                  {application.message && <p className="mt-1 text-sm text-muted-foreground">{application.message}</p>}
+                  {application.websiteUrl && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      <span className="font-medium">Website:</span>{' '}
+                      <a
+                        href={application.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        {application.websiteUrl}
+                      </a>
+                    </p>
+                  )}
+                  {application.reason && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      <span className="font-medium">Reason:</span> {application.reason}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => void approveApplication(application.id, 'approved')}>Approve</Button>

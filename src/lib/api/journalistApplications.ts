@@ -30,6 +30,8 @@ export interface JournalistApplication {
   name: string
   outlet: string
   message: string | undefined
+  websiteUrl: string | undefined
+  reason: string | undefined
   status: 'pending' | 'approved' | 'rejected'
   reviewedBy: string | undefined
   reviewedAt: string | undefined
@@ -48,6 +50,8 @@ function rowToApplication(row: ApplicationRow): JournalistApplication {
     name: row.name,
     outlet: row.outlet,
     message: row.message ?? undefined,
+    websiteUrl: row.website_url ?? undefined,
+    reason: row.reason ?? undefined,
     status: row.status,
     reviewedBy: row.reviewed_by ?? undefined,
     reviewedAt: row.reviewed_at ?? undefined,

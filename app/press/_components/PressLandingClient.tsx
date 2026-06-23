@@ -23,7 +23,11 @@ interface PressLandingClientProps {
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString()
+  return new Date(date).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
 }
 
 type SortKey = 'nameAsc' | 'nameDesc' | 'genreAsc'
@@ -51,8 +55,11 @@ export function PressLandingClient({
     return filtered.slice().sort((a, b) => {
       if (sort === 'nameAsc') return a.name.localeCompare(b.name)
       if (sort === 'nameDesc') return b.name.localeCompare(a.name)
-      // genreAsc: compare first genre
-      return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '')
+      // genreAsc: compare the sorted genre lists so every genre is considered,
+      // not just the first entry in the array.
+      const aGenre = [...a.genres].sort()[0] ?? ''
+      const bGenre = [...b.genres].sort()[0] ?? ''
+      return aGenre.localeCompare(bGenre)
     })
   }, [artists, search, sort])
 
