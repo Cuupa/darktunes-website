@@ -2,8 +2,9 @@
  * app/api/journalist-applications/[id]/route.ts
  *
  * PATCH — Admin: approve or reject a journalist application.
- *         On approval, upgrades the applicant's profile role to 'journalist'.
- *         On rejection (after a prior approval), reverts the role to 'user'.
+ *         The applicant's profile role is automatically updated by the
+ *         `trg_journalist_application_status_change` database trigger:
+ *         'approved' → role becomes 'journalist'; 'rejected' → role reverts to 'user'.
  */
 
 import { withErrorHandler, ApiError } from '@/lib/errors'
@@ -38,11 +39,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const db = await createServiceRoleSupabaseClient()
   const application = await updateApplicationStatus(db, id, status, user.id)
 
-  // Promote the applicant's role on approval; demote on rejection
-  if (application.userId) {
-    const newRole = status === 'approved' ? 'journalist' : 'user'
-    await db.from('users').update({ role: newRole }).eq('id', application.userId)
-  }
+  // Role promotion/demotion is handled atomically by the database trigger
+  // `trg_journalist_application_status_change`. No manual update is needed here.
 
   return NextResponse.json({ application })
 })

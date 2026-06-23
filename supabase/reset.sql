@@ -357,6 +357,44 @@ CREATE TRIGGER on_oauth_artist_verify
   AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_artist_verification();
 
+-- HELPER: journalist application status → user role sync
+-- When an application is approved, the applicant's profile role is set to
+-- 'journalist'. When rejected (or a prior approval is reversed), the role
+-- reverts to 'user'. Running as SECURITY DEFINER so the trigger can write
+-- to public.users even when invoked by a non-admin session.
+CREATE OR REPLACE FUNCTION public.handle_journalist_application_status_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- No-op when the status column did not actually change.
+  IF NEW.status = OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  -- No-op when the application is not linked to an auth user.
+  IF NEW.user_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status = 'approved' THEN
+    UPDATE public.users SET role = 'journalist' WHERE id = NEW.user_id;
+  ELSIF NEW.status = 'rejected' THEN
+    UPDATE public.users SET role = 'user' WHERE id = NEW.user_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_journalist_application_status_change ON public.journalist_applications;
+CREATE TRIGGER trg_journalist_application_status_change
+  AFTER UPDATE OF status ON public.journalist_applications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_journalist_application_status_change();
+
 INSERT INTO public.users (id, email, role)
 SELECT id, email, 'user'
 FROM auth.users
@@ -1317,6 +1355,10 @@ CREATE TABLE IF NOT EXISTS public.journalist_applications (
   CONSTRAINT journalist_applications_status_check
     CHECK (status IN ('pending', 'approved', 'rejected'))
 );
+
+-- Structured fields for website URL and application reason (added after initial schema)
+ALTER TABLE public.journalist_applications ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE public.journalist_applications ADD COLUMN IF NOT EXISTS reason      TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_journalist_applications_user_id
   ON public.journalist_applications (user_id);

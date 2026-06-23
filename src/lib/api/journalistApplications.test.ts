@@ -41,6 +41,8 @@ const mockApplicationRow: ApplicationRow = {
   name: 'Jane Press',
   outlet: 'Dark Magazine',
   message: 'I want to cover your release.',
+  website_url: 'https://darkmagazine.com',
+  reason: 'We cover underground electronic music and want to feature your artists.',
   status: 'pending',
   reviewed_by: null,
   reviewed_at: null,
@@ -63,6 +65,10 @@ describe('getJournalistApplications', () => {
     expect(result[0].email).toBe('journalist@magazine.com')
     expect(result[0].name).toBe('Jane Press')
     expect(result[0].outlet).toBe('Dark Magazine')
+    expect(result[0].websiteUrl).toBe('https://darkmagazine.com')
+    expect(result[0].reason).toBe(
+      'We cover underground electronic music and want to feature your artists.',
+    )
     expect(result[0].status).toBe('pending')
     expect(result[0].reviewedBy).toBeUndefined()
     expect(result[0].reviewedAt).toBeUndefined()
@@ -104,10 +110,15 @@ describe('createJournalistApplication', () => {
       name: 'Jane Press',
       outlet: 'Dark Magazine',
       user_id: 'user-uuid-1',
+      website_url: 'https://darkmagazine.com',
+      reason: 'We cover underground electronic music and want to feature your artists.',
     })
     expect(result.id).toBe('app-uuid-1')
     expect(result.status).toBe('pending')
-    expect(result.message).toBe('I want to cover your release.')
+    expect(result.websiteUrl).toBe('https://darkmagazine.com')
+    expect(result.reason).toBe(
+      'We cover underground electronic music and want to feature your artists.',
+    )
   })
 
   it('throws on database error', async () => {
