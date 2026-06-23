@@ -57,6 +57,31 @@ export async function createServerSupabaseClient() {
  * making all PostgREST queries run under the admin's role (with RLS applied)
  * rather than as the service-role principal.
  */
+/**
+ * Creates a Supabase client authenticated with a Bearer access token.
+ * Use in portal Route Handlers that verify JWT via `getUser(token)` so that
+ * subsequent RLS-protected queries run as the authenticated user (not anon).
+ */
+export async function createBearerAuthSupabaseClient(accessToken: string) {
+  const { serverEnv } = await import('@/lib/env.server')
+
+  return createClient<Database>(
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
+    serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  )
+}
+
 export async function createServiceRoleSupabaseClient() {
   const { serverEnv } = await import('@/lib/env.server')
 

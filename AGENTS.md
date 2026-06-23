@@ -676,6 +676,10 @@ Artist Preview
 When `artistSlug` is set, a "Preview Public Profile" link is shown under the artist name (opens `/artists/{slug}` in a new tab).
 The same preview link/button appears at the top of `ProfileForm` (passed via `artistSlug` prop from `portal/profile/page.tsx`).
 
+EPK PDF Export (Artist Portal) — WYSIWYG Print
+The portal EPK PDF uses the **browser print dialog** on the live HTML preview (`src/lib/epk/printEpkDocument.ts`, entry `app/portal/profile/_components/epkPdf.ts`). `generateEpkPdf()` clones `[data-epk-root]` from `EPKPreview.tsx` into a print popup and calls `window.print()` — the user saves as PDF. This guarantees visual parity with the preview (themes, layouts, rich HTML, icons). Requires popups allowed; `TabsContent value="epk"` uses `forceMount` so the document is always in the DOM for export from any tab.
+Profile save (`PUT /api/portal/profile`): artist photo lives on `artists.image_url` (not `artist_epks`). Route handlers that verify Bearer tokens MUST use `createBearerAuthSupabaseClient(token)` for subsequent RLS writes — cookie session alone may be stale.
+
 Journalist Dashboard
 Protected routes live at `/press/dashboard/*` with dedicated `/press/login`.
 Middleware enforces auth and role (`journalist` or `admin`) before access.

@@ -6,8 +6,11 @@ const resolvePortalArtistMock = vi.fn()
 const upsertArtistProfileMock = vi.fn()
 const revalidatePathMock = vi.fn()
 
+const createBearerAuthSupabaseClientMock = vi.fn()
+
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: createServerSupabaseClientMock,
+  createBearerAuthSupabaseClient: createBearerAuthSupabaseClientMock,
 }))
 
 vi.mock('@/lib/api/artistProfiles', () => ({
@@ -32,7 +35,7 @@ describe('PUT /api/portal/profile', () => {
     const updateMock = vi.fn(() => ({ eq: eqMock }))
     const fromMock = vi.fn(() => ({ update: updateMock }))
 
-    createServerSupabaseClientMock.mockResolvedValue({
+    const supabaseClient = {
       auth: {
         getUser: vi.fn().mockResolvedValue({
           data: { user: { id: 'user-1' } },
@@ -40,7 +43,10 @@ describe('PUT /api/portal/profile', () => {
         }),
       },
       from: fromMock,
-    })
+    }
+
+    createServerSupabaseClientMock.mockResolvedValue(supabaseClient)
+    createBearerAuthSupabaseClientMock.mockResolvedValue(supabaseClient)
 
     resolvePortalArtistMock.mockResolvedValue({ id: artistId, slug: 'artist-slug' })
     upsertArtistProfileMock.mockResolvedValue({ id: 'profile-1' })
@@ -60,7 +66,7 @@ describe('PUT /api/portal/profile', () => {
       },
       body: JSON.stringify({
         artist_id: artistId,
-        photo_url: '',
+        image_url: 'https://cdn.example.com/photo.jpg',
         website_url: '',
         instagram_url: '',
         youtube_url: '',
@@ -89,7 +95,6 @@ describe('PUT /api/portal/profile', () => {
     expect(upsertArtistProfileMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        photo_url: null,
         rider_stage_plot_url: null,
         rider_technical_url: null,
         rider_hospitality_url: null,
@@ -106,6 +111,7 @@ describe('PUT /api/portal/profile', () => {
     expect(client.from).toHaveBeenCalledWith('artists')
     expect(updateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
+        image_url: 'https://cdn.example.com/photo.jpg',
         website_url: null,
         instagram_url: null,
         youtube_url: null,
