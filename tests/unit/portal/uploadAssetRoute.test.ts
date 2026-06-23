@@ -1,22 +1,26 @@
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { ApiError } from '@/lib/errors'
 
-const createServerSupabaseClientMock = vi.fn()
+async function loadRoute() {
+  vi.resetModules()
+  return import('../../../app/api/portal/upload-asset/route')
+}
+
+const authenticatePortalBearerWithArtistMock = vi.fn()
 const createServiceRoleSupabaseClientMock = vi.fn()
-const resolvePortalArtistMock = vi.fn()
 const createR2ClientMock = vi.fn()
 const createAssetRecordMock = vi.fn()
 const createArtistAssetMock = vi.fn()
 const editorNotificationsInsertMock = vi.fn()
 
-vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: createServerSupabaseClientMock,
-  createServiceRoleSupabaseClient: createServiceRoleSupabaseClientMock,
+vi.mock('@/lib/portal/bearerAuth', () => ({
+  authenticatePortalBearerWithArtist: authenticatePortalBearerWithArtistMock,
 }))
 
-vi.mock('@/lib/api/artistProfiles', () => ({
-  resolvePortalArtist: resolvePortalArtistMock,
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceRoleSupabaseClient: createServiceRoleSupabaseClientMock,
 }))
 
 vi.mock('@/lib/r2Utils', () => ({
@@ -42,11 +46,6 @@ vi.mock('@/lib/env.server', () => ({
     CLOUDFLARE_R2_PUBLIC_URL: 'https://cdn.example.com',
   },
 }))
-
-async function loadRoute() {
-  vi.resetModules()
-  return import('../../../app/api/portal/upload-asset/route')
-}
 
 const ARTIST_ID = '123e4567-e89b-12d3-a456-426614174000'
 
@@ -116,13 +115,20 @@ function makeUploadRequest(file: File, pressSuggested = false) {
 describe('POST /api/portal/upload-asset', () => {
   beforeEach(() => {
     const supabase = makeSupabaseClient()
-    createServerSupabaseClientMock.mockResolvedValue(supabase)
-    createServiceRoleSupabaseClientMock.mockResolvedValue(supabase)
-    resolvePortalArtistMock.mockResolvedValue({
-      id: ARTIST_ID,
-      name: 'Dark Artist',
-      storageQuotaBytes: null,
+    authenticatePortalBearerWithArtistMock.mockImplementation(async (req: NextRequest) => {
+      const token = req.headers.get('authorization')?.replace('Bearer ', '')
+      if (!token) throw new ApiError(401, 'Missing authorization token')
+      return {
+        supabase,
+        artist: {
+          id: ARTIST_ID,
+          name: 'Dark Artist',
+          storageQuotaBytes: null,
+        },
+        user: { id: 'user-1' },
+      }
     })
+    createServiceRoleSupabaseClientMock.mockResolvedValue(supabase)
     createR2ClientMock.mockReturnValue({ send: vi.fn().mockResolvedValue({}) })
     createAssetRecordMock.mockResolvedValue({
       id: 'main-asset-1',
@@ -157,7 +163,8 @@ describe('POST /api/portal/upload-asset', () => {
   })
 
   it('rejects requests without Authorization header', async () => {
-    const { POST } = await loadRoute()
+    // Avoid resetModules so ApiError class identity matches the one used inside withErrorHandler
+    const { POST } = await import('../../../app/api/portal/upload-asset/route')
     const request = new NextRequest('http://localhost/api/portal/upload-asset', { method: 'POST' })
     const response = await POST(request)
     expect(response.status).toBe(401)

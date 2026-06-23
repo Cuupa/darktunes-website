@@ -217,12 +217,19 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             <FilePdf size={16} aria-hidden="true" className="mr-1.5" />
             {pdfDownloading ? dict.profile_epk_downloading : dict.profile_download_epk}
           </Button>
+          <Link
+            href={`/portal/epk-builder?artistId=${artistId}`}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
+          >
+            <FilePdf size={15} aria-hidden="true" />
+            {dict.epk_builder_nav}
+          </Link>
           {artistSlug && (
             <Link
               href={`/artists/${artistSlug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
               aria-label="Preview your public artist profile in a new tab"
             >
               <Eye size={15} aria-hidden="true" />

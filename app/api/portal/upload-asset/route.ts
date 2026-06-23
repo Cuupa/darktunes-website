@@ -2,9 +2,11 @@ import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { z } from 'zod'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import type { Database } from '@/types/database'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 import { createArtistAsset, deleteArtistAsset } from '@/lib/api/artistAssets'
 import { createAssetRecord } from '@/lib/api/assets'
@@ -54,35 +56,9 @@ async function uploadAssetToR2(
   return { key, url: `${r2PublicUrl.replace(/\/$/, '')}/${key}` }
 }
 
-async function authenticateArtist(req: NextRequest) {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
-  const artistId = new URL(req.url).searchParams.get('artistId')
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, artistId)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  }
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  return { supabase, artist, userId: user.id }
-}
-
 /** Look up the asset_folder that belongs to this artist (the artist's root folder). */
 async function getOrCreateArtistFolder(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  supabase: SupabaseClient<Database>,
   artistId: string,
 ): Promise<string | null> {
   const { data } = await supabase
@@ -95,7 +71,9 @@ async function getOrCreateArtistFolder(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, artist, userId } = await authenticateArtist(req)
+  const artistId = new URL(req.url).searchParams.get('artistId')
+  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
+  const userId = user.id
 
   const formData = await req.formData()
   const file = formData.get('file')
@@ -209,7 +187,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, artist } = await authenticateArtist(req)
+  const artistId = new URL(req.url).searchParams.get('artistId')
+  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const body = deleteSchema.parse(await req.json())
   const assetId = body.id

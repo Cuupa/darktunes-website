@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getBillingProfile, isBillingProfileComplete, upsertBillingProfile } from '@/lib/api/artistBillingProfiles'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 
 const upsertBillingProfileSchema = z.object({
   artist_id: z.string().uuid(),
@@ -20,22 +20,8 @@ const upsertBillingProfileSchema = z.object({
   paypal_email: z.string().email().optional().or(z.literal('')),
 })
 
-async function requirePortalUser(req: NextRequest) {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token)
-
-  if (error || !user) throw new ApiError(401, 'Invalid or expired token')
-  return { supabase, user }
-}
-
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await requirePortalUser(req)
+  const { supabase, user } = await authenticatePortalBearer(req)
   const artistId = req.nextUrl.searchParams.get('artist_id') ?? undefined
   const artist = await resolvePortalArtist(supabase, user.id, artistId)
   if (!artist) throw new ApiError(403, 'Forbidden')
@@ -49,7 +35,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await requirePortalUser(req)
+  const { supabase, user } = await authenticatePortalBearer(req)
   const body: unknown = await req.json()
   const parsed = upsertBillingProfileSchema.safeParse(body)
 

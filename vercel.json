@@ -18,6 +18,7 @@
     "app/api/sync/query/route.ts": { "maxDuration": 300 },
     "app/api/sync/execute/route.ts": { "maxDuration": 300 },
     "app/api/sync-youtube/route.ts": { "maxDuration": 300 },
-    "app/api/process-sync-queue/route.ts": { "maxDuration": 60 }
+    "app/api/process-sync-queue/route.ts": { "maxDuration": 60 },
+    "app/api/portal/epk/export/route.ts": { "maxDuration": 60 }
   }
 }

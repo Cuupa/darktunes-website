@@ -4,15 +4,14 @@
  * Returns all upcoming concerts for the authenticated artist as an ICS
  * (iCalendar) file that can be imported into any calendar application.
  *
- * GET /api/portal/concerts/ics  (****** required)
+ * GET /api/portal/concerts/ics  (Bearer token required)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
+import { withErrorHandler } from '@/lib/errors'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import type { Concert } from '@/types'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 /** Escape special characters in iCalendar text values. */
 function icsEscape(str: string): string {
@@ -28,14 +27,12 @@ function icsDate(date: Date): string {
 function buildVEvent(concert: Concert): string {
   const dtStamp = icsDate(new Date())
 
-  // Combine date and optional time
   let dtStart: string
   if (concert.eventTime) {
     const [h, m] = concert.eventTime.split(':')
     const d = new Date(`${concert.concertDate}T${h.padStart(2, '0')}:${m.padStart(2, '0')}:00Z`)
     dtStart = `DTSTART:${icsDate(d)}`
   } else {
-    // All-day event
     const dateOnly = concert.concertDate.slice(0, 10).replace(/-/g, '')
     dtStart = `DTSTART;VALUE=DATE:${dateOnly}`
   }
@@ -61,26 +58,8 @@ function buildVEvent(concert: Concert): string {
 }
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
   const artistId = req.nextUrl.searchParams.get('artistId')
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, artistId)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  }
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const concerts = await getConcertsByArtistId(supabase, artist.id)
 

@@ -72,8 +72,9 @@ const nextConfig: NextConfig = {
   },
   // Tailwind v4 + tw-animate-css use PostCSS features that require transpiling
   transpilePackages: [],
+  serverExternalPackages: ['sharp', 'fontkit'],
   experimental: {
-    optimizePackageImports: ['framer-motion', '@phosphor-icons/react', 'lenis'],
+    optimizePackageImports: ['framer-motion', '@phosphor-icons/react', 'lenis', 'konva', 'react-konva'],
   },
 }
 

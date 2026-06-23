@@ -10,7 +10,6 @@ import {
   listArtistInvoices,
   updateInvoice,
 } from '@/lib/api/artistInvoices'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getSalesStatementById, updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -18,7 +17,7 @@ import { generateInvoiceNumber } from '@/lib/portal/invoiceNumber'
 import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
 import { LABEL_BILLING_PARTY, LABEL_CLIENT_EMAIL } from '@/lib/portal/labelBilling'
 import { createR2Client } from '@/lib/r2Utils'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 const lineItemSchema = z.object({
   description: z.string().min(1).max(500),
@@ -48,38 +47,18 @@ function getLineItemSubtotal(lineItems: Array<{ qty: number; unit_price_cents: n
 }
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!artistId) throw new ApiError(400, 'artist_id is required')
 
-  await resolvePortalArtist(supabase, user.id, artistId)
+  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10))
-  const { invoices, total } = await listArtistInvoices(supabase, artistId, page)
+  const { invoices, total } = await listArtistInvoices(supabase, artist.id, page)
 
   return NextResponse.json({ invoices, total, page })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
   const body: unknown = await req.json()
   const parsed = createInvoiceSchema.safeParse(body)
   if (!parsed.success) {
@@ -87,8 +66,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const input = parsed.data
-  const artist = await resolvePortalArtist(supabase, user.id, input.artist_id)
-  if (!artist) throw new ApiError(403, 'Forbidden')
+  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, input.artist_id)
 
   const billingProfile = await getBillingProfile(supabase, artist.id)
   if (!billingProfile || !isBillingProfileComplete(billingProfile)) {

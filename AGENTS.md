@@ -681,8 +681,29 @@ Artist Preview
 When `artistSlug` is set, a "Preview Public Profile" link is shown under the artist name (opens `/artists/{slug}` in a new tab).
 The same preview link/button appears at the top of `ProfileForm` (passed via `artistSlug` prop from `portal/profile/page.tsx`).
 
-EPK PDF Export (Artist Portal) — WYSIWYG Print
-The portal EPK PDF uses the **browser print dialog** on the live HTML preview (`src/lib/epk/printEpkDocument.ts`, entry `app/portal/profile/_components/epkPdf.ts`). `generateEpkPdf()` clones `[data-epk-root]` from `EPKPreview.tsx` into a print popup and calls `window.print()` — the user saves as PDF. This guarantees visual parity with the preview (themes, layouts, rich HTML, icons). Requires popups allowed; `TabsContent value="epk"` uses `forceMount` so the document is always in the DOM for export from any tab.
+EPK PDF Export (Artist Portal) — Dual Path
+**Legacy (HTML presets):** Browser print dialog on the live HTML preview (`src/lib/epk/printEpkDocument.ts`, entry `app/portal/profile/_components/epkPdf.ts`). `generateEpkPdf()` clones `[data-epk-root]` from `EPKPreview.tsx` into a print popup and calls `window.print()`. `TabsContent value="epk"` uses `forceMount` so the document stays in the DOM for export from any tab.
+
+**Canvas Builder (Phase 1+):** Route `/portal/epk-builder` (feature flag `artist.epk_builder`). Document JSON schema v2 lives in `src/lib/epk/schema/documentV2.ts` and is persisted on `artist_epks.epk_document` (JSONB) with `epk_document_version` and `epk_editor_mode` (`legacy` | `canvas`). Version history: `epk_versions` table. Custom fonts: `epk_fonts` table (R2 key `epk-fonts/{artistId}/`).
+
+Migration: `src/lib/epk/migrate/legacyToDocumentV2.ts` converts legacy preset columns into positioned canvas elements on first access (`ensureMigratedEpkDocument` in `src/lib/api/epkDocument.ts`).
+
+Server PDF: `POST /api/portal/epk/export` → `src/lib/epk/export/renderDocumentToPdf.ts` (pdf-lib + Sharp image compression). No Puppeteer.
+
+Editor (Phase 2): `/portal/epk-builder` uses `EpkEditorProvider` + Zustand/Immer/zundo (`src/lib/epk/editor/store.ts`). UI: `EpkBuilderShell` (toolbar, `EpkCanvas` with Transformer, `EpkLayersPanel`, `EpkPropertiesPanel`). Autosave: `useEpkAutosave` (3s debounce → `PUT /api/portal/epk/document`). Read-only preview fallback: `EpkCanvasPreview.tsx`.
+
+Editor (Phase 3): Multi-page UI (`EpkPagesPanel` — add/duplicate/delete/rename pages via store page CRUD). Asset library (`EpkAssetPicker` — inserts images from `artist_assets` + `POST /api/portal/upload-asset`). Version history (`EpkVersionHistoryPanel` — list/restore snapshots from `epk_versions`; manual snapshots via toolbar `create_version: true` on `PUT /api/portal/epk/document`).
+
+Editor (Phase 4): Custom fonts (`EpkFontManager` + `EpkFontLoader` — upload WOFF2/WOFF/TTF/OTF to R2 `epk-fonts/{artistId}/`, register in `epk_fonts`, sync `document.fonts[]`). Font family picker in `EpkPropertiesPanel`. Server PDF embeds custom fonts via `embedDocumentFonts.ts` (fontkit + pdf-lib). Rider PDFs from `artist_epks.rider_*_url` are appended as extra pages in `appendPdfAttachments.ts` during `generateEpkPdfBytes()`.
+
+API routes: `GET/PUT /api/portal/epk/document`, `GET /api/portal/epk/versions`, `POST /api/portal/epk/versions/[id]/restore`, `GET/POST/DELETE /api/portal/epk/fonts`, `GET/POST/DELETE /api/portal/epk/share` (Bearer auth + `resolvePortalArtist`). Export route uses `ipRateLimit` (10 req / 10 min per IP). DAL: `epkFonts.ts`, `epkShareLinks.ts`, `restoreEpkVersion()` in `epkDocument.ts`, `getEpkVersionById()` in `epkVersions.ts`.
+
+Public (Phase 5): `getPublicArtistEpkByArtistId()` in `src/lib/api/publicArtistEpk.ts` reads safe columns from `artist_epks` (RLS: `artist_epks: public read visible`). Press artist page (`app/press/artists/[slug]`) renders `EpkPublicViewer` when `epk_editor_mode === 'canvas'`. Share links: table `epk_share_links`, public route `/epk/share/[token]`, API `GET/POST /api/epk/share/[token]` (service-role lookup + optional password). Group elements: `groupSelected`/`ungroupSelected` in editor store; `EpkGroupNode` + `flattenGroupElements()` for PDF. PDF bookmarks from page names via `addPdfBookmarksFromPages.ts` in `generateEpkPdfBytes()`.
+
+Analytics & Templates (Phase 6): `epk_download_events` table logs PDF exports (`portal` | `share` | `press`) via fire-and-forget `recordEpkDownloadAsync()` (hashed IP, service-role insert). Press PDF: `GET /api/epk/press/[slug]/export` (rate-limited, logs `press` source) + download button on `ArtistEpkClient` when canvas EPK is shown. Portal stats: `GET /api/portal/epk/analytics`, UI `EpkDownloadStatsPanel` (count queries, not full-table scan). Share-link expiry presets in `EpkShareLinkPanel` (`expires_at` on create). Admin brand templates: `epk_templates` table, `EpkTemplatesManager` (Press Portal tab), `GET/POST/PATCH/DELETE /api/admin/epk-templates` (verifyAdmin + service-role client), artist picker `GET /api/portal/epk/templates` (portal Bearer auth) + `EpkTemplatePicker` (`applyDocument` clears custom fonts + undo history).
+
+Portal Bearer auth: ALL portal Route Handlers that verify a Bearer JWT MUST use `authenticatePortalBearer()` or `authenticatePortalBearerWithArtist()` from `src/lib/portal/bearerAuth.ts` — not just `/api/portal/epk/*`. These helpers return a Supabase client from `createBearerAuthSupabaseClient(token)` so RLS sees `auth.uid()` correctly; do not use `createServerSupabaseClient()` (cookie session) for DB operations after Bearer verification.
+
 Profile save (`PUT /api/portal/profile`): artist photo lives on `artists.image_url` (not `artist_epks`). Route handlers that verify Bearer tokens MUST use `createBearerAuthSupabaseClient(token)` for subsequent RLS writes — cookie session alone may be stale.
 
 Journalist Dashboard
