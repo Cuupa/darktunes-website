@@ -1,9 +1,9 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Calendar } from '@phosphor-icons/react'
@@ -25,20 +25,13 @@ const DEFAULT_SNEAK_PEEK_COUNT = 3
 
 export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
-  const prefersReducedMotion = useReducedMotion()
   const count = sneakPeekCount && sneakPeekCount > 0 ? sneakPeekCount : DEFAULT_SNEAK_PEEK_COUNT
   const sneakPeek = news.slice(0, count)
   const hasMore = news.length > count
   return (
     <section id="news" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-12 flex items-end justify-between gap-4 flex-wrap"
-        >
+        <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
             <p className="text-xl text-muted-foreground">{dict.subheading}</p>
@@ -49,19 +42,14 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
               <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
             </Link>
           </Button>
-        </motion.div>
+        </ScrollReveal>
 
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none">
-          {sneakPeek.map((post, index) => (
-            <motion.li
-              key={post.id}
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.5, delay: prefersReducedMotion ? 0 : index * 0.08 }}
-            >
-              <Link href={`/news/${post.slug}`} className="block h-full">
-              <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 h-full flex flex-col">
+          {sneakPeek.map((post) => (
+            <li key={post.id} className="h-full">
+              <ScrollReveal className="h-full">
+                <Link href={`/news/${post.slug}`} className="block h-full">
+                <Card className="glow-card group bg-card border-border overflow-hidden hover:border-accent/50 transition-all duration-300 h-full flex flex-col">
                 {post.imageUrl && (
                   <div className="relative aspect-[16/9] overflow-hidden flex-shrink-0">
                     <Image
@@ -97,25 +85,20 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
                 </div>
               </Card>
               </Link>
-            </motion.li>
+             </ScrollReveal>
+           </li>
           ))}
         </ul>
 
         {hasMore && (
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
-            className="mt-10 flex justify-center"
-          >
+          <ScrollReveal className="mt-10 flex justify-center">
             <Button size="lg" variant="outline" className="gap-2 font-bold uppercase tracking-wider hover:bg-accent hover:text-accent-foreground hover:border-accent" asChild>
               <Link href="/news">
                 {dict.viewAll}
                 <ArrowRight weight="bold" />
               </Link>
             </Button>
-          </motion.div>
+          </ScrollReveal>
         )}
       </div>
     </section>

@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useInView, useReducedMotion } from 'framer-motion'
-import { useRef, type ReactNode } from 'react'
+import { useRef, type CSSProperties, type ReactNode } from 'react'
 
 interface ScrollRevealProps {
   children: ReactNode
@@ -9,14 +9,16 @@ interface ScrollRevealProps {
   delay?: number
   /** CSS class names to apply to the wrapper element. */
   className?: string
+  /** Additional inline styles to apply to the wrapper. */
+  style?: CSSProperties
 }
 
 /**
  * ScrollReveal – fades and slides a section into view as it enters the
- * viewport.  Respects `prefers-reduced-motion` by rendering children
+ * viewport. Respects `prefers-reduced-motion` by rendering children
  * immediately without animation.
  */
-export function ScrollReveal({ children, delay = 0, className }: ScrollRevealProps) {
+export function ScrollReveal({ children, delay = 0, className, style }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = useReducedMotion()
   const isInView = useInView(ref, { once: true, margin: '0px 0px -80px 0px' })
@@ -25,18 +27,10 @@ export function ScrollReveal({ children, delay = 0, className }: ScrollRevealPro
     <motion.div
       ref={ref}
       className={className}
-      animate={
-        prefersReducedMotion
-          ? { opacity: 1, y: 0 }
-          : isInView
-            ? { opacity: 1, y: 0 }
-            : { opacity: 0, y: 24 }
-      }
-      transition={
-        prefersReducedMotion
-          ? { duration: 0 }
-          : { duration: 0.5, ease: 'easeOut', delay }
-      }
+      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+      animate={prefersReducedMotion ? { opacity: 1, y: 0 } : isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.5, ease: 'easeOut', delay }}
+      style={{ willChange: 'transform, opacity', ...style }}
     >
       {children}
     </motion.div>

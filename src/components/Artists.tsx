@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo, useDeferredValue } from 'react'
+import { useMemo, useDeferredValue, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useInView, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Badge } from '@/components/ui/badge'
 import {
   InstagramLogo,
@@ -32,7 +33,7 @@ const MAX_VISIBLE = 6
 
 // Variants for the card list — Framer Motion batches all stagger timers
 // inside a single IntersectionObserver + AnimationFrame scheduler, reducing
-// overhead vs. per-item `whileInView` with individual observers.
+// overhead vs. per-item in-view observers.
 const listVariants = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.1 } },
@@ -56,6 +57,8 @@ export function Artists({ artists, dict }: ArtistsProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const prefersReducedMotion = useReducedMotion()
+  const listRef = useRef<HTMLUListElement>(null)
+  const isListInView = useInView(listRef, { once: true, margin: '0px 0px -80px 0px' })
 
   // Defer search filtering so the input updates instantly while the heavier
   // filter+render work runs as a low-priority React update.
@@ -85,16 +88,10 @@ export function Artists({ artists, dict }: ArtistsProps) {
     <>
       <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20 scroll-mt-36">
       <div className="container mx-auto">
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-12"
-        >
+        <ScrollReveal className="mb-12">
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
-        </motion.div>
+        </ScrollReveal>
 
         <div className="relative mb-6">
           <MagnifyingGlass
@@ -116,12 +113,12 @@ export function Artists({ artists, dict }: ArtistsProps) {
           <p className="text-muted-foreground font-serif">{dict.noResults}</p>
         ) : (
           <motion.ul
+            ref={listRef}
             data-lenis-prevent
             className={`list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:gap-8 sm:pb-0 lg:grid-cols-3 transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
-            whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}
-            viewport={{ once: true }}
+            animate={prefersReducedMotion ? { opacity: 1 } : isListInView ? 'visible' : 'hidden'}
           >
             {filteredArtists.map((artist) => {
               const thumbUrl = getSquareThumbnail(artist.imageUrl ?? '', 800)

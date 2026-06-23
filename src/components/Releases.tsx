@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useRef, useMemo, useDeferredValue } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { MagnifyingGlass, ArrowRight } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { ReleasesCoverflow } from '@/components/ReleasesCoverflow'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import type { Release } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -19,7 +19,6 @@ interface ReleasesProps extends SectionProps {
 }
 
 export function Releases({ releases, dict, locale, autoplayMs, consentDict }: ReleasesProps) {
-  const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
 
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -62,16 +61,10 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
   return (
     <section id="releases" ref={sectionRef} className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-10"
-        >
+        <ScrollReveal className="mb-10">
           <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
           <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
-        </motion.div>
+        </ScrollReveal>
 
         {/* View all button row */}
         <div className="flex justify-end mb-4">
@@ -86,13 +79,7 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
         </div>
 
         {/* Search + category filter row */}
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : 0.1 }}
-          className="flex flex-col sm:flex-row gap-4 mb-8"
-        >
+        <ScrollReveal delay={0.1} className="flex flex-col sm:flex-row gap-4 mb-8">
           {/* Search input */}
           <div className="relative flex-1 max-w-sm">
             <MagnifyingGlass
@@ -141,7 +128,7 @@ export function Releases({ releases, dict, locale, autoplayMs, consentDict }: Re
               ))}
             </div>
           )}
-        </motion.div>
+        </ScrollReveal>
 
         {/* Subtle opacity fade while the deferred filter is still pending */}
         <div className={`transition-opacity duration-150 ${isFilterPending ? 'opacity-60' : 'opacity-100'}`}>

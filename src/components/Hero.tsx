@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion, useReducedMotion, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -161,12 +162,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
       
       <div className="container mx-auto px-4 lg:px-16 z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.2 }}
-            className="space-y-8"
-          >
+          <ScrollReveal delay={0.2} className="space-y-8">
             <Badge className="bg-secondary/90 text-secondary-foreground uppercase tracking-wider font-bold text-sm px-4 py-2 backdrop-blur-sm">
               {itemIsRelease ? siteSettings.heroBadge : (siteSettings.heroNewsBadge || '📰 News')}
             </Badge>
@@ -247,15 +243,10 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                 )
               )}
             </div>
-          </motion.div>
+          </ScrollReveal>
 
           {coverImageUrl && (
-            <motion.div
-              initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.8, delay: prefersReducedMotion ? 0 : 0.4 }}
-              className="relative hidden lg:block"
-            >
+            <ScrollReveal delay={0.4} className="relative hidden lg:block">
               <div className="glow-card relative aspect-square rounded-lg overflow-hidden shadow-2xl shadow-accent/20">
                 <Image 
                   src={coverImageUrl}
@@ -267,7 +258,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
               </div>
-            </motion.div>
+            </ScrollReveal>
           )}
         </div>
       </div>
