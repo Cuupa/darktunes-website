@@ -19,14 +19,52 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
+import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 
 const ADMIN_ROLES = new Set(['admin', 'editor'])
 
+function classifyRoute(pathname: string) {
+  return {
+    isLoginPage: pathname === '/login',
+    isAdminRoute: pathname.startsWith('/admin'),
+    isEditorRoute: pathname.startsWith('/editor'),
+    isPortalAcceptInvitePage: pathname === '/portal/accept-invite',
+    isPortalRoute: pathname.startsWith('/portal'),
+    isPressDashboardRoute: pathname.startsWith('/press/dashboard'),
+    isPromoPoolRoute: pathname.startsWith('/promo-pool'),
+    isAccountRoute: pathname.startsWith('/account'),
+  }
+}
+
+function routeIsProtected(flags: ReturnType<typeof classifyRoute>): boolean {
+  return (
+    flags.isAdminRoute ||
+    flags.isEditorRoute ||
+    flags.isPortalRoute ||
+    flags.isPressDashboardRoute ||
+    flags.isPromoPoolRoute ||
+    flags.isAccountRoute
+  )
+}
+
+function redirectUnauthenticatedToLogin(request: NextRequest): NextResponse {
+  const loginUrl = request.nextUrl.clone()
+  loginUrl.pathname = '/login'
+  loginUrl.searchParams.set('returnTo', request.nextUrl.pathname)
+  return NextResponse.redirect(loginUrl)
+}
+
 export async function middleware(request: NextRequest) {
-  // Guard: if Supabase env vars are missing, skip auth checks.
-  // In production, these vars are always set (Vercel injects them at build time).
-  // In local dev without .env.local, admin routes are unprotected but non-functional.
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  const { pathname } = request.nextUrl
+  const route = classifyRoute(pathname)
+  const protectedRoute = routeIsProtected(route)
+
+  // CI placeholder credentials: enforce route redirects without calling Supabase
+  // (avoids slow/hanging auth against fake hosts while keeping protected routes gated).
+  if (!isSupabaseEnvConfigured()) {
+    if (protectedRoute && !route.isLoginPage && !route.isPortalAcceptInvitePage) {
+      return redirectUnauthenticatedToLogin(request)
+    }
     return NextResponse.next({ request })
   }
 
@@ -57,19 +95,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
-  const isLoginPage = pathname === '/login'
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isEditorRoute = pathname.startsWith('/editor')
-
-  const isPortalAcceptInvitePage = pathname === '/portal/accept-invite'
-  const isPortalRoute = pathname.startsWith('/portal')
-  const isPressDashboardRoute = pathname.startsWith('/press/dashboard')
-  const isPromoPoolRoute = pathname.startsWith('/promo-pool')
-  const isAccountRoute = pathname.startsWith('/account')
-
-  const isProtectedRoute = isAdminRoute || isEditorRoute || isPortalRoute || isPressDashboardRoute || isPromoPoolRoute || isAccountRoute
+  const isLoginPage = route.isLoginPage
+  const isAdminRoute = route.isAdminRoute
+  const isEditorRoute = route.isEditorRoute
+  const isPortalAcceptInvitePage = route.isPortalAcceptInvitePage
+  const isPortalRoute = route.isPortalRoute
+  const isPressDashboardRoute = route.isPressDashboardRoute
+  const isProtectedRoute = protectedRoute
 
   // Fetch the user's role once for all route sections that need it.
   // This avoids repeated round-trips to the users table within the same

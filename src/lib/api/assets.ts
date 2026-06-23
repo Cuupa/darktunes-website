@@ -6,7 +6,7 @@ type DbClient = SupabaseClient<Database>
 type AssetRow = Database['public']['Tables']['assets']['Row']
 export type AssetInsert = Database['public']['Tables']['assets']['Insert']
 
-function rowToAsset(row: AssetRow): Asset {
+export function rowToAsset(row: AssetRow): Asset {
   return {
     id: row.id,
     filename: row.filename,
@@ -23,6 +23,13 @@ function rowToAsset(row: AssetRow): Asset {
     releaseId: row.release_id ?? undefined,
     tags: row.tags ?? [],
     sha256Hash: row.sha256_hash ?? undefined,
+    altText: row.alt_text ?? undefined,
+    isPressApproved: row.is_press_approved ?? false,
+    pressSuggested: row.press_suggested ?? false,
+    pressCategory: (row.press_category as Asset['pressCategory']) ?? undefined,
+    pressCaption: row.press_caption ?? undefined,
+    photographerCredit: row.photographer_credit ?? undefined,
+    downloadableForPress: row.downloadable_for_press ?? true,
   }
 }
 
@@ -45,6 +52,56 @@ export async function getAssetsByFolder(db: DbClient, folderId: string | null): 
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToAsset)
+}
+
+export interface PressAssetFilters {
+  isPressApproved?: boolean
+  pressSuggested?: boolean
+  pressCategory?: string
+  artistId?: string
+}
+
+export async function getPressAssets(db: DbClient, filters: PressAssetFilters = {}): Promise<Asset[]> {
+  let query = db.from('assets').select('*').order('created_at', { ascending: false })
+
+  if (filters.isPressApproved !== undefined) {
+    query = query.eq('is_press_approved', filters.isPressApproved)
+  }
+  if (filters.pressSuggested !== undefined) {
+    query = query.eq('press_suggested', filters.pressSuggested)
+  }
+  if (filters.pressCategory) {
+    query = query.eq('press_category', filters.pressCategory)
+  }
+  if (filters.artistId) {
+    query = query.eq('artist_id', filters.artistId)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToAsset)
+}
+
+export async function getAssetsByIds(db: DbClient, ids: string[]): Promise<Asset[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await db.from('assets').select('*').in('id', ids)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToAsset)
+}
+
+export async function bulkSetPressApproved(
+  db: DbClient,
+  assetIds: string[],
+  approved: boolean,
+): Promise<number> {
+  if (assetIds.length === 0) return 0
+  const { data, error } = await db
+    .from('assets')
+    .update({ is_press_approved: approved })
+    .in('id', assetIds)
+    .select('id')
+  if (error) throw new Error(error.message)
+  return data?.length ?? 0
 }
 
 export async function searchAssets(db: DbClient, query: string): Promise<Asset[]> {
@@ -75,6 +132,13 @@ export async function updateAsset(
     releaseId?: string | null
     tags?: string[]
     originalFilename?: string
+    altText?: string | null
+    isPressApproved?: boolean
+    pressSuggested?: boolean
+    pressCategory?: string | null
+    pressCaption?: string | null
+    photographerCredit?: string | null
+    downloadableForPress?: boolean
   },
 ): Promise<Asset> {
   const dbUpdates: Database['public']['Tables']['assets']['Update'] = {}
@@ -83,6 +147,15 @@ export async function updateAsset(
   if ('releaseId' in updates) dbUpdates.release_id = updates.releaseId ?? null
   if ('tags' in updates) dbUpdates.tags = updates.tags ?? []
   if ('originalFilename' in updates) dbUpdates.original_filename = updates.originalFilename ?? ''
+  if ('altText' in updates) dbUpdates.alt_text = updates.altText ?? null
+  if ('isPressApproved' in updates) dbUpdates.is_press_approved = updates.isPressApproved ?? false
+  if ('pressSuggested' in updates) dbUpdates.press_suggested = updates.pressSuggested ?? false
+  if ('pressCategory' in updates) dbUpdates.press_category = updates.pressCategory ?? null
+  if ('pressCaption' in updates) dbUpdates.press_caption = updates.pressCaption ?? null
+  if ('photographerCredit' in updates) dbUpdates.photographer_credit = updates.photographerCredit ?? null
+  if ('downloadableForPress' in updates) {
+    dbUpdates.downloadable_for_press = updates.downloadableForPress ?? true
+  }
 
   // When only junction-table fields (artistIds) are updated, dbUpdates is
   // empty. Calling .update({}) throws "Nothing to update" in Supabase.

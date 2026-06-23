@@ -442,6 +442,8 @@
     "messages_no_messages_desc": "You'll see new messages from the label here.",
     "marketing_label_assets": "Label Assets",
     "marketing_label_assets_empty": "No label assets available yet.",
+    "marketing_press_suggest": "Suggest for press kit review",
+    "marketing_press_suggest_hint": "Images only. Notifies editors to review this upload for the press kit.",
     "promo_log_heading": "Label Marketing Activities",
     "promo_log_empty_heading": "No activities yet",
     "promo_log_empty_description": "The label will document marketing campaigns, playlist placements, ad spend, and more here.",

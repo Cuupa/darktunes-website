@@ -1335,6 +1335,13 @@ export interface Database {
           tags: string[]
           sha256_hash: string | null
           release_id: string | null
+          alt_text: string | null
+          is_press_approved: boolean
+          press_suggested: boolean
+          press_category: string | null
+          press_caption: string | null
+          photographer_credit: string | null
+          downloadable_for_press: boolean
         }
         Insert: {
           id?: string
@@ -1351,6 +1358,13 @@ export interface Database {
           tags?: string[]
           sha256_hash?: string | null
           release_id?: string | null
+          alt_text?: string | null
+          is_press_approved?: boolean
+          press_suggested?: boolean
+          press_category?: string | null
+          press_caption?: string | null
+          photographer_credit?: string | null
+          downloadable_for_press?: boolean
         }
         Update: {
           id?: string
@@ -1367,6 +1381,13 @@ export interface Database {
           tags?: string[]
           sha256_hash?: string | null
           release_id?: string | null
+          alt_text?: string | null
+          is_press_approved?: boolean
+          press_suggested?: boolean
+          press_category?: string | null
+          press_caption?: string | null
+          photographer_credit?: string | null
+          downloadable_for_press?: boolean
         }
         Relationships: []
       }
@@ -1569,6 +1590,30 @@ export interface Database {
           is_completed?: boolean
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      press_kit_items: {
+        Row: {
+          id: string
+          asset_id: string
+          artist_id: string | null
+          display_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          asset_id: string
+          artist_id?: string | null
+          display_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          asset_id?: string
+          artist_id?: string | null
+          display_order?: number
+          created_at?: string
         }
         Relationships: []
       }
@@ -2036,6 +2081,7 @@ export interface Database {
           id: string
           journalist_id: string
           release_id: string | null
+          asset_id: string | null
           asset_key: string
           downloaded_at: string
         }
@@ -2043,6 +2089,7 @@ export interface Database {
           id?: string
           journalist_id: string
           release_id?: string | null
+          asset_id?: string | null
           asset_key: string
           downloaded_at?: string
         }
@@ -2050,6 +2097,7 @@ export interface Database {
           id?: string
           journalist_id?: string
           release_id?: string | null
+          asset_id?: string | null
           asset_key?: string
           downloaded_at?: string
         }

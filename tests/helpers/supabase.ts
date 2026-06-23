@@ -6,10 +6,12 @@ type TestClient = SupabaseClient<Database>
 type ArtistRouteRow = Pick<Database['public']['Tables']['artists']['Row'], 'slug'>
 type ReleaseRouteRow = Pick<Database['public']['Tables']['releases']['Row'], 'id'>
 
+import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
+
 function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const configured = Boolean(url && anonKey)
+  const configured = isSupabaseEnvConfigured()
 
   return {
     configured,

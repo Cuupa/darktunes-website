@@ -3,12 +3,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   batchDeleteAssets,
+  bulkSetPressApproved,
   createAssetRecord,
   deleteAssetRecord,
   getAssetByHash,
   getAssets,
   getAssetsByArtist,
   getAssetsByFolder,
+  getAssetsByIds,
+  getPressAssets,
   moveAsset,
   searchAssets,
   updateAsset,
@@ -67,6 +70,13 @@ const mockRow: AssetRow = {
   tags: ['cover', 'promo'],
   sha256_hash: 'abc123',
   release_id: null,
+  alt_text: 'Band on stage',
+  is_press_approved: true,
+  press_suggested: false,
+  press_category: 'live',
+  press_caption: null,
+  photographer_credit: 'Jane Doe',
+  downloadable_for_press: true,
 }
 
 describe('assets DAL', () => {
@@ -80,6 +90,9 @@ describe('assets DAL', () => {
       artistId: 'artist-1',
       tags: ['cover', 'promo'],
       sha256Hash: 'abc123',
+      isPressApproved: true,
+      pressCategory: 'live',
+      photographerCredit: 'Jane Doe',
     })
   })
 
@@ -150,5 +163,48 @@ describe('assets DAL', () => {
   it('throws when Supabase returns an error', async () => {
     const db = makeMockDb([{ data: null, error: { message: 'DB error' } }])
     await expect(getAssets(db)).rejects.toThrow('DB error')
+  })
+
+  it('filters press-approved assets', async () => {
+    const db = makeMockDb([{ data: [mockRow], error: null }])
+    const result = await getPressAssets(db, { isPressApproved: true })
+    expect(result[0].isPressApproved).toBe(true)
+  })
+
+  it('returns assets by ids', async () => {
+    const db = makeMockDb([{ data: [mockRow], error: null }])
+    const result = await getAssetsByIds(db, ['asset-uuid-1'])
+    expect(result).toHaveLength(1)
+  })
+
+  it('returns empty array for empty id list', async () => {
+    const db = makeMockDb([{ data: [], error: null }])
+    const result = await getAssetsByIds(db, [])
+    expect(result).toEqual([])
+    expect(db.from).not.toHaveBeenCalled()
+  })
+
+  it('bulk sets press approved flag', async () => {
+    const db = makeMockDb([{ data: [{ id: 'asset-uuid-1' }], error: null }])
+    const count = await bulkSetPressApproved(db, ['asset-uuid-1'], true)
+    expect(count).toBe(1)
+  })
+
+  it('updates press metadata fields', async () => {
+    const db = makeMockDb([
+      {
+        data: {
+          ...mockRow,
+          press_caption: 'On stage at Wacken',
+          is_press_approved: true,
+        },
+        error: null,
+      },
+    ])
+    const result = await updateAsset(db, 'asset-uuid-1', {
+      pressCaption: 'On stage at Wacken',
+      isPressApproved: true,
+    })
+    expect(result.isPressApproved).toBe(true)
   })
 })

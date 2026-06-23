@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistBySlug } from '@/lib/api/artists'
-import { getPressPhotos } from '@/lib/api/pressPhotos'
+import { getPressKitForArtist } from '@/lib/api/pressKit'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 import { listEpkFonts, buildEpkFontPublicUrl } from '@/lib/api/epkFonts'
@@ -36,7 +36,7 @@ export default async function ArtistEpkPage({ params }: { params: Promise<{ slug
 
   const [publicEpk, photos, concerts, fonts] = await Promise.all([
     getPublicArtistEpkByArtistId(publicClient, artist.id).catch(() => null),
-    getPressPhotos(supabase).then((p) => p.filter((ph) => !ph.artistId || ph.artistId === artist.id)).catch(() => []),
+    getPressKitForArtist(supabase, artist.id).catch(() => []),
     getConcertsByArtistId(supabase, artist.id).catch(() => []),
     listEpkFonts(publicClient, artist.id).catch(() => []),
   ])

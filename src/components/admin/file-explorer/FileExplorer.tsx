@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useArtists } from '@/hooks/useArtists'
-import { useFileExplorer } from '@/hooks/useFileExplorer'
+import { useFileExplorer, type PressFilters } from '@/hooks/useFileExplorer'
+import type { AssetPressDraft } from './AssetPressFields'
 import { useReleases } from '@/hooks/useReleases'
 import { cn } from '@/lib/utils'
 import type { Asset } from '@/types'
@@ -44,6 +45,76 @@ export function FileExplorer({ className }: { className?: string }) {
     () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
     [artists],
   )
+
+  const artistOptions = useMemo(
+    () => artists.map((artist) => ({ id: artist.id, name: artist.name })),
+    [artists],
+  )
+
+  const selectedFileCount = useMemo(
+    () => [...explorer.selectedIds].filter((id) => !id.startsWith('folder:')).length,
+    [explorer.selectedIds],
+  )
+
+  useEffect(() => {
+    if (searchParams.get('pressOnly') === '1') {
+      explorer.setPressFilters({
+        pressOnly: true,
+        pressSuggested: false,
+        pressCategory: null,
+        artistId: null,
+      })
+    }
+    // URL seed runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handlePressFiltersChange = useCallback((filters: PressFilters) => {
+    explorer.setPressFilters(filters)
+    const params = new URLSearchParams(searchParams.toString())
+    if (filters.pressOnly) params.set('pressOnly', '1')
+    else params.delete('pressOnly')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname)
+  }, [explorer, pathname, router, searchParams])
+
+  const handleBulkPress = useCallback(async (
+    action: Parameters<typeof explorer.bulkPressAction>[0],
+    kitArtistId?: string | null,
+  ) => {
+    try {
+      await explorer.bulkPressAction(action, kitArtistId)
+      toast.success('Bulk press action completed')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Bulk action failed')
+    }
+  }, [explorer])
+
+  const handleSavePress = useCallback(async (assetId: string, draft: AssetPressDraft) => {
+    await explorer.updateAsset(assetId, {
+      altText: draft.altText || null,
+      isPressApproved: draft.isPressApproved,
+      pressSuggested: draft.pressSuggested,
+      pressCategory: draft.pressCategory || null,
+      pressCaption: draft.pressCaption || null,
+      photographerCredit: draft.photographerCredit || null,
+      downloadableForPress: draft.downloadableForPress,
+    })
+    setPreviewAsset((prev) => (
+      prev?.id === assetId
+        ? {
+            ...prev,
+            altText: draft.altText || undefined,
+            isPressApproved: draft.isPressApproved,
+            pressSuggested: draft.pressSuggested,
+            pressCategory: draft.pressCategory || undefined,
+            pressCaption: draft.pressCaption || undefined,
+            photographerCredit: draft.photographerCredit || undefined,
+            downloadableForPress: draft.downloadableForPress,
+          }
+        : prev
+    ))
+  }, [explorer])
 
   const navigate = useCallback((id: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -298,6 +369,11 @@ export function FileExplorer({ className }: { className?: string }) {
                 onDeleteSelected={() => void deleteSelected()}
                 onUpload={() => uploadRef.current?.openPicker()}
                 authToken={explorer.token}
+                pressFilters={explorer.pressFilters}
+                onPressFiltersChange={handlePressFiltersChange}
+                selectedFileCount={selectedFileCount}
+                onBulkPress={(action, kitArtistId) => void handleBulkPress(action, kitArtistId)}
+                artists={artistOptions}
               />
               <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
               <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
@@ -347,6 +423,11 @@ export function FileExplorer({ className }: { className?: string }) {
             onDeleteSelected={() => void deleteSelected()}
             onUpload={() => uploadRef.current?.openPicker()}
             authToken={explorer.token}
+            pressFilters={explorer.pressFilters}
+            onPressFiltersChange={handlePressFiltersChange}
+            selectedFileCount={selectedFileCount}
+            onBulkPress={(action, kitArtistId) => void handleBulkPress(action, kitArtistId)}
+            artists={artistOptions}
           />
         </div>
         {/* Collapsible folder tree */}
@@ -377,7 +458,14 @@ export function FileExplorer({ className }: { className?: string }) {
         </div>
       </div>
 
-      <AssetPreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+      <AssetPreviewModal
+        asset={previewAsset}
+        artists={artistOptions}
+        authToken={explorer.token}
+        onClose={() => setPreviewAsset(null)}
+        onSavePress={(assetId, draft) => handleSavePress(assetId, draft)}
+        onAssetUpdated={(asset) => setPreviewAsset(asset)}
+      />
       <TagsEditorDialog
         open={tagsAsset !== null}
         initialTags={tagsAsset?.tags ?? []}

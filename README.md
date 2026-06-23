@@ -172,6 +172,15 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `SUPABASE_REPLICA_URL` | Supabase read-replica URL (Pro plan). Routes heavy analytics/reporting queries away from the primary DB. Falls back to primary when unset. |
 | `SUPABASE_REPLICA_ANON_KEY` | Anon key for the read replica. |
 
+### Playwright E2E (optional — authenticated tests skip when unset)
+
+| Variable | Description |
+|---|---|
+| `E2E_ADMIN_EMAIL` | Admin account email for authenticated admin E2E tests |
+| `E2E_ADMIN_PASSWORD` | Admin account password |
+| `E2E_JOURNALIST_EMAIL` | Journalist account email (optional; admin also works for press dashboard tests) |
+| `E2E_JOURNALIST_PASSWORD` | Journalist account password |
+
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 ---
@@ -302,12 +311,11 @@ app/                          # Next.js App Router entry points
     ├── vitals/route.ts                    # Core Web Vitals RUM ingestion
     ├── journalist-applications/           # Journalist application CRUD
     ├── account/                           # Account export + deletion (GDPR)
-    ├── upload-epk/route.ts                # Presigned EPK asset upload (R2)
-    ├── upload-media/route.ts              # Presigned media upload (R2)
+    ├── upload-epk/route.ts                # Presigned EPK promo-track upload (R2)
     ├── admin/
     │   ├── artists/                       # Artist CRUD + Spotify/iTunes prefill + Discogs enrich
-    │   ├── assets/                        # File explorer APIs (list, folders, batch, storage stats)
-    │   ├── media/                         # Media library APIs (list, folders, batch)
+    │   ├── assets/                        # File explorer APIs (list, folders, batch, bulk-press, storage stats)
+    │   ├── press-kit/                     # Press kit curation (list, add, reorder, remove)
     │   ├── concerts/route.ts              # Admin concert management (any artist)
     │   ├── feature-flags/[id]/route.ts    # Toggle portal/journalist feature flags
     │   ├── users/                         # User management (role, ban, delete, link-artist, invite)
