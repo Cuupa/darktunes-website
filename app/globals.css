@@ -496,3 +496,30 @@ html[data-fx-scroll-reveal] [data-reveal][data-revealed] {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* === Scroll Performance Optimierungen === */
+
+/* backdrop-blur nur auf Desktop (teuer auf Mobile) */
+@media (hover: hover) and (pointer: fine) {
+  .backdrop-blur {
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* GPU-freundliche Animationen erzwingen */
+.motion-safe {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Schwere Schatten bei vielen Elementen reduzieren */
+@media (max-width: 1024px) {
+  .card-shadow {
+    box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.15);
+  }
+}
+
+/* Scanline / CRT Effekte nur bei Bedarf */
+.crt-effect {
+  will-change: auto;
+}
