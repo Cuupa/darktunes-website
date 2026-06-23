@@ -175,17 +175,21 @@ export async function fetchHistoricalExchangeRates(
  * @param currency - ISO 4217 currency code (e.g. "USD", "GBP").
  * @param rates    - Exchange rates map (1 EUR = N units of currency).
  * @returns The EUR-equivalent amount, or the original amount if the currency
- *          is already EUR or the rate is unavailable.
+ *          is already EUR.
+ * @throws {Error} when no rate is available for `currency` in `rates` — callers
+ *         must handle this to prevent silent revenue loss.
  */
 export function convertToEur(amount: number, currency: string, rates: ExchangeRates): number {
   const code = currency.trim().toUpperCase()
   if (!code || code === 'EUR') return amount
   const rate = rates[code]
   if (!rate || rate <= 0) {
-    // Rate unavailable — return 0 to avoid mixing currencies in EUR totals.
-    // The missing rate will have been warned about at fetch time.
-    console.warn(`[currency] No exchange rate for ${code} — amount excluded from EUR totals`)
-    return 0
+    // A missing rate must never silently zero-out an artist's earnings.
+    // Throw so the caller (statement generator) aborts and forces the label
+    // to supply the correct rate before any statement is sent.
+    throw new Error(
+      `Missing exchange rate for currency "${code}" — add the rate before generating statements`,
+    )
   }
   return amount / rate
 }

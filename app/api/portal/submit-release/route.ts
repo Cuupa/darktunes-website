@@ -27,6 +27,29 @@ const bodySchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 })
 
+/**
+ * Maps snake_case DB field keys (from submission_form_schema) to their
+ * camelCase counterparts in the validated request body.
+ * Any field key NOT present in this map is a custom/dynamic field and must
+ * be looked up inside body.formData instead.
+ */
+const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
+  title: 'title',
+  audio_download_url: 'audioDownloadUrl',
+  cover_art_url: 'coverArtUrl',
+  cover_art_verified: 'coverArtVerified',
+  release_date: 'releaseDate',
+  type: 'type',
+  genre: 'genre',
+  catalog_number: 'catalogNumber',
+  isrc: 'isrc',
+  label_copy: 'labelCopy',
+  spotify_url: 'spotifyUrl',
+  apple_music_url: 'appleMusicUrl',
+  youtube_url: 'youtubeUrl',
+  notes: 'notes',
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) throw new ApiError(401, 'Missing authorization token')
@@ -64,21 +87,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  // Validate required fields from dynamic schema
+  // Validate required fields from dynamic schema.
+  // Standard fields (those that live directly on `body`) are looked up via
+  // STANDARD_FIELD_TO_BODY_KEY.  Custom/admin-defined fields are sent by the
+  // frontend inside `body.formData` and must be looked up there.
   const schemaFields = await getFormSchema(supabase, 'release')
   for (const field of schemaFields) {
     if (!field.isRequired) continue
-    const val = (body as Record<string, unknown>)[
-      field.fieldKey === 'audio_download_url' ? 'audioDownloadUrl'
-      : field.fieldKey === 'cover_art_url' ? 'coverArtUrl'
-      : field.fieldKey === 'release_date' ? 'releaseDate'
-      : field.fieldKey === 'catalog_number' ? 'catalogNumber'
-      : field.fieldKey === 'label_copy' ? 'labelCopy'
-      : field.fieldKey === 'apple_music_url' ? 'appleMusicUrl'
-      : field.fieldKey === 'spotify_url' ? 'spotifyUrl'
-      : field.fieldKey === 'youtube_url' ? 'youtubeUrl'
-      : field.fieldKey
-    ]
+    const bodyKey = STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
+    const val = bodyKey !== undefined
+      ? (body as Record<string, unknown>)[bodyKey]
+      : (body.formData ?? {})[field.fieldKey]
     if (val === undefined || val === null || val === '') {
       throw new ApiError(400, `Required field missing: ${field.fieldKey}`)
     }
