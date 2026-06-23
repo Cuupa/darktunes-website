@@ -190,6 +190,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — module feature flags | ✅ Implemented | `portal_feature_flags` (`artist.*`) controls nav + page availability |
 | Journalist Dashboard — auth + routing | ✅ Implemented | `/press/login` + `/press/dashboard/*` protected in middleware (journalist/admin only) |
 | Journalist Dashboard — feature modules | ✅ Implemented | Promo Pool, Press Kit, Press Releases, Accreditation, Download History with `journalist.*` flags |
+| Unified press asset system | ✅ Implemented | Single Asset Explorer SSOT (`assets` + press metadata); curated kits via `press_kit_items`; `PressKitBuilder` in `/admin/press`; `PressPhotoLightbox` on EPK + journalist dashboard; legacy `media_files` / `press_photos` DAL removed |
 | Journalist download logging | ✅ Implemented | `journalist_downloads` tracks all secure journalist downloads |
 | SOS — Statement of Sales PDF upload | ✅ Implemented | Direct `uploadStatement` Server Action (admin/editor session auth) — no external webhook or shared secret |
 | Artist Portal — multi-tenant DB security | ✅ Implemented | `artists.user_id` → `auth.users(id)`; all portal tables use row-level `auth.uid()` policies |
@@ -210,7 +211,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 | Artist Portal — Help / FAQ | ✅ Implemented | `/portal/help` — FAQ and contact form for artist support requests |
 | Artist Portal — Video Submission | ✅ Implemented | `/portal/releases/videos/new` — artists submit new video entries for admin review (`is_visible=false`); stored in `videos` table pending admin approval in `/admin/video-submissions` |
 | Admin — Accounting tab | ✅ Implemented | `/admin/accounting` — SOS Generator (upload royalty PDFs for any artist via `uploadStatement` Server Action) + Statement History table (`sales_statements`); admin/editor only |
-| Admin — System tab | ✅ Implemented | `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, Media Library, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats) |
+| Admin — System tab | ✅ Implemented | `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats) |
 | Admin — Release Submissions | ✅ Implemented | `/admin/release-submissions` — review and approve/reject artist-submitted releases (`is_visible=false` → `is_visible=true`) |
 | Admin — Video Submissions | ✅ Implemented | `/admin/video-submissions` — review and approve/reject artist-submitted videos |
 | Supabase Read Replica | ✅ Implemented | `src/lib/supabase/replica.ts` — `createReplicaSupabaseClient()` uses `SUPABASE_REPLICA_URL` / `SUPABASE_REPLICA_ANON_KEY`; analytics queries, admin health dashboard, SOS CSV export routed to replica; silent fallback to primary when env vars unset |

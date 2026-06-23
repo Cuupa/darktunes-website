@@ -9,6 +9,7 @@ import { logDownload } from '@/lib/api/journalistDownloads'
 export async function getJournalistDownloadUrl(
   assetKey: string,
   releaseId: string | null,
+  assetId?: string | null,
 ): Promise<{ url: string | null }> {
   try {
     const supabase = await createServerSupabaseClient()
@@ -50,6 +51,7 @@ export async function getJournalistDownloadUrl(
     await logDownload(supabase, {
       journalist_id: user.id,
       release_id: releaseId,
+      asset_id: assetId ?? null,
       asset_key: assetKey,
     })
     return { url }

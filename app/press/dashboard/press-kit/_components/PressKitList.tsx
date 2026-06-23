@@ -7,34 +7,47 @@ import { DownloadSimple, FileArrowDown } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
 import type { Dictionary } from '@/i18n/types'
-import type { PressPhoto } from '@/lib/api/pressPhotos'
+import type { PressAsset } from '@/types'
 import { getJournalistDownloadUrl } from '../../_actions/download'
 import { getPressKitUrls } from '../_actions/downloadZip'
 
 interface PressKitListProps {
-  photos: PressPhoto[]
+  assets: PressAsset[]
   dict: Dictionary['pressKit']
 }
 
-const IMAGE_CATEGORIES = new Set(['photo', 'logo', 'social'])
+const IMAGE_CATEGORIES = new Set(['photo', 'logo', 'social', 'promo', 'live', 'stage', 'artwork'])
 
-export function PressKitList({ photos, dict }: PressKitListProps) {
+function assetTitle(asset: PressAsset): string {
+  return asset.pressCaption ?? asset.originalFilename
+}
+
+export function PressKitList({ assets, dict }: PressKitListProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'photo' | 'logo' | 'social' | 'document'>('all')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [preparingZip, setPreparingZip] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const filtered = useMemo(() => (
-    activeTab === 'all' ? photos : photos.filter((photo) => photo.category === activeTab)
-  ), [activeTab, photos])
+    activeTab === 'all'
+      ? assets
+      : assets.filter((asset) => (asset.pressCategory ?? 'photo') === activeTab)
+  ), [activeTab, assets])
 
-  const imageAssets = filtered.filter((photo) => IMAGE_CATEGORIES.has(photo.category))
-  const documentAssets = filtered.filter((photo) => !IMAGE_CATEGORIES.has(photo.category))
+  const imageAssets = filtered.filter(
+    (asset) => asset.mimeType.startsWith('image/') || IMAGE_CATEGORIES.has(asset.pressCategory ?? 'photo'),
+  )
+  const documentAssets = filtered.filter(
+    (asset) => !asset.mimeType.startsWith('image/') && !IMAGE_CATEGORIES.has(asset.pressCategory ?? 'photo'),
+  )
 
-  const download = async (photo: PressPhoto) => {
-    setLoadingId(photo.id)
+  const download = async (asset: PressAsset) => {
+    setLoadingId(asset.id)
     try {
-      const result = await getJournalistDownloadUrl(photo.r2Key, null)
+      const result = await getJournalistDownloadUrl(asset.r2Key, null, asset.id)
       if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer')
     } finally {
       setLoadingId(null)
@@ -53,6 +66,13 @@ export function PressKitList({ photos, dict }: PressKitListProps) {
     } finally {
       setPreparingZip(false)
     }
+  }
+
+  const openLightbox = (assetId: string) => {
+    const index = imageAssets.findIndex((asset) => asset.id === assetId)
+    if (index < 0) return
+    setLightboxIndex(index)
+    setLightboxOpen(true)
   }
 
   return (
@@ -80,31 +100,36 @@ export function PressKitList({ photos, dict }: PressKitListProps) {
       ) : (
         <div className="space-y-6">
           {imageAssets.length > 0 && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {imageAssets.map((photo) => (
-                <div key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-card/70">
-                  <div className="relative aspect-square overflow-hidden">
+            <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
+              {imageAssets.map((asset) => (
+                <li key={asset.id} className="overflow-hidden rounded-2xl border border-border bg-card/70">
+                  <button
+                    type="button"
+                    className="group relative block aspect-square w-full overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => openLightbox(asset.id)}
+                    aria-label={`View ${assetTitle(asset)}`}
+                  >
                     <Image
-                      src={getOptimizedImageUrl(photo.publicUrl, 1000)}
-                      alt={photo.altText ?? `${photo.title} – press asset`}
+                      src={getOptimizedImageUrl(asset.publicUrl, 1000)}
+                      alt={asset.altText ?? `${assetTitle(asset)} – press asset`}
                       fill
-                      className="object-cover"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                       unoptimized
                     />
-                  </div>
+                  </button>
                   <div className="flex items-center justify-between gap-3 p-4">
-                    <div>
-                      <p className="font-medium">{photo.title}</p>
-                      <p className="text-sm text-muted-foreground">{photo.category}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{assetTitle(asset)}</p>
+                      <p className="text-sm text-muted-foreground">{asset.pressCategory ?? 'photo'}</p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => void download(photo)} disabled={loadingId === photo.id}>
+                    <Button size="sm" variant="outline" onClick={() => void download(asset)} disabled={loadingId === asset.id}>
                       <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                      {loadingId === photo.id ? dict.preparingZip : dict.downloadZip}
+                      {loadingId === asset.id ? dict.preparingZip : dict.downloadZip}
                     </Button>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
           {documentAssets.length > 0 && (
@@ -112,8 +137,8 @@ export function PressKitList({ photos, dict }: PressKitListProps) {
               {documentAssets.map((asset) => (
                 <div key={asset.id} className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card/70 p-4">
                   <div>
-                    <p className="font-medium">{asset.title}</p>
-                    <p className="text-sm text-muted-foreground">{asset.category}</p>
+                    <p className="font-medium">{assetTitle(asset)}</p>
+                    <p className="text-sm text-muted-foreground">{asset.pressCategory ?? 'document'}</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void download(asset)} disabled={loadingId === asset.id}>
                     <DownloadSimple size={16} weight="bold" aria-hidden="true" />
@@ -125,6 +150,14 @@ export function PressKitList({ photos, dict }: PressKitListProps) {
           )}
         </div>
       )}
+
+      <PressPhotoLightbox
+        photos={imageAssets}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        onDownload={(asset) => void download(asset)}
+      />
     </div>
   )
 }

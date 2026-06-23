@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 import { createArtistAsset, deleteArtistAsset } from '@/lib/api/artistAssets'
@@ -100,6 +100,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const formData = await req.formData()
   const file = formData.get('file')
   const label = formData.get('label')
+  const suggestForPress = formData.get('pressSuggested') === 'true'
 
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
@@ -141,10 +142,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Write DB records. On failure, delete the already-uploaded R2 object so it
   // doesn't become an orphaned (cost-incurring) file in the bucket.
+  const isImage = file.type.startsWith('image/')
+  const pressSuggested = suggestForPress && isImage
+
   let asset
+  let mainAssetId: string | null = null
   try {
     // Insert into main assets table so admin file explorer can see portal uploads
-    await createAssetRecord(supabase, {
+    const mainAsset = await createAssetRecord(supabase, {
       filename: file.name,
       original_filename: file.name,
       mime_type: file.type || 'application/octet-stream',
@@ -154,7 +159,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       uploaded_by: userId,
       folder_id: folderId,
       artist_id: artist.id,
+      press_suggested: pressSuggested,
     })
+    mainAssetId = mainAsset.id
 
     asset = await createArtistAsset(supabase, {
       artist_id: artist.id,
@@ -174,6 +181,28 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       console.error('[upload-asset] R2 rollback failed for key:', uploaded.key)
     }
     throw dbErr
+  }
+
+  if (pressSuggested && mainAssetId) {
+    const serviceRole = await createServiceRoleSupabaseClient()
+    const { data: recipientProfiles } = await serviceRole
+      .from('users')
+      .select('id')
+      .in('role', ['admin', 'editor'])
+
+    const recipients = (recipientProfiles ?? []).map((profile) => ({
+      recipient_id: profile.id,
+      type: 'press_asset_suggestion',
+      entity_type: 'asset',
+      entity_id: mainAssetId,
+      entity_name: `${artist.name}: ${file.name}`,
+      sender_id: userId,
+      read: false,
+    }))
+
+    if (recipients.length > 0) {
+      await serviceRole.from('editor_notifications').insert(recipients)
+    }
   }
 
   return NextResponse.json({ asset })

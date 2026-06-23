@@ -11,6 +11,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
+import { waitForPageSettled } from '../helpers/pageSettle'
 
 // ---------------------------------------------------------------------------
 // Helper: intercept Supabase REST calls and add artificial latency
@@ -89,7 +90,7 @@ test.describe('Skeleton Loaders — No CLS', () => {
 
     // Release the held requests so content loads.
     resolveRequests()
-    await page.waitForLoadState('networkidle')
+    await waitForPageSettled(page)
 
     if (skeletonBoxes.length === 0) {
       // No skeletons detected — the app may render content immediately
@@ -141,7 +142,7 @@ test.describe('Long Artist Name Truncation', () => {
     page,
   }) => {
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await waitForPageSettled(page)
 
     const artistSection = page.locator('#artists')
     const sectionCount = await artistSection.count()

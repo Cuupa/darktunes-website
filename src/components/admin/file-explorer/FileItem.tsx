@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { File, MusicNotes, Tag } from '@phosphor-icons/react'
+import { File, MusicNotes, Newspaper, Tag } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Artist, Asset, AssetFolder, Release } from '@/types'
@@ -142,6 +142,17 @@ export function FileItem({
           <span className="md:hidden">{formatBytes(asset.sizeBytes)}</span>
           <span className="hidden md:inline">{asset.mimeType}</span>
           <span className="hidden md:inline">{formatBytes(asset.sizeBytes)}</span>
+          {asset.isPressApproved && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+              <Newspaper size={10} aria-hidden="true" />
+              Press
+            </span>
+          )}
+          {asset.pressSuggested && !asset.isPressApproved && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary/15 px-2 py-0.5 text-secondary">
+              Suggested
+            </span>
+          )}
           {asset.tags.length > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-0.5 text-secondary">
               <Tag size={10} aria-hidden="true" />

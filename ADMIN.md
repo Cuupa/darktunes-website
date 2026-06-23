@@ -49,12 +49,13 @@ WHERE slug = 'artist-slug';
 - **Release Submissions**: `/admin/release-submissions` — review and approve/reject release submissions from artists (submitted via `/portal/releases/new` with `is_visible=false`).
 - **Video Submissions**: `/admin/video-submissions` — review and approve/reject video submissions from artists (submitted via `/portal/releases/videos/new`).
 - **Accounting** *(admin-only)*: `/admin/accounting` — Tab A: SOS Generator (create and upload royalty statement PDFs for any artist directly from the admin, authenticated via the admin's Supabase session). Tab B: Statement History (read-only table of all `sales_statements` rows).
-- **System** *(admin-only)*: `/admin/system` — Health dashboard (queue stats, DB connectivity), Audit Log (`sync_logs`), Error Log (failed sync runs), App Errors (`app_logs`), Media Library, and Maintenance tasks (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats). Supports full-text search, source/status filters, and pagination.
+- **System** *(admin-only)*: `/admin/system` — Health dashboard (queue stats, DB connectivity), Audit Log (`sync_logs`), Error Log (failed sync runs), App Errors (`app_logs`), and Maintenance tasks (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats). Supports full-text search, source/status filters, and pagination.
 - **Logs** included in System tab: Audit Log (all `sync_logs` entries), Error Log (failed/partial), App Errors (`app_logs`).
 - **Statement Approval Workflow**: Statements tab (within Accounting) shows workflow status (`draft`, `label_approved`, `artist_notified`, `acknowledged`) and lets admins/editors approve draft statements with optional internal notes before artists generate linked invoices.
 - **Roles & Permissions** *(admin-only)*: Configure per-role content permissions (`can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`) stored in `role_permissions`. Also supports **Custom Roles** via `/api/admin/roles/custom` and **Permission Definitions** via `/api/admin/roles/permissions-def`. Changes are enforced at API, RLS, and frontend layers.
 - **Videos Management**: Manage music videos and YouTube content.
-- **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads, with search, bulk selection/delete, folder CRUD, artist assignment, inline previews, and duplicate detection via SHA-256 hash. A parallel **Media Library** (`/api/admin/media`) handles non-asset media files with the same folder structure.
+- **Assets Management**: Folder-based File Explorer / Asset Manager for Cloudflare R2 uploads (single source of truth for all media), with search, bulk selection/delete, folder CRUD, artist assignment, press metadata, bulk press approve/kit actions, inline previews, and duplicate detection via SHA-256 hash.
+- **Press Kit** (`/admin/press`): `PressKitBuilder` curates `press_kit_items` per artist or label-wide; uploads happen in the Asset Explorer, not in a separate media library.
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes.
 - **Visual Effects**: Configure the dark-industrial overlay effects (noise/grain opacity, CRT scanlines toggle, vignette intensity) from the **Admin → Color Theme** page (Effects tab) — changes go live immediately via ISR cache revalidation.
 - **Legal / DSGVO**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
@@ -127,6 +128,8 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Browse uploaded assets with inline previews/audio playback and copy public URLs for use in content
 - Delete assets or folder subtrees — R2 objects are deleted before their database rows are removed
 - Reuse uploaded image/logo assets directly inside the Artist form via the built-in `AssetPicker`
+- Set press metadata on assets (category, caption, alt text, approval) and bulk-approve or add selected assets to a press kit via toolbar actions
+- Artist portal uploads can flag assets as "suggest for press kit review" (`press_suggested`) — admins see these in the explorer for curation
 
 ### Site Settings
 Manage all global site content from the **Settings** tab — no code changes needed:
@@ -151,7 +154,7 @@ The permission system is database-backed via the `role_permissions` table in Pos
 | `can_manage_artists` | Creating and editing artist profiles |
 | `can_manage_releases` | Creating and editing releases |
 | `can_manage_videos` | Creating and editing videos |
-| `can_view_admin_panel` | Accessing assets, media files, and the admin panel |
+| `can_view_admin_panel` | Accessing the Asset Explorer and the admin panel |
 
 ### Default Role Permissions
 
@@ -189,13 +192,13 @@ The admin panel is an integrated part of the Next.js App Router — it lives at 
 Admin pages are always dynamically rendered (`force-dynamic`) so auth cookies are always checked server-side on every request.
 
 
-- Press Portal tab: review journalist applications, upload press kit assets by category/artist, manage promo tracks with genre/BPM/key/NDA metadata, review accreditations, and monitor portal analytics.
+- Press Portal tab: review journalist applications, curate press kits via `PressKitBuilder`, manage promo tracks with genre/BPM/key/NDA metadata, review accreditations, and monitor portal analytics.
 
 ## Press Portal (Admin)
 
 The Press Portal admin features are in the Admin Dashboard under the **Press** tab
 (admin-only). This tab provides:
-- **Press Photos**: Upload/manage photos by category (live, promo, artwork) and artist
+- **Press Kit Builder**: Curate `press_kit_items` per artist or label-wide — uploads and press metadata (category, caption, alt text, approval) happen in the **Assets** tab (Asset Explorer), not in a separate media library
 - **Promo Tracks**: Manage promo audio with metadata (genre, BPM, key, NDA required flag)
 - **Journalist Applications**: Review and approve/reject journalist accreditation requests
 - **Accreditations**: Grant/revoke journalist portal access
