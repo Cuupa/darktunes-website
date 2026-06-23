@@ -59,6 +59,8 @@ export interface SyncLog {
   errors: string[]
   apiSource: string
   rateLimited: boolean
+  durationMs?: number | null
+  metadata?: Record<string, unknown>
   createdAt: string
 }
 

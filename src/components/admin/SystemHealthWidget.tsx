@@ -4,19 +4,9 @@
  * src/components/admin/SystemHealthWidget.tsx
  *
  * Admin "System Health & API Status" dashboard widget.
- *
- * Displays:
- *   - Database connection status (Online / Offline)
- *   - Per-API last sync timestamp and status (auto-discovered from sync_logs)
- *   - Rate-limit warning badges
- *   - Error details for partial/error syncs
- *   - "Force Sync All" and "Sync YouTube" actions with loading states
- *
- * Props (IoC): receives the Bearer token from the parent (AuthContext) so
- * this component itself never reads auth state directly.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,37 +24,25 @@ import {
   Ticket,
   YoutubeLogo,
   Link,
+  Queue,
+  Gauge,
+  Bell,
+  ChartLine,
+  Clock,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { useEffect } from 'react'
-
-// ---------------------------------------------------------------------------
-// Types (mirror HealthResponse from app/api/health/route.ts)
-// ---------------------------------------------------------------------------
-
-interface ApiHealthStatus {
-  configured: boolean
-  lastSyncAt: string | null
-  lastSyncStatus: 'success' | 'partial' | 'error' | null
-  rateLimited: boolean
-  lastErrors: string[]
-}
-
-interface HealthData {
-  status: 'healthy' | 'degraded' | 'unhealthy'
-  database: { status: 'online' | 'offline'; latencyMs: number | null }
-  apis: Record<string, ApiHealthStatus>
-  checkedAt: string
-}
+import { cn } from '@/lib/utils'
+import {
+  formatDurationMs,
+  sortApiSources,
+  type ApiOperationalState,
+  type QueueOperationalState,
+} from '@/lib/health/apiStatus'
+import type { AlertSeverity, HealthResponse } from '@/lib/health/types'
 
 interface SystemHealthWidgetProps {
-  /** Bearer token from the auth context — used to authenticate the sync call */
   bearerToken: string
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function formatRelativeTime(isoDate: string | null): string {
   if (!isoDate) return 'Never'
@@ -78,48 +56,116 @@ function formatRelativeTime(isoDate: string | null): string {
 }
 
 const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
-  itunes: { label: 'iTunes', icon: <MusicNote size={16} weight="bold" /> },
-  spotify: { label: 'Spotify', icon: <Microphone size={16} weight="bold" /> },
-  discogs: { label: 'Discogs', icon: <RecordIcon size={16} weight="bold" /> },
-  songkick: { label: 'Songkick', icon: <Ticket size={16} weight="bold" /> },
-  bandsintown: { label: 'Bandsintown', icon: <Ticket size={16} weight="bold" /> },
-  youtube: { label: 'YouTube', icon: <YoutubeLogo size={16} weight="bold" /> },
-  odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" /> },
+  itunes: { label: 'iTunes', icon: <MusicNote size={16} weight="bold" aria-hidden="true" /> },
+  spotify: { label: 'Spotify', icon: <Microphone size={16} weight="bold" aria-hidden="true" /> },
+  discogs: { label: 'Discogs', icon: <RecordIcon size={16} weight="bold" aria-hidden="true" /> },
+  songkick: { label: 'Songkick', icon: <Ticket size={16} weight="bold" aria-hidden="true" /> },
+  bandsintown: { label: 'Bandsintown', icon: <Ticket size={16} weight="bold" aria-hidden="true" /> },
+  youtube: { label: 'YouTube', icon: <YoutubeLogo size={16} weight="bold" aria-hidden="true" /> },
+  odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" aria-hidden="true" /> },
+  all: { label: 'Full pipeline', icon: <ArrowsClockwise size={16} weight="bold" aria-hidden="true" /> },
 }
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
-  return API_META[api] ?? { label: api.charAt(0).toUpperCase() + api.slice(1), icon: <MusicNote size={16} weight="bold" /> }
+  return (
+    API_META[api] ?? {
+      label: api.charAt(0).toUpperCase() + api.slice(1),
+      icon: <MusicNote size={16} weight="bold" aria-hidden="true" />,
+    }
+  )
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function operationalBadgeClass(
+  state: ApiOperationalState | QueueOperationalState | 'unconfigured',
+): string {
+  switch (state) {
+    case 'operational':
+      return 'bg-green-500/20 text-green-400 border-green-500/30'
+    case 'idle':
+    case 'unconfigured':
+      return 'bg-muted text-muted-foreground border-border'
+    case 'unavailable':
+      return 'bg-muted/60 text-muted-foreground border-border'
+    case 'stale':
+    case 'degraded':
+      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    case 'failing':
+      return 'bg-red-500/20 text-red-400 border-red-500/30'
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
+}
+
+function overallBadgeClass(status: HealthResponse['status']): string {
+  switch (status) {
+    case 'healthy':
+      return 'bg-green-500/20 text-green-400 border-green-500/30'
+    case 'degraded':
+      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    case 'unhealthy':
+      return 'bg-red-500/20 text-red-400 border-red-500/30'
+  }
+}
+
+function healthScoreClass(score: number): string {
+  if (score >= 85) return 'text-green-400'
+  if (score >= 60) return 'text-yellow-400'
+  return 'text-red-400'
+}
+
+function alertSeverityClass(severity: AlertSeverity): string {
+  switch (severity) {
+    case 'critical':
+      return 'border-red-500/40 bg-red-500/10'
+    case 'warning':
+      return 'border-yellow-500/40 bg-yellow-500/10'
+    case 'info':
+      return 'border-border bg-muted/40'
+  }
+}
+
+function databaseCardClass(status: HealthResponse['database']['status']): string {
+  switch (status) {
+    case 'online':
+      return 'border-green-500/30'
+    case 'slow':
+      return 'border-yellow-500/30'
+    case 'critical':
+      return 'border-red-500/30'
+    case 'offline':
+      return 'border-red-500/30'
+  }
+}
 
 export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
-  const [health, setHealth] = useState<HealthData | null>(null)
+  const [health, setHealth] = useState<HealthResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncingYoutube, setSyncingYoutube] = useState(false)
   const [syncingApi, setSyncingApi] = useState<string | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
 
-  const fetchHealth = useCallback(async () => {
+  const fetchHealth = useCallback(async (showRefreshSpinner = false) => {
+    if (showRefreshSpinner) setRefreshing(true)
     try {
       const res = await fetch('/api/health')
       if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
-      const data: HealthData = await res.json()
+      const data: HealthResponse = await res.json()
       setHealth(data)
     } catch (err) {
       toast.error(`Health check failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
+      if (showRefreshSpinner) setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
     void fetchHealth()
-    // Refresh every 60 seconds
-    const interval = setInterval(() => { void fetchHealth() }, 60_000)
+    const interval = setInterval(() => {
+      void fetchHealth()
+    }, 60_000)
     return () => clearInterval(interval)
   }, [fetchHealth])
 
@@ -133,8 +179,8 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
-
-      const dataQueue: unknown = await resQueue.json()
+      const dataQueue = (await resQueue.json()) as { queued?: number; error?: string }
+      if (!resQueue.ok) throw new Error(dataQueue.error ?? `Queue failed (${resQueue.status})`)
 
       const resExecute = await fetch('/api/sync/execute', {
         method: 'POST',
@@ -143,29 +189,20 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
+      const dataExecute = (await resExecute.json()) as { accepted?: boolean; error?: string }
+      if (!resExecute.ok) throw new Error(dataExecute.error ?? `Execute failed (${resExecute.status})`)
 
-      const dataExecute: unknown = await resExecute.json()
+      const queued = dataQueue.queued ?? 0
+      toast.success(
+        queued > 0
+          ? `${queued} job(s) enqueued — background executor accepted the run.`
+          : 'No new jobs enqueued (artists may already be queued). Executor started.',
+      )
 
-      const resultQueue = dataQueue as { totalErrors: number; results: Array<{ api: string; releasesUpserted: number; errors: string[] }> }
-      const resultExecute = dataExecute as { totalErrors: number; results: Array<{ api: string; releasesUpserted: number; errors: string[] }> }
-
-      if (resultQueue.totalErrors === 0 && resultExecute.totalErrors === 0) {
-        toast.success('Sync completed successfully across all APIs.')
-      } else {
-        toast.warning(
-          `Sync completed with ${resultQueue.totalErrors} error(s). Check the console for details.`,
-        )
-      }
-
-      // Refresh health dataQueue after sync
       await fetchHealth()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      if (message.includes('429')) {
-        toast.error('Sync failed: Rate limit reached. Retrying automatically.')
-      } else {
-        toast.error(`Sync failed: ${message}`)
-      }
+      toast.error(message.includes('429') ? 'Sync failed: rate limit reached.' : `Sync failed: ${message}`)
     } finally {
       setSyncing(false)
     }
@@ -181,21 +218,15 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
+      const data = (await res.json()) as { synced?: number; count?: number; message?: string; error?: string }
+      if (!res.ok) throw new Error(data.error ?? `YouTube sync failed (${res.status})`)
 
-      const data: unknown = await res.json()
-
-      if (!res.ok) {
-        const errorData = data as { error?: string }
-        throw new Error(errorData.error ?? `YouTube sync failed with status ${res.status}`)
-      }
-
-      const result = data as { synced?: number; count?: number; message?: string }
-      const syncedCount = result.synced ?? result.count
-      if (typeof syncedCount === 'number') {
-        toast.success(`YouTube sync completed (${syncedCount} video${syncedCount === 1 ? '' : 's'} synced).`)
-      } else {
-        toast.success(result.message ?? 'YouTube sync completed successfully.')
-      }
+      const syncedCount = data.synced ?? data.count
+      toast.success(
+        typeof syncedCount === 'number'
+          ? `YouTube sync completed (${syncedCount} video${syncedCount === 1 ? '' : 's'}).`
+          : (data.message ?? 'YouTube sync completed.'),
+      )
       await fetchHealth()
     } catch (err) {
       toast.error(`YouTube sync failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -215,16 +246,10 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         },
         body: JSON.stringify({ apiSource: api }),
       })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? `Sync failed (${res.status})`)
 
-      const data: unknown = await res.json()
-
-      if (!res.ok) {
-        const errorData = data as { error?: string }
-        throw new Error(errorData.error ?? `Sync failed with status ${res.status}`)
-      }
-
-      const meta = getApiMeta(api)
-      toast.success(`${meta.label} sync completed.`)
+      toast.success(`${getApiMeta(api).label} sync completed.`)
       await fetchHealth()
     } catch (err) {
       toast.error(`${getApiMeta(api).label} sync failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -248,48 +273,67 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
 
   if (!health) return null
 
-  const dbOnline = health.database.status === 'online'
-  const apiEntries = Object.entries(health.apis) as [string, ApiHealthStatus][]
+  const dbOnline = health.database.status !== 'offline'
+  const apiEntries = sortApiSources(Object.keys(health.apis))
+    .filter((api) => api !== 'all')
+    .map((api) => [api, health.apis[api]] as const)
+
+  const criticalAlerts = health.alerts.filter((a) => a.severity === 'critical')
+  const warningAlerts = health.alerts.filter((a) => a.severity === 'warning')
 
   return (
     <div className="space-y-6">
-      {/* Overall status header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          {health.status === 'healthy' && (
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">All systems operational</Badge>
-          )}
-          {health.status === 'degraded' && (
-            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-              <Warning size={12} className="mr-1" />
-              Degraded — rate limits active
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={overallBadgeClass(health.status)} aria-label={`System status: ${health.statusLabel}`}>
+              {health.status === 'unhealthy' && <XCircle size={12} className="mr-1" aria-hidden="true" />}
+              {health.status === 'degraded' && <Warning size={12} className="mr-1" aria-hidden="true" />}
+              {health.statusLabel}
             </Badge>
-          )}
-          {health.status === 'unhealthy' && (
-            <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-              <XCircle size={12} className="mr-1" />
-              Unhealthy
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground">
-            Updated {formatRelativeTime(health.checkedAt)}
-          </span>
+            <span
+              className={cn('text-sm font-semibold tabular-nums', healthScoreClass(health.healthScore))}
+              aria-label={`Health score ${health.healthScore} out of 100`}
+            >
+              <Gauge size={14} className="inline mr-1" aria-hidden="true" />
+              {health.healthScore}/100
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Checked {formatRelativeTime(health.checkedAt)}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">{health.statusDetail}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={() => { void fetchHealth(true) }}
+            disabled={refreshing}
+            size="sm"
+            variant="ghost"
+            aria-label="Refresh health status"
+            className="min-w-[44px] min-h-[44px]"
+          >
+            <ArrowsClockwise
+              size={16}
+              className={cn(refreshing && 'animate-spin')}
+              aria-hidden="true"
+            />
+          </Button>
           <Button
             onClick={() => { void handleSyncYoutube() }}
             disabled={syncingYoutube || !dbOnline}
             size="sm"
             variant="outline"
+            aria-label="Sync YouTube channel videos"
           >
             {syncingYoutube ? (
               <>
-                <Spinner size={14} className="mr-2 animate-spin" />
+                <Spinner size={14} className="mr-2 animate-spin" aria-hidden="true" />
                 Syncing…
               </>
             ) : (
               <>
-                <YoutubeLogo size={14} className="mr-2" />
+                <YoutubeLogo size={14} className="mr-2" aria-hidden="true" />
                 Sync YouTube
               </>
             )}
@@ -299,15 +343,16 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
             disabled={syncing || !dbOnline}
             size="sm"
             variant="outline"
+            aria-label="Enqueue and execute sync queue jobs"
           >
             {syncing ? (
               <>
-                <Spinner size={14} className="mr-2 animate-spin" />
+                <Spinner size={14} className="mr-2 animate-spin" aria-hidden="true" />
                 Syncing…
               </>
             ) : (
               <>
-                <ArrowsClockwise size={14} className="mr-2" />
+                <ArrowsClockwise size={14} className="mr-2" aria-hidden="true" />
                 Force Sync All
               </>
             )}
@@ -315,118 +360,346 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         </div>
       </div>
 
-      {/* Database card */}
-      <Card className={dbOnline ? 'border-green-500/30' : 'border-red-500/30'}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Database size={16} weight="bold" />
-            Database
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            {dbOnline ? (
-              <CheckCircle size={20} weight="fill" className="text-green-400" />
-            ) : (
-              <XCircle size={20} weight="fill" className="text-red-400" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Configured</p>
+          <p className="text-lg font-semibold tabular-nums">{health.kpis.configuredApis}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Operational</p>
+          <p className="text-lg font-semibold tabular-nums text-green-400">{health.kpis.operationalApis}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Degraded</p>
+          <p className="text-lg font-semibold tabular-nums text-yellow-400">{health.kpis.degradedApis}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Failing</p>
+          <p className="text-lg font-semibold tabular-nums text-red-400">{health.kpis.failingApis}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <ChartLine size={12} aria-hidden="true" />
+            24h SLA
+          </p>
+          <p className="text-lg font-semibold tabular-nums">
+            {health.kpis.avgSuccessRate24h !== null ? `${health.kpis.avgSuccessRate24h}%` : '—'}
+          </p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Bell size={12} aria-hidden="true" />
+            Alerts
+          </p>
+          <p className="text-lg font-semibold tabular-nums">
+            {criticalAlerts.length > 0 && (
+              <span className="text-red-400">{criticalAlerts.length}</span>
             )}
-            <span className="font-medium text-sm">
-              {dbOnline ? 'Online' : 'Offline'}
-            </span>
-            {health.database.latencyMs !== null && (
-              <span className="text-xs text-muted-foreground ml-auto">
-                {health.database.latencyMs}ms
-              </span>
+            {criticalAlerts.length > 0 && warningAlerts.length > 0 && (
+              <span className="text-muted-foreground mx-1">/</span>
             )}
-          </div>
-        </CardContent>
-      </Card>
+            {warningAlerts.length > 0 && (
+              <span className="text-yellow-400">{warningAlerts.length}</span>
+            )}
+            {criticalAlerts.length === 0 && warningAlerts.length === 0 && (
+              <span className="text-green-400">0</span>
+            )}
+          </p>
+        </Card>
+      </div>
 
-      {/* Per-API cards */}
+      {health.alerts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell size={16} weight="bold" aria-hidden="true" />
+              Active Alerts
+              <Badge variant="outline" className="ml-auto text-xs">
+                {health.alerts.length}
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              {criticalAlerts.length > 0
+                ? `${criticalAlerts.length} critical · ${warningAlerts.length} warning`
+                : 'No critical issues — review warnings below'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 max-h-[40vh] overflow-y-auto" data-lenis-prevent>
+              {health.alerts.map((alert) => (
+                <li
+                  key={alert.id}
+                  className={cn(
+                    'rounded-md border px-3 py-2 text-sm',
+                    alertSeverityClass(alert.severity),
+                  )}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-xs capitalize',
+                        alert.severity === 'critical' && 'border-red-500/40 text-red-400',
+                        alert.severity === 'warning' && 'border-yellow-500/40 text-yellow-400',
+                      )}
+                      aria-label={`Severity: ${alert.severity}`}
+                    >
+                      {alert.severity}
+                    </Badge>
+                    <span className="font-medium">{alert.title}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{alert.message}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className={databaseCardClass(health.database.status)}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database size={16} weight="bold" aria-hidden="true" />
+              Database
+            </CardTitle>
+            <CardDescription>{health.database.statusDetail}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              {health.database.status === 'online' ? (
+                <CheckCircle size={20} weight="fill" className="text-green-400" aria-hidden="true" />
+              ) : health.database.status === 'slow' ? (
+                <Warning size={20} weight="fill" className="text-yellow-400" aria-hidden="true" />
+              ) : (
+                <XCircle size={20} weight="fill" className="text-red-400" aria-hidden="true" />
+              )}
+              <span className="font-medium text-sm">{health.database.statusLabel}</span>
+              {health.database.latencyMs !== null && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {health.database.latencyMs}ms round-trip
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {health.syncQueue && (
+          <Card
+            className={cn(
+              health.syncQueue.operationalState === 'failing' && 'border-red-500/30',
+              health.syncQueue.operationalState === 'degraded' && 'border-yellow-500/30',
+              health.syncQueue.operationalState === 'operational' && 'border-green-500/30',
+            )}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Queue size={16} weight="bold" aria-hidden="true" />
+                Sync Queue
+              </CardTitle>
+              <CardDescription>{health.syncQueue.statusDetail}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge
+                className={operationalBadgeClass(health.syncQueue.operationalState)}
+                aria-label={`Sync queue: ${health.syncQueue.statusLabel}`}
+              >
+                {health.syncQueue.statusLabel}
+              </Badge>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline">Pending: {health.syncQueue.pending}</Badge>
+                <Badge variant="outline">Running: {health.syncQueue.running}</Badge>
+                <Badge variant="outline">Done (24h): {health.syncQueue.done}</Badge>
+                <Badge
+                  variant="outline"
+                  className={health.syncQueue.failed > 0 ? 'border-red-500/40 text-red-400' : undefined}
+                >
+                  Failed (24h): {health.syncQueue.failed}
+                </Badge>
+                {health.syncQueue.stuckRunning > 0 && (
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                    Stuck: {health.syncQueue.stuckRunning}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {health.cronHealth && (
+        <Card
+          className={cn(
+            health.cronHealth.operationalState === 'failing' && 'border-red-500/30',
+            health.cronHealth.operationalState === 'degraded' && 'border-yellow-500/30',
+            health.cronHealth.operationalState === 'operational' && 'border-green-500/30',
+          )}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock size={16} weight="bold" aria-hidden="true" />
+              Cron Schedulers
+            </CardTitle>
+            <CardDescription>{health.cronHealth.statusDetail}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Badge
+              className={operationalBadgeClass(health.cronHealth.operationalState)}
+              aria-label={`Cron health: ${health.cronHealth.statusLabel}`}
+            >
+              {health.cronHealth.statusLabel}
+            </Badge>
+            <ul className="space-y-2">
+              {health.cronHealth.jobs.map((job) => (
+                <li
+                  key={job.key}
+                  className="flex flex-wrap items-center gap-2 text-xs border border-border rounded-md px-3 py-2"
+                >
+                  <span className="font-medium text-foreground">{job.label}</span>
+                  <Badge className={operationalBadgeClass(job.operationalState)}>
+                    {job.statusLabel}
+                  </Badge>
+                  <span className="text-muted-foreground ml-auto">
+                    {job.lastHeartbeatAt
+                      ? formatRelativeTime(job.lastHeartbeatAt)
+                      : 'No heartbeat'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {apiEntries.map(([api, status]) => {
           const meta = getApiMeta(api)
-          const hasErrors = status.lastErrors.length > 0 && (status.lastSyncStatus === 'partial' || status.lastSyncStatus === 'error')
+          const hasErrors =
+            status.errorCount > 0 &&
+            (status.lastSyncStatus === 'partial' || status.lastSyncStatus === 'error')
           const isExpanded = expandedErrors === api
+          const durationLabel = formatDurationMs(status.durationMs)
+          const slaLabel =
+            status.stats24h.total > 0 && status.stats24h.successRate !== null
+              ? `${status.stats24h.successRate}% (${status.stats24h.success}/${status.stats24h.total})`
+              : null
 
           return (
             <Card
               key={api}
-              className={
-                status.rateLimited
-                  ? 'border-yellow-500/30'
-                  : status.lastSyncStatus === 'error'
-                    ? 'border-red-500/30'
-                    : status.lastSyncStatus === 'partial'
-                      ? 'border-yellow-500/30'
-                      : 'border-border'
-              }
+              className={cn(
+                status.operationalState === 'failing' && 'border-red-500/30',
+                (status.operationalState === 'degraded' ||
+                  status.operationalState === 'stale') &&
+                  'border-yellow-500/30',
+                status.operationalState === 'operational' && 'border-green-500/30',
+              )}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   {meta.icon}
                   {meta.label}
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  {status.configured ? 'Configured' : 'Not configured'}
-                </CardDescription>
+                <CardDescription className="line-clamp-3">{status.statusDetail}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {/* Last sync */}
-                <div className="text-xs text-muted-foreground">
-                  Last sync:{' '}
-                  <span className="text-foreground font-medium">
-                    {formatRelativeTime(status.lastSyncAt)}
-                  </span>
+                <Badge
+                  className={operationalBadgeClass(status.operationalState)}
+                  aria-label={`${meta.label} status: ${status.statusLabel}`}
+                >
+                  {status.statusLabel}
+                </Badge>
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>
+                    Last run:{' '}
+                    <span className="text-foreground font-medium">
+                      {formatRelativeTime(status.lastSyncAt)}
+                    </span>
+                  </p>
+                  {slaLabel && (
+                    <p>
+                      24h SLA:{' '}
+                      <span
+                        className={cn(
+                          'font-medium',
+                          status.stats24h.successRate !== null &&
+                            status.stats24h.successRate < 80 &&
+                            'text-yellow-400',
+                          status.stats24h.successRate !== null &&
+                            status.stats24h.successRate < 50 &&
+                            'text-red-400',
+                        )}
+                      >
+                        {slaLabel}
+                      </span>
+                    </p>
+                  )}
+                  {!status.configured && (
+                    <p>Missing server env vars for this integration.</p>
+                  )}
+                  {api === 'discogs' && status.operationalState === 'idle' && (
+                    <p>Also runs inside Spotify sync when artists have a Discogs ID.</p>
+                  )}
+                  {api === 'odesli' && status.operationalState === 'idle' && (
+                    <p>Resolves smart links after Spotify releases sync.</p>
+                  )}
                 </div>
-                {api === 'discogs' && !status.lastSyncStatus && (
-                  <p className="text-xs text-muted-foreground">
-                    Runs as part of Spotify sync when artist has a Discogs ID set.
-                  </p>
-                )}
-                {api === 'odesli' && !status.lastSyncStatus && (
-                  <p className="text-xs text-muted-foreground">
-                    Runs automatically after each successful Spotify release sync.
-                  </p>
+
+                {(status.releasesSynced !== null ||
+                  status.concertsSynced !== null ||
+                  durationLabel) && (
+                  <ul className="text-xs text-muted-foreground space-y-0.5">
+                    {status.releasesSynced !== null && status.releasesSynced > 0 && (
+                      <li>
+                        {status.releasesSynced}{' '}
+                        {api === 'youtube' ? 'video' : 'release'}
+                        {status.releasesSynced === 1 ? '' : 's'} on last run
+                      </li>
+                    )}
+                    {status.concertsSynced !== null && status.concertsSynced > 0 && (
+                      <li>
+                        {status.concertsSynced} concert{status.concertsSynced === 1 ? '' : 's'} on
+                        last run
+                      </li>
+                    )}
+                    {status.artistsProcessed !== null && status.artistsProcessed > 0 && (
+                      <li>
+                        {status.artistsProcessed} artist
+                        {status.artistsProcessed === 1 ? '' : 's'} processed
+                      </li>
+                    )}
+                    {durationLabel && <li>Duration: {durationLabel}</li>}
+                  </ul>
                 )}
 
-                {/* Status badge */}
-                {status.lastSyncStatus && (
-                  <Badge
-                    className={
-                      status.lastSyncStatus === 'success'
-                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                        : status.lastSyncStatus === 'partial'
-                          ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                          : 'bg-red-500/20 text-red-400 border-red-500/30'
-                    }
-                  >
-                    {status.lastSyncStatus}
-                  </Badge>
-                )}
-
-                {/* Rate-limit warning */}
                 {status.rateLimited && (
                   <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
-                    <Warning size={10} className="mr-1" />
+                    <Warning size={10} className="mr-1" aria-hidden="true" />
                     Rate limited
                   </Badge>
                 )}
 
-                {/* Error details toggle */}
                 {hasErrors && (
                   <div className="pt-1">
                     <button
                       type="button"
                       onClick={() => setExpandedErrors(isExpanded ? null : api)}
-                      className="text-xs text-red-400 underline underline-offset-2 hover:text-red-300"
+                      className="text-xs text-red-400 underline underline-offset-2 hover:text-red-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-accent rounded min-h-[44px]"
+                      aria-expanded={isExpanded}
                     >
-                      {isExpanded ? 'Hide errors' : `Show ${status.lastErrors.length} error(s)`}
+                      {isExpanded ? 'Hide errors' : `Show ${status.errorCount} error(s)`}
                     </button>
                     {isExpanded && (
-                      <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                      <ul
+                        className="mt-2 space-y-1 max-h-40 overflow-y-auto"
+                        data-lenis-prevent
+                      >
                         {status.lastErrors.map((err, i) => (
-                          <li key={i} className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 font-mono break-all">
+                          <li
+                            key={i}
+                            className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 font-mono break-all"
+                          >
                             {err}
                           </li>
                         ))}
@@ -435,19 +708,25 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                   </div>
                 )}
 
-                {/* Force sync button */}
                 <div className="pt-1">
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-6 text-xs px-2"
-                    disabled={!dbOnline || syncingApi === api || syncing}
-                    onClick={() => handleSyncApi(api)}
+                    disabled={
+                      !dbOnline ||
+                      !status.configured ||
+                      status.operationalState === 'unavailable' ||
+                      syncingApi === api ||
+                      syncing
+                    }
+                    onClick={() => { void handleSyncApi(api) }}
+                    aria-label={`Force sync ${meta.label}`}
                   >
                     {syncingApi === api ? (
-                      <ArrowsClockwise size={10} className="mr-1 animate-spin" />
+                      <ArrowsClockwise size={10} className="mr-1 animate-spin" aria-hidden="true" />
                     ) : (
-                      <ArrowsClockwise size={10} className="mr-1" />
+                      <ArrowsClockwise size={10} className="mr-1" aria-hidden="true" />
                     )}
                     Force Sync
                   </Button>

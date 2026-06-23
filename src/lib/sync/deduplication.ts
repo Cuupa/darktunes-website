@@ -67,8 +67,16 @@ export interface MergedRelease {
 // Helpers
 // ---------------------------------------------------------------------------
 
+export interface CrossSourceReleaseRow {
+  id: string
+  title: string
+  release_date: string
+  spotify_id: string | null
+  itunes_id: string | null
+}
+
 /** Normalise a title for fuzzy comparison: lowercase, strip punctuation */
-function normTitle(title: string): string {
+export function normTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
@@ -77,7 +85,7 @@ function normTitle(title: string): string {
 }
 
 /** Extract YYYY from an ISO date string (YYYY-MM-DD or YYYY) */
-function extractYear(date: string | null): number | null {
+export function extractYear(date: string | null): number | null {
   if (!date) return null
   const m = /^(\d{4})/.exec(date)
   return m ? parseInt(m[1], 10) : null
@@ -171,4 +179,32 @@ export function deduplicateReleases(
   }
 
   return merged
+}
+
+/**
+ * Finds an existing Spotify-sourced release row that likely represents the same
+ * album as an incoming iTunes release (title + approximate year match).
+ */
+export function findCrossSourceMergeTarget(
+  existingReleases: CrossSourceReleaseRow[],
+  incomingTitle: string,
+  incomingDate: string,
+): CrossSourceReleaseRow | null {
+  const incomingYear = extractYear(incomingDate)
+  const incomingNorm = normTitle(incomingTitle)
+
+  for (const row of existingReleases) {
+    if (!row.spotify_id || row.itunes_id) continue
+
+    const rowYear = extractYear(row.release_date)
+    const titleMatch = normTitle(row.title) === incomingNorm
+    const yearMatch =
+      incomingYear !== null && rowYear !== null
+        ? Math.abs(incomingYear - rowYear) <= 1
+        : titleMatch
+
+    if (titleMatch && yearMatch) return row
+  }
+
+  return null
 }

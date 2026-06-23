@@ -16,6 +16,8 @@ function rowToSyncLog(row: SyncLogRow): SyncLog {
     errors: row.errors,
     apiSource: row.api_source,
     rateLimited: row.rate_limited,
+    durationMs: row.duration_ms ?? undefined,
+    metadata: row.metadata ?? undefined,
     createdAt: row.created_at,
   }
 }

@@ -18,6 +18,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
+import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
 // Fetching and upserting up to 200 YouTube videos can take longer than the default timeout.
@@ -130,5 +131,9 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   revalidateTag('videos')
 
+  await recordHealthHeartbeat(db, 'sync_youtube')
+
   return NextResponse.json({ synced: videos.length })
 })
+
+export const GET = POST

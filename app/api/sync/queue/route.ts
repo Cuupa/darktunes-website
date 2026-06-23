@@ -5,6 +5,7 @@ import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { enqueueArtistSyncJobs } from '@/lib/api/syncQueue'
+import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import type { ServerEnv } from '@/lib/env.server'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro.
@@ -54,6 +55,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const artistIds = (artists ?? []).map((a) => a.id)
 
   const queued = await enqueueArtistSyncJobs(db, artistIds, 'full')
+  await recordHealthHeartbeat(db, 'sync_queue')
 
   return NextResponse.json({
     queued,
@@ -61,3 +63,5 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     message: queued + ' sync job(s) enqueued.',
   })
 })
+
+export const GET = POST

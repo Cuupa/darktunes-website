@@ -190,6 +190,7 @@ export interface Database {
           scheduled_at: string
           started_at: string | null
           finished_at: string | null
+          locked_until: string | null
           error_message: string | null
           attempt_count: number
           created_at: string
@@ -202,6 +203,7 @@ export interface Database {
           scheduled_at?: string
           started_at?: string | null
           finished_at?: string | null
+          locked_until?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string
@@ -214,6 +216,7 @@ export interface Database {
           scheduled_at?: string
           started_at?: string | null
           finished_at?: string | null
+          locked_until?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string
@@ -1351,6 +1354,8 @@ export interface Database {
           errors: string[]
           api_source: string
           rate_limited: boolean
+          duration_ms: number | null
+          metadata: Record<string, unknown>
           created_at: string
         }
         Insert: {
@@ -1362,6 +1367,8 @@ export interface Database {
           errors?: string[]
           api_source?: string
           rate_limited?: boolean
+          duration_ms?: number | null
+          metadata?: Record<string, unknown>
           created_at?: string
         }
         Update: {
@@ -1373,6 +1380,8 @@ export interface Database {
           errors?: string[]
           api_source?: string
           rate_limited?: boolean
+          duration_ms?: number | null
+          metadata?: Record<string, unknown>
           created_at?: string
         }
         Relationships: []

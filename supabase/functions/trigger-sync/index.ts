@@ -17,7 +17,7 @@
  *   songkick     — sync Songkick concerts        (POST /api/sync-api, apiSource: songkick)
  *   bandsintown  — sync Bandsintown concerts     (POST /api/sync-api, apiSource: bandsintown)
  *   odesli       — resolve Odesli smart links    (POST /api/sync-api, apiSource: odesli)
- *   process-queue — process one job from sync_queue  (POST /api/process-sync-queue)
+ *   process-queue — process pending sync_queue jobs  (POST /api/sync/execute)
  *
  * Usage options:
  *
@@ -34,8 +34,7 @@
  * 3. Scheduled for queue processing (every 5 minutes):
  *      Path:    /trigger-sync?type=process-queue
  *      Method:  POST
- *      Note: Each invocation processes exactly one job. Schedule frequently enough
- *            to drain the queue in a reasonable time.
+ *      Note: Each invocation processes jobs within a 50s budget. Schedule every 5 min.
  *
  * 4. Manual HTTP call:
  *      curl -X POST \
@@ -155,33 +154,41 @@ serve(async (req: Request) => {
     let response: Response
 
     if (syncType === 'all') {
-      targetUrl = `${siteUrl}/api/sync/queue`
-      response = await fetch(targetUrl, {
+      const queueUrl = `${siteUrl}/api/sync/queue`
+      const queueResponse = await fetch(queueUrl, {
         method: 'POST',
         headers: {
           Authorization: authHeader,
           'Content-Type': 'application/json',
         },
-        body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
       })
+
+      if (!queueResponse.ok) {
+        const queueBody: unknown = await queueResponse.json()
+        const err = queueBody as { error?: string }
+        return new Response(
+          JSON.stringify({
+            error: `Sync route returned ${queueResponse.status}: ${err.error ?? 'Unknown error'}`,
+            type: syncType,
+            target: queueUrl,
+          }),
+          { status: queueResponse.status, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
 
       targetUrl = `${siteUrl}/api/sync/execute`
-
       response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           Authorization: authHeader,
           'Content-Type': 'application/json',
         },
-        body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
       })
-
     } else {
       if (syncType === 'youtube') {
         targetUrl = `${siteUrl}/api/sync-youtube`
       } else if (syncType === 'process-queue') {
-        targetUrl = `${siteUrl}/api/process-sync-queue`
-        // No requestBody needed — the processor picks the next pending job itself
+        targetUrl = `${siteUrl}/api/sync/execute`
       } else {
         targetUrl = `${siteUrl}/api/sync-api`
         requestBody = {apiSource: syncType}

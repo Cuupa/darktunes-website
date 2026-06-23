@@ -63,6 +63,7 @@ type LoadingKey =
   | 'clear-sos-summaries'
   | 'revalidate-all'
   | 'revalidate-site-settings'
+  | 'requeue-sync-jobs'
 
 type ConfirmDialog =
   | 'clear-app-logs'
@@ -76,6 +77,7 @@ type ConfirmDialog =
   | 'reset-accreditations'
   | 'clear-streaming-stats'
   | 'clear-sos-summaries'
+  | 'requeue-sync-jobs'
   | null
 
 // ---------------------------------------------------------------------------
@@ -272,6 +274,24 @@ export function MaintenanceManager() {
       toast.error(err instanceof Error ? err.message : 'Failed to revalidate caches')
     } finally {
       setLoading(null)
+    }
+  }
+
+  async function handleRequeueSyncJobs() {
+    setLoading('requeue-sync-jobs')
+    try {
+      const result = await callMaintenanceApi('/api/admin/maintenance/requeue-sync-jobs')
+      const requeued = result.requeued as number
+      if (requeued > 0) {
+        toast.success(`${requeued} failed sync job(s) re-queued`)
+      } else {
+        toast.info('No failed sync jobs to re-queue')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to re-queue sync jobs')
+    } finally {
+      setLoading(null)
+      setConfirmDialog(null)
     }
   }
 
@@ -503,7 +523,38 @@ export function MaintenanceManager() {
       <Separator />
 
       {/* ------------------------------------------------------------------ */}
-      {/* Section 5 — Cache & System                                          */}
+      {/* Section 5 — Sync Queue                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowsClockwise size={18} weight="bold" aria-hidden="true" />
+            Sync Queue
+          </CardTitle>
+          <CardDescription>
+            Retry permanently failed background sync jobs. Re-queued jobs are
+            picked up by the next cron execution of{' '}
+            <code className="font-mono text-xs">/api/sync/execute</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading !== null}
+            onClick={() => setConfirmDialog('requeue-sync-jobs')}
+            className="gap-2"
+          >
+            <Spinner active={loading === 'requeue-sync-jobs'} />
+            Requeue Failed Sync Jobs
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Section 6 — Cache & System                                          */}
       {/* ------------------------------------------------------------------ */}
       <Card>
         <CardHeader>
@@ -863,6 +914,31 @@ export function MaintenanceManager() {
               className="bg-destructive hover:bg-destructive/90"
             >
               Delete All Streaming Stats
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Requeue Failed Sync Jobs */}
+      <AlertDialog
+        open={confirmDialog === 'requeue-sync-jobs'}
+        onOpenChange={(open) => !open && setConfirmDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Requeue Failed Sync Jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This resets all jobs in{' '}
+              <code className="font-mono text-xs">sync_queue</code> with status{' '}
+              <code className="font-mono text-xs">failed</code> back to{' '}
+              <code className="font-mono text-xs">pending</code> so the cron
+              executor can retry them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleRequeueSyncJobs()}>
+              Requeue Failed Jobs
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

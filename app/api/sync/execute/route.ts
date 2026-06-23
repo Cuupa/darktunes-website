@@ -8,6 +8,7 @@ import {createSyncUploadFn} from '@/lib/r2Utils'
 import {isValidCronSecret} from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
 import {syncSingleArtist} from "@/lib/sync/syncAll"
+import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 
 const TIME_BUDGET_MS = 50_000
 
@@ -45,6 +46,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
         serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
     )
+
+    void recordHealthHeartbeat(db, 'sync_execute')
 
     waitUntil((async () => {
 
@@ -87,3 +90,5 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
     return NextResponse.json( {accepted: true })
 })
+
+export const GET = POST

@@ -3,14 +3,11 @@
  *
  * POST /api/sync-artist
  * Body: { artistId: string }
- * Auth: ******
+ * Auth: Bearer token
  *
- * Verifies the caller is authenticated, then runs the full sync pipeline
- * for the given artist: fetches iTunes releases, caches cover art in R2,
- * upserts releases to Supabase, and writes a sync_log entry.
- *
- * All business logic lives in src/lib/sync/syncArtist.ts — this handler
- * only wires up real dependencies.
+ * Verifies the caller is authenticated, then runs the full multi-API sync
+ * pipeline for the given artist via syncSingleArtist (iTunes, Spotify, Discogs,
+ * concerts, Odesli — depending on configured env vars and artist IDs).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -18,7 +15,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import type { ServerEnv } from '@/lib/env.server'
-import { syncArtist } from '@/lib/sync/syncArtist'
+import { syncSingleArtist } from '@/lib/sync/syncAll'
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
@@ -64,6 +61,14 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Missing required field: artistId')
   }
 
+  const {
+    SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET,
+    DISCOGS_TOKEN,
+    SONGKICK_API_KEY,
+    BANDSINTOWN_API_KEY,
+  } = process.env
+
   // 3. Wire up dependencies
   const db = createClient<Database>(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
@@ -79,13 +84,22 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
 
-  // 4. Run sync (never throws — errors are in SyncResult.errors)
-  const result = await syncArtist(artistId, {
+  // 4. Run full multi-API sync for this artist (never throws — errors in SyncAllResult)
+  const result = await syncSingleArtist(artistId, 'full', {
     db,
     fetch: globalThis.fetch,
     uploadToR2: uploadFn,
+    spotify:
+      SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET
+        ? { clientId: SPOTIFY_CLIENT_ID, clientSecret: SPOTIFY_CLIENT_SECRET }
+        : undefined,
+    discogsToken: DISCOGS_TOKEN,
+    songkickApiKey: SONGKICK_API_KEY,
+    bandsintownApiKey: BANDSINTOWN_API_KEY,
   })
+
   revalidateTag('releases')
   revalidateTag('artists')
+  revalidateTag('concerts')
   return NextResponse.json(result)
 })

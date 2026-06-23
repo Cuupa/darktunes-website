@@ -273,13 +273,27 @@ export function ArtistsManager() {
         throw new Error(`Sync failed: ${text}`)
       }
 
-      const result = (await res.json()) as { releasesUpserted: number; errors: string[] }
-      if (result.errors.length > 0) {
+      const result = (await res.json()) as {
+        results: Array<{ api: string; releasesUpserted: number; concertsUpserted: number; errors: string[] }>
+        totalErrors: number
+      }
+      const releasesSynced = result.results.reduce((sum, r) => sum + r.releasesUpserted, 0)
+      const concertsSynced = result.results.reduce((sum, r) => sum + r.concertsUpserted, 0)
+      const syncedSummary = [
+        releasesSynced > 0 ? `${releasesSynced} release(s)` : null,
+        concertsSynced > 0 ? `${concertsSynced} concert(s)` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
+
+      if (result.totalErrors > 0) {
         toast.warning(
-          `Sync for "${artist.name}" completed with ${result.errors.length} error(s). ${result.releasesUpserted} release(s) synced.`,
+          `Sync for "${artist.name}" completed with ${result.totalErrors} error(s).${syncedSummary ? ` ${syncedSummary} synced.` : ''}`,
         )
       } else {
-        toast.success(`Sync complete for "${artist.name}": ${result.releasesUpserted} release(s) updated.`)
+        toast.success(
+          `Sync complete for "${artist.name}"${syncedSummary ? `: ${syncedSummary} updated.` : '.'}`,
+        )
       }
       await reload()
     } catch (err) {

@@ -111,7 +111,8 @@
 - **`withErrorHandler(handler)`** — Higher-Order Function that wraps any Next.js Route Handler. Catches `ApiError` (returns its status), `ZodError` (returns 400 with `VALIDATION_ERROR` code), and unknown errors (returns 500). All errors returned as `{ error, code, status }` JSON.
 
 ### API Routes
-- **`POST /api/sync`** — Triggers full multi-API sync for all artists. Requires `Authorization: Bearer <token>`. Uses `withErrorHandler`.
+- **`POST /api/sync`** — Enqueues one `full` sync job per artist into `sync_queue` (does not run inline). Requires `Authorization: Bearer <token>`. Uses `withErrorHandler`.
+- **`POST /api/sync/queue`** — Enqueues per-artist jobs (admin bulk sync). **`POST /api/sync/execute`** — Claims and processes pending queue jobs (Vercel cron).
 - **`GET /api/health`** — Returns database connection status (latency ms), per-API last-sync timestamp and status, and rate-limit warnings. Public endpoint.
 
 ### Admin Health Dashboard
@@ -145,7 +146,7 @@ interface SyncDeps {
   uploadToR2: (imageUrl: string, keyPrefix: string) => Promise<string>
 }
 ```
-The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and calls `syncArtist()`. Tests mock all deps.
+The HTTP handler in `app/api/sync-artist/route.ts` wires real deps and calls `syncSingleArtist(artistId, 'full', deps)` (full multi-API pipeline). Tests mock all deps.
 
 ### Sync Logs DAL (`src/lib/api/syncLogs.ts`)
 - `getSyncLogsByArtist(db, artistId, limit)` — Fetches recent sync history for an artist.
@@ -153,7 +154,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` only wires real deps and call
 
 ### Manual Sync API (`app/api/sync-artist/route.ts`)
 - POST `/api/sync-artist` with body `{ artistId: string }` and `Authorization: Bearer <token>` header.
-- Verifies the caller is authenticated, runs the sync pipeline, returns `SyncResult`.
+- Verifies the caller is authenticated, runs the full multi-API sync pipeline, returns `SyncAllResult`.
 
 ---
 

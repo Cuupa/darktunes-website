@@ -1,0 +1,120 @@
+import { describe, it, expect, vi } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+import {
+  recoverStuckSyncJobs,
+  requeueFailedSyncJobs,
+  enqueueArtistSyncJobs,
+  markSyncJobFailed,
+  markSyncJobDone,
+  countStuckSyncJobs,
+  MAX_ATTEMPTS,
+} from './syncQueue'
+
+type DbClient = SupabaseClient<Database>
+function makeBuilder(data: unknown = null, error: unknown = null) {
+  const result = { data, error }
+  const p = Promise.resolve(result)
+  return {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    then: p.then.bind(p),
+    catch: p.catch.bind(p),
+    finally: p.finally.bind(p),
+  }
+}
+
+function makeSequentialMockDb(calls: Array<{ data: unknown; error?: unknown }>): DbClient {
+  let callIndex = 0
+  return {
+    from: vi.fn().mockImplementation(() => {
+      const call = calls[callIndex] ?? { data: null, error: null }
+      callIndex++
+      return makeBuilder(call.data, call.error ?? null)
+    }),
+  } as unknown as DbClient
+}
+
+describe('countStuckSyncJobs', () => {
+  it('returns the number of stuck running jobs', async () => {
+    const db = makeSequentialMockDb([{ data: [{ id: 'job-9' }] }])
+    const count = await countStuckSyncJobs(db)
+    expect(count).toBe(1)
+  })
+})
+
+describe('recoverStuckSyncJobs', () => {
+  it('returns the number of recovered jobs', async () => {
+    const db = makeSequentialMockDb([{ data: [{ id: 'job-1' }, { id: 'job-2' }] }])
+    const count = await recoverStuckSyncJobs(db)
+    expect(count).toBe(2)
+  })
+
+  it('throws when Supabase returns an error', async () => {
+    const db = makeSequentialMockDb([{ data: null, error: { message: 'update failed' } }])
+    await expect(recoverStuckSyncJobs(db)).rejects.toThrow('Failed to recover stuck sync jobs')
+  })
+})
+
+describe('requeueFailedSyncJobs', () => {
+  it('returns the number of re-queued jobs', async () => {
+    const db = makeSequentialMockDb([{ data: [{ id: 'job-3' }] }])
+    const count = await requeueFailedSyncJobs(db)
+    expect(count).toBe(1)
+  })
+})
+
+describe('enqueueArtistSyncJobs', () => {
+  it('skips artists that already have pending or running jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: [{ artist_id: 'artist-1' }] },
+      { data: null },
+    ])
+    const count = await enqueueArtistSyncJobs(db, ['artist-1', 'artist-2'])
+    expect(count).toBe(1)
+  })
+
+  it('returns 0 when all artists are already queued', async () => {
+    const db = makeSequentialMockDb([{ data: [{ artist_id: 'artist-1' }] }])
+    const count = await enqueueArtistSyncJobs(db, ['artist-1'])
+    expect(count).toBe(0)
+  })
+
+  it('returns 0 for an empty artist list', async () => {
+    const db = makeSequentialMockDb([])
+    const count = await enqueueArtistSyncJobs(db, [])
+    expect(count).toBe(0)
+  })
+})
+
+describe('markSyncJobDone', () => {
+  it('clears locked_until on completion', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await expect(markSyncJobDone(db, 'job-1')).resolves.toBeUndefined()
+    expect(db.from).toHaveBeenCalledWith('sync_queue')
+  })
+})
+
+describe('markSyncJobFailed', () => {
+  it('re-queues with backoff when attempts remain', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await markSyncJobFailed(db, 'job-1', 'timeout', 1)
+    expect(db.from).toHaveBeenCalledWith('sync_queue')
+  })
+
+  it('marks permanently failed when max attempts reached', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await markSyncJobFailed(db, 'job-1', 'fatal', MAX_ATTEMPTS)
+    expect(db.from).toHaveBeenCalledWith('sync_queue')
+  })
+})
