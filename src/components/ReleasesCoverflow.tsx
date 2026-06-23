@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, EffectCoverflow, Keyboard } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
@@ -27,8 +27,6 @@ export interface ReleasesCoverflowProps {
 
 const MAX_DOTS = 12
 const DOTS_THRESHOLD = 50
-
-const KEYBOARD_CONFIG = { enabled: true }
 
 function SlideContent({
   release,
@@ -74,13 +72,8 @@ function SlideContent({
           draggable={false}
           onLoad={() => setIsLoaded(true)}
           onError={(e) => {
-            console.error('[ReleasesCoverflow] Image load failed:', release.id, release.coverArt)
+            console.error('[ReleasesCoverflow] Image load failed:', release.id)
             e.currentTarget.style.display = 'none'
-            const skeleton = e.currentTarget.parentElement?.querySelector<HTMLElement>('.absolute.inset-0.animate-pulse')
-            if (skeleton) {
-              skeleton.style.display = 'flex'
-              skeleton.innerHTML = '<span class="m-auto text-xs text-muted-foreground">Failed to load</span>'
-            }
           }}
         />
         {release.featured && (
@@ -118,20 +111,34 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   const [displayIndex, setDisplayIndex] = useState(0)
   const [formattedDates, setFormattedDates] = useState<string[]>([])
   const metaRef = useRef<HTMLDivElement>(null)
+  const [isDesktop, setIsDesktop] = useState(true)
 
+  // Responsive Detection (stabil + performant)
+  useEffect(() => {
+    const checkSize = () => setIsDesktop(window.innerWidth >= 1024)
+    checkSize()
+    const handleResize = () => {
+      checkSize()
+      // Swiper nach Resize aktualisieren
+      setTimeout(() => swiperRef.current?.update(), 100)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Formatierte Daten
   useEffect(() => {
     const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
     setFormattedDates(
       releases.map((release) =>
         new Date(release.releaseDate).toLocaleDateString(dateLocale, {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
+          year: 'numeric', month: 'short', day: 'numeric',
         }),
       ),
     )
   }, [locale, releases])
 
+  // Meta-Info Fade Animation
   useEffect(() => {
     const el = metaRef.current
     if (!el) return
@@ -140,53 +147,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     el.classList.add('animate-in', 'fade-in', 'duration-200')
   }, [displayIndex])
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    const handleResize = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        swiperRef.current?.update()
-      }, 150)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      clearTimeout(timer)
-    }
-  }, [])
-
-  // iOS-specific memory pressure detection
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-    if (!isIOS) return
-
-    console.log('[ReleasesCoverflow] iOS device detected, monitoring for memory issues')
-
-    const handleMemoryWarning = () => {
-      console.warn('[ReleasesCoverflow] Memory warning detected - attempting recovery')
-      if (autoplayMs > 0) swiperRef.current?.autoplay?.stop()
-    }
-
-    window.addEventListener('pagehide', handleMemoryWarning)
-
-    return () => {
-      window.removeEventListener('pagehide', handleMemoryWarning)
-    }
-  }, [autoplayMs])
-
-  // Initialization diagnostic logging
-  useEffect(() => {
-    console.log('[ReleasesCoverflow] Initialized with', releases.length, 'releases')
-    if (typeof window !== 'undefined') {
-      console.log('[ReleasesCoverflow] Device width:', window.innerWidth)
-      console.log('[ReleasesCoverflow] User agent:', navigator.userAgent)
-    }
-  }, [releases.length])
-
   const handlePrev = useCallback(() => swiperRef.current?.slidePrev(), [])
   const handleNext = useCallback(() => swiperRef.current?.slideNext(), [])
+
   const handleOverlayClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (isDragging.current) {
       event.preventDefault()
@@ -194,63 +157,44 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     }
   }, [])
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        handlePrev()
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        handleNext()
-      }
-    },
-    [handleNext, handlePrev],
-  )
-
   const goToIndex = useCallback((index: number) => {
-    swiperRef.current?.slideTo(index)
+    swiperRef.current?.slideToLoop?.(index) ?? swiperRef.current?.slideTo(index)
   }, [])
 
   const handleMouseEnter = useCallback(() => {
-    if (autoplayMs > 0) swiperRef.current?.autoplay?.stop()
-  }, [autoplayMs])
+    if (autoplayMs > 0 && isDesktop) swiperRef.current?.autoplay?.stop()
+  }, [autoplayMs, isDesktop])
 
   const handleMouseLeave = useCallback(() => {
-    if (autoplayMs > 0) swiperRef.current?.autoplay?.start()
-  }, [autoplayMs])
+    if (autoplayMs > 0 && isDesktop) swiperRef.current?.autoplay?.start()
+  }, [autoplayMs, isDesktop])
 
-  const handleFocusIn = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    if (autoplayMs > 0 && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
-      swiperRef.current?.autoplay?.stop()
-    }
-  }, [autoplayMs])
+  // Dynamische Konfiguration (Coverflow nur auf Desktop)
+  const effect = isDesktop ? 'coverflow' : 'slide'
 
-  const handleBlurOut = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    if (autoplayMs > 0 && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
-      swiperRef.current?.autoplay?.start()
-    }
-  }, [autoplayMs])
-
-  const autoplayConfig = useMemo(
-    () =>
-      autoplayMs > 0 && !prefersReducedMotion
-        ? { delay: autoplayMs, disableOnInteraction: false }
-        : false,
-    [autoplayMs, prefersReducedMotion],
-  )
-
-  // Responsive coverflow effect: lighter 3D transforms on memory-constrained mobile devices
   const coverflowEffect = useMemo(() => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    if (!isDesktop) return undefined
     return {
       rotate: 0,
       stretch: 0,
-      depth: isMobile ? 80 : 120,
-      modifier: isMobile ? 1.8 : 2.5,
+      depth: 100,
+      modifier: 2.2,
       slideShadows: false,
-      scale: isMobile ? 0.94 : 0.92,
+      scale: 0.92,
     }
-  }, [])
+  }, [isDesktop])
+
+  const autoplayConfig = useMemo(() => {
+    if (!isDesktop || autoplayMs <= 0 || prefersReducedMotion) return false
+    return { delay: autoplayMs, disableOnInteraction: false }
+  }, [autoplayMs, prefersReducedMotion, isDesktop])
+
+  const breakpoints = {
+    0: { slidesPerView: 1.15, spaceBetween: 12 },
+    640: { slidesPerView: 1.6, spaceBetween: 16 },
+    1024: { slidesPerView: 2.4, spaceBetween: 20 },
+    1280: { slidesPerView: 3.0, spaceBetween: 24 },
+  }
 
   if (total === 0) return null
 
@@ -263,66 +207,45 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
       role="region"
       aria-label={dict.coverflowRegionLabel}
       tabIndex={0}
-      onKeyDown={handleKeyDown}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); handlePrev() }
+        if (e.key === 'ArrowRight') { e.preventDefault(); handleNext() }
+      }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onFocus={handleFocusIn}
-      onBlur={handleBlurOut}
     >
       <div className="relative overflow-clip" data-lenis-prevent style={{ touchAction: 'pan-y pinch-zoom' }}>
         <Swiper
-          modules={[EffectCoverflow, Keyboard, Autoplay]}
-          effect="coverflow"
+          key={isDesktop ? 'desktop' : 'mobile'} // Force re-init bei Wechsel
+          modules={[EffectCoverflow, Keyboard, Autoplay, Virtual]}
+          effect={effect}
+          virtual={{ enabled: true }}
           centeredSlides
           grabCursor
           touchStartPreventDefault={false}
           passiveListeners
           watchOverflow
-          threshold={10}
+          threshold={8}
           preventClicks={false}
           preventClicksPropagation={false}
           observer
           observeParents
-          keyboard={KEYBOARD_CONFIG}
+          keyboard={{ enabled: true }}
           autoplay={autoplayConfig}
           coverflowEffect={coverflowEffect}
-          speed={prefersReducedMotion ? 0 : 400}
-          breakpoints={{
-            0: { slidesPerView: 1.2 },
-            640: { slidesPerView: 1.8 },
-            1024: { slidesPerView: 2.5 },
-            1280: { slidesPerView: 3.2 },
-          }}
+          speed={prefersReducedMotion ? 0 : 380}
+          breakpoints={breakpoints}
           onSwiper={(swiper) => {
             swiperRef.current = swiper
             setDisplayIndex(swiper.activeIndex)
-            console.log('[ReleasesCoverflow] Swiper initialized:', {
-              slidesCount: swiper.slides.length,
-              slidesPerView: swiper.params.slidesPerView,
-              activeIndex: swiper.activeIndex,
-            })
           }}
-          onActiveIndexChange={(swiper) => {
-            setDisplayIndex(swiper.activeIndex)
-            console.log('[ReleasesCoverflow] Slide changed to:', swiper.activeIndex)
-          }}
-          onSlideChangeTransitionEnd={(swiper) => {
-            setDisplayIndex(swiper.activeIndex)
-          }}
-          onTouchStart={() => {
-            isDragging.current = false
-            console.log('[ReleasesCoverflow] Touch started')
-          }}
-          onTouchMove={() => {
-            isDragging.current = true
-          }}
-          onTouchEnd={() => {
-            console.log('[ReleasesCoverflow] Touch ended')
-          }}
+          onActiveIndexChange={(swiper) => setDisplayIndex(swiper.activeIndex)}
+          onTouchStart={() => { isDragging.current = false }}
+          onTouchMove={() => { isDragging.current = true }}
           className="pb-2"
         >
           {releases.map((release, index) => (
-            <SwiperSlide key={release.id}>
+            <SwiperSlide key={release.id} virtualIndex={index}>
               {({ isActive }) => (
                 <SlideContent
                   release={release}
@@ -340,19 +263,20 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </Swiper>
       </div>
 
-      <div ref={metaRef} className="animate-in fade-in duration-200">
+      {/* Meta Info */}
+      <div ref={metaRef} className="animate-in fade-in duration-200 mt-6">
         <Link
           href={`/releases/${activeRelease.id}`}
           tabIndex={-1}
           aria-hidden="true"
-          className="mt-6 block px-4 text-center hover:opacity-80 transition-opacity"
+          className="block px-4 text-center hover:opacity-80 transition-opacity"
         >
-          <Badge variant="outline" className="uppercase text-xs font-mono tracking-widest border-primary/30 text-primary-foreground">
+          <Badge variant="outline" className="uppercase text-xs font-mono tracking-widest border-primary/30">
             {activeRelease.type}
           </Badge>
-          <h3 className="mt-2 text-xl font-bold line-clamp-1 text-foreground">{activeRelease.title}</h3>
+          <h3 className="mt-2 text-xl font-bold line-clamp-1">{activeRelease.title}</h3>
           <p className="mt-1 text-sm font-medium text-muted-foreground">
-            {activeRelease.artists && activeRelease.artists.length > 0
+            {activeRelease.artists?.length
               ? activeRelease.artists.map((a) => a.name).join(', ')
               : activeRelease.artistName}
           </p>
@@ -363,52 +287,46 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         </Link>
       </div>
 
+      {/* Navigation */}
       {total > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-6">
+        <div className="mt-5 flex items-center justify-center gap-6">
           <button
-            type="button"
             onClick={handlePrev}
             aria-label={dict.previousReleaseAriaLabel}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
-            <CaretLeft size={20} weight="bold" aria-hidden="true" />
+            <CaretLeft size={22} weight="bold" />
           </button>
 
           {total <= DOTS_THRESHOLD && (
-            <div className="flex items-center gap-1.5" role="group" aria-label={dict.releaseDotsAriaLabel}>
+            <div className="flex items-center gap-1.5" role="group">
               {releases.slice(0, MAX_DOTS).map((release, index) => (
                 <button
                   key={release.id}
-                  type="button"
                   onClick={() => goToIndex(index)}
                   aria-pressed={index === displayIndex}
-                  aria-label={dict.goToReleaseAriaLabelTemplate
-                    .replace('{index}', String(index + 1))
-                    .replace('{title}', release.title)}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <span
-                    aria-hidden="true"
                     className={cn(
                       'h-2 rounded-full transition-all',
-                      index === displayIndex ? 'w-6 bg-accent' : 'w-2 bg-muted-foreground/40 hover:bg-muted-foreground/70',
+                      index === displayIndex ? 'w-7 bg-accent' : 'w-2 bg-muted-foreground/40 hover:bg-muted-foreground/70',
                     )}
                   />
                 </button>
               ))}
               {hiddenDotCount > 0 && (
-                <span className="pl-1 text-xs font-mono text-muted-foreground">+{hiddenDotCount}</span>
+                <span className="pl-2 text-xs font-mono text-muted-foreground">+{hiddenDotCount}</span>
               )}
             </div>
           )}
 
           <button
-            type="button"
             onClick={handleNext}
             aria-label={dict.nextReleaseAriaLabel}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
-            <CaretRight size={20} weight="bold" aria-hidden="true" />
+            <CaretRight size={22} weight="bold" />
           </button>
         </div>
       )}
