@@ -91,8 +91,12 @@ export function useReleases() {
           Authorization: `Bearer ${session.access_token}`,
         },
       })
+      if (!resQueue.ok) {
+        const text = await resQueue.text()
+        throw new Error(`Queue failed: ${text}`)
+      }
 
-      const res = await fetch('/api/sync/execute', {
+      const res = await fetch('/api/sync', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,

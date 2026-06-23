@@ -1025,6 +1025,8 @@ CREATE TABLE IF NOT EXISTS public.sync_logs (
 
 ALTER TABLE public.sync_logs ADD COLUMN IF NOT EXISTS api_source   TEXT    NOT NULL DEFAULT 'itunes';
 ALTER TABLE public.sync_logs ADD COLUMN IF NOT EXISTS rate_limited BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.sync_logs ADD COLUMN IF NOT EXISTS duration_ms  INTEGER;
+ALTER TABLE public.sync_logs ADD COLUMN IF NOT EXISTS metadata     JSONB   NOT NULL DEFAULT '{}';
 
 CREATE INDEX IF NOT EXISTS idx_sync_logs_artist_id  ON public.sync_logs (artist_id);
 CREATE INDEX IF NOT EXISTS idx_sync_logs_created_at ON public.sync_logs (created_at DESC);
@@ -1703,7 +1705,7 @@ DROP POLICY IF EXISTS "idempotency_keys: service_role only" ON public.idempotenc
 -- SYNC QUEUE — asynchronous background sync jobs
 -- Decouples the sync trigger (POST /api/sync) from the actual processing so
 -- that syncing many artists never exceeds Vercel's 10-second Edge timeout.
--- Each job processes one artist via POST /api/process-sync-queue (every 5 min).
+-- Each job processes one artist via POST /api/sync (every 5 min).
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.sync_queue (
@@ -1714,10 +1716,13 @@ CREATE TABLE IF NOT EXISTS public.sync_queue (
   scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at    TIMESTAMPTZ,
   finished_at   TIMESTAMPTZ,
+  locked_until  TIMESTAMPTZ,
   error_message TEXT,
   attempt_count INTEGER     NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status       ON public.sync_queue (status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_artist        ON public.sync_queue (artist_id);

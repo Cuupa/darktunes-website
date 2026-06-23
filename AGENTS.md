@@ -183,7 +183,8 @@ Next.js `<Image>` Component – ALWAYS use `<Image />` from `next/image` instead
 
 Sync Service Pattern
 Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps` interface (db, fetch, uploadToR2).
-The HTTP handler in `app/api/sync-artist/route.ts` only wires deps and calls `syncArtist()`. Tests mock all deps.
+The HTTP handler in `app/api/sync/artist/route.ts` wires deps and calls `syncSingleArtist(artistId, 'full', deps)` so manual per-artist sync runs the full multi-API pipeline (iTunes via internal `syncArtist()`, plus Spotify/Discogs/concerts/Odesli when env vars and artist IDs are set). Tests mock all deps.
+`syncArtist()` processes iTunes releases with bounded concurrency (`mapWithConcurrency` from `src/lib/mapWithConcurrency.ts`, limit 5): upsert release first (external cover URL fallback), then upload cover to R2 and update `cover_art`.
 Sync functions MUST NOT throw — capture all errors in `SyncResult.errors` and return gracefully.
 Every sync run writes a `sync_logs` entry with status 'success', 'partial', or 'error'.
 `sync_logs` also records `api_source` (itunes | spotify | discogs | songkick | bandsintown | odesli | all) and `rate_limited` (boolean) per run.
@@ -195,7 +196,8 @@ Cron Jobs (Vercel):
   Three cron jobs can be configured in `vercel.json`:
   - `/api/sync-youtube` — daily at 06:00 UTC: fetches latest YouTube channel videos.
   - `/api/sync` — daily at 03:00 UTC: enqueues async sync jobs for all artists into `sync_queue` and returns immediately.
-  - `/api/process-sync-queue` — every 5 minutes: picks one pending job from `sync_queue`, syncs that artist (iTunes), marks it done/failed. maxDuration: 60s.
+  - `/api/sync` — every 5 minutes: claims pending `sync_queue` jobs (50s budget per invocation, multiple jobs), runs `syncSingleArtist` per job, marks done/failed. maxDuration: 300s.
+  - `/api/sync/queue` — enqueues one `full` job per artist (called by daily `/api/sync` cron or admin bulk sync).
   All routes accept either a ****** (manual trigger), a Vercel cron call (`x-vercel-cron: 1` header),
   or a CRON_SECRET ****** (from a Supabase Edge Function or external scheduler) — all require `CRON_SECRET` env var (mandatory).
   The `isValidCronSecret` helper uses `timingSafeEqual` to prevent timing attacks.
@@ -211,9 +213,9 @@ Supabase Sync Triggers (`supabase/functions/trigger-sync/index.ts`):
 
 Async Sync Queue (`sync_queue` table):
   `POST /api/sync` enqueues one row per artist with `status='pending'` — it does NOT run the sync inline.
-  `POST /api/process-sync-queue` claims one job at a time (atomic UPDATE to `status='running'`) to prevent double-processing.
+  `POST /api/sync` claims jobs atomically (UPDATE to `status='running'` with optimistic lock) to prevent double-processing.
   Failed jobs are retried up to 3 times (`attempt_count`) with exponential backoff managed in `markSyncJobFailed()`.
-  DAL: `src/lib/api/syncQueue.ts` exports `enqueueArtistSyncJobs`, `claimNextSyncJob`, `markSyncJobDone`, `markSyncJobFailed`, `getSyncQueueStats`, `getRecentSyncJobs`.
+  DAL: `src/lib/api/syncQueue.ts` exports `enqueueArtistSyncJobs`, `claimNextSyncJob`, `markSyncJobDone`, `markSyncJobFailed`, `recoverStuckSyncJobs`, `requeueFailedSyncJobs`, `getSyncQueueStats`, `getRecentSyncJobs`.
   The Admin Health tab shows queue progress via `getSyncQueueStats()`.
 
 Idempotency Keys (`idempotency_keys` table):
@@ -278,7 +280,7 @@ Throw `new ApiError(status, message, code?)` inside route handlers instead of ma
 `app/error.tsx` and `app/global-error.tsx` are the Next.js rendering error boundaries.
 
 R2 Image Caching
-When syncing external content, always download cover/artwork images and upload to Cloudflare R2 via `uploadUrlToR2()` from `src/lib/r2Utils.ts`.
+When syncing external content, always download cover/artwork images and upload to Cloudflare R2 via `uploadUrlToR2()` from `src/lib/r2Utils.ts`. Sync uploads use SHA-256 content hashes as object keys (`cover-art/{hash}.{ext}`) and skip `PutObject` when `HeadObject` finds an existing object — preventing duplicate R2 objects on repeated syncs. Upsert the DB row first (with external URL as `cover_art` fallback), then upload to R2 and update `cover_art` only after a successful upsert.
 `src/lib/r2Utils.ts` also exports `createR2Client()` and `deleteObjectFromR2(r2Key, s3, bucket)` — use `deleteObjectFromR2` whenever a DB record that carries an `r2_key` is deleted, to keep R2 storage in sync.
 Store the R2 public URL (not the external URL) in the database. The public website reads only from Supabase + R2.
 If R2 upload fails during sync, fall back to the external URL and log the error — do not abort the sync.
@@ -394,7 +396,7 @@ Admin Accounting Tab
 
 Admin System Tab (Health, Logs, Maintenance)
 `/admin/system` — admin-only route with multiple sub-sections:
-  - **Health dashboard**: sync queue stats, DB connectivity, Vercel cron status.
+  - **Health dashboard** (`SystemHealthWidget`): enterprise monitoring via `src/lib/health/healthSnapshot.ts` (`buildHealthSnapshot`) + pure derivations in `apiStatus.ts` / `alerts.ts` / `cronHeartbeat.ts`. `GET /api/health` returns health score (0–100), KPI summary, sorted actionable alerts (critical/warning/info), per-API 24h SLA stats, DB latency tiers (online/slow/critical/offline), cron scheduler heartbeats (`site_settings.health_heartbeats`), and speakable operational states. **Proactive alerts:** `GET|POST /api/health/alert` (Vercel cron every 10 min) evaluates critical alerts, deduplicates via `site_settings.health_alert_state` (30 min cooldown per fingerprint), and dispatches email (`sendHealthAlertNotification` → `LABEL_NOTIFICATION_EMAIL`) plus optional `HEALTH_ALERT_WEBHOOK_URL`. Cron routes record heartbeats: `sync_execute`, `sync_queue`, `sync_youtube`, `health_alert`. `vercel.json` crons: execute */5, alert */10, queue 03:00 UTC, youtube 06:00 UTC (all require `Authorization: Bearer <CRON_SECRET>`).
   - **Audit Log**: all `sync_logs` entries with full-text search, `api_source` filter, and `status` filter.
   - **Error Log**: failed and partial sync runs (`sync_logs.status IN ('error','partial')`).
   - **App Errors**: `app_logs` entries with `level = 'error'` or `level = 'warn'`.
@@ -405,7 +407,8 @@ Admin System Tab (Health, Logs, Maintenance)
       - `POST /api/admin/maintenance/clear-accreditations` — deletes pending `accreditation_requests` older than N days.
       - `POST /api/admin/maintenance/reset-accreditations` — resets a journalist's accreditation status.
       - `POST /api/admin/maintenance/clear-stats` — deletes `streaming_stats` rows for a given artist + period.
-  All maintenance routes require admin/editor auth via `verifyAdminOrEditor`. All are wrapped with `withErrorHandler`.
+      - `POST /api/sync/requeue` — resets `sync_queue` rows with `status='failed'` back to `pending` (admin Maintenance tab).
+  All maintenance routes require admin auth via `verifyAdmin`. All are wrapped with `withErrorHandler`.
 
 Supabase Read Replica Client
 `src/lib/supabase/replica.ts` exports `createReplicaSupabaseClient()`.

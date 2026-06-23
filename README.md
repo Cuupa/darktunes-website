@@ -296,9 +296,11 @@ app/                          # Next.js App Router entry points
 │       └── download-history/ # Download audit log
 └── api/
     ├── upload/route.ts                    # Admin asset upload (R2 + SHA-256 dedupe)
-    ├── sync-artist/route.ts               # Single-artist sync trigger
-    ├── sync/route.ts                      # Enqueue async sync jobs for all artists
-    ├── process-sync-queue/route.ts        # Claim + process one sync job (Vercel cron)
+    ├── sync-artist/route.ts               # Single-artist full multi-API sync (admin JWT)
+    ├── sync/route.ts                      # Enqueue async sync jobs for all artists (daily cron)
+    ├── sync/queue/route.ts                # Enqueue per-artist sync_queue jobs (bulk/admin)
+    ├── sync/execute/route.ts              # Claim + process sync_queue jobs (Vercel cron)
+    ├── sync-api/route.ts                  # Per-API sync trigger (iTunes, Spotify, Discogs, etc.)
     ├── sync-youtube/route.ts              # YouTube channel video sync (Vercel cron)
     ├── revalidate/route.ts                # ISR cache busting (Supabase webhook)
     ├── revalidate-content/route.ts        # Targeted entity revalidation

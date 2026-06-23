@@ -35,6 +35,8 @@ const mockRow: SyncLogRow = {
   errors: [],
   api_source: 'itunes',
   rate_limited: false,
+  duration_ms: 1200,
+  metadata: { source: 'itunes' },
   created_at: '2024-01-01T00:00:00Z',
 }
 
@@ -52,6 +54,8 @@ describe('getSyncLogsByArtist', () => {
       errors: [],
       apiSource: 'itunes',
       rateLimited: false,
+      durationMs: 1200,
+      metadata: { source: 'itunes' },
       createdAt: '2024-01-01T00:00:00Z',
     })
   })

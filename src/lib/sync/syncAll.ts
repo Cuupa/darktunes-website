@@ -106,6 +106,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // 2. iTunes sync (existing pipeline) — parallelised per artist with
   // Promise.allSettled so one failed artist does not block the others.
   if (!onlyApi || onlyApi === 'itunes') {
+    const itunesStartedAt = Date.now()
     const itunesResult: ApiSyncResult = {
       api: 'itunes',
       artistsProcessed: 0,
@@ -115,7 +116,9 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       errors: [],
     }
     const itunesOutcomes = await Promise.allSettled(
-      artists.map((artist) => syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2 })),
+      artists.map((artist) =>
+        syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2, skipSyncLog: true }),
+      ),
     )
     for (const outcome of itunesOutcomes) {
       itunesResult.artistsProcessed++
@@ -126,12 +129,21 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         itunesResult.errors.push(`iTunes sync failed: ${String(outcome.reason)}`)
       }
     }
-    await writeSyncLog(db, 'itunes', itunesResult)
+    await writeSyncLog(db, 'itunes', itunesResult, {
+      durationMs: Date.now() - itunesStartedAt,
+      artistId: onlyArtistId ?? null,
+      metadata: {
+        source: 'itunes',
+        artists_processed: itunesResult.artistsProcessed,
+        only_artist_id: onlyArtistId ?? null,
+      },
+    })
     results.push(itunesResult)
   }
 
   // 3. Spotify sync
   if ((!onlyApi || onlyApi === 'spotify') && spotify) {
+    const spotifyStartedAt = Date.now()
     const spotifyResult: ApiSyncResult = {
       api: 'spotify',
       artistsProcessed: 0,
@@ -169,16 +181,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
         for (const release of merged) {
           try {
-            // Download and cache cover art if not already in R2
-            let coverArt: string | null = release.coverUrl
-            if (release.coverUrl && !release.coverUrl.startsWith('https://cdn.')) {
-              try {
-                coverArt = await uploadToR2(release.coverUrl, 'cover-art')
-              } catch {
-                // Graceful fallback
-              }
-            }
-
             // Resolve Odesli smart link for Spotify releases
             let smartUrl: string | null = null
             let appleMusicUrl: string | null = null
@@ -207,14 +209,14 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               preservedFeatured = existingRelease?.featured ?? false
             }
 
-            await db
+            const { data: upsertedRelease, error: upsertErr } = await db
               .from('releases')
               .upsert(
                 {
                   title: release.title,
                   artist_id: artist.id,
                   release_date: release.releaseDate,
-                  cover_art: coverArt,
+                  cover_art: release.coverUrl,
                   type: release.type,
                   spotify_url: release.spotifyUrl,
                   spotify_id: release.spotifyId,
@@ -232,6 +234,23 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               .select()
               .single()
 
+            if (upsertErr || !upsertedRelease) {
+              throw new Error(upsertErr?.message ?? 'No data returned from Spotify upsert')
+            }
+
+            if (
+              release.coverUrl &&
+              !release.coverUrl.startsWith('https://cdn.') &&
+              upsertedRelease.id
+            ) {
+              try {
+                const coverArt = await uploadToR2(release.coverUrl, 'cover-art')
+                await db.from('releases').update({ cover_art: coverArt }).eq('id', upsertedRelease.id)
+              } catch {
+                // Graceful fallback — external URL already stored from upsert
+              }
+            }
+
             spotifyResult.releasesUpserted++
           } catch (e) {
             spotifyResult.errors.push(
@@ -248,7 +267,10 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
     }
 
-    await writeSyncLog(db, 'spotify', spotifyResult)
+    await writeSyncLog(db, 'spotify', spotifyResult, {
+      durationMs: Date.now() - spotifyStartedAt,
+      artistId: onlyArtistId ?? null,
+    })
     results.push(spotifyResult)
   }
 
@@ -256,6 +278,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // Syncs releases for artists that have a discogs_id but may not have been
   // covered by the Spotify block (or when Spotify is not configured).
   if ((!onlyApi || onlyApi === 'discogs') && discogsToken) {
+    const discogsStartedAt = Date.now()
     const discogsResult: ApiSyncResult = {
       api: 'discogs',
       artistsProcessed: 0,
@@ -286,23 +309,14 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
             if (existing?.spotify_id) continue // Already handled by Spotify sync
 
-            let coverArt: string | null = release.coverUrl
-            if (release.coverUrl && !release.coverUrl.startsWith('https://cdn.')) {
-              try {
-                coverArt = await uploadToR2(release.coverUrl, 'cover-art')
-              } catch {
-                // Graceful fallback to external URL
-              }
-            }
-
-            await db
+            const { data: upsertedRelease, error: upsertErr } = await db
               .from('releases')
               .upsert(
                 {
                   title: release.title,
                   artist_id: artist.id,
                   release_date: release.releaseDate ?? new Date().toISOString().slice(0, 10),
-                  cover_art: coverArt,
+                  cover_art: release.coverUrl,
                   type: release.format === 'vinyl' || release.format === 'cd' ? 'album' : 'single',
                   discogs_id: release.discogsId,
                   barcode: release.barcode,
@@ -310,6 +324,25 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                 },
                 { onConflict: 'discogs_id' },
               )
+              .select()
+              .single()
+
+            if (upsertErr || !upsertedRelease) {
+              throw new Error(upsertErr?.message ?? 'No data returned from Discogs upsert')
+            }
+
+            if (
+              release.coverUrl &&
+              !release.coverUrl.startsWith('https://cdn.') &&
+              upsertedRelease.id
+            ) {
+              try {
+                const coverArt = await uploadToR2(release.coverUrl, 'cover-art')
+                await db.from('releases').update({ cover_art: coverArt }).eq('id', upsertedRelease.id)
+              } catch {
+                // Graceful fallback — external URL already stored from upsert
+              }
+            }
 
             discogsResult.releasesUpserted++
           } catch (e) {
@@ -325,12 +358,17 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
     }
 
-    await writeSyncLog(db, 'discogs', discogsResult)
+    await writeSyncLog(db, 'discogs', discogsResult, {
+      durationMs: Date.now() - discogsStartedAt,
+      artistId: onlyArtistId ?? null,
+      metadata: { source: 'discogs', only_artist_id: onlyArtistId ?? null },
+    })
     results.push(discogsResult)
   }
 
   // 4. Songkick sync
   if ((!onlyApi || onlyApi === 'songkick') && songkickApiKey) {
+    const songkickStartedAt = Date.now()
     const songkickResult: ApiSyncResult = {
       api: 'songkick',
       artistsProcessed: 0,
@@ -379,7 +417,11 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
     }
 
-    await writeSyncLog(db, 'songkick', songkickResult)
+    await writeSyncLog(db, 'songkick', songkickResult, {
+      durationMs: Date.now() - songkickStartedAt,
+      artistId: onlyArtistId ?? null,
+      metadata: { source: 'songkick', only_artist_id: onlyArtistId ?? null },
+    })
     results.push(songkickResult)
   }
 
@@ -389,6 +431,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   //   - at least one artist has a per-artist bandsintown_api_key set
   const hasBandsintownKey = !!bandsintownApiKey || artists.some((a) => !!a.bandsintown_api_key)
   if ((!onlyApi || onlyApi === 'bandsintown') && hasBandsintownKey) {
+    const bandsintownStartedAt = Date.now()
     const bandsintownResult: ApiSyncResult = {
       api: 'bandsintown',
       artistsProcessed: 0,
@@ -440,7 +483,11 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
     }
 
-    await writeSyncLog(db, 'bandsintown', bandsintownResult)
+    await writeSyncLog(db, 'bandsintown', bandsintownResult, {
+      durationMs: Date.now() - bandsintownStartedAt,
+      artistId: onlyArtistId ?? null,
+      metadata: { source: 'bandsintown', only_artist_id: onlyArtistId ?? null },
+    })
     results.push(bandsintownResult)
   }
 
@@ -448,7 +495,10 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // Spotify sync succeeded or was skipped.  Finds all releases that have a
   // Spotify URL or Apple Music URL but no smart_url yet, and resolves each
   // one through Odesli so they always get a working link.
+  let odesliStartedAt: number | null = null
+
   if (!onlyApi || onlyApi === 'odesli') {
+    odesliStartedAt = Date.now()
     const odesliResult: ApiSyncResult = {
       api: 'odesli',
       artistsProcessed: 0,
@@ -460,11 +510,17 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
     try {
       // PostgREST "not null" filter: column.not.is.null is valid PostgREST syntax
-      const { data: releasesWithoutSmartUrl, error: batchErr } = await db
+      let releasesQuery = db
         .from('releases')
-        .select('id, spotify_url, apple_music_url')
+        .select('id, spotify_url, apple_music_url, artist_id')
         .is('smart_url', null)
         .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+
+      if (onlyArtistId) {
+        releasesQuery = releasesQuery.eq('artist_id', onlyArtistId)
+      }
+
+      const { data: releasesWithoutSmartUrl, error: batchErr } = await releasesQuery
 
       if (batchErr) {
         odesliResult.errors.push(`Odesli batch query failed: ${batchErr.message}`)
@@ -523,7 +579,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       odesliResult.errors.push(`Odesli batch query failed: ${String(e)}`)
     }
 
-    await writeSyncLog(db, 'odesli', odesliResult)
     results.push(odesliResult)
   }
 
@@ -537,11 +592,17 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     const existingOdesli = results.find((r) => r.api === 'odesli')
 
     try {
-      const { data: artistsWithoutPlatformLinks, error: batchErr } = await db
+      let artistsQuery = db
         .from('artists')
         .select('id, spotify_url, apple_music_url')
         .is('platform_links', null)
         .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+
+      if (onlyArtistId) {
+        artistsQuery = artistsQuery.eq('id', onlyArtistId)
+      }
+
+      const { data: artistsWithoutPlatformLinks, error: batchErr } = await artistsQuery
 
       if (batchErr) {
         existingOdesli?.errors.push(`Odesli artist batch query failed: ${batchErr.message}`)
@@ -592,9 +653,13 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       existingOdesli?.errors.push(`Odesli artist batch query failed: ${String(e)}`)
     }
 
-    // Update the sync_log with the combined release+artist result
+    // Write one combined sync_log for releases + artist platform links
     if (existingOdesli) {
-      await writeSyncLog(db, 'odesli', existingOdesli)
+      await writeSyncLog(db, 'odesli', existingOdesli, {
+        durationMs: odesliStartedAt !== null ? Date.now() - odesliStartedAt : undefined,
+        artistId: onlyArtistId ?? null,
+        metadata: { source: 'odesli', only_artist_id: onlyArtistId ?? null },
+      })
     }
   }
 
@@ -611,7 +676,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 /**
  * Syncs one artist identified by `artistId` using the APIs implied by
  * `jobType`.  This is the function called by the sync-queue executor
- * (`app/api/sync/execute/route.ts`) for each queue job so that exactly
+ * (`app/api/sync/route.ts`) for each queue job so that exactly
  * one artist is processed per invocation.
  *
  * jobType → onlyApi mapping:
@@ -634,10 +699,17 @@ export async function syncSingleArtist(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+interface WriteSyncLogOptions {
+  durationMs?: number
+  metadata?: Record<string, unknown>
+  artistId?: string | null
+}
+
 async function writeSyncLog(
   db: SupabaseClient<Database>,
   apiSource: string,
   result: ApiSyncResult,
+  options?: WriteSyncLogOptions,
 ): Promise<void> {
   const status: 'success' | 'partial' | 'error' =
     result.errors.length === 0
@@ -647,12 +719,18 @@ async function writeSyncLog(
         : 'error'
 
   await db.from('sync_logs').insert({
-    artist_id: null,
+    artist_id: options?.artistId ?? null,
     status,
     message: result.errors[0] ?? null,
     releases_synced: result.releasesUpserted,
     errors: result.errors,
     api_source: apiSource,
     rate_limited: result.rateLimited,
+    duration_ms: options?.durationMs ?? null,
+    metadata: {
+      artists_processed: result.artistsProcessed,
+      concerts_synced: result.concertsUpserted,
+      ...options?.metadata,
+    },
   })
 }

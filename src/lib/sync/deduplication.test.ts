@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   deduplicateReleases,
+  findCrossSourceMergeTarget,
+  normTitle,
+  extractYear,
   type SpotifyReleaseInput,
   type DiscogsReleaseInput,
+  type CrossSourceReleaseRow,
 } from './deduplication'
 
 const SPOTIFY_BASE: SpotifyReleaseInput = {
@@ -133,5 +137,50 @@ describe('deduplicateReleases', () => {
   it('uses Spotify cover art over Discogs when available', () => {
     const result = deduplicateReleases([SPOTIFY_BASE], [DISCOGS_BASE])
     expect(result[0].coverUrl).toBe(SPOTIFY_BASE.coverUrl)
+  })
+})
+
+describe('normTitle / extractYear', () => {
+  it('normalises punctuation and casing', () => {
+    expect(normTitle('Dark Matter (Deluxe)')).toBe('dark matter deluxe')
+  })
+
+  it('extracts year from ISO date strings', () => {
+    expect(extractYear('2023-03-15')).toBe(2023)
+    expect(extractYear('2020')).toBe(2020)
+    expect(extractYear(null)).toBeNull()
+  })
+})
+
+describe('findCrossSourceMergeTarget', () => {
+  const spotifyRow: CrossSourceReleaseRow = {
+    id: 'rel-spotify',
+    title: 'Dark Matter',
+    release_date: '2023-03-15',
+    spotify_id: 'sp1',
+    itunes_id: null,
+  }
+
+  it('merges iTunes into an existing Spotify row by title + year', () => {
+    const target = findCrossSourceMergeTarget([spotifyRow], 'Dark Matter', '2023-04-01')
+    expect(target?.id).toBe('rel-spotify')
+  })
+
+  it('skips rows that already have an itunes_id', () => {
+    const rowWithItunes: CrossSourceReleaseRow = { ...spotifyRow, itunes_id: 'it1' }
+    expect(findCrossSourceMergeTarget([rowWithItunes], 'Dark Matter', '2023-03-15')).toBeNull()
+  })
+
+  it('skips rows without spotify_id', () => {
+    const itunesOnly: CrossSourceReleaseRow = { ...spotifyRow, spotify_id: null }
+    expect(findCrossSourceMergeTarget([itunesOnly], 'Dark Matter', '2023-03-15')).toBeNull()
+  })
+
+  it('returns null when years differ by more than one year', () => {
+    expect(findCrossSourceMergeTarget([spotifyRow], 'Dark Matter', '2020-01-01')).toBeNull()
+  })
+
+  it('returns null when titles differ', () => {
+    expect(findCrossSourceMergeTarget([spotifyRow], 'Other Album', '2023-03-15')).toBeNull()
   })
 })

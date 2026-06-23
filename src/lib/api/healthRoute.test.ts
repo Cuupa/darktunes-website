@@ -4,34 +4,62 @@ import { NextRequest } from 'next/server'
 const ORIGINAL_ENV = { ...process.env }
 const MOCK_REQUEST = new NextRequest('http://localhost/api/health')
 
+const SAMPLE_LOG_ROW = {
+  api_source: 'itunes',
+  created_at: '2026-06-23T10:00:00.000Z',
+  status: 'success',
+  rate_limited: false,
+  errors: [],
+  duration_ms: 900,
+  releases_synced: 2,
+  metadata: { artists_processed: 1, concerts_synced: 0 },
+}
+
+function makeThenableBuilder(data: unknown, error: unknown = null) {
+  const result = { data, error }
+  const p = Promise.resolve(result)
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    then: p.then.bind(p),
+    catch: p.catch.bind(p),
+    finally: p.finally.bind(p),
+  }
+}
+
 function mockSupabaseClientOnline(): void {
   vi.doMock('@supabase/supabase-js', () => ({
     createClient: vi.fn(() => ({
-      from: vi.fn(() => {
-        let selectedFields = ''
-
-        const builder = {
-          select: vi.fn((fields: string) => {
-            selectedFields = fields
-            return builder
-          }),
-          eq: vi.fn(() => builder),
-          order: vi.fn(() => builder),
-          limit: vi.fn(() => builder),
-          then: vi.fn((onFulfilled?: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
-            Promise.resolve(
-              selectedFields === 'id'
-                ? { error: null }
-                : {
-                    data: [{ created_at: '2026-01-01T00:00:00.000Z', status: 'success', rate_limited: false }],
-                  },
-            ).then(onFulfilled, onRejected),
-          ),
-          catch: vi.fn((onRejected?: (reason: unknown) => unknown) => Promise.resolve().catch(onRejected)),
-          finally: vi.fn((onFinally?: (() => void) | undefined) => Promise.resolve().finally(onFinally)),
+      from: vi.fn((table: string) => {
+        if (table === 'site_settings') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
         }
-
-        return builder
+        if (table === 'sync_logs') {
+          return makeThenableBuilder([SAMPLE_LOG_ROW])
+        }
+        if (table === 'sync_queue') {
+          return {
+            select: vi.fn((fields: string) =>
+              makeThenableBuilder(
+                fields === 'id' ? [] : [{ status: 'done' }, { status: 'pending' }],
+              ),
+            ),
+            eq: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            gte: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+          }
+        }
+        return makeThenableBuilder(null)
       }),
     })),
   }))
@@ -73,6 +101,23 @@ describe('app/api/health/route', () => {
 
     expect(getResponse.status).toBe(200)
     expect(headResponse.status).toBe(200)
+
+    const body = (await getResponse.json()) as {
+      statusLabel: string
+      healthScore: number
+      kpis: { configuredApis: number }
+      alerts: unknown[]
+      apis: Record<string, { statusLabel: string; operationalState: string; stats24h: { total: number } }>
+      syncQueue: { statusLabel: string } | null
+    }
+    expect(body.statusLabel).toBeTruthy()
+    expect(body.healthScore).toBeGreaterThan(0)
+    expect(body.kpis.configuredApis).toBeGreaterThan(0)
+    expect(Array.isArray(body.alerts)).toBe(true)
+    expect(body.apis.itunes.operationalState).toBe('operational')
+    expect(body.apis.itunes.statusLabel).toBe('Operational')
+    expect(body.apis.itunes.stats24h.total).toBe(1)
+    expect(body.syncQueue?.statusLabel).toBeTruthy()
   })
 
   it('OPTIONS responds with CORS preflight headers', async () => {

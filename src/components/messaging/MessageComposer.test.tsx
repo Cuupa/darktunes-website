@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { MessageComposer } from './MessageComposer'
@@ -47,7 +47,23 @@ vi.mock('./RichTextEditor', () => ({
   ),
 }))
 
+function mockLocalStorage(): void {
+  const store = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value) },
+    removeItem: (key: string) => { store.delete(key) },
+    clear: () => { store.clear() },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() { return store.size },
+  })
+}
+
 describe('MessageComposer artist loading states', () => {
+  beforeEach(() => {
+    mockLocalStorage()
+  })
+
   it('disables artist selection while artists are loading', () => {
     render(
       <MessageComposer

@@ -164,7 +164,7 @@ These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync
 ### YouTube Video Sync (optional — sync channel videos)
 - `YOUTUBE_API_KEY`: Google Cloud API key with YouTube Data API v3 enabled. See https://console.developers.google.com → Enable YouTube Data API v3.
 - `YOUTUBE_CHANNEL_ID`: Your YouTube channel ID (starts with `UC`). Used by `POST /api/sync-youtube` to fetch and upsert the latest videos.
-- `CRON_SECRET`: Optional shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync-youtube`, and `/api/sync-api`. If set, callers must send `Authorization: ****** `****** Also required by the `trigger-sync` Supabase Edge Function (see below).
+- `CRON_SECRET`: Optional shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync`, `/api/sync-youtube`, and `/api/sync-api`. If set, callers must send `Authorization: Bearer <CRON_SECRET>`. Also required by the `trigger-sync` Supabase Edge Function (see below).
 
 ### Newsletter Double Opt-In (optional — confirmation email delivery)
 These variables are shared between the **Supabase Edge Function** (`newsletter-confirm`) and the Next.js app. Configure `RESEND_*` both as Supabase Edge Function secrets (for DOI emails) and in Vercel when you want the contact form Route Handler to send mail.
@@ -321,7 +321,7 @@ After deployment, verify that Vercel cron jobs are active:
 2. Confirm all three cron entries appear:
    - `/api/sync-youtube` — daily 06:00 UTC (YouTube channel sync)
    - `/api/sync` — daily 03:00 UTC (enqueues async artist sync jobs)
-   - `/api/process-sync-queue` — every 5 minutes (claims and processes one pending sync job)
+   - `/api/sync` — every 5 minutes (claims and processes pending `sync_queue` jobs)
 3. Check **Last execution** timestamp and status after 24 hours.
 4. If a cron fails: Admin Panel → **Logs** tab → **Error Log** → filter by `api_source`.
 

@@ -7,8 +7,13 @@
  * Keeping this in its own module makes it easy to inject in tests.
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { randomUUID } from 'crypto'
+import { createHash } from 'crypto'
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3'
 
 /**
  * Creates a pre-configured S3Client pointed at the Cloudflare R2 endpoint.
@@ -21,9 +26,36 @@ export function createR2Client(accountId: string, accessKeyId: string, secretAcc
   })
 }
 
+/** Builds the public CDN URL for an R2 object key. */
+export function buildR2PublicUrl(r2PublicUrl: string, key: string): string {
+  return `${r2PublicUrl.replace(/\/$/, '')}/${key}`
+}
+
+function isNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } }
+  return e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404
+}
+
+/**
+ * Returns true when the object already exists in the bucket.
+ */
+export async function objectExistsInR2(s3: S3Client, bucket: string, key: string): Promise<boolean> {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+    return true
+  } catch (err) {
+    if (isNotFoundError(err)) return false
+    throw err
+  }
+}
+
 /**
  * Downloads an image from `imageUrl` and uploads it to R2, returning the
  * public CDN URL.
+ *
+ * Objects are keyed by SHA-256 hash of the image bytes so repeated syncs
+ * reuse the same R2 object instead of creating duplicates.
  *
  * @param imageUrl    - URL of the source image to download
  * @param s3          - Pre-configured S3Client for R2
@@ -48,9 +80,14 @@ export async function uploadUrlToR2(
 
   const contentType = resp.headers.get('content-type') ?? 'image/jpeg'
   const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg'
-  const key = `${keyPrefix}/${randomUUID()}.${ext}`
-
   const buffer = Buffer.from(await resp.arrayBuffer())
+  const hash = createHash('sha256').update(buffer).digest('hex')
+  const key = `${keyPrefix}/${hash}.${ext}`
+  const publicUrl = buildR2PublicUrl(r2PublicUrl, key)
+
+  if (await objectExistsInR2(s3, bucket, key)) {
+    return publicUrl
+  }
 
   await s3.send(
     new PutObjectCommand({
@@ -63,7 +100,7 @@ export async function uploadUrlToR2(
     }),
   )
 
-  return `${r2PublicUrl.replace(/\/$/, '')}/${key}`
+  return publicUrl
 }
 
 /**

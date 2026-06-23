@@ -3,10 +3,9 @@
  *
  * Provides read/write access to the sync_queue table.
  *
- * The sync queue decouples triggering a sync (POST /api/sync) from the actual
+ * The sync queue decouples triggering a sync (POST /api/sync/queue) from the actual
  * processing, so syncing many artists never exceeds Vercel's timeout limits.
- * Each job processes one artist via POST /api/process-sync-queue (cron: every
- * 5 minutes).
+ * Each job processes one artist via POST /api/sync (cron: every 5 minutes).
  *
  * Job lifecycle:
  *   pending → running → done
@@ -30,12 +29,15 @@ export interface SyncJob {
   scheduledAt: string
   startedAt: string | null
   finishedAt: string | null
+  lockedUntil: string | null
   errorMessage: string | null
   attemptCount: number
   createdAt: string
 }
 
 export const MAX_ATTEMPTS = 3
+/** Visibility timeout — running jobs past this are reset to pending. */
+export const LOCK_DURATION_MS = 10 * 60 * 1000
 
 function rowToSyncJob(row: SyncQueueRow): SyncJob {
   return {
@@ -46,10 +48,56 @@ function rowToSyncJob(row: SyncQueueRow): SyncJob {
     scheduledAt: row.scheduled_at,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
+    lockedUntil: row.locked_until ?? null,
     errorMessage: row.error_message ?? null,
     attemptCount: row.attempt_count,
     createdAt: row.created_at,
   }
+}
+
+/**
+ * Resets jobs stuck in `running` past their visibility timeout back to `pending`.
+ * Returns the number of jobs recovered.
+ */
+export async function recoverStuckSyncJobs(db: DbClient): Promise<number> {
+  const now = new Date().toISOString()
+  const staleStartedBefore = new Date(Date.now() - LOCK_DURATION_MS).toISOString()
+
+  const { data, error } = await db
+    .from('sync_queue')
+    .update({
+      status: 'pending',
+      locked_until: null,
+      started_at: null,
+    })
+    .eq('status', 'running')
+    .or(`locked_until.lt.${now},and(locked_until.is.null,started_at.lt.${staleStartedBefore})`)
+    .select('id')
+
+  if (error) throw new Error(`Failed to recover stuck sync jobs: ${error.message}`)
+  return data?.length ?? 0
+}
+
+/**
+ * Re-queues permanently failed jobs so an admin can retry them manually.
+ * Returns the number of jobs re-queued.
+ */
+export async function requeueFailedSyncJobs(db: DbClient): Promise<number> {
+  const { data, error } = await db
+    .from('sync_queue')
+    .update({
+      status: 'pending',
+      scheduled_at: new Date().toISOString(),
+      finished_at: null,
+      locked_until: null,
+      started_at: null,
+      error_message: null,
+    })
+    .eq('status', 'failed')
+    .select('id')
+
+  if (error) throw new Error(`Failed to requeue failed sync jobs: ${error.message}`)
+  return data?.length ?? 0
 }
 
 /**
@@ -96,12 +144,18 @@ export async function enqueueArtistSyncJobs(
  * race conditions when multiple cron instances run concurrently.
  */
 export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
-  // Find the oldest pending job that hasn't exceeded max attempts
+  await recoverStuckSyncJobs(db)
+
+  const now = new Date().toISOString()
+  const lockedUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString()
+
+  // Find the oldest pending job that hasn't exceeded max attempts and is due
   const { data: candidates } = await db
     .from('sync_queue')
     .select('id')
     .eq('status', 'pending')
     .lt('attempt_count', MAX_ATTEMPTS)
+    .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
     .limit(1)
 
@@ -113,8 +167,8 @@ export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
     .from('sync_queue')
     .update({
       status: 'running',
-      started_at: new Date().toISOString(),
-      // attempt_count is incremented separately below
+      started_at: now,
+      locked_until: lockedUntil,
     })
     .eq('id', jobId)
     .eq('status', 'pending') // optimistic lock — prevent double-claim
@@ -129,7 +183,7 @@ export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
     .update({ attempt_count: (data.attempt_count ?? 0) + 1 })
     .eq('id', jobId)
 
-  return rowToSyncJob({ ...data, attempt_count: (data.attempt_count ?? 0) + 1 })
+  return rowToSyncJob({ ...data, attempt_count: (data.attempt_count ?? 0) + 1, locked_until: lockedUntil })
 }
 
 /**
@@ -138,7 +192,11 @@ export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
 export async function markSyncJobDone(db: DbClient, jobId: string): Promise<void> {
   const { error } = await db
     .from('sync_queue')
-    .update({ status: 'done', finished_at: new Date().toISOString() })
+    .update({
+      status: 'done',
+      finished_at: new Date().toISOString(),
+      locked_until: null,
+    })
     .eq('id', jobId)
 
   if (error) throw new Error(`Failed to mark job done: ${error.message}`)
@@ -167,7 +225,8 @@ export async function markSyncJobFailed(
       status: willRetry ? 'pending' : 'failed',
       finished_at: willRetry ? null : new Date().toISOString(),
       error_message: errorMessage,
-      ...(willRetry ? { scheduled_at: scheduledAt } : {}),
+      locked_until: null,
+      ...(willRetry ? { scheduled_at: scheduledAt, started_at: null } : {}),
     })
     .eq('id', jobId)
 
@@ -177,6 +236,23 @@ export async function markSyncJobFailed(
 /**
  * Get recent queue status for the Admin Health dashboard.
  */
+/**
+ * Counts running jobs whose visibility timeout has expired (stuck / zombie jobs).
+ */
+export async function countStuckSyncJobs(db: DbClient): Promise<number> {
+  const now = new Date().toISOString()
+  const staleStartedBefore = new Date(Date.now() - LOCK_DURATION_MS).toISOString()
+
+  const { data, error } = await db
+    .from('sync_queue')
+    .select('id')
+    .eq('status', 'running')
+    .or(`locked_until.lt.${now},and(locked_until.is.null,started_at.lt.${staleStartedBefore})`)
+
+  if (error) throw new Error(`Failed to count stuck sync jobs: ${error.message}`)
+  return data?.length ?? 0
+}
+
 export async function getSyncQueueStats(
   db: DbClient,
 ): Promise<{ pending: number; running: number; done: number; failed: number }> {

@@ -29,22 +29,44 @@ function makeArtistBuilder(
   }
 }
 
-function makeReleaseBuilder(
+function makeReleasesTableBuilder(
   data: unknown = { id: 'r1', title: 'Test' },
-  error: unknown = null,
+  listData: unknown[] = [],
 ) {
-  const result = { data, error }
-  const p = Promise.resolve(result)
-  return {
+  const listResult = { data: listData, error: null }
+  const listPromise = Promise.resolve(listResult)
+  const singleResult = { data, error: null }
+  const singlePromise = Promise.resolve(singleResult)
+  const updateResult = { data: null, error: null }
+  const updatePromise = Promise.resolve(updateResult)
+
+  const builder = {
     upsert: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
-    then: p.then.bind(p),
-    catch: p.catch.bind(p),
-    finally: p.finally.bind(p),
+    then: listPromise.then.bind(listPromise),
+    catch: listPromise.catch.bind(listPromise),
+    finally: listPromise.finally.bind(listPromise),
   }
+
+  builder.single = vi.fn().mockImplementation(() => ({
+    then: singlePromise.then.bind(singlePromise),
+    catch: singlePromise.catch.bind(singlePromise),
+    finally: singlePromise.finally.bind(singlePromise),
+  }))
+
+  builder.update = vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({
+      then: updatePromise.then.bind(updatePromise),
+      catch: updatePromise.catch.bind(updatePromise),
+      finally: updatePromise.finally.bind(updatePromise),
+    }),
+  })
+
+  return builder
 }
 
 function makeGenericBuilder(data: unknown = null, error: unknown = null) {
@@ -116,6 +138,43 @@ describe('syncArtist', () => {
     expect(result.releasesUpserted).toBe(0)
   })
 
+  it('upserts before uploading cover art to R2', async () => {
+    const callOrder: string[] = []
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => (url.includes('/search') ? ITUNES_ARTIST_SEARCH_RESPONSE : ITUNES_RESPONSE),
+    } as Response))
+
+    const mockUploadToR2 = vi.fn().mockImplementation(async () => {
+      callOrder.push('upload')
+      return 'https://cdn.darktunes.com/cover-art/123.jpg'
+    })
+
+    const releaseUpsert = vi.fn().mockImplementation(() => {
+      callOrder.push('upsert')
+      return makeReleasesTableBuilder()
+    })
+
+    const fromFn = vi.fn((table: string) => {
+      if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
+      if (table === 'releases') {
+        const builder = makeReleasesTableBuilder()
+        builder.upsert = releaseUpsert
+        return builder
+      }
+      return makeGenericBuilder()
+    })
+    const db = { from: fromFn } as unknown as DbClient
+
+    await syncArtist(ARTIST_ID, {
+      db,
+      fetch: mockFetch,
+      uploadToR2: mockUploadToR2,
+    })
+
+    expect(callOrder).toEqual(['upsert', 'upload'])
+  })
+
   it('upserts releases and returns success result', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
@@ -127,7 +186,7 @@ describe('syncArtist', () => {
     // from() is called for: artists.select, artists.update, releases.upsert, sync_logs.insert
     const fromFn = vi.fn((table: string) => {
       if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
-      if (table === 'releases') return makeReleaseBuilder()
+      if (table === 'releases') return makeReleasesTableBuilder()
       return makeGenericBuilder()
     })
     const db = { from: fromFn } as unknown as DbClient
@@ -159,7 +218,7 @@ describe('syncArtist', () => {
       if (table === 'artists') {
         return makeArtistBuilder(ARTIST_ROW)
       }
-      if (table === 'releases') return makeReleaseBuilder()
+      if (table === 'releases') return makeReleasesTableBuilder()
       return makeGenericBuilder()
     })
     const db = { from: fromFn } as unknown as DbClient
@@ -205,7 +264,7 @@ describe('syncArtist', () => {
     const syncLogInsert = vi.fn().mockReturnThis()
     const fromFn = vi.fn((table: string) => {
       if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
-      if (table === 'releases') return makeReleaseBuilder()
+      if (table === 'releases') return makeReleasesTableBuilder()
       if (table === 'sync_logs') {
         const b = makeGenericBuilder()
         b.insert = syncLogInsert
