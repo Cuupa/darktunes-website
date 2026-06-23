@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
-import type { AnchorHTMLAttributes, KeyboardEvent, MouseEvent } from 'react'
+import type { AnchorHTMLAttributes, MouseEvent } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -158,7 +158,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
   }, [])
 
   const goToIndex = useCallback((index: number) => {
-    swiperRef.current?.slideToLoop?.(index) ?? swiperRef.current?.slideTo(index)
+    void (swiperRef.current?.slideToLoop?.(index) ?? swiperRef.current?.slideTo(index))
   }, [])
 
   const handleMouseEnter = useCallback(() => {
