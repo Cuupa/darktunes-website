@@ -168,13 +168,15 @@ describe('ReleasesCoverflow', () => {
   it('prevents overlay navigation after a drag and allows it again on the next click', () => {
     render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
 
-    const region = screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })
     const overlayLink = screen.getByRole('link', {
       name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
     })
 
-    fireEvent.pointerDown(region, { clientX: 0, clientY: 0 })
-    fireEvent.pointerMove(region, { clientX: 10, clientY: 10 })
+    // Simulate a Swiper drag: touchStart resets isDragging, touchMove sets it to true
+    act(() => {
+      mockedState.latestSwiperProps?.onTouchStart?.(null as never, {} as never)
+      mockedState.latestSwiperProps?.onTouchMove?.(null as never, {} as never)
+    })
 
     const dragClick = createEvent.click(overlayLink)
     fireEvent(overlayLink, dragClick)
@@ -184,7 +186,10 @@ describe('ReleasesCoverflow', () => {
     fireEvent(overlayLink, nextClick)
     expect(nextClick.defaultPrevented).toBe(false)
 
-    fireEvent.pointerDown(region)
+    // Simulate a tap: touchStart only resets isDragging, no move — click is allowed
+    act(() => {
+      mockedState.latestSwiperProps?.onTouchStart?.(null as never, {} as never)
+    })
     const tapClick = createEvent.click(overlayLink)
     fireEvent(overlayLink, tapClick)
     expect(tapClick.defaultPrevented).toBe(false)
