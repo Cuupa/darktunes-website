@@ -12,6 +12,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
+import { waitForPageSettled } from '../helpers/pageSettle'
 
 // ---------------------------------------------------------------------------
 // Helper: inject CSS that neutralises all dynamic visual effects
@@ -54,7 +55,7 @@ async function disableDynamicEffects(page: Page): Promise<void> {
 // Helper: wait for images (lazy-loaded via Intersection Observer) to settle
 // ---------------------------------------------------------------------------
 async function waitForImages(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle')
+  await waitForPageSettled(page)
 }
 
 // ---------------------------------------------------------------------------

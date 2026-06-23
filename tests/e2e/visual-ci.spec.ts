@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { gotoAndSettle } from '../helpers/pageSettle'
 
 test.describe('Corporate identity visual validation', () => {
   test('primary button uses CI violet #493687', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'networkidle' })
+    await gotoAndSettle(page, '/')
 
     const primary = page.locator('button[class*="bg-primary"], a[class*="bg-primary"]').first()
     await expect(primary).toBeVisible()

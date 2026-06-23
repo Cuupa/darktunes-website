@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { getTestUser, loginAsAdmin, loginForPressDashboard } from '../helpers/auth'
 import { isSupabaseE2EConfigured } from '../helpers/supabase'
+import { gotoAndSettle } from '../helpers/pageSettle'
 
 test.describe('Press kit — API security', () => {
   test('admin press-kit endpoints reject unauthenticated requests', async ({ request }) => {
@@ -103,7 +104,7 @@ test.describe('Press kit — journalist dashboard', () => {
     }
 
     await loginForPressDashboard(page)
-    await page.goto('/press/dashboard/press-kit', { waitUntil: 'networkidle' })
+    await gotoAndSettle(page, '/press/dashboard/press-kit')
 
     const viewButton = page.getByRole('button', { name: /^View /i }).first()
     const hasImages = await viewButton.isVisible().catch(() => false)
@@ -130,7 +131,7 @@ test.describe('Press kit — journalist dashboard', () => {
     }
 
     await loginForPressDashboard(page)
-    await page.goto('/press/dashboard/press-kit', { waitUntil: 'networkidle' })
+    await gotoAndSettle(page, '/press/dashboard/press-kit')
 
     const viewButtons = page.getByRole('button', { name: /^View /i })
     const count = await viewButtons.count()

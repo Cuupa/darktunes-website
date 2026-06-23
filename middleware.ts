@@ -19,6 +19,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
+import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 
 const ADMIN_ROLES = new Set(['admin', 'editor'])
 
@@ -26,7 +27,7 @@ export async function middleware(request: NextRequest) {
   // Guard: if Supabase env vars are missing, skip auth checks.
   // In production, these vars are always set (Vercel injects them at build time).
   // In local dev without .env.local, admin routes are unprotected but non-functional.
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  if (!isSupabaseEnvConfigured()) {
     return NextResponse.next({ request })
   }
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { gotoAndSettle } from '../helpers/pageSettle'
 
 test.describe('User journeys and accessibility flows', () => {
   test('visitor can navigate homepage → releases page → release detail', async ({ page }) => {
@@ -18,7 +19,7 @@ test.describe('User journeys and accessibility flows', () => {
   })
 
   test('visitor can navigate homepage → artist card → artist detail', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'networkidle' })
+    await gotoAndSettle(page, '/')
 
     const artistLink = page.locator('#artists a[href^="/artists/"]').first()
     if ((await artistLink.count()) === 0) {

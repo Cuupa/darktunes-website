@@ -12,6 +12,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { waitForPageSettled } from '../helpers/pageSettle'
 
 // ---------------------------------------------------------------------------
 // 1. Shrinking logo header
@@ -165,7 +166,7 @@ test.describe('Grid Stacking', () => {
     }
 
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await waitForPageSettled(page)
 
     const artistSection = page.locator('#artists')
     const sectionCount = await artistSection.count()
@@ -197,7 +198,7 @@ test.describe('Grid Stacking', () => {
     }
 
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
+    await waitForPageSettled(page)
 
     const releasesSection = page.locator('#releases')
     const sectionCount = await releasesSection.count()
