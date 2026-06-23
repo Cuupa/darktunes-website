@@ -34,6 +34,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockReturnThis(),
@@ -194,8 +195,18 @@ describe('listUsersWithProfiles', () => {
   })
 
   it('throws when profiles query fails', async () => {
+    // listUsersData must be non-empty so the function reaches the profiles query.
+    // With no users the function returns early before attempting any DB query.
     const client = makeAdminClient({
-      listUsersData: [],
+      listUsersData: [
+        {
+          id: 'user-1',
+          email: 'user@test.com',
+          created_at: '2024-01-01T00:00:00Z',
+          last_sign_in_at: null,
+          banned_until: null,
+        },
+      ],
       profilesError: { message: 'DB error' },
     })
 

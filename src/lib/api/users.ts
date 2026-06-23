@@ -24,30 +24,52 @@ type DbClient = SupabaseClient<Database>
  * Requires a service-role client (Supabase Admin API).
  */
 export async function listUsersWithProfiles(adminClient: DbClient): Promise<UserWithProfile[]> {
-  // 1. Fetch all auth users via Admin API
-  const { data: authData, error: authError } = await (adminClient.auth.admin as {
-    listUsers: (opts?: { perPage?: number }) => Promise<{
-      data: {
-        users: Array<{
-          id: string
-          email?: string
-          created_at: string
-          last_sign_in_at?: string | null
-          banned_until?: string | null
-        }>
-      }
-      error: { message: string } | null
-    }>
-  }).listUsers({ perPage: 1000 })
+  // 1. Fetch ALL auth users via paginated Admin API calls.
+  //    The Supabase Admin API caps each page at 1000; without pagination the 1001st
+  //    user would silently disappear from the admin dashboard.
+  const perPage = 1000
+  let page = 1
+  const users: Array<{
+    id: string
+    email?: string
+    created_at: string
+    last_sign_in_at?: string | null
+    banned_until?: string | null
+  }> = []
 
-  if (authError) throw new Error(authError.message)
+  while (true) {
+    const { data: authData, error: authError } = await (adminClient.auth.admin as {
+      listUsers: (opts?: { page?: number; perPage?: number }) => Promise<{
+        data: {
+          users: Array<{
+            id: string
+            email?: string
+            created_at: string
+            last_sign_in_at?: string | null
+            banned_until?: string | null
+          }>
+        }
+        error: { message: string } | null
+      }>
+    }).listUsers({ page, perPage })
 
-  const users = authData.users
+    if (authError) throw new Error(authError.message)
+    users.push(...authData.users)
+    // Fewer results than the page size means we've reached the last page
+    if (authData.users.length < perPage) break
+    page++
+  }
 
-  // 2. Fetch primary roles + full_name from users
+  if (users.length === 0) return []
+
+  const userIds = users.map((u) => u.id)
+
+  // 2. Fetch primary roles + full_name — scoped to the fetched user IDs so we
+  //    don't pull the entire profiles table into memory.
   const { data: profiles, error: profilesError } = await adminClient
     .from('users')
     .select('id, role, full_name, is_active')
+    .in('id', userIds)
 
   if (profilesError) throw new Error(profilesError.message)
 
@@ -60,6 +82,7 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
   const { data: userRolesData } = await adminClient
     .from('user_roles')
     .select('user_id, role')
+    .in('user_id', userIds)
 
   const userRolesMap = new Map<string, UserRole[]>()
   for (const ur of userRolesData ?? []) {
@@ -72,6 +95,7 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
   const { data: memberships, error: membershipsError } = await adminClient
     .from('artist_members')
     .select('user_id, member_role, artists!inner(id, name, slug)')
+    .in('user_id', userIds)
 
   if (membershipsError) throw new Error(membershipsError.message)
 
