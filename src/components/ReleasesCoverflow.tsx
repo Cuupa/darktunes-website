@@ -239,7 +239,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
             swiperRef.current = swiper
             setDisplayIndex(swiper.activeIndex)
           }}
-          onActiveIndexChange={(swiper) => setDisplayIndex(swiper.activeIndex)}
+          onSlideChangeTransitionEnd={(swiper) => setDisplayIndex(swiper.activeIndex)}
           onTouchStart={() => { isDragging.current = false }}
           onTouchMove={() => { isDragging.current = true }}
           className="pb-2"
@@ -304,6 +304,9 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 <button
                   key={release.id}
                   onClick={() => goToIndex(index)}
+                  aria-label={dict.goToReleaseAriaLabelTemplate
+                    .replace('{index}', String(index + 1))
+                    .replace('{title}', release.title)}
                   aria-pressed={index === displayIndex}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >

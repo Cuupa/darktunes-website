@@ -34,6 +34,7 @@ vi.mock('framer-motion', () => ({
     },
   },
   useReducedMotion: () => false,
+  useInView: () => true,
 }))
 
 const concert: Concert = {
