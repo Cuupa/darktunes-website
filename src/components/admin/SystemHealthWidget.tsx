@@ -182,7 +182,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       const dataQueue = (await resQueue.json()) as { queued?: number; error?: string }
       if (!resQueue.ok) throw new Error(dataQueue.error ?? `Queue failed (${resQueue.status})`)
 
-      const resExecute = await fetch('/api/sync/execute', {
+      const resExecute = await fetch('/api/sync', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${bearerToken}`,

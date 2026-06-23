@@ -1565,7 +1565,7 @@ DROP POLICY IF EXISTS "idempotency_keys: service_role only" ON public.idempotenc
 -- SYNC QUEUE — asynchronous background sync jobs
 -- Decouples the sync trigger (POST /api/sync) from the actual processing so
 -- that syncing many artists never exceeds Vercel's 10-second Edge timeout.
--- Each job processes one artist via POST /api/sync/execute (every 5 min).
+-- Each job processes one artist via POST /api/sync (every 5 min).
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.sync_queue (

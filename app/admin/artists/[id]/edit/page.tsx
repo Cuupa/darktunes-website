@@ -147,7 +147,7 @@ export default function ArtistEditPage() {
       if (data.spotifyId && data.spotifyId !== artist.spotifyId) {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
-          fetch('/api/sync-artist', {
+          fetch('/api/sync/artist', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

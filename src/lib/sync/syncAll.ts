@@ -676,7 +676,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 /**
  * Syncs one artist identified by `artistId` using the APIs implied by
  * `jobType`.  This is the function called by the sync-queue executor
- * (`app/api/sync/execute/route.ts`) for each queue job so that exactly
+ * (`app/api/sync/route.ts`) for each queue job so that exactly
  * one artist is processed per invocation.
  *
  * jobType → onlyApi mapping:

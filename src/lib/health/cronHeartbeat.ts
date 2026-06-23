@@ -77,8 +77,8 @@ function deriveExecuteCron(
       statusLabel: backlog > 0 ? 'Executor never ran' : 'Awaiting first run',
       statusDetail:
         backlog > 0
-          ? `${backlog} queue job(s) waiting but /api/sync/execute has no heartbeat yet.`
-          : 'No heartbeat recorded — schedule /api/sync/execute every 5 minutes.',
+          ? `${backlog} queue job(s) waiting but /api/sync has no heartbeat yet.`
+          : 'No heartbeat recorded — schedule /api/sync every 5 minutes.',
     }
   }
 

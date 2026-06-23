@@ -259,7 +259,7 @@ export function ArtistsManager() {
       } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
 
-      const res = await fetch('/api/sync-artist', {
+      const res = await fetch('/api/sync/artist', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

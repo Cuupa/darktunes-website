@@ -16,12 +16,12 @@
   ],
   "functions": {
     "app/api/sync/queue/route.ts": { "maxDuration": 300 },
-    "app/api/sync/execute/route.ts": { "maxDuration": 300 },
+    "app/api/sync/route.ts": { "maxDuration": 300 },
     "app/api/sync-youtube/route.ts": { "maxDuration": 300 },
     "app/api/health/alert/route.ts": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/sync/execute", "schedule": "*/5 * * * *" },
+    { "path": "/api/sync", "schedule": "*/5 * * * *" },
     { "path": "/api/health/alert", "schedule": "*/10 * * * *" },
     { "path": "/api/sync/queue", "schedule": "0 3 * * *" },
     { "path": "/api/sync-youtube", "schedule": "0 6 * * *" }

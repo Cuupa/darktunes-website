@@ -183,7 +183,7 @@ Next.js `<Image>` Component – ALWAYS use `<Image />` from `next/image` instead
 
 Sync Service Pattern
 Complex sync logic lives in `src/lib/sync/` with a dependency-injected `SyncDeps` interface (db, fetch, uploadToR2).
-The HTTP handler in `app/api/sync-artist/route.ts` wires deps and calls `syncSingleArtist(artistId, 'full', deps)` so manual per-artist sync runs the full multi-API pipeline (iTunes via internal `syncArtist()`, plus Spotify/Discogs/concerts/Odesli when env vars and artist IDs are set). Tests mock all deps.
+The HTTP handler in `app/api/sync/artist/route.ts` wires deps and calls `syncSingleArtist(artistId, 'full', deps)` so manual per-artist sync runs the full multi-API pipeline (iTunes via internal `syncArtist()`, plus Spotify/Discogs/concerts/Odesli when env vars and artist IDs are set). Tests mock all deps.
 `syncArtist()` processes iTunes releases with bounded concurrency (`mapWithConcurrency` from `src/lib/mapWithConcurrency.ts`, limit 5): upsert release first (external cover URL fallback), then upload cover to R2 and update `cover_art`.
 Sync functions MUST NOT throw — capture all errors in `SyncResult.errors` and return gracefully.
 Every sync run writes a `sync_logs` entry with status 'success', 'partial', or 'error'.
@@ -196,7 +196,7 @@ Cron Jobs (Vercel):
   Three cron jobs can be configured in `vercel.json`:
   - `/api/sync-youtube` — daily at 06:00 UTC: fetches latest YouTube channel videos.
   - `/api/sync` — daily at 03:00 UTC: enqueues async sync jobs for all artists into `sync_queue` and returns immediately.
-  - `/api/sync/execute` — every 5 minutes: claims pending `sync_queue` jobs (50s budget per invocation, multiple jobs), runs `syncSingleArtist` per job, marks done/failed. maxDuration: 300s.
+  - `/api/sync` — every 5 minutes: claims pending `sync_queue` jobs (50s budget per invocation, multiple jobs), runs `syncSingleArtist` per job, marks done/failed. maxDuration: 300s.
   - `/api/sync/queue` — enqueues one `full` job per artist (called by daily `/api/sync` cron or admin bulk sync).
   All routes accept either a ****** (manual trigger), a Vercel cron call (`x-vercel-cron: 1` header),
   or a CRON_SECRET ****** (from a Supabase Edge Function or external scheduler) — all require `CRON_SECRET` env var (mandatory).
@@ -213,7 +213,7 @@ Supabase Sync Triggers (`supabase/functions/trigger-sync/index.ts`):
 
 Async Sync Queue (`sync_queue` table):
   `POST /api/sync` enqueues one row per artist with `status='pending'` — it does NOT run the sync inline.
-  `POST /api/sync/execute` claims jobs atomically (UPDATE to `status='running'` with optimistic lock) to prevent double-processing.
+  `POST /api/sync` claims jobs atomically (UPDATE to `status='running'` with optimistic lock) to prevent double-processing.
   Failed jobs are retried up to 3 times (`attempt_count`) with exponential backoff managed in `markSyncJobFailed()`.
   DAL: `src/lib/api/syncQueue.ts` exports `enqueueArtistSyncJobs`, `claimNextSyncJob`, `markSyncJobDone`, `markSyncJobFailed`, `recoverStuckSyncJobs`, `requeueFailedSyncJobs`, `getSyncQueueStats`, `getRecentSyncJobs`.
   The Admin Health tab shows queue progress via `getSyncQueueStats()`.
@@ -405,7 +405,7 @@ Admin System Tab (Health, Logs, Maintenance)
       - `POST /api/admin/maintenance/clear-accreditations` — deletes pending `accreditation_requests` older than N days.
       - `POST /api/admin/maintenance/reset-accreditations` — resets a journalist's accreditation status.
       - `POST /api/admin/maintenance/clear-stats` — deletes `streaming_stats` rows for a given artist + period.
-      - `POST /api/admin/maintenance/requeue-sync-jobs` — resets `sync_queue` rows with `status='failed'` back to `pending` (admin Maintenance tab).
+      - `POST /api/sync/requeue` — resets `sync_queue` rows with `status='failed'` back to `pending` (admin Maintenance tab).
   All maintenance routes require admin auth via `verifyAdmin`. All are wrapped with `withErrorHandler`.
 
 Supabase Read Replica Client

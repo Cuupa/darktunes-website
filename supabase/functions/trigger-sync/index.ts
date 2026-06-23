@@ -17,7 +17,7 @@
  *   songkick     — sync Songkick concerts        (POST /api/sync-api, apiSource: songkick)
  *   bandsintown  — sync Bandsintown concerts     (POST /api/sync-api, apiSource: bandsintown)
  *   odesli       — resolve Odesli smart links    (POST /api/sync-api, apiSource: odesli)
- *   process-queue — process pending sync_queue jobs  (POST /api/sync/execute)
+ *   process-queue — process pending sync_queue jobs  (POST /api/sync)
  *
  * Usage options:
  *
@@ -176,7 +176,7 @@ serve(async (req: Request) => {
         )
       }
 
-      targetUrl = `${siteUrl}/api/sync/execute`
+      targetUrl = `${siteUrl}/api/sync`
       response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
@@ -188,7 +188,7 @@ serve(async (req: Request) => {
       if (syncType === 'youtube') {
         targetUrl = `${siteUrl}/api/sync-youtube`
       } else if (syncType === 'process-queue') {
-        targetUrl = `${siteUrl}/api/sync/execute`
+        targetUrl = `${siteUrl}/api/sync`
       } else {
         targetUrl = `${siteUrl}/api/sync-api`
         requestBody = {apiSource: syncType}

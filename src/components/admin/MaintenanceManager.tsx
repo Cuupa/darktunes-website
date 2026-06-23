@@ -280,7 +280,7 @@ export function MaintenanceManager() {
   async function handleRequeueSyncJobs() {
     setLoading('requeue-sync-jobs')
     try {
-      const result = await callMaintenanceApi('/api/admin/maintenance/requeue-sync-jobs')
+      const result = await callMaintenanceApi('/api/sync/requeue')
       const requeued = result.requeued as number
       if (requeued > 0) {
         toast.success(`${requeued} failed sync job(s) re-queued`)
@@ -534,7 +534,7 @@ export function MaintenanceManager() {
           <CardDescription>
             Retry permanently failed background sync jobs. Re-queued jobs are
             picked up by the next cron execution of{' '}
-            <code className="font-mono text-xs">/api/sync/execute</code>.
+            <code className="font-mono text-xs">/api/sync</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">

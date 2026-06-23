@@ -40,7 +40,7 @@ export const SCORE_QUEUE_DEGRADED = 10
 export const SCORE_SLA_CRITICAL = 15
 export const SCORE_SLA_WARN = 5
 
-/** Expected interval for `/api/sync/execute` (Vercel cron: every 5 minutes). */
+/** Expected interval for `/api/sync` (Vercel cron: every 5 minutes). */
 export const CRON_EXECUTE_INTERVAL_MS = 5 * 60 * 1000
 
 /** Alert when execute cron has not fired within this window (3 missed runs). */

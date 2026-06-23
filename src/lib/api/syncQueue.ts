@@ -5,7 +5,7 @@
  *
  * The sync queue decouples triggering a sync (POST /api/sync/queue) from the actual
  * processing, so syncing many artists never exceeds Vercel's timeout limits.
- * Each job processes one artist via POST /api/sync/execute (cron: every 5 minutes).
+ * Each job processes one artist via POST /api/sync (cron: every 5 minutes).
  *
  * Job lifecycle:
  *   pending → running → done

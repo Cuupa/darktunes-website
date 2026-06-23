@@ -92,7 +92,7 @@ export function useReleases() {
         },
       })
 
-      const res = await fetch('/api/sync/execute', {
+      const res = await fetch('/api/sync', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,

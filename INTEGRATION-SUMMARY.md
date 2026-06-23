@@ -112,7 +112,7 @@
 
 ### API Routes
 - **`POST /api/sync`** — Enqueues one `full` sync job per artist into `sync_queue` (does not run inline). Requires `Authorization: Bearer <token>`. Uses `withErrorHandler`.
-- **`POST /api/sync/queue`** — Enqueues per-artist jobs (admin bulk sync). **`POST /api/sync/execute`** — Claims and processes pending queue jobs (Vercel cron).
+- **`POST /api/sync/queue`** — Enqueues per-artist jobs (admin bulk sync). **`POST /api/sync`** — Claims and processes pending queue jobs (Vercel cron). **`POST /api/sync/requeue`** — Re-queues permanently failed jobs for retry.
 - **`GET /api/health`** — Returns database connection status (latency ms), per-API last-sync timestamp and status, and rate-limit warnings. Public endpoint.
 
 ### Admin Health Dashboard
@@ -146,13 +146,13 @@ interface SyncDeps {
   uploadToR2: (imageUrl: string, keyPrefix: string) => Promise<string>
 }
 ```
-The HTTP handler in `app/api/sync-artist/route.ts` wires real deps and calls `syncSingleArtist(artistId, 'full', deps)` (full multi-API pipeline). Tests mock all deps.
+The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `syncSingleArtist(artistId, 'full', deps)` (full multi-API pipeline). Tests mock all deps.
 
 ### Sync Logs DAL (`src/lib/api/syncLogs.ts`)
 - `getSyncLogsByArtist(db, artistId, limit)` — Fetches recent sync history for an artist.
 - `insertSyncLog(db, log)` — Records a sync result.
 
-### Manual Sync API (`app/api/sync-artist/route.ts`)
+### Manual Sync API (`app/api/sync/artist/route.ts`)
 - POST `/api/sync-artist` with body `{ artistId: string }` and `Authorization: Bearer <token>` header.
 - Verifies the caller is authenticated, runs the full multi-API sync pipeline, returns `SyncAllResult`.
 
@@ -257,7 +257,7 @@ The HTTP handler in `app/api/sync-artist/route.ts` wires real deps and calls `sy
 | `src/lib/sync/deduplication.ts` | ISRC/barcode deduplication utility for merging Spotify + Discogs releases |
 | `src/lib/errors.ts` | `ApiError` class + `withErrorHandler` HOF for centralized error handling |
 | `app/api/sync/route.ts` | Manual all-artists sync trigger — POST /api/sync |
-| `app/api/sync-artist/route.ts` | Manual single-artist sync trigger — POST /api/sync-artist |
+| `app/api/sync/artist/route.ts` | Manual single-artist sync trigger — POST /api/sync-artist |
 | `app/api/health/route.ts` | System health check — GET /api/health |
 | `app/error.tsx` | Next.js error boundary (route-segment level) |
 | `app/global-error.tsx` | Next.js global error boundary (root layout level) |

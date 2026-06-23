@@ -6,7 +6,7 @@
  * Cron-only proactive alert dispatcher. Evaluates health, deduplicates
  * critical alerts, and sends email (Resend) + optional webhook.
  *
- * Auth: Bearer CRON_SECRET (Vercel cron must include Authorization header).
+ * Auth: ****** or admin JWT.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -17,20 +17,18 @@ import { isValidCronSecret } from '@/lib/cronAuth'
 import { processHealthAlerts } from '@/lib/health/alertNotifier'
 import { buildHealthSnapshot } from '@/lib/health/healthSnapshot'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 
 export const maxDuration = 60
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  const isCron = request.headers.get('x-vercel-cron') === '1'
   const authHeader = request.headers.get('authorization') ?? ''
   const cronSecret = process.env.CRON_SECRET
+  const isCronAuthorized = Boolean(cronSecret && isValidCronSecret(authHeader, cronSecret))
 
-  if (isCron) {
-    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-      throw new ApiError(401, 'Unauthorized')
-    }
-  } else if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-    throw new ApiError(401, 'Unauthorized')
+  if (!isCronAuthorized) {
+    const token = extractBearerToken(authHeader)
+    await verifyAdmin(token)
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
