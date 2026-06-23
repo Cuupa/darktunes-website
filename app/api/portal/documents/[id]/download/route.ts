@@ -7,29 +7,23 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 
 const EXPIRY_SECONDS = 600 // 10 minutes
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  const { supabase, user } = await authenticatePortalBearer(req)
 
   const artist = await getArtistByUserId(supabase, user.id)
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  // Extract id from URL: /api/portal/documents/{id}/download
   const parts = req.nextUrl.pathname.split('/')
-  const id = parts[parts.length - 2] // second-to-last segment before "download"
+  const id = parts[parts.length - 2]
   if (!id) throw new ApiError(400, 'Missing document id')
 
   const doc = await getArtistDocument(supabase, id, artist.id)
@@ -50,4 +44,3 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   return NextResponse.json({ url })
 })
-

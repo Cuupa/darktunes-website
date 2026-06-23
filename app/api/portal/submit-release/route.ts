@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -51,19 +51,11 @@ const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const body = bodySchema.parse(await req.json())
 
-  // Idempotency check — prevents double-submission on network retry/double-click
   const serviceRole = await createServiceRoleSupabaseClient()
   if (body.idempotencyKey) {
     const claimed = await checkAndClaimIdempotencyKey(
@@ -76,21 +68,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, artistId)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  }
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  // Validate required fields from dynamic schema.
-  // Standard fields (those that live directly on `body`) are looked up via
-  // STANDARD_FIELD_TO_BODY_KEY.  Custom/admin-defined fields are sent by the
-  // frontend inside `body.formData` and must be looked up there.
   const schemaFields = await getFormSchema(supabase, 'release')
   for (const field of schemaFields) {
     if (!field.isRequired) continue
@@ -122,7 +99,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     form_data: body.formData ?? null,
   })
 
-  // Notify editors and admins (insert in-app notification rows)
   const { data: recipientProfiles } = await serviceRole
     .from('users')
     .select('id')
@@ -142,7 +118,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await serviceRole.from('editor_notifications').insert(recipients)
   }
 
-  // Send label notification email (fire-and-forget; failure does not block the response)
   const resendApiKey = process.env.RESEND_API_KEY ?? ''
   const resendFromEmail = process.env.RESEND_FROM_EMAIL ?? ''
   const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
@@ -160,7 +135,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     console.error('[submit-release] Email notification error:', err instanceof Error ? err.message : err),
   )
 
-  // Update idempotency key with the created resource ID (non-blocking)
   if (body.idempotencyKey) {
     void updateIdempotencyKeyResourceId(serviceRole, body.idempotencyKey, submission.id)
   }

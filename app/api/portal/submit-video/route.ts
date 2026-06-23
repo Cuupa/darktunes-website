@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
+import { withErrorHandler } from '@/lib/errors'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createVideoSubmission } from '@/lib/api/videoSubmissions'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -20,28 +20,10 @@ const bodySchema = z.object({
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const body = bodySchema.parse(await req.json())
-
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, artistId)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  }
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const submission = await createVideoSubmission(supabase, {
     artist_id: artist.id,
