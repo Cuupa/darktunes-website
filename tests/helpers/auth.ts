@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 
-export type TestUserRole = 'admin' | 'artist'
+export type TestUserRole = 'admin' | 'artist' | 'journalist'
 
 export interface TestUserCredentials {
   email: string
@@ -27,6 +27,23 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 
   await page.waitForURL(/\/admin(\?|$)/, { timeout: 15_000 })
   await expect(page).toHaveURL(/\/admin(\?|$)/)
+}
+
+export function getPressDashboardUser(): TestUserCredentials | null {
+  return getTestUser('journalist') ?? getTestUser('admin')
+}
+
+export async function loginForPressDashboard(page: Page): Promise<void> {
+  const creds = getPressDashboardUser()
+  if (!creds) throw new Error('Missing E2E_JOURNALIST or E2E_ADMIN credentials')
+
+  await page.goto('/login?returnTo=/press/dashboard/press-kit', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel(/email/i).fill(creds.email)
+  await page.getByLabel(/password/i).fill(creds.password)
+  await page.getByRole('button', { name: /sign in/i }).click()
+
+  await page.waitForURL(/\/press\/dashboard\/press-kit/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/press\/dashboard\/press-kit/)
 }
 
 export async function loginAsArtist(page: Page): Promise<void> {

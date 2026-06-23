@@ -442,6 +442,8 @@
     "messages_no_messages_desc": "Neue Nachrichten vom Label werden hier angezeigt.",
     "marketing_label_assets": "Label-Dateien",
     "marketing_label_assets_empty": "Noch keine Label-Dateien verfügbar.",
+    "marketing_press_suggest": "Für Pressekit zur Prüfung vorschlagen",
+    "marketing_press_suggest_hint": "Nur Bilder. Benachrichtigt Redakteure, diesen Upload für das Pressekit zu prüfen.",
     "promo_log_heading": "Label-Marketing-Aktivitäten",
     "promo_log_empty_heading": "Noch keine Aktivitäten",
     "promo_log_empty_description": "Das Label dokumentiert hier Marketingkampagnen, Playlist-Platzierungen, Werbeausgaben und mehr.",

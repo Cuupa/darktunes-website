@@ -20,15 +20,19 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
-import type { Artist, Concert } from '@/types'
+import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
+import type { Artist, Concert, PressAsset } from '@/types'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
-import type { PressPhoto } from '@/lib/api/pressPhotos'
 
 interface ArtistEpkClientProps {
   artist: Artist
   profile: ArtistProfile | null
-  photos: PressPhoto[]
+  photos: PressAsset[]
   concerts: Concert[]
+}
+
+function pressAssetTitle(photo: PressAsset): string {
+  return photo.pressCaption ?? photo.originalFilename
 }
 
 function sanitizeHtml(html: string): string {
@@ -68,6 +72,18 @@ const SOCIAL_LINKS = [
 ] as const
 
 export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpkClientProps) {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+
+  const imagePhotos = photos.filter((photo) => photo.mimeType.startsWith('image/'))
+
+  const openLightbox = (photoId: string) => {
+    const index = imagePhotos.findIndex((photo) => photo.id === photoId)
+    if (index < 0) return
+    setLightboxIndex(index)
+    setLightboxOpen(true)
+  }
+
   const bios = [
     { label: 'Short Bio', text: profile?.bioShort },
     { label: 'Medium Bio', text: profile?.bioMedium },
@@ -177,19 +193,30 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
             <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
               {photos.map((photo) => (
                 <li key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-card/70">
-                  <div className="relative aspect-square overflow-hidden">
-                    <Image
-                      src={getOptimizedImageUrl(photo.publicUrl, 1000)}
-                      alt={photo.altText ?? `${artist.name} – press photo`}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
+                  {photo.mimeType.startsWith('image/') ? (
+                    <button
+                      type="button"
+                      className="group relative block aspect-square w-full overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => openLightbox(photo.id)}
+                      aria-label={`View ${pressAssetTitle(photo)}`}
+                    >
+                      <Image
+                        src={getOptimizedImageUrl(photo.publicUrl, 1000)}
+                        alt={photo.altText ?? `${artist.name} – press photo`}
+                        fill
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        unoptimized
+                      />
+                    </button>
+                  ) : (
+                    <div className="flex aspect-square items-center justify-center bg-card p-6 text-center text-sm text-muted-foreground">
+                      {pressAssetTitle(photo)}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-3 p-4">
-                    <div>
-                      <p className="font-medium">{photo.title}</p>
-                      <p className="text-sm text-muted-foreground">{photo.category}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{pressAssetTitle(photo)}</p>
+                      <p className="text-sm text-muted-foreground">{photo.pressCategory ?? 'photo'}</p>
                     </div>
                     <Button asChild variant="outline">
                       <a href={photo.publicUrl} target="_blank" rel="noopener noreferrer" download>
@@ -203,6 +230,14 @@ export function ArtistEpkClient({ artist, profile, photos, concerts }: ArtistEpk
             </ul>
           )}
         </section>
+
+        <PressPhotoLightbox
+          photos={imagePhotos}
+          initialIndex={lightboxIndex}
+          open={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          artistName={artist.name}
+        />
 
         <section aria-labelledby="artist-tour" className="space-y-4">
           <h2 id="artist-tour" className="text-2xl font-bold tracking-tight">Tour Dates</h2>

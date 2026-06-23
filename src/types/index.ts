@@ -224,6 +224,7 @@ export interface JournalistDownload {
   id: string
   journalistId: string
   releaseId: string | null
+  assetId?: string
   assetKey: string
   downloadedAt: string
 }
@@ -296,6 +297,17 @@ export interface UserProfile {
   updatedAt: string
 }
 
+export type PressCategory =
+  | 'promo'
+  | 'live'
+  | 'stage'
+  | 'artwork'
+  | 'logo'
+  | 'social'
+  | 'document'
+  | 'photo'
+  | 'other'
+
 export interface Asset {
   id: string
   filename: string
@@ -312,6 +324,28 @@ export interface Asset {
   releaseId?: string
   tags: string[]
   sha256Hash?: string
+  altText?: string
+  isPressApproved: boolean
+  pressSuggested: boolean
+  pressCategory?: PressCategory
+  pressCaption?: string
+  photographerCredit?: string
+  downloadableForPress: boolean
+}
+
+export interface PressKitItem {
+  id: string
+  assetId: string
+  artistId?: string
+  displayOrder: number
+  createdAt: string
+}
+
+/** Asset joined with press kit membership for public/journalist views. */
+export interface PressAsset extends Asset {
+  kitItemId: string
+  kitDisplayOrder: number
+  kitArtistId?: string
 }
 
 export interface AssetFolder {

@@ -6,14 +6,26 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import type { Asset } from '@/types'
+import { AssetPressFields, type AssetPressDraft } from './AssetPressFields'
 import { isImageAsset } from './utils'
 
 interface AssetPreviewModalProps {
   asset: Asset | null
+  artists?: Array<{ id: string; name: string }>
+  authToken?: string | null
   onClose: () => void
+  onSavePress?: (assetId: string, draft: AssetPressDraft) => Promise<void>
+  onAssetUpdated?: (asset: Asset) => void
 }
 
-export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
+export function AssetPreviewModal({
+  asset,
+  artists = [],
+  authToken = null,
+  onClose,
+  onSavePress,
+  onAssetUpdated,
+}: AssetPreviewModalProps) {
   const open = asset !== null
   const [rotation, setRotation] = useState(0)
   const [isCropping, setIsCropping] = useState(false)
@@ -113,7 +125,7 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-[calc(100%-2rem)] sm:max-w-5xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[92vh] max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-5xl lg:max-w-6xl flex-col gap-0 overflow-hidden p-0"
         aria-labelledby="preview-title"
         hideCloseButton
       >
@@ -176,47 +188,60 @@ export function AssetPreviewModal({ asset, onClose }: AssetPreviewModalProps) {
           </div>
         </div>
 
-        {/* Preview area */}
-        <div className="relative flex flex-1 items-center justify-center overflow-auto bg-background/40 p-4">
-          {isImage ? (
-            <div
-              className="relative inline-block"
-              style={{ cursor: isCropping ? 'crosshair' : 'default' }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-            >
-              {/* Hidden canvas for crop rendering */}
-              <canvas ref={canvasRef} className="hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element -- canvas crop requires naturalWidth/naturalHeight from the raw img element */}
-              <img
-                ref={imgRef}
-                src={asset.publicUrl}
-                alt={asset.originalFilename}
-                className="max-h-[70vh] max-w-full select-none rounded-md object-contain shadow-lg"
-                style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s' }}
-                draggable={false}
-              />
-              {isCropping && cropRect && Math.abs(cropRect.w) > 2 && Math.abs(cropRect.h) > 2 && (
-                <div
-                  className="pointer-events-none absolute border-2 border-primary bg-primary/10"
-                  style={{
-                    left: Math.min(cropRect.x, cropRect.x + cropRect.w),
-                    top: Math.min(cropRect.y, cropRect.y + cropRect.h),
-                    width: Math.abs(cropRect.w),
-                    height: Math.abs(cropRect.h),
-                  }}
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          {/* Preview area */}
+          <div className="relative flex flex-1 items-center justify-center overflow-auto bg-background/40 p-4 lg:min-w-0">
+            {isImage ? (
+              <div
+                className="relative inline-block"
+                style={{ cursor: isCropping ? 'crosshair' : 'default' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+              >
+                <canvas ref={canvasRef} className="hidden" />
+                {/* eslint-disable-next-line @next/next/no-img-element -- canvas crop requires naturalWidth/naturalHeight from the raw img element */}
+                <img
+                  ref={imgRef}
+                  src={asset.publicUrl}
+                  alt={asset.altText ?? asset.originalFilename}
+                  className="max-h-[50vh] lg:max-h-[70vh] max-w-full select-none rounded-md object-contain shadow-lg"
+                  style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s' }}
+                  draggable={false}
                 />
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 py-12 text-muted-foreground">
-              <p className="text-sm">{asset.mimeType}</p>
-              <p className="text-xs">No preview available for this file type.</p>
-              <Button variant="outline" onClick={download}>
-                <DownloadSimple size={16} className="mr-2" aria-hidden="true" />
-                Download file
-              </Button>
+                {isCropping && cropRect && Math.abs(cropRect.w) > 2 && Math.abs(cropRect.h) > 2 && (
+                  <div
+                    className="pointer-events-none absolute border-2 border-primary bg-primary/10"
+                    style={{
+                      left: Math.min(cropRect.x, cropRect.x + cropRect.w),
+                      top: Math.min(cropRect.y, cropRect.y + cropRect.h),
+                      width: Math.abs(cropRect.w),
+                      height: Math.abs(cropRect.h),
+                    }}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-12 text-muted-foreground">
+                <p className="text-sm">{asset.mimeType}</p>
+                <p className="text-xs">No preview available for this file type.</p>
+                <Button variant="outline" onClick={download}>
+                  <DownloadSimple size={16} className="mr-2" aria-hidden="true" />
+                  Download file
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {onSavePress && isImage && (
+            <div className="overflow-y-auto max-h-[40vh] lg:max-h-[70vh] border-t lg:border-t-0 lg:border-l border-border p-6 lg:w-80 xl:w-96 shrink-0">
+              <AssetPressFields
+                asset={asset}
+                artists={artists}
+                authToken={authToken}
+                onSave={(draft) => onSavePress(asset.id, draft)}
+                onAssetChange={(updated) => onAssetUpdated?.(updated)}
+              />
             </div>
           )}
         </div>

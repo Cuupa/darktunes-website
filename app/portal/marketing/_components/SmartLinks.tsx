@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getMarketingAssetDownloadUrl } from '../_actions/presignedUrl'
@@ -25,6 +26,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
   const [artistAssets, setArtistAssets] = useState(initialArtistAssets)
   const [label, setLabel] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [suggestForPress, setSuggestForPress] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -64,6 +66,9 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       const body = new FormData()
       body.append('file', file)
       body.append('label', label)
+      if (suggestForPress && file.type.startsWith('image/')) {
+        body.append('pressSuggested', 'true')
+      }
 
       const res = await fetch('/api/portal/upload-asset', {
         method: 'POST',
@@ -79,6 +84,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       const payload = (await res.json()) as { asset: ArtistAsset }
       setArtistAssets((prev) => [payload.asset, ...prev])
       setLabel('')
+      setSuggestForPress(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
       toast.success(dict.marketing_asset_uploaded)
     } catch {
@@ -173,6 +179,17 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                 if (file) void uploadAsset(file)
               }}
             />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="press-suggest"
+                checked={suggestForPress}
+                onCheckedChange={(value) => setSuggestForPress(value === true)}
+              />
+              <Label htmlFor="press-suggest" className="text-sm font-normal">
+                {dict.marketing_press_suggest}
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">{dict.marketing_press_suggest_hint}</p>
             <p className="text-xs text-muted-foreground">JPEG, PNG, WebP, PDF, ZIP · max 20 MB</p>
             <Button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} aria-label={dict.marketing_upload_asset}>
               <UploadSimple size={16} className="mr-2" />

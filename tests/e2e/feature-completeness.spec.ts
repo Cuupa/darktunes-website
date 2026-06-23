@@ -10,7 +10,6 @@ const ADMIN_TABS = [
   'Assets',
   'Settings',
   'Health',
-  'Media',
   'Users',
   'Features',
   'Feature Flags',
