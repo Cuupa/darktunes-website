@@ -1,7 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
 import { Envelope } from '@phosphor-icons/react'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import type { Dictionary } from '@/i18n/types'
 
 interface NewsletterSectionProps {
@@ -14,18 +14,10 @@ interface NewsletterSectionProps {
  * explicitly allows https://darkmerch.com so the embed is permitted.
  */
 export function NewsletterSection({ dict }: NewsletterSectionProps) {
-  const prefersReducedMotion = useReducedMotion()
-
   return (
     <section id="newsletter" className="py-24 px-4 lg:px-16">
       <div className="container mx-auto max-w-2xl">
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="text-center mb-10"
-        >
+        <ScrollReveal className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 ring-1 ring-primary/20 mb-5 shadow-[0_0_20px_rgba(73,54,135,0.3)]">
             <Envelope size={28} weight="fill" className="text-primary" />
           </div>
@@ -35,14 +27,9 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
           <p className="text-lg text-muted-foreground font-serif max-w-md mx-auto">
             {dict.description}
           </p>
-        </motion.div>
+        </ScrollReveal>
 
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : 0.15 }}
-          className="relative rounded-sm border border-border overflow-hidden bg-card"
+        <ScrollReveal delay={0.15} className="relative rounded-sm border border-border overflow-hidden bg-card"
           style={{ boxShadow: '0 0 40px rgba(73,54,135,0.15)' }}
         >
           {/* Subtle top accent line */}
@@ -57,7 +44,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
             scrolling="no"
             className="block w-full border-0"
           />
-        </motion.div>
+        </ScrollReveal>
       </div>
     </section>
   )

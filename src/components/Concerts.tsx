@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,6 @@ interface ConcertsProps extends SectionProps {
 
 export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concertsLinkToPage = false }: ConcertsProps) {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
-  const prefersReducedMotion = useReducedMotion()
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -57,13 +56,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
   return (
     <section id="events" className="py-24 px-4 lg:px-16 scroll-mt-36">
       <div className="container mx-auto">
-        <motion.div
-          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          className="mb-12 flex items-end justify-between gap-4 flex-wrap"
-        >
+        <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
             <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
@@ -76,7 +69,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
               </Link>
             </Button>
           )}
-        </motion.div>
+        </ScrollReveal>
 
         {/* Search input */}
         <div className="relative mb-8 max-w-sm">
@@ -100,30 +93,19 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
             {dict.noResults}
           </p>
         ) : concerts.length === 0 ? (
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-          >
+          <ScrollReveal>
             <Card className="bg-card border-border p-8 text-center">
               <p className="text-lg font-semibold mb-2">{dict.noShows}</p>
               <p className="text-muted-foreground">{dict.checkBack}</p>
             </Card>
-          </motion.div>
+          </ScrollReveal>
         ) : (
           <div ref={listRef} className="space-y-4">
-            {pageConcerts.map((concert, index) => {
+            {pageConcerts.map((concert) => {
               const isCancelled = concert.status === 'cancelled'
               const location = [concert.venueCity, concert.venueCountry].filter(Boolean).join(', ')
               return (
-                <motion.div
-                  key={concert.id}
-                  initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: prefersReducedMotion ? 0 : 0.6, delay: prefersReducedMotion ? 0 : index * 0.08 }}
-                >
+                <ScrollReveal key={concert.id}>
                   <Card className="bg-card border-border p-5 md:p-6 relative group cursor-pointer hover:border-accent/50 transition-colors">
                     {/* Invisible full-card overlay link — sits behind all content */}
                     <Link
@@ -171,7 +153,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
                       )}
                     </div>
                   </Card>
-                </motion.div>
+                </ScrollReveal>
               )
             })}
           </div>

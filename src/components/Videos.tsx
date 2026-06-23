@@ -2,9 +2,10 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useInView, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
+import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -110,6 +111,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLUListElement>(null)
   const prefersReducedMotion = useReducedMotion()
+  const isListInView = useInView(listRef, { once: true, margin: '0px 0px -80px 0px' })
 
   const filteredVideos = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -144,13 +146,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
     <>
       <section id="videos" className="py-24 px-4 lg:px-16 scroll-mt-36">
         <div className="container mx-auto">
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
-            className="mb-12 flex items-end justify-between gap-4 flex-wrap"
-          >
+          <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
               <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
@@ -163,7 +159,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
                 </Link>
               </Button>
             )}
-          </motion.div>
+          </ScrollReveal>
 
           {/* Search input */}
           <div className="relative mb-8 max-w-sm">
@@ -199,8 +195,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
             className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
-            whileInView={prefersReducedMotion ? { opacity: 1 } : 'visible'}
-            viewport={{ once: true }}
+            animate={prefersReducedMotion ? { opacity: 1 } : isListInView ? 'visible' : 'hidden'}
           >
             {pageVideos.map((video) => (
               <motion.li
