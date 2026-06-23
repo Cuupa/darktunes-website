@@ -260,6 +260,17 @@ export async function getAssetsByArtist(db: DbClient, artistId: string): Promise
   return (data ?? []).map(rowToAsset)
 }
 
+/** Counts label-managed assets assigned to a specific artist. */
+export async function countAssetsByArtist(db: DbClient, artistId: string): Promise<number> {
+  const { count, error } = await db
+    .from('assets')
+    .select('id', { count: 'exact', head: true })
+    .eq('artist_id', artistId)
+
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
 export async function deleteAssetRecord(db: DbClient, id: string): Promise<void> {
   const { error } = await db.from('assets').delete().eq('id', id)
   if (error) throw new Error(error.message)

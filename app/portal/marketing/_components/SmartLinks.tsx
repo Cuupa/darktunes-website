@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getMarketingAssetDownloadUrl } from '../_actions/presignedUrl'
+import { validatePortalUpload, PORTAL_ASSET_RULES } from '@/lib/portal/uploadValidation'
 import type { Dictionary } from '@/i18n/types'
 import type { Asset, ArtistAsset } from '@/types'
 
@@ -42,6 +43,12 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
   }
 
   const uploadAsset = async (file: File) => {
+    const validationError = validatePortalUpload(file, PORTAL_ASSET_RULES)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
     setUploading(true)
     try {
       const supabase = createBrowserSupabaseClient()

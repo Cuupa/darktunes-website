@@ -9,11 +9,13 @@ export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artistProfiles'
+import { countAssetsByArtist } from '@/lib/api/assets'
 import { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { calcProfileCompletion } from '@/lib/portal/profileCompletion'
+import { safeHeadCount } from '@/lib/portal/safeQuery'
 import { PortalOverview } from './_components/PortalOverview'
 import { getPortalDictionary } from '@/i18n/getDictionary'
 
@@ -30,25 +32,29 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
 
-  const [stats, releases, concerts, openChecklistCountResult, featureFlags, artistProfile, statementCountResult, assetCountResult] = artist
+  const [stats, releases, concerts, openChecklistCount, featureFlags, artistProfile, statementCount, assetCount] = artist
     ? await Promise.all([
         getStreamingStatsByArtistId(supabase, artist.id).catch(() => []),
         getReleasesByArtistId(supabase, artist.id).catch(() => []),
         getConcertsByArtistId(supabase, artist.id).catch(() => []),
-        supabase
-          .from('release_checklists')
-          .select('id', { count: 'exact', head: true })
-          .eq('artist_id', artist.id)
-          .eq('is_completed', false),
+        safeHeadCount(
+          supabase
+            .from('release_checklists')
+            .select('id', { count: 'exact', head: true })
+            .eq('artist_id', artist.id)
+            .eq('is_completed', false),
+        ),
         getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
         getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
-        supabase
-          .from('sales_statements')
-          .select('id', { count: 'exact', head: true })
-          .eq('artist_id', artist.id),
-        supabase.from('assets').select('id', { count: 'exact', head: true }),
+        safeHeadCount(
+          supabase
+            .from('sales_statements')
+            .select('id', { count: 'exact', head: true })
+            .eq('artist_id', artist.id),
+        ),
+        countAssetsByArtist(supabase, artist.id).catch(() => 0),
       ])
-    : [[], [], [], { count: 0, error: null }, {}, null, { count: 0, error: null }, { count: 0, error: null }]
+    : [[], [], [], 0, {}, null, 0, 0]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
@@ -65,9 +71,9 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       totalStreams={totalStreams}
       releaseCount={releases.length}
       upcomingShowCount={concerts.length}
-      openChecklistCount={openChecklistCountResult.count ?? 0}
-      statementCount={statementCountResult.count ?? 0}
-      assetCount={assetCountResult.count ?? 0}
+      openChecklistCount={openChecklistCount}
+      statementCount={statementCount}
+      assetCount={assetCount}
       featureFlags={featureFlags}
       completionScore={completionScore}
       missingFields={missingFields}

@@ -30,6 +30,7 @@ import { saveOnboardingStep, completeOnboarding, skipOnboarding } from '../_acti
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { uploadArtistPhoto } from '@/lib/api/portalProfile'
 import { compressImage, formatFileSize } from '@/lib/imageResizer'
+import { validatePortalUpload, PORTAL_PHOTO_RULES } from '@/lib/portal/uploadValidation'
 
 /** Must match the server-side limit in /api/portal/upload-photo. */
 const ONBOARDING_PHOTO_MAX_BYTES = 5 * 1024 * 1024
@@ -101,6 +102,13 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.files?.[0]
       if (!raw) return
+
+      const validationError = validatePortalUpload(raw, PORTAL_PHOTO_RULES)
+      if (validationError) {
+        toast.error(validationError)
+        return
+      }
+
       setUploadProgress(0)
       try {
         const supabase = createBrowserSupabaseClient()
@@ -116,7 +124,7 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
           setUploadProgress(pct),
         )
         setPhotoUrl(url)
-        await saveOnboardingStep({ image_url: url })
+        await saveOnboardingStep(artistId, { image_url: url })
       } catch (err) {
         toast.error(dict.profile_photoError)
         console.error(err)
@@ -132,13 +140,13 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
     setSaving(true)
     try {
       if (currentStepId === 'bio' && bioShort) {
-        const result = await saveOnboardingStep({ bio_short: bioShort })
+        const result = await saveOnboardingStep(artistId, { bio_short: bioShort })
         if (!result.ok) {
           toast.error(dict.onboarding_save_error)
           return
         }
       } else if (currentStepId === 'links') {
-        const result = await saveOnboardingStep({
+        const result = await saveOnboardingStep(artistId, {
           instagram_url: instagramUrl || null,
           spotify_url: spotifyUrl || null,
           website_url: websiteUrl || null,
@@ -159,20 +167,20 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
   const handleFinish = async () => {
     setSaving(true)
     try {
-      const result = await completeOnboarding()
+      const result = await completeOnboarding(artistId)
       if (!result.ok) {
         toast.error(dict.onboarding_save_error)
         return
       }
-      router.push('/portal')
+      router.push(`/portal?artistId=${artistId}`)
     } finally {
       setSaving(false)
     }
   }
 
   const handleSkip = async () => {
-    await skipOnboarding()
-    router.push('/portal')
+    await skipOnboarding(artistId)
+    router.push(`/portal?artistId=${artistId}`)
   }
 
   const currentStepId = STEPS[step]
@@ -347,7 +355,9 @@ export function OnboardingWizard({ dict, artistId }: OnboardingWizardProps) {
                   variant="default"
                   className="gap-2"
                   onClick={() => {
-                    void completeOnboarding().then(() => router.push('/portal/releases/new'))
+                    void completeOnboarding(artistId).then(() =>
+                      router.push(`/portal/releases/new?artistId=${artistId}`),
+                    )
                   }}
                 >
                   {dict.onboarding_release_cta}

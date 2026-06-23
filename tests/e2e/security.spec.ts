@@ -9,9 +9,9 @@ test.describe('Security validation', () => {
     expect(redirected || denied).toBe(true)
   })
 
-  test('portal routes redirect unauthenticated users to /portal/login', async ({ page }) => {
+  test('portal routes redirect unauthenticated users to /login', async ({ page }) => {
     await page.goto('/portal', { waitUntil: 'domcontentloaded' })
-    await expect(page).toHaveURL(/\/portal\/login/)
+    await expect(page).toHaveURL(/\/login/)
   })
 
   test('admin API endpoints reject requests without Authorization header', async ({ request }) => {

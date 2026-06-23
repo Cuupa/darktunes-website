@@ -97,19 +97,26 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
  * second argument to include them in the completeness check.
  * Used to decide whether to show the onboarding wizard.
  */
+function hasAnySocialOrStreamingLink(artist: Artist): boolean {
+  return Boolean(
+    artist.soundcloudUrl ||
+      artist.spotifyUrl ||
+      artist.instagramUrl ||
+      artist.websiteUrl ||
+      artist.youtubeUrl ||
+      artist.appleMusicUrl ||
+      artist.facebookUrl ||
+      artist.tiktokUrl ||
+      artist.bandcampUrl ||
+      artist.twitterUrl,
+  )
+}
+
 export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
   if (!profile || !artist) return false
   const hasPhoto = Boolean(artist.imageUrl)
   const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong)
-  const hasLink = Boolean(
-    artist?.soundcloudUrl ||
-      artist?.spotifyUrl ||
-      artist?.instagramUrl ||
-      artist?.websiteUrl ||
-      artist?.youtubeUrl ||
-      artist?.appleMusicUrl,
-  )
-  return hasPhoto && hasBio && hasLink
+  return hasPhoto && hasBio && hasAnySocialOrStreamingLink(artist)
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +256,10 @@ export async function resolvePortalArtist(
     if (!membership) throw new Error('FORBIDDEN: not a member of this artist')
 
     const { data, error } = await db.from('artists').select('*').eq('id', artistId).single()
-    if (error) throw new Error(error.message)
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw new Error(error.message)
+    }
     return data ? rowToArtist(data as ArtistRow) : null
   }
 

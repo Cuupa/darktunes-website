@@ -12,21 +12,30 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getArtistByUserId, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { getDictionary, getLocale } from '@/i18n/getDictionary'
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-async function getCurrentArtist() {
+async function getCurrentArtist(artistId?: string | null) {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser()
   if (authError || !user) throw new Error('Not authenticated')
-  const artist = await getArtistByUserId(supabase, user.id)
+
+  let artist
+  try {
+    artist = await resolvePortalArtist(supabase, user.id, artistId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new Error('No artist linked to this account')
+    throw err
+  }
+
   if (!artist) throw new Error('No artist linked to this account')
   return { supabase, artist }
 }
@@ -41,15 +50,18 @@ async function getCurrentArtist() {
  * Social/streaming URLs (instagram_url, spotify_url, website_url) and image_url
  * are stored in the artists table only — written directly here without going via artist_epks.
  */
-export async function saveOnboardingStep(data: {
-  image_url?: string | null
-  bio_short?: string | null
-  instagram_url?: string | null
-  spotify_url?: string | null
-  website_url?: string | null
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function saveOnboardingStep(
+  artistId: string,
+  data: {
+    image_url?: string | null
+    bio_short?: string | null
+    instagram_url?: string | null
+    spotify_url?: string | null
+    website_url?: string | null
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist()
+    const { supabase, artist } = await getCurrentArtist(artistId)
 
     // Profile-specific fields only (bio)
     const { instagram_url, spotify_url, website_url, image_url, ...profileFields } = data
@@ -79,14 +91,17 @@ export async function saveOnboardingStep(data: {
  * Marks the onboarding as completed and saves any final data.
  * Also inserts a welcome message into the artist's label inbox.
  */
-export async function completeOnboarding(data?: {
-  bio_short?: string | null
-  instagram_url?: string | null
-  spotify_url?: string | null
-  website_url?: string | null
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function completeOnboarding(
+  artistId: string,
+  data?: {
+    bio_short?: string | null
+    instagram_url?: string | null
+    spotify_url?: string | null
+    website_url?: string | null
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist()
+    const { supabase, artist } = await getCurrentArtist(artistId)
 
     const { instagram_url, spotify_url, website_url, ...profileFields } = data ?? {}
     await upsertArtistProfile(supabase, {
@@ -125,9 +140,9 @@ export async function completeOnboarding(data?: {
 /**
  * Skips the onboarding wizard without filling in profile data.
  */
-export async function skipOnboarding(): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function skipOnboarding(artistId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist()
+    const { supabase, artist } = await getCurrentArtist(artistId)
     await upsertArtistProfile(supabase, {
       artist_id: artist.id,
       onboarding_completed: true,
