@@ -24,6 +24,9 @@ export default defineConfig({
   /* Fail the build on CI if a test.only() accidentally gets committed. */
   forbidOnly: !!process.env.CI,
 
+  /* CI runners have no committed snapshot baselines (per AGENTS.md); seed on first run. */
+  updateSnapshots: process.env.CI ? 'missing' : 'none',
+
   /* Retry once on CI to reduce flakiness caused by resource contention. */
   retries: process.env.CI ? 1 : 0,
 
@@ -97,6 +100,21 @@ export default defineConfig({
     env: {
       /* Ensure the server binds to the expected port. */
       PORT: '3000',
+      /* Placeholders so `next build` succeeds when CI secrets are unset (empty string). */
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build',
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key-for-ci',
+      CLOUDFLARE_R2_ACCOUNT_ID: process.env.CLOUDFLARE_R2_ACCOUNT_ID || 'placeholder-r2-account',
+      CLOUDFLARE_R2_ACCESS_KEY_ID:
+        process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || 'placeholder-r2-access-key',
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY:
+        process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || 'placeholder-r2-secret-key',
+      CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME || 'placeholder-bucket',
+      CLOUDFLARE_R2_PUBLIC_URL:
+        process.env.CLOUDFLARE_R2_PUBLIC_URL || 'https://cdn.placeholder.example',
     },
   },
 })

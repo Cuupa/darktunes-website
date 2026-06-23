@@ -51,6 +51,9 @@ export interface ArtistProfile {
   epkGalleryPhotos: string[]
   epkCustomThemeTokens: Record<string, string>
   customLinks: Array<{ label: string; url: string }>
+  epkDocument: Record<string, unknown> | undefined
+  epkDocumentVersion: number
+  epkEditorMode: 'legacy' | 'canvas'
   createdAt: string
   updatedAt: string
 }
@@ -85,6 +88,9 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     epkGalleryPhotos: row.epk_gallery_photos ?? [],
     epkCustomThemeTokens: (row.epk_custom_theme_tokens as Record<string, string> | null) ?? {},
     customLinks: (row as unknown as { custom_links?: Array<{ label: string; url: string }> | null }).custom_links ?? [],
+    epkDocument: row.epk_document ?? undefined,
+    epkDocumentVersion: row.epk_document_version ?? 1,
+    epkEditorMode: (row.epk_editor_mode as ArtistProfile['epkEditorMode'] | null) ?? 'legacy',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

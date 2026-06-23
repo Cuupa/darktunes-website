@@ -100,6 +100,9 @@ const mockProfileRow: ArtistProfileRow = {
   epk_gallery_photos: [],
   epk_custom_theme_tokens: null,
   custom_links: null,
+  epk_document: null,
+  epk_document_version: 1,
+  epk_editor_mode: 'legacy',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -324,6 +327,9 @@ describe('isProfileComplete', () => {
     epkGalleryPhotos: [],
     epkCustomThemeTokens: {},
     customLinks: [],
+    epkDocument: undefined,
+    epkDocumentVersion: 1,
+    epkEditorMode: 'legacy',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   }

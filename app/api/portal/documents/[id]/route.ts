@@ -6,19 +6,14 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getArtistDocument, deleteArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  const { supabase, user } = await authenticatePortalBearer(req)
 
   const artist = await getArtistByUserId(supabase, user.id)
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
@@ -28,7 +23,6 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const doc = await getArtistDocument(supabase, id, artist.id)
   if (!doc) throw new ApiError(404, 'Document not found')
 
-  // Delete from R2
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -42,7 +36,6 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  // Delete DB row
   await deleteArtistDocument(supabase, id, artist.id)
 
   return NextResponse.json({ success: true })

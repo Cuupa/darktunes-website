@@ -56,6 +56,7 @@ import { toast } from 'sonner'
 
 interface ProfileFormProps {
   dict: Dictionary['portal']
+  errors: Dictionary['errors']
   artistId: string | null
   artistName: string | null
   artistSlug: string | null
@@ -72,7 +73,7 @@ interface ProfileFormProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
+export function ProfileForm({ dict, errors, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
   if (!artistId) {
     return (
       <Card className="bg-card border-border">
@@ -83,15 +84,16 @@ export function ProfileForm({ dict, artistId, artistName, artistSlug, initialPro
     )
   }
 
-  return <ProfileFormInner dict={dict} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
+  return <ProfileFormInner dict={dict} errors={errors} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
 }
 
 interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
   artistId: string
 }
 
-function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
+function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
   const [pdfDownloading, setPdfDownloading] = React.useState(false)
+  const epkDocumentRef = React.useRef<HTMLElement>(null)
   const [genreCatalogue, setGenreCatalogue] = React.useState<Genre[]>([])
   const {
     form,
@@ -112,7 +114,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
     handleGalleryRemove,
     handleEpkSettingsChange,
     onSubmit,
-  } = usePortalProfileForm({ artistId, initialProfile, artist, dict })
+  } = usePortalProfileForm({ artistId, initialProfile, artist, dict, errors })
 
   const { fields: customLinkFields, append: appendCustomLink, remove: removeCustomLink } =
     useFieldArray({ control: form.control, name: 'custom_links' })
@@ -198,27 +200,36 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
             type="button"
             variant="outline"
             disabled={pdfDownloading}
+            aria-busy={pdfDownloading}
             onClick={async () => {
               setPdfDownloading(true)
               try {
-                const { generateEpkPdf } = await import('./epkPdf')
-                await generateEpkPdf(epkData)
-              } catch {
-              toast.error(dict.profile_error)
+                const { buildEpkPdfMessages, generateEpkPdf } = await import('./epkPdf')
+                await generateEpkPdf(epkData, buildEpkPdfMessages(dict), epkDocumentRef.current)
+              } catch (err) {
+                const message = err instanceof Error ? err.message : dict.profile_epk_error_print_failed
+                toast.error(message || dict.profile_epk_error_print_failed)
               } finally {
                 setPdfDownloading(false)
               }
             }}
           >
             <FilePdf size={16} aria-hidden="true" className="mr-1.5" />
-            {pdfDownloading ? '…' : dict.profile_download_epk}
+            {pdfDownloading ? dict.profile_epk_downloading : dict.profile_download_epk}
           </Button>
+          <Link
+            href={`/portal/epk-builder?artistId=${artistId}`}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
+          >
+            <FilePdf size={15} aria-hidden="true" />
+            {dict.epk_builder_nav}
+          </Link>
           {artistSlug && (
             <Link
               href={`/artists/${artistSlug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
               aria-label="Preview your public artist profile in a new tab"
             >
               <Eye size={15} aria-hidden="true" />
@@ -638,7 +649,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
           </TabsContent>
 
           {/* ── Tab 5: EPK Preview ───────────────────────────────────────── */}
-          <TabsContent value="epk" className="mt-0">
+          <TabsContent value="epk" className="mt-0" forceMount>
             <EPKPreview
               dict={dict}
               data={epkData}
@@ -653,7 +664,7 @@ function ProfileFormInner({ dict, artistId, artistName, artistSlug, initialProfi
               epkOrientation={epkSettings.epkOrientation}
               epkBgImageUrl={epkSettings.epkBgImageUrl}
               epkBgOpacity={epkSettings.epkBgOpacity}
-              documentRef={undefined}
+              documentRef={epkDocumentRef}
               onSettingsChange={handleEpkSettingsChange}
             />
           </TabsContent>

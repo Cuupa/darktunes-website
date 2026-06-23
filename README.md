@@ -8,7 +8,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
-- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, EPK editor + PDF print view, streaming analytics, release submission + checklist, video submission, tour manager, marketing assets, document vault, label inbox with rich-text replies + realtime updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, interview requests, onboarding wizard, calendar, help FAQ, account settings)
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, legacy EPK presets + canvas EPK Builder at `/portal/epk-builder` with server PDF export, share links, download analytics, and admin starter templates, streaming analytics, release submission + checklist, video submission, tour manager, marketing assets, document vault, label inbox with rich-text replies + realtime updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, interview requests, onboarding wizard, calendar, help FAQ, account settings)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
@@ -172,6 +172,15 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `SUPABASE_REPLICA_URL` | Supabase read-replica URL (Pro plan). Routes heavy analytics/reporting queries away from the primary DB. Falls back to primary when unset. |
 | `SUPABASE_REPLICA_ANON_KEY` | Anon key for the read replica. |
 
+### Playwright E2E (optional — authenticated tests skip when unset)
+
+| Variable | Description |
+|---|---|
+| `E2E_ADMIN_EMAIL` | Admin account email for authenticated admin E2E tests |
+| `E2E_ADMIN_PASSWORD` | Admin account password |
+| `E2E_JOURNALIST_EMAIL` | Journalist account email (optional; admin also works for press dashboard tests) |
+| `E2E_JOURNALIST_PASSWORD` | Journalist account password |
+
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 ---
@@ -304,12 +313,11 @@ app/                          # Next.js App Router entry points
     ├── vitals/route.ts                    # Core Web Vitals RUM ingestion
     ├── journalist-applications/           # Journalist application CRUD
     ├── account/                           # Account export + deletion (GDPR)
-    ├── upload-epk/route.ts                # Presigned EPK asset upload (R2)
-    ├── upload-media/route.ts              # Presigned media upload (R2)
+    ├── upload-epk/route.ts                # Presigned EPK promo-track upload (R2)
     ├── admin/
     │   ├── artists/                       # Artist CRUD + Spotify/iTunes prefill + Discogs enrich
-    │   ├── assets/                        # File explorer APIs (list, folders, batch, storage stats)
-    │   ├── media/                         # Media library APIs (list, folders, batch)
+    │   ├── assets/                        # File explorer APIs (list, folders, batch, bulk-press, storage stats)
+    │   ├── press-kit/                     # Press kit curation (list, add, reorder, remove)
     │   ├── concerts/route.ts              # Admin concert management (any artist)
     │   ├── feature-flags/[id]/route.ts    # Toggle portal/journalist feature flags
     │   ├── users/                         # User management (role, ban, delete, link-artist, invite)

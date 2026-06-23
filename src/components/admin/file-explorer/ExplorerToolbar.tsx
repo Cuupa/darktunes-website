@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { SortDir, SortField, ViewMode } from '@/hooks/useFileExplorer'
+import type { BulkPressAction, PressFilters, SortDir, SortField, ViewMode } from '@/hooks/useFileExplorer'
 
 const R2_FREE_TIER_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB
 
@@ -37,8 +37,13 @@ interface ExplorerToolbarProps {
   onCreateFolder: () => void
   onDeleteSelected: () => void
   onUpload: () => void
-  /** ****** used to authenticate the storage-stats API call. */
+  /** Token used to authenticate the storage-stats API call. */
   authToken?: string | null
+  pressFilters?: PressFilters
+  onPressFiltersChange?: (filters: PressFilters) => void
+  selectedFileCount?: number
+  onBulkPress?: (action: BulkPressAction, kitArtistId?: string | null) => void
+  artists?: Array<{ id: string; name: string }>
 }
 
 export function ExplorerToolbar({
@@ -56,8 +61,14 @@ export function ExplorerToolbar({
   onDeleteSelected,
   onUpload,
   authToken,
+  pressFilters,
+  onPressFiltersChange,
+  selectedFileCount = 0,
+  onBulkPress,
+  artists = [],
 }: ExplorerToolbarProps) {
   const [usedBytes, setUsedBytes] = useState<number | null>(null)
+  const [bulkKitArtistId, setBulkKitArtistId] = useState<string>('label')
 
   const fetchStats = useCallback(() => {
     if (!authToken) return
@@ -79,8 +90,110 @@ export function ExplorerToolbar({
 
   const usedPct = usedBytes !== null ? Math.min(100, (usedBytes / R2_FREE_TIER_BYTES) * 100) : null
 
+  const updatePressFilter = (patch: Partial<PressFilters>) => {
+    if (!pressFilters || !onPressFiltersChange) return
+    onPressFiltersChange({ ...pressFilters, ...patch })
+  }
+
   return (
-    <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
+      {pressFilters && onPressFiltersChange && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={pressFilters.pressOnly ? 'default' : 'outline'}
+            onClick={() => updatePressFilter({ pressOnly: !pressFilters.pressOnly })}
+            aria-pressed={pressFilters.pressOnly}
+          >
+            Press only
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={pressFilters.pressSuggested ? 'default' : 'outline'}
+            onClick={() => updatePressFilter({ pressSuggested: !pressFilters.pressSuggested })}
+            aria-pressed={pressFilters.pressSuggested}
+          >
+            Suggestions
+          </Button>
+          <Select
+            value={pressFilters.pressCategory ?? 'all'}
+            onValueChange={(value) => updatePressFilter({ pressCategory: value === 'all' ? null : value })}
+          >
+            <SelectTrigger className="h-8 w-36" aria-label="Filter by press category">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="photo">Photo</SelectItem>
+              <SelectItem value="promo">Promo</SelectItem>
+              <SelectItem value="live">Live</SelectItem>
+              <SelectItem value="stage">Stage</SelectItem>
+              <SelectItem value="artwork">Artwork</SelectItem>
+              <SelectItem value="logo">Logo</SelectItem>
+              <SelectItem value="social">Social</SelectItem>
+              <SelectItem value="document">Document</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={pressFilters.artistId ?? 'all'}
+            onValueChange={(value) => updatePressFilter({ artistId: value === 'all' ? null : value })}
+          >
+            <SelectTrigger className="h-8 w-40" aria-label="Filter by artist">
+              <SelectValue placeholder="Artist" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All artists</SelectItem>
+              {artists.map((artist) => (
+                <SelectItem key={artist.id} value={artist.id}>{artist.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {selectedFileCount > 0 && onBulkPress && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/50 p-2">
+          <span className="text-xs text-muted-foreground">{selectedFileCount} file(s) selected</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => onBulkPress('approve')}>
+            Approve press
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onBulkPress('unapprove')}>
+            Unapprove
+          </Button>
+          <Select value={bulkKitArtistId} onValueChange={setBulkKitArtistId}>
+            <SelectTrigger className="h-8 w-36" aria-label="Press kit target">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="label">Label-wide</SelectItem>
+              {artists.map((artist) => (
+                <SelectItem key={artist.id} value={artist.id}>{artist.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onBulkPress('addToKit', bulkKitArtistId === 'label' ? null : bulkKitArtistId)}
+          >
+            Add to kit
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onBulkPress('removeFromKit', bulkKitArtistId === 'label' ? null : bulkKitArtistId)}
+          >
+            Remove from kit
+          </Button>
+        </div>
+      )}
+
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -143,6 +256,7 @@ export function ExplorerToolbar({
           </Button>
         )}
       </div>
+    </div>
     </div>
   )
 }

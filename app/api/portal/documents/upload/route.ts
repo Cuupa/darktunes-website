@@ -9,12 +9,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { createArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 
 const MAX_BYTES = 20 * 1024 * 1024 // 20 MB
 
@@ -22,7 +22,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
-  'application/octet-stream', // fallback some browsers send
+  'application/octet-stream',
 ])
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.doc'])
@@ -35,19 +35,11 @@ function getExtension(filename: string): string {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // 1. Authenticate
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
+  const { supabase, user } = await authenticatePortalBearer(req)
 
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
-  // 2. Confirm artist ownership
   const artist = await getArtistByUserId(supabase, user.id)
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  // 3. Parse form data
   const formData = await req.formData()
   const file = formData.get('file')
   const label = formData.get('label')
@@ -70,7 +62,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(415, 'Only PDF and DOCX files are allowed')
   }
 
-  // 4. Upload to R2 (private bucket via same credentials; different key prefix)
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -92,7 +83,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  // 5. Insert DB row
   const doc = await createArtistDocument(supabase, {
     artistId: artist.id,
     label: label.slice(0, 255),

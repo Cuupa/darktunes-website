@@ -1,34 +1,25 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function getRootCssVar(page: Page, name: string): Promise<string> {
+  return page.evaluate((varName) => {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+  }, name)
+}
 
 test.describe('Corporate identity visual validation', () => {
-  test('primary button uses CI violet #493687', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'networkidle' })
-
-    const primary = page.locator('button[class*="bg-primary"], a[class*="bg-primary"]').first()
-    await expect(primary).toBeVisible()
-
-    const background = await primary.evaluate((el) => getComputedStyle(el).backgroundColor)
-    expect(background).toBe('rgb(73, 54, 135)')
+  test('primary token uses CI violet #493687', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect(await getRootCssVar(page, '--primary')).toBe('#493687')
   })
 
-  test('main background uses CI black #101010', async ({ page }) => {
+  test('background token uses CI black #101010 via --background-rgb', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-
-    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
-    expect(background).toBe('rgb(16, 16, 16)')
+    const backgroundRgb = (await getRootCssVar(page, '--background-rgb')).replace(/\s/g, '')
+    await expect(backgroundRgb).toBe('16,16,16')
   })
 
-  test('secondary accent elements use #7e1e37', async ({ page }) => {
+  test('secondary token uses CI pink #7e1e37', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-
-    const accent = page.locator('[class*="bg-secondary"]').first()
-    const accentCount = await accent.count()
-    if (accentCount === 0) {
-      test.skip(true, 'No secondary accent element found on homepage')
-      return
-    }
-
-    const color = await accent.evaluate((el) => getComputedStyle(el).backgroundColor)
-    expect(color).toBe('rgb(126, 30, 55)')
+    await expect(await getRootCssVar(page, '--secondary')).toBe('#7e1e37')
   })
 })

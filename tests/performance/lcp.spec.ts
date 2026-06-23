@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test'
-
-const budget = (production: number, ci: number) => (process.env.CI ? ci : production)
+import { budget, waitForPageSettled } from './budget'
 
 test('Homepage LCP remains below budget', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'LCP measurement runs on Chromium only')
+  test.setTimeout(budget(30_000, 120_000))
 
   await page.goto('/')
-  await page.waitForLoadState('networkidle')
+  await waitForPageSettled(page)
 
   const lcp = await page.evaluate((): Promise<number> => {
     return new Promise((resolve) => {

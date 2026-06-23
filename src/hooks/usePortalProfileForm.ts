@@ -14,7 +14,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { uploadArtistPhoto, uploadRiderDocument, saveArtistProfile } from '@/lib/api/portalProfile'
+import {
+  PortalProfileSaveError,
+  uploadArtistPhoto,
+  uploadRiderDocument,
+  saveArtistProfile,
+} from '@/lib/api/portalProfile'
+import { getErrorMessageFromErrors } from '@/lib/clientErrors'
 import type { RiderType } from '@/lib/api/portalProfile'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
@@ -68,6 +74,7 @@ interface UsePortalProfileFormOptions {
   /** Artist row from the `artists` table — used as fallback when no profile exists yet. */
   artist?: Artist | null
   dict: Dictionary['portal']
+  errors: Dictionary['errors']
 }
 
 export function usePortalProfileForm({
@@ -75,6 +82,7 @@ export function usePortalProfileForm({
   initialProfile,
   artist,
   dict,
+  errors,
 }: UsePortalProfileFormOptions) {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(artist?.imageUrl)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -295,7 +303,7 @@ export function usePortalProfileForm({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(dict.profile_error)
+        toast.error(errors.AUTH_TOKEN_INVALID)
         return
       }
 
@@ -306,6 +314,7 @@ export function usePortalProfileForm({
       await saveArtistProfile(
         {
           artist_id: artistId,
+          image_url: photoUrl ?? null,
           bio: values.bio ?? null,
           bio_short: values.bio_short ?? null,
           bio_medium: values.bio_medium ?? null,
@@ -349,7 +358,11 @@ export function usePortalProfileForm({
       )
 
       toast.success(dict.profile_saved)
-    } catch {
+    } catch (err) {
+      if (err instanceof PortalProfileSaveError) {
+        toast.error(getErrorMessageFromErrors(err.body, errors))
+        return
+      }
       toast.error(dict.profile_error)
     }
   }

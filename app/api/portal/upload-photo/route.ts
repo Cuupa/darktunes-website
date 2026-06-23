@@ -15,11 +15,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 async function uploadPhotoToR2(
   file: File,
@@ -49,28 +48,9 @@ async function uploadPhotoToR2(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // 1. Authenticate
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
-  // 2. Confirm artist ownership
   const artistId = new URL(req.url).searchParams.get('artistId')
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
-  // 3. Parse multipart form
   const formData = await req.formData()
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
@@ -83,7 +63,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP, GIF')
   }
 
-  // 4. Upload to R2
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,

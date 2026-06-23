@@ -69,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_music',
     items: [
       { href: '/portal/profile', label: 'profile', icon: User },
+      { href: '/portal/epk-builder', label: 'epk_builder_nav', icon: FileText, flag: 'artist.epk_builder' },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
       { href: '/portal/calendar', label: 'calendar', icon: CalendarDots, flag: 'artist.calendar' },
       { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },

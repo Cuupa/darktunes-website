@@ -10,20 +10,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { toggleChecklistItem } from '@/lib/api/releaseChecklists'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  const { supabase } = await authenticatePortalBearer(req)
 
   const body: unknown = await req.json()
   if (

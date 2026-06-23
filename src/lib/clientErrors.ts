@@ -55,3 +55,15 @@ export async function getResponseErrorMessage(res: Response, dict: Dictionary): 
     return dict.errors.SERVER_ERROR
   }
 }
+
+/** Like `getErrorMessage` but accepts only the `errors` slice of the dictionary. */
+export function getErrorMessageFromErrors(
+  body: ApiErrorResponse,
+  errors: Dictionary['errors'],
+): string {
+  const code = body.code
+  if (code && (ERROR_CODES as readonly string[]).includes(code)) {
+    return errors[code as keyof Dictionary['errors']]
+  }
+  return errors.SERVER_ERROR
+}

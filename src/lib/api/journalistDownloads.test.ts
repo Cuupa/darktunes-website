@@ -28,6 +28,7 @@ const row = {
   id: 'dl-1',
   journalist_id: 'user-1',
   release_id: 'release-1',
+  asset_id: 'asset-1',
   asset_key: 'promo/file.wav',
   downloaded_at: '2026-01-01T00:00:00Z',
 }
@@ -35,8 +36,14 @@ const row = {
 describe('journalistDownloads DAL', () => {
   it('logs download', async () => {
     const db = makeMockDb(row)
-    const item = await logDownload(db, { journalist_id: 'user-1', release_id: 'release-1', asset_key: 'promo/file.wav' })
+    const item = await logDownload(db, {
+      journalist_id: 'user-1',
+      release_id: 'release-1',
+      asset_id: 'asset-1',
+      asset_key: 'promo/file.wav',
+    })
     expect(item.assetKey).toBe('promo/file.wav')
+    expect(item.assetId).toBe('asset-1')
   })
 
   it('gets history', async () => {

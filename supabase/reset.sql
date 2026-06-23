@@ -919,6 +919,13 @@ CREATE TABLE IF NOT EXISTS public.assets (
   tags              TEXT[]  NOT NULL DEFAULT '{}',
   sha256_hash       TEXT,
   release_id        UUID    REFERENCES public.releases (id) ON DELETE SET NULL,
+  alt_text              TEXT,
+  is_press_approved     BOOLEAN NOT NULL DEFAULT FALSE,
+  press_suggested       BOOLEAN NOT NULL DEFAULT FALSE,
+  press_category        TEXT,
+  press_caption         TEXT,
+  photographer_credit   TEXT,
+  downloadable_for_press BOOLEAN NOT NULL DEFAULT TRUE,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -928,6 +935,13 @@ ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT 
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS sha256_hash TEXT;
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS original_filename TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS release_id UUID REFERENCES public.releases(id) ON DELETE SET NULL;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS alt_text TEXT;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS is_press_approved BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS press_suggested BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS press_category TEXT;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS press_caption TEXT;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS photographer_credit TEXT;
+ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS downloadable_for_press BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_assets_uploaded_by ON public.assets (uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_assets_mime_type   ON public.assets (mime_type);
@@ -936,6 +950,8 @@ CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
 CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
 CREATE INDEX IF NOT EXISTS idx_assets_release_id  ON public.assets (release_id);
+CREATE INDEX IF NOT EXISTS idx_assets_press_approved ON public.assets (is_press_approved) WHERE is_press_approved = TRUE;
+CREATE INDEX IF NOT EXISTS idx_assets_press_suggested ON public.assets (press_suggested) WHERE press_suggested = TRUE;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: asset_artists  (many-to-many: one asset can belong to multiple artists)
@@ -947,6 +963,28 @@ CREATE TABLE IF NOT EXISTS public.asset_artists (
 );
 CREATE INDEX IF NOT EXISTS idx_asset_artists_asset_id  ON public.asset_artists(asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_artists_artist_id ON public.asset_artists(artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: press_kit_items  (curated press kit membership per artist)
+-- artist_id NULL = label-wide kit entry visible on all artist EPK pages
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.press_kit_items (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id      UUID        NOT NULL REFERENCES public.assets(id) ON DELETE CASCADE,
+  artist_id     UUID        REFERENCES public.artists(id) ON DELETE CASCADE,
+  display_order INTEGER     NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_press_kit_items_artist_order
+  ON public.press_kit_items (artist_id, display_order ASC);
+CREATE INDEX IF NOT EXISTS idx_press_kit_items_asset_id
+  ON public.press_kit_items (asset_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_press_kit_items_asset_label
+  ON public.press_kit_items (asset_id) WHERE artist_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_press_kit_items_asset_artist
+  ON public.press_kit_items (asset_id, artist_id) WHERE artist_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: site_settings  (CMS key-value store)
@@ -1211,6 +1249,102 @@ ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_sections_hidden   TE
 -- EPK Password protection for sensitive sections
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_hash     TEXT;
 ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_password_sections TEXT[] NOT NULL DEFAULT '{}';
+-- EPK Canvas Builder (v2 document JSON)
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_document          JSONB;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_document_version  INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE public.artist_epks ADD COLUMN IF NOT EXISTS epk_editor_mode       TEXT NOT NULL DEFAULT 'legacy';
+
+COMMENT ON COLUMN public.artist_epks.epk_document IS
+  'EPK Canvas document JSON (schema version 2) — Konva editor state.';
+COMMENT ON COLUMN public.artist_epks.epk_editor_mode IS
+  'EPK editor mode: legacy (HTML presets) or canvas (Konva builder).';
+
+-- ---------------------------------------------------------------------------
+-- TABLE: epk_versions  (EPK document version history)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.epk_versions (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  document        JSONB       NOT NULL,
+  version_number  INTEGER     NOT NULL,
+  label           TEXT,
+  created_by      UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_epk_versions_artist_id ON public.epk_versions (artist_id);
+CREATE INDEX IF NOT EXISTS idx_epk_versions_created_at ON public.epk_versions (artist_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_epk_versions_artist_version
+  ON public.epk_versions (artist_id, version_number);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: epk_fonts  (custom fonts for EPK canvas)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.epk_fonts (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
+  name            TEXT        NOT NULL,
+  r2_key          TEXT        NOT NULL,
+  mime_type       TEXT        NOT NULL DEFAULT 'font/woff2',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_epk_fonts_artist_id ON public.epk_fonts (artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: epk_share_links  (tokenized public EPK share URLs)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.epk_share_links (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  token           TEXT        NOT NULL UNIQUE,
+  password_hash   TEXT,
+  expires_at      TIMESTAMPTZ,
+  label           TEXT,
+  created_by      UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at      TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_epk_share_links_token ON public.epk_share_links (token);
+CREATE INDEX IF NOT EXISTS idx_epk_share_links_artist_id ON public.epk_share_links (artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: epk_download_events  (EPK PDF download analytics)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.epk_download_events (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id     UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  source        TEXT        NOT NULL CHECK (source IN ('portal', 'share', 'press')),
+  share_link_id UUID        REFERENCES public.epk_share_links (id) ON DELETE SET NULL,
+  ip_hash       TEXT,
+  user_agent    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_epk_download_events_artist_id ON public.epk_download_events (artist_id);
+CREATE INDEX IF NOT EXISTS idx_epk_download_events_created_at ON public.epk_download_events (artist_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: epk_templates  (admin brand guideline / starter templates)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.epk_templates (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT        NOT NULL,
+  description  TEXT,
+  document     JSONB       NOT NULL,
+  is_published BOOLEAN     NOT NULL DEFAULT FALSE,
+  sort_order   INTEGER     NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_epk_templates_published ON public.epk_templates (is_published, sort_order);
+
+DROP TRIGGER IF EXISTS trg_epk_templates_updated_at ON public.epk_templates;
+CREATE TRIGGER trg_epk_templates_updated_at
+  BEFORE UPDATE ON public.epk_templates
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 COMMENT ON COLUMN public.artist_epks.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
@@ -1281,7 +1415,8 @@ CREATE TRIGGER trg_release_checklists_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- TABLE: press_photos  (public EPK photos stored in R2)
+-- TABLE: press_photos  (DEPRECATED — migrated to assets + press_kit_items)
+-- Kept for idempotent backfill on existing databases only.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.press_photos (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1485,14 +1620,19 @@ CREATE TABLE IF NOT EXISTS public.journalist_downloads (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   journalist_id UUID        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   release_id    UUID        REFERENCES public.releases (id) ON DELETE SET NULL,
+  asset_id      UUID        REFERENCES public.assets (id) ON DELETE SET NULL,
   asset_key     TEXT        NOT NULL,
   downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.journalist_downloads ADD COLUMN IF NOT EXISTS asset_id UUID REFERENCES public.assets(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_journalist_downloads_journalist_id
   ON public.journalist_downloads (journalist_id);
 CREATE INDEX IF NOT EXISTS idx_journalist_downloads_downloaded_at
   ON public.journalist_downloads (downloaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_journalist_downloads_asset_id
+  ON public.journalist_downloads (asset_id);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: accreditation_requests
@@ -1647,6 +1787,11 @@ ALTER TABLE public.site_settings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_logs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.concerts              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_epks       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.epk_versions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.epk_fonts         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.epk_share_links   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.epk_download_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.epk_templates     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
@@ -1875,10 +2020,17 @@ DROP POLICY IF EXISTS "assets: admin delete"                ON public.assets;
 DROP POLICY IF EXISTS "assets: editor+ update"              ON public.assets;
 DROP POLICY IF EXISTS "assets: can_view_admin_panel insert" ON public.assets;
 DROP POLICY IF EXISTS "assets: can_view_admin_panel update" ON public.assets;
+DROP POLICY IF EXISTS "assets: public press read"            ON public.assets;
 
 -- Allows any authenticated user to read assets
 CREATE POLICY "assets: authenticated read" ON public.assets
   FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Allows anonymous/public read of press-approved assets (replaces press_photos public read)
+CREATE POLICY "assets: public press read" ON public.assets
+  FOR SELECT USING (
+    is_press_approved = TRUE AND downloadable_for_press = TRUE
+  );
 
 -- Requires can_view_admin_panel permission (admin always bypasses)
 CREATE POLICY "assets: can_view_admin_panel insert" ON public.assets
@@ -2142,6 +2294,145 @@ CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
+-- Public read for visible artists (press portal + public EPK viewer)
+DROP POLICY IF EXISTS "artist_epks: public read visible" ON public.artist_epks;
+CREATE POLICY "artist_epks: public read visible" ON public.artist_epks
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id AND a.is_visible = TRUE
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- RLS: epk_versions
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "epk_versions: artist read own"   ON public.epk_versions;
+DROP POLICY IF EXISTS "epk_versions: artist insert own" ON public.epk_versions;
+DROP POLICY IF EXISTS "epk_versions: admin all"         ON public.epk_versions;
+
+CREATE POLICY "epk_versions: artist read own" ON public.epk_versions
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_versions: artist insert own" ON public.epk_versions
+  FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+
+CREATE POLICY "epk_versions: admin all" ON public.epk_versions
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: epk_fonts
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "epk_fonts: artist read own"   ON public.epk_fonts;
+DROP POLICY IF EXISTS "epk_fonts: artist insert own" ON public.epk_fonts;
+DROP POLICY IF EXISTS "epk_fonts: artist delete own" ON public.epk_fonts;
+DROP POLICY IF EXISTS "epk_fonts: admin all"         ON public.epk_fonts;
+
+CREATE POLICY "epk_fonts: artist read own" ON public.epk_fonts
+  FOR SELECT USING (
+    artist_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_fonts: artist insert own" ON public.epk_fonts
+  FOR INSERT
+  WITH CHECK (
+    artist_id IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_fonts: artist delete own" ON public.epk_fonts
+  FOR DELETE USING (
+    artist_id IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_fonts: admin all" ON public.epk_fonts
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+DROP POLICY IF EXISTS "epk_fonts: public read visible artist" ON public.epk_fonts;
+CREATE POLICY "epk_fonts: public read visible artist" ON public.epk_fonts
+  FOR SELECT USING (
+    artist_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id AND a.is_visible = TRUE
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- RLS: epk_share_links
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "epk_share_links: artist read own"   ON public.epk_share_links;
+DROP POLICY IF EXISTS "epk_share_links: artist insert own" ON public.epk_share_links;
+DROP POLICY IF EXISTS "epk_share_links: artist update own" ON public.epk_share_links;
+DROP POLICY IF EXISTS "epk_share_links: admin all"         ON public.epk_share_links;
+
+CREATE POLICY "epk_share_links: artist read own" ON public.epk_share_links
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_share_links: artist insert own" ON public.epk_share_links
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_share_links: artist update own" ON public.epk_share_links
+  FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_share_links: admin all" ON public.epk_share_links
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: epk_download_events
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "epk_download_events: artist read own" ON public.epk_download_events;
+DROP POLICY IF EXISTS "epk_download_events: admin all"     ON public.epk_download_events;
+
+CREATE POLICY "epk_download_events: artist read own" ON public.epk_download_events
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "epk_download_events: admin all" ON public.epk_download_events
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: epk_templates
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "epk_templates: read published" ON public.epk_templates;
+DROP POLICY IF EXISTS "epk_templates: admin all"      ON public.epk_templates;
+
+CREATE POLICY "epk_templates: read published" ON public.epk_templates
+  FOR SELECT USING (
+    (is_published = TRUE AND auth.uid() IS NOT NULL)
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
+
+CREATE POLICY "epk_templates: admin all" ON public.epk_templates
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
 -- ---------------------------------------------------------------------------
 -- RLS: streaming_stats
 -- ---------------------------------------------------------------------------
@@ -2211,20 +2502,55 @@ CREATE POLICY "release_checklists: admin all" ON public.release_checklists
   WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
--- RLS: press_photos
+-- RLS: press_photos  (DEPRECATED — kept for legacy DB backfill source only)
 -- ---------------------------------------------------------------------------
+ALTER TABLE public.press_photos ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "press_photos: public read" ON public.press_photos;
 DROP POLICY IF EXISTS "press_photos: admin all"   ON public.press_photos;
 
--- Allows public read access to all press photos
 CREATE POLICY "press_photos: public read" ON public.press_photos
   FOR SELECT USING (TRUE);
 
--- Allows admins full access to press photos
 CREATE POLICY "press_photos: admin all" ON public.press_photos
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: press_kit_items
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.press_kit_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "press_kit_items: public read"                    ON public.press_kit_items;
+DROP POLICY IF EXISTS "press_kit_items: can_view_admin_panel insert"    ON public.press_kit_items;
+DROP POLICY IF EXISTS "press_kit_items: can_view_admin_panel update"    ON public.press_kit_items;
+DROP POLICY IF EXISTS "press_kit_items: can_view_admin_panel delete"    ON public.press_kit_items;
+
+CREATE POLICY "press_kit_items: public read" ON public.press_kit_items
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.assets a
+      WHERE a.id = asset_id
+        AND a.is_press_approved = TRUE
+        AND a.downloadable_for_press = TRUE
+    )
+  );
+
+CREATE POLICY "press_kit_items: can_view_admin_panel insert" ON public.press_kit_items
+  FOR INSERT WITH CHECK (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  );
+
+CREATE POLICY "press_kit_items: can_view_admin_panel update" ON public.press_kit_items
+  FOR UPDATE USING (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  ) WITH CHECK (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  );
+
+CREATE POLICY "press_kit_items: can_view_admin_panel delete" ON public.press_kit_items
+  FOR DELETE USING (
+    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  );
 
 -- ---------------------------------------------------------------------------
 -- RLS: promo_tracks
@@ -2411,6 +2737,7 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.invoices', 'Artist Invoices', TRUE, 'artist'),
   ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
   ('artist.calendar', 'Artist Release Calendar', TRUE, 'artist'),
+  ('artist.epk_builder', 'EPK Canvas Builder', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 
@@ -2543,7 +2870,7 @@ CREATE TABLE IF NOT EXISTS public.media_folders (
 CREATE INDEX IF NOT EXISTS idx_media_folders_parent_id ON public.media_folders(parent_id);
 
 -- ---------------------------------------------------------------------------
--- TABLE: media_files  (dedicated filesystem for Press & Media tab)
+-- TABLE: media_files  (DEPRECATED — migrated to assets; kept for backfill only)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.media_files (
   id                UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3674,6 +4001,132 @@ CREATE POLICY "promo_log: artist read" ON public.promo_log_entries
       SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()
     )
   );
+
+-- =============================================================================
+-- DATA BACKFILL: press_photos + media_files → assets + press_kit_items
+-- Idempotent — safe to re-run on existing databases.
+-- =============================================================================
+DO $$
+DECLARE
+  v_photo RECORD;
+  v_media RECORD;
+  v_asset_id UUID;
+  v_ext TEXT;
+  v_mime TEXT;
+BEGIN
+  -- Migrate legacy press_photos into assets + press_kit_items
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'press_photos'
+  ) THEN
+    FOR v_photo IN SELECT * FROM public.press_photos LOOP
+      SELECT id INTO v_asset_id FROM public.assets WHERE r2_key = v_photo.r2_key LIMIT 1;
+
+      IF v_asset_id IS NULL THEN
+        v_ext := lower(regexp_replace(v_photo.r2_key, '.*(\.[^.]+)$', '\1'));
+        v_mime := CASE v_ext
+          WHEN '.png'  THEN 'image/png'
+          WHEN '.webp' THEN 'image/webp'
+          WHEN '.gif'  THEN 'image/gif'
+          WHEN '.svg'  THEN 'image/svg+xml'
+          WHEN '.pdf'  THEN 'application/pdf'
+          ELSE 'image/jpeg'
+        END;
+
+        INSERT INTO public.assets (
+          filename, original_filename, mime_type, size_bytes,
+          r2_key, public_url, artist_id,
+          alt_text, is_press_approved, press_category, downloadable_for_press,
+          created_at
+        ) VALUES (
+          reverse(split_part(reverse(v_photo.r2_key), '/', 1)),
+          v_photo.title,
+          v_mime,
+          0,
+          v_photo.r2_key,
+          v_photo.public_url,
+          v_photo.artist_id,
+          v_photo.alt_text,
+          TRUE,
+          v_photo.category,
+          TRUE,
+          v_photo.created_at
+        )
+        ON CONFLICT (r2_key) DO NOTHING
+        RETURNING id INTO v_asset_id;
+
+        IF v_asset_id IS NULL THEN
+          SELECT id INTO v_asset_id FROM public.assets WHERE r2_key = v_photo.r2_key LIMIT 1;
+        END IF;
+      ELSE
+        UPDATE public.assets SET
+          alt_text              = COALESCE(alt_text, v_photo.alt_text),
+          is_press_approved     = TRUE,
+          press_category        = COALESCE(press_category, v_photo.category),
+          downloadable_for_press = TRUE,
+          artist_id             = COALESCE(artist_id, v_photo.artist_id),
+          original_filename     = CASE
+            WHEN original_filename = '' OR original_filename IS NULL THEN v_photo.title
+            ELSE original_filename
+          END
+        WHERE id = v_asset_id;
+      END IF;
+
+      IF v_asset_id IS NOT NULL THEN
+        IF v_photo.artist_id IS NULL THEN
+          IF NOT EXISTS (
+            SELECT 1 FROM public.press_kit_items
+            WHERE asset_id = v_asset_id AND artist_id IS NULL
+          ) THEN
+            INSERT INTO public.press_kit_items (asset_id, artist_id, display_order)
+            VALUES (v_asset_id, NULL, v_photo.display_order);
+          END IF;
+        ELSE
+          IF NOT EXISTS (
+            SELECT 1 FROM public.press_kit_items
+            WHERE asset_id = v_asset_id AND artist_id = v_photo.artist_id
+          ) THEN
+            INSERT INTO public.press_kit_items (asset_id, artist_id, display_order)
+            VALUES (v_asset_id, v_photo.artist_id, v_photo.display_order);
+          END IF;
+        END IF;
+      END IF;
+    END LOOP;
+  END IF;
+
+  -- Migrate legacy media_files into assets (no auto press-kit membership)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'media_files'
+  ) THEN
+    FOR v_media IN SELECT * FROM public.media_files LOOP
+      SELECT id INTO v_asset_id FROM public.assets WHERE r2_key = v_media.r2_key LIMIT 1;
+
+      IF v_asset_id IS NULL THEN
+        INSERT INTO public.assets (
+          filename, original_filename, mime_type, size_bytes,
+          r2_key, public_url, uploaded_by, folder_id, artist_id,
+          tags, sha256_hash, created_at
+        ) VALUES (
+          v_media.filename,
+          v_media.original_filename,
+          v_media.mime_type,
+          v_media.size_bytes,
+          v_media.r2_key,
+          v_media.public_url,
+          v_media.uploaded_by,
+          NULL,
+          v_media.artist_id,
+          v_media.tags,
+          v_media.sha256_hash,
+          v_media.created_at
+        )
+        ON CONFLICT (r2_key) DO NOTHING;
+      END IF;
+    END LOOP;
+  END IF;
+END;
+$$;
 
 -- =============================================================================
 -- Backfill claims for all existing users

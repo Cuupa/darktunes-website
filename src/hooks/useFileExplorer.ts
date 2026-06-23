@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { isSupabaseConfigured } from '@/env'
+import { rowToAsset } from '@/lib/api/assets'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Asset, AssetFolder } from '@/types'
 import type { Database } from '@/types/database'
@@ -9,6 +10,31 @@ import type { Database } from '@/types/database'
 export type ViewMode = 'grid' | 'list'
 export type SortField = 'name' | 'size' | 'date' | 'type'
 export type SortDir = 'asc' | 'desc'
+
+export interface PressFilters {
+  pressOnly: boolean
+  pressSuggested: boolean
+  pressCategory: string | null
+  artistId: string | null
+}
+
+export type BulkPressAction = 'approve' | 'unapprove' | 'addToKit' | 'removeFromKit'
+
+export interface AssetUpdatePayload {
+  tags?: string[]
+  artistId?: string | null
+  artistIds?: string[]
+  releaseId?: string | null
+  folderId?: string | null
+  originalFilename?: string
+  altText?: string | null
+  isPressApproved?: boolean
+  pressSuggested?: boolean
+  pressCategory?: string | null
+  pressCaption?: string | null
+  photographerCredit?: string | null
+  downloadableForPress?: boolean
+}
 
 export interface UseFileExplorerState {
   currentFolderId: string | null
@@ -38,14 +64,11 @@ export interface UseFileExplorerState {
   deleteAsset: (id: string) => Promise<void>
   batchDelete: (ids: string[]) => Promise<void>
   moveAsset: (assetId: string, newFolderId: string | null) => Promise<void>
-  updateAsset: (assetId: string, updates: {
-    tags?: string[]
-    artistId?: string | null
-    artistIds?: string[]
-    releaseId?: string | null
-    folderId?: string | null
-    originalFilename?: string
-  }) => Promise<void>
+  updateAsset: (assetId: string, updates: AssetUpdatePayload) => Promise<void>
+  pressFilters: PressFilters
+  setPressFilters: (filters: PressFilters) => void
+  pressFilterActive: boolean
+  bulkPressAction: (action: BulkPressAction, kitArtistId?: string | null) => Promise<void>
   reload: () => void
   token: string | null
 }
@@ -66,23 +89,7 @@ function mapFolder(row: FolderRow): AssetFolder {
 }
 
 function mapAsset(row: AssetRow): Asset {
-  return {
-    id: row.id,
-    filename: row.filename,
-    originalFilename: row.original_filename,
-    mimeType: row.mime_type,
-    sizeBytes: row.size_bytes,
-    r2Key: row.r2_key,
-    publicUrl: row.public_url,
-    uploadedBy: row.uploaded_by ?? undefined,
-    createdAt: row.created_at,
-    folderId: row.folder_id ?? undefined,
-    artistId: row.artist_id ?? undefined,
-    artistIds: [],
-    releaseId: row.release_id ?? undefined,
-    tags: row.tags ?? [],
-    sha256Hash: row.sha256_hash ?? undefined,
-  }
+  return rowToAsset(row)
 }
 
 function buildFolderPath(folders: AssetFolder[], folderId: string | null): AssetFolder[] {
@@ -135,6 +142,19 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
   const [isSearching, setIsSearching] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [token, setToken] = useState<string | null>(null)
+  const [pressFilters, setPressFilters] = useState<PressFilters>({
+    pressOnly: false,
+    pressSuggested: false,
+    pressCategory: null,
+    artistId: null,
+  })
+  const [pressFilteredAssets, setPressFilteredAssets] = useState<Asset[]>([])
+
+  const pressFilterActive =
+    pressFilters.pressOnly
+    || pressFilters.pressSuggested
+    || Boolean(pressFilters.pressCategory)
+    || Boolean(pressFilters.artistId)
 
   useEffect(() => {
     setCurrentFolderId(initialFolderId)
@@ -186,8 +206,41 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
   }, [supabase])
 
   useEffect(() => {
+    if (pressFilterActive) return
     void fetchFolderContents(currentFolderId)
-  }, [currentFolderId, fetchFolderContents])
+  }, [currentFolderId, fetchFolderContents, pressFilterActive])
+
+  const fetchPressFilteredAssets = useCallback(async () => {
+    if (!pressFilterActive) {
+      setPressFilteredAssets([])
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const currentToken = token ?? (await supabase.auth.getSession()).data.session?.access_token ?? null
+      if (!currentToken) return
+
+      const params = new URLSearchParams()
+      if (pressFilters.pressOnly) params.set('pressOnly', '1')
+      if (pressFilters.pressSuggested) params.set('pressSuggested', '1')
+      if (pressFilters.pressCategory) params.set('pressCategory', pressFilters.pressCategory)
+      if (pressFilters.artistId) params.set('artistId', pressFilters.artistId)
+
+      const response = await fetch(`/api/admin/assets?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      })
+      if (!response.ok) throw new Error(await response.text())
+      const json = (await response.json()) as { assets: Asset[] }
+      setPressFilteredAssets(json.assets)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [pressFilterActive, pressFilters, supabase, token])
+
+  useEffect(() => {
+    void fetchPressFilteredAssets()
+  }, [fetchPressFilteredAssets])
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -354,23 +407,23 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
 
   const updateAssetMutation = useCallback(async (
     assetId: string,
-    updates: {
-      tags?: string[]
-      artistId?: string | null
-      artistIds?: string[]
-      releaseId?: string | null
-      folderId?: string | null
-      originalFilename?: string
-    },
+    updates: AssetUpdatePayload,
   ): Promise<void> => {
     const currentToken = await getToken()
-    const body: Record<string, string | string[] | null> = {}
+    const body: Record<string, string | string[] | boolean | null> = {}
     if ('tags' in updates) body.tags = updates.tags ?? []
     if ('artistId' in updates) body.artistId = updates.artistId ?? null
     if ('artistIds' in updates) body.artistIds = updates.artistIds ?? []
     if ('releaseId' in updates) body.releaseId = updates.releaseId ?? null
     if ('folderId' in updates) body.folderId = updates.folderId ?? null
     if ('originalFilename' in updates) body.originalFilename = updates.originalFilename ?? ''
+    if ('altText' in updates) body.altText = updates.altText ?? null
+    if ('isPressApproved' in updates) body.isPressApproved = updates.isPressApproved ?? false
+    if ('pressSuggested' in updates) body.pressSuggested = updates.pressSuggested ?? false
+    if ('pressCategory' in updates) body.pressCategory = updates.pressCategory ?? null
+    if ('pressCaption' in updates) body.pressCaption = updates.pressCaption ?? null
+    if ('photographerCredit' in updates) body.photographerCredit = updates.photographerCredit ?? null
+    if ('downloadableForPress' in updates) body.downloadableForPress = updates.downloadableForPress ?? true
 
     const response = await fetch(`/api/admin/assets/${assetId}`, {
       method: 'PATCH',
@@ -381,14 +434,57 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
       body: JSON.stringify(body),
     })
     if (!response.ok) throw new Error(await response.text())
-    await fetchFolderContents(currentFolderId)
-  }, [currentFolderId, fetchFolderContents, getToken])
+    const json = (await response.json()) as { asset: Asset }
+    setAssets((previous) => previous.map((item) => (item.id === assetId ? json.asset : item)))
+    setPressFilteredAssets((previous) => previous.map((item) => (item.id === assetId ? json.asset : item)))
+    if (!pressFilterActive) {
+      await fetchFolderContents(currentFolderId)
+    } else {
+      await fetchPressFilteredAssets()
+    }
+  }, [currentFolderId, fetchFolderContents, fetchPressFilteredAssets, getToken, pressFilterActive])
+
+  const bulkPressActionMutation = useCallback(async (
+    action: BulkPressAction,
+    kitArtistId?: string | null,
+  ): Promise<void> => {
+    const fileIds = [...selectedIds].filter((id) => !id.startsWith('folder:'))
+    if (fileIds.length === 0) throw new Error('Select at least one file')
+
+    const currentToken = await getToken()
+    const response = await fetch('/api/admin/assets/bulk-press', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${currentToken}`,
+      },
+      body: JSON.stringify({
+        assetIds: fileIds,
+        action,
+        artistId: kitArtistId === undefined ? null : kitArtistId,
+      }),
+    })
+    if (!response.ok) throw new Error(await response.text())
+
+    setSelectedIds(new Set())
+    if (pressFilterActive) {
+      await fetchPressFilteredAssets()
+    } else {
+      await fetchFolderContents(currentFolderId)
+    }
+  }, [currentFolderId, fetchFolderContents, fetchPressFilteredAssets, getToken, pressFilterActive, selectedIds])
+
+  const sortedFolderAssets = sortAssets(
+    pressFilterActive ? pressFilteredAssets : assets,
+    sortField,
+    sortDir,
+  )
 
   return {
     currentFolderId,
     folderPath,
     folders,
-    assets: sortAssets(assets, sortField, sortDir),
+    assets: sortedFolderAssets,
     allFolders,
     viewMode,
     setViewMode,
@@ -413,7 +509,14 @@ export function useFileExplorer(initialFolderId: string | null = null): UseFileE
     batchDelete: batchDeleteMutation,
     moveAsset: moveAssetMutation,
     updateAsset: updateAssetMutation,
-    reload: () => void fetchFolderContents(currentFolderId),
+    pressFilters,
+    setPressFilters,
+    pressFilterActive,
+    bulkPressAction: bulkPressActionMutation,
+    reload: () => {
+      if (pressFilterActive) void fetchPressFilteredAssets()
+      else void fetchFolderContents(currentFolderId)
+    },
     token,
   }
 }

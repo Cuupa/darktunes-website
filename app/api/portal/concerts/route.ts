@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createConcert, updateConcert, deleteConcert, setConcertArtists } from '@/lib/api/concerts'
+import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 /** Normalize a URL string: prepend https:// if no scheme is present. */
 function normalizeUrl(url: string | null | undefined): string | null {
@@ -70,33 +69,9 @@ const updateSchema = z.object({
   status: z.string().optional(),
 })
 
-async function getRequestArtist(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
-
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token)
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
-
-  const artistId = request.nextUrl?.searchParams.get('artistId') ?? new URL(request.url).searchParams.get('artistId')
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, artistId)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  }
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  return { supabase, artist, user }
-}
-
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, artist, user } = await getRequestArtist(req)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
   const body = createSchema.parse(await req.json())
 
   const concert = await createConcert(supabase, {
@@ -128,7 +103,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
-  const { supabase } = await getRequestArtist(req)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const { supabase } = await authenticatePortalBearerWithArtist(req, artistId)
   const body = updateSchema.parse(await req.json())
 
   const concert = await updateConcert(supabase, body.id, {
@@ -157,7 +133,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const { supabase } = await getRequestArtist(req)
+  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const { supabase } = await authenticatePortalBearerWithArtist(req, artistId)
   let id = req.nextUrl.searchParams.get('id')
   if (!id) {
     const body = (await req.json().catch(() => null)) as { id?: string } | null

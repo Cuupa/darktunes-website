@@ -11,8 +11,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { withErrorHandler, buildApiError } from '@/lib/errors'
+import {
+  createBearerAuthSupabaseClient,
+  createServerSupabaseClient,
+} from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { z } from 'zod'
 import { scryptSync, randomBytes } from 'crypto'
@@ -34,7 +37,7 @@ const profileBodySchema = z.object({
   bio_short: z.string().max(6000).nullable().optional(),
   bio_medium: z.string().max(12000).nullable().optional(),
   bio_long: z.string().max(30000).nullable().optional(),
-  photo_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  image_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   genres: z.array(z.string()).optional(),
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Accepted here so the form submits a single payload; written to artists only.
@@ -82,21 +85,25 @@ const normalizeUrl = (v: NullableUrl): string | null => (v === '' ? null : v ?? 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
   // 1. Authenticate
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
+  if (!token) throw buildApiError('AUTH_TOKEN_MISSING', 401)
 
-  const supabase = await createServerSupabaseClient()
+  // Validate the Bearer token, then use a JWT-authenticated client so RLS
+  // policies see auth.uid() correctly (cookie session may be absent/stale).
+  const authClient = await createServerSupabaseClient()
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser(token)
+  } = await authClient.auth.getUser(token)
 
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  if (authError || !user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
+
+  const supabase = await createBearerAuthSupabaseClient(token)
 
   // 2. Validate body
   const body: unknown = await req.json()
   const parsed = profileBodySchema.safeParse(body)
   if (!parsed.success) {
-    throw new ApiError(400, parsed.error.issues.map((e) => e.message).join('; '))
+    throw buildApiError('VALIDATION_ERROR', 400)
   }
 
   // 3. Confirm the artist_id in the body belongs to the authenticated user
@@ -105,10 +112,10 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
   } catch (err) {
     const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'You do not have permission to update this profile')
+    if (msg.startsWith('FORBIDDEN')) throw buildApiError('FORBIDDEN', 403)
     throw err
   }
-  if (!artist) throw new ApiError(403, 'You do not have permission to update this profile')
+  if (!artist) throw buildApiError('FORBIDDEN', 403)
 
   // 4. Build upsert payload — resolve password before inserting.
   // Social/streaming URLs (website_url, instagram_url, etc.) are stored in
@@ -124,7 +131,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     tiktok_url,
     facebook_url,
     soundcloud_url,
-    photo_url,
+    image_url,
     rider_stage_plot_url,
     rider_technical_url,
     rider_hospitality_url,
@@ -158,7 +165,6 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   const profileData = {
     ...profileFields,
-    ...(photo_url !== undefined ? { photo_url: normalizeUrl(photo_url) } : {}),
     ...(rider_stage_plot_url !== undefined ? { rider_stage_plot_url: normalizeUrl(rider_stage_plot_url) } : {}),
     ...(rider_technical_url !== undefined ? { rider_technical_url: normalizeUrl(rider_technical_url) } : {}),
     ...(rider_hospitality_url !== undefined ? { rider_hospitality_url: normalizeUrl(rider_hospitality_url) } : {}),
@@ -187,8 +193,16 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (tiktok_url !== undefined) artistUpdate.tiktok_url = normalizeUrl(tiktok_url)
   if (facebook_url !== undefined) artistUpdate.facebook_url = normalizeUrl(facebook_url)
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
+  if (image_url !== undefined) artistUpdate.image_url = normalizeUrl(image_url)
 
-  await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+  const { error: artistUpdateError } = await supabase
+    .from('artists')
+    .update(artistUpdate)
+    .eq('id', artist.id)
+
+  if (artistUpdateError) {
+    throw buildApiError('FORBIDDEN', 403)
+  }
 
   // 6. Invalidate public-facing artist pages so changes are reflected immediately
   if (artist.slug) {

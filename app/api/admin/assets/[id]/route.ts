@@ -13,6 +13,13 @@ interface PatchAssetBody {
   releaseId?: string | null
   tags?: string[]
   originalFilename?: string
+  altText?: string | null
+  isPressApproved?: boolean
+  pressSuggested?: boolean
+  pressCategory?: string | null
+  pressCaption?: string | null
+  photographerCredit?: string | null
+  downloadableForPress?: boolean
 }
 
 function extractId(req: NextRequest): string {
@@ -35,6 +42,13 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
   if ('releaseId' in body) updates.releaseId = body.releaseId ?? null
   if ('tags' in body) updates.tags = body.tags ?? []
   if ('originalFilename' in body) updates.originalFilename = body.originalFilename?.trim() ?? ''
+  if ('altText' in body) updates.altText = body.altText ?? null
+  if ('isPressApproved' in body) updates.isPressApproved = body.isPressApproved ?? false
+  if ('pressSuggested' in body) updates.pressSuggested = body.pressSuggested ?? false
+  if ('pressCategory' in body) updates.pressCategory = body.pressCategory ?? null
+  if ('pressCaption' in body) updates.pressCaption = body.pressCaption ?? null
+  if ('photographerCredit' in body) updates.photographerCredit = body.photographerCredit ?? null
+  if ('downloadableForPress' in body) updates.downloadableForPress = body.downloadableForPress ?? true
   if (Object.keys(updates).length === 0) throw new ApiError(400, 'No asset changes provided')
 
   const supabase = await createServerSupabaseClient()

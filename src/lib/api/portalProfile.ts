@@ -5,7 +5,16 @@
  * Keeps XHR/fetch calls out of the UI component (SRP).
  */
 
+import type { ApiErrorResponse } from '@/lib/errors'
 import type { Database } from '@/types/database'
+
+/** Thrown when /api/portal/profile returns a non-2xx response. */
+export class PortalProfileSaveError extends Error {
+  constructor(public readonly body: ApiErrorResponse) {
+    super(body.error)
+    this.name = 'PortalProfileSaveError'
+  }
+}
 
 /**
  * Payload for saving an artist profile via /api/portal/profile.
@@ -39,12 +48,13 @@ export type ArtistProfilePayload = Pick<
   // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
   epk_password_raw?: string | null
   epk_custom_theme_tokens?: Record<string, string> | null
-  // bio, genres, founding_year, and hometown are stored in the artists table (single source of truth).
+  // bio, genres, founding_year, hometown, and image_url are stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   bio?: string | null
   genres?: string[]
   founding_year?: number | null
   hometown?: string | null
+  image_url?: string | null
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   website_url?: string | null
@@ -169,7 +179,11 @@ export async function saveArtistProfile(
   })
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}) ) as { error?: string }
-    throw new Error(errBody.error ?? 'Save failed')
+    const errBody = await res.json().catch(() => ({ error: 'Save failed', status: res.status })) as ApiErrorResponse
+    throw new PortalProfileSaveError({
+      error: errBody.error ?? 'Save failed',
+      code: errBody.code,
+      status: errBody.status ?? res.status,
+    })
   }
 }

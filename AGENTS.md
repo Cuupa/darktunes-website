@@ -99,7 +99,7 @@ Performance scripts summary:
   - `npm run perf:build` — profiling build (`next build --profile`)
 
 Data Access Layer (DAL)
-All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressPhotos.ts, promoTracks.ts, journalistApplications.ts).
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressKit.ts, promoTracks.ts, journalistApplications.ts). Press photo reads/writes use `assets` + `press_kit_items` via `pressKit.ts` (the legacy `press_photos` table exists in `reset.sql` for idempotent backfill only — no application DAL).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
@@ -236,11 +236,14 @@ Admin Utility Routes (admin/editor auth required):
   `POST /api/admin/fetch-youtube-info` — resolves a YouTube URL or video ID to `{ videoId, title, channelTitle, thumbnailUrl }` via YouTube oEmbed (no API key needed). Called by the "Fetch Info" button in VideoForm.
   `DELETE /api/admin/assets/[id]` — permanently deletes an asset record from Supabase AND its corresponding object from Cloudflare R2 via `deleteObjectFromR2()` from `src/lib/r2Utils.ts`. The R2 object is deleted first; if that fails the DB record remains. Returns `{ success: true }`.
 
-Admin Asset Explorer
-The admin Assets tab is a folder-based file explorer backed by the `asset_folders` table and the enriched `assets` schema (`folder_id`, `artist_id`, `tags`, `sha256_hash`, `original_filename`).
+Admin Asset Explorer (Single Source of Truth for media)
+The admin Assets tab is the sole media manager — the legacy `media_files` / `/api/admin/media` system is deprecated and removed. All press photos, logos, and label media live in the `assets` table with optional press metadata (`is_press_approved`, `press_suggested`, `press_category`, `alt_text`, etc.).
+Curated journalist/public press kits use the `press_kit_items` junction table (per-artist or label-wide scope). Admin curation: `PressKitBuilder` in `/admin/press` (Press Kit tab) + bulk press actions in the Asset Explorer toolbar. API: `/api/admin/press-kit/*`, `/api/admin/assets/bulk-press`.
+The explorer is folder-based, backed by `asset_folders` and the enriched `assets` schema (`folder_id`, `artist_id`, `tags`, `sha256_hash`, `original_filename`).
 `app/api/upload/route.ts` is the single admin upload entry point: it verifies admin/editor auth, computes a SHA-256 hash, returns the existing asset on duplicate upload, uploads new files to R2, and inserts the asset row server-side.
 Folder/list/search/batch mutations live under `app/api/admin/assets/*`; destructive deletes must remove the R2 object(s) before deleting database rows.
-`src/hooks/useFileExplorer.ts` is the client-side orchestration hook for the explorer, and `src/components/admin/file-explorer/AssetPicker.tsx` is the reusable selector used by `ArtistForm` for image/logo assignment.
+`src/hooks/useFileExplorer.ts` is the client-side orchestration hook for the explorer, and `src/components/admin/file-explorer/AssetPicker.tsx` is the reusable selector used by `ArtistForm` and `PressKitBuilder`.
+Artist portal uploads (`POST /api/portal/upload-asset`) also insert into `assets`; artists can check "Suggest for press kit review" (`press_suggested`) which creates `editor_notifications` for admins/editors.
 
 Video Admin UX:
   VideoForm accepts full YouTube URLs (watch?v=, youtu.be/, /shorts/, /embed/) and auto-extracts the 11-char video ID on input.
@@ -397,7 +400,6 @@ Admin System Tab (Health, Logs, Maintenance)
   - **Audit Log**: all `sync_logs` entries with full-text search, `api_source` filter, and `status` filter.
   - **Error Log**: failed and partial sync runs (`sync_logs.status IN ('error','partial')`).
   - **App Errors**: `app_logs` entries with `level = 'error'` or `level = 'warn'`.
-  - **Media Library**: R2 media file browser (`/api/admin/media` routes), separate from the Assets asset manager.
   - **Maintenance panel** (`MaintenanceManager.tsx`): destructive one-shot admin operations:
       - `POST /api/admin/maintenance/clear-logs` — truncates `sync_logs` older than N days.
       - `POST /api/admin/maintenance/purge-releases` — deletes orphaned releases (`artist_id IS NULL`).
@@ -629,7 +631,10 @@ Real-time cross-tab theme sync:
   - NEVER add a second ThemeBroadcastListener instance.
 
 Press & Media Ecosystem
-Public EPK page: `app/press/page.tsx` (Server Component) fetches press_photos, artist profile bios (short/medium/long), concerts, and press_quote from Supabase. All photo display URLs pass through `getOptimizedImageUrl()` (wsrv.nl proxy); download links point to the original R2 public CDN URL.
+Press assets SSOT: `assets` table (upload via `/api/upload` or portal `/api/portal/upload-asset`) + `press_kit_items` curation. Public/journalist reads use `getPressKitForArtist()` / `getJournalistPressKit()` from `src/lib/api/pressKit.ts`. Legacy `press_photos` table is retained in schema for idempotent backfill only.
+Artist EPK: `app/press/artists/[slug]/page.tsx` fetches curated kit items via `getPressKitForArtist()`. `ArtistEpkClient` renders a `PressPhotoLightbox` slider (Framer Motion, WCAG) for image assets.
+Journalist press kit dashboard: `app/press/dashboard/press-kit/page.tsx` uses `getJournalistPressKit()` + `PressKitList` with the same lightbox.
+Public press landing: `app/press/page.tsx` (Server Component) fetches artists and press releases — per-artist EPK photos come from the artist slug route above.
 Promo Pool: `/promo-pool/*` is a dual-gated journalist-only area.
   - Gate 1 (Edge Middleware): unauthenticated users are redirected to `/promo-pool/login`.
   - Gate 2 (Layout Server Component): authenticated users without role `journalist` or `admin` see `PromoPoolAccessGate` (shows application status or application form).
@@ -639,9 +644,9 @@ Journalist applications: `journalist_applications` table; `POST /api/journalist-
 Application schema: `journalist_applications` has separate `website_url TEXT` and `reason TEXT` columns for structured storage — do NOT concatenate them into the legacy `message` column. The `submitPressApplication` Server Action in `app/press/apply/_actions/apply.ts` writes `website_url` and `reason` individually.
 Transaction safety in `apply.ts`: After `supabase.auth.signUp`, if the `journalist_applications` INSERT fails the action immediately calls `serviceRole.auth.admin.deleteUser()` to roll back the orphaned auth account before returning an error.
 Role assignment trigger: The DB trigger `trg_journalist_application_status_change` (function `handle_journalist_application_status_change`, SECURITY DEFINER) automatically sets `users.role = 'journalist'` on approval and `users.role = 'user'` on rejection. The `PATCH /api/journalist-applications/[id]` route handler therefore only calls `updateApplicationStatus()` — it does NOT need a separate manual role update.
-DAL: `src/lib/api/pressPhotos.ts`, `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests.
+DAL: `src/lib/api/pressKit.ts` (primary), `src/lib/api/promoTracks.ts`, `src/lib/api/journalistApplications.ts` — each with Vitest tests. `journalist_downloads.asset_id` optionally links downloads to `assets.id`.
 user_role enum: includes `journalist`, `artist` in addition to `admin`, `editor`, `user`. The `UserProfile` type in `src/types/index.ts` reflects all five values.
-DB: All tables for journalist role, press_photos, promo_tracks, and journalist_applications are defined in `supabase/reset.sql` (the only schema source of truth).
+DB: All tables for journalist role, `press_kit_items`, `assets` press columns, promo_tracks, and journalist_applications are defined in `supabase/reset.sql` (the only schema source of truth).
 
 Admin User Management
 The **Users** tab in the AdminDashboard (`src/components/admin/AdminDashboard.tsx`) is only visible when `profile.role === 'admin'`. It renders `<UsersManager />`.
@@ -678,6 +683,31 @@ Artist Preview
 `PortalSidebar` accepts `artistSlug: string | null`, `featureFlags: Record<string, boolean>`, and `unreadMessages: number` props from the layout Server Component.
 When `artistSlug` is set, a "Preview Public Profile" link is shown under the artist name (opens `/artists/{slug}` in a new tab).
 The same preview link/button appears at the top of `ProfileForm` (passed via `artistSlug` prop from `portal/profile/page.tsx`).
+
+EPK PDF Export (Artist Portal) — Dual Path
+**Legacy (HTML presets):** Browser print dialog on the live HTML preview (`src/lib/epk/printEpkDocument.ts`, entry `app/portal/profile/_components/epkPdf.ts`). `generateEpkPdf()` clones `[data-epk-root]` from `EPKPreview.tsx` into a print popup and calls `window.print()`. `TabsContent value="epk"` uses `forceMount` so the document stays in the DOM for export from any tab.
+
+**Canvas Builder (Phase 1+):** Route `/portal/epk-builder` (feature flag `artist.epk_builder`). Document JSON schema v2 lives in `src/lib/epk/schema/documentV2.ts` and is persisted on `artist_epks.epk_document` (JSONB) with `epk_document_version` and `epk_editor_mode` (`legacy` | `canvas`). Version history: `epk_versions` table. Custom fonts: `epk_fonts` table (R2 key `epk-fonts/{artistId}/`).
+
+Migration: `src/lib/epk/migrate/legacyToDocumentV2.ts` converts legacy preset columns into positioned canvas elements on first access (`ensureMigratedEpkDocument` in `src/lib/api/epkDocument.ts`).
+
+Server PDF: `POST /api/portal/epk/export` → `src/lib/epk/export/renderDocumentToPdf.ts` (pdf-lib + Sharp image compression). No Puppeteer.
+
+Editor (Phase 2): `/portal/epk-builder` uses `EpkEditorProvider` + Zustand/Immer/zundo (`src/lib/epk/editor/store.ts`). UI: `EpkBuilderShell` (toolbar, `EpkCanvas` with Transformer, `EpkLayersPanel`, `EpkPropertiesPanel`). Autosave: `useEpkAutosave` (3s debounce → `PUT /api/portal/epk/document`). Read-only preview fallback: `EpkCanvasPreview.tsx`.
+
+Editor (Phase 3): Multi-page UI (`EpkPagesPanel` — add/duplicate/delete/rename pages via store page CRUD). Asset library (`EpkAssetPicker` — inserts images from `artist_assets` + `POST /api/portal/upload-asset`). Version history (`EpkVersionHistoryPanel` — list/restore snapshots from `epk_versions`; manual snapshots via toolbar `create_version: true` on `PUT /api/portal/epk/document`).
+
+Editor (Phase 4): Custom fonts (`EpkFontManager` + `EpkFontLoader` — upload WOFF2/WOFF/TTF/OTF to R2 `epk-fonts/{artistId}/`, register in `epk_fonts`, sync `document.fonts[]`). Font family picker in `EpkPropertiesPanel`. Server PDF embeds custom fonts via `embedDocumentFonts.ts` (fontkit + pdf-lib). Rider PDFs from `artist_epks.rider_*_url` are appended as extra pages in `appendPdfAttachments.ts` during `generateEpkPdfBytes()`.
+
+API routes: `GET/PUT /api/portal/epk/document`, `GET /api/portal/epk/versions`, `POST /api/portal/epk/versions/[id]/restore`, `GET/POST/DELETE /api/portal/epk/fonts`, `GET/POST/DELETE /api/portal/epk/share` (Bearer auth + `resolvePortalArtist`). Export route uses `ipRateLimit` (10 req / 10 min per IP). DAL: `epkFonts.ts`, `epkShareLinks.ts`, `restoreEpkVersion()` in `epkDocument.ts`, `getEpkVersionById()` in `epkVersions.ts`.
+
+Public (Phase 5): `getPublicArtistEpkByArtistId()` in `src/lib/api/publicArtistEpk.ts` reads safe columns from `artist_epks` (RLS: `artist_epks: public read visible`). Press artist page (`app/press/artists/[slug]`) renders `EpkPublicViewer` when `epk_editor_mode === 'canvas'`. Share links: table `epk_share_links`, public route `/epk/share/[token]`, API `GET/POST /api/epk/share/[token]` (service-role lookup + optional password). Group elements: `groupSelected`/`ungroupSelected` in editor store; `EpkGroupNode` + `flattenGroupElements()` for PDF. PDF bookmarks from page names via `addPdfBookmarksFromPages.ts` in `generateEpkPdfBytes()`.
+
+Analytics & Templates (Phase 6): `epk_download_events` table logs PDF exports (`portal` | `share` | `press`) via fire-and-forget `recordEpkDownloadAsync()` (hashed IP, service-role insert). Press PDF: `GET /api/epk/press/[slug]/export` (rate-limited, logs `press` source) + download button on `ArtistEpkClient` when canvas EPK is shown. Portal stats: `GET /api/portal/epk/analytics`, UI `EpkDownloadStatsPanel` (count queries, not full-table scan). Share-link expiry presets in `EpkShareLinkPanel` (`expires_at` on create). Admin brand templates: `epk_templates` table, `EpkTemplatesManager` (Press Portal tab), `GET/POST/PATCH/DELETE /api/admin/epk-templates` (verifyAdmin + service-role client), artist picker `GET /api/portal/epk/templates` (portal Bearer auth) + `EpkTemplatePicker` (`applyDocument` clears custom fonts + undo history).
+
+Portal Bearer auth: ALL portal Route Handlers that verify a Bearer JWT MUST use `authenticatePortalBearer()` or `authenticatePortalBearerWithArtist()` from `src/lib/portal/bearerAuth.ts` — not just `/api/portal/epk/*`. These helpers return a Supabase client from `createBearerAuthSupabaseClient(token)` so RLS sees `auth.uid()` correctly; do not use `createServerSupabaseClient()` (cookie session) for DB operations after Bearer verification.
+
+Profile save (`PUT /api/portal/profile`): artist photo lives on `artists.image_url` (not `artist_epks`). Route handlers that verify Bearer tokens MUST use `createBearerAuthSupabaseClient(token)` for subsequent RLS writes — cookie session alone may be stale.
 
 Journalist Dashboard
 Protected routes live at `/press/dashboard/*` with dedicated `/press/login`.
