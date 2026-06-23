@@ -8,10 +8,21 @@ import {createSyncUploadFn} from '@/lib/r2Utils'
 import {isValidCronSecret} from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
 import {syncSingleArtist} from "@/lib/sync/syncAll"
+import type { ServerEnv } from '@/lib/env.server'
 
 const TIME_BUDGET_MS = 50_000
 
 export const maxDuration = 60
+
+async function verifyToken(token: string, env: ServerEnv): Promise<void> {
+    const admin = createClient(
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false } },
+    )
+    const { data, error } = await admin.auth.getUser(token)
+    if (error || !data.user) throw new ApiError(401, 'Unauthorized')
+}
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
     const {serverEnv} = await import('@/lib/env.server')
@@ -20,8 +31,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     const force = request.headers.get('force') ?? ''
 
     const {CRON_SECRET: cronSecret} = serverEnv
-    if (!cronSecret || !isValidCronSecret(authHeader, cronSecret)) {
-        throw new ApiError(401, 'Unauthorized')
+
+    const isCronAuthorized = Boolean(cronSecret && isValidCronSecret(authHeader, cronSecret))
+
+    if (!isCronAuthorized) {
+        await verifyToken(authHeader.slice(7), serverEnv)
     }
 
     const {
