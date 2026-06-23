@@ -10,14 +10,17 @@ import path from 'node:path'
  * catastrophic regressions, while still documenting the production target.
  */
 const budget = (production: number, ci: number) => (process.env.CI ? ci : production)
+/** CI shared runners rarely reach networkidle within the default 30s test timeout. */
+const networkIdleTimeout = budget(15_000, 90_000)
 
 test.describe('Core web vitals budgets', () => {
   test('Homepage LCP is under 2500ms', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Perf budget is enforced in Chromium only')
+    test.setTimeout(budget(30_000, 120_000))
 
     await page.goto('/')
     // Wait for the page to fully settle so the LCP entry is present in the buffer.
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('networkidle', { timeout: networkIdleTimeout })
 
     const lcp = await page.evaluate((): Promise<number> => {
       return new Promise((resolve) => {
@@ -48,9 +51,10 @@ test.describe('Core web vitals budgets', () => {
 
   test('Artist page TTI is under 3500ms', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Perf budget is enforced in Chromium only')
+    test.setTimeout(budget(30_000, 120_000))
 
     await page.goto('/artists')
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('networkidle', { timeout: networkIdleTimeout })
 
     const tti = await page.evaluate(() => {
       const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
