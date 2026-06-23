@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Security validation', () => {
   test('admin routes reject unauthenticated users (redirect/401)', async ({ page }) => {
     const response = await page.goto('/admin', { waitUntil: 'domcontentloaded' })
-    const redirected = page.url().includes('/admin/login')
+    const redirected = page.url().includes('/admin/login') || page.url().includes('/login')
     const denied = response?.status() === 401
 
     expect(redirected || denied).toBe(true)

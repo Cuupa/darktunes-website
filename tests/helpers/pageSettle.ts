@@ -13,6 +13,8 @@ const networkIdleTimeout = budget(15_000, 30_000)
  */
 export async function waitForPageSettled(page: Page): Promise<void> {
   await page.waitForLoadState('load')
+  // CI runners never reach networkidle (analytics/polling); load is sufficient.
+  if (process.env.CI) return
   await page.waitForLoadState('networkidle', { timeout: networkIdleTimeout }).catch(() => undefined)
 }
 
