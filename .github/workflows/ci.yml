@@ -28,13 +28,12 @@ jobs:
         run: npm run lint
 
       - name: Build
-        # Secrets must be configured in the repository:
-        # Settings → Secrets and variables → Actions
-        # See DEPLOYMENT.md for details on each variable.
+        # Secrets optional for CI build — placeholders allow prerender without a live DB.
+        # See DEPLOYMENT.md for production secret configuration.
         run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build' }}
 
       - name: Test
         run: npm test

@@ -97,6 +97,11 @@ export default defineConfig({
     env: {
       /* Ensure the server binds to the expected port. */
       PORT: '3000',
+      /* Placeholders so `next build` succeeds when CI secrets are unset (empty string). */
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build',
     },
   },
 })
