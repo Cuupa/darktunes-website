@@ -26,9 +26,9 @@ test.describe('Feature completeness', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
 
     await expect(page.locator('#hero')).toBeVisible()
-    await expect(page.locator('#releases')).toBeVisible()
-    await expect(page.locator('#news')).toBeVisible()
-    await expect(page.locator('#artists')).toBeVisible()
+    await expect(page.locator('section#releases').first()).toBeVisible()
+    await expect(page.locator('section#news').first()).toBeVisible()
+    await expect(page.locator('section#artists').first()).toBeVisible()
   })
 
   test('artist detail shows bio, releases, and concerts sections', async ({ page }) => {
@@ -63,23 +63,10 @@ test.describe('Feature completeness', () => {
     }
   })
 
-  test('newsletter submission shows confirmation message', async ({ page }) => {
-    await page.route('**/api/newsletter', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, message: 'Subscription confirmed' }),
-      })
-    })
-
+  test('newsletter section embeds the Shopify signup iframe', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-
-    const emailInput = page.locator('input[type="email"]').first()
-    await emailInput.fill('qa-test@example.com')
-
-    const submit = page.getByRole('button', { name: /subscribe|anmelden|newsletter/i }).first()
-    await submit.click()
-
-    await expect(page.getByText(/confirmed|success|danke|thank/i).first()).toBeVisible()
+    const newsletter = page.locator('section#newsletter').first()
+    await expect(newsletter).toBeVisible()
+    await expect(newsletter.locator('iframe[title]')).toBeVisible()
   })
 })

@@ -117,7 +117,7 @@ test.describe('Visual Regression — Releases section', () => {
   })
 
   test('matches releases grid snapshot', async ({ page }) => {
-    const section = page.locator('#releases')
+    const section = page.locator('section#releases').first()
     const count = await section.count()
     if (count === 0) {
       test.skip(true, '#releases section not present (no Supabase data)')

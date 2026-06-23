@@ -14,7 +14,8 @@ test.describe('Corporate identity visual validation', () => {
 
   test('background token uses CI black #101010 via --background-rgb', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(await getRootCssVar(page, '--background-rgb')).toBe('16, 16, 16')
+    const backgroundRgb = (await getRootCssVar(page, '--background-rgb')).replace(/\s/g, '')
+    await expect(backgroundRgb).toBe('16,16,16')
   })
 
   test('secondary token uses CI pink #7e1e37', async ({ page }) => {

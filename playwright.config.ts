@@ -24,6 +24,9 @@ export default defineConfig({
   /* Fail the build on CI if a test.only() accidentally gets committed. */
   forbidOnly: !!process.env.CI,
 
+  /* CI runners have no committed snapshot baselines (per AGENTS.md); seed on first run. */
+  updateSnapshots: process.env.CI ? 'missing' : 'none',
+
   /* Retry once on CI to reduce flakiness caused by resource contention. */
   retries: process.env.CI ? 1 : 0,
 
