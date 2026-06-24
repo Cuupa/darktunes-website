@@ -23,6 +23,7 @@ import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { ShareButton } from '@/components/ShareButton'
+import { trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import type { Release, Artist } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
 
@@ -168,7 +169,17 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                 {release.smartUrl && (
                   <div>
                     <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                      <a href={release.smartUrl} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={release.smartUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          const artistId = artist?.id ?? release.artistId
+                          if (artistId) {
+                            trackSmartLinkClick(artistId, `/releases/${release.id}`)
+                          }
+                        }}
+                      >
                         <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
                         {dict.listenEverywhere}
                       </a>

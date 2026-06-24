@@ -40,6 +40,12 @@ const TAB_LABEL_KEYS: Record<AnalyticsTabId, keyof Dictionary['portal']> = {
   territories: 'analytics_tab_territories',
   events: 'analytics_tab_events',
   earnings: 'analytics_tab_earnings',
+  releases: 'analytics_tab_releases',
+  'revenue-mix': 'analytics_tab_revenue_mix',
+  press: 'analytics_tab_press',
+  settlement: 'analytics_tab_settlement',
+  engagement: 'analytics_tab_engagement',
+  merch: 'analytics_tab_merch',
 }
 
 export function AnalyticsToolbar({

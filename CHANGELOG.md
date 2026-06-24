@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Analytics — Portal** (`/portal/analytics`): 11 tabs — Streaming, Listeners, Territories, Events (concert + promo impact), Earnings, Releases, Revenue Mix, EPK & Press, Settlement, Website engagement, Merch. Overview intelligence panel on `/portal` with deep links. Authenticated Supabase reads for correct RLS.
+- **Enterprise Analytics — Admin** (`/admin/analytics`): Label Intelligence Hub — roster health, period trends, press CRM, website engagement, financial audit viewer. Sidebar entry under MANAGEMENT.
+- **Gold-layer tables**: `promo_impact`, `page_events`, `merch_orders` in `supabase/reset.sql` + `src/types/database.ts`.
+- **Website tracking**: consent-gated `PageTracker` + `POST /api/page-events` (rate-limited, service-role insert, slug resolution). Shop clicks from roster cards.
+- **Merch pipeline**: `buildMerchOrderRows()` in SOS worker → upsert on Accounting **Save to Portal**.
+- **DAL**: `pageEvents.ts`, `merchOrders.ts`, `labelAnalytics.ts`, `promoImpact.ts`; analytics compute modules in `src/lib/analytics/`.
 - **Artist Portal — Document Vault**: `/portal/documents` — artists upload and manage PDF/DOCX contracts, GEMA forms, and splits documents. Stored in R2 under `artist-documents/{artistId}/`. `artist_documents` table with RLS. Route handlers: `POST /api/portal/documents/upload` (20 MB), `DELETE /api/portal/documents/[id]`.
 - **Artist Portal — Calendar**: `/portal/calendar` — tour date / event calendar view for the artist's own concerts.
 - **Artist Portal — Interviews**: `/portal/interviews` — interview request management and scheduling.

@@ -7,6 +7,10 @@ import type { ArtistTerritoryMetric } from '@/lib/api/artistTerritoryMetrics'
 import type { EventImpact } from '@/lib/api/eventImpact'
 import type { StreamingStat } from '@/lib/api/streamingStats'
 import type { SalesStatement } from '@/lib/api/salesStatements'
+import type { EpkDownloadStats } from '@/lib/api/epkDownloadEvents'
+import type { ArtistPressDownloadStats } from '@/lib/api/journalistDownloads'
+import type { ReleasePerformanceRow } from '@/lib/analytics/releasePerformance'
+import type { PromoImpact } from '@/lib/api/promoImpact'
 import {
   ANOMALY_Z_SCORE_THRESHOLD,
   CORRELATION_STRONG_THRESHOLD,
@@ -202,9 +206,13 @@ export function computeAnalyticsInsights(input: {
   territoryMetrics: ArtistTerritoryMetric[]
   listenerMetrics: ArtistListenerMetric[]
   eventImpacts: EventImpact[]
+  promoImpacts?: PromoImpact[]
+  releaseRows?: ReleasePerformanceRow[]
+  epkStats?: EpkDownloadStats
+  pressStats?: ArtistPressDownloadStats
 }): AnalyticsInsight[] {
   const insights: AnalyticsInsight[] = []
-  const { stats, listenerMetrics, eventImpacts } = input
+  const { stats, listenerMetrics, eventImpacts, promoImpacts, releaseRows, epkStats, pressStats } = input
 
   const streamByPeriod = sumStreamsByPeriod(stats)
   const periods = [...streamByPeriod.keys()].sort()
@@ -274,6 +282,54 @@ export function computeAnalyticsInsights(input: {
       titleKey: 'analytics_insight_event_title',
       bodyKey: 'analytics_insight_event_body',
       values: { country: ev.country, pct: Math.abs(ev.deltaPct) },
+    })
+  }
+
+  const topRelease = releaseRows?.find((r) => r.releaseId && r.totalRevenueEur > 0)
+  if (topRelease) {
+    insights.push({
+      id: 'top-release',
+      severity: 'info',
+      titleKey: 'analytics_insight_top_release_title',
+      bodyKey: 'analytics_insight_top_release_body',
+      values: {
+        release: topRelease.releaseTitle,
+        revenue: Math.round(topRelease.totalRevenueEur * 100) / 100,
+      },
+    })
+  }
+
+  if (epkStats && epkStats.last30Days >= 3) {
+    insights.push({
+      id: 'epk-momentum',
+      severity: 'positive',
+      titleKey: 'analytics_insight_epk_title',
+      bodyKey: 'analytics_insight_epk_body',
+      values: { count: epkStats.last30Days },
+    })
+  }
+
+  if (pressStats && pressStats.last30Days >= 2) {
+    insights.push({
+      id: 'press-momentum',
+      severity: 'positive',
+      titleKey: 'analytics_insight_press_title',
+      bodyKey: 'analytics_insight_press_body',
+      values: { count: pressStats.last30Days },
+    })
+  }
+
+  const strongPromo = promoImpacts
+    ?.filter((p) => Math.abs(p.deltaPct) >= GROWTH_SIGNIFICANT_PCT)
+    .sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct))[0]
+
+  if (strongPromo) {
+    insights.push({
+      id: 'promo-impact',
+      severity: strongPromo.deltaPct >= 0 ? 'positive' : 'negative',
+      titleKey: 'analytics_insight_promo_impact_title',
+      bodyKey: 'analytics_insight_promo_impact_body',
+      values: { pct: Math.abs(strongPromo.deltaPct) },
     })
   }
 

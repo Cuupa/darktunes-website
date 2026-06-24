@@ -311,3 +311,18 @@ Use the service-role client; never expose app_logs to anon/public.
 Schema: { level: 'error'|'warn'|'info', message: string, context: JSONB, created_at }
 Visible in Admin → Logs tab (AppErrors sub-view).
 
+## Public Endpoint Rate Limiting (IP)
+
+In-memory sliding-window limiter: `src/lib/ipRateLimit.ts` (`checkRateLimit`, `getClientIp`).
+
+| Route | Limit | Window | Auth |
+|---|---|---|---|
+| `/api/contact` | 5 | 10 min | Public |
+| `/api/newsletter` | 3 | 10 min | Public |
+| `/api/journalist-applications` | 3 | 30 min | Public POST |
+| `/api/page-events` | 120 | 10 min | Public (consent-gated client); service-role insert |
+
+`POST /api/page-events` resolves `/artists/[slug]` and `/news/[slug]` to UUIDs, hashes session IDs, and inserts into `page_events`. No Bearer token — abuse mitigation is IP rate limiting only. See `SECURITY.md` for privacy notes.
+
+SOS analytics persist (`persistSosAnalytics` server action) requires admin/editor JWT; delegates to `persistSosAnalyticsCore` with service-role client for gold-layer upserts including `merch_orders`.
+

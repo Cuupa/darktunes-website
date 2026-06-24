@@ -72,6 +72,7 @@ const EMPTY_RESULT: WorkerResult = {
   totalGrossAllData: 0,
   releaseTitlesByArtistIncFeaturing: {},
   territoryMetrics: [],
+  merchOrderRows: [],
 }
 
 /**
@@ -426,6 +427,7 @@ export function useCSVProcessor(
     totalGrossAllData: workerResult.totalGrossAllData,
     releaseTitlesByArtistIncFeaturing: workerResult.releaseTitlesByArtistIncFeaturing,
     territoryMetrics: workerResult.territoryMetrics,
+    merchOrderRows: workerResult.merchOrderRows,
   }
 }
 

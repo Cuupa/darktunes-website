@@ -10,7 +10,16 @@ import { aggregateMetricsByCountry } from '@/lib/api/artistTerritoryMetrics'
 import type { EventImpact } from '@/lib/api/eventImpact'
 import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Concert } from '@/types'
+import type { ArtistLineItemWithContext } from '@/lib/api/salesStatementLineItems'
+import type { EpkDownloadStats } from '@/lib/api/epkDownloadEvents'
+import type { ArtistPressDownloadStats } from '@/lib/api/journalistDownloads'
+import type { PromoImpact } from '@/lib/api/promoImpact'
+import type { ArtistSettlementSummary } from '@/lib/api/settlementLedger'
+import type { PageEngagementStats } from '@/lib/api/pageEvents'
+import type { MerchOrderStats } from '@/lib/api/merchOrders'
+import type { Concert, PromoLogEntry } from '@/types'
+import { aggregateReleasePerformance } from '@/lib/analytics/releasePerformance'
+import { computeRevenueMix } from '@/lib/analytics/revenueMix'
 import type { Dictionary } from '@/i18n/types'
 import {
   EMPTY_ANALYTICS_FILTER,
@@ -39,6 +48,13 @@ import { EarningsStatementsPanel } from './EarningsStatementsPanel'
 import { TerritoriesChart } from './TerritoriesChart'
 import { EventImpactChart } from './EventImpactChart'
 import { ListenersChart } from './ListenersChart'
+import { ReleasePerformanceChart } from './ReleasePerformanceChart'
+import { RevenueMixChart } from './RevenueMixChart'
+import { EpkPressTab } from './EpkPressTab'
+import { SettlementTab } from './SettlementTab'
+import { PromoImpactChart } from './PromoImpactChart'
+import { EngagementTab } from './EngagementTab'
+import { MerchTab } from './MerchTab'
 
 interface AnalyticsPageClientProps {
   artistId: string
@@ -52,6 +68,15 @@ interface AnalyticsPageClientProps {
   eventImpacts: EventImpact[]
   listenerMetrics: ArtistListenerMetric[]
   concerts: Concert[]
+  lineItems: ArtistLineItemWithContext[]
+  epkStats: EpkDownloadStats
+  pressStats: ArtistPressDownloadStats
+  promoImpacts: PromoImpact[]
+  promoEntries: PromoLogEntry[]
+  settlementSummary: ArtistSettlementSummary
+  engagementStats: PageEngagementStats
+  merchStats: MerchOrderStats
+  statementsEnabled: boolean
 }
 
 export function AnalyticsPageClient({
@@ -66,6 +91,15 @@ export function AnalyticsPageClient({
   eventImpacts,
   listenerMetrics,
   concerts,
+  lineItems,
+  epkStats,
+  pressStats,
+  promoImpacts,
+  promoEntries,
+  settlementSummary,
+  engagementStats,
+  merchStats,
+  statementsEnabled,
 }: AnalyticsPageClientProps) {
   const [filters, setFilters] = useState<AnalyticsFilterState>(EMPTY_ANALYTICS_FILTER)
   const [searchQuery, setSearchQuery] = useState('')
@@ -127,14 +161,28 @@ export function AnalyticsPageClient({
     [filteredStats, filteredTerritory, filteredListeners, statements],
   )
 
+  const releaseRows = useMemo(
+    () => aggregateReleasePerformance(lineItems),
+    [lineItems],
+  )
+
+  const revenueMixSlices = useMemo(
+    () => computeRevenueMix(filteredTerritory),
+    [filteredTerritory],
+  )
+
   const insights = useMemo(
     () => computeAnalyticsInsights({
       stats: filteredStats,
       territoryMetrics: filteredTerritory,
       listenerMetrics: filteredListeners,
       eventImpacts,
+      promoImpacts,
+      releaseRows,
+      epkStats,
+      pressStats,
     }),
-    [filteredStats, filteredTerritory, filteredListeners, eventImpacts],
+    [filteredStats, filteredTerritory, filteredListeners, eventImpacts, promoImpacts, releaseRows, epkStats, pressStats],
   )
 
   const visibleTabs = useMemo(() => visibleTabIds(tabVisibility), [tabVisibility])
@@ -204,6 +252,24 @@ export function AnalyticsPageClient({
           {visibleTabs.includes('earnings') && (
             <TabsTrigger value="earnings">{dict.analytics_tab_earnings}</TabsTrigger>
           )}
+          {visibleTabs.includes('releases') && (
+            <TabsTrigger value="releases">{dict.analytics_tab_releases}</TabsTrigger>
+          )}
+          {visibleTabs.includes('revenue-mix') && (
+            <TabsTrigger value="revenue-mix">{dict.analytics_tab_revenue_mix}</TabsTrigger>
+          )}
+          {visibleTabs.includes('press') && (
+            <TabsTrigger value="press">{dict.analytics_tab_press}</TabsTrigger>
+          )}
+          {statementsEnabled && visibleTabs.includes('settlement') && (
+            <TabsTrigger value="settlement">{dict.analytics_tab_settlement}</TabsTrigger>
+          )}
+          {visibleTabs.includes('engagement') && (
+            <TabsTrigger value="engagement">{dict.analytics_tab_engagement}</TabsTrigger>
+          )}
+          {visibleTabs.includes('merch') && (
+            <TabsTrigger value="merch">{dict.analytics_tab_merch}</TabsTrigger>
+          )}
         </TabsList>
 
         {visibleTabs.includes('streaming') && (
@@ -231,12 +297,17 @@ export function AnalyticsPageClient({
         )}
 
         {visibleTabs.includes('events') && (
-          <TabsContent value="events" className="mt-0 space-y-4">
+          <TabsContent value="events" className="mt-0 space-y-6">
             <h2 className="text-2xl font-bold">{dict.analytics_eventImpact_heading}</h2>
             <EventImpactChart
               dict={dict}
               impacts={eventImpacts}
               concerts={concerts}
+            />
+            <PromoImpactChart
+              dict={dict}
+              impacts={promoImpacts}
+              promoEntries={promoEntries}
             />
           </TabsContent>
         )}
@@ -252,6 +323,42 @@ export function AnalyticsPageClient({
               searchQuery={searchQuery}
               statements={statements}
             />
+          </TabsContent>
+        )}
+
+        {visibleTabs.includes('releases') && (
+          <TabsContent value="releases" className="mt-0">
+            <ReleasePerformanceChart dict={dict} rows={releaseRows} />
+          </TabsContent>
+        )}
+
+        {visibleTabs.includes('revenue-mix') && (
+          <TabsContent value="revenue-mix" className="mt-0">
+            <RevenueMixChart dict={dict} slices={revenueMixSlices} />
+          </TabsContent>
+        )}
+
+        {visibleTabs.includes('press') && (
+          <TabsContent value="press" className="mt-0">
+            <EpkPressTab dict={dict} epkStats={epkStats} pressStats={pressStats} />
+          </TabsContent>
+        )}
+
+        {statementsEnabled && visibleTabs.includes('settlement') && (
+          <TabsContent value="settlement" className="mt-0">
+            <SettlementTab dict={dict} summary={settlementSummary} />
+          </TabsContent>
+        )}
+
+        {visibleTabs.includes('engagement') && (
+          <TabsContent value="engagement" className="mt-0">
+            <EngagementTab dict={dict} stats={engagementStats} />
+          </TabsContent>
+        )}
+
+        {visibleTabs.includes('merch') && (
+          <TabsContent value="merch" className="mt-0">
+            <MerchTab dict={dict} stats={merchStats} />
           </TabsContent>
         )}
       </Tabs>

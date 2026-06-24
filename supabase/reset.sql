@@ -1523,6 +1523,68 @@ CREATE INDEX IF NOT EXISTS idx_event_impact_artist
   ON public.event_impact (artist_id);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: promo_impact  (Gold — precomputed promo log ↔ stream correlation)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.promo_impact (
+  id              UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  promo_log_id    UUID           NOT NULL REFERENCES public.promo_log_entries (id) ON DELETE CASCADE,
+  artist_id       UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  window_days     INTEGER        NOT NULL DEFAULT 30,
+  streams_before  BIGINT         NOT NULL DEFAULT 0,
+  streams_after   BIGINT         NOT NULL DEFAULT 0,
+  delta_streams   BIGINT         NOT NULL DEFAULT 0,
+  delta_pct       NUMERIC(8, 2)  NOT NULL DEFAULT 0,
+  revenue_before  NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  revenue_after   NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  calculated_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (promo_log_id, window_days)
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_impact_artist
+  ON public.promo_impact (artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: page_events  (website engagement — consent-gated, API-inserted)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.page_events (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type     TEXT        NOT NULL CHECK (event_type IN ('page_view', 'shop_click', 'smart_link_click', 'news_view')),
+  path           TEXT        NOT NULL,
+  artist_id      UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  news_post_id   UUID        REFERENCES public.news_posts (id) ON DELETE SET NULL,
+  release_id     UUID        REFERENCES public.releases (id) ON DELETE SET NULL,
+  referrer_host  TEXT,
+  session_hash   TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_events_artist_created
+  ON public.page_events (artist_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_page_events_type_created
+  ON public.page_events (event_type, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: merch_orders  (Gold — normalised Shopify / Darkmerch line items)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.merch_orders (
+  id              UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  source          TEXT           NOT NULL CHECK (source IN ('shopify', 'darkmerch')),
+  external_id     TEXT           NOT NULL,
+  period          TEXT           NOT NULL,
+  product_title   TEXT           NOT NULL DEFAULT '',
+  country         TEXT           NOT NULL DEFAULT '',
+  quantity        INTEGER        NOT NULL DEFAULT 0,
+  revenue_eur     NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  source_batch_id UUID           REFERENCES public.distributor_import_batches (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (source, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_merch_orders_artist_period
+  ON public.merch_orders (artist_id, period DESC);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: artist_listener_metrics  (Gold — external listener/play trends)
 -- Sources: Last.fm (free), Soundcharts (optional paid API key)
 -- ---------------------------------------------------------------------------
@@ -1949,6 +2011,9 @@ ALTER TABLE public.artist_territory_metrics     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_listener_metrics      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statement_line_items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_impact                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promo_impact                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.page_events                    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.merch_orders                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.press_photos          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promo_tracks          ENABLE ROW LEVEL SECURITY;
@@ -2708,6 +2773,55 @@ CREATE POLICY "event_impact: artist read own" ON public.event_impact
   );
 
 CREATE POLICY "event_impact: admin all" ON public.event_impact
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: promo_impact
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "promo_impact: artist read own" ON public.promo_impact;
+DROP POLICY IF EXISTS "promo_impact: admin all"       ON public.promo_impact;
+
+CREATE POLICY "promo_impact: artist read own" ON public.promo_impact
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "promo_impact: admin all" ON public.promo_impact
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: page_events
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "page_events: artist read own" ON public.page_events;
+DROP POLICY IF EXISTS "page_events: admin all"       ON public.page_events;
+
+CREATE POLICY "page_events: artist read own" ON public.page_events
+  FOR SELECT USING (
+    artist_id IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "page_events: admin all" ON public.page_events
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: merch_orders
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "merch_orders: artist read own" ON public.merch_orders;
+DROP POLICY IF EXISTS "merch_orders: admin all"       ON public.merch_orders;
+
+CREATE POLICY "merch_orders: artist read own" ON public.merch_orders
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "merch_orders: admin all" ON public.merch_orders
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));

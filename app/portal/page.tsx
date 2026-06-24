@@ -11,6 +11,10 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { countAssetsByArtist } from '@/lib/api/assets'
 import { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
+import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
+import { getPromoImpactByArtistId } from '@/lib/api/promoImpact'
+import { getArtistSettlementSummary } from '@/lib/api/settlementLedger'
+import { computeOverviewInsights } from '@/lib/analytics/overviewInsights'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
@@ -31,8 +35,24 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
   if (!user) return null
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
+  const featureFlags = await getFeatureFlagsForRole(supabase, 'artist').catch(
+    () => ({} as Record<string, boolean>),
+  )
+  const statementsEnabled = featureFlags['artist.statements'] !== false
+  const analyticsEnabled = featureFlags['artist.analytics'] !== false
 
-  const [stats, releases, concerts, openChecklistCount, featureFlags, artistProfile, statementCount, assetCount] = artist
+  const [
+    stats,
+    releases,
+    concerts,
+    openChecklistCount,
+    artistProfile,
+    statementCount,
+    assetCount,
+    statements,
+    promoImpacts,
+    settlementSummary,
+  ] = artist
     ? await Promise.all([
         getStreamingStatsByArtistId(supabase, artist.id).catch(() => []),
         getReleasesByArtistId(supabase, artist.id).catch(() => []),
@@ -44,7 +64,6 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
             .eq('artist_id', artist.id)
             .eq('is_completed', false),
         ),
-        getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
         getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
         safeHeadCount(
           supabase
@@ -53,8 +72,13 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
             .eq('artist_id', artist.id),
         ),
         countAssetsByArtist(supabase, artist.id).catch(() => 0),
+        getSalesStatementsByArtistId(supabase, artist.id).catch(() => []),
+        getPromoImpactByArtistId(supabase, artist.id).catch(() => []),
+        statementsEnabled
+          ? getArtistSettlementSummary(supabase, artist.id).catch(() => null)
+          : Promise.resolve(null),
       ])
-    : [[], [], [], 0, {}, null, 0, 0]
+    : [[], [], [], 0, null, 0, 0, [], [], null]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
@@ -62,6 +86,14 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
   const { score: completionScore, missing: missingFields } = artist
     ? calcProfileCompletion(artist, artistProfile)
     : { score: 0, missing: [] }
+
+  const overviewInsights = computeOverviewInsights({
+    stats,
+    statements,
+    settlement: settlementSummary,
+    promoImpacts,
+    analyticsEnabled,
+  })
 
   return (
     <PortalOverview
@@ -77,6 +109,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       featureFlags={featureFlags}
       completionScore={completionScore}
       missingFields={missingFields}
+      overviewInsights={overviewInsights}
     />
   )
 }

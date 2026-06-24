@@ -18,6 +18,7 @@ import {
 } from '@/lib/sos/lineItemsFromArtistData'
 import { persistAnalyticsAfterStatementUpload } from '@/lib/sos/persistAfterStatementUpload'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
+import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type {
   SafeProcessedArtistData,
   LabelInfo,
@@ -31,6 +32,7 @@ import type {
 
 export interface SosExportPersistContext {
   territoryMetrics: TerritoryMetricRow[]
+  merchOrderRows: MerchOrderRow[]
   revenues: ArtistRevenue[]
   bronzeBatchIds: string[]
 }
@@ -165,6 +167,7 @@ export function useExports(
                 periodStart,
                 periodEnd: periodEnd || periodStart,
                 territoryMetrics: persistContext.territoryMetrics,
+                merchOrderRows: persistContext.merchOrderRows,
                 labelArtists: labelArtists ?? [],
                 revenues: persistContext.revenues,
                 bronzeBatchIds: persistContext.bronzeBatchIds,
@@ -362,6 +365,7 @@ export function useExports(
             periodStart,
             periodEnd: periodEnd || periodStart,
             territoryMetrics: persistContext.territoryMetrics,
+            merchOrderRows: persistContext.merchOrderRows,
             labelArtists: labelArtists ?? [],
             revenues: persistContext.revenues,
             bronzeBatchIds: persistContext.bronzeBatchIds,

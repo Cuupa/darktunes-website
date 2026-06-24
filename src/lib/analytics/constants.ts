@@ -19,6 +19,12 @@ export const ANALYTICS_TAB_IDS = [
   'territories',
   'events',
   'earnings',
+  'releases',
+  'revenue-mix',
+  'press',
+  'settlement',
+  'engagement',
+  'merch',
 ] as const
 
 export type AnalyticsTabId = (typeof ANALYTICS_TAB_IDS)[number]
@@ -29,4 +35,10 @@ export const DEFAULT_VISIBLE_TABS: Record<AnalyticsTabId, boolean> = {
   territories: true,
   events: true,
   earnings: true,
+  releases: true,
+  'revenue-mix': true,
+  press: true,
+  settlement: true,
+  engagement: true,
+  merch: true,
 }

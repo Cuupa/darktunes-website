@@ -178,7 +178,10 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | Release detail pages | ✅ Implemented | `/releases/[id]` RSC + Framer Motion Shared Layout Animation |
 | Artist Portal — auth + routing | ✅ Implemented | `/portal/*` protected by Edge Middleware; `/portal/login` login page |
 | Artist Portal — EPK profile editor | ✅ Implemented | `artist_epks` table + RLS + profile form with bio_short/medium/long, theme/layout/orientation/background settings, and photo upload via R2 |
-| Artist Portal — streaming analytics | ✅ Implemented | `streaming_stats` table + RLS + StreamingChart (Recharts BarChart + platform summary cards) |
+| Artist Portal — enterprise analytics | ✅ Implemented | `/portal/analytics` — 11 tabs (streaming, listeners, territories, events/promo impact, earnings, releases, revenue mix, EPK & press, settlement, website, merch); overview intelligence hub; authenticated Supabase reads for RLS |
+| Artist Portal — website engagement | ✅ Implemented | Consent-gated `PageTracker` + `POST /api/page-events` → `page_events` table; shop clicks from roster cards |
+| Admin — Label Analytics | ✅ Implemented | `/admin/analytics` — Label Intelligence Hub (roster health, period trends, press CRM, website engagement, financial audit) |
+| SOS — merch order normalisation | ✅ Implemented | Worker `buildMerchOrderRows` → `merch_orders` upsert on Accounting Save to Portal |
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + status workflow + StatementsTable + presigned URL Server Action (5 min TTL) |
 | Artist Portal — billing profiles | ✅ Implemented | `/portal/billing` + `artist_billing_profiles` + completeness gating for invoice creation |
 | Artist Portal — SOS-linked invoices | ✅ Implemented | `/portal/invoices?statement=...` pre-fills approved SOS amounts, stores artist invoice numbers, and generates §14 UStG-ready PDFs |
@@ -215,7 +218,7 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | Admin — System tab | ✅ Implemented | `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats) |
 | Admin — Release Submissions | ✅ Implemented | `/admin/release-submissions` — review and approve/reject artist-submitted releases (`is_visible=false` → `is_visible=true`) |
 | Admin — Video Submissions | ✅ Implemented | `/admin/video-submissions` — review and approve/reject artist-submitted videos |
-| Supabase Read Replica | ✅ Implemented | `src/lib/supabase/replica.ts` — `createReplicaSupabaseClient()` uses `SUPABASE_REPLICA_URL` / `SUPABASE_REPLICA_ANON_KEY`; analytics queries, admin health dashboard, SOS CSV export routed to replica; silent fallback to primary when env vars unset |
+| Supabase Read Replica | ✅ Implemented | `src/lib/supabase/replica.ts` — `createReplicaSupabaseClient()` uses `SUPABASE_REPLICA_URL` / `SUPABASE_REPLICA_ANON_KEY`; admin health dashboard, SOS CSV export routed to replica; portal `/portal/analytics` uses authenticated primary client for RLS; silent fallback to primary when env vars unset |
 | Admin Maintenance API routes | ✅ Implemented | `POST /api/admin/maintenance/clear-logs`, `purge-releases`, `reset-checklists`, `clear-accreditations`, `reset-accreditations`, `clear-stats` — all require admin/editor auth |
 
 ---

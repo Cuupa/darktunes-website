@@ -72,3 +72,13 @@ export async function upsertSosPeriodSummary(
   if (error) throw new Error(error.message)
   return rowToSummary(data)
 }
+
+export async function listSosPeriodSummaries(db: DbClient): Promise<SosPeriodSummary[]> {
+  const { data, error } = await db
+    .from('sos_period_summaries')
+    .select('*')
+    .order('period_start', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => rowToSummary(row as Row))
+}

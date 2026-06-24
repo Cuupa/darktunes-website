@@ -239,6 +239,7 @@ function SosGeneratorPanel() {
     uniqueArtists,
     releaseTitlesByArtistIncFeaturing,
     territoryMetrics,
+    merchOrderRows,
   } = useCSVProcessor(
     believeManager.files,
     bandcampManager.files,
@@ -348,11 +349,12 @@ function SosGeneratorPanel() {
       hasData && territoryMetrics.length > 0
         ? {
             territoryMetrics,
+            merchOrderRows,
             revenues,
             bronzeBatchIds,
           }
         : undefined,
-    [hasData, territoryMetrics, revenues, bronzeBatchIds],
+    [hasData, territoryMetrics, merchOrderRows, revenues, bronzeBatchIds],
   )
 
   const { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal } =
@@ -600,6 +602,7 @@ function SosGeneratorPanel() {
                   periodStart={detectedPeriodStart}
                   periodEnd={detectedPeriodEnd}
                   territoryMetrics={territoryMetrics}
+                  merchOrderRows={merchOrderRows}
                   labelArtists={labelArtists}
                   revenues={revenues}
                   bronzeBatchIds={bronzeBatchIds}

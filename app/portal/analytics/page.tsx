@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { createReplicaSupabaseClient } from '@/lib/supabase/replica'
+
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getStreamingStatsByArtistId } from '@/lib/api/streamingStats'
@@ -20,6 +20,14 @@ import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { listArtistInvoices } from '@/lib/api/artistInvoices'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
+import { getLineItemsByArtistId } from '@/lib/api/salesStatementLineItems'
+import { getEpkDownloadStats } from '@/lib/api/epkDownloadEvents'
+import { getPressDownloadStatsByArtistId } from '@/lib/api/journalistDownloads'
+import { getPromoImpactByArtistId } from '@/lib/api/promoImpact'
+import { getPromoLogEntries } from '@/lib/api/promoLog'
+import { getArtistSettlementSummary } from '@/lib/api/settlementLedger'
+import { getPageEngagementStats } from '@/lib/api/pageEvents'
+import { getMerchOrdersByArtistId, computeMerchOrderStats } from '@/lib/api/merchOrders'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AnalyticsPageClient } from './_components/AnalyticsPageClient'
 import { getPortalDictionary } from '@/i18n/getDictionary'
@@ -66,7 +74,6 @@ async function AnalyticsContent({
     )
   }
 
-  const readDb = createReplicaSupabaseClient()
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
 
   const [
@@ -78,29 +85,99 @@ async function AnalyticsContent({
     concerts,
     billingProfile,
     invoiceList,
+    lineItems,
+    epkStats,
+    pressStats,
+    promoImpacts,
+    promoEntries,
+    settlementSummary,
+    engagementStats,
+    merchOrders,
   ] = await Promise.all([
-    artist ? getStreamingStatsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getSalesStatementsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getTerritoryMetricsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getEventImpactByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getListenerMetricsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getConcertsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getStreamingStatsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getSalesStatementsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getTerritoryMetricsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getEventImpactByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getListenerMetricsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getConcertsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
     artist ? getBillingProfile(supabase, artist.id).catch(() => null) : Promise.resolve(null),
     artist
       ? listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
       : Promise.resolve({ invoices: [], total: 0 }),
+    artist ? getLineItemsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist
+      ? getEpkDownloadStats(supabase, artist.id).catch(() => ({
+          total: 0,
+          last30Days: 0,
+          bySource: { portal: 0, share: 0, press: 0 },
+        }))
+      : Promise.resolve({
+          total: 0,
+          last30Days: 0,
+          bySource: { portal: 0, share: 0, press: 0 },
+        }),
+    artist
+      ? getPressDownloadStatsByArtistId(supabase, artist.id).catch(() => ({
+          totalDownloads: 0,
+          last30Days: 0,
+          uniqueJournalists: 0,
+          recentDownloads: [],
+        }))
+      : Promise.resolve({
+          totalDownloads: 0,
+          last30Days: 0,
+          uniqueJournalists: 0,
+          recentDownloads: [],
+        }),
+    artist ? getPromoImpactByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getPromoLogEntries(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist && flags['artist.statements'] !== false
+      ? getArtistSettlementSummary(supabase, artist.id).catch(() => ({
+          balanceEur: 0,
+          recentEntries: [],
+          latestCarryForwardEur: null,
+        }))
+      : Promise.resolve({
+          balanceEur: 0,
+          recentEntries: [],
+          latestCarryForwardEur: null,
+        }),
+    artist
+      ? getPageEngagementStats(supabase, artist.id).catch(() => ({
+          totalViews: 0,
+          last30DaysViews: 0,
+          shopClicks: 0,
+          last30DaysShopClicks: 0,
+          newsViews: 0,
+          dailyViews: [],
+        }))
+      : Promise.resolve({
+          totalViews: 0,
+          last30DaysViews: 0,
+          shopClicks: 0,
+          last30DaysShopClicks: 0,
+          newsViews: 0,
+          dailyViews: [],
+        }),
+    artist ? getMerchOrdersByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
   ])
 
-  const defaultTab =
-    tab === 'earnings'
-      ? 'earnings'
-      : tab === 'territories'
-        ? 'territories'
-        : tab === 'events'
-          ? 'events'
-          : tab === 'listeners'
-            ? 'listeners'
-            : 'streaming'
+  const merchStats = computeMerchOrderStats(merchOrders)
+
+  const validTabs = new Set([
+    'streaming',
+    'listeners',
+    'territories',
+    'events',
+    'earnings',
+    'releases',
+    'revenue-mix',
+    'press',
+    'settlement',
+    'engagement',
+    'merch',
+  ])
+  const defaultTab = tab && validTabs.has(tab) ? tab : 'streaming'
 
   return (
     <AnalyticsPageClient
@@ -117,6 +194,15 @@ async function AnalyticsContent({
       eventImpacts={eventImpacts}
       listenerMetrics={listenerMetrics}
       concerts={concerts}
+      lineItems={lineItems}
+      epkStats={epkStats}
+      pressStats={pressStats}
+      promoImpacts={promoImpacts}
+      promoEntries={promoEntries}
+      settlementSummary={settlementSummary}
+      engagementStats={engagementStats}
+      merchStats={merchStats}
+      statementsEnabled={flags['artist.statements'] !== false}
     />
   )
 }

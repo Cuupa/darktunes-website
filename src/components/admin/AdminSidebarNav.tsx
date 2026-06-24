@@ -43,6 +43,7 @@ import {
   Key,
   SignOut,
   List,
+  ChartLine,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -95,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
       { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
+      { label: 'Analytics',   href: '/admin/analytics',   icon: ChartLine,       adminOnly: true  },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
       { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
       { label: 'Promo Log',   href: '/admin/promo-log',   icon: MegaphoneSimple, adminOnly: false },
