@@ -37,6 +37,7 @@ export function ApiCredentialsManager() {
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [importSummary, setImportSummary] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
 
@@ -147,15 +148,38 @@ export function ApiCredentialsManager() {
       }
       const body = (await res.json()) as {
         imported: string[]
-        skipped: string[]
+        skipped: Array<{ key: string; envVar: string | null; reason: string }>
+        envVarsChecked: Array<{ envVar: string; present: boolean }>
         credentials: CredentialStatus[]
       }
       setCredentials(body.credentials)
-      toast.success(
-        body.imported.length > 0
-          ? `Imported ${body.imported.length} credential(s) from environment`
-          : 'No new credentials found in environment variables',
-      )
+
+      const presentEnvVars = body.envVarsChecked
+        .filter((entry) => entry.present)
+        .map((entry) => entry.envVar)
+      const missingEnvVars = body.envVarsChecked
+        .filter((entry) => !entry.present)
+        .map((entry) => entry.envVar)
+      const alreadyConfigured = body.skipped.filter((s) => s.reason === 'already_configured').length
+
+      if (body.imported.length > 0) {
+        const summary = `Imported ${body.imported.length} key(s): ${body.imported.join(', ')}.`
+        setImportSummary(summary)
+        toast.success(summary)
+      } else if (missingEnvVars.length === body.envVarsChecked.length) {
+        const summary =
+          'No legacy API env vars are visible on this deployment. Add them in Vercel (SPOTIFY_CLIENT_ID, DISCOGS_TOKEN, RESEND_API_KEY, …), redeploy, then import again. API_CREDENTIALS_ENCRYPTION_KEY must already be set.'
+        setImportSummary(summary)
+        toast.error(summary, { duration: 12_000 })
+      } else if (alreadyConfigured > 0 && missingEnvVars.length === 0) {
+        const summary = 'All matching credentials are already stored in Supabase — nothing new to import.'
+        setImportSummary(summary)
+        toast.message(summary)
+      } else {
+        const summary = `No new imports. ${alreadyConfigured} already stored. Env vars found: ${presentEnvVars.join(', ') || 'none'}. Still missing: ${missingEnvVars.slice(0, 8).join(', ')}${missingEnvVars.length > 8 ? '…' : ''}.`
+        setImportSummary(summary)
+        toast.message(summary, { duration: 12_000 })
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
     } finally {
@@ -198,10 +222,23 @@ export function ApiCredentialsManager() {
         </AlertDescription>
       </Alert>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={() => void importFromEnv()} disabled={importing}>
-          {importing ? 'Importing…' : 'Import from environment variables'}
-        </Button>
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => void importFromEnv()} disabled={importing}>
+            {importing ? 'Importing…' : 'Import from environment variables'}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Reads legacy Vercel env vars (SPOTIFY_CLIENT_ID, DISCOGS_TOKEN, RESEND_API_KEY, …) from the
+          running deployment and encrypts them into Supabase. After adding vars in Vercel you must{' '}
+          <strong>redeploy</strong> before importing.
+        </p>
+        {importSummary && (
+          <Alert>
+            <AlertTitle>Last import result</AlertTitle>
+            <AlertDescription>{importSummary}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
       {CREDENTIAL_CATEGORIES.map((category) => {
