@@ -126,6 +126,28 @@ describe('app/api/health/route', () => {
     expect(body.syncQueue?.statusLabel).toBeTruthy()
   })
 
+  it('returns 200 when database is online but third-party keys are missing', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+    process.env.API_CREDENTIALS_ENCRYPTION_KEY =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+
+    mockSupabaseClientOnline()
+
+    const { GET } = await loadHealthRoute()
+    const response = await GET(MOCK_REQUEST)
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      status: string
+      database: { status: string }
+      apis: Record<string, { operationalState: string }>
+    }
+    expect(body.database.status).toBe('online')
+    expect(body.status).not.toBe('unhealthy')
+    expect(body.apis.spotify?.operationalState).toBe('unconfigured')
+  })
+
   it('OPTIONS responds with CORS preflight headers', async () => {
     const { OPTIONS } = await loadHealthRoute()
     const response = await OPTIONS()

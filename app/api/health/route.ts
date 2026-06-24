@@ -29,8 +29,11 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 
   const snapshot = await buildHealthSnapshot({ db })
 
+  // Reserve 503 for database reachability — missing API keys or sync issues stay 200 with body status.
+  const httpStatus = snapshot.database.status === 'offline' ? 503 : 200
+
   return NextResponse.json(snapshot satisfies HealthResponse, {
-    status: snapshot.status === 'unhealthy' ? 503 : 200,
+    status: httpStatus,
   })
 })
 
