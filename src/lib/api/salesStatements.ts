@@ -43,6 +43,35 @@ export interface CreateSalesStatementData {
   batchId?: string | null
 }
 
+export class DuplicateDraftStatementError extends Error {
+  constructor() {
+    super('A draft statement already exists for this artist and period')
+    this.name = 'DuplicateDraftStatementError'
+  }
+}
+
+async function assertNoDuplicateDraft(
+  db: DbClient,
+  artistId: string,
+  periodStart: string | null | undefined,
+  periodEnd: string | null | undefined,
+): Promise<void> {
+  if (!periodStart || !periodEnd) return
+
+  const { data, error } = await db
+    .from('sales_statements')
+    .select('id')
+    .eq('artist_id', artistId)
+    .eq('period_start', periodStart)
+    .eq('period_end', periodEnd)
+    .eq('status', 'draft')
+    .neq('document_type', 'storno')
+    .limit(1)
+
+  if (error) throw new Error(error.message)
+  if (data && data.length > 0) throw new DuplicateDraftStatementError()
+}
+
 function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
   return {
     id: row.id,
@@ -71,6 +100,8 @@ export async function createSalesStatement(
   db: DbClient,
   data: CreateSalesStatementData,
 ): Promise<SalesStatement> {
+  await assertNoDuplicateDraft(db, data.artistId, data.periodStart, data.periodEnd)
+
   const { data: row, error } = await db
     .from('sales_statements')
     .insert({

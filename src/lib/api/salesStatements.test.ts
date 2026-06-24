@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getSalesStatementsByArtistId,
   createSalesStatement,
+  DuplicateDraftStatementError,
   getSalesStatementById,
   approveSalesStatement,
   approveAndNotifySalesStatement,
@@ -51,6 +52,8 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -118,14 +121,37 @@ describe('getSalesStatementsByArtistId', () => {
   })
 })
 
+function makeCreateStatementDb(
+  selectData: unknown,
+  insertData: unknown = mockStatementRow,
+  selectError: unknown = null,
+  insertError: unknown = null,
+): DbClient {
+  let salesStatementsCalls = 0
+  return {
+    from: vi.fn((table: string) => {
+      if (table !== 'sales_statements') {
+        return makeBuilder(null, { message: `unexpected table ${table}` })
+      }
+      salesStatementsCalls += 1
+      if (salesStatementsCalls === 1) {
+        return makeBuilder(selectData, selectError)
+      }
+      return makeBuilder(insertData, insertError)
+    }),
+  } as unknown as DbClient
+}
+
 describe('createSalesStatement', () => {
   it('inserts and returns the mapped domain object', async () => {
-    const db = makeMockDb(mockStatementRow)
+    const db = makeCreateStatementDb([])
     const result = await createSalesStatement(db, {
       artistId: 'artist-uuid',
       filename: 'Statement_2024_Q1.pdf',
       r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
       period: 'Q1-2024',
+      periodStart: '2025-01-01',
+      periodEnd: '2025-03-31',
       amountEur: 1234.56,
     })
     expect(result.id).toBe('stmt-uuid-1')
@@ -134,38 +160,63 @@ describe('createSalesStatement', () => {
     expect(result.period).toBe('Q1-2024')
   })
 
+  it('rejects a second draft for the same artist and period', async () => {
+    const db = makeCreateStatementDb([{ id: 'existing-draft' }])
+    await expect(
+      createSalesStatement(db, {
+        artistId: 'artist-uuid',
+        filename: 'Statement_2024_Q1.pdf',
+        r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
+        period: 'Q1-2024',
+        periodStart: '2025-01-01',
+        periodEnd: '2025-03-31',
+      }),
+    ).rejects.toBeInstanceOf(DuplicateDraftStatementError)
+  })
+
   it('maps null amount_eur to undefined', async () => {
     const rowWithoutAmount: SalesStatementRow = { ...mockStatementRow, amount_eur: null }
-    const db = makeMockDb(rowWithoutAmount)
+    const db = makeCreateStatementDb([], rowWithoutAmount)
     const result = await createSalesStatement(db, {
       artistId: 'artist-uuid',
       filename: 'Statement_2024_Q1.pdf',
       r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
       period: 'Q1-2024',
+      periodStart: '2025-01-01',
+      periodEnd: '2025-03-31',
     })
     expect(result.amountEur).toBeUndefined()
   })
 
   it('throws on database error', async () => {
-    const db = makeMockDb(null, { message: 'duplicate key value violates unique constraint', code: '23505' })
+    const db = makeCreateStatementDb(
+      [],
+      null,
+      null,
+      { message: 'duplicate key value violates unique constraint', code: '23505' },
+    )
     await expect(
       createSalesStatement(db, {
         artistId: 'artist-uuid',
         filename: 'dup.pdf',
         r2Key: 'statements/artist-uuid/dup.pdf',
         period: 'Q2-2024',
+        periodStart: '2025-04-01',
+        periodEnd: '2025-06-30',
       }),
     ).rejects.toThrow('duplicate key value violates unique constraint')
   })
 
   it('throws when no row is returned', async () => {
-    const db = makeMockDb(null, null) // no error, no data
+    const db = makeCreateStatementDb([], null, null, null)
     await expect(
       createSalesStatement(db, {
         artistId: 'artist-uuid',
         filename: 'empty.pdf',
         r2Key: 'statements/artist-uuid/empty.pdf',
         period: 'Q3-2024',
+        periodStart: '2025-07-01',
+        periodEnd: '2025-09-30',
       }),
     ).rejects.toThrow('No data returned from createSalesStatement')
   })

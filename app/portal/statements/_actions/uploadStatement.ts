@@ -15,7 +15,7 @@
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
-import { createSalesStatement } from '@/lib/api/salesStatements'
+import { createSalesStatement, DuplicateDraftStatementError } from '@/lib/api/salesStatements'
 import {
   assertSettlementPeriodWritable,
   getOrCreateSettlementPeriod,
@@ -157,7 +157,7 @@ export async function uploadStatement(
 
     return { success: true, statementId: statement.id }
   } catch (err) {
-    if (err instanceof SettlementPeriodNotWritableError) {
+    if (err instanceof SettlementPeriodNotWritableError || err instanceof DuplicateDraftStatementError) {
       return { success: false, error: err.message }
     }
     const message = err instanceof Error ? err.message : 'Unexpected error'

@@ -1,22 +1,25 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { DownloadSimple, Warning, CheckCircle, Bank } from '@phosphor-icons/react'
+import { DownloadSimple, Warning, CheckCircle, Bank, CircleNotch } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import type { ArtistRevenue, LabelArtist, LabelInfo } from '@/lib/sos/types'
-import { isValidIBAN, maskIBAN } from '@/lib/sos/iban-validator'
+import type { LabelArtist, LabelInfo } from '@/lib/sos/types'
+import { isValidIBAN } from '@/lib/sos/iban-validator'
 import { generateSepaXml, downloadSepaXml } from '@/lib/sos/sepa-generator'
 import type { SepaPayoutEntry } from '@/lib/sos/sepa-generator'
 import { useDict } from '@/contexts/DictContext'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
+import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
+import type { SettlementRegister } from '@/lib/api/settlementRegister'
+import { buildPayoutRowsFromRegister } from '@/lib/sos/payoutRowsFromRegister'
 
 interface PayoutManagerProps {
-  revenues: ArtistRevenue[]
   labelArtists: LabelArtist[]
   labelInfo: LabelInfo
   periodStart: string
@@ -33,23 +36,7 @@ function fmtEur(value: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
-type IbanStatus = 'valid' | 'invalid' | 'missing'
-
-interface PayoutRow {
-  artistName: string
-  amount: number
-  roster: LabelArtist | undefined
-  ibanStatus: IbanStatus
-  ibanDisplay: string
-}
-
-function deriveIbanStatus(roster: LabelArtist | undefined): IbanStatus {
-  if (!roster?.iban) return 'missing'
-  return isValidIBAN(roster.iban) ? 'valid' : 'invalid'
-}
-
 export function PayoutManager({
-  revenues,
   labelArtists,
   labelInfo,
   periodStart,
@@ -62,8 +49,11 @@ export function PayoutManager({
     payoutInvalidIbanCount: '{count} missing or invalid IBAN',
     payoutSelectedSummary: '{amount} · {count} selected',
     payoutExportSepa: 'Export SEPA XML',
-    payoutNoDataTitle: 'No payouts calculated yet.',
-    payoutNoDataHint: 'Upload CSV files first, then run the statement calculation.',
+    payoutNoDataTitle: 'No ledger payouts for this period.',
+    payoutNoDataHint: 'Approve statements and record payments in Settlement Center first.',
+    payoutLedgerSourceHint: 'Amounts come from the settlement ledger, not the CSV session.',
+    payoutLoadingRegister: 'Loading settlement ledger…',
+    payoutRegisterFailed: 'Could not load settlement ledger',
     payoutColArtist: 'Artist',
     payoutColHolder: 'Account holder',
     payoutColIban: 'IBAN',
@@ -86,66 +76,124 @@ export function PayoutManager({
   } as const
   const t = { ...payoutFallback, ...(dict.admin?.accounting ?? {}) }
 
+  const [register, setRegister] = useState<SettlementRegister | null>(null)
+  const [loadingRegister, setLoadingRegister] = useState(true)
+
+  const periodStartDate = monthToPeriodDate(periodStart, false)
+  const periodEndDate = monthToPeriodDate(periodEnd || periodStart, true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRegister() {
+      if (!periodStartDate || !periodEndDate) {
+        setRegister(null)
+        setLoadingRegister(false)
+        return
+      }
+
+      setLoadingRegister(true)
+      try {
+        const token = await getAdminAccessToken()
+        if (!token) throw new Error('Session expired')
+
+        const params = new URLSearchParams({
+          periodStart: periodStartDate,
+          periodEnd: periodEndDate,
+        })
+        const response = await fetch(`/api/admin/settlements/register?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const json = (await response.json().catch(() => null)) as
+          | SettlementRegister
+          | { error?: string }
+          | null
+
+        if (!response.ok) {
+          throw new Error(
+            (json as { error?: string } | null)?.error ?? payoutFallback.payoutRegisterFailed,
+          )
+        }
+
+        if (!cancelled) {
+          setRegister(json as SettlementRegister)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRegister(null)
+          toast.error(err instanceof Error ? err.message : payoutFallback.payoutRegisterFailed)
+        }
+      } finally {
+        if (!cancelled) setLoadingRegister(false)
+      }
+    }
+
+    void loadRegister()
+    return () => {
+      cancelled = true
+    }
+  }, [periodStartDate, periodEndDate])
+
   const [draftSepaIban, setDraftSepaIban] = useState(labelInfo.sepaIban ?? '')
   const [draftSepaAccountHolder, setDraftSepaAccountHolder] = useState(
     labelInfo.sepaAccountHolder ?? labelInfo.name ?? '',
   )
-  const rows = useMemo<PayoutRow[]>(() => {
-    return revenues
-      .filter(r => r.finalAmount > 0)
-      .map(r => {
-        const roster = labelArtists.find(a => a.name.toLowerCase() === r.artist.toLowerCase())
-        const ibanStatus = deriveIbanStatus(roster)
-        const ibanDisplay = roster?.iban ? maskIBAN(roster.iban) : '—'
-        return { artistName: r.artist, amount: r.finalAmount, roster, ibanStatus, ibanDisplay }
-      })
-  }, [revenues, labelArtists])
 
-  const validRows  = useMemo(() => rows.filter(r => r.ibanStatus === 'valid'), [rows])
-  const invalidRows = useMemo(() => rows.filter(r => r.ibanStatus !== 'valid'), [rows])
-
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(validRows.map(r => r.artistName))
+  const rows = useMemo(
+    () => buildPayoutRowsFromRegister(register?.rows ?? [], labelArtists),
+    [register?.rows, labelArtists],
   )
 
-  const validArtistSet = useMemo(() => new Set(validRows.map(r => r.artistName)), [validRows])
+  const validRows = useMemo(() => rows.filter((r) => r.ibanStatus === 'valid'), [rows])
+  const invalidRows = useMemo(() => rows.filter((r) => r.ibanStatus !== 'valid'), [rows])
+
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+
+  const validArtistSet = useMemo(() => new Set(validRows.map((r) => r.artistId)), [validRows])
   const syncedSelected = useMemo(
-    () => new Set([...selected].filter(name => validArtistSet.has(name))),
-    [selected, validArtistSet]
+    () => new Set([...selected].filter((artistId) => validArtistSet.has(artistId))),
+    [selected, validArtistSet],
   )
 
-  const toggleArtist = useCallback((artistName: string) => {
-    setSelected(prev => {
+  useEffect(() => {
+    setSelected(new Set(validRows.map((r) => r.artistId)))
+  }, [validRows])
+
+  const toggleArtist = useCallback((artistId: string) => {
+    setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(artistName)) next.delete(artistName)
-      else next.add(artistName)
+      if (next.has(artistId)) next.delete(artistId)
+      else next.add(artistId)
       return next
     })
   }, [])
 
-  const allValidSelected = validRows.length > 0 && validRows.every(r => syncedSelected.has(r.artistName))
+  const allValidSelected =
+    validRows.length > 0 && validRows.every((r) => syncedSelected.has(r.artistId))
 
   const toggleSelectAll = useCallback(() => {
     if (allValidSelected) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(validRows.map(r => r.artistName)))
+      setSelected(new Set(validRows.map((r) => r.artistId)))
     }
   }, [allValidSelected, validRows])
 
   const selectedPayouts = useMemo(
-    () => rows.filter(r => syncedSelected.has(r.artistName)),
-    [rows, syncedSelected]
+    () => rows.filter((r) => syncedSelected.has(r.artistId)),
+    [rows, syncedSelected],
   )
   const totalSelected = useMemo(
     () => selectedPayouts.reduce((acc, r) => acc + r.amount, 0),
-    [selectedPayouts]
+    [selectedPayouts],
   )
 
   const handleExport = useCallback(() => {
     if (!labelInfo.sepaIban) {
       toast.error('Label IBAN missing', {
-        description: 'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
+        description:
+          'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
       })
       return
     }
@@ -191,7 +239,7 @@ export function PayoutManager({
 
   const labelIbanOk = useMemo(
     () => !!labelInfo.sepaIban && isValidIBAN(labelInfo.sepaIban),
-    [labelInfo.sepaIban]
+    [labelInfo.sepaIban],
   )
 
   return (
@@ -199,27 +247,36 @@ export function PayoutManager({
       <div className="flex flex-col h-full">
         <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-white/10 bg-card/60 sticky top-0 z-10">
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle size={14} className="text-emerald-400" />
-              <span className="text-muted-foreground">
-                {interpolate(t.payoutValidIbanCount, { count: validRows.length })}
-              </span>
-            </div>
-            {invalidRows.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Warning size={14} className="text-red-400" />
-                <span className="text-muted-foreground">
-                  {interpolate(t.payoutInvalidIbanCount, { count: invalidRows.length })}
-                </span>
+            {loadingRegister ? (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CircleNotch size={14} className="animate-spin" />
+                <span>{t.payoutLoadingRegister}</span>
               </div>
-            )}
-            {syncedSelected.size > 0 && (
-              <div className="font-medium tabular-nums text-emerald-400">
-                {interpolate(t.payoutSelectedSummary, {
-                  amount: fmtEur(totalSelected),
-                  count: syncedSelected.size,
-                })}
-              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-emerald-400" />
+                  <span className="text-muted-foreground">
+                    {interpolate(t.payoutValidIbanCount, { count: validRows.length })}
+                  </span>
+                </div>
+                {invalidRows.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Warning size={14} className="text-red-400" />
+                    <span className="text-muted-foreground">
+                      {interpolate(t.payoutInvalidIbanCount, { count: invalidRows.length })}
+                    </span>
+                  </div>
+                )}
+                {syncedSelected.size > 0 && (
+                  <div className="font-medium tabular-nums text-emerald-400">
+                    {interpolate(t.payoutSelectedSummary, {
+                      amount: fmtEur(totalSelected),
+                      count: syncedSelected.size,
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -234,13 +291,17 @@ export function PayoutManager({
               size="sm"
               className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
               onClick={handleExport}
-              disabled={syncedSelected.size === 0}
+              disabled={loadingRegister || syncedSelected.size === 0}
             >
               <DownloadSimple size={14} />
               {t.payoutExportSepa}
             </Button>
           </div>
         </div>
+
+        {!loadingRegister && rows.length > 0 && (
+          <p className="px-6 pt-4 text-xs text-muted-foreground">{t.payoutLedgerSourceHint}</p>
+        )}
 
         {!labelIbanOk && onLabelSepaUpdate && (
           <div className="mx-6 mt-4 p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-3">
@@ -291,7 +352,12 @@ export function PayoutManager({
         )}
 
         <div className="overflow-x-auto flex-1">
-          {rows.length === 0 ? (
+          {loadingRegister ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
+              <CircleNotch size={32} className="animate-spin opacity-50" />
+              <p className="text-sm">{t.payoutLoadingRegister}</p>
+            </div>
+          ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <Bank size={32} className="opacity-30" />
               <p className="text-sm">{t.payoutNoDataTitle}</p>
@@ -310,21 +376,31 @@ export function PayoutManager({
                       disabled={validRows.length === 0}
                     />
                   </th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColArtist}</th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColHolder}</th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColIban}</th>
-                  <th className="py-3 text-right font-medium text-muted-foreground px-4">{t.payoutColAmount}</th>
-                  <th className="py-3 text-center font-medium text-muted-foreground px-4">{t.payoutColStatus}</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">
+                    {t.payoutColArtist}
+                  </th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">
+                    {t.payoutColHolder}
+                  </th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">
+                    {t.payoutColIban}
+                  </th>
+                  <th className="py-3 text-right font-medium text-muted-foreground px-4">
+                    {t.payoutColAmount}
+                  </th>
+                  <th className="py-3 text-center font-medium text-muted-foreground px-4">
+                    {t.payoutColStatus}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(row => {
+                {rows.map((row) => {
                   const isInvalid = row.ibanStatus !== 'valid'
-                  const isChecked = syncedSelected.has(row.artistName)
+                  const isChecked = syncedSelected.has(row.artistId)
 
                   return (
                     <tr
-                      key={row.artistName}
+                      key={row.artistId}
                       className={`border-b border-white/5 transition-colors ${
                         isInvalid
                           ? 'bg-red-500/5 hover:bg-red-500/8'
@@ -334,7 +410,7 @@ export function PayoutManager({
                       <td className="w-14 px-4 py-3">
                         <Checkbox
                           checked={isChecked}
-                          onCheckedChange={() => toggleArtist(row.artistName)}
+                          onCheckedChange={() => toggleArtist(row.artistId)}
                           aria-label={`Select ${row.artistName}`}
                           disabled={isInvalid}
                           className="border-2 border-white/40 data-[state=checked]:border-primary data-[state=checked]:bg-primary disabled:opacity-30"
@@ -350,7 +426,9 @@ export function PayoutManager({
                       </td>
                       <td className="py-3 px-4 font-mono text-xs">
                         {row.ibanStatus === 'missing' ? (
-                          <span className="text-red-400 text-xs font-sans font-medium">{t.payoutIbanMissing}</span>
+                          <span className="text-red-400 text-xs font-sans font-medium">
+                            {t.payoutIbanMissing}
+                          </span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -358,7 +436,10 @@ export function PayoutManager({
                                 {row.ibanDisplay}
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs text-xs bg-red-900/90 text-red-100 border-red-700">
+                            <TooltipContent
+                              side="top"
+                              className="max-w-xs text-xs bg-red-900/90 text-red-100 border-red-700"
+                            >
                               {t.payoutInvalidIbanTooltip}
                             </TooltipContent>
                           </Tooltip>
@@ -366,21 +447,28 @@ export function PayoutManager({
                           <span className="text-muted-foreground">{row.ibanDisplay}</span>
                         )}
                       </td>
-                      <td className={`py-3 px-4 text-right tabular-nums font-medium ${isInvalid ? 'text-red-300/70' : 'text-emerald-400'}`}>
+                      <td
+                        className={`py-3 px-4 text-right tabular-nums font-medium ${
+                          isInvalid ? 'text-red-300/70' : 'text-emerald-400'
+                        }`}
+                      >
                         {fmtEur(row.amount)}
                       </td>
                       <td className="py-3 px-4 text-center">
                         {row.ibanStatus === 'valid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                            <CheckCircle size={10} />{t.payoutStatusOk}
+                            <CheckCircle size={10} />
+                            {t.payoutStatusOk}
                           </span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/15 text-red-400 border border-red-500/25">
-                            <Warning size={10} weight="bold" />{t.payoutStatusInvalid}
+                            <Warning size={10} weight="bold" />
+                            {t.payoutStatusInvalid}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                            <Warning size={10} weight="bold" />{t.payoutStatusMissing}
+                            <Warning size={10} weight="bold" />
+                            {t.payoutStatusMissing}
                           </span>
                         )}
                       </td>

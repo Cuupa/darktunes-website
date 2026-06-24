@@ -835,7 +835,6 @@ function SosGeneratorPanel() {
         {activeSubTab === 'payout' && (
           hasData ? (
             <PayoutManager
-              revenues={revenues}
               labelArtists={labelArtists}
               labelInfo={labelInfo}
               periodStart={detectedPeriodStart}
