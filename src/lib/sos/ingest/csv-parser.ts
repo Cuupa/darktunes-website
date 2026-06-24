@@ -69,7 +69,7 @@ export interface ParsedCSVData {
 }
 
 export const semanticDictionary: Record<string, string[]> = {
-  sales_month: ["Sales Month", "Month", "Date", "Period", "Verkaufsmonat", "Datum", "Reporting Period"],
+  sales_month: ["Believe Sales Month", "Sales Month", "Month", "Date", "Period", "Verkaufsmonat", "Datum", "Reporting Period"],
   platform: ["Platform", "Store", "Shop", "Plattform", "Provider", "Service", "DSP"],
   country: ["Country/Region", "Country", "Region", "Territory", "Land", "Territorium"],
   original_artist: ["Artist Name", "Artist", "Band", "Künstler", "Main Artist", "Track Artist"],
@@ -79,7 +79,7 @@ export const semanticDictionary: Record<string, string[]> = {
   isrc: ["ISRC", "Track ISRC", "Recording ISRC"],
   catalog_number: ["Release Catalog nb", "Catalog Number", "Cat No", "Cat Number", "Katalognummer", "Catalog"],
   quantity: ["Quantity", "Qty", "Downloads", "Streams", "Units", "Anzahl", "Menge", "Verkäufe"],
-  net_revenue: ["Net Revenue", "Revenue", "Umsatz", "Netto", "Net Amount", "Earnings", "Amount", "net amount", "item price"],
+  net_revenue: ["Net Revenue", "Revenue", "Umsatz", "Netto", "Net Amount", "net amount", "Amount You Received", "amount you received", "Earnings", "Amount", "item price"],
   currency: ["Currency", "Währung", "Curr", "Paid Currency", "currency code"],
   release_type: ["Release Type", "Sales Type", "Format", "Product Type", "Physical", "Medium", "Type", "item type"],
   /** Bandcamp-specific column: pre-converted EUR balance for this transaction row. */

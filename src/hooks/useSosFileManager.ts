@@ -5,6 +5,7 @@ import { useKV } from '@/hooks/useLocalKV'
 import { toast } from 'sonner'
 import { parseCSVContentStreaming } from '@/lib/sos/ingest/streaming-csv-parser'
 import { parseShopifyCSV } from '@/lib/sos/ingest/shopify-parser'
+import { extractPeriodBounds, uploadBronzeDistributorCsv } from '@/lib/sos/bronzeUpload'
 import type { UploadedFile, FileProcessingState } from '@/lib/sos/types'
 
 type FileType = 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'
@@ -95,12 +96,14 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       let rowsParsed: number
       let rowsSkipped: number
       let uniqueArtists: number
+      let salesMonths: string[] = []
 
       if (type === 'shopify') {
         const result = parseShopifyCSV(data)
         rowsParsed = result.transactions.length
         rowsSkipped = result.errors.length
         uniqueArtists = new Set(result.transactions.map(t => t.original_artist)).size
+        salesMonths = result.transactions.map((t) => t.sales_month)
       } else if (type === 'printful') {
         // parsePrintfulCSV is imported lazily to keep the bundle lean in non-merch flows
         const { parsePrintfulCSV } = await import('@/lib/sos/ingest/printful-parser')
@@ -116,6 +119,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         rowsParsed = result.transactions.length
         rowsSkipped = result.errors.length
         uniqueArtists = new Set(result.transactions.map(t => t.original_artist).filter(Boolean)).size
+        salesMonths = result.transactions.map((t) => t.sales_month)
       } else {
         const result = await parseCSVContentStreaming(data, type, progress => {
           setFileState(id, { progress: progress.percentage })
@@ -123,12 +127,37 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         rowsParsed = result.transactions.length
         rowsSkipped = result.errors.length
         uniqueArtists = result.uniqueArtists.length
+        salesMonths = result.transactions.map((t) => t.sales_month)
       }
 
       setFileState(id, { status: 'done', progress: 100 })
+
+      const { periodStart, periodEnd } = extractPeriodBounds(salesMonths)
+      void (async () => {
+        setFileState(id, { bronzeStatus: 'uploading' })
+        const bronze = await uploadBronzeDistributorCsv({
+          distributor: type,
+          filename: rawFile.name,
+          csvContent: data,
+          rowCount: rowsParsed,
+          periodStart,
+          periodEnd,
+        })
+        if (bronze) {
+          setFileMetas((current) =>
+            (current ?? []).map((f) =>
+              f.id === id ? { ...f, bronzeBatchId: bronze.batchId } : f,
+            ),
+          )
+          setFileState(id, { bronzeStatus: 'done' })
+        } else {
+          setFileState(id, { bronzeStatus: 'error' })
+        }
+      })()
+
       return { data, rowsParsed, rowsSkipped, uniqueArtists }
     },
-    [type, setFileState]
+    [type, setFileState, setFileMetas]
   )
 
   const addFiles = useCallback(

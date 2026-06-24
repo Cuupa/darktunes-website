@@ -62,6 +62,16 @@ const serverEnvSchema = z.object({
     .string()
     .optional()
     .describe('Bandsintown API key — leave blank to disable Bandsintown sync'),
+  /** Last.fm API key (https://www.last.fm/api/account/create) */
+  LASTFM_API_KEY: z
+    .string()
+    .optional()
+    .describe('Last.fm API key — leave blank to disable listener sync'),
+  /** Soundcharts API key (optional paid tier) */
+  SOUNDCHARTS_API_KEY: z
+    .string()
+    .optional()
+    .describe('Soundcharts API key — leave blank to disable Soundcharts sync'),
   /** Resend API key — used for contact form emails and SOS statement notifications */
   RESEND_API_KEY: z
     .string()

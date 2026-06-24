@@ -14,6 +14,7 @@
 import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import type { StreamingStat, PlatformAggregate } from '@/lib/api/streamingStats'
+import type { Concert } from '@/types'
 import type { Dictionary } from '@/i18n/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -22,12 +23,14 @@ export interface StreamingChartInnerProps {
   platforms: string[]
   monthlyData: Record<string, string | number>[]
   aggregates: PlatformAggregate[]
+  eventMarkers: Array<{ period: string; label: string }>
 }
 
 interface StreamingChartProps {
   dict: Dictionary['portal']
   stats: StreamingStat[]
   aggregates: PlatformAggregate[]
+  concerts: Concert[]
 }
 
 const StreamingChartInner = dynamic(
@@ -49,9 +52,9 @@ const StreamingChartInner = dynamic(
   },
 )
 
-export function StreamingChart({ dict, stats, aggregates }: StreamingChartProps) {
+export function StreamingChart({ dict, stats, aggregates, concerts }: StreamingChartProps) {
   // useMemo must be called before any early returns (Rules of Hooks).
-  const { platforms, monthlyData } = useMemo(() => {
+  const { platforms, monthlyData, eventMarkers } = useMemo(() => {
     const _periods = [...new Set(stats.map((s) => s.period))].sort()
     const _platforms = [...new Set(stats.map((s) => s.platform))]
     // Pre-index stats by "period|platform" for O(1) lookup
@@ -66,8 +69,13 @@ export function StreamingChart({ dict, stats, aggregates }: StreamingChartProps)
       }
       return row
     })
-    return { platforms: _platforms, monthlyData: _monthlyData }
-  }, [stats])
+    const _eventMarkers = concerts.map((c) => ({
+      period: c.concertDate.slice(0, 7),
+      label: `${c.eventName} (${c.venueCity ?? c.venueCountry ?? ''})`,
+    }))
+
+    return { platforms: _platforms, monthlyData: _monthlyData, eventMarkers: _eventMarkers }
+  }, [stats, concerts])
 
   if (stats.length === 0) {
     return (
@@ -84,6 +92,7 @@ export function StreamingChart({ dict, stats, aggregates }: StreamingChartProps)
       platforms={platforms}
       monthlyData={monthlyData}
       aggregates={aggregates}
+      eventMarkers={eventMarkers}
     />
   )
 }

@@ -62,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_dashboard',
     items: [
       { href: '/portal', label: 'overview', icon: ChartBar },
-      { href: '/portal/analytics', label: 'analytics', icon: ChartBar },
+      { href: '/portal/analytics', label: 'analytics', icon: ChartBar, flag: 'artist.analytics' },
     ],
   },
   {

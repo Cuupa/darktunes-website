@@ -18,6 +18,7 @@ export const SYSTEM_BANDCAMP_DDS_PROFILE_ID = 'system-bandcamp-dds'
 export const SYSTEM_BELIEVE_PROFILE_ID = 'system-believe'
 export const SYSTEM_SHOPIFY_PROFILE_ID = 'system-shopify'
 export const SYSTEM_PRINTFUL_PROFILE_ID = 'system-printful'
+export const SYSTEM_DARKMERCH_PROFILE_ID = 'system-darkmerch'
 export const SYSTEM_LABEL_ARTISTS_PROFILE_ID = 'system-label-artists'
 
 // ── Internal field key → streaming-parser internal field name mapping ─────────
@@ -100,9 +101,9 @@ const BELIEVE_DIGITAL: CsvImportProfile = {
   name: 'Believe Digital',
   type: 'financial',
   delimiter: ';',
-  autoDetectHeaders: ['Sales Month', 'Platform', 'Country/Region', 'Label Name', 'Artist Name'],
+  autoDetectHeaders: ['Believe Sales Month', 'Sales Month', 'Platform', 'Artist Name', 'Net Revenue'],
   columnMapping: {
-    salesMonth:    'Sales Month',
+    salesMonth:    'Believe Sales Month',
     platform:      'Platform',
     country:       'Country/Region',
     artistName:    'Artist Name',
@@ -150,6 +151,21 @@ const PRINTFUL_COSTS: CsvImportProfile = {
   isSystemDefault: true,
 }
 
+const DARKMERCH_ORDERS: CsvImportProfile = {
+  id: SYSTEM_DARKMERCH_PROFILE_ID,
+  name: 'Darkmerch Orders',
+  type: 'financial',
+  delimiter: ',',
+  autoDetectHeaders: ['DATE', 'ORDER NUMBER', 'BAND', 'NET REVENUE'],
+  columnMapping: {
+    salesMonth:  'DATE',
+    artistName:  'BAND',
+    netRevenue:  'NET REVENUE',
+    releaseType: 'ORDER NUMBER',
+  },
+  isSystemDefault: true,
+}
+
 const LABEL_ARTISTS_MASTER_DATA: CsvImportProfile = {
   id: SYSTEM_LABEL_ARTISTS_PROFILE_ID,
   name: 'Label Artists (Stammdaten)',
@@ -174,6 +190,7 @@ export const DEFAULT_CSV_PROFILES: CsvImportProfile[] = [
   BELIEVE_DIGITAL,
   BANDCAMP_DDS_PAYOUTS,
   BANDCAMP_STANDARD,
+  DARKMERCH_ORDERS,
   SHOPIFY_ORDERS,
   PRINTFUL_COSTS,
   LABEL_ARTISTS_MASTER_DATA,

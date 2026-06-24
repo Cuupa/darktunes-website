@@ -101,6 +101,8 @@ export interface UploadedFile {
   rowsSkipped?: number
   /** Number of unique artists found. */
   uniqueArtistsCount?: number
+  /** Bronze import batch ID when raw CSV was archived in R2. */
+  bronzeBatchId?: string
 }
 
 /** Transient per-file processing state (not persisted). */
@@ -110,6 +112,8 @@ export interface FileProcessingState {
   status: FileStatus
   progress: number
   error?: string
+  /** Bronze R2 archive status (non-blocking side upload). */
+  bronzeStatus?: 'uploading' | 'done' | 'error' | 'skipped'
 }
 
 export interface CompilationFilter {

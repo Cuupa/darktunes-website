@@ -11,13 +11,58 @@ import {
 import { createSafeFilename } from '@/lib/sos/utils'
 import { isValidArtistId, isValidPeriod } from '@/lib/sos/validation'
 import { uploadStatement } from '../../app/portal/statements/_actions/uploadStatement'
-import type { SafeProcessedArtistData, LabelInfo, PdfExportSettings, AppDefaults, LabelArtist, EmailConfig, CompilationFilter } from '@/lib/sos/types'
+import {
+  buildLineItemsFromArtistData,
+  computeTotalStreamsFromArtistData,
+  monthToPeriodDate,
+} from '@/lib/sos/lineItemsFromArtistData'
+import { persistAnalyticsAfterStatementUpload } from '@/lib/sos/persistAfterStatementUpload'
+import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
+import type {
+  SafeProcessedArtistData,
+  LabelInfo,
+  PdfExportSettings,
+  AppDefaults,
+  LabelArtist,
+  EmailConfig,
+  CompilationFilter,
+  ArtistRevenue,
+} from '@/lib/sos/types'
+
+export interface SosExportPersistContext {
+  territoryMetrics: TerritoryMetricRow[]
+  revenues: ArtistRevenue[]
+  bronzeBatchIds: string[]
+}
 
 /** Converts a Blob to a Base64-encoded string. */
 async function blobToBase64(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer()
   const bytes = new Uint8Array(buffer)
   return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
+}
+
+function buildUploadPayload(
+  artistData: SafeProcessedArtistData,
+  periodStart: string,
+  periodEnd: string,
+) {
+  const lineItems = buildLineItemsFromArtistData('pending', artistData).map(
+    ({ statementId: _statementId, releaseId, platform, country, streams, revenueEur, quantity }) => ({
+      releaseId: releaseId ?? undefined,
+      platform: platform ?? undefined,
+      country: country ?? undefined,
+      streams,
+      revenueEur,
+      quantity,
+    }),
+  )
+  return {
+    periodStart: monthToPeriodDate(periodStart, false),
+    periodEnd: monthToPeriodDate(periodEnd || periodStart, true),
+    totalStreams: computeTotalStreamsFromArtistData(artistData),
+    lineItems,
+  }
 }
 
 /**
@@ -34,7 +79,8 @@ export function useExports(
   labelArtists?: LabelArtist[],
   emailConfig?: Partial<EmailConfig>,
   compilationFilters: CompilationFilter[] = [],
-  autoUploadToPortal = true
+  autoUploadToPortal = true,
+  persistContext?: SosExportPersistContext,
 ) {
   const emailOptions = useMemo(
     () =>
@@ -100,15 +146,31 @@ export function useExports(
           toast.loading('Uploading statement to portal…', { id: 'sos-upload' })
 
           const pdfBase64 = await blobToBase64(blob)
+          const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
+          const batchId = persistContext?.bronzeBatchIds[0]
           const result = await uploadStatement({
             artistId: artistInfo.artistId,
             filename,
             period: validPeriod,
             amountEur: artistData.finalPayout,
+            ...analyticsPayload,
+            batchId,
             pdfBase64,
           })
 
           if (result.success) {
+            if (persistContext && periodStart) {
+              void persistAnalyticsAfterStatementUpload({
+                artistName: artist,
+                periodStart,
+                periodEnd: periodEnd || periodStart,
+                territoryMetrics: persistContext.territoryMetrics,
+                labelArtists: labelArtists ?? [],
+                revenues: persistContext.revenues,
+                bronzeBatchIds: persistContext.bronzeBatchIds,
+                batchId,
+              })
+            }
             toast.success('Statement uploaded! Artist will receive an email notification.', { id: 'sos-upload' })
           } else {
             toast.error(`Upload failed: ${result.error ?? 'Unknown error'}. PDF saved locally instead.`, { id: 'sos-upload' })
@@ -124,7 +186,7 @@ export function useExports(
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists]
   )
 
   const handleDownloadExcel = useCallback(
@@ -278,16 +340,33 @@ export function useExports(
         const filename = `${createSafeFilename(artist)}_statement.pdf`
         const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
         const pdfBase64 = await blobToBase64(blob)
+        const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
+        const batchId = persistContext?.bronzeBatchIds[0]
         const result = await uploadStatement({
           artistId: artistInfo.artistId,
           filename,
           period: validPeriod,
           amountEur: artistData.finalPayout,
+          ...analyticsPayload,
+          batchId,
           pdfBase64,
         })
 
         if (!result.success) {
           throw new Error(result.error ?? 'Failed to publish statement to portal')
+        }
+
+        if (persistContext && periodStart) {
+          await persistAnalyticsAfterStatementUpload({
+            artistName: artist,
+            periodStart,
+            periodEnd: periodEnd || periodStart,
+            territoryMetrics: persistContext.territoryMetrics,
+            labelArtists: labelArtists ?? [],
+            revenues: persistContext.revenues,
+            bronzeBatchIds: persistContext.bronzeBatchIds,
+            batchId,
+          })
         }
 
         toast.success('Statement published to portal')
@@ -296,7 +375,7 @@ export function useExports(
         toast.error(message)
       }
     },
-    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists]
   )
 
   return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal }

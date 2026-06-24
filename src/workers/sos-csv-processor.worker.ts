@@ -42,7 +42,9 @@ import { parseDarkmerchCSV } from '../lib/sos/ingest/darkmerch-parser'
 import {
   processTransactionsWithCompilations,
   buildArtistTree,
+  aggregateTerritoryMetrics,
 } from '../lib/sos/data-processor'
+import type { TerritoryMetricRow } from '../lib/sos/data-processor'
 import { buildArtistCollabTree } from '../lib/sos/grouping'
 import type { SalesTransaction } from '../lib/sos/ingest/csv-parser'
 import { extractFeaturedArtistsDetailed } from '../lib/sos/ingest/csv-parser'
@@ -132,6 +134,8 @@ export interface WorkerResult {
    * not in the roster still have their releases listed.
    */
   releaseTitlesByArtistIncFeaturing: Record<string, string[]>
+  /** Monthly territory metrics — serialisable gold-layer facts for analytics. */
+  territoryMetrics: TerritoryMetricRow[]
 }
 
 export type WorkerRequest =
@@ -250,6 +254,7 @@ function runProcess(config: WorkerProcessConfig): void {
           periodEnd: '',
           totalGrossAllData: 0,
           releaseTitlesByArtistIncFeaturing: {},
+          territoryMetrics: [],
         },
       })
       return
@@ -305,12 +310,29 @@ function runProcess(config: WorkerProcessConfig): void {
     // raw transactions in scope (they must not be sent to the main thread).
     const releaseTitlesByArtistIncFeaturing = buildReleaseTitlesByArtistIncFeaturing(allTransactions)
 
+    const territoryMetrics = aggregateTerritoryMetrics(
+      artistData,
+      config.exchangeRates,
+      config.historicalExchangeRates,
+    )
+
     // Raw transaction arrays and the full ProcessedArtistData (with .transactions)
     // are now only in local scope and will be garbage-collected once this
     // function returns — they are NEVER sent to the main thread.
     post({
       type: 'result',
-      data: { processedData, artistTrees, collabTree, filteredCompilations, uniqueArtists, periodStart, periodEnd, totalGrossAllData, releaseTitlesByArtistIncFeaturing },
+      data: {
+        processedData,
+        artistTrees,
+        collabTree,
+        filteredCompilations,
+        uniqueArtists,
+        periodStart,
+        periodEnd,
+        totalGrossAllData,
+        releaseTitlesByArtistIncFeaturing,
+        territoryMetrics,
+      },
     })
   } catch (err) {
     post({

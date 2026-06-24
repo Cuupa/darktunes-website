@@ -25,6 +25,7 @@ import {
   SYSTEM_BANDCAMP_DDS_PROFILE_ID,
   SYSTEM_SHOPIFY_PROFILE_ID,
   SYSTEM_PRINTFUL_PROFILE_ID,
+  SYSTEM_DARKMERCH_PROFILE_ID,
 } from './default-profiles'
 import {
   parseShopifyRaw,
@@ -33,6 +34,7 @@ import {
 import type { ShopifyRawOrder, PrintfulRawCost } from './ecommerce-merger'
 import { parsePrintfulCSV } from './printful-parser'
 import type { LabelArtist } from '../types'
+import { resolveProfileColumnsAgainstHeaders } from './columnMappingSuggestions'
 
 export type FileType = 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'master-data' | 'unknown'
 
@@ -134,7 +136,9 @@ export function matchProfile(
     const required = profile.autoDetectHeaders.map(h => h.toLowerCase().trim())
     if (required.length === 0) continue
 
-    const matches = required.filter(h => normalized.includes(h)).length
+    const matches = required.filter((h) =>
+      normalized.some((col) => col === h || col.includes(h) || h.includes(col)),
+    ).length
     const minRequired = Math.min(2, required.length)
 
     if (matches < minRequired) continue
@@ -162,11 +166,16 @@ export function matchProfile(
  *   `columnMapping` parameter.
  */
 export function buildStreamingColumnMapping(
-  profile: CsvImportProfile
+  profile: CsvImportProfile,
+  headers?: string[],
 ): Record<string, string> {
+  const resolved = headers
+    ? resolveProfileColumnsAgainstHeaders(profile.columnMapping, headers)
+    : profile.columnMapping
+
   const result: Record<string, string> = {}
 
-  for (const [profileKey, csvColumn] of Object.entries(profile.columnMapping)) {
+  for (const [profileKey, csvColumn] of Object.entries(resolved)) {
     if (!csvColumn) continue
     const internalKey = FINANCIAL_KEY_TO_INTERNAL[profileKey as FinancialFieldKey]
     if (internalKey) {
@@ -362,6 +371,20 @@ export async function parseFile(
         }
       }
 
+      if (matched.id === SYSTEM_DARKMERCH_PROFILE_ID) {
+        const { parseDarkmerchCSV } = await import('./darkmerch-parser')
+        const { transactions, errors } = parseDarkmerchCSV(content)
+        const artists = [...new Set(transactions.map((t) => t.main_artist).filter(Boolean))]
+        return {
+          fileType: 'believe',
+          profileId: matched.id,
+          profileType: 'financial',
+          transactions,
+          errors,
+          uniqueArtists: artists,
+        }
+      }
+
       // Bandcamp and Bandcamp DDS profiles: must be routed as 'bandcamp' (not 'believe') to preserve
       // the EUR balance correction logic in streaming-csv-parser that handles
       // Bandcamp's unique per-sale net-amount calculation. DDS payout-fee rows
@@ -371,7 +394,7 @@ export async function parseFile(
           ? 'bandcamp'
           : 'believe'
 
-      const columnMapping = buildStreamingColumnMapping(matched)
+      const columnMapping = buildStreamingColumnMapping(matched, rawHeaders)
       const streamingResult: StreamingParseResult = await parseCSVContentStreaming(
         content,
         parserSource,

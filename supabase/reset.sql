@@ -1393,6 +1393,106 @@ CREATE INDEX IF NOT EXISTS idx_sales_statements_artist_id  ON public.sales_state
 CREATE INDEX IF NOT EXISTS idx_sales_statements_created_at ON public.sales_statements (created_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: distributor_import_batches  (Bronze metadata — raw CSV in R2)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.distributor_import_batches (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start    TEXT        NOT NULL,
+  period_end      TEXT        NOT NULL,
+  distributor     TEXT        NOT NULL,
+  r2_key          TEXT        NOT NULL UNIQUE,
+  file_hash       TEXT,
+  row_count       INTEGER     NOT NULL DEFAULT 0,
+  status          TEXT        NOT NULL DEFAULT 'uploaded'
+                  CHECK (status IN ('uploaded', 'processing', 'completed', 'failed')),
+  rules_preset_id UUID        REFERENCES public.sos_rules_presets (id) ON DELETE SET NULL,
+  uploaded_by     UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_distributor_import_batches_period
+  ON public.distributor_import_batches (period_start DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_territory_metrics  (Gold — monthly streams/revenue per territory)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_territory_metrics (
+  id              UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  period          TEXT           NOT NULL,
+  platform        TEXT           NOT NULL DEFAULT '',
+  country         TEXT           NOT NULL DEFAULT '',
+  streams         BIGINT         NOT NULL DEFAULT 0,
+  revenue_eur     NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  quantity        BIGINT         NOT NULL DEFAULT 0,
+  source_batch_id UUID           REFERENCES public.distributor_import_batches (id) ON DELETE SET NULL,
+  updated_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, period, platform, country)
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_territory_metrics_artist_period
+  ON public.artist_territory_metrics (artist_id, period DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: sales_statement_line_items  (Gold — SOS detail rows per statement)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sales_statement_line_items (
+  id           UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  statement_id UUID           NOT NULL REFERENCES public.sales_statements (id) ON DELETE CASCADE,
+  release_id   UUID           REFERENCES public.releases (id) ON DELETE SET NULL,
+  platform     TEXT,
+  country      TEXT,
+  streams      BIGINT         NOT NULL DEFAULT 0,
+  revenue_eur  NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  quantity     BIGINT         NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_statement_line_items_statement
+  ON public.sales_statement_line_items (statement_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: event_impact  (Gold — precomputed concert ↔ territory correlation)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.event_impact (
+  id              UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  concert_id      UUID           NOT NULL REFERENCES public.concerts (id) ON DELETE CASCADE,
+  artist_id       UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  country         TEXT           NOT NULL,
+  window_days     INTEGER        NOT NULL DEFAULT 30,
+  streams_before  BIGINT         NOT NULL DEFAULT 0,
+  streams_after   BIGINT         NOT NULL DEFAULT 0,
+  delta_streams   BIGINT         NOT NULL DEFAULT 0,
+  delta_pct       NUMERIC(8, 2)  NOT NULL DEFAULT 0,
+  revenue_before  NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  revenue_after   NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  calculated_at   TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (concert_id, country, window_days)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_impact_artist
+  ON public.event_impact (artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_listener_metrics  (Gold — external listener/play trends)
+-- Sources: Last.fm (free), Soundcharts (optional paid API key)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_listener_metrics (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  source      TEXT        NOT NULL CHECK (source IN ('lastfm', 'soundcharts')),
+  metric_type TEXT        NOT NULL CHECK (metric_type IN ('listeners', 'plays')),
+  period      TEXT        NOT NULL,
+  value       BIGINT      NOT NULL DEFAULT 0,
+  country     TEXT        NOT NULL DEFAULT '',
+  fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, source, metric_type, period, country)
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_listener_metrics_artist_period
+  ON public.artist_listener_metrics (artist_id, period DESC);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: release_checklists  (per-artist release task tracking)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.release_checklists (
@@ -1792,8 +1892,13 @@ ALTER TABLE public.epk_fonts         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_share_links   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_download_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_templates     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.streaming_stats       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sales_statements      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.streaming_stats              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_statements             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.distributor_import_batches     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_territory_metrics     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_listener_metrics      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_statement_line_items     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_impact                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_checklists    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.press_photos          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promo_tracks          ENABLE ROW LEVEL SECURITY;
@@ -2445,11 +2550,11 @@ CREATE POLICY "streaming_stats: artist read own" ON public.streaming_stats
     EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
   );
 
--- Allows admins full access to all streaming stats
+-- Allows admins and editors to manage streaming stats (SOS rollup writes)
 CREATE POLICY "streaming_stats: admin all" ON public.streaming_stats
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: sales_statements
@@ -2465,6 +2570,83 @@ CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
 
 -- Allows admins full access to all sales statements
 CREATE POLICY "sales_statements: admin all" ON public.sales_statements
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: distributor_import_batches
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "distributor_import_batches: admin all" ON public.distributor_import_batches;
+CREATE POLICY "distributor_import_batches: admin all" ON public.distributor_import_batches
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: artist_territory_metrics
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "artist_territory_metrics: artist read own" ON public.artist_territory_metrics;
+DROP POLICY IF EXISTS "artist_territory_metrics: admin all"       ON public.artist_territory_metrics;
+
+CREATE POLICY "artist_territory_metrics: artist read own" ON public.artist_territory_metrics
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_territory_metrics: admin all" ON public.artist_territory_metrics
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: artist_listener_metrics
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "artist_listener_metrics: artist read own" ON public.artist_listener_metrics;
+DROP POLICY IF EXISTS "artist_listener_metrics: admin all"       ON public.artist_listener_metrics;
+
+CREATE POLICY "artist_listener_metrics: artist read own" ON public.artist_listener_metrics
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_listener_metrics: admin all" ON public.artist_listener_metrics
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: sales_statement_line_items
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "sales_statement_line_items: artist read own" ON public.sales_statement_line_items;
+DROP POLICY IF EXISTS "sales_statement_line_items: admin all"       ON public.sales_statement_line_items;
+
+CREATE POLICY "sales_statement_line_items: artist read own" ON public.sales_statement_line_items
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.sales_statements ss
+      JOIN public.artist_members am ON am.artist_id = ss.artist_id
+      WHERE ss.id = statement_id AND am.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "sales_statement_line_items: admin all" ON public.sales_statement_line_items
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: event_impact
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "event_impact: artist read own" ON public.event_impact;
+DROP POLICY IF EXISTS "event_impact: admin all"       ON public.event_impact;
+
+CREATE POLICY "event_impact: artist read own" ON public.event_impact
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "event_impact: admin all" ON public.event_impact
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
@@ -2732,6 +2914,7 @@ INSERT INTO public.site_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
+  ('artist.analytics', 'Artist Analytics Dashboard', TRUE, 'artist'),
   ('artist.statements', 'Artist Statements', TRUE, 'artist'),
   ('artist.marketing', 'Artist Marketing', TRUE, 'artist'),
   ('artist.invoices', 'Artist Invoices', TRUE, 'artist'),
@@ -3933,8 +4116,12 @@ CREATE TABLE IF NOT EXISTS public.sos_period_summaries (
   artist_count        INTEGER     NOT NULL DEFAULT 0,
   artist_breakdowns   JSONB       NOT NULL DEFAULT '[]'::JSONB,
   platform_breakdowns JSONB       NOT NULL DEFAULT '[]'::JSONB,
+  source_batch_ids    UUID[]      NOT NULL DEFAULT '{}',
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS sos_period_summaries_period_key
+  ON public.sos_period_summaries (period_start, period_end);
 
 ALTER TABLE public.sos_period_summaries ENABLE ROW LEVEL SECURITY;
 
@@ -3953,6 +4140,22 @@ ALTER TABLE public.sales_statements
   ADD COLUMN IF NOT EXISTS label_notes TEXT;
 ALTER TABLE public.sales_statements
   ADD COLUMN IF NOT EXISTS label_approved_at TIMESTAMPTZ;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS period_start DATE;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS period_end DATE;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS total_streams BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES public.distributor_import_batches (id) ON DELETE SET NULL;
+ALTER TABLE public.artists
+  ADD COLUMN IF NOT EXISTS lastfm_name TEXT;
+ALTER TABLE public.artists
+  ADD COLUMN IF NOT EXISTS soundcharts_id TEXT;
+ALTER TABLE public.sos_period_summaries
+  ADD COLUMN IF NOT EXISTS source_batch_ids UUID[] NOT NULL DEFAULT '{}';
+CREATE UNIQUE INDEX IF NOT EXISTS sos_period_summaries_period_key
+  ON public.sos_period_summaries (period_start, period_end);
 
 ALTER TABLE public.artist_invoices
   ADD COLUMN IF NOT EXISTS statement_id UUID REFERENCES public.sales_statements(id) ON DELETE SET NULL;

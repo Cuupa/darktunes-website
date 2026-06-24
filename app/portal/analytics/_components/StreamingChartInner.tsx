@@ -16,12 +16,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PLATFORM_COLORS, formatPlatformLabel } from './streamingChartUtils'
 import type { StreamingChartInnerProps } from './StreamingChart'
 
-export function StreamingChartInner({ dict, platforms, monthlyData, aggregates }: StreamingChartInnerProps) {
+export function StreamingChartInner({ dict, platforms, monthlyData, aggregates, eventMarkers }: StreamingChartInnerProps) {
   const totalStreams = aggregates.reduce((sum, a) => sum + a.totalStreams, 0)
 
   return (
@@ -87,6 +88,15 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates }
                   dataKey={platform}
                   fill={PLATFORM_COLORS[platform] ?? 'var(--primary)'}
                   radius={[2, 2, 0, 0]}
+                />
+              ))}
+              {eventMarkers.map((marker) => (
+                <ReferenceLine
+                  key={`${marker.period}-${marker.label}`}
+                  x={marker.period}
+                  stroke="#f59e0b"
+                  strokeDasharray="4 4"
+                  label={{ value: '●', position: 'top', fill: '#f59e0b', fontSize: 10 }}
                 />
               ))}
             </BarChart>

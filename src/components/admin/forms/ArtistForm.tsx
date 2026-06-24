@@ -211,6 +211,8 @@ export interface ArtistFormData {
   songkickId: string
   bandsintownId: string
   bandsintownApiKey: string
+  lastfmName: string
+  soundchartsId: string
   /** Storage quota in MB (empty string = no limit / system default). Admin-only field. */
   storageQuotaMb: string
   /** Custom smart links for the artist profile (e.g. Linktree-style). */
@@ -1061,6 +1063,27 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   </Button>
                 </div>
                 {isSyncingBandsintown && <IndeterminateBar />}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
+              <div className="space-y-1">
+                <Label htmlFor="lastfmName">Last.fm artist name</Label>
+                <Input
+                  id="lastfmName"
+                  {...register('lastfmName')}
+                  placeholder="Exact Last.fm artist name"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="soundchartsId">Soundcharts UUID</Label>
+                <Input
+                  id="soundchartsId"
+                  {...register('soundchartsId')}
+                  placeholder="Soundcharts artist UUID"
+                  disabled={isLoading}
+                />
               </div>
             </div>
           </TabsContent>

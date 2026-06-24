@@ -1,29 +1,27 @@
 /**
  * app/portal/analytics/page.tsx — Portal Analytics (Server Component)
  *
- * Fetches streaming stats AND royalty statements server-side and passes
- * aggregated data to the chart leaf components. Follows IoC: leaves never
- * fetch data themselves.
- *
- * Two tabs:
- *   - Streaming: monthly Spotify/Apple Music stream counts
- *   - Einnahmen: royalty earnings from sales_statements
+ * Fetches streaming stats, territory metrics, event impact, concerts,
+ * and royalty statements server-side and passes aggregated data to chart leaves.
  */
 
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createReplicaSupabaseClient } from '@/lib/supabase/replica'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import {
-  getStreamingStatsByArtistId,
-  getAggregatedStreamsByPlatform,
-} from '@/lib/api/streamingStats'
+import { getStreamingStatsByArtistId } from '@/lib/api/streamingStats'
+import { getTerritoryMetricsByArtistId } from '@/lib/api/artistTerritoryMetrics'
+import { getEventImpactByArtistId } from '@/lib/api/eventImpact'
+import { getListenerMetricsByArtistId } from '@/lib/api/artistListenerMetrics'
+import { getConcertsByArtistId } from '@/lib/api/concerts'
+import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
+import { listArtistInvoices } from '@/lib/api/artistInvoices'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { StreamingChart } from './_components/StreamingChart'
-import { EarningsChart } from './_components/EarningsChart'
+import { AnalyticsPageClient } from './_components/AnalyticsPageClient'
 import { getPortalDictionary } from '@/i18n/getDictionary'
 
 function AnalyticsSkeleton() {
@@ -43,7 +41,11 @@ function AnalyticsSkeleton() {
   )
 }
 
-async function AnalyticsContent({ searchParams }: { searchParams: Promise<{ artistId?: string; tab?: string }> }) {
+async function AnalyticsContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ artistId?: string; tab?: string }>
+}) {
   const dict = await getPortalDictionary()
   const { artistId, tab } = await searchParams
 
@@ -54,35 +56,76 @@ async function AnalyticsContent({ searchParams }: { searchParams: Promise<{ arti
 
   if (!user) return null
 
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.analytics'] === false) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">{dict.portal.analytics_dashboard_heading}</h1>
+        <p className="text-muted-foreground">{dict.portal.analytics_unavailable}</p>
+      </div>
+    )
+  }
+
+  const readDb = createReplicaSupabaseClient()
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
 
-  const [stats, statements] = await Promise.all([
-    artist ? getStreamingStatsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
-    artist ? getSalesStatementsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+  const [
+    stats,
+    statements,
+    territoryMetrics,
+    eventImpacts,
+    listenerMetrics,
+    concerts,
+    billingProfile,
+    invoiceList,
+  ] = await Promise.all([
+    artist ? getStreamingStatsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getSalesStatementsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getTerritoryMetricsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getEventImpactByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getListenerMetricsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getConcertsByArtistId(readDb, artist.id).catch(() => []) : Promise.resolve([]),
+    artist ? getBillingProfile(supabase, artist.id).catch(() => null) : Promise.resolve(null),
+    artist
+      ? listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
+      : Promise.resolve({ invoices: [], total: 0 }),
   ])
 
-  const aggregates = getAggregatedStreamsByPlatform(stats)
-  const defaultTab = tab === 'earnings' ? 'earnings' : 'streaming'
+  const defaultTab =
+    tab === 'earnings'
+      ? 'earnings'
+      : tab === 'territories'
+        ? 'territories'
+        : tab === 'events'
+          ? 'events'
+          : tab === 'listeners'
+            ? 'listeners'
+            : 'streaming'
 
   return (
-    <Tabs defaultValue={defaultTab} className="space-y-6">
-      <TabsList className="bg-card border border-border">
-        <TabsTrigger value="streaming">{dict.portal.analytics_tab_streaming}</TabsTrigger>
-        <TabsTrigger value="earnings">{dict.portal.analytics_tab_earnings}</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="streaming" className="mt-0">
-        <StreamingChart dict={dict.portal} stats={stats} aggregates={aggregates} />
-      </TabsContent>
-
-      <TabsContent value="earnings" className="mt-0">
-        <EarningsChart dict={dict.portal} statements={statements} />
-      </TabsContent>
-    </Tabs>
+    <AnalyticsPageClient
+      artistId={artist?.id ?? ''}
+      billingProfileComplete={isBillingProfileComplete(billingProfile)}
+      dict={dict.portal}
+      defaultTab={defaultTab}
+      invoicedStatementIds={invoiceList.invoices.flatMap((invoice) =>
+        invoice.statementId ? [invoice.statementId] : [],
+      )}
+      stats={stats}
+      statements={statements}
+      territoryMetrics={territoryMetrics}
+      eventImpacts={eventImpacts}
+      listenerMetrics={listenerMetrics}
+      concerts={concerts}
+    />
   )
 }
 
-export default function AnalyticsPage({ searchParams }: { searchParams: Promise<{ artistId?: string; tab?: string }> }) {
+export default function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ artistId?: string; tab?: string }>
+}) {
   return (
     <Suspense fallback={<AnalyticsSkeleton />}>
       <AnalyticsContent searchParams={searchParams} />

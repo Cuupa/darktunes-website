@@ -17,15 +17,30 @@ import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/l
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
 import { createSalesStatement } from '@/lib/api/salesStatements'
+import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+
+export interface UploadStatementLineItemInput {
+  platform?: string
+  country?: string
+  streams?: number
+  revenueEur?: number
+  quantity?: number
+  releaseId?: string
+}
 
 export interface UploadStatementInput {
   artistId: string
   filename: string
   period: string
   amountEur?: number
+  periodStart?: string
+  periodEnd?: string
+  totalStreams?: number
+  batchId?: string
+  lineItems?: UploadStatementLineItemInput[]
   /** PDF file contents encoded as a Base64 string. */
   pdfBase64: string
 }
@@ -104,7 +119,26 @@ export async function uploadStatement(
       r2Key,
       period: input.period,
       amountEur: input.amountEur,
+      periodStart: input.periodStart ?? null,
+      periodEnd: input.periodEnd ?? null,
+      totalStreams: input.totalStreams ?? 0,
+      batchId: input.batchId ?? null,
     })
+
+    if (input.lineItems && input.lineItems.length > 0) {
+      await createSalesStatementLineItems(
+        serviceSupabase,
+        input.lineItems.map((item) => ({
+          statementId: statement.id,
+          releaseId: item.releaseId ?? null,
+          platform: item.platform ?? null,
+          country: item.country ?? null,
+          streams: item.streams ?? 0,
+          revenueEur: item.revenueEur ?? 0,
+          quantity: item.quantity ?? 0,
+        })),
+      )
+    }
 
     // 6. Send email notification (non-blocking — failure must not abort the response)
     try {

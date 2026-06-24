@@ -69,6 +69,7 @@ const EMPTY_RESULT: WorkerResult = {
   periodEnd: '',
   totalGrossAllData: 0,
   releaseTitlesByArtistIncFeaturing: {},
+  territoryMetrics: [],
 }
 
 /**
@@ -420,6 +421,7 @@ export function useCSVProcessor(
     detectedPeriodEnd: workerResult.periodEnd,
     totalGrossAllData: workerResult.totalGrossAllData,
     releaseTitlesByArtistIncFeaturing: workerResult.releaseTitlesByArtistIncFeaturing,
+    territoryMetrics: workerResult.territoryMetrics,
   }
 }
 
