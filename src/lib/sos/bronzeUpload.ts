@@ -55,6 +55,55 @@ export async function sha256Hex(text: string): Promise<string> {
     .join('')
 }
 
+const CONFIRM_MAX_ATTEMPTS = 3
+const CONFIRM_RETRY_DELAY_MS = 500
+
+async function abandonBronzeImportBatch(batchId: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      console.error('[bronzeUpload] failed to abandon orphan batch:', batchId, res.status)
+    }
+  } catch (err) {
+    console.error('[bronzeUpload] abandon orphan batch error:', err)
+  }
+}
+
+async function markBronzeUploadFailed(batchId: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'failed' }),
+    })
+    if (!res.ok) {
+      console.error('[bronzeUpload] failed to mark batch as failed:', batchId, res.status)
+    }
+  } catch (err) {
+    console.error('[bronzeUpload] mark batch failed error:', err)
+  }
+}
+
+async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= CONFIRM_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`/api/admin/sos/import-batches/${batchId}/confirm`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_hash: fileHash }),
+      })
+      if (res.ok) return true
+      console.error('[bronzeUpload] confirm attempt failed:', attempt, res.status)
+    } catch (err) {
+      console.error('[bronzeUpload] confirm attempt error:', attempt, err)
+    }
+    if (attempt < CONFIRM_MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, CONFIRM_RETRY_DELAY_MS * attempt))
+    }
+  }
+  return false
+}
+
 /**
  * Registers an import batch and uploads the raw CSV to R2.
  * Returns null on failure (local SOS processing should continue).
@@ -113,15 +162,17 @@ export async function uploadBronzeDistributorCsv(
 
     if (!putRes.ok) {
       console.error('[bronzeUpload] R2 PUT failed:', putRes.status, putRes.statusText)
+      await abandonBronzeImportBatch(batch.id)
       return null
     }
 
     const fileHash = await sha256HexFromBuffer(await uploadBlob.arrayBuffer())
-    void fetch(`/api/admin/sos/import-batches/${batch.id}/confirm`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_hash: fileHash }),
-    }).catch(() => undefined)
+    const confirmed = await confirmBronzeUpload(batch.id, fileHash)
+    if (!confirmed) {
+      console.error('[bronzeUpload] hash confirm failed after R2 PUT for batch:', batch.id)
+      await markBronzeUploadFailed(batch.id)
+      return null
+    }
 
     return { batchId: batch.id, r2Key }
   } catch (err) {

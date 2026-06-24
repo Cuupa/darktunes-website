@@ -178,6 +178,7 @@ function SosGeneratorPanel() {
     EMPTY_SOS_RULES_BUNDLE,
   )
   const rulesHydratedRef = useRef(false)
+  const [rulesReady, setRulesReady] = useState(false)
 
   useEffect(() => {
     if (!rulesLoaded || rulesHydratedRef.current) return
@@ -193,10 +194,11 @@ function SosGeneratorPanel() {
     setTrackRevenueAssignments(bundle.trackRevenueAssignments)
     setAppDefaults(bundle.appDefaults)
     setEmailConfig(bundle.emailConfig)
+    setRulesReady(true)
   }, [rulesLoaded, savedRules])
 
   useEffect(() => {
-    if (!rulesHydratedRef.current) return
+    if (!rulesReady) return
     setSavedRules({
       artistMappings,
       compilationFilters,
@@ -221,6 +223,7 @@ function SosGeneratorPanel() {
     appDefaults,
     emailConfig,
     setSavedRules,
+    rulesReady,
   ])
 
   const handleSubTabKeyDown = useCallback(
