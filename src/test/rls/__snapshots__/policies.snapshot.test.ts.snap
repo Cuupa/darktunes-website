@@ -190,6 +190,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "settlement_periods: admin all",
   "site_settings_admin_write",
   "site_settings_public_read",
+  "sos_accounting_workspaces: admin/editor all",
   "sos_period_summaries: admin all",
   "sos_rules_presets: admin all",
   "streaming_stats: admin all",
@@ -290,6 +291,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "sales_statements",
   "settlement_periods",
   "site_settings",
+  "sos_accounting_workspaces",
   "sos_period_summaries",
   "sos_rules_presets",
   "streaming_stats",
@@ -633,6 +635,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "site_settings": [
     "site_settings_admin_write",
     "site_settings_public_read",
+  ],
+  "sos_accounting_workspaces": [
+    "sos_accounting_workspaces: admin/editor all",
   ],
   "sos_period_summaries": [
     "sos_period_summaries: admin all",

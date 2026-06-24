@@ -4287,6 +4287,38 @@ CREATE TRIGGER sos_rules_presets_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: sos_accounting_workspaces  — server-persisted live workspace for a period
+-- Stores the full current rules bundle (as JSONB) + attached bronze batch IDs.
+-- Enables collaborative retrieval of accounting configuration at any time.
+-- Keyed by the same (period_start, period_end) strings used by bronze + summaries.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sos_accounting_workspaces (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start     TEXT        NOT NULL,
+  period_end       TEXT        NOT NULL,
+  config           JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  bronze_batch_ids UUID[]      NOT NULL DEFAULT '{}',
+  updated_by       UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (period_start, period_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sos_accounting_workspaces_period ON public.sos_accounting_workspaces (period_start DESC, period_end);
+
+ALTER TABLE public.sos_accounting_workspaces ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "sos_accounting_workspaces: admin/editor all" ON public.sos_accounting_workspaces;
+CREATE POLICY "sos_accounting_workspaces: admin/editor all" ON public.sos_accounting_workspaces
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+DROP TRIGGER IF EXISTS sos_accounting_workspaces_updated_at ON public.sos_accounting_workspaces;
+CREATE TRIGGER sos_accounting_workspaces_updated_at
+  BEFORE UPDATE ON public.sos_accounting_workspaces
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- TABLE: sos_period_summaries  — per-period aggregate revenue figures
 -- Stores historical trend data: total revenue, payouts, and per-artist/platform
 -- breakdowns as JSONB.

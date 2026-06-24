@@ -1,4 +1,13 @@
 import '@testing-library/jest-dom'
+import { webcrypto } from 'node:crypto'
+
+// jsdom may not expose Web Crypto; bronze upload tests hash file bodies before fetch.
+if (typeof globalThis.crypto?.subtle === 'undefined') {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: webcrypto,
+    writable: true,
+  })
+}
 
 // Test-only encryption master key (32 bytes hex). Never use in production.
 if (!process.env.API_CREDENTIALS_ENCRYPTION_KEY) {
