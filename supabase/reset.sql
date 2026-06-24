@@ -1010,10 +1010,10 @@ CREATE TRIGGER trg_site_settings_updated_at
 
 -- ---------------------------------------------------------------------------
 -- TABLE: api_credentials  (admin-managed external API keys, AES-256-GCM ciphertext)
--- label_id NULL = default single-label tenant; future multi-label SaaS uses per-label rows.
+-- label_id 00000000-0000-0000-0000-000000000000 = default single-label tenant.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.api_credentials (
-  label_id   UUID        NULL,
+  label_id   UUID        NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
   key        TEXT        NOT NULL,
   value      TEXT        NOT NULL DEFAULT '',
   category   TEXT        NOT NULL DEFAULT 'integration',
@@ -1022,7 +1022,7 @@ CREATE TABLE IF NOT EXISTS public.api_credentials (
   PRIMARY KEY (label_id, key)
 );
 
-ALTER TABLE public.api_credentials ADD COLUMN IF NOT EXISTS label_id   UUID NULL;
+ALTER TABLE public.api_credentials ADD COLUMN IF NOT EXISTS label_id   UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
 ALTER TABLE public.api_credentials ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'integration';
 
 -- Migrate legacy single-column PK (key-only) to composite PK when upgrading existing DBs.
@@ -1037,12 +1037,21 @@ BEGIN
       AND array_length(c.conkey, 1) = 1
   ) THEN
     ALTER TABLE public.api_credentials DROP CONSTRAINT api_credentials_pkey;
-    UPDATE public.api_credentials SET label_id = NULL;
+    UPDATE public.api_credentials SET label_id = '00000000-0000-0000-0000-000000000000' WHERE label_id IS NULL;
     ALTER TABLE public.api_credentials ADD PRIMARY KEY (label_id, key);
   END IF;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Normalize NULL label_id rows and enforce NOT NULL (PK columns cannot be NULL in PostgreSQL).
+UPDATE public.api_credentials
+SET label_id = '00000000-0000-0000-0000-000000000000'
+WHERE label_id IS NULL;
+
+ALTER TABLE public.api_credentials
+  ALTER COLUMN label_id SET DEFAULT '00000000-0000-0000-0000-000000000000',
+  ALTER COLUMN label_id SET NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.set_api_credentials_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$

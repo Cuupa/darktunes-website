@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
+  DEFAULT_LABEL_ID,
   deleteCredential,
   listCredentialStatus,
   upsertCredential,
@@ -20,40 +21,68 @@ function createMockDb(rows: Array<Record<string, unknown>> = []) {
 
       const api = {
         select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        is: vi.fn(function (this: typeof api) {
+        eq: vi.fn(function (this: typeof api, col: string, val: unknown) {
+          if (col === 'label_id') {
+            this._labelId = val
+          }
+          if (col === 'key') {
+            this._key = val
+          }
           return this
         }),
-        maybeSingle: vi.fn(async () => {
-          const row = store[0] ?? null
+        maybeSingle: vi.fn(async function (this: { _labelId?: unknown; _key?: unknown }) {
+          const row =
+            store.find(
+              (r) =>
+                r.label_id === (this._labelId ?? DEFAULT_LABEL_ID) &&
+                (this._key === undefined || r.key === this._key),
+            ) ?? null
           return { data: row, error: null }
         }),
         upsert: vi.fn(async (payload: Record<string, unknown>) => {
+          const labelId = payload.label_id ?? DEFAULT_LABEL_ID
           const idx = store.findIndex(
-            (row) => row.key === payload.key && row.label_id === (payload.label_id ?? null),
+            (row) => row.key === payload.key && row.label_id === labelId,
           )
-          const next = { ...payload, updated_at: new Date().toISOString() }
+          const next = { ...payload, label_id: labelId, updated_at: new Date().toISOString() }
           if (idx >= 0) store[idx] = next
           else store.push(next)
           return { error: null }
         }),
-        delete: vi.fn(() => ({
-          eq: vi.fn((_col: string, keyVal: string) => ({
-            is: vi.fn(async (_labelCol: string, labelVal: null) => {
-              const idx = store.findIndex(
-                (row) => row.key === keyVal && (row.label_id ?? null) === labelVal,
-              )
-              if (idx >= 0) store.splice(idx, 1)
-              return { error: null }
-            }),
-          })),
-        })),
+        delete: vi.fn(function (this: typeof api) {
+          return {
+            eq: vi.fn(function (this: { _key?: unknown; _labelId?: unknown }, col: string, val: unknown) {
+              if (col === 'key') this._key = val
+              if (col === 'label_id') this._labelId = val
+              return {
+                eq: vi.fn(async function (
+                  this: { _key?: unknown; _labelId?: unknown },
+                  col2: string,
+                  val2: unknown,
+                ) {
+                  if (col2 === 'label_id') this._labelId = val2
+                  const idx = store.findIndex(
+                    (row) =>
+                      row.key === this._key &&
+                      row.label_id === (this._labelId ?? DEFAULT_LABEL_ID),
+                  )
+                  if (idx >= 0) store.splice(idx, 1)
+                  return { error: null }
+                }).bind(this),
+              }
+            }).bind(this),
+          }
+        }),
+        _labelId: undefined as unknown,
+        _key: undefined as unknown,
         then: undefined as unknown,
       }
       const chain = {
         ...api,
         then(onFulfilled: (value: { data: typeof store; error: null }) => unknown) {
-          return Promise.resolve({ data: store, error: null }).then(onFulfilled)
+          const labelId = api._labelId ?? DEFAULT_LABEL_ID
+          const filtered = store.filter((row) => row.label_id === labelId)
+          return Promise.resolve({ data: filtered, error: null }).then(onFulfilled)
         },
       }
       return chain
@@ -67,6 +96,10 @@ describe('apiCredentials DAL', () => {
     vi.stubEnv('API_CREDENTIALS_ENCRYPTION_KEY', TEST_KEY_HEX)
   })
 
+  it('uses sentinel label_id for default tenant', () => {
+    expect(DEFAULT_LABEL_ID).toBe('00000000-0000-0000-0000-000000000000')
+  })
+
   it('lists all defined keys with configured=false when empty', async () => {
     const db = createMockDb()
     const status = await listCredentialStatus(db)
@@ -74,7 +107,7 @@ describe('apiCredentials DAL', () => {
     expect(status.every((row) => row.configured === false)).toBe(true)
   })
 
-  it('encrypts value on upsert', async () => {
+  it('encrypts value on upsert with default label_id', async () => {
     const db = createMockDb()
     await upsertCredential(db, {
       key: 'discogs_token',
@@ -83,6 +116,7 @@ describe('apiCredentials DAL', () => {
     })
 
     const stored = db._store[0]
+    expect(stored?.label_id).toBe(DEFAULT_LABEL_ID)
     expect(stored?.value).toMatch(/^v1:/)
     expect(stored?.value).not.toContain('my-discogs-token')
   })
@@ -90,7 +124,7 @@ describe('apiCredentials DAL', () => {
   it('deletes credential row', async () => {
     const db = createMockDb([
       {
-        label_id: null,
+        label_id: DEFAULT_LABEL_ID,
         key: 'discogs_token',
         value: 'v1:iv:tag:data',
         updated_at: '',

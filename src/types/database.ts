@@ -327,7 +327,7 @@ export interface Database {
       }
       api_credentials: {
         Row: {
-          label_id: string | null
+          label_id: string
           key: string
           value: string
           category: string
@@ -335,7 +335,7 @@ export interface Database {
           updated_by: string | null
         }
         Insert: {
-          label_id?: string | null
+          label_id?: string
           key: string
           value?: string
           category?: string
@@ -343,7 +343,7 @@ export interface Database {
           updated_by?: string | null
         }
         Update: {
-          label_id?: string | null
+          label_id?: string
           key?: string
           value?: string
           category?: string

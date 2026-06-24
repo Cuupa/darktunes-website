@@ -49,6 +49,24 @@ export function buildApiError(code: ErrorCode, status: number): ApiError {
   return new ApiError(status, ERROR_MESSAGES[code], code)
 }
 
+interface PostgresErrorLike {
+  code?: string
+  message?: string
+  details?: string | null
+  hint?: string | null
+}
+
+export function isPostgresError(err: unknown, code?: string): err is PostgresErrorLike {
+  if (!err || typeof err !== 'object') return false
+  const pgCode = (err as PostgresErrorLike).code
+  if (typeof pgCode !== 'string') return false
+  return code ? pgCode === code : true
+}
+
+export function getPostgresErrorMessage(err: PostgresErrorLike): string {
+  return err.message ?? 'Database operation failed'
+}
+
 // ---------------------------------------------------------------------------
 // Standard JSON error shape
 // ---------------------------------------------------------------------------
@@ -141,6 +159,24 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
           issues: err.issues,
         }, 'warn')
         return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
+      }
+
+      if (isPostgresError(err)) {
+        const message = getPostgresErrorMessage(err)
+        console.error('[withErrorHandler] Database error:', {
+          code: err.code,
+          message,
+          details: err.details ?? null,
+          path: routePath,
+        })
+        void persistErrorToDb('api', message, {
+          path: routePath,
+          method: req.method,
+          code: err.code ?? null,
+          details: err.details ?? null,
+          hint: err.hint ?? null,
+        })
+        return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
       }
 
       // Unknown error — log server-side and persist to app_logs

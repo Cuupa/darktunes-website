@@ -18,14 +18,18 @@ import {
 
 type DbClient = SupabaseClient<Database>
 
-/** NULL label_id = default single-label tenant. */
-export const DEFAULT_LABEL_ID: null = null
+/**
+ * Sentinel UUID for the default single-label tenant.
+ * PostgreSQL PRIMARY KEY columns cannot be NULL — use this instead of NULL.
+ */
+export const DEFAULT_LABEL_ID = '00000000-0000-0000-0000-000000000000'
 
 export interface CredentialStatusRow {
   key: CredentialKey
   label: string
   description: string
   category: string
+  group: string
   isSecret: boolean
   docsUrl?: string
   configured: boolean
@@ -40,6 +44,10 @@ export interface UpsertCredentialInput {
   labelId?: string | null
 }
 
+function resolveLabelId(labelId?: string | null): string {
+  return labelId ?? DEFAULT_LABEL_ID
+}
+
 function isNonEmptyCredential(value: string): boolean {
   return value.trim().length > 0
 }
@@ -50,16 +58,13 @@ function isStoredCredential(value: string): boolean {
 
 export async function listCredentialStatus(
   db: DbClient,
-  labelId: string | null = DEFAULT_LABEL_ID,
+  labelId: string = DEFAULT_LABEL_ID,
 ): Promise<CredentialStatusRow[]> {
-  let query = db.from('api_credentials').select('key, value, updated_at, updated_by')
-  if (labelId === null) {
-    query = query.is('label_id', null)
-  } else {
-    query = query.eq('label_id', labelId)
-  }
+  const { data, error } = await db
+    .from('api_credentials')
+    .select('key, value, updated_at, updated_by')
+    .eq('label_id', labelId)
 
-  const { data, error } = await query
   if (error) throw error
 
   const stored = new Map(
@@ -80,6 +85,7 @@ export async function listCredentialStatus(
       label: def.label,
       description: def.description,
       category: def.category,
+      group: def.group,
       isSecret: def.isSecret,
       docsUrl: def.docsUrl,
       configured: row?.configured ?? false,
@@ -92,16 +98,15 @@ export async function listCredentialStatus(
 export async function getDecryptedCredential(
   db: DbClient,
   key: CredentialKey,
-  labelId: string | null = DEFAULT_LABEL_ID,
+  labelId: string = DEFAULT_LABEL_ID,
 ): Promise<string | null> {
-  let query = db.from('api_credentials').select('value').eq('key', key)
-  if (labelId === null) {
-    query = query.is('label_id', null)
-  } else {
-    query = query.eq('label_id', labelId)
-  }
+  const { data, error } = await db
+    .from('api_credentials')
+    .select('value')
+    .eq('key', key)
+    .eq('label_id', labelId)
+    .maybeSingle()
 
-  const { data, error } = await query.maybeSingle()
   if (error) throw error
   if (!data?.value) return null
 
@@ -116,16 +121,13 @@ export async function getDecryptedCredential(
 
 export async function getConfiguredCredentialKeys(
   db: DbClient,
-  labelId: string | null = DEFAULT_LABEL_ID,
+  labelId: string = DEFAULT_LABEL_ID,
 ): Promise<Set<CredentialKey>> {
-  let query = db.from('api_credentials').select('key, value')
-  if (labelId === null) {
-    query = query.is('label_id', null)
-  } else {
-    query = query.eq('label_id', labelId)
-  }
+  const { data, error } = await db
+    .from('api_credentials')
+    .select('key, value')
+    .eq('label_id', labelId)
 
-  const { data, error } = await query
   if (error) throw error
 
   const configured = new Set<CredentialKey>()
@@ -147,13 +149,14 @@ export async function upsertCredential(
   }
 
   const trimmed = input.value.trim()
+  const labelId = resolveLabelId(input.labelId)
+
   if (!trimmed) {
-    await deleteCredential(db, input.key, input.labelId ?? DEFAULT_LABEL_ID)
+    await deleteCredential(db, input.key, labelId)
     return
   }
 
   const ciphertext = encryptCredential(trimmed)
-  const labelId = input.labelId ?? DEFAULT_LABEL_ID
 
   const { error } = await db.from('api_credentials').upsert(
     {
@@ -171,15 +174,13 @@ export async function upsertCredential(
 export async function deleteCredential(
   db: DbClient,
   key: CredentialKey,
-  labelId: string | null = DEFAULT_LABEL_ID,
+  labelId: string = DEFAULT_LABEL_ID,
 ): Promise<void> {
-  let query = db.from('api_credentials').delete().eq('key', key)
-  if (labelId === null) {
-    query = query.is('label_id', null)
-  } else {
-    query = query.eq('label_id', labelId)
-  }
+  const { error } = await db
+    .from('api_credentials')
+    .delete()
+    .eq('key', key)
+    .eq('label_id', labelId)
 
-  const { error } = await query
   if (error) throw error
 }

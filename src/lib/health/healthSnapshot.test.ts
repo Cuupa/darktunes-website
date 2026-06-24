@@ -109,4 +109,25 @@ describe('buildHealthSnapshot', () => {
     const syncLogsCall = fromCalls.filter(([t]) => t === 'sync_logs')
     expect(syncLogsCall.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('stays healthy when no third-party API keys are configured', async () => {
+    const snapshot = await buildHealthSnapshot({
+      db: createMockDb(),
+      knownApis: {
+        itunes: true,
+        spotify: false,
+        discogs: false,
+        songkick: false,
+        bandsintown: false,
+        odesli: true,
+        youtube: false,
+      },
+      nowMs: NOW_MS,
+    })
+
+    expect(snapshot.database.status).toBe('online')
+    expect(snapshot.status).not.toBe('unhealthy')
+    expect(snapshot.apis.spotify.operationalState).toBe('unconfigured')
+    expect(snapshot.kpis.configuredApis).toBe(2)
+  })
 })
