@@ -348,21 +348,9 @@ export function ThemeStyleInjector(props: ThemeColors) {
       fontLinks.push(
         <link key="gf-preconnect"        rel="preconnect" href="https://fonts.googleapis.com" />,
         <link key="gf-preconnect-origin" rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />,
+        <link key="gf-preload"           rel="preload" as="style" href={fontsUrl} />,
         <link key="gf-stylesheet"        rel="stylesheet" href={fontsUrl} />,
       )
-
-      // Preload primary body weight for faster FCP
-      const primarySpec = buildGoogleFontSpec(fontFamily ?? '', [bodyWeight ?? '400'])
-      if (primarySpec) {
-        fontLinks.push(
-          <link
-            key="gf-preload"
-            rel="preload"
-            as="style"
-            href={`https://fonts.googleapis.com/css2?family=${primarySpec}&display=swap`}
-          />,
-        )
-      }
     }
   }
 

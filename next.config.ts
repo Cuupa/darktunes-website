@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next'
 import withSerwistInit from '@serwist/next'
 import withBundleAnalyzerInit from '@next/bundle-analyzer'
+import { buildContentSecurityPolicy } from './src/lib/security/contentSecurityPolicy'
 
 const withSerwist = withSerwistInit({
   swSrc: 'app/sw.ts',
@@ -54,17 +55,7 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://open.spotify.com https://www.youtube.com",
-              "frame-src https://open.spotify.com https://www.youtube.com https://darkmerch.com https://www.openstreetmap.org",
-              "img-src 'self' data: blob: https://*.r2.dev https://wsrv.nl https://i.ytimg.com https://*.supabase.co https://*.mzstatic.com https://*.bcbits.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
-              "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://wsrv.nl https://fonts.googleapis.com https://fonts.gstatic.com https://darkmerch.com https://cdn.jsdelivr.net",
-              "media-src 'self' blob: https://*.r2.dev https://*.supabase.co",
-              "worker-src 'self' blob:",
-            ].join('; '),
+            value: buildContentSecurityPolicy(),
           },
         ],
       },

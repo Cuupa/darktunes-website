@@ -14,7 +14,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
-import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
+import { getSalesStatementsByArtistId, recordStatementView } from '@/lib/api/salesStatements'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedDownloadUrl } from '@/lib/portal/presignedUrl'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -48,6 +48,12 @@ export async function getStatementPresignedUrl(statementId: string): Promise<Pre
 
     if (!statement) {
       return { url: null, error: 'Statement not found or access denied' }
+    }
+
+    try {
+      await recordStatementView(supabase, statementId, artist.id)
+    } catch (viewErr) {
+      console.warn('[getStatementPresignedUrl] View tracking failed:', viewErr)
     }
 
     const { serverEnv } = await import('@/lib/env.server')

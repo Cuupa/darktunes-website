@@ -17,10 +17,10 @@ import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/l
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
 import { createSalesStatement } from '@/lib/api/salesStatements'
+import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
-import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 export interface UploadStatementLineItemInput {
@@ -44,6 +44,8 @@ export interface UploadStatementInput {
   lineItems?: UploadStatementLineItemInput[]
   /** PDF file contents encoded as a Base64 string. */
   pdfBase64: string
+  /** When true, sends the artist notification email immediately. Defaults to false. */
+  notifyArtist?: boolean
 }
 
 export interface UploadStatementResult {
@@ -114,17 +116,31 @@ export async function uploadStatement(
     }
 
     // 5. Persist the DB record via service-role client (bypasses RLS)
+    const periodStart = input.periodStart ?? null
+    const periodEnd = input.periodEnd ?? null
+    const settlementPeriod =
+      periodStart && periodEnd
+        ? await getOrCreateSettlementPeriod(serviceSupabase, periodStart, periodEnd)
+        : null
+
     const statement = await createSalesStatement(serviceSupabase, {
       artistId: input.artistId,
       filename: input.filename,
       r2Key,
       period: input.period,
       amountEur: input.amountEur,
-      periodStart: input.periodStart ?? null,
-      periodEnd: input.periodEnd ?? null,
+      periodStart,
+      periodEnd,
       totalStreams: input.totalStreams ?? 0,
       batchId: input.batchId ?? null,
     })
+
+    if (settlementPeriod) {
+      await serviceSupabase
+        .from('sales_statements')
+        .update({ settlement_period_id: settlementPeriod.id })
+        .eq('id', statement.id)
+    }
 
     if (input.lineItems && input.lineItems.length > 0) {
       await createSalesStatementLineItems(
@@ -141,24 +157,19 @@ export async function uploadStatement(
       )
     }
 
-    // 6. Send email notification (non-blocking — failure must not abort the response)
-    try {
-      const { sendStatementNotification } = await import(
-        '@/lib/email/sendStatementNotification'
-      )
-      const emailCredentials = await getEmailCredentials(serviceSupabase)
-      await sendStatementNotification(
-        artist,
-        { filename: input.filename, period: input.period, amountEur: input.amountEur },
-        {
-          resendApiKey: emailCredentials.resendApiKey ?? '',
-          resendFromEmail: emailCredentials.resendFromEmail ?? 'noreply@darktunes.com',
-          siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com',
-          fetch,
-        },
-      )
-    } catch (emailErr) {
-      console.error('[uploadStatement] Email notification failed:', emailErr)
+    if (input.notifyArtist) {
+      try {
+        const { notifyStatementArtist } = await import('@/lib/sos/notifyStatementArtist')
+        const emailResult = await notifyStatementArtist(serviceSupabase, statement, fetch)
+        if (emailResult.success) {
+          const { updateSalesStatementStatus } = await import('@/lib/api/salesStatements')
+          await updateSalesStatementStatus(serviceSupabase, statement.id, 'artist_notified')
+        } else {
+          console.warn('[uploadStatement] Email notification skipped:', emailResult.error)
+        }
+      } catch (emailErr) {
+        console.error('[uploadStatement] Email notification failed:', emailErr)
+      }
     }
 
     return { success: true, statementId: statement.id }

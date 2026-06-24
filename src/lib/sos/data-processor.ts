@@ -113,6 +113,11 @@ export interface DataProcessorConfig {
    */
   trackRevenueAssignments?: TrackRevenueAssignment[]
   /**
+   * Opening balances carried forward from a prior settlement period, keyed by
+   * artist name (lowercase-normalised lookup at processing time).
+   */
+  carryForwardByArtist?: Record<string, number>
+  /**
    * Label distribution fee as a percentage (0–100) deducted from each artist's
    * streaming/physical gross revenue before the split percentage is applied.
    */
@@ -968,6 +973,9 @@ export function processTransactionsWithCompilations(
           totalExpenses +
           manualRevenue
     }
+
+    const carryForwardEur = config.carryForwardByArtist?.[lowerKey] ?? 0
+    finalPayout += carryForwardEur
 
     artistData.push({
       artist,

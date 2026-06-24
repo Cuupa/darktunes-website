@@ -4225,6 +4225,220 @@ ALTER TABLE public.artist_invoices
 ALTER TABLE public.artist_invoices
   ADD COLUMN IF NOT EXISTS artist_invoice_number TEXT;
 
+-- ---------------------------------------------------------------------------
+-- Settlement periods (label accounting register)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.settlement_periods (
+  id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start  DATE         NOT NULL,
+  period_end    DATE         NOT NULL,
+  label         TEXT         NOT NULL,
+  status        TEXT         NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open', 'under_review', 'approved', 'locked', 'archived')),
+  notes         TEXT,
+  locked_at     TIMESTAMPTZ,
+  locked_by     UUID         REFERENCES auth.users (id) ON DELETE SET NULL,
+  archived_at   TIMESTAMPTZ,
+  archived_by   UUID         REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (period_start, period_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_settlement_periods_status ON public.settlement_periods (status);
+CREATE INDEX IF NOT EXISTS idx_settlement_periods_dates  ON public.settlement_periods (period_start, period_end);
+
+DROP TRIGGER IF EXISTS trg_settlement_periods_updated_at ON public.settlement_periods;
+CREATE TRIGGER trg_settlement_periods_updated_at
+  BEFORE UPDATE ON public.settlement_periods
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.settlement_periods ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "settlement_periods: admin all" ON public.settlement_periods;
+CREATE POLICY "settlement_periods: admin all" ON public.settlement_periods
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- Artist settlement ledger (append-only journal)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_settlement_ledger (
+  id                   UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id            UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  settlement_period_id UUID           REFERENCES public.settlement_periods (id) ON DELETE SET NULL,
+  entry_type           TEXT           NOT NULL
+                       CHECK (entry_type IN (
+                         'statement_payout', 'invoice_liability', 'payment',
+                         'carry_in', 'carry_out', 'correction', 'opening_balance', 'partial_payment'
+                       )),
+  amount_eur           NUMERIC(14, 4) NOT NULL,
+  currency             VARCHAR(3),
+  amount_original      NUMERIC(14, 4),
+  fx_rate              NUMERIC(14, 6),
+  reference_type       TEXT,
+  reference_id         UUID,
+  description          TEXT,
+  created_by           UUID           REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_settlement_ledger_artist    ON public.artist_settlement_ledger (artist_id);
+CREATE INDEX IF NOT EXISTS idx_settlement_ledger_period    ON public.artist_settlement_ledger (settlement_period_id);
+CREATE INDEX IF NOT EXISTS idx_settlement_ledger_ref       ON public.artist_settlement_ledger (reference_type, reference_id);
+
+ALTER TABLE public.artist_settlement_ledger ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "settlement_ledger: artist read own" ON public.artist_settlement_ledger;
+CREATE POLICY "settlement_ledger: artist read own" ON public.artist_settlement_ledger
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = artist_settlement_ledger.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "settlement_ledger: admin all" ON public.artist_settlement_ledger;
+CREATE POLICY "settlement_ledger: admin all" ON public.artist_settlement_ledger
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- Period carry-forwards (opening balances into next period)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.period_carry_forwards (
+  id                  UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_period_id      UUID           NOT NULL REFERENCES public.settlement_periods (id) ON DELETE CASCADE,
+  to_period_id        UUID           REFERENCES public.settlement_periods (id) ON DELETE SET NULL,
+  artist_id           UUID           NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  opening_balance_eur NUMERIC(14, 4) NOT NULL DEFAULT 0,
+  breakdown           JSONB          NOT NULL DEFAULT '{}',
+  applied_at          TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (from_period_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_carry_forwards_artist ON public.period_carry_forwards (artist_id);
+CREATE INDEX IF NOT EXISTS idx_carry_forwards_to     ON public.period_carry_forwards (to_period_id);
+
+ALTER TABLE public.period_carry_forwards ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "carry_forwards: artist read own" ON public.period_carry_forwards;
+CREATE POLICY "carry_forwards: artist read own" ON public.period_carry_forwards
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members
+      WHERE artist_members.artist_id = period_carry_forwards.artist_id
+        AND artist_members.user_id   = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "carry_forwards: admin all" ON public.period_carry_forwards;
+CREATE POLICY "carry_forwards: admin all" ON public.period_carry_forwards
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- Financial audit events (immutable)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.financial_audit_events (
+  id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type TEXT         NOT NULL,
+  entity_id   UUID         NOT NULL,
+  action      TEXT         NOT NULL,
+  actor_id    UUID         REFERENCES auth.users (id) ON DELETE SET NULL,
+  before_data JSONB,
+  after_data  JSONB,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_audit_entity ON public.financial_audit_events (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_financial_audit_created ON public.financial_audit_events (created_at DESC);
+
+ALTER TABLE public.financial_audit_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "financial_audit: admin read" ON public.financial_audit_events;
+CREATE POLICY "financial_audit: admin read" ON public.financial_audit_events
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "financial_audit: admin insert" ON public.financial_audit_events;
+CREATE POLICY "financial_audit: admin insert" ON public.financial_audit_events
+  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- Migrate legacy statement status
+UPDATE public.sales_statements SET status = 'invoiced' WHERE status = 'acknowledged';
+
+ALTER TABLE public.sales_statements DROP CONSTRAINT IF EXISTS sales_statements_status_check;
+ALTER TABLE public.sales_statements ADD CONSTRAINT sales_statements_status_check
+  CHECK (status IN (
+    'draft', 'label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid',
+    'superseded', 'cancelled', 'acknowledged'
+  ));
+
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS first_viewed_at TIMESTAMPTZ;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS last_viewed_at TIMESTAMPTZ;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT 'original'
+  CHECK (document_type IN ('original', 'correction', 'storno'));
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS correction_of_id UUID REFERENCES public.sales_statements (id) ON DELETE SET NULL;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS superseded_by_id UUID REFERENCES public.sales_statements (id) ON DELETE SET NULL;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS reporting_currency VARCHAR(3) NOT NULL DEFAULT 'EUR';
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS amount_reporting NUMERIC(14, 4);
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS fx_rate_to_eur NUMERIC(14, 6);
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS fx_source TEXT;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS settlement_period_id UUID REFERENCES public.settlement_periods (id) ON DELETE SET NULL;
+ALTER TABLE public.sales_statements
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.artist_invoices DROP CONSTRAINT IF EXISTS artist_invoices_status_check;
+ALTER TABLE public.artist_invoices ADD CONSTRAINT artist_invoices_status_check
+  CHECK (status IN ('draft', 'sent', 'received', 'partially_paid', 'paid', 'cancelled'));
+
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS received_by UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS paid_by UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS paid_amount_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS outstanding_amount_cents BIGINT;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS payment_method TEXT
+  CHECK (payment_method IS NULL OR payment_method IN ('sepa', 'paypal', 'manual', 'other'));
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS payment_reference TEXT;
+ALTER TABLE public.artist_invoices
+  ADD COLUMN IF NOT EXISTS settlement_period_id UUID REFERENCES public.settlement_periods (id) ON DELETE SET NULL;
+
+ALTER TABLE public.sales_statement_line_items
+  ADD COLUMN IF NOT EXISTS amount_original NUMERIC(14, 4);
+ALTER TABLE public.sales_statement_line_items
+  ADD COLUMN IF NOT EXISTS currency_original VARCHAR(3);
+ALTER TABLE public.sales_statement_line_items
+  ADD COLUMN IF NOT EXISTS fx_rate NUMERIC(14, 6);
+ALTER TABLE public.sales_statement_line_items
+  ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
+
 -- =============================================================================
 -- TABLE: promo_log_entries
 -- Label-documented marketing activities shown to the linked artist as a

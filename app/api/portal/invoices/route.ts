@@ -10,6 +10,8 @@ import {
   listArtistInvoices,
   updateInvoice,
 } from '@/lib/api/artistInvoices'
+import { appendLedgerEntry } from '@/lib/api/settlementLedger'
+import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
 import { getSalesStatementById, updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -87,7 +89,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(404, 'Statement not found')
   }
 
-  if (statement && !['label_approved', 'artist_notified'].includes(statement.status)) {
+  if (statement && !['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
     throw new ApiError(422, 'Statement is not ready for invoice creation')
   }
 
@@ -127,8 +129,26 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     notes: input.notes,
   }
 
+  let settlementPeriodId: string | null = statement?.settlementPeriodId ?? null
+  if (statement && !settlementPeriodId && statement.periodStart && statement.periodEnd) {
+    const period = await getOrCreateSettlementPeriod(
+      supabase,
+      statement.periodStart,
+      statement.periodEnd,
+    )
+    settlementPeriodId = period.id
+    await supabase
+      .from('sales_statements')
+      .update({ settlement_period_id: period.id })
+      .eq('id', statement.id)
+  }
+
   const invoice = statement
-    ? await createSosLinkedInvoice(supabase, { ...invoicePayload, statementId: statement.id })
+    ? await createSosLinkedInvoice(supabase, {
+        ...invoicePayload,
+        statementId: statement.id,
+        settlementPeriodId,
+      })
     : await createArtistInvoice(supabase, invoicePayload)
 
   const pdfBytes = generateInvoicePdf({
@@ -181,8 +201,25 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     status: input.send_email ? 'sent' : 'draft',
   })
 
-  if (statement?.status === 'label_approved') {
-    await updateSalesStatementStatus(supabase, statement.id, 'acknowledged')
+  if (
+    statement &&
+    ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
+  ) {
+    await updateSalesStatementStatus(supabase, statement.id, 'invoiced')
+  }
+
+  if (statement && settlementPeriodId) {
+    const invoiceTotalEur = getLineItemSubtotal(input.line_items) / 100
+    await appendLedgerEntry(supabase, {
+      artistId: artist.id,
+      settlementPeriodId,
+      entryType: 'invoice_liability',
+      amountEur: -invoiceTotalEur,
+      currency: input.currency,
+      referenceType: 'artist_invoice',
+      referenceId: invoice.id,
+      description: `Invoice liability ${input.artist_invoice_number}`,
+    })
   }
 
   if (input.send_email) {

@@ -369,7 +369,7 @@ export function useExports(
           })
         }
 
-        toast.success('Statement published to portal')
+        toast.success('Draft statement saved to portal')
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         toast.error(message)

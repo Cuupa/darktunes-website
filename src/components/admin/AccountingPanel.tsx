@@ -9,7 +9,9 @@
  *  Tab B — "Statement History": read-only view of uploaded PDFs (StatementsManager).
  */
 
-import { lazy, Suspense, useState, useMemo, useCallback } from 'react'
+import { lazy, Suspense, useState, useMemo, useCallback, useEffect } from 'react'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useArtists } from '@/hooks/useArtists'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -26,6 +28,7 @@ import type {
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG } from '@/lib/sos/defaults'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
+import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
@@ -41,7 +44,7 @@ import { useCsvImportProfiles } from '@/hooks/useCsvImportProfiles'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 import {
   Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
-  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table,
+  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -55,7 +58,7 @@ const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
 )
 
-type SubTab = 'upload' | 'reporting' | 'analytics' | 'payout' | 'rules' | 'trends'
+type SubTab = 'upload' | 'reporting' | 'settlements' | 'analytics' | 'payout' | 'rules' | 'trends'
 
 function SosGeneratorPanel() {
   const { artists } = useArtists()
@@ -224,6 +227,7 @@ function SosGeneratorPanel() {
   const shopifyManager   = useFileManager('shopify')
   const printfulManager  = useFileManager('printful')
   const darkmerchManager = useFileManager('darkmerch')
+  const [carryForwardByArtist, setCarryForwardByArtist] = useState<Record<string, number>>({})
 
   // CSV processing — all config fields now wired
   const {
@@ -256,11 +260,57 @@ function SosGeneratorPanel() {
       defaultSplitPercentagePhysical: appDefaults.defaultSplitPercentagePhysical,
       sourceSplits:              appDefaults.sourceSplits,
       trackRevenueAssignments,
+      carryForwardByArtist,
     },
     shopifyManager.files,
     printfulManager.files,
     darkmerchManager.files,
   )
+
+  useEffect(() => {
+    const periodStartDate = monthToPeriodDate(detectedPeriodStart, false)
+    const periodEndDate = monthToPeriodDate(detectedPeriodEnd || detectedPeriodStart, true)
+    if (!periodStartDate || !periodEndDate) {
+      setCarryForwardByArtist({})
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      try {
+        const supabase = createBrowserSupabaseClient()
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token
+        if (!token) return
+
+        const params = new URLSearchParams({
+          periodStart: periodStartDate,
+          periodEnd: periodEndDate,
+        })
+        const response = await fetch(`/api/admin/settlements/register?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok || cancelled) return
+
+        const json = (await response.json()) as {
+          rows?: Array<{ artistName: string; openingBalanceEur?: number }>
+        }
+        const map: Record<string, number> = {}
+        for (const row of json.rows ?? []) {
+          if (row.openingBalanceEur != null && row.openingBalanceEur !== 0) {
+            map[row.artistName.toLowerCase()] = row.openingBalanceEur
+          }
+        }
+        if (!cancelled) setCarryForwardByArtist(map)
+      } catch {
+        if (!cancelled) setCarryForwardByArtist({})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [detectedPeriodStart, detectedPeriodEnd])
 
   // Derive flat list of all release titles across all artists for IgnoredEntriesManager
   const allReleaseTitles = useMemo(() => {
@@ -329,6 +379,15 @@ function SosGeneratorPanel() {
   const subTabs: { id: SubTab; label: React.ReactNode }[] = [
     { id: 'upload',    label: 'Upload' },
     { id: 'reporting', label: 'Reporting' },
+    {
+      id: 'settlements',
+      label: (
+        <>
+          <SealCheck size={13} className="inline mr-1" />
+          Abrechnungszentrale
+        </>
+      ),
+    },
     { id: 'analytics', label: <><ChartBar size={13} className="inline mr-1" />Analytics</> },
     { id: 'payout',    label: 'SEPA Payout' },
     { id: 'trends',    label: <><TrendUp size={13} className="inline mr-1" />Trends</> },
@@ -504,12 +563,29 @@ function SosGeneratorPanel() {
               appDefaults={appDefaults}
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
-              onPublishToPortal={handlePublishToPortal}
+              onGoToReleaseWorkflow={() => setActiveSubTab('settlements')}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
               <FileText size={32} className="opacity-30" />
               <p className="text-sm">Upload CSV files first to see reporting data.</p>
+            </div>
+          )
+        )}
+
+        {activeSubTab === 'settlements' && (
+          hasData ? (
+            <SettlementCenterPanel
+              revenues={revenues}
+              labelArtists={labelArtists}
+              periodStart={detectedPeriodStart}
+              periodEnd={detectedPeriodEnd}
+              onCreateDraft={handlePublishToPortal}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+              <SealCheck size={32} className="opacity-30" />
+              <p className="text-sm">CSV-Dateien hochladen, um die Abrechnungszentrale zu starten.</p>
             </div>
           )
         )}

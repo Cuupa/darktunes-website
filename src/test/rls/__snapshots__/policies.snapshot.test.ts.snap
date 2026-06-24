@@ -59,6 +59,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "assets: public press read",
   "ban_history: admin insert",
   "ban_history: admin read",
+  "carry_forwards: admin all",
+  "carry_forwards: artist read own",
   "concert_artists: admin all",
   "concert_artists: artist manage",
   "concert_artists: public read",
@@ -99,6 +101,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "epk_versions: artist read own",
   "event_impact: admin all",
   "event_impact: artist read own",
+  "financial_audit: admin insert",
+  "financial_audit: admin read",
   "genres_read_public",
   "genres_write_admin",
   "interview_requests: artist read own",
@@ -175,6 +179,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "sales_statement_line_items: artist read own",
   "sales_statements: admin all",
   "sales_statements: artist read own",
+  "settlement_ledger: admin all",
+  "settlement_ledger: artist read own",
+  "settlement_periods: admin all",
   "site_settings_admin_write",
   "site_settings_public_read",
   "sos_period_summaries: admin all",
@@ -218,6 +225,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "artist_listener_metrics",
   "artist_members",
   "artist_replies",
+  "artist_settlement_ledger",
   "artist_territory_metrics",
   "artists",
   "asset_artists",
@@ -238,6 +246,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "epk_templates",
   "epk_versions",
   "event_impact",
+  "financial_audit_events",
   "genres",
   "idempotency_keys",
   "interview_requests",
@@ -252,6 +261,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "message_templates",
   "news_post_artists",
   "news_posts",
+  "period_carry_forwards",
   "portal_feature_flags",
   "portal_message_attachments",
   "portal_message_folders",
@@ -269,6 +279,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "role_permissions",
   "sales_statement_line_items",
   "sales_statements",
+  "settlement_periods",
   "site_settings",
   "sos_period_summaries",
   "sos_rules_presets",
@@ -342,6 +353,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "artist_replies_admin_all",
     "artist_replies_insert_own",
     "artist_replies_select_own",
+  ],
+  "artist_settlement_ledger": [
+    "settlement_ledger: admin all",
+    "settlement_ledger: artist read own",
   ],
   "artist_territory_metrics": [
     "artist_territory_metrics: admin all",
@@ -447,6 +462,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "event_impact: admin all",
     "event_impact: artist read own",
   ],
+  "financial_audit_events": [
+    "financial_audit: admin insert",
+    "financial_audit: admin read",
+  ],
   "genres": [
     "genres_read_public",
     "genres_write_admin",
@@ -504,6 +523,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "news_posts: can_edit_news update",
     "news_posts: can_publish_news insert",
     "news_posts: public read",
+  ],
+  "period_carry_forwards": [
+    "carry_forwards: admin all",
+    "carry_forwards: artist read own",
   ],
   "portal_feature_flags": [
     "portal_feature_flags: admin write",
@@ -582,6 +605,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "sales_statements": [
     "sales_statements: admin all",
     "sales_statements: artist read own",
+  ],
+  "settlement_periods": [
+    "settlement_periods: admin all",
   ],
   "site_settings": [
     "site_settings_admin_write",

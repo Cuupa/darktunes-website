@@ -22,7 +22,29 @@ IoC in portal: Every portal page is a Server Component that fetches data and pas
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
 Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Calendar (`/portal/calendar`), Marketing (`/portal/marketing`), Documents (`/portal/documents`), Interviews (`/portal/interviews`), Statements, Messages (`/portal/messages`), Help (`/portal/help`). Settings (`/portal/settings`) is always visible (not flag-gated). Onboarding (`/portal/onboarding`) is shown only for new artists who have not completed the first-run wizard.
-Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'acknowledged'` after successful creation.
+Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'invoiced'` after successful creation.
+
+## Settlement & Abrechnungszentrale
+
+Enterprise settlement lifecycle for SOS statements and artist invoices. Admin UI: **Accounting → Abrechnungszentrale** (`SettlementCenterPanel` in `src/components/admin/sos/SettlementCenterPanel.tsx`).
+
+**Workflow (7 steps):** review → draft upload → label approve + notify → artist viewed → invoice created → invoice received → paid. Status helpers live in `src/lib/sos/statementWorkflow.ts`; badges/stepper in `statementWorkflowUi.tsx`.
+
+**Tables** (schema in `supabase/reset.sql`): `settlement_periods`, `artist_settlement_ledger` (append-only), `period_carry_forwards`, `financial_audit_events`. Extended columns on `sales_statements` (view tracking, correction/versioning, FX, `settlement_period_id`) and `artist_invoices` (received/paid/outstanding, `settlement_period_id`).
+
+**DAL:** `src/lib/api/settlementPeriods.ts`, `settlementLedger.ts`, `settlementRegister.ts`, `financialAudit.ts`; extended `salesStatements.ts` (`linkApprovedStatementToSettlement`, `recordStatementView`, `createCorrectionStatement`) and `artistInvoices.ts` (`markInvoiceReceived`, `recordInvoicePayment`).
+
+**Admin APIs:** `GET /api/admin/settlements/register`, `GET /api/admin/settlements/periods`, `POST .../periods/[id]/lock`, `POST .../periods/[id]/archive`, `POST /api/admin/sales-statements/bulk-approve`, `POST .../[id]/correction`, `PATCH /api/admin/invoices/[id]/received`, `PATCH .../[id]/payment`.
+
+**Portal:** `POST /api/portal/statements/[id]/view` (also triggered on PDF download via `getStatementPresignedUrl` server action). Invoice create (`POST /api/portal/invoices`) books `invoice_liability` ledger entries.
+
+**Carry-forward:** Archiving a period (`archivePeriodWithCarryForward`) writes `period_carry_forwards` + `carry_out`/`carry_in` ledger entries. SOS CSV processing accepts `carryForwardByArtist` in `DataProcessorConfig` (loaded from register `openingBalanceEur` in `AccountingPanel`).
+
+**Corrections:** `POST /api/admin/sales-statements/[id]/correction` supersedes the original statement and creates a correction draft; UI wizard in Abrechnungszentrale per-artist **Korrektur** button.
+
+**Shared client helpers:** `getAdminAccessToken()` in `src/lib/admin/getAccessToken.ts` (admin API auth from client components). Workflow step derivation: `deriveActiveWorkflowStep` / `deriveCompletedWorkflowSteps` in `statementWorkflow.ts`.
+
+**CSP:** `src/lib/security/contentSecurityPolicy.ts` is the single source of truth (imported by `next.config.ts`). `connect-src` must include `https://*.r2.cloudflarestorage.com` for browser-side R2 presigned uploads.
 
 Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
   - **Streaming** tab: monthly stream counts from `streaming_stats`, rendered by `StreamingChart` / `StreamingChartInner` using Recharts.

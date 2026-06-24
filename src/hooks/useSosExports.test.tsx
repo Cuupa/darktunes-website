@@ -104,7 +104,7 @@ describe('useSosExports.handlePublishToPortal', () => {
         pdfBase64: expect.any(String),
       })
     )
-    expect(mockToastSuccess).toHaveBeenCalledWith('Statement published to portal')
+    expect(mockToastSuccess).toHaveBeenCalledWith('Draft statement saved to portal')
   })
 
   it('shows upload error and does not fall back to local download', async () => {

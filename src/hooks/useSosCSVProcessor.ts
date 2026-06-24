@@ -57,6 +57,8 @@ interface CSVProcessorConfig {
    * single owner artist.
    */
   trackRevenueAssignments?: TrackRevenueAssignment[]
+  /** Opening balances from prior settlement period, keyed by artist name. */
+  carryForwardByArtist?: Record<string, number>
 }
 
 const EMPTY_RESULT: WorkerResult = {
@@ -211,6 +213,7 @@ export function useCSVProcessor(
     String(config.defaultSplitPercentagePhysical ?? ''),
     JSON.stringify(config.sourceSplits ?? {}),
     config.trackRevenueAssignments?.map(r => `${r.id}:${r.trackTitle}:${r.ownerArtist}`).join(',') ?? '',
+    JSON.stringify(config.carryForwardByArtist ?? {}),
   ].join('|')
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -234,7 +237,8 @@ export function useCSVProcessor(
     defaultSplitPercentagePhysical: config.defaultSplitPercentagePhysical,
     sourceSplits: config.sourceSplits,
     trackRevenueAssignments: config.trackRevenueAssignments,
-  }), [config.compilationFilters, config.artistMappings, config.splitFees, config.manualRevenues, config.expenses, config.excludePhysical, exchangeRates, historicalRates, config.labelArtists, config.ignoredEntries, config.distributionFeePercentage, config.distributionFeeDigital, config.distributionFeePhysical, config.defaultSplitPercentage, config.defaultSplitPercentageDigital, config.defaultSplitPercentagePhysical, config.sourceSplits, config.trackRevenueAssignments])
+    carryForwardByArtist: config.carryForwardByArtist,
+  }), [config.compilationFilters, config.artistMappings, config.splitFees, config.manualRevenues, config.expenses, config.excludePhysical, exchangeRates, historicalRates, config.labelArtists, config.ignoredEntries, config.distributionFeePercentage, config.distributionFeeDigital, config.distributionFeePhysical, config.defaultSplitPercentage, config.defaultSplitPercentageDigital, config.defaultSplitPercentagePhysical, config.sourceSplits, config.trackRevenueAssignments, config.carryForwardByArtist])
 
   const sendProcess = useCallback(() => {
     const cfg = latestConfigRef.current ?? buildConfig()

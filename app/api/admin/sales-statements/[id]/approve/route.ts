@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
-import { approveSalesStatement } from '@/lib/api/salesStatements'
+import {
+  approveAndNotifySalesStatement,
+  linkApprovedStatementToSettlement,
+} from '@/lib/api/salesStatements'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const approveSchema = z.object({
   notes: z.string().max(4000).optional(),
@@ -11,7 +15,7 @@ const approveSchema = z.object({
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  const userId = await verifyAdminOrEditor(token)
 
   const id = req.nextUrl.pathname.split('/').at(-2)
   if (!id) throw new ApiError(400, 'Missing statement id')
@@ -23,6 +27,19 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   }
 
   const supabase = await createServerSupabaseClient()
-  const statement = await approveSalesStatement(supabase, id, parsed.data.notes)
-  return NextResponse.json({ statement })
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+  const outcome = await approveAndNotifySalesStatement(
+    supabase,
+    id,
+    (statement) => notifyStatementArtist(serviceSupabase, statement),
+    parsed.data.notes,
+  )
+
+  await linkApprovedStatementToSettlement(supabase, outcome.statement, userId)
+
+  return NextResponse.json({
+    statement: outcome.statement,
+    emailSent: outcome.emailSent,
+    emailError: outcome.emailError,
+  })
 })
