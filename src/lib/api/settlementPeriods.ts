@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
+import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 
 type DbClient = SupabaseClient<Database>
 type SettlementPeriodRow = Database['public']['Tables']['settlement_periods']['Row']
@@ -43,6 +44,24 @@ export function buildPeriodLabel(periodStart: string, periodEnd: string): string
   return periodStart === periodEnd ? periodStart : `${periodStart} – ${periodEnd}`
 }
 
+/** Accept YYYY-MM (bronze/SOS UI) or YYYY-MM-DD (settlement register) for DATE columns. */
+export function normalizeSettlementPeriodDate(value: string, endOfMonth = false): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const converted = monthToPeriodDate(value, endOfMonth)
+  if (converted) return converted
+  throw new Error(`Invalid settlement period date: ${value}`)
+}
+
+export function normalizeSettlementPeriodBounds(
+  periodStart: string,
+  periodEnd: string,
+): { periodStart: string; periodEnd: string } {
+  return {
+    periodStart: normalizeSettlementPeriodDate(periodStart, false),
+    periodEnd: normalizeSettlementPeriodDate(periodEnd, true),
+  }
+}
+
 export async function listSettlementPeriods(db: DbClient): Promise<SettlementPeriod[]> {
   const { data, error } = await db
     .from('settlement_periods')
@@ -72,22 +91,24 @@ export async function getOrCreateSettlementPeriod(
   periodStart: string,
   periodEnd: string,
 ): Promise<SettlementPeriod> {
+  const bounds = normalizeSettlementPeriodBounds(periodStart, periodEnd)
+
   const { data: existing, error: findError } = await db
     .from('settlement_periods')
     .select('*')
-    .eq('period_start', periodStart)
-    .eq('period_end', periodEnd)
+    .eq('period_start', bounds.periodStart)
+    .eq('period_end', bounds.periodEnd)
     .maybeSingle()
 
   if (findError) throw new Error(findError.message)
   if (existing) return rowToPeriod(existing as SettlementPeriodRow)
 
-  const label = buildPeriodLabel(periodStart, periodEnd)
+  const label = buildPeriodLabel(bounds.periodStart, bounds.periodEnd)
   const { data, error } = await db
     .from('settlement_periods')
     .insert({
-      period_start: periodStart,
-      period_end: periodEnd,
+      period_start: bounds.periodStart,
+      period_end: bounds.periodEnd,
       label,
       status: 'open',
     })
@@ -198,11 +219,13 @@ export async function assertSettlementPeriodWritable(
   periodStart: string,
   periodEnd: string,
 ): Promise<void> {
+  const bounds = normalizeSettlementPeriodBounds(periodStart, periodEnd)
+
   const { data, error } = await db
     .from('settlement_periods')
     .select('status')
-    .eq('period_start', periodStart)
-    .eq('period_end', periodEnd)
+    .eq('period_start', bounds.periodStart)
+    .eq('period_end', bounds.periodEnd)
     .maybeSingle()
 
   if (error) throw new Error(error.message)

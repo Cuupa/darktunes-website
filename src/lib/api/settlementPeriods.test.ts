@@ -6,6 +6,8 @@ import {
   assertSettlementPeriodWritableById,
   buildPeriodLabel,
   isPeriodWritable,
+  normalizeSettlementPeriodBounds,
+  normalizeSettlementPeriodDate,
   SettlementPeriodNotWritableError,
 } from './settlementPeriods'
 
@@ -29,12 +31,40 @@ describe('settlementPeriods helpers', () => {
   })
 })
 
+describe('normalizeSettlementPeriodDate', () => {
+  it('passes through YYYY-MM-DD values', () => {
+    expect(normalizeSettlementPeriodDate('2023-08-01', false)).toBe('2023-08-01')
+    expect(normalizeSettlementPeriodDate('2026-03-31', true)).toBe('2026-03-31')
+  })
+
+  it('converts YYYY-MM bronze/UI months to first/last day of month', () => {
+    expect(normalizeSettlementPeriodDate('2023-08', false)).toBe('2023-08-01')
+    expect(normalizeSettlementPeriodDate('2026-03', true)).toBe('2026-03-31')
+    expect(normalizeSettlementPeriodDate('2024-02', true)).toBe('2024-02-29')
+  })
+
+  it('rejects invalid period strings', () => {
+    expect(() => normalizeSettlementPeriodDate('2023/08')).toThrow(/Invalid settlement period date/)
+    expect(() => normalizeSettlementPeriodDate('August 2023')).toThrow(/Invalid settlement period date/)
+  })
+})
+
+describe('normalizeSettlementPeriodBounds', () => {
+  it('normalizes multi-month bronze ranges', () => {
+    expect(normalizeSettlementPeriodBounds('2023-08', '2026-03')).toEqual({
+      periodStart: '2023-08-01',
+      periodEnd: '2026-03-31',
+    })
+  })
+})
+
 describe('assertSettlementPeriodWritable', () => {
   it('allows mutations when no period row exists yet', async () => {
+    const eq = vi.fn().mockReturnThis()
     const db = {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
+        eq,
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
     } as unknown as DbClient
@@ -42,6 +72,24 @@ describe('assertSettlementPeriodWritable', () => {
     await expect(
       assertSettlementPeriodWritable(db, '2025-01-01', '2025-03-31'),
     ).resolves.toBeUndefined()
+  })
+
+  it('normalizes YYYY-MM bronze periods before querying settlement_periods', async () => {
+    const eq = vi.fn().mockReturnThis()
+    const db = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq,
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+    } as unknown as DbClient
+
+    await expect(
+      assertSettlementPeriodWritable(db, '2023-08', '2026-03'),
+    ).resolves.toBeUndefined()
+
+    expect(eq).toHaveBeenCalledWith('period_start', '2023-08-01')
+    expect(eq).toHaveBeenCalledWith('period_end', '2026-03-31')
   })
 
   it('rejects locked periods', async () => {
