@@ -30,13 +30,13 @@ export default function AdminStatementsPage() {
             alles in der Abrechnungszentrale unter Accounting.
           </span>
           <Button size="sm" className="shrink-0" asChild>
-            <Link href="/admin/accounting">Zur Abrechnungszentrale</Link>
+            <Link href="/admin/accounting?subTab=settlements">Zur Abrechnungszentrale</Link>
           </Button>
         </AlertDescription>
       </Alert>
 
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
-        <StatementsManager />
+        <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
       </Suspense>
     </AdminPageShell>
   )

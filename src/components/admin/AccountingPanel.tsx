@@ -10,6 +10,7 @@
  */
 
 import { lazy, Suspense, useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -34,6 +35,7 @@ import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
 import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
+import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
 import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
 import dynamic from 'next/dynamic'
@@ -70,7 +72,11 @@ const ACCOUNTING_FALLBACK = {
   subTabUpload: 'Upload',
   subTabReporting: 'Reporting',
   subTabSettlements: 'Settlement Center',
-  subTabAnalytics: 'Analytics',
+  subTabAnalytics: 'Portal Data',
+  subTabAnalyticsHint:
+    'Bronze archives, listener sync, and Save to Portal — data artists will see after you persist it.',
+  subTabSettlementsHint:
+    'Create draft statements, approve them, track invoices, and record payments.',
   subTabPayout: 'SEPA Payout',
   subTabTrends: 'Trends',
   subTabRules: 'Rules',
@@ -91,10 +97,21 @@ const ACCOUNTING_FALLBACK = {
   analyticsPreviewHeading: 'Session preview (not in portal)',
   analyticsSessionBanner:
     'Charts below use in-memory CSV data. Artists only see metrics after you click Save to Portal.',
+  playbookTitle: 'Operator playbook',
+  playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
+  playbookStep2: 'Click Save to Portal below to persist territory metrics for linked artists.',
+  playbookStep3: 'Review saved trends and roster health in Label Intelligence.',
 } as const
+
+const SUB_TAB_IDS: SubTab[] = ['upload', 'reporting', 'settlements', 'analytics', 'payout', 'trends', 'rules']
+
+function isSubTab(value: string | null): value is SubTab {
+  return value != null && (SUB_TAB_IDS as string[]).includes(value)
+}
 
 function SosGeneratorPanel() {
   const dict = useDict()
+  const searchParams = useSearchParams()
   const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
@@ -137,6 +154,11 @@ function SosGeneratorPanel() {
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
+
+  useEffect(() => {
+    const subTab = searchParams.get('subTab')
+    if (isSubTab(subTab)) setActiveSubTab(subTab)
+  }, [searchParams])
 
   // Rules state
   const [artistMappings, setArtistMappings] = useState<ArtistMapping[]>([])
@@ -566,6 +588,12 @@ function SosGeneratorPanel() {
         </button>
       </div>
 
+      {(activeSubTab === 'analytics' || activeSubTab === 'settlements') && (
+        <p className="px-6 py-2 text-xs text-muted-foreground border-b border-border bg-muted/20">
+          {activeSubTab === 'analytics' ? t.subTabAnalyticsHint : t.subTabSettlementsHint}
+        </p>
+      )}
+
       {/* Period info banner */}
       {hasData && (detectedPeriodStart || detectedPeriodEnd) && (
         <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
@@ -649,6 +677,12 @@ function SosGeneratorPanel() {
               <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
                 {t.analyticsOpsHeading}
               </h3>
+              <OperatorPlaybook
+                title={t.playbookTitle}
+                step1={t.playbookStep1}
+                step2={t.playbookStep2}
+                step3={t.playbookStep3}
+              />
               <ImportBatchesPanel labelArtists={labelArtists} />
               <ExternalMetricsSyncPanel />
               {hasData ? (
@@ -781,12 +815,14 @@ export function AccountingPanel() {
       </div>
 
       <TabsContent value="generate" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-        <SosGeneratorPanel />
+        <Suspense fallback={<Skeleton className="h-96 w-full m-6" />}>
+          <SosGeneratorPanel />
+        </Suspense>
       </TabsContent>
 
       <TabsContent value="history" className="flex-1 mt-0 p-6">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <StatementsManager />
+          <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
         </Suspense>
       </TabsContent>
     </Tabs>

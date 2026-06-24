@@ -1372,6 +1372,18 @@
     "DB_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut."
   },
   "admin": {
+    "nav": {
+      "labelIntelligence": "Label Intelligence"
+    },
+    "labelIntelligence": {
+      "pageTitle": "Label Intelligence",
+      "pageDescription": "Persistierte Label-weite Umsatztrends, Roster-Gesundheit, Press-Engagement und Finanz-Audit-Trail.",
+      "emptyTrendsHint": "Noch keine gespeicherten Perioden-Zusammenfassungen.",
+      "playbookTitle": "So füllen Sie diesen Hub",
+      "playbookStep1": "Distributor-CSVs in Accounting hochladen und Statements in der Abrechnungszentrale freigeben.",
+      "playbookStep2": "In Accounting → Portal-Daten auf „Save to Portal“ klicken, um Territory-Metriken zu speichern.",
+      "playbookStep3": "Hier Trends, Roster-Gesundheit und Audit-Historie prüfen."
+    },
     "accreditations": {
       "whatIsHeading": "Was sind Akkreditierungen?",
       "whatIsDescription": "Journalisten nutzen das Presseportal, um eine Akkreditierung für anstehende Events oder Konzerte anzufragen. Hier kannst du die Anfragen prüfen, eine optionale interne Notiz hinzufügen und sie genehmigen oder ablehnen.",
@@ -1394,7 +1406,9 @@
       "subTabUpload": "Upload",
       "subTabReporting": "Reporting",
       "subTabSettlements": "Abrechnungszentrale",
-      "subTabAnalytics": "Analytics",
+      "subTabAnalytics": "Portal-Daten",
+      "subTabAnalyticsHint": "Bronze-Archive, Listener-Sync und Save to Portal — Daten, die Künstler nach dem Speichern sehen.",
+      "subTabSettlementsHint": "Statement-Entwürfe erstellen, freigeben, Rechnungen verfolgen und Zahlungen erfassen.",
       "subTabPayout": "SEPA-Auszahlung",
       "subTabTrends": "Trends",
       "subTabRules": "Regeln",
@@ -1440,7 +1454,15 @@
       "workflowAcknowledged": "Bestätigt",
       "analyticsOpsHeading": "Portal-Daten & Vorgänge",
       "analyticsPreviewHeading": "Session-Vorschau (nicht im Portal)",
-      "analyticsSessionBanner": "Die Charts unten nutzen CSV-Daten im Speicher. Künstler sehen Metriken erst nach „Save to Portal“."
+      "analyticsSessionBanner": "Die Charts unten nutzen CSV-Daten im Speicher. Künstler sehen Metriken erst nach „Save to Portal“.",
+      "playbookTitle": "Operator-Playbook",
+      "playbookStep1": "CSV-Dateien hochladen und Statements in der Abrechnungszentrale freigeben.",
+      "playbookStep2": "Unten auf „Save to Portal“ klicken, um Territory-Metriken für verknüpfte Künstler zu speichern.",
+      "playbookStep3": "Gespeicherte Trends und Roster-Gesundheit in Label Intelligence prüfen.",
+      "historyReadOnlyTitle": "Nur-Lese-Historie",
+      "historyReadOnlyBody": "Statements freigeben, Zahlungen erfassen und Rechnungen verwalten — in der Abrechnungszentrale, nicht hier.",
+      "historyManageInSettlement": "In Abrechnungszentrale verwalten",
+      "historyDraftPending": "{count} Entwurf/Entwürfe warten auf Freigabe in der Abrechnungszentrale"
     }
   }
 }
