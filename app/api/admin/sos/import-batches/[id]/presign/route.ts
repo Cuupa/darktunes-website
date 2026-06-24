@@ -1,18 +1,22 @@
 /**
- * POST /api/admin/sos/import-batches/[id]/upload — stream bronze CSV to R2 server-side
+ * POST /api/admin/sos/import-batches/[id]/presign — presigned PUT URL for large bronze CSVs
  *
- * Avoids browser CORS restrictions on direct PUT to r2.cloudflarestorage.com presigned URLs.
+ * Bypasses Vercel's ~50 MB request body limit by uploading directly from the browser to R2.
+ * Requires R2 bucket CORS to allow PUT from the site origin (see DEPLOYMENT.md).
  */
 
-import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
-import { MAX_BRONZE_CSV_SERVER_BYTES } from '@/lib/sos/bronzeUploadLimits'
+import { MAX_BRONZE_CSV_BYTES } from '@/lib/sos/bronzeUploadLimits'
+import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
+
+const PRESIGN_BODY_MAX_BYTES = 512
 
 async function requireAdminOrEditor() {
   const supabase = await createServerSupabaseClient()
@@ -26,14 +30,25 @@ async function requireAdminOrEditor() {
 }
 
 function extractBatchIdFromPath(pathname: string): string | null {
-  const match = pathname.match(/\/import-batches\/([^/]+)\/upload\/?$/)
+  const match = pathname.match(/\/import-batches\/([^/]+)\/presign\/?$/)
   return match?.[1] ?? null
 }
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminOrEditor()
   const id = extractBatchIdFromPath(new URL(req.url).pathname)
-  if (!id) throw new ApiError(400, 'Invalid import batch upload path')
+  if (!id) throw new ApiError(400, 'Invalid import batch presign path')
+
+  const raw = await req.text()
+  if (raw.length > PRESIGN_BODY_MAX_BYTES) throw new ApiError(413, 'Presign payload too large')
+
+  const body = JSON.parse(raw) as { content_type?: string; file_size?: number }
+  const contentType = body.content_type?.trim() || 'text/csv; charset=utf-8'
+  const fileSize = body.file_size
+
+  if (typeof fileSize === 'number' && fileSize > MAX_BRONZE_CSV_BYTES) {
+    throw new ApiError(413, `CSV too large (max ${MAX_BRONZE_CSV_BYTES} bytes)`)
+  }
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getImportBatchById(serviceSupabase, id)
@@ -42,28 +57,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw new ApiError(409, 'Import batch already has archived content')
   }
 
-  let formData: FormData
-  try {
-    formData = await req.formData()
-  } catch {
-    throw new ApiError(400, 'Failed to parse form data')
-  }
-
-  const file = formData.get('file')
-  if (!(file instanceof File)) {
-    throw new ApiError(400, 'file is required')
-  }
-
-  if (file.size > MAX_BRONZE_CSV_SERVER_BYTES) {
-    throw new ApiError(
-      413,
-      `CSV too large for server upload (max ${MAX_BRONZE_CSV_SERVER_BYTES} bytes). Use presigned upload instead.`,
-    )
-  }
-
-  const body = Buffer.from(await file.arrayBuffer())
-  const contentType = file.type || 'text/csv; charset=utf-8'
-
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -71,14 +64,11 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
 
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
-      Key: batch.r2Key,
-      Body: body,
-      ContentType: contentType,
-    }),
-  )
+  const uploadUrl = await generatePresignedUploadUrl(batch.r2Key, contentType, {
+    getSignedUrl,
+    s3Client: s3,
+    bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+  })
 
-  return NextResponse.json({ ok: true, r2Key: batch.r2Key })
+  return NextResponse.json({ uploadUrl })
 })

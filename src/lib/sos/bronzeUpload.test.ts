@@ -93,6 +93,50 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(confirmCalls).toHaveLength(2)
   })
 
+  it('uses presigned direct upload when CSV exceeds the server proxy limit', async () => {
+    vi.resetModules()
+    vi.doMock('./bronzeUploadLimits', () => ({
+      MAX_BRONZE_CSV_SERVER_BYTES: 4,
+      MAX_BRONZE_CSV_BYTES: 200,
+    }))
+    const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-large' },
+          r2Key: 'sos-imports/batch-large/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ uploadUrl: 'https://r2.example.com/presigned' }),
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadLargeCsv({
+      distributor: 'believe',
+      filename: 'large.csv',
+      uploadBody: 'abcdef',
+      rowCount: 1,
+      periodStart: '2024-04',
+      periodEnd: '2024-04',
+    })
+
+    expect(result).toEqual({ batchId: 'batch-large', r2Key: 'sos-imports/batch-large/file.csv' })
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/presign')
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://r2.example.com/presigned')
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/csv; charset=utf-8' },
+    })
+
+    vi.doUnmock('./bronzeUploadLimits')
+    vi.resetModules()
+  })
+
   it('marks the batch failed when confirm never succeeds', async () => {
     fetchMock
       .mockResolvedValueOnce({

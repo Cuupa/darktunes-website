@@ -1,9 +1,10 @@
 /**
- * Client-side Bronze layer upload: raw distributor CSV → R2 via server-side API route.
- * Avoids R2 CORS restrictions on browser PUT to r2.cloudflarestorage.com presigned URLs.
+ * Client-side Bronze layer upload: raw distributor CSV → R2.
+ * Files ≤45 MB use the server-side upload route; larger files use a presigned PUT URL
+ * (requires R2 bucket CORS for the site origin).
  */
 
-import { MAX_BRONZE_CSV_BYTES } from '@/lib/sos/bronzeUploadLimits'
+import { MAX_BRONZE_CSV_BYTES, MAX_BRONZE_CSV_SERVER_BYTES } from '@/lib/sos/bronzeUploadLimits'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
 const MAX_REGISTRATION_JSON_BYTES = 8_192
@@ -87,6 +88,64 @@ async function markBronzeUploadFailed(batchId: string): Promise<void> {
   } catch (err) {
     console.error('[bronzeUpload] mark batch failed error:', err)
   }
+}
+
+async function uploadBronzeCsvToR2(
+  batchId: string,
+  uploadBlob: Blob,
+  uploadFilename: string,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
+    const presignRes = await fetch(`/api/admin/sos/import-batches/${batchId}/presign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
+    })
+
+    if (!presignRes.ok) {
+      const presignErr = await presignRes.json().catch(() => ({}))
+      const message =
+        typeof presignErr === 'object' && presignErr && 'error' in presignErr
+          ? String((presignErr as { error: unknown }).error)
+          : presignRes.statusText
+      return { ok: false, message }
+    }
+
+    const { uploadUrl } = (await presignRes.json()) as { uploadUrl?: string }
+    if (!uploadUrl) return { ok: false, message: 'Missing presigned upload URL' }
+
+    const putRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: uploadBlob,
+      headers: { 'Content-Type': contentType },
+    })
+
+    if (!putRes.ok) {
+      return { ok: false, message: `Direct R2 upload failed (${putRes.status})` }
+    }
+
+    return { ok: true }
+  }
+
+  const uploadForm = new FormData()
+  uploadForm.append('file', uploadBlob, uploadFilename)
+
+  const uploadRes = await fetch(`/api/admin/sos/import-batches/${batchId}/upload`, {
+    method: 'POST',
+    body: uploadForm,
+  })
+
+  if (!uploadRes.ok) {
+    const uploadErr = await uploadRes.json().catch(() => ({}))
+    const message =
+      typeof uploadErr === 'object' && uploadErr && 'error' in uploadErr
+        ? String((uploadErr as { error: unknown }).error)
+        : uploadRes.statusText
+    return { ok: false, message }
+  }
+
+  return { ok: true }
 }
 
 async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<boolean> {
@@ -177,7 +236,7 @@ export async function uploadBronzeDistributorCsv(
 
     if (uploadBlob.size > MAX_BRONZE_CSV_BYTES) {
       console.error(
-        '[bronzeUpload] CSV exceeds server upload limit:',
+        '[bronzeUpload] CSV exceeds upload limit:',
         uploadBlob.size,
         'bytes (max',
         MAX_BRONZE_CSV_BYTES,
@@ -187,22 +246,9 @@ export async function uploadBronzeDistributorCsv(
       return null
     }
 
-    const uploadForm = new FormData()
-    uploadForm.append('file', uploadBlob, uploadFilename)
-
-    const uploadRes = await fetch(`/api/admin/sos/import-batches/${batch.id}/upload`, {
-      method: 'POST',
-      body: uploadForm,
-    })
-
-    if (!uploadRes.ok) {
-      const uploadErr =
-        typeof uploadRes.json === 'function' ? await uploadRes.json().catch(() => ({})) : {}
-      const uploadMessage =
-        typeof uploadErr === 'object' && uploadErr && 'error' in uploadErr
-          ? String((uploadErr as { error: unknown }).error)
-          : uploadRes.statusText
-      console.error('[bronzeUpload] server upload failed:', uploadMessage)
+    const uploadResult = await uploadBronzeCsvToR2(batch.id, uploadBlob, uploadFilename, contentType)
+    if (!uploadResult.ok) {
+      console.error('[bronzeUpload] upload failed:', uploadResult.message)
       await abandonBronzeImportBatch(batch.id)
       return null
     }
