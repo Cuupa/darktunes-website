@@ -6,6 +6,7 @@
  * Read-only Konva canvas preview of an EpkDocumentV2 document.
  */
 
+import '@/lib/epk/konvaShapes'
 import { useMemo } from 'react'
 import { Stage, Layer, Rect } from 'react-konva'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'

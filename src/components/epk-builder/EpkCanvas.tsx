@@ -6,6 +6,7 @@
  * Interactive Konva canvas with selection, drag, resize, and rotate.
  */
 
+import '@/lib/epk/konvaShapes'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Stage, Layer, Rect, Transformer } from 'react-konva'
 import type Konva from 'konva'

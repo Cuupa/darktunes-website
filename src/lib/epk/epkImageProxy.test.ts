@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildEpkProxyImageUrl,
   isAllowedEpkImageUrl,
   isPrivateOrLoopbackHost,
+  resolveEpkCanvasImageSrc,
 } from './epkImageProxy'
 
 describe('epkImageProxy', () => {
@@ -41,6 +42,24 @@ describe('epkImageProxy', () => {
           'https://cdn.darktunes.com',
         ),
       ).toBe(true)
+    })
+  })
+
+  describe('resolveEpkCanvasImageSrc', () => {
+    it('returns data and blob URIs unchanged', () => {
+      const dataUri = 'data:image/png;base64,abc'
+      const blobUri = 'blob:https://darktunes.com/abc'
+      expect(resolveEpkCanvasImageSrc(dataUri)).toBe(dataUri)
+      expect(resolveEpkCanvasImageSrc(blobUri)).toBe(blobUri)
+    })
+
+    it('rewrites remote HTTPS URLs through the portal proxy in the browser', () => {
+      vi.stubGlobal('window', { location: { origin: 'https://darktunes.com' } })
+      expect(resolveEpkCanvasImageSrc('https://abc123.r2.dev/photo.jpg')).toBe(
+        'https://darktunes.com/api/portal/proxy-image?url=' +
+          encodeURIComponent('https://abc123.r2.dev/photo.jpg'),
+      )
+      vi.unstubAllGlobals()
     })
   })
 
