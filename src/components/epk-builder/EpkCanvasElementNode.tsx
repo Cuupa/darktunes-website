@@ -6,9 +6,11 @@
  * Shared Konva node renderer for EPK canvas elements (preview + editor children).
  */
 
+import '@/lib/epk/konvaShapes'
 import { useEffect, useState } from 'react'
 import { Rect, Text, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
+import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
 
 function useHtmlImage(src: string | undefined): HTMLImageElement | null {
@@ -23,7 +25,7 @@ function useHtmlImage(src: string | undefined): HTMLImageElement | null {
     img.crossOrigin = 'anonymous'
     img.onload = () => setImage(img)
     img.onerror = () => setImage(null)
-    img.src = src
+    img.src = resolveEpkCanvasImageSrc(src)
   }, [src])
 
   return image

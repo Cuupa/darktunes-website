@@ -88,7 +88,7 @@ export function ReportingPanel({
       const artistEmail = roster?.email ?? ''
       const template = labelInfo?.emailTemplate ?? ''
       if (!template) {
-        toast.error('No e-mail template configured. Please add one in Branding > E-Mail-Anschreiben.')
+        toast.error('No email template configured. Please add one under Branding → Email template.')
         return
       }
       const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.finalAmount)

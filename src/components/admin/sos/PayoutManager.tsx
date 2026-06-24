@@ -21,7 +21,7 @@ interface PayoutManagerProps {
 
 function buildPeriodLabel(periodStart: string, periodEnd: string): string {
   if (periodStart && periodEnd) return `${periodStart} – ${periodEnd}`
-  return periodStart || periodEnd || 'Aktueller Zeitraum'
+  return periodStart || periodEnd || 'Current period'
 }
 
 function fmtEur(value: number): string {
@@ -104,20 +104,20 @@ export function PayoutManager({
 
   const handleExport = useCallback(() => {
     if (!labelInfo.sepaIban) {
-      toast.error('Label-IBAN fehlt', {
-        description: 'Bitte trage die Absender-IBAN des Labels in den Einstellungen unter "Branding → SEPA-Absenderkonto" ein.',
+      toast.error('Label IBAN missing', {
+        description: 'Add the label sender IBAN under Settings → Branding → SEPA sender account.',
       })
       return
     }
     if (!isValidIBAN(labelInfo.sepaIban)) {
-      toast.error('Ungültige Label-IBAN', {
-        description: 'Die hinterlegte IBAN des Labels besteht die Modulo-97-Prüfung nicht.',
+      toast.error('Invalid label IBAN', {
+        description: 'The stored label IBAN failed the modulo-97 checksum validation.',
       })
       return
     }
     if (selectedPayouts.length === 0) {
-      toast.error('Keine Künstler ausgewählt', {
-        description: 'Wähle mindestens einen Künstler mit gültiger IBAN aus.',
+      toast.error('No artists selected', {
+        description: 'Select at least one artist with a valid IBAN.',
       })
       return
     }
@@ -140,12 +140,12 @@ export function PayoutManager({
       const safeLabel = (labelInfo.name || 'sepa').toLowerCase().replace(/[^a-z0-9]/g, '-')
       const today = new Date().toISOString().slice(0, 10)
       downloadSepaXml(xml, `${safeLabel}-payouts-${today}.xml`)
-      toast.success(`SEPA XML exportiert`, {
-        description: `${selectedPayouts.length} Überweisungen · ${fmtEur(totalSelected)} gesamt`,
+      toast.success('SEPA XML exported', {
+        description: `${selectedPayouts.length} transfers · ${fmtEur(totalSelected)} total`,
       })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unbekannter Fehler'
-      toast.error('SEPA-Export fehlgeschlagen', { description: message })
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error('SEPA export failed', { description: message })
     }
   }, [selectedPayouts, labelInfo, periodStart, periodEnd, totalSelected])
 
@@ -161,17 +161,17 @@ export function PayoutManager({
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <div className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-emerald-400" />
-              <span className="text-muted-foreground">{validRows.length} Künstler mit gültiger IBAN</span>
+              <span className="text-muted-foreground">{validRows.length} artists with valid IBAN</span>
             </div>
             {invalidRows.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <Warning size={14} className="text-red-400" />
-                <span className="text-muted-foreground">{invalidRows.length} ohne / ungültige IBAN</span>
+                <span className="text-muted-foreground">{invalidRows.length} missing or invalid IBAN</span>
               </div>
             )}
             {syncedSelected.size > 0 && (
               <div className="font-medium tabular-nums text-emerald-400">
-                {fmtEur(totalSelected)} · {syncedSelected.size} ausgewählt
+                {fmtEur(totalSelected)} · {syncedSelected.size} selected
               </div>
             )}
           </div>
@@ -180,7 +180,7 @@ export function PayoutManager({
             {!labelIbanOk && (
               <span className="text-xs text-amber-400 flex items-center gap-1">
                 <Warning size={13} weight="bold" />
-                Label-IBAN fehlt (Einstellungen → Branding)
+                Label IBAN missing (Settings → Branding)
               </span>
             )}
             <Button
@@ -190,7 +190,7 @@ export function PayoutManager({
               disabled={syncedSelected.size === 0}
             >
               <DownloadSimple size={14} />
-              SEPA XML exportieren
+              Export SEPA XML
             </Button>
           </div>
         </div>
@@ -199,9 +199,9 @@ export function PayoutManager({
           {rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <Bank size={32} className="opacity-30" />
-              <p className="text-sm">Keine Auszahlungen berechnet.</p>
+              <p className="text-sm">No payouts calculated yet.</p>
               <p className="text-xs text-muted-foreground/60">
-                Lade zunächst CSV-Dateien hoch und berechne die Abrechnung.
+                Upload CSV files first, then run the statement calculation.
               </p>
             </div>
           ) : (
@@ -212,15 +212,15 @@ export function PayoutManager({
                     <Checkbox
                       checked={allValidSelected}
                       onCheckedChange={toggleSelectAll}
-                      aria-label="Alle gültigen Künstler auswählen"
+                      aria-label="Select all artists with valid IBAN"
                       className="border-2 border-white/40 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
                       disabled={validRows.length === 0}
                     />
                   </th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Künstler</th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Kontoinhaber</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Artist</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Account holder</th>
                   <th className="py-3 text-left font-medium text-muted-foreground px-4">IBAN</th>
-                  <th className="py-3 text-right font-medium text-muted-foreground px-4">Auszahlung</th>
+                  <th className="py-3 text-right font-medium text-muted-foreground px-4">Payout</th>
                   <th className="py-3 text-center font-medium text-muted-foreground px-4">Status</th>
                 </tr>
               </thead>
@@ -242,7 +242,7 @@ export function PayoutManager({
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => toggleArtist(row.artistName)}
-                          aria-label={`${row.artistName} auswählen`}
+                          aria-label={`Select ${row.artistName}`}
                           disabled={isInvalid}
                           className="border-2 border-white/40 data-[state=checked]:border-primary data-[state=checked]:bg-primary disabled:opacity-30"
                         />
@@ -257,7 +257,7 @@ export function PayoutManager({
                       </td>
                       <td className="py-3 px-4 font-mono text-xs">
                         {row.ibanStatus === 'missing' ? (
-                          <span className="text-red-400 text-xs font-sans font-medium">IBAN fehlt</span>
+                          <span className="text-red-400 text-xs font-sans font-medium">IBAN missing</span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -266,7 +266,7 @@ export function PayoutManager({
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs text-xs bg-red-900/90 text-red-100 border-red-700">
-                              Prüfsumme fehlerhaft. SEPA-Export blockiert.
+                              Checksum invalid. SEPA export blocked.
                             </TooltipContent>
                           </Tooltip>
                         ) : (
@@ -283,11 +283,11 @@ export function PayoutManager({
                           </span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/15 text-red-400 border border-red-500/25">
-                            <Warning size={10} weight="bold" />Ungültig
+                            <Warning size={10} weight="bold" />Invalid
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                            <Warning size={10} weight="bold" />Fehlt
+                            <Warning size={10} weight="bold" />Missing
                           </span>
                         )}
                       </td>

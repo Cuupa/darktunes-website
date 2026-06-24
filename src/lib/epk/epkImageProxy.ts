@@ -129,6 +129,28 @@ export function isAllowedEpkImageUrl(url: string, r2PublicUrl?: string): boolean
  * Builds an absolute proxy URL for @react-pdf/renderer image fetches.
  * Relative paths and `data:` URIs are returned unchanged.
  */
+/**
+ * Resolves an image URL for Konva canvas rendering in the authenticated portal.
+ * Remote assets are routed through the portal proxy so R2 CORS restrictions do not
+ * block `HTMLImageElement` loads used by react-konva.
+ */
+export function resolveEpkCanvasImageSrc(src: string): string {
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src
+
+  if (typeof window === 'undefined') return src
+
+  try {
+    const parsed = new URL(src, window.location.origin)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return buildEpkProxyImageUrl(parsed.href, window.location.origin)
+    }
+  } catch {
+    // Relative or invalid URL — return unchanged.
+  }
+
+  return src
+}
+
 export function buildEpkProxyImageUrl(
   url: string,
   origin: string,

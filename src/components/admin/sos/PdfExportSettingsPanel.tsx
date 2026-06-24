@@ -48,50 +48,50 @@ export function PdfExportSettingsPanel({ settings, onUpdate }: PdfExportSettings
     <div className="space-y-4 p-8">
       <div className="flex items-center gap-2">
         <FilePdf size={20} weight="bold" className="text-primary" />
-        <h3 className="font-semibold">PDF-Export-Module</h3>
+        <h3 className="font-semibold">PDF export modules</h3>
       </div>
 
       <Card className="p-6 space-y-8">
         <div className="space-y-3">
-          <SectionHeading icon={FilePdf} title="Inhalt der PDF-Abrechnung" />
+          <SectionHeading icon={FilePdf} title="Statement PDF content" />
           <p className="text-xs text-muted-foreground">
-            Wähle aus, welche Abschnitte im exportierten PDF enthalten sein sollen.
-            Pflichtfelder (Zusammenfassung, Künstler-Info) sind immer enthalten.
+            Choose which sections to include in exported PDFs.
+            Required fields (summary, artist info) are always included.
           </p>
 
           <div className="space-y-2">
             <ToggleRow
               id="pdf-releases"
-              label="Release-Aufschlüsselung"
-              description="Tabelle aller Releases mit Umsatz und Menge pro Album / Single."
+              label="Release breakdown"
+              description="Table of all releases with revenue and quantity per album or single."
               checked={settings.includeReleaseBreakdown}
               onCheckedChange={v => patch({ includeReleaseBreakdown: v })}
             />
             <ToggleRow
               id="pdf-hide-compilations"
-              label="Compilations ausblenden"
-              description="Versteckt Sampler-Releases in der Release-Aufschlüsselung des Statements."
+              label="Hide compilations"
+              description="Hides sampler releases in the statement release breakdown."
               checked={settings.hideCompilationsInStatement ?? true}
               onCheckedChange={v => patch({ hideCompilationsInStatement: v })}
             />
             <ToggleRow
               id="pdf-platforms"
-              label="Plattform-Aufschlüsselung"
-              description="Umsatz pro Streaming-Dienst (Spotify, Apple Music, etc.)."
+              label="Platform breakdown"
+              description="Revenue per streaming service (Spotify, Apple Music, etc.)."
               checked={settings.includePlatformBreakdown}
               onCheckedChange={v => patch({ includePlatformBreakdown: v })}
             />
             <ToggleRow
               id="pdf-countries"
-              label="Länder-Aufschlüsselung"
-              description="Umsatz nach Herkunftsland / Territorium."
+              label="Country breakdown"
+              description="Revenue by country or territory."
               checked={settings.includeCountryBreakdown}
               onCheckedChange={v => patch({ includeCountryBreakdown: v })}
             />
             {settings.includeCountryBreakdown && (
               <div className="ml-4 flex items-center gap-3 py-2 px-4 rounded-xl bg-muted/10 border border-border/30">
                 <Label htmlFor="pdf-top-countries" className="text-xs text-muted-foreground whitespace-nowrap">
-                  Max. Länder anzeigen
+                  Max countries shown
                 </Label>
                 <Input
                   id="pdf-top-countries"
@@ -106,27 +106,27 @@ export function PdfExportSettingsPanel({ settings, onUpdate }: PdfExportSettings
                   }}
                   className="w-20 h-7 text-xs"
                 />
-                <span className="text-xs text-muted-foreground">(Default: 15)</span>
+                <span className="text-xs text-muted-foreground">(default: 15)</span>
               </div>
             )}
             <ToggleRow
               id="pdf-monthly"
-              label="Monatlicher Verlauf"
-              description="Monat-für-Monat-Entwicklung der Stream-Einnahmen im Abrechnungszeitraum."
+              label="Monthly trend"
+              description="Month-by-month streaming revenue within the statement period."
               checked={settings.includeMonthlyBreakdown}
               onCheckedChange={v => patch({ includeMonthlyBreakdown: v })}
             />
             <ToggleRow
               id="pdf-cover"
-              label="E-Mail-Anschreiben als erste Seite"
-              description="Hängt den ausgefüllten E-Mail-Text als Deckblatt ans PDF."
+              label="Email cover letter as first page"
+              description="Prepends the filled email template as a cover page on the PDF."
               checked={settings.includeEmailCoverLetter}
               onCheckedChange={v => patch({ includeEmailCoverLetter: v })}
             />
             <ToggleRow
               id="pdf-pie-chart"
-              label="Umsatz-Kuchendiagramm"
-              description="Fügt ein Kuchendiagramm ein, das den Anteil jeder Umsatzkategorie zeigt."
+              label="Revenue pie chart"
+              description="Adds a pie chart showing the share of each revenue category."
               checked={settings.includePieChart ?? true}
               onCheckedChange={v => patch({ includePieChart: v })}
             />
