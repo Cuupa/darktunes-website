@@ -1,6 +1,6 @@
 /**
  * GET  /api/admin/sos/import-batches — list bronze import batches
- * POST /api/admin/sos/import-batches — register a bronze CSV import + presigned upload URL
+ * POST /api/admin/sos/import-batches — register a bronze CSV import (upload via [id]/upload)
  */
 
 import { randomUUID, createHash } from 'crypto'
@@ -14,8 +14,6 @@ import {
   listImportBatches,
 } from '@/lib/api/distributorImportBatches'
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
-import { createR2Client } from '@/lib/r2Utils'
-import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 async function requireAdminOrEditor() {
@@ -38,14 +36,6 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 })
 
 const MAX_REGISTRATION_BODY_BYTES = 16_384
-const BASE_UPLOAD_EXPIRY_SECONDS = 900
-const MAX_UPLOAD_EXPIRY_SECONDS = 3_600
-
-function uploadExpiryForFileSize(fileSizeBytes?: number): number {
-  if (!fileSizeBytes || fileSizeBytes <= 0) return BASE_UPLOAD_EXPIRY_SECONDS
-  const sizeMb = Math.ceil(fileSizeBytes / (1024 * 1024))
-  return Math.min(MAX_UPLOAD_EXPIRY_SECONDS, BASE_UPLOAD_EXPIRY_SECONDS + sizeMb * 60)
-}
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const { user } = await requireAdminOrEditor()
@@ -54,7 +44,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   if (rawBody.length > MAX_REGISTRATION_BODY_BYTES) {
     throw new ApiError(
       413,
-      'Registration payload too large. Upload the file directly to the presigned R2 URL; do not send file contents to this endpoint.',
+      'Registration payload too large. Send file bytes to /api/admin/sos/import-batches/[id]/upload instead.',
     )
   }
 
@@ -75,7 +65,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     filename,
     file_hash,
     row_count,
-    file_size,
   } = body
 
   if (!period_start || !period_end || !distributor || !filename) {
@@ -96,25 +85,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   const hashPrefix = file_hash?.slice(0, 12) ?? createHash('sha256').update(`${batchId}-${filename}`).digest('hex').slice(0, 12)
   const r2Key = `sos-imports/${batchId}/${hashPrefix}_${safeName}`
 
-  const { serverEnv } = await import('@/lib/env.server')
-  const s3 = createR2Client(
-    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
-    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-  )
-
-  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
-  const uploadUrl = await generatePresignedUploadUrl(
-    r2Key,
-    'text/csv; charset=utf-8',
-    {
-      getSignedUrl,
-      s3Client: s3,
-      bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
-    },
-    uploadExpiryForFileSize(file_size),
-  )
-
   await assertSettlementPeriodWritable(serviceSupabase, period_start, period_end)
 
   const batch = await createImportBatch(serviceSupabase, {
@@ -126,12 +96,5 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     uploadedBy: user.id,
   })
 
-  return NextResponse.json(
-    {
-      batch,
-      uploadUrl,
-      r2Key,
-    },
-    { status: 201 },
-  )
+  return NextResponse.json({ batch, r2Key }, { status: 201 })
 })

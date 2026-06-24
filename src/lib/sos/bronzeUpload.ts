@@ -1,7 +1,9 @@
 /**
- * Client-side Bronze layer upload: raw distributor CSV → R2 via presigned PUT.
- * Large files bypass Vercel's 4.5 MB body limit by uploading directly to R2.
+ * Client-side Bronze layer upload: raw distributor CSV → R2 via server-side API route.
+ * Avoids R2 CORS restrictions on browser PUT to r2.cloudflarestorage.com presigned URLs.
  */
+
+import { MAX_BRONZE_CSV_BYTES } from '@/lib/sos/bronzeUploadLimits'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
 const MAX_REGISTRATION_JSON_BYTES = 8_192
@@ -156,7 +158,6 @@ export async function uploadBronzeDistributorCsv(
 
     const registerJson = (await registerRes.json()) as {
       batch: { id: string; r2Key?: string }
-      uploadUrl?: string
       r2Key?: string
       duplicate?: boolean
     }
@@ -168,20 +169,40 @@ export async function uploadBronzeDistributorCsv(
       }
     }
 
-    const { batch, uploadUrl, r2Key } = registerJson
-    if (!batch?.id || !uploadUrl || !r2Key) {
+    const { batch, r2Key } = registerJson
+    if (!batch?.id || !r2Key) {
       console.error('[bronzeUpload] invalid register response')
       return null
     }
 
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: uploadBlob,
-      headers: { 'Content-Type': contentType },
+    if (uploadBlob.size > MAX_BRONZE_CSV_BYTES) {
+      console.error(
+        '[bronzeUpload] CSV exceeds server upload limit:',
+        uploadBlob.size,
+        'bytes (max',
+        MAX_BRONZE_CSV_BYTES,
+        ')',
+      )
+      await abandonBronzeImportBatch(batch.id)
+      return null
+    }
+
+    const uploadForm = new FormData()
+    uploadForm.append('file', uploadBlob, uploadFilename)
+
+    const uploadRes = await fetch(`/api/admin/sos/import-batches/${batch.id}/upload`, {
+      method: 'POST',
+      body: uploadForm,
     })
 
-    if (!putRes.ok) {
-      console.error('[bronzeUpload] R2 PUT failed:', putRes.status, putRes.statusText)
+    if (!uploadRes.ok) {
+      const uploadErr =
+        typeof uploadRes.json === 'function' ? await uploadRes.json().catch(() => ({})) : {}
+      const uploadMessage =
+        typeof uploadErr === 'object' && uploadErr && 'error' in uploadErr
+          ? String((uploadErr as { error: unknown }).error)
+          : uploadRes.statusText
+      console.error('[bronzeUpload] server upload failed:', uploadMessage)
       await abandonBronzeImportBatch(batch.id)
       return null
     }

@@ -30,17 +30,21 @@ describe('uploadBronzeDistributorCsv', () => {
     vi.unstubAllGlobals()
   })
 
-  it('abandons the batch when R2 PUT fails', async () => {
+  it('abandons the batch when server upload fails', async () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           batch: { id: 'batch-1' },
-          uploadUrl: 'https://r2.example/upload',
           r2Key: 'sos-imports/batch-1/file.csv',
         }),
       })
-      .mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Unavailable' })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Unavailable',
+        json: async () => ({ error: 'Service unavailable' }),
+      })
       .mockResolvedValueOnce({ ok: true })
 
     const result = await uploadBronzeDistributorCsv({
@@ -54,6 +58,8 @@ describe('uploadBronzeDistributorCsv', () => {
 
     expect(result).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/sos/import-batches/batch-1/upload')
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'POST' })
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/admin/sos/import-batches/batch-1')
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' })
   })
@@ -64,11 +70,10 @@ describe('uploadBronzeDistributorCsv', () => {
         ok: true,
         json: async () => ({
           batch: { id: 'batch-2' },
-          uploadUrl: 'https://r2.example/upload',
           r2Key: 'sos-imports/batch-2/file.csv',
         }),
       })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
       .mockResolvedValueOnce({ ok: false, status: 500 })
       .mockResolvedValueOnce({ ok: true })
 
@@ -94,11 +99,10 @@ describe('uploadBronzeDistributorCsv', () => {
         ok: true,
         json: async () => ({
           batch: { id: 'batch-3' },
-          uploadUrl: 'https://r2.example/upload',
           r2Key: 'sos-imports/batch-3/file.csv',
         }),
       })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
       .mockResolvedValueOnce({ ok: false, status: 500 })
       .mockResolvedValueOnce({ ok: false, status: 500 })
       .mockResolvedValueOnce({ ok: false, status: 500 })
