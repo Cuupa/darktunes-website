@@ -61,6 +61,8 @@
 - [ ] Spotify and YouTube iframes are blocked until consent is given
 - [ ] Accepting consent loads embedded players
 - [ ] Declining keeps embeds blocked indefinitely (until browser storage cleared)
+- [ ] Page views are NOT sent to `/api/page-events` until consent is accepted
+- [ ] Admin/portal/press routes are excluded from page-event tracking
 
 ## Internationalisation (i18n)
 - [ ] Language switch EN↔DE in header works and persists via NEXT_LOCALE cookie
@@ -85,6 +87,14 @@
 - [ ] PortalAccessGate shown for unlinked users (role=user)
 - [ ] Profile edit saves bio, photo uploads to R2
 - [ ] Feature-flagged modules hidden when flag is disabled
+- [ ] `/portal/analytics` tabs load (streaming, website, merch) when `artist.analytics` is enabled
+- [ ] Overview intelligence panel shows insights with working deep links
+
+## Analytics & SOS Persist
+- [ ] Accounting → Save to Portal persists territory metrics after CSV processing
+- [ ] Merch tab shows data after Shopify/Darkmerch CSV + Save to Portal
+- [ ] `/admin/analytics` Label Intelligence Hub loads (admin role only)
+- [ ] Website engagement appears after accepting cookies on public artist pages
 
 ## Journalist Dashboard
 - [ ] /press/login accessible, /press/dashboard/* redirects to login when unauthenticated

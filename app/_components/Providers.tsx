@@ -8,6 +8,7 @@ import { ConsentBanner } from '@/components/ConsentBanner'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { ThemeBroadcastListener } from '@/components/ThemeBroadcastListener'
 import { ErrorFallback } from '@/ErrorFallback'
+import { PageTracker } from '@/components/PageTracker'
 import type { Dictionary } from '@/i18n/types'
 
 interface ProvidersProps {
@@ -31,6 +32,7 @@ export function Providers({ children, consentDict }: ProvidersProps) {
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <LenisProvider>
+        <PageTracker />
         {children}
         <ConsentBanner dict={consentDict} />
         <PWAInstallPrompt />

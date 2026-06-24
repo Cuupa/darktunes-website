@@ -1,5 +1,6 @@
 import { persistSosAnalytics } from '@/lib/sos/persistSosAnalyticsAction'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
+import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
 
 export interface PersistAfterUploadContext {
@@ -7,6 +8,7 @@ export interface PersistAfterUploadContext {
   periodStart: string
   periodEnd: string
   territoryMetrics: TerritoryMetricRow[]
+  merchOrderRows?: MerchOrderRow[]
   labelArtists: LabelArtist[]
   revenues: ArtistRevenue[]
   bronzeBatchIds: string[]
@@ -20,8 +22,12 @@ export interface PersistAfterUploadContext {
 export async function persistAnalyticsAfterStatementUpload(
   ctx: PersistAfterUploadContext,
 ): Promise<void> {
+  const artistKey = ctx.artistName.trim().toLowerCase()
   const artistMetrics = ctx.territoryMetrics.filter(
-    (m) => m.artistName.trim().toLowerCase() === ctx.artistName.trim().toLowerCase(),
+    (m) => m.artistName.trim().toLowerCase() === artistKey,
+  )
+  const artistMerch = (ctx.merchOrderRows ?? []).filter(
+    (m) => m.artistName.trim().toLowerCase() === artistKey,
   )
   if (artistMetrics.length === 0) return
 
@@ -41,6 +47,7 @@ export async function persistAnalyticsAfterStatementUpload(
     periodEnd: ctx.periodEnd,
     batchIds,
     territoryMetrics: artistMetrics,
+    merchOrderRows: artistMerch.length > 0 ? artistMerch : undefined,
     labelArtists: ctx.labelArtists.map((la) => ({
       name: la.name,
       artistId: la.artistId,

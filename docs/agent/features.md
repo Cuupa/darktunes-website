@@ -46,11 +46,11 @@ Enterprise settlement lifecycle for SOS statements and artist invoices. Admin UI
 
 **CSP:** `src/lib/security/contentSecurityPolicy.ts` is the single source of truth (imported by `next.config.ts`). `connect-src` must include `https://*.r2.cloudflarestorage.com` for browser-side R2 presigned uploads.
 
-Portal Analytics page (`app/portal/analytics/page.tsx`) has two tabs:
-  - **Streaming** tab: monthly stream counts from `streaming_stats`, rendered by `StreamingChart` / `StreamingChartInner` using Recharts.
-  - **Einnahmen** (Earnings) tab: royalty earnings from `sales_statements`, rendered by `EarningsChart` / `EarningsChartInner`. Shows KPI cards (total earned, last payout, pending count) and a bar chart of `amount_eur` per `period`. The default tab can be pre-selected via the `?tab=earnings` query param.
-  Both charts are loaded lazily via `next/dynamic` (`ssr: false`) to exclude Recharts from the initial bundle.
-  Data fetch follows IoC: the Server Component fetches both `getStreamingStatsByArtistId` and `getSalesStatementsByArtistId` in parallel (`Promise.all`) and passes results as props to the leaf client components.
+Portal Analytics page (`app/portal/analytics/page.tsx`) — tabs: Streaming, Listeners, Territories, Events (concert + **promo impact** from `promo_impact`), Earnings, Releases, Revenue Mix, EPK & Press, **Settlement** (`artist_settlement_ledger` read-only), **Website** (`page_events`), **Merch** (`merch_orders`). Promo impact precomputed in `src/lib/analytics/promoImpactCompute.ts` on SOS persist. Merch orders normalised in the SOS worker (`buildMerchOrderRows`) and upserted on persist. Overview (`/portal`) shows **Intelligence** panel via `src/lib/analytics/overviewInsights.ts`. Auto-insights in `src/lib/analytics/insights.ts`.
+
+**Website tracking (consent-gated):** `PageTracker` in `Providers.tsx` fires `page_view` / `news_view` when `darktunes_consent=accepted`. Shop clicks from roster + artist detail pages (`trackShopClick`). Smart-link clicks from artist `smartLinks` and release Odesli hubs (`trackSmartLinkClick`). `POST /api/page-events` (rate-limited, service-role insert, slug → artist/news resolution). Skips `/admin`, `/portal`, `/press`, `/editor`.
+
+Admin Label Analytics (`app/admin/analytics/page.tsx`, admin-only): persistent **Label Intelligence Hub** — roster health matrix, `sos_period_summaries` trends, press download CRM, **website engagement** (`page_events` label rollup), and `financial_audit_events` viewer. Nav entry under MANAGEMENT in `AdminSidebarNav`.
 
 ## Document Vault
 

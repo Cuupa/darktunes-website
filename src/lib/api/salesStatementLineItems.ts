@@ -78,3 +78,57 @@ export async function getLineItemsByStatementId(
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => rowToLineItem(row as Row))
 }
+
+export interface ArtistLineItemWithContext extends SalesStatementLineItem {
+  periodStart: string | undefined
+  periodEnd: string | undefined
+  releaseTitle: string | undefined
+  releaseIsrc: string | undefined
+}
+
+/**
+ * All SOS line items for an artist (via sales_statements), with release metadata.
+ */
+export async function getLineItemsByArtistId(
+  db: DbClient,
+  artistId: string,
+): Promise<ArtistLineItemWithContext[]> {
+  const { data: statements, error: stmtError } = await db
+    .from('sales_statements')
+    .select('id, period_start, period_end')
+    .eq('artist_id', artistId)
+
+  if (stmtError) throw new Error(stmtError.message)
+  if (!statements?.length) return []
+
+  const periodByStatement = new Map(
+    statements.map((s) => [
+      s.id,
+      { periodStart: s.period_start ?? undefined, periodEnd: s.period_end ?? undefined },
+    ]),
+  )
+  const statementIds = statements.map((s) => s.id)
+
+  const { data, error } = await db
+    .from('sales_statement_line_items')
+    .select('*, releases(title, isrc)')
+    .in('statement_id', statementIds)
+    .order('revenue_eur', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((raw) => {
+    const row = raw as Row & {
+      releases: { title: string; isrc: string | null } | null
+    }
+    const period = periodByStatement.get(row.statement_id)
+    const base = rowToLineItem(row)
+    return {
+      ...base,
+      periodStart: period?.periodStart,
+      periodEnd: period?.periodEnd,
+      releaseTitle: row.releases?.title ?? undefined,
+      releaseIsrc: row.releases?.isrc ?? undefined,
+    }
+  })
+}

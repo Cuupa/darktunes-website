@@ -12,7 +12,7 @@ Impressum & Datenschutz pages specifically: both pages use `unstable_cache` to f
 ## Data Access Layer (DAL)
 
 Data Access Layer (DAL)
-All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressKit.ts, promoTracks.ts, journalistApplications.ts). Press photo reads/writes use `assets` + `press_kit_items` via `pressKit.ts` (the legacy `press_photos` table exists in `reset.sql` for idempotent backfill only — no application DAL).
+All database queries live in `src/lib/api/` — one file per table (artists.ts, releases.ts, news.ts, videos.ts, assets.ts, artistAssets.ts, labelMessages.ts, artistReplies.ts, siteSettings.ts, artistProfiles.ts, streamingStats.ts, salesStatements.ts, newsletter.ts, pressKit.ts, promoTracks.ts, journalistApplications.ts, pageEvents.ts, merchOrders.ts, labelAnalytics.ts, promoImpact.ts, settlementLedger.ts, sosPeriodSummaries.ts, …). Press photo reads/writes use `assets` + `press_kit_items` via `pressKit.ts` (the legacy `press_photos` table exists in `reset.sql` for idempotent backfill only — no application DAL).
 Every DAL function receives `SupabaseClient<Database>` as its first argument. Never import the global `supabase` singleton inside a DAL file.
 DAL functions throw `new Error(error.message)` when Supabase returns an error. For `.single()` queries, error code `PGRST116` (not found) returns `null` instead of throwing.
 Row-to-domain mappers: Use `rowTo*` functions to convert snake_case DB rows to camelCase domain types. Nullables map to `undefined` (optional fields) or `''` (required string fields) using `?? undefined` / `?? ''`.
@@ -156,4 +156,21 @@ Supabase Read Replica Client
 `src/lib/supabase/replica.ts` exports `createReplicaSupabaseClient()`.
 When `SUPABASE_REPLICA_URL` and `SUPABASE_REPLICA_ANON_KEY` are set (Supabase Pro plan, configure via Dashboard → Database → Replicas), this client is used for read-heavy queries: portal analytics charts, admin health dashboard, admin logs, SOS CSV exports. Falls back silently to the primary DB via `createBrowserSupabaseClient()` / `createServerSupabaseClient()` when env vars are unset — safe for all environments.
 Never use the replica client for write operations (INSERT/UPDATE/DELETE) — it is read-only. Never use it inside `unstable_cache` callbacks (use the cookie-free anon client there instead).
+
+## Analytics Gold Layer
+
+Precomputed or normalised analytics tables (all in `supabase/reset.sql`, RLS: artist read own + admin/editor all):
+
+| Table | Source | Persist path |
+|---|---|---|
+| `artist_territory_metrics` | SOS territory rollups | Accounting → Save to Portal |
+| `streaming_stats` | Derived from territory metrics | Same persist |
+| `sos_period_summaries` | SOS period totals | Same persist (optional) |
+| `event_impact` | Concert ↔ stream correlation | Recomputed on persist |
+| `promo_impact` | Promo log ↔ stream correlation | Recomputed on persist |
+| `merch_orders` | Shopify/Darkmerch line items | Worker `buildMerchOrderRows` → persist |
+| `page_events` | Public site navigation | `POST /api/page-events` (service role, consent-gated) |
+| `epk_download_events` | EPK PDF exports | Export routes (fire-and-forget) |
+
+Portal analytics (`/portal/analytics`) reads via authenticated `createServerSupabaseClient()` — not the read replica — so RLS artist scoping is correct.
 

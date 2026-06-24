@@ -8,11 +8,11 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 ## 🎵 Features
 
 - **Public site** – Hero, Releases (iTunes sync), Artists, Videos, News, Tour dates, Spotify Player
-- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, legacy EPK presets + canvas EPK Builder at `/portal/epk-builder` with server PDF export, share links, download analytics, and admin starter templates, streaming analytics, release submission + checklist, video submission, tour manager, marketing assets, document vault, label inbox with rich-text replies + realtime updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, interview requests, onboarding wizard, calendar, help FAQ, account settings)
+- **Artist Portal** – Secure multi-tenant dashboard at `/portal` for signed-in artists (responsive mobile sidebar, legacy EPK presets + canvas EPK Builder at `/portal/epk-builder` with server PDF export, share links, download analytics, and admin starter templates, **enterprise analytics** at `/portal/analytics` — streaming, territories, releases, revenue mix, EPK & press, settlement ledger, website engagement, merch orders — plus overview intelligence hub, release submission + checklist, video submission, tour manager, marketing assets, document vault, label inbox with rich-text replies + realtime updates, billing profile management, SOS statement downloads, SOS-linked invoice creation, interview requests, onboarding wizard, calendar, help FAQ, account settings)
 - **Internationalisation (i18n)** – EN/DE support via custom dictionary pattern (`src/i18n/`), locale auto-detected from `Accept-Language` header, locale switcher in Header
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
-- **Admin panel** – full CMS at `/admin` (sidebar navigation with dedicated pages for artists, releases, news, videos, assets, events, messages, accreditations, promo log, release submissions, video submissions, accounting/SOS generator, system/health/logs, color theme, features, settings, users)
+- **Admin panel** – full CMS at `/admin` (sidebar navigation with dedicated pages for artists, releases, news, videos, assets, events, messages, accreditations, promo log, release submissions, video submissions, accounting/SOS generator, **label analytics hub** at `/admin/analytics`, system/health/logs, color theme, features, settings, users)
 - **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Odesli), R2 cover art caching, and Supabase upsert via async sync queue (`sync_queue` table, processed every 5 min by Vercel cron)
 - **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; Vercel cron can trigger daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
@@ -233,7 +233,7 @@ app/                          # Next.js App Router entry points
 ├── globals.css               # Global CSS / Tailwind v4 theme
 ├── _components/              # App-level client wrappers
 │   ├── HomePageContent.tsx   # "use client" home page shell (receives data as props)
-│   └── Providers.tsx         # Lenis + Toaster + ErrorBoundary (client)
+│   └── Providers.tsx         # Lenis + PageTracker + Consent + Toaster + ErrorBoundary (client)
 ├── admin/                    # Protected admin routes — each feature has a dedicated page
 │   ├── layout.tsx            # Admin route layout (sidebar + auth gate)
 │   ├── page.tsx              # Admin overview (redirect to first tab)
@@ -249,7 +249,8 @@ app/                          # Next.js App Router entry points
 │   ├── promo-log/            # Promo activity timeline
 │   ├── release-submissions/  # Review + approve artist release submissions
 │   ├── video-submissions/    # Review + approve artist video submissions
-│   ├── accounting/           # SOS generator + statement history
+│   ├── accounting/           # SOS generator + statement history + portal analytics persist
+│   ├── analytics/            # Label Intelligence Hub (roster, trends, press, website engagement)
 │   ├── statements/           # (legacy — redirects to accounting)
 │   ├── system/               # Health dashboard, Logs, Media, Maintenance
 │   ├── press/                # Press portal management (photos, promo tracks, applications)
@@ -263,7 +264,7 @@ app/                          # Next.js App Router entry points
 │   ├── login/page.tsx        # Artist portal login
 │   ├── onboarding/           # First-run onboarding wizard
 │   ├── profile/              # EPK profile editor + PDF export
-│   ├── analytics/            # Streaming analytics + earnings charts
+│   ├── analytics/            # Enterprise analytics (11 tabs: streaming → merch)
 │   ├── releases/             # Release management + checklist + submission form
 │   │   ├── new/              # Submit new release
 │   │   ├── submissions/      # Track own submission status
@@ -311,6 +312,7 @@ app/                          # Next.js App Router entry points
     ├── health/route.ts                    # Health check endpoint
     ├── log-error/route.ts                 # Client-side error reporting (app_logs)
     ├── vitals/route.ts                    # Core Web Vitals RUM ingestion
+    ├── page-events/route.ts             # Consent-gated website engagement (rate-limited)
     ├── journalist-applications/           # Journalist application CRUD
     ├── account/                           # Account export + deletion (GDPR)
     ├── upload-epk/route.ts                # Presigned EPK promo-track upload (R2)
@@ -368,6 +370,9 @@ src/
 │   ├── api/                  # Data Access Layer — one file per DB table
 │   │   ├── artistProfiles.ts # EPK profile DAL + resolvePortalArtist
 │   │   ├── streamingStats.ts # Streaming stats DAL
+│   │   ├── pageEvents.ts     # Website engagement DAL
+│   │   ├── merchOrders.ts    # Normalised merch order DAL
+│   │   ├── labelAnalytics.ts # Admin label intelligence DAL
 │   │   ├── salesStatements.ts# Royalty statements DAL
 │   │   ├── artistDocuments.ts# Document Vault DAL
 │   │   └── artistRowMapper.ts# Shared ArtistRow → Artist domain mapper

@@ -18,6 +18,7 @@ import {
   TiktokLogo,
   MusicNote,
   ShoppingBag,
+  LinkSimple,
   MapPin,
   Calendar,
   Ticket,
@@ -34,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
 import type { Dictionary, Locale } from '@/i18n/types'
+import { trackShopClick, trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
@@ -324,12 +326,32 @@ export function ArtistDetailContent({
                 })()}
                 {artist.shopUrl && (
                   <Button asChild size="sm" className="bg-secondary hover:bg-secondary/90 text-white font-semibold">
-                    <a href={artist.shopUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={artist.shopUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackShopClick(artist.id, `/artists/${artist.slug}`)}
+                    >
                       <ShoppingBag size={18} weight="fill" className="mr-2" aria-hidden="true" />
                       {dict.shopMerch}
                     </a>
                   </Button>
                 )}
+                {(artist.smartLinks ?? []).map((link) => (
+                  link.url ? (
+                    <Button key={`${link.label}-${link.url}`} asChild size="sm" variant="outline">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => trackSmartLinkClick(artist.id, `/artists/${artist.slug}`)}
+                      >
+                        <LinkSimple size={16} weight="bold" className="mr-2" aria-hidden="true" />
+                        {link.label || link.url}
+                      </a>
+                    </Button>
+                  ) : null
+                ))}
               </div>
 
               {/* Social links */}

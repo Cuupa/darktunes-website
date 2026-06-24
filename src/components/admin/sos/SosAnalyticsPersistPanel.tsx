@@ -6,12 +6,14 @@ import { CloudArrowUp } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { persistSosAnalytics } from '@/lib/sos/persistSosAnalyticsAction'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
+import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
 
 interface SosAnalyticsPersistPanelProps {
   periodStart: string
   periodEnd: string
   territoryMetrics: TerritoryMetricRow[]
+  merchOrderRows?: MerchOrderRow[]
   labelArtists: LabelArtist[]
   revenues?: ArtistRevenue[]
   bronzeBatchIds?: string[]
@@ -22,6 +24,7 @@ export function SosAnalyticsPersistPanel({
   periodStart,
   periodEnd,
   territoryMetrics,
+  merchOrderRows = [],
   labelArtists,
   revenues = [],
   bronzeBatchIds = [],
@@ -54,6 +57,7 @@ export function SosAnalyticsPersistPanel({
         periodEnd,
         batchIds: bronzeBatchIds,
         territoryMetrics,
+        merchOrderRows,
         labelArtists: labelArtists.map((la) => ({
           name: la.name,
           artistId: la.artistId,
@@ -66,12 +70,21 @@ export function SosAnalyticsPersistPanel({
           result.eventImpactRows != null && result.eventImpactRows > 0
             ? ` · ${result.eventImpactRows} event-impact rows`
             : ''
+        const merchNote =
+          result.merchOrdersUpserted != null && result.merchOrdersUpserted > 0
+            ? ` · ${result.merchOrdersUpserted} merch orders`
+            : ''
         toast.success(
-          `Analytics saved: ${result.metricsUpserted ?? 0} metrics for ${result.artistsProcessed ?? 0} artists${impactNote}`,
+          `Analytics saved: ${result.metricsUpserted ?? 0} metrics for ${result.artistsProcessed ?? 0} artists${impactNote}${merchNote}`,
         )
         if (result.eventImpactWarnings?.length) {
           toast.warning('Event impact partially failed', {
             description: result.eventImpactWarnings.join('; '),
+          })
+        }
+        if (result.promoImpactWarnings?.length) {
+          toast.warning('Promo impact partially failed', {
+            description: result.promoImpactWarnings.join('; '),
           })
         }
       } else {
@@ -85,7 +98,7 @@ export function SosAnalyticsPersistPanel({
       <div>
         <p className="text-sm font-medium">Portal Analytics</p>
         <p className="text-xs text-muted-foreground">
-          Persist territory metrics, period summary, and event correlations for linked artists ({territoryMetrics.length} rows).
+          Persist territory metrics, merch orders, period summary, and correlations for linked artists ({territoryMetrics.length} metric rows, {merchOrderRows.length} merch rows).
           {bronzeBatchIds.length > 0 && (
             <> {bronzeBatchIds.length} Bronze CSV archive{bronzeBatchIds.length === 1 ? '' : 's'} linked.</>
           )}

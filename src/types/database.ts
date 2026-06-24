@@ -1465,6 +1465,126 @@ export interface Database {
         }
         Relationships: []
       }
+      promo_impact: {
+        Row: {
+          id: string
+          promo_log_id: string
+          artist_id: string
+          window_days: number
+          streams_before: number
+          streams_after: number
+          delta_streams: number
+          delta_pct: number
+          revenue_before: number
+          revenue_after: number
+          calculated_at: string
+        }
+        Insert: {
+          id?: string
+          promo_log_id: string
+          artist_id: string
+          window_days?: number
+          streams_before?: number
+          streams_after?: number
+          delta_streams?: number
+          delta_pct?: number
+          revenue_before?: number
+          revenue_after?: number
+          calculated_at?: string
+        }
+        Update: {
+          id?: string
+          promo_log_id?: string
+          artist_id?: string
+          window_days?: number
+          streams_before?: number
+          streams_after?: number
+          delta_streams?: number
+          delta_pct?: number
+          revenue_before?: number
+          revenue_after?: number
+          calculated_at?: string
+        }
+        Relationships: []
+      }
+      page_events: {
+        Row: {
+          id: string
+          event_type: 'page_view' | 'shop_click' | 'smart_link_click' | 'news_view'
+          path: string
+          artist_id: string | null
+          news_post_id: string | null
+          release_id: string | null
+          referrer_host: string | null
+          session_hash: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: 'page_view' | 'shop_click' | 'smart_link_click' | 'news_view'
+          path: string
+          artist_id?: string | null
+          news_post_id?: string | null
+          release_id?: string | null
+          referrer_host?: string | null
+          session_hash?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: 'page_view' | 'shop_click' | 'smart_link_click' | 'news_view'
+          path?: string
+          artist_id?: string | null
+          news_post_id?: string | null
+          release_id?: string | null
+          referrer_host?: string | null
+          session_hash?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      merch_orders: {
+        Row: {
+          id: string
+          artist_id: string
+          source: 'shopify' | 'darkmerch'
+          external_id: string
+          period: string
+          product_title: string
+          country: string
+          quantity: number
+          revenue_eur: number
+          source_batch_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          source: 'shopify' | 'darkmerch'
+          external_id: string
+          period: string
+          product_title?: string
+          country?: string
+          quantity?: number
+          revenue_eur?: number
+          source_batch_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          source?: 'shopify' | 'darkmerch'
+          external_id?: string
+          period?: string
+          product_title?: string
+          country?: string
+          quantity?: number
+          revenue_eur?: number
+          source_batch_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       releases: {
         Row: {
           id: string

@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Dictionary } from '@/i18n/types'
 import type { CompletionField } from '@/lib/portal/profileCompletion'
+import type { OverviewInsight } from '@/lib/analytics/overviewInsights'
+import { PortalIntelligencePanel } from './PortalIntelligencePanel'
 import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalOverviewProps {
@@ -28,6 +30,7 @@ interface PortalOverviewProps {
   featureFlags: Record<string, boolean>
   completionScore: number
   missingFields: CompletionField[]
+  overviewInsights: OverviewInsight[]
 }
 
 export function PortalOverview({
@@ -43,6 +46,7 @@ export function PortalOverview({
   featureFlags,
   completionScore,
   missingFields,
+  overviewInsights,
 }: PortalOverviewProps) {
   const isEnabled = (id: string) => featureFlags[id] ?? true
   const { unreadCount } = useUnreadMessages()
@@ -70,6 +74,10 @@ export function PortalOverview({
           )}
         </div>
       </div>
+
+      {overviewInsights.length > 0 && (
+        <PortalIntelligencePanel dict={dict} insights={overviewInsights} />
+      )}
 
       {/* Profile Completion Card — hidden when 100% complete */}
       {completionScore < 100 && (

@@ -42,3 +42,43 @@ export async function listFinancialAuditEvents(
   if (error) throw new Error(error.message)
   return data ?? []
 }
+
+export interface FinancialAuditEvent {
+  id: string
+  entityType: string
+  entityId: string
+  action: string
+  actorId: string | null
+  beforeData: Record<string, unknown> | null
+  afterData: Record<string, unknown> | null
+  createdAt: string
+}
+
+function rowToEvent(
+  row: Database['public']['Tables']['financial_audit_events']['Row'],
+): FinancialAuditEvent {
+  return {
+    id: row.id,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    action: row.action,
+    actorId: row.actor_id,
+    beforeData: row.before_data as Record<string, unknown> | null,
+    afterData: row.after_data as Record<string, unknown> | null,
+    createdAt: row.created_at,
+  }
+}
+
+export async function listRecentFinancialAuditEvents(
+  db: DbClient,
+  limit = 100,
+): Promise<FinancialAuditEvent[]> {
+  const { data, error } = await db
+    .from('financial_audit_events')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToEvent)
+}

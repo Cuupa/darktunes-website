@@ -19,6 +19,7 @@ import {
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { getSquareThumbnail } from '@/lib/imageUtils'
+import { trackShopClick } from '@/lib/analytics/trackPageEvent'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import type { Artist } from '@/types'
 import type { Dictionary } from '@/i18n/types'
@@ -261,6 +262,7 @@ export function Artists({ artists, dict }: ArtistsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${artist.name} merch shop`}
+                          onClick={() => trackShopClick(artist.id, `/artists/${artist.slug}`)}
                           className="pointer-events-auto p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-secondary hover:text-white transition-all hover:scale-110"
                         >
                           <ShoppingBag size={20} weight="fill" aria-hidden="true" />

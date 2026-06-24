@@ -103,6 +103,39 @@ export function sumLedgerBalance(entries: LedgerEntry[]): number {
   return entries.reduce((sum, entry) => sum + entry.amountEur, 0)
 }
 
+export interface ArtistSettlementSummary {
+  balanceEur: number
+  recentEntries: LedgerEntry[]
+  latestCarryForwardEur: number | null
+}
+
+export async function getArtistSettlementSummary(
+  db: DbClient,
+  artistId: string,
+): Promise<ArtistSettlementSummary> {
+  const [entries, carryRes] = await Promise.all([
+    getLedgerEntriesForArtist(db, artistId),
+    db
+      .from('period_carry_forwards')
+      .select('opening_balance_eur')
+      .eq('artist_id', artistId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (carryRes.error) throw new Error(carryRes.error.message)
+
+  return {
+    balanceEur: sumLedgerBalance(entries),
+    recentEntries: [...entries].reverse().slice(0, 25),
+    latestCarryForwardEur:
+      carryRes.data?.opening_balance_eur != null
+        ? Number(carryRes.data.opening_balance_eur)
+        : null,
+  }
+}
+
 export async function getArtistOutstandingBalance(
   db: DbClient,
   artistId: string,

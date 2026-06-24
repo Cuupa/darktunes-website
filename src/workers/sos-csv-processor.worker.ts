@@ -45,6 +45,7 @@ import {
   aggregateTerritoryMetrics,
 } from '../lib/sos/data-processor'
 import type { TerritoryMetricRow } from '../lib/sos/data-processor'
+import { buildMerchOrderRows, type MerchOrderRow } from '../lib/sos/merchOrderRows'
 import { buildArtistCollabTree } from '../lib/sos/grouping'
 import type { SalesTransaction } from '../lib/sos/ingest/csv-parser'
 import { extractFeaturedArtistsDetailed } from '../lib/sos/ingest/csv-parser'
@@ -138,6 +139,8 @@ export interface WorkerResult {
   releaseTitlesByArtistIncFeaturing: Record<string, string[]>
   /** Monthly territory metrics — serialisable gold-layer facts for analytics. */
   territoryMetrics: TerritoryMetricRow[]
+  /** Normalised merch line items for portal merch analytics. */
+  merchOrderRows: MerchOrderRow[]
 }
 
 export type WorkerRequest =
@@ -257,6 +260,7 @@ function runProcess(config: WorkerProcessConfig): void {
           totalGrossAllData: 0,
           releaseTitlesByArtistIncFeaturing: {},
           territoryMetrics: [],
+          merchOrderRows: [],
         },
       })
       return
@@ -318,6 +322,8 @@ function runProcess(config: WorkerProcessConfig): void {
       config.historicalExchangeRates,
     )
 
+    const merchOrderRows = buildMerchOrderRows(allTransactions)
+
     // Raw transaction arrays and the full ProcessedArtistData (with .transactions)
     // are now only in local scope and will be garbage-collected once this
     // function returns — they are NEVER sent to the main thread.
@@ -334,6 +340,7 @@ function runProcess(config: WorkerProcessConfig): void {
         totalGrossAllData,
         releaseTitlesByArtistIncFeaturing,
         territoryMetrics,
+        merchOrderRows,
       },
     })
   } catch (err) {

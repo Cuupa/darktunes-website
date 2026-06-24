@@ -26,6 +26,8 @@ dist-ssr
 
 .env
 **/agent-eval-report*
+agent-tools/
+mcps/
 packages
 pids
 .file-manifest
