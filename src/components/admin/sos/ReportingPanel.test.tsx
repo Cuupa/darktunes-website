@@ -1,8 +1,8 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReportingPanel } from './ReportingPanel'
-import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
+import type { ArtistRevenue } from '@/lib/sos/types'
 
 vi.mock('@/components/ui/button', () => ({
   Button: ({ children, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
@@ -23,6 +23,12 @@ vi.mock('@/components/ui/checkbox', () => ({
       {...props}
     />
   ),
+}))
+
+vi.mock('@/components/ui/alert', () => ({
+  Alert: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }))
 
 function makeRevenue(artist: string): ArtistRevenue {
@@ -51,61 +57,41 @@ function makeRevenue(artist: string): ArtistRevenue {
   }
 }
 
-describe('ReportingPanel publish actions', () => {
+describe('ReportingPanel release workflow CTA', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('shows row-level publish only for linked artists', () => {
-    const labelArtists: LabelArtist[] = [
-      { id: '1', name: 'Linked Artist', artistId: '123e4567-e89b-12d3-a456-426614174000' },
-      { id: '2', name: 'Unlinked Artist' },
-    ]
+  it('shows the release workflow banner when callback is provided', () => {
+    const onGoToReleaseWorkflow = vi.fn()
 
     render(
       <ReportingPanel
-        revenues={[makeRevenue('Linked Artist'), makeRevenue('Unlinked Artist')]}
+        revenues={[makeRevenue('Artist A')]}
         onDownloadPDF={vi.fn()}
         onDownloadExcel={vi.fn()}
         onDownloadAll={vi.fn()}
         onDownloadSelected={vi.fn()}
-        onPublishToPortal={vi.fn().mockResolvedValue(undefined)}
-        labelArtists={labelArtists}
-      />
+        onGoToReleaseWorkflow={onGoToReleaseWorkflow}
+      />,
     )
 
-    expect(screen.getAllByRole('button', { name: 'Publish' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /Open Release Workflow/i }))
+    expect(onGoToReleaseWorkflow).toHaveBeenCalledTimes(1)
   })
 
-  it('publishes selected artists sequentially from toolbar action', async () => {
-    const publishMock = vi.fn().mockResolvedValue(undefined)
-
+  it('does not render publish buttons anymore', () => {
     render(
       <ReportingPanel
-        revenues={[makeRevenue('Artist A'), makeRevenue('Artist B')]}
+        revenues={[makeRevenue('Artist A')]}
         onDownloadPDF={vi.fn()}
         onDownloadExcel={vi.fn()}
         onDownloadAll={vi.fn()}
         onDownloadSelected={vi.fn()}
-        onPublishToPortal={publishMock}
-        labelArtists={[
-          { id: '1', name: 'Artist A', artistId: '123e4567-e89b-12d3-a456-426614174000' },
-          { id: '2', name: 'Artist B' },
-        ]}
-      />
+      />,
     )
 
-    const publishSelectedButton = screen.getByRole('button', { name: 'Publish Selected' })
-    expect(publishSelectedButton).toBeDisabled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Select All' }))
-    expect(publishSelectedButton).not.toBeDisabled()
-
-    fireEvent.click(publishSelectedButton)
-
-    await waitFor(() => {
-      expect(publishMock).toHaveBeenNthCalledWith(1, 'Artist A')
-      expect(publishMock).toHaveBeenNthCalledWith(2, 'Artist B')
-    })
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Publish Selected/i })).not.toBeInTheDocument()
   })
 })

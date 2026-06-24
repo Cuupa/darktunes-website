@@ -6,7 +6,7 @@ const MOCK_REQUEST = new NextRequest('http://localhost/api/health')
 
 const SAMPLE_LOG_ROW = {
   api_source: 'itunes',
-  created_at: '2026-06-23T10:00:00.000Z',
+  created_at: new Date(Date.now() - 60_000).toISOString(),
   status: 'success',
   rate_limited: false,
   errors: [],

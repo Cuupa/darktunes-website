@@ -10,10 +10,11 @@ import {
   Table,
   Archive,
   MagnifyingGlass,
-  CircleNotch,
   EnvelopeSimple,
-  PaperPlaneTilt,
+  SealCheck,
+  ArrowRight,
 } from '@phosphor-icons/react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig } from '@/lib/sos/types'
 import { buildMailtoLink } from '@/lib/sos/utils'
@@ -30,7 +31,7 @@ interface ReportingPanelProps {
   emailConfig?: Partial<EmailConfig>
   periodStart?: string
   periodEnd?: string
-  onPublishToPortal?: (artist: string) => Promise<void>
+  onGoToReleaseWorkflow?: () => void
 }
 
 function fmtEur(value: number) {
@@ -70,11 +71,9 @@ export function ReportingPanel({
   emailConfig,
   periodStart,
   periodEnd,
-  onPublishToPortal,
+  onGoToReleaseWorkflow,
 }: ReportingPanelProps) {
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
-  const [publishingArtists, setPublishingArtists] = useState<Set<string>>(new Set())
-  const [isPublishingSelected, setIsPublishingSelected] = useState(false)
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
 
@@ -107,14 +106,6 @@ export function ReportingPanel({
     },
     [labelArtists, labelInfo, appDefaults, emailConfig, period]
   )
-
-  const artistInfoMap = useMemo(() => {
-    const map = new Map<string, LabelArtist>()
-    for (const artist of labelArtists) {
-      map.set(artist.name.toLowerCase(), artist)
-    }
-    return map
-  }, [labelArtists])
 
   const [colOrder, setColOrder] = useState<ColId[]>(INITIAL_COLUMNS.map(c => c.id))
   const [colWidths, setColWidths] = useState<Record<ColId, number>>(
@@ -197,43 +188,29 @@ export function ReportingPanel({
 
   function exportSelected() { onDownloadSelected(Array.from(selectedArtists)) }
 
-  const publishArtist = useCallback(
-    async (artist: string) => {
-      if (!onPublishToPortal) return
-      setPublishingArtists(prev => new Set(prev).add(artist))
-      try {
-        await onPublishToPortal(artist)
-      } finally {
-        setPublishingArtists(prev => {
-          const next = new Set(prev)
-          next.delete(artist)
-          return next
-        })
-      }
-    },
-    [onPublishToPortal]
-  )
-
-  const publishSelected = useCallback(
-    async () => {
-      if (!onPublishToPortal || selectedArtists.size === 0) return
-      setIsPublishingSelected(true)
-      try {
-        for (const artist of selectedArtists) {
-          await publishArtist(artist)
-        }
-      } finally {
-        setIsPublishingSelected(false)
-      }
-    },
-    [onPublishToPortal, publishArtist, selectedArtists]
-  )
-
   const selectedCount = selectedArtists.size
   const orderedCols = colOrder.map(id => INITIAL_COLUMNS.find(c => c.id === id)!).filter(Boolean)
 
   return (
     <div className="flex flex-col h-full">
+      {onGoToReleaseWorkflow && (
+        <div className="px-6 pt-4">
+          <Alert className="border-primary/30 bg-primary/5">
+            <SealCheck size={16} className="text-primary" />
+            <AlertTitle className="text-sm">Use the Release Workflow for portal publishing</AlertTitle>
+            <AlertDescription className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Review payouts here, then move to Release Workflow to create draft statements, approve them, and notify artists.
+              </span>
+              <Button size="sm" className="gap-1.5 shrink-0" onClick={onGoToReleaseWorkflow}>
+                Open Release Workflow
+                <ArrowRight size={14} />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-white/10 bg-card/60 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
@@ -249,16 +226,6 @@ export function ReportingPanel({
           <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={selectedCount === 0} onClick={exportSelected}>
             <Archive size={14} />
             Export Selected to ZIP
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 text-xs"
-            disabled={selectedCount === 0 || !onPublishToPortal || isPublishingSelected}
-            onClick={() => void publishSelected()}
-          >
-            {isPublishingSelected ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
-            Publish Selected
           </Button>
           <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={revenues.length === 0} onClick={onDownloadAll}>
             <DownloadSimple size={14} />
@@ -387,23 +354,6 @@ export function ReportingPanel({
                     })}
                     <td className="py-3 text-right px-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        {onPublishToPortal && !!artistInfoMap.get(r.artist.toLowerCase())?.artistId?.trim() && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 gap-1 text-xs"
-                            onClick={() => void publishArtist(r.artist)}
-                            title={`Publish statement for ${r.artist}`}
-                            disabled={publishingArtists.has(r.artist)}
-                          >
-                            {publishingArtists.has(r.artist) ? (
-                              <CircleNotch size={13} className="animate-spin" />
-                            ) : (
-                              <PaperPlaneTilt size={13} />
-                            )}
-                            Publish
-                          </Button>
-                        )}
                         {labelInfo?.emailTemplate && (
                           <Button size="sm" variant="ghost" className="h-7 px-2 gap-1 text-xs" onClick={() => handleSendEmail(r)} title={`Send e-mail to ${r.artist}`}>
                             <EnvelopeSimple size={13} />

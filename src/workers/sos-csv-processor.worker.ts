@@ -113,6 +113,8 @@ export interface WorkerProcessConfig {
    * single owner artist.  Forwarded unchanged to the data-processor pipeline.
    */
   trackRevenueAssignments?: TrackRevenueAssignment[]
+  /** Opening balances from prior settlement period, keyed by artist name. */
+  carryForwardByArtist?: Record<string, number>
 }
 
 export interface WorkerResult {

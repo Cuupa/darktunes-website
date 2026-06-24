@@ -112,6 +112,189 @@ export interface Database {
         }
         Relationships: []
       }
+      settlement_periods: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          label: string
+          status: 'open' | 'under_review' | 'approved' | 'locked' | 'archived'
+          notes: string | null
+          locked_at: string | null
+          locked_by: string | null
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          label: string
+          status?: 'open' | 'under_review' | 'approved' | 'locked' | 'archived'
+          notes?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          label?: string
+          status?: 'open' | 'under_review' | 'approved' | 'locked' | 'archived'
+          notes?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      artist_settlement_ledger: {
+        Row: {
+          id: string
+          artist_id: string
+          settlement_period_id: string | null
+          entry_type:
+            | 'statement_payout'
+            | 'invoice_liability'
+            | 'payment'
+            | 'carry_in'
+            | 'carry_out'
+            | 'correction'
+            | 'opening_balance'
+            | 'partial_payment'
+          amount_eur: number
+          currency: string | null
+          amount_original: number | null
+          fx_rate: number | null
+          reference_type: string | null
+          reference_id: string | null
+          description: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          settlement_period_id?: string | null
+          entry_type:
+            | 'statement_payout'
+            | 'invoice_liability'
+            | 'payment'
+            | 'carry_in'
+            | 'carry_out'
+            | 'correction'
+            | 'opening_balance'
+            | 'partial_payment'
+          amount_eur: number
+          currency?: string | null
+          amount_original?: number | null
+          fx_rate?: number | null
+          reference_type?: string | null
+          reference_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          settlement_period_id?: string | null
+          entry_type?:
+            | 'statement_payout'
+            | 'invoice_liability'
+            | 'payment'
+            | 'carry_in'
+            | 'carry_out'
+            | 'correction'
+            | 'opening_balance'
+            | 'partial_payment'
+          amount_eur?: number
+          currency?: string | null
+          amount_original?: number | null
+          fx_rate?: number | null
+          reference_type?: string | null
+          reference_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      period_carry_forwards: {
+        Row: {
+          id: string
+          from_period_id: string
+          to_period_id: string | null
+          artist_id: string
+          opening_balance_eur: number
+          breakdown: Record<string, unknown>
+          applied_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          from_period_id: string
+          to_period_id?: string | null
+          artist_id: string
+          opening_balance_eur?: number
+          breakdown?: Record<string, unknown>
+          applied_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          from_period_id?: string
+          to_period_id?: string | null
+          artist_id?: string
+          opening_balance_eur?: number
+          breakdown?: Record<string, unknown>
+          applied_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      financial_audit_events: {
+        Row: {
+          id: string
+          entity_type: string
+          entity_id: string
+          action: string
+          actor_id: string | null
+          before_data: Record<string, unknown> | null
+          after_data: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entity_type: string
+          entity_id: string
+          action: string
+          actor_id?: string | null
+          before_data?: Record<string, unknown> | null
+          after_data?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entity_type?: string
+          entity_id?: string
+          action?: string
+          actor_id?: string | null
+          before_data?: Record<string, unknown> | null
+          after_data?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       app_logs: {
         Row: {
           id: string
@@ -812,11 +995,20 @@ export interface Database {
           line_items: { description: string; qty: number; unit_price_cents: number }[]
           currency: string
           tax_rate_pct: number
-          status: 'draft' | 'sent' | 'paid' | 'cancelled'
+          status: 'draft' | 'sent' | 'received' | 'partially_paid' | 'paid' | 'cancelled'
           due_date: string | null
           issued_date: string
           notes: string | null
           pdf_url: string | null
+          received_at: string | null
+          received_by: string | null
+          paid_at: string | null
+          paid_by: string | null
+          paid_amount_cents: number
+          outstanding_amount_cents: number | null
+          payment_method: 'sepa' | 'paypal' | 'manual' | 'other' | null
+          payment_reference: string | null
+          settlement_period_id: string | null
           created_at: string
           updated_at: string
         }
@@ -832,11 +1024,20 @@ export interface Database {
           line_items?: { description: string; qty: number; unit_price_cents: number }[]
           currency?: string
           tax_rate_pct?: number
-          status?: 'draft' | 'sent' | 'paid' | 'cancelled'
+          status?: 'draft' | 'sent' | 'received' | 'partially_paid' | 'paid' | 'cancelled'
           due_date?: string | null
           issued_date?: string
           notes?: string | null
           pdf_url?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_amount_cents?: number
+          outstanding_amount_cents?: number | null
+          payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
+          payment_reference?: string | null
+          settlement_period_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -852,11 +1053,20 @@ export interface Database {
           line_items?: { description: string; qty: number; unit_price_cents: number }[]
           currency?: string
           tax_rate_pct?: number
-          status?: 'draft' | 'sent' | 'paid' | 'cancelled'
+          status?: 'draft' | 'sent' | 'received' | 'partially_paid' | 'paid' | 'cancelled'
           due_date?: string | null
           issued_date?: string
           notes?: string | null
           pdf_url?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_amount_cents?: number
+          outstanding_amount_cents?: number | null
+          payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
+          payment_reference?: string | null
+          settlement_period_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -936,13 +1146,36 @@ export interface Database {
           r2_key: string
           period: string
           amount_eur: number | null
-          status: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          status:
+            | 'draft'
+            | 'label_approved'
+            | 'artist_notified'
+            | 'viewed'
+            | 'invoiced'
+            | 'paid'
+            | 'superseded'
+            | 'cancelled'
+            | 'acknowledged'
           label_notes: string | null
           label_approved_at: string | null
           period_start: string | null
           period_end: string | null
           total_streams: number
           batch_id: string | null
+          first_viewed_at: string | null
+          last_viewed_at: string | null
+          view_count: number
+          document_type: 'original' | 'correction' | 'storno'
+          correction_of_id: string | null
+          superseded_by_id: string | null
+          version: number
+          reporting_currency: string
+          amount_reporting: number | null
+          fx_rate_to_eur: number | null
+          fx_rate_date: string | null
+          fx_source: string | null
+          settlement_period_id: string | null
+          is_archived: boolean
           created_at: string
         }
         Insert: {
@@ -952,13 +1185,36 @@ export interface Database {
           r2_key: string
           period: string
           amount_eur?: number | null
-          status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          status?:
+            | 'draft'
+            | 'label_approved'
+            | 'artist_notified'
+            | 'viewed'
+            | 'invoiced'
+            | 'paid'
+            | 'superseded'
+            | 'cancelled'
+            | 'acknowledged'
           label_notes?: string | null
           label_approved_at?: string | null
           period_start?: string | null
           period_end?: string | null
           total_streams?: number
           batch_id?: string | null
+          first_viewed_at?: string | null
+          last_viewed_at?: string | null
+          view_count?: number
+          document_type?: 'original' | 'correction' | 'storno'
+          correction_of_id?: string | null
+          superseded_by_id?: string | null
+          version?: number
+          reporting_currency?: string
+          amount_reporting?: number | null
+          fx_rate_to_eur?: number | null
+          fx_rate_date?: string | null
+          fx_source?: string | null
+          settlement_period_id?: string | null
+          is_archived?: boolean
           created_at?: string
         }
         Update: {
@@ -968,13 +1224,36 @@ export interface Database {
           r2_key?: string
           period?: string
           amount_eur?: number | null
-          status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
+          status?:
+            | 'draft'
+            | 'label_approved'
+            | 'artist_notified'
+            | 'viewed'
+            | 'invoiced'
+            | 'paid'
+            | 'superseded'
+            | 'cancelled'
+            | 'acknowledged'
           label_notes?: string | null
           label_approved_at?: string | null
           period_start?: string | null
           period_end?: string | null
           total_streams?: number
           batch_id?: string | null
+          first_viewed_at?: string | null
+          last_viewed_at?: string | null
+          view_count?: number
+          document_type?: 'original' | 'correction' | 'storno'
+          correction_of_id?: string | null
+          superseded_by_id?: string | null
+          version?: number
+          reporting_currency?: string
+          amount_reporting?: number | null
+          fx_rate_to_eur?: number | null
+          fx_rate_date?: string | null
+          fx_source?: string | null
+          settlement_period_id?: string | null
+          is_archived?: boolean
           created_at?: string
         }
         Relationships: []
@@ -1103,6 +1382,10 @@ export interface Database {
           streams: number
           revenue_eur: number
           quantity: number
+          amount_original: number | null
+          currency_original: string | null
+          fx_rate: number | null
+          fx_rate_date: string | null
           created_at: string
         }
         Insert: {
@@ -1114,6 +1397,10 @@ export interface Database {
           streams?: number
           revenue_eur?: number
           quantity?: number
+          amount_original?: number | null
+          currency_original?: string | null
+          fx_rate?: number | null
+          fx_rate_date?: string | null
           created_at?: string
         }
         Update: {
@@ -1125,6 +1412,10 @@ export interface Database {
           streams?: number
           revenue_eur?: number
           quantity?: number
+          amount_original?: number | null
+          currency_original?: string | null
+          fx_rate?: number | null
+          fx_rate_date?: string | null
           created_at?: string
         }
         Relationships: []

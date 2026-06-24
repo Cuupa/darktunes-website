@@ -6,6 +6,8 @@ import {
   createSalesStatement,
   getSalesStatementById,
   approveSalesStatement,
+  approveAndNotifySalesStatement,
+  createCorrectionStatement,
   updateSalesStatementStatus,
   getSalesSummariesForAdmin,
 } from './salesStatements'
@@ -49,6 +51,20 @@ const mockStatementRow: SalesStatementRow = {
   period_end: null,
   total_streams: 0,
   batch_id: null,
+  first_viewed_at: null,
+  last_viewed_at: null,
+  view_count: 0,
+  document_type: 'original',
+  correction_of_id: null,
+  superseded_by_id: null,
+  version: 1,
+  reporting_currency: 'EUR',
+  amount_reporting: null,
+  fx_rate_to_eur: null,
+  fx_rate_date: null,
+  fx_source: null,
+  settlement_period_id: null,
+  is_archived: false,
   created_at: '2024-04-01T00:00:00Z',
 }
 
@@ -185,6 +201,50 @@ describe('approveSalesStatement', () => {
   })
 })
 
+describe('approveAndNotifySalesStatement', () => {
+  it('approves and marks artist_notified when email succeeds', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+      label_approved_at: '2024-04-02T12:00:00Z',
+    }
+    const notifiedRow: SalesStatementRow = {
+      ...approvedRow,
+      status: 'artist_notified',
+    }
+
+    const from = vi
+      .fn()
+      .mockReturnValueOnce(makeBuilder(approvedRow))
+      .mockReturnValueOnce(makeBuilder(notifiedRow))
+
+    const db = { from } as unknown as DbClient
+    const notify = vi.fn().mockResolvedValue({ success: true })
+
+    const result = await approveAndNotifySalesStatement(db, 'stmt-uuid-1', notify, 'Approved')
+
+    expect(result.emailSent).toBe(true)
+    expect(result.statement.status).toBe('artist_notified')
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps label_approved when email fails', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+      label_approved_at: '2024-04-02T12:00:00Z',
+    }
+    const db = makeMockDb(approvedRow)
+    const notify = vi.fn().mockResolvedValue({ success: false, error: 'SMTP down' })
+
+    const result = await approveAndNotifySalesStatement(db, 'stmt-uuid-1', notify)
+
+    expect(result.emailSent).toBe(false)
+    expect(result.emailError).toBe('SMTP down')
+    expect(result.statement.status).toBe('label_approved')
+  })
+})
+
 describe('updateSalesStatementStatus', () => {
   it('updates and returns the mapped domain object with new status', async () => {
     const acknowledgedRow: SalesStatementRow = {
@@ -201,6 +261,61 @@ describe('updateSalesStatementStatus', () => {
     await expect(
       updateSalesStatementStatus(db, 'stmt-uuid-1', 'acknowledged'),
     ).rejects.toThrow('update error')
+  })
+})
+
+describe('createCorrectionStatement', () => {
+  it('rejects draft statements', async () => {
+    const db = makeMockDb(mockStatementRow)
+    await expect(
+      createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 99 }, 'actor-1'),
+    ).rejects.toThrow('Cannot correct statement in status "draft"')
+  })
+
+  it('creates a correction draft and supersedes the original', async () => {
+    const original: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+      amount_eur: 100,
+      period_start: '2025-01-01',
+      period_end: '2025-03-31',
+    }
+    const correction: SalesStatementRow = {
+      ...original,
+      id: 'stmt-correction',
+      status: 'draft',
+      amount_eur: 120,
+      document_type: 'correction',
+      correction_of_id: 'stmt-uuid-1',
+      version: 2,
+      filename: 'Statement_2024_Q1-Korrektur.pdf',
+    }
+
+    let singleCalls = 0
+    const builder = {
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockImplementation(() => {
+        singleCalls += 1
+        if (singleCalls === 1) return Promise.resolve({ data: original, error: null })
+        return Promise.resolve({ data: correction, error: null })
+      }),
+    }
+    const p = Promise.resolve({ data: null, error: null })
+    Object.assign(builder, {
+      then: p.then.bind(p),
+      catch: p.catch.bind(p),
+      finally: p.finally.bind(p),
+    })
+
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    const result = await createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 120 }, 'actor-1')
+
+    expect(result.id).toBe('stmt-correction')
+    expect(result.amountEur).toBe(120)
+    expect(builder.update).toHaveBeenCalled()
   })
 })
 

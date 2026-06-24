@@ -60,13 +60,14 @@ export function EarningsChart({ dict, statements }: EarningsChartProps) {
 
     const total = [...periodMap.values()].reduce((sum, v) => sum + v, 0)
 
-    // Last payout = most recent acknowledged/approved statement amount
-    const acknowledged = statements
-      .filter((s) => (s.status === 'acknowledged' || s.status === 'label_approved') && s.amountEur !== undefined)
+    const settledStatuses = new Set(['invoiced', 'acknowledged', 'paid'] as const)
+    const lastPayoutStatement = statements
+      .filter((s) => settledStatuses.has(s.status as 'invoiced' | 'acknowledged' | 'paid') && s.amountEur !== undefined)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    const last = acknowledged[0]?.amountEur
+    const last = lastPayoutStatement[0]?.amountEur
 
-    const pending = statements.filter((s) => s.status === 'label_approved').length
+    const pendingStatuses = new Set(['label_approved', 'artist_notified', 'viewed'] as const)
+    const pending = statements.filter((s) => pendingStatuses.has(s.status as 'label_approved' | 'artist_notified' | 'viewed')).length
 
     return { chartData: data, totalEarned: total, lastPayout: last, pendingCount: pending }
   }, [statements])

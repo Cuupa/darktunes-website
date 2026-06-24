@@ -41,8 +41,18 @@ function statusLabel(status: SalesStatement['status'], dict: Dictionary['portal'
       return dict.statements_status_approved
     case 'artist_notified':
       return dict.statements_status_notified
+    case 'viewed':
+      return dict.statements_status_viewed
+    case 'invoiced':
+      return dict.statements_status_invoiced
     case 'acknowledged':
       return dict.statements_status_acknowledged
+    case 'paid':
+      return dict.statements_status_paid
+    case 'superseded':
+      return dict.statements_status_superseded
+    case 'cancelled':
+      return dict.statements_status_cancelled
     default:
       return status
   }
@@ -51,9 +61,16 @@ function statusLabel(status: SalesStatement['status'], dict: Dictionary['portal'
 function statusVariant(status: SalesStatement['status']): 'outline' | 'secondary' | 'default' {
   switch (status) {
     case 'label_approved':
+    case 'artist_notified':
+    case 'viewed':
       return 'secondary'
+    case 'invoiced':
     case 'acknowledged':
+    case 'paid':
       return 'default'
+    case 'superseded':
+    case 'cancelled':
+      return 'outline'
     default:
       return 'outline'
   }
@@ -76,7 +93,7 @@ function StatementActions({
   onDownload: (id: string) => void
   statement: SalesStatement
 }) {
-  const canInvoice = statement.status === 'label_approved' && !hasInvoice
+  const canInvoice = ['label_approved', 'artist_notified', 'viewed'].includes(statement.status) && !hasInvoice
 
   return (
     <div className="flex flex-wrap justify-end gap-2">

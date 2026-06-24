@@ -28,6 +28,15 @@ export interface ArtistInvoice {
   issuedDate: string
   notes: string | undefined
   pdfUrl: string | undefined
+  receivedAt: string | undefined
+  receivedBy: string | undefined
+  paidAt: string | undefined
+  paidBy: string | undefined
+  paidAmountCents: number
+  outstandingAmountCents: number | undefined
+  paymentMethod: InvoiceRow['payment_method']
+  paymentReference: string | undefined
+  settlementPeriodId: string | undefined
   createdAt: string
   updatedAt: string
 }
@@ -49,6 +58,7 @@ export interface CreateInvoiceData {
 
 export interface CreateSosLinkedInvoiceData extends CreateInvoiceData {
   statementId: string
+  settlementPeriodId?: string | null
 }
 
 function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
@@ -69,6 +79,15 @@ function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
     issuedDate: row.issued_date ?? '',
     notes: row.notes ?? undefined,
     pdfUrl: row.pdf_url ?? undefined,
+    receivedAt: row.received_at ?? undefined,
+    receivedBy: row.received_by ?? undefined,
+    paidAt: row.paid_at ?? undefined,
+    paidBy: row.paid_by ?? undefined,
+    paidAmountCents: Number(row.paid_amount_cents ?? 0),
+    outstandingAmountCents: row.outstanding_amount_cents ?? undefined,
+    paymentMethod: row.payment_method,
+    paymentReference: row.payment_reference ?? undefined,
+    settlementPeriodId: row.settlement_period_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -181,6 +200,7 @@ export async function createSosLinkedInvoice(
       invoice_number: data.invoiceNumber,
       artist_invoice_number: normaliseOptional(data.artistInvoiceNumber),
       statement_id: data.statementId,
+      settlement_period_id: data.settlementPeriodId ?? null,
       client_name: data.clientName,
       client_email: data.clientEmail,
       client_address: normaliseOptional(data.clientAddress),
@@ -220,4 +240,123 @@ export async function updateInvoice(
 
   if (error) throw new Error(`Failed to update invoice: ${error.message}`)
   return rowToArtistInvoice(row)
+}
+
+export async function getAdminInvoiceById(db: DbClient, id: string): Promise<ArtistInvoice | null> {
+  const { data, error } = await db.from('artist_invoices').select('*').eq('id', id).single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+
+  return rowToArtistInvoice(data as InvoiceRow)
+}
+
+export async function listInvoicesForPeriod(
+  db: DbClient,
+  settlementPeriodId: string,
+): Promise<ArtistInvoice[]> {
+  const { data, error } = await db
+    .from('artist_invoices')
+    .select('*')
+    .eq('settlement_period_id', settlementPeriodId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => rowToArtistInvoice(row as InvoiceRow))
+}
+
+export async function listInvoicesByStatementIds(
+  db: DbClient,
+  statementIds: string[],
+): Promise<ArtistInvoice[]> {
+  if (statementIds.length === 0) return []
+
+  const { data, error } = await db
+    .from('artist_invoices')
+    .select('*')
+    .in('statement_id', statementIds)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => rowToArtistInvoice(row as InvoiceRow))
+}
+
+export async function markInvoiceReceived(
+  db: DbClient,
+  id: string,
+  actorId: string,
+): Promise<ArtistInvoice> {
+  const existing = await getAdminInvoiceById(db, id)
+  if (!existing) throw new Error('Invoice not found')
+  if (!['sent', 'draft'].includes(existing.status)) {
+    throw new Error(`Cannot mark received from status "${existing.status}"`)
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('artist_invoices')
+    .update({
+      status: 'received',
+      received_at: now,
+      received_by: actorId,
+      updated_at: now,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return rowToArtistInvoice(data as InvoiceRow)
+}
+
+export interface RecordInvoicePaymentInput {
+  amountCents: number
+  paymentMethod: NonNullable<InvoiceRow['payment_method']>
+  paymentReference?: string
+  actorId: string
+}
+
+export async function recordInvoicePayment(
+  db: DbClient,
+  id: string,
+  input: RecordInvoicePaymentInput,
+): Promise<ArtistInvoice> {
+  const existing = await getAdminInvoiceById(db, id)
+  if (!existing) throw new Error('Invoice not found')
+  if (!['received', 'partially_paid', 'sent'].includes(existing.status)) {
+    throw new Error(`Cannot record payment from status "${existing.status}"`)
+  }
+
+  const totalCents = existing.lineItems.reduce(
+    (sum, item) => sum + item.qty * item.unit_price_cents,
+    0,
+  )
+  const newPaid = existing.paidAmountCents + input.amountCents
+  if (newPaid > totalCents) throw new Error('Payment exceeds invoice total')
+
+  const outstanding = totalCents - newPaid
+  const now = new Date().toISOString()
+  const nextStatus = outstanding === 0 ? 'paid' : 'partially_paid'
+
+  const { data, error } = await db
+    .from('artist_invoices')
+    .update({
+      status: nextStatus,
+      paid_amount_cents: newPaid,
+      outstanding_amount_cents: outstanding,
+      paid_at: outstanding === 0 ? now : existing.paidAt ?? null,
+      paid_by: input.actorId,
+      payment_method: input.paymentMethod,
+      payment_reference: input.paymentReference?.trim() || null,
+      received_at: existing.receivedAt ?? now,
+      received_by: existing.receivedBy ?? input.actorId,
+      updated_at: now,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return rowToArtistInvoice(data as InvoiceRow)
 }
