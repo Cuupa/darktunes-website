@@ -1,10 +1,14 @@
 /**
  * Client-side Bronze layer upload: raw distributor CSV → R2.
- * Files ≤45 MB use the server-side upload route; larger files use a presigned PUT URL
- * (requires R2 bucket CORS for the site origin).
+ * Files ≤45 MB use a single server-side upload; larger files are sent in 20 MB chunks
+ * via R2 multipart upload (no browser-to-R2 CORS required).
  */
 
-import { MAX_BRONZE_CSV_BYTES, MAX_BRONZE_CSV_SERVER_BYTES } from '@/lib/sos/bronzeUploadLimits'
+import {
+  BRONZE_UPLOAD_CHUNK_BYTES,
+  MAX_BRONZE_CSV_BYTES,
+  MAX_BRONZE_CSV_SERVER_BYTES,
+} from '@/lib/sos/bronzeUploadLimits'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
 const MAX_REGISTRATION_JSON_BYTES = 8_192
@@ -90,6 +94,95 @@ async function markBronzeUploadFailed(batchId: string): Promise<void> {
   }
 }
 
+async function readApiErrorMessage(res: Response): Promise<string> {
+  const errBody = await res.json().catch(() => ({}))
+  return typeof errBody === 'object' && errBody && 'error' in errBody
+    ? String((errBody as { error: unknown }).error)
+    : res.statusText
+}
+
+async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Promise<void> {
+  try {
+    await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/abort`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId }),
+    })
+  } catch (err) {
+    console.error('[bronzeUpload] multipart abort error:', err)
+  }
+}
+
+async function uploadBronzeCsvMultipart(
+  batchId: string,
+  uploadBlob: Blob,
+  uploadFilename: string,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  let uploadId: string | undefined
+
+  try {
+    const initRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
+    })
+
+    if (!initRes.ok) {
+      return { ok: false, message: await readApiErrorMessage(initRes) }
+    }
+
+    const initJson = (await initRes.json()) as { uploadId?: string }
+    uploadId = initJson.uploadId
+    if (!uploadId) return { ok: false, message: 'Missing multipart upload ID' }
+
+    const parts: { partNumber: number; etag: string }[] = []
+    const totalParts = Math.ceil(uploadBlob.size / BRONZE_UPLOAD_CHUNK_BYTES)
+
+    for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+      const start = (partNumber - 1) * BRONZE_UPLOAD_CHUNK_BYTES
+      const end = Math.min(start + BRONZE_UPLOAD_CHUNK_BYTES, uploadBlob.size)
+      const chunk = uploadBlob.slice(start, end)
+
+      const partForm = new FormData()
+      partForm.append('file', chunk, uploadFilename)
+      partForm.append('upload_id', uploadId)
+      partForm.append('part_number', String(partNumber))
+
+      const partRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/part`, {
+        method: 'POST',
+        body: partForm,
+      })
+
+      if (!partRes.ok) {
+        return { ok: false, message: await readApiErrorMessage(partRes) }
+      }
+
+      const partJson = (await partRes.json()) as { etag?: string; partNumber?: number }
+      if (!partJson.etag || partJson.partNumber !== partNumber) {
+        return { ok: false, message: 'Invalid multipart part response' }
+      }
+
+      parts.push({ partNumber, etag: partJson.etag })
+    }
+
+    const completeRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, parts }),
+    })
+
+    if (!completeRes.ok) {
+      return { ok: false, message: await readApiErrorMessage(completeRes) }
+    }
+
+    return { ok: true }
+  } catch (err) {
+    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
+    throw err
+  }
+}
+
 async function uploadBronzeCsvToR2(
   batchId: string,
   uploadBlob: Blob,
@@ -97,35 +190,7 @@ async function uploadBronzeCsvToR2(
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
-    const presignRes = await fetch(`/api/admin/sos/import-batches/${batchId}/presign`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
-    })
-
-    if (!presignRes.ok) {
-      const presignErr = await presignRes.json().catch(() => ({}))
-      const message =
-        typeof presignErr === 'object' && presignErr && 'error' in presignErr
-          ? String((presignErr as { error: unknown }).error)
-          : presignRes.statusText
-      return { ok: false, message }
-    }
-
-    const { uploadUrl } = (await presignRes.json()) as { uploadUrl?: string }
-    if (!uploadUrl) return { ok: false, message: 'Missing presigned upload URL' }
-
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: uploadBlob,
-      headers: { 'Content-Type': contentType },
-    })
-
-    if (!putRes.ok) {
-      return { ok: false, message: `Direct R2 upload failed (${putRes.status})` }
-    }
-
-    return { ok: true }
+    return uploadBronzeCsvMultipart(batchId, uploadBlob, uploadFilename, contentType)
   }
 
   const uploadForm = new FormData()
@@ -137,12 +202,7 @@ async function uploadBronzeCsvToR2(
   })
 
   if (!uploadRes.ok) {
-    const uploadErr = await uploadRes.json().catch(() => ({}))
-    const message =
-      typeof uploadErr === 'object' && uploadErr && 'error' in uploadErr
-        ? String((uploadErr as { error: unknown }).error)
-        : uploadRes.statusText
-    return { ok: false, message }
+    return { ok: false, message: await readApiErrorMessage(uploadRes) }
   }
 
   return { ok: true }

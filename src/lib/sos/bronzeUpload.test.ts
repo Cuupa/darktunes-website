@@ -93,11 +93,12 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(confirmCalls).toHaveLength(2)
   })
 
-  it('uses presigned direct upload when CSV exceeds the server proxy limit', async () => {
+  it('uses chunked multipart upload when CSV exceeds the server proxy limit', async () => {
     vi.resetModules()
     vi.doMock('./bronzeUploadLimits', () => ({
       MAX_BRONZE_CSV_SERVER_BYTES: 4,
       MAX_BRONZE_CSV_BYTES: 200,
+      BRONZE_UPLOAD_CHUNK_BYTES: 3,
     }))
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
 
@@ -111,9 +112,17 @@ describe('uploadBronzeDistributorCsv', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ uploadUrl: 'https://r2.example.com/presigned' }),
+        json: async () => ({ uploadId: 'upload-1' }),
       })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ etag: 'etag-1', partNumber: 1 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ etag: 'etag-2', partNumber: 2 }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
       .mockResolvedValueOnce({ ok: true })
 
     const result = await uploadLargeCsv({
@@ -126,12 +135,10 @@ describe('uploadBronzeDistributorCsv', () => {
     })
 
     expect(result).toEqual({ batchId: 'batch-large', r2Key: 'sos-imports/batch-large/file.csv' })
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/presign')
-    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://r2.example.com/presigned')
-    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/csv; charset=utf-8' },
-    })
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/init')
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/part')
+    expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/part')
+    expect(fetchMock.mock.calls[4]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/complete')
 
     vi.doUnmock('./bronzeUploadLimits')
     vi.resetModules()

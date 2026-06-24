@@ -1,22 +1,20 @@
 /**
- * POST /api/admin/sos/import-batches/[id]/presign — presigned PUT URL for large bronze CSVs
- *
- * Bypasses Vercel's ~50 MB request body limit by uploading directly from the browser to R2.
- * Requires R2 bucket CORS to allow PUT from the site origin (see DEPLOYMENT.md).
+ * POST /api/admin/sos/import-batches/[id]/multipart/init — start R2 multipart upload
  */
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { getImportBatchById } from '@/lib/api/distributorImportBatches'
 import { MAX_BRONZE_CSV_BYTES } from '@/lib/sos/bronzeUploadLimits'
-import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
+import {
+  createBronzeMultipartR2Context,
+  getWritableImportBatch,
+  initBronzeMultipartUpload,
+} from '@/lib/sos/bronzeMultipartUpload'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { createR2Client } from '@/lib/r2Utils'
 
-const PRESIGN_BODY_MAX_BYTES = 512
+const INIT_BODY_MAX_BYTES = 512
 
 async function requireAdminOrEditor() {
   const supabase = await createServerSupabaseClient()
@@ -30,17 +28,17 @@ async function requireAdminOrEditor() {
 }
 
 function extractBatchIdFromPath(pathname: string): string | null {
-  const match = pathname.match(/\/import-batches\/([^/]+)\/presign\/?$/)
+  const match = pathname.match(/\/import-batches\/([^/]+)\/multipart\/init\/?$/)
   return match?.[1] ?? null
 }
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminOrEditor()
   const id = extractBatchIdFromPath(new URL(req.url).pathname)
-  if (!id) throw new ApiError(400, 'Invalid import batch presign path')
+  if (!id) throw new ApiError(400, 'Invalid import batch multipart init path')
 
   const raw = await req.text()
-  if (raw.length > PRESIGN_BODY_MAX_BYTES) throw new ApiError(413, 'Presign payload too large')
+  if (raw.length > INIT_BODY_MAX_BYTES) throw new ApiError(413, 'Init payload too large')
 
   const body = JSON.parse(raw) as { content_type?: string; file_size?: number }
   const contentType = body.content_type?.trim() || 'text/csv; charset=utf-8'
@@ -51,24 +49,9 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
-  const batch = await getImportBatchById(serviceSupabase, id)
-  if (!batch) throw new ApiError(404, 'Import batch not found')
-  if (batch.fileHash || batch.status === 'completed') {
-    throw new ApiError(409, 'Import batch already has archived content')
-  }
+  const batch = await getWritableImportBatch(serviceSupabase, id)
+  const ctx = await createBronzeMultipartR2Context()
+  const uploadId = await initBronzeMultipartUpload(ctx, batch.r2Key, contentType)
 
-  const { serverEnv } = await import('@/lib/env.server')
-  const s3 = createR2Client(
-    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
-    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-  )
-
-  const uploadUrl = await generatePresignedUploadUrl(batch.r2Key, contentType, {
-    getSignedUrl,
-    s3Client: s3,
-    bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
-  })
-
-  return NextResponse.json({ uploadUrl })
+  return NextResponse.json({ uploadId })
 })

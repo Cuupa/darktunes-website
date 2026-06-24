@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/sos/import-batches/[id]/upload — stream bronze CSV to R2 server-side
  *
- * Avoids browser CORS restrictions on direct PUT to r2.cloudflarestorage.com presigned URLs.
+ * For files above MAX_BRONZE_CSV_SERVER_BYTES, use the /multipart/* routes instead.
  */
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
