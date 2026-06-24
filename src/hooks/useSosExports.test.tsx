@@ -181,3 +181,57 @@ describe('useSosExports.handlePublishToPortal', () => {
     expect(mockDownloadBlob).not.toHaveBeenCalled()
   })
 })
+
+describe('useSosExports.buildCorrectionPdfBase64', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+  })
+
+  it('returns base64 PDF with overridden payout amount', async () => {
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+      ),
+    )
+
+    let pdfBase64: string | null = null
+    await act(async () => {
+      pdfBase64 = await result.current.buildCorrectionPdfBase64('Artist One', 250.5)
+    })
+
+    expect(pdfBase64).toBeTruthy()
+    expect(mockGeneratePDF).toHaveBeenCalledWith(
+      expect.objectContaining({ finalPayout: 250.5 }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      [],
+    )
+  })
+
+  it('returns null when artist data is missing', async () => {
+    const { result } = renderHook(() =>
+      useExports([], labelInfo, '2026-03', '2026-03', {}, {}, [], {}, []),
+    )
+
+    let pdfBase64: string | null = 'pending'
+    await act(async () => {
+      pdfBase64 = await result.current.buildCorrectionPdfBase64('Missing Artist', 10)
+    })
+
+    expect(pdfBase64).toBeNull()
+  })
+})

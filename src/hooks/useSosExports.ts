@@ -420,5 +420,54 @@ export function useExports(
     [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists]
   )
 
-  return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal }
+  const buildCorrectionPdfBase64 = useCallback(
+    async (artist: string, amountEur: number): Promise<string | null> => {
+      const artistData = processedData.find((d) => d.artist === artist)
+      if (!artistData) return null
+
+      const artistInfo = artistInfoMap.get(artist.toLowerCase())
+
+      try {
+        const currentYear = new Date().getFullYear()
+        const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
+        const artistSlug = artist.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4) || '0001'
+        const invoiceNumber = `${prefix}-${currentYear}-${artistSlug}`
+        const correctedData = { ...artistData, finalPayout: amountEur }
+        const blob = await generatePDF(
+          correctedData,
+          labelInfo,
+          periodStart || undefined,
+          periodEnd || undefined,
+          invoiceNumber,
+          pdfSettings,
+          emailOptions,
+          artistInfo,
+          compilationFilters,
+        )
+        return blobToBase64(blob)
+      } catch (err) {
+        console.error('Correction PDF generation error:', err)
+        return null
+      }
+    },
+    [
+      processedData,
+      artistInfoMap,
+      labelInfo,
+      periodStart,
+      periodEnd,
+      pdfSettings,
+      emailOptions,
+      compilationFilters,
+    ],
+  )
+
+  return {
+    handleDownloadPDF,
+    handleDownloadExcel,
+    handleDownloadAll,
+    handleDownloadSelected,
+    handlePublishToPortal,
+    buildCorrectionPdfBase64,
+  }
 }

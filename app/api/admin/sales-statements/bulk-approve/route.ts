@@ -6,6 +6,7 @@ import {
   getSalesStatementById,
   linkApprovedStatementToSettlement,
 } from '@/lib/api/salesStatements'
+import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -46,6 +47,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
         results.push({ id, success: false, error: `Cannot approve statement in status "${existing.status}"` })
         continue
       }
+
+      await assertStatementPeriodWritable(supabase, id)
 
       const outcome = await approveAndNotifySalesStatement(
         supabase,

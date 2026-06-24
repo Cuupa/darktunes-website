@@ -272,6 +272,7 @@ const CORRECTABLE_STATUSES: SalesStatementStatus[] = [
 
 export interface CreateCorrectionStatementInput {
   amountEur: number
+  r2Key: string
   labelNotes?: string
 }
 
@@ -303,7 +304,7 @@ export async function createCorrectionStatement(
     .insert({
       artist_id: originalRow.artist_id,
       filename: originalRow.filename.replace(/\.pdf$/i, '') + '-Korrektur.pdf',
-      r2_key: originalRow.r2_key,
+      r2_key: input.r2Key,
       period: originalRow.period,
       amount_eur: input.amountEur,
       status: 'draft',

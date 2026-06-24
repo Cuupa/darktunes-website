@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
-import { recordInvoicePayment } from '@/lib/api/artistInvoices'
+import { getAdminInvoiceById, recordInvoicePayment } from '@/lib/api/artistInvoices'
+import { assertSettlementPeriodWritableById } from '@/lib/api/settlementPeriods'
 import { appendLedgerEntry } from '@/lib/api/settlementLedger'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
 import { updateSalesStatementStatus } from '@/lib/api/salesStatements'
@@ -28,6 +29,12 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   }
 
   const supabase = await createServerSupabaseClient()
+  const existing = await getAdminInvoiceById(supabase, id)
+  if (!existing) throw new ApiError(404, 'Invoice not found')
+  if (existing.settlementPeriodId) {
+    await assertSettlementPeriodWritableById(supabase, existing.settlementPeriodId)
+  }
+
   const invoice = await recordInvoicePayment(supabase, id, {
     amountCents: parsed.data.amountCents,
     paymentMethod: parsed.data.paymentMethod,

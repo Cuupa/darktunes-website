@@ -1,5 +1,32 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { ArtistRevenue } from '@/lib/sos/types'
 import { persistAnalyticsAfterStatementUpload } from './persistAfterStatementUpload'
+
+function makeArtistRevenue(overrides: Partial<ArtistRevenue> & Pick<ArtistRevenue, 'artist'>): ArtistRevenue {
+  return {
+    believeRevenue: 0,
+    bandcampRevenue: 0,
+    darkmerchRevenue: 0,
+    manualRevenue: 0,
+    totalRevenue: 0,
+    splitPercentage: 100,
+    finalAmount: 0,
+    totalQuantity: 0,
+    totalExpenses: 0,
+    distributionFeeDeducted: 0,
+    totalStreamRevenue: 0,
+    totalDownloadRevenue: 0,
+    platformBreakdown: [],
+    countryBreakdown: [],
+    monthlyBreakdown: [],
+    releaseBreakdown: [],
+    physicalReleasesRevenue: 0,
+    digitalSplitPercentage: 100,
+    physicalSplitPercentage: 100,
+    darkmerchSplitPercentage: 100,
+    ...overrides,
+  }
+}
 
 vi.mock('@/lib/sos/persistSosAnalyticsAction', () => ({
   persistSosAnalytics: vi.fn(async () => ({ success: true, merchOrdersUpserted: 2 })),
@@ -99,12 +126,13 @@ describe('persistAnalyticsAfterStatementUpload', () => {
       }],
       merchOrderRows: [],
       labelArtists: [{ id: '1', name: 'Band A', artistId: 'artist-1' }],
-      revenues: [{
-        artist: 'Band A',
-        totalRevenue: 500,
-        finalAmount: 400,
-        platformBreakdown: [],
-      }],
+      revenues: [
+        makeArtistRevenue({
+          artist: 'Band A',
+          totalRevenue: 500,
+          finalAmount: 400,
+        }),
+      ],
       bronzeBatchIds: ['batch-1'],
     })
 

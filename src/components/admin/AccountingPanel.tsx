@@ -507,8 +507,14 @@ function SosGeneratorPanel() {
     [hasData, territoryMetrics, merchOrderRows, revenues, bronzeBatchIds],
   )
 
-  const { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal } =
-    useExports(
+  const {
+    handleDownloadPDF,
+    handleDownloadExcel,
+    handleDownloadAll,
+    handleDownloadSelected,
+    handlePublishToPortal,
+    buildCorrectionPdfBase64,
+  } = useExports(
       processedData,
       labelInfo,
       detectedPeriodStart,
@@ -762,6 +768,7 @@ function SosGeneratorPanel() {
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
               onCreateDraft={handlePublishToPortal}
+              onBuildCorrectionPdf={buildCorrectionPdfBase64}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">

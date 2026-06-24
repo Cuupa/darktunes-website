@@ -9,6 +9,7 @@ import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createImportBatch, listImportBatches } from '@/lib/api/distributorImportBatches'
+import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -102,6 +103,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   )
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
+  await assertSettlementPeriodWritable(serviceSupabase, period_start, period_end)
+
   const batch = await createImportBatch(serviceSupabase, {
     periodStart: period_start,
     periodEnd: period_end,

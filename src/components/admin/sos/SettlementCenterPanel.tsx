@@ -81,6 +81,7 @@ interface SettlementCenterPanelProps {
   periodStart: string
   periodEnd: string
   onCreateDraft: (artist: string) => Promise<void>
+  onBuildCorrectionPdf?: (artistName: string, amountEur: number) => Promise<string | null>
 }
 
 type MasterRow = {
@@ -144,6 +145,9 @@ const SETTLEMENT_FALLBACK = {
   settlementCorrectionInvalidAmount: 'Please enter a valid amount in EUR',
   settlementCorrectionFailed: 'Failed to create correction',
   settlementCorrectionFailedToast: 'Correction failed',
+  settlementCorrectionPdfRequired:
+    'Upload CSV data first so a correction PDF can be generated for this artist.',
+  settlementCorrectionPdfUnavailable: 'Correction PDF generation is not available in this view.',
   settlementArchiveFailed: 'Failed to archive period',
   settlementArchiveFailedToast: 'Archive failed',
   settlementDraftsCreated: '{count} draft(s) created',
@@ -380,6 +384,7 @@ export function SettlementCenterPanel({
   periodStart,
   periodEnd,
   onCreateDraft,
+  onBuildCorrectionPdf,
 }: SettlementCenterPanelProps) {
   const dict = useDict()
   const t = useMemo(
@@ -839,10 +844,21 @@ export function SettlementCenterPanel({
       return
     }
 
+    if (!onBuildCorrectionPdf) {
+      toast.error(t.settlementCorrectionPdfUnavailable)
+      return
+    }
+
     setCorrecting(true)
     try {
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.settlementSessionExpired)
+
+      const pdfBase64 = await onBuildCorrectionPdf(correctionTarget.artistName, amountEur)
+      if (!pdfBase64) {
+        toast.error(t.settlementCorrectionPdfRequired)
+        return
+      }
 
       const response = await fetch(
         `/api/admin/sales-statements/${correctionTarget.statementId}/correction`,
@@ -854,6 +870,7 @@ export function SettlementCenterPanel({
           },
           body: JSON.stringify({
             amount_eur: amountEur,
+            pdf_base64: pdfBase64,
             label_notes: correctionNotes.trim() || undefined,
           }),
         },

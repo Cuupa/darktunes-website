@@ -5,6 +5,7 @@ import {
   approveAndNotifySalesStatement,
   linkApprovedStatementToSettlement,
 } from '@/lib/api/salesStatements'
+import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -27,6 +28,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   }
 
   const supabase = await createServerSupabaseClient()
+  await assertStatementPeriodWritable(supabase, id)
+
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const outcome = await approveAndNotifySalesStatement(
     supabase,

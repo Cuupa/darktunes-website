@@ -293,7 +293,7 @@ describe('createCorrectionStatement', () => {
   it('rejects draft statements', async () => {
     const db = makeMockDb(mockStatementRow)
     await expect(
-      createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 99 }, 'actor-1'),
+      createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 99, r2Key: 'statements/artist-uuid/correction.pdf' }, 'actor-1'),
     ).rejects.toThrow('Cannot correct statement in status "draft"')
   })
 
@@ -336,7 +336,12 @@ describe('createCorrectionStatement', () => {
     })
 
     const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
-    const result = await createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 120 }, 'actor-1')
+    const result = await createCorrectionStatement(
+      db,
+      'stmt-uuid-1',
+      { amountEur: 120, r2Key: 'statements/artist-uuid/Statement_2024_Q1-Korrektur.pdf' },
+      'actor-1',
+    )
 
     expect(result.id).toBe('stmt-correction')
     expect(result.amountEur).toBe(120)

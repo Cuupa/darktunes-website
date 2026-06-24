@@ -14,6 +14,7 @@ import {
   upsertSosPeriodSummary,
   type SosPeriodSummary,
 } from '@/lib/api/sosPeriodSummaries'
+import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 async function requireAccountingRole() {
@@ -74,6 +75,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
+  await assertSettlementPeriodWritable(serviceSupabase, period_start, period_end)
+
   const existing = (await listSosPeriodSummaries(serviceSupabase)).find(
     (s) => s.periodStart === period_start && s.periodEnd === period_end,
   )
