@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { ArrowsClockwise, Database } from '@phosphor-icons/react'
+import { ArrowsClockwise, Database, Trash, DownloadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
@@ -12,6 +12,7 @@ import { interpolate } from '@/lib/i18n/interpolate'
 
 interface ImportBatchesPanelProps {
   labelArtists: LabelArtist[]
+  onLoadBatch?: (batch: DistributorImportBatch) => void
 }
 
 const BRONZE_FALLBACK = {
@@ -26,13 +27,19 @@ const BRONZE_FALLBACK = {
   bronzeColActions: 'Actions',
   bronzeValidate: 'Validate',
   bronzeRebuildGold: 'Rebuild Gold',
+  bronzeLoad: 'Load for processing',
+  bronzeDelete: 'Delete',
+  bronzeDeleteConfirm: 'Delete this bronze archive (raw CSV in R2) permanently?',
   bronzeLoadError: 'Failed to load import batches',
+  bronzeLoadSuccess: 'Loaded {distributor} archive into workspace',
+  bronzeDeleteError: 'Delete failed',
+  bronzeDeleteSuccess: 'Bronze archive deleted',
   bronzeReprocessError: 'Reprocess failed',
   bronzeReprocessSaved: 'Reprocessed & saved {metricCount} metrics from {rowCount} rows',
   bronzeReprocessValidated: 'Validated {rowCount} rows ({metricCount} metric groups)',
 } as const
 
-export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
+export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesPanelProps) {
   const dict = useDict()
   const t = dict.admin?.accounting ?? BRONZE_FALLBACK
   const [batches, setBatches] = useState<DistributorImportBatch[]>([])
@@ -56,6 +63,37 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
   useEffect(() => {
     void loadBatches()
   }, [loadBatches])
+
+  const handleLoad = async (batch: DistributorImportBatch) => {
+    if (!onLoadBatch) {
+      toast.info('Load not available in this context')
+      return
+    }
+    try {
+      await onLoadBatch(batch)
+      const dist = batch.distributor
+      toast.success(t.bronzeLoadSuccess.replace('{distributor}', dist))
+    } catch {
+      // error already reported by load implementation
+    }
+  }
+
+  const handleDelete = (batchId: string) => {
+    if (!window.confirm(t.bronzeDeleteConfirm)) return
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, { method: 'DELETE' })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(typeof data?.error === 'string' ? data.error : t.bronzeDeleteError)
+        }
+        toast.success(t.bronzeDeleteSuccess)
+        await loadBatches()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t.bronzeDeleteError)
+      }
+    })
+  }
 
   const handleReprocess = (batchId: string, persist: boolean) => {
     startTransition(async () => {
@@ -137,7 +175,20 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
                     {batch.status}
                   </Badge>
                 </td>
-                <td className="px-4 py-2 text-right space-x-2">
+                <td className="px-4 py-2 text-right space-x-1">
+                  {onLoadBatch && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => void handleLoad(batch)}
+                      title={t.bronzeLoad}
+                    >
+                      <DownloadSimple size={14} className="mr-1" />
+                      {t.bronzeLoad}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
@@ -155,6 +206,17 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
                   >
                     <ArrowsClockwise size={14} className="mr-1" />
                     {t.bronzeRebuildGold}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => handleDelete(batch.id)}
+                    title={t.bronzeDelete}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash size={14} />
                   </Button>
                 </td>
               </tr>

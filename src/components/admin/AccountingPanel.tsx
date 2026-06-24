@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
+import { toast } from 'sonner'
 import { useDict } from '@/contexts/DictContext'
 
 const StatementsManager = lazy(
@@ -376,6 +377,39 @@ function SosGeneratorPanel() {
   const printfulManager  = useFileManager('printful')
   const darkmerchManager = useFileManager('darkmerch')
   const [carryForwardByArtist, setCarryForwardByArtist] = useState<Record<string, number>>({})
+
+  // Load a bronze archive into the appropriate in-memory file manager for processing.
+  // Fetches presigned download, streams CSV text, creates synthetic File and feeds to manager.
+  // Bronze re-archive on load will dedupe via hash.
+  const loadBronzeBatch = useCallback(async (batch: { id: string; distributor: string; periodStart: string }) => {
+    try {
+      const res = await fetch(`/api/admin/sos/import-batches/${batch.id}`)
+      if (!res.ok) throw new Error('Failed to get download URL for bronze batch')
+      const json = (await res.json()) as { downloadUrl?: string }
+      if (!json.downloadUrl) throw new Error('No download URL')
+      const csvText = await (await fetch(json.downloadUrl)).text()
+      const fileName = `${batch.distributor}-${batch.periodStart || 'archive'}.csv`
+      const blob = new Blob([csvText], { type: 'text/csv; charset=utf-8' })
+      const file = new File([blob], fileName, { type: 'text/csv; charset=utf-8' })
+      const dist = batch.distributor as 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'
+      if (dist === 'believe') await believeManager.addFiles([file])
+      else if (dist === 'bandcamp') await bandcampManager.addFiles([file])
+      else if (dist === 'shopify') await shopifyManager.addFiles([file])
+      else if (dist === 'printful') await printfulManager.addFiles([file])
+      else if (dist === 'darkmerch') await darkmerchManager.addFiles([file])
+      else throw new Error(`Unsupported distributor: ${dist}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load bronze archive'
+      toast.error(msg)
+      throw err
+    }
+  }, [
+    believeManager,
+    bandcampManager,
+    shopifyManager,
+    printfulManager,
+    darkmerchManager,
+  ])
 
   // CSV processing — all config fields now wired
   const {
@@ -806,7 +840,7 @@ function SosGeneratorPanel() {
                 step2={t.playbookStep2}
                 step3={t.playbookStep3}
               />
-              <ImportBatchesPanel labelArtists={labelArtists} />
+              <ImportBatchesPanel labelArtists={labelArtists} onLoadBatch={loadBronzeBatch} />
               <ExternalMetricsSyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel

@@ -1,6 +1,7 @@
 /**
+ * GET    /api/admin/sos/import-batches/[id] — fetch batch + short-lived presigned download URL (for loading into workspace)
  * PATCH  /api/admin/sos/import-batches/[id] — mark unconfirmed upload as failed
- * DELETE /api/admin/sos/import-batches/[id] — remove orphan batch (upload never confirmed)
+ * DELETE /api/admin/sos/import-batches/[id] — delete batch + its R2 object (confirmed or not)
  */
 
 import { NextResponse } from 'next/server'
@@ -8,11 +9,12 @@ import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
-  deleteUnconfirmedImportBatch,
+  deleteImportBatch,
   getImportBatchById,
   updateImportBatchStatus,
 } from '@/lib/api/distributorImportBatches'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 
 async function requireAdminOrEditor() {
   const supabase = await createServerSupabaseClient()
@@ -29,6 +31,33 @@ function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/?$/)
   return match?.[1] ?? null
 }
+
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminOrEditor()
+  const id = extractBatchIdFromPath(new URL(req.url).pathname)
+  if (!id) throw new ApiError(400, 'Invalid import batch path')
+
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+  const batch = await getImportBatchById(serviceSupabase, id)
+  if (!batch) throw new ApiError(404, 'Import batch not found')
+
+  const { serverEnv } = await import('@/lib/env.server')
+  const s3 = createR2Client(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+  const { generatePresignedDownloadUrl } = await import('@/lib/portal/presignedUrl')
+  const downloadUrl = await generatePresignedDownloadUrl(batch.r2Key, {
+    getSignedUrl,
+    s3Client: s3,
+    bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+  })
+
+  return NextResponse.json({ batch, downloadUrl })
+})
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminOrEditor()
@@ -62,12 +91,22 @@ export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextRes
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getImportBatchById(serviceSupabase, id)
   if (!batch) throw new ApiError(404, 'Import batch not found')
-  if (batch.fileHash) {
-    throw new ApiError(409, 'Cannot delete a batch with a confirmed upload')
+
+  const { serverEnv } = await import('@/lib/env.server')
+  const s3 = createR2Client(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+  try {
+    await deleteObjectFromR2(batch.r2Key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
+  } catch (err) {
+    // best effort; do not block DB cleanup
+    console.warn('[import-batches] R2 delete best-effort failed for batch', id, err)
   }
 
-  const deleted = await deleteUnconfirmedImportBatch(serviceSupabase, id)
-  if (!deleted) throw new ApiError(404, 'Import batch not found or already confirmed')
+  const deleted = await deleteImportBatch(serviceSupabase, id)
+  if (!deleted) throw new ApiError(404, 'Import batch not found')
 
   return NextResponse.json({ ok: true })
 })

@@ -65,7 +65,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 
   const { error } = await serviceSupabase
     .from('distributor_import_batches')
-    .update({ file_hash: normalizedHash })
+    .update({ file_hash: normalizedHash, status: 'completed' })
     .eq('id', id)
 
   if (error) throw new ApiError(500, error.message)

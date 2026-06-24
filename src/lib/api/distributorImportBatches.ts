@@ -143,16 +143,18 @@ export async function updateImportBatchStatus(
   if (error) throw new Error(error.message)
 }
 
-/** Remove a batch that never completed upload confirmation (no file_hash). */
-export async function deleteUnconfirmedImportBatch(db: DbClient, id: string): Promise<boolean> {
+/** Delete an import batch row (and its bronze archive) unconditionally. */
+export async function deleteImportBatch(db: DbClient, id: string): Promise<boolean> {
   const { data, error } = await db
     .from('distributor_import_batches')
     .delete()
     .eq('id', id)
-    .is('file_hash', null)
     .select('id')
     .maybeSingle()
 
   if (error) throw new Error(error.message)
   return data != null
 }
+
+/** @deprecated Use deleteImportBatch (confirmed deletes now supported). */
+export const deleteUnconfirmedImportBatch = deleteImportBatch
