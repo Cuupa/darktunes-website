@@ -5,7 +5,7 @@
  * Allows all public pages; blocks admin, portal, press, promo-pool, and API routes.
  * Always references the canonical sitemap.
  *
- * ── AGENTS.md Maintenance Rule ──────────────────────────────────────────────
+ * ── docs/agent/backend.md (robots.txt section) ─────────────────────────────
  * When adding a NEW protected route prefix (e.g. /new-private-area):
  *   1. Add a new `{ userAgent: '*', disallow: '/new-private-area/' }` entry
  *      inside the `rules` array below.

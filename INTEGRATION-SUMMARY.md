@@ -227,7 +227,7 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | `README.md` | Project overview, quick start, scripts |
 | `DEPLOYMENT.md` | Full deployment guide (Vercel, Supabase, R2) |
 | `ADMIN.md` | Admin panel usage documentation |
-| `AGENTS.md` | Coding conventions and agent workflow rules |
+| `AGENTS.md` + `docs/agent/` | Agent index and topic-specific coding conventions |
 | `.env.example` | Required environment variables template |
 | `vercel.json` | Vercel build/deploy configuration |
 | `scripts/vercel-install.sh` | Vercel install hook (npm ci + env var check) |

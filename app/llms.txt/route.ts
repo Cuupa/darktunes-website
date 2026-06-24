@@ -10,7 +10,7 @@
  * invalidation via POST /api/revalidate-site-settings also purges this route
  * because it shares the 'artists' and 'releases' cache tags.
  *
- * ── AGENTS.md Maintenance Rule ───────────────────────────────────────────────
+ * ── docs/agent/backend.md (llms.txt section) ────────────────────────────────
  * When adding a NEW public section to the website (e.g. /merch, /events):
  *   1. Add a section entry in the `## Sections` block inside `buildLlmsTxt()`.
  *   2. If the section has its own DB table, add a DAL query and render those

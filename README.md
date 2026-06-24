@@ -189,7 +189,7 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for full setup instructions.
 
 The schema lives in **`supabase/reset.sql`** — a single fully idempotent script.
 Types are defined in `src/types/database.ts`.
-**Always keep both in sync** — see the schema change checklist in [AGENTS.md](./AGENTS.md).
+**Always keep both in sync** — see the schema change checklist in [docs/agent/data-and-schema.md](./docs/agent/data-and-schema.md).
 
 To apply the schema (fresh or existing database):
 1. Open the **Supabase SQL Editor** in the dashboard.
