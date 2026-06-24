@@ -20,6 +20,7 @@ import { createSalesStatement } from '@/lib/api/salesStatements'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 export interface UploadStatementLineItemInput {
@@ -145,12 +146,13 @@ export async function uploadStatement(
       const { sendStatementNotification } = await import(
         '@/lib/email/sendStatementNotification'
       )
+      const emailCredentials = await getEmailCredentials(serviceSupabase)
       await sendStatementNotification(
         artist,
         { filename: input.filename, period: input.period, amountEur: input.amountEur },
         {
-          resendApiKey: serverEnv.RESEND_API_KEY ?? '',
-          resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? 'noreply@darktunes.com',
+          resendApiKey: emailCredentials.resendApiKey ?? '',
+          resendFromEmail: emailCredentials.resendFromEmail ?? 'noreply@darktunes.com',
           siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com',
           fetch,
         },

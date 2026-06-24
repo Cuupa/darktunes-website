@@ -79,6 +79,18 @@ Spotify Sync Notes:
 Odesli Sync Notes:
   The Odesli batch in `syncAll.ts` tracks `artistsProcessed` (counts release attempts) and captures API errors per-release into `odesliResult.errors`. Rate-limit errors (HTTP 429) set `rateLimited = true`. 404/no-match responses are silently skipped (expected for unlisted tracks).
 
+## API Credentials (encrypted in Supabase)
+
+External integration keys (Spotify, Discogs, Resend, YouTube, MailerLite, health webhook) are stored in `api_credentials` as AES-256-GCM ciphertext. Admin manages them at `/admin/api-keys` (admin-only). API routes: `GET/PUT /api/admin/api-credentials`, `DELETE /api/admin/api-credentials/[key]`, one-time `POST /api/admin/api-credentials/import-env`.
+
+- SSOT key list: `src/lib/secrets/credentialKeys.ts`
+- Encrypt/decrypt: `src/lib/secrets/credentialCrypto.ts` (envelope `v1:<iv>:<tag>:<data>`)
+- DAL: `src/lib/api/apiCredentials.ts` — pass `SupabaseClient` as first arg
+- Runtime resolver: `src/lib/secrets/getExternalCredentials.ts` — 60s in-memory cache; call `invalidateCredentialCache()` after admin writes
+- Sync routes wire credentials via `getSyncCredentials(db)` instead of `process.env`
+- Supabase/Cloudflare bootstrap secrets and `CRON_SECRET` / `REVALIDATE_SECRET` remain in env
+- Edge Function `newsletter-confirm` still uses Supabase Edge Secrets for Resend (not yet migrated)
+
 ## Admin Utility Routes
 
 Admin Utility Routes (admin/editor auth required):
@@ -184,7 +196,7 @@ The Server Action: (1) verifies admin/editor role via `createServerSupabaseClien
 DAL: `createSalesStatement(db, data)` in `src/lib/api/salesStatements.ts` inserts the record. MUST be called with a service-role client to bypass RLS.
 PDF encoding: The client hook (`useSosExports`) converts the PDF Blob to Base64 via `blobToBase64()` (uses `blob.arrayBuffer()` + `btoa`) before calling the Server Action — Server Actions do not support raw Blob transfer.
 Validation helpers: `isValidArtistId` and `isValidPeriod` live in `src/lib/sos/validation.ts`.
-Email notification: After a successful `sales_statements` insert, the Server Action calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. Failure is logged but does NOT block the response (graceful degradation). Skipped silently when `RESEND_API_KEY` is not set.
+Email notification: After a successful `sales_statements` insert, the Server Action calls `sendStatementNotification()` from `src/lib/email/sendStatementNotification.ts`. Failure is logged but does NOT block the response (graceful degradation). Skipped silently when Resend is not configured in Admin → API Keys.
 Admin statements overview: `StatementsManager` component (`src/components/admin/StatementsManager.tsx`) provides a read-only table in the Admin dashboard (Statements tab, admin-only) showing all `sales_statements` rows joined with `artists.name`. Columns: Artist Name, Period, Amount (EUR), Filename (monospace), Created At. Sorted newest first.
 
 ## Submission Notifications
@@ -192,7 +204,7 @@ Admin statements overview: `StatementsManager` component (`src/components/admin/
 Submission Notifications (artist portal → admin)
 When an artist submits a release or video, two notification paths are triggered in parallel:
 1. In-app bell: `editor_notifications` rows are inserted for every user with role `admin` or `editor` (query uses `.in('role', ['admin', 'editor'])`). The `EditorNotificationBell` component in `AdminSidebarNav` highlights unread notifications — it is shown in both the desktop sidebar brand header and the mobile header.
-2. Email: `sendSubmissionNotificationEmail()` in `src/lib/email/sendSubmissionNotificationEmail.ts` sends an HTML notification via Resend to `LABEL_NOTIFICATION_EMAIL`. Follows the same non-throwing, fire-and-forget pattern as `sendStatementNotification.ts` — failure is logged but never blocks the portal response. Silently skipped when `RESEND_API_KEY` or `LABEL_NOTIFICATION_EMAIL` are unset.
+2. Email: `sendSubmissionNotificationEmail()` in `src/lib/email/sendSubmissionNotificationEmail.ts` sends an HTML notification via Resend to `LABEL_NOTIFICATION_EMAIL`. Follows the same non-throwing, fire-and-forget pattern as `sendStatementNotification.ts` — failure is logged but never blocks the portal response. Silently skipped when Resend (Admin → API Keys) or `LABEL_NOTIFICATION_EMAIL` are unset.
 The `sendSubmissionNotificationEmail` function is dependency-injected (`SendSubmissionEmailDeps`) to remain fully testable without network calls. 7 unit tests in `src/lib/email/sendSubmissionNotificationEmail.test.ts`.
 
 ## Admin Live Shows
@@ -216,16 +228,12 @@ Required env vars are split into two groups:
       CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
       CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME,
       CLOUDFLARE_R2_PUBLIC_URL
-  - Optional (external API sync — required for Spotify / Discogs / Songkick artist sync):
-      SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
-     DISCOGS_TOKEN, SONGKICK_API_KEY,
-     BANDSINTOWN_API_KEY
-  - Optional (YouTube sync):
-     YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID, CRON_SECRET
-  - Optional (Newsletter DOI — required for sending Double Opt-In confirmation emails):
-     RESEND_API_KEY, RESEND_FROM_EMAIL, NEXT_PUBLIC_SITE_URL
-  - Optional (MailerLite — adds verified subscribers to the marketing list after DOI confirmation):
-     MAILERLITE_API_KEY, MAILERLITE_GROUP_ID
+  - Required (API credentials encryption):
+      API_CREDENTIALS_ENCRYPTION_KEY (64-char hex; `openssl rand -hex 32`)
+  - External integrations (Spotify, Discogs, Resend, YouTube, MailerLite, etc.):
+      configured in Admin → API Keys (`api_credentials` table), not Vercel env vars
+  - Optional (cron / infra):
+      CRON_SECRET, REVALIDATE_SECRET, NEXT_PUBLIC_SITE_URL, LABEL_NOTIFICATION_EMAIL, CONTACT_EMAIL
   - Optional (ISR webhook revalidation — required for Supabase webhook-triggered cache busting):
      REVALIDATE_SECRET
   - Optional (Supabase Read Replica — Supabase Pro plan; routes heavy analytics reads off the primary DB):

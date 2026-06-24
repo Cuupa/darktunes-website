@@ -22,6 +22,7 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
   const builder = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
@@ -47,6 +48,9 @@ function createMockDb(): SupabaseClient<Database> {
       if (table === 'sync_logs') {
         return makeThenableBuilder([RECENT_LOG])
       }
+      if (table === 'api_credentials') {
+        return makeThenableBuilder([])
+      }
       if (table === 'sync_queue') {
         return {
           select: vi.fn((fields: string) =>
@@ -68,12 +72,7 @@ function createMockDb(): SupabaseClient<Database> {
 
 describe('buildHealthSnapshot', () => {
   beforeEach(() => {
-    vi.stubEnv('SPOTIFY_CLIENT_ID', '')
-    vi.stubEnv('SPOTIFY_CLIENT_SECRET', '')
-    vi.stubEnv('DISCOGS_TOKEN', '')
-    vi.stubEnv('SONGKICK_API_KEY', '')
-    vi.stubEnv('BANDSINTOWN_API_KEY', '')
-    vi.stubEnv('YOUTUBE_API_KEY', '')
+    vi.stubEnv('API_CREDENTIALS_ENCRYPTION_KEY', '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
   })
 
   it('returns unavailable APIs when db is null', async () => {

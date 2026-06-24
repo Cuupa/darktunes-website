@@ -10,6 +10,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "accreditation_requests: own read",
   "admin_audit_log: admin insert",
   "admin_audit_log: admin read",
+  "api_credentials_admin_only",
   "app_logs: admin read",
   "app_logs: authenticated insert",
   "artist_assets_admin_all",
@@ -207,6 +208,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
 [
   "accreditation_requests",
   "admin_audit_log",
+  "api_credentials",
   "app_logs",
   "artist_assets",
   "artist_billing_profiles",
@@ -292,6 +294,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "admin_audit_log": [
     "admin_audit_log: admin insert",
     "admin_audit_log: admin read",
+  ],
+  "api_credentials": [
+    "api_credentials_admin_only",
   ],
   "app_logs": [
     "app_logs: admin read",

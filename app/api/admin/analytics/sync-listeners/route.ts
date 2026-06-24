@@ -8,6 +8,7 @@ import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { syncListenerMetricsForArtists } from '@/lib/analytics/syncListenerMetrics'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { getListenerAnalyticsCredentials } from '@/lib/secrets/getExternalCredentials'
 
 async function requireAdminOrEditor() {
   const supabase = await createServerSupabaseClient()
@@ -23,8 +24,8 @@ async function requireAdminOrEditor() {
 export const POST = withErrorHandler(async (): Promise<NextResponse> => {
   await requireAdminOrEditor()
 
-  const { serverEnv } = await import('@/lib/env.server')
   const serviceSupabase = await createServiceRoleSupabaseClient()
+  const { lastfmApiKey, soundchartsApiKey } = await getListenerAnalyticsCredentials(serviceSupabase)
 
   const { data: artists, error } = await serviceSupabase
     .from('artists')
@@ -42,8 +43,8 @@ export const POST = withErrorHandler(async (): Promise<NextResponse> => {
       soundchartsUuid: a.soundcharts_id,
     })),
     {
-      lastfmApiKey: serverEnv.LASTFM_API_KEY,
-      soundchartsApiKey: serverEnv.SOUNDCHARTS_API_KEY,
+      lastfmApiKey: lastfmApiKey ?? undefined,
+      soundchartsApiKey: soundchartsApiKey ?? undefined,
     },
   )
 

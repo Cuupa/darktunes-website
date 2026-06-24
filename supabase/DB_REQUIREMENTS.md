@@ -58,6 +58,7 @@ Each logical attribute has **exactly one canonical table**:
 | Artist primary image | `artists.image_url` | `artist_profiles.photo_url` is the EPK press photo (different purpose) |
 | Artist genres | `artists.genres` | `artist_profiles.genres` is an optional EPK override (intentional) |
 | CMS key-value settings | `site_settings` | Never replicate in code constants |
+| External integration API keys | `api_credentials` | AES-256-GCM ciphertext; master key in `API_CREDENTIALS_ENCRYPTION_KEY` env only; admin-only RLS; `label_id NULL` = default tenant |
 
 ### 2.4 Junction Tables for Many-to-Many Relationships
 

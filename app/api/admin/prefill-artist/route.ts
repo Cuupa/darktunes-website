@@ -4,6 +4,8 @@ import { fetchSpotifyArtistProfile } from '@/lib/sync/spotifyApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { extractSpotifyArtistId } from '@/lib/parsers/platformUrlParser'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 
 interface PrefillResponse {
   spotifyId: string
@@ -37,13 +39,12 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Invalid Spotify artist URL or ID')
   }
 
-  // Dynamic import defers validation — note: we only need SPOTIFY vars here but
-  // keep direct process.env access to avoid requiring R2 vars (serverEnv validates all).
-  const clientId = process.env.SPOTIFY_CLIENT_ID
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-  if (!clientId || !clientSecret) {
-    throw new ApiError(503, 'Spotify is not configured')
+  const db = await createServiceRoleSupabaseClient()
+  const { spotify } = await getSyncCredentials(db)
+  if (!spotify) {
+    throw new ApiError(503, 'Spotify is not configured in Admin → API Keys')
   }
+  const { clientId, clientSecret } = spotify
 
   try {
     const profile = await withExponentialBackoff(() =>

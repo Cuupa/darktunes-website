@@ -37,17 +37,18 @@ import type {
   HealthResponse,
   SyncQueueHealth,
 } from './types'
+import { getKnownApiConfiguration } from '@/lib/secrets/getExternalCredentials'
 
-/** Known API sources with their configuration check. */
-export function getKnownApis(): Record<string, boolean> {
+/** Fallback when DB is unavailable — only always-on APIs marked configured. */
+export function getKnownApisFallback(): Record<string, boolean> {
   return {
     itunes: true,
-    spotify: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
-    discogs: !!process.env.DISCOGS_TOKEN,
-    songkick: !!process.env.SONGKICK_API_KEY,
-    bandsintown: !!process.env.BANDSINTOWN_API_KEY,
+    spotify: false,
+    discogs: false,
+    songkick: false,
+    bandsintown: false,
     odesli: true,
-    youtube: !!process.env.YOUTUBE_API_KEY,
+    youtube: false,
   }
 }
 
@@ -174,7 +175,9 @@ export async function buildHealthSnapshot(
 ): Promise<HealthResponse> {
   const checkedAt = new Date().toISOString()
   const nowMs = deps.nowMs ?? Date.now()
-  const knownApis = deps.knownApis ?? getKnownApis()
+  const knownApis =
+    deps.knownApis ??
+    (deps.db ? await getKnownApiConfiguration(deps.db) : getKnownApisFallback())
   const cutoffLookback = new Date(nowMs - HEALTH_LOG_LOOKBACK_MS).toISOString()
   const cutoff24hMs = nowMs - 24 * 60 * 60 * 1000
 
@@ -269,9 +272,7 @@ export async function buildHealthSnapshot(
           heartbeats,
           syncQueue: syncQueueHealth,
           cronSecretConfigured: Boolean(process.env.CRON_SECRET),
-          youtubeConfigured: Boolean(
-            process.env.YOUTUBE_API_KEY && process.env.YOUTUBE_CHANNEL_ID,
-          ),
+          youtubeConfigured: knownApis.youtube ?? false,
           nowMs,
         })
       }

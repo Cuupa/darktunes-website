@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { verifySubscriberToken } from '@/lib/api/newsletter'
+import { getMailerLiteCredentials } from '@/lib/secrets/getExternalCredentials'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
@@ -43,13 +44,17 @@ function getServiceClient() {
 
 /**
  * Pushes a verified subscriber to MailerLite (fire-and-forget).
- * Only runs when MAILERLITE_API_KEY is set. Failure is logged but does NOT
+ * Only runs when MailerLite is configured in Admin → API Keys. Failure is logged but does NOT
  * prevent the verification from succeeding — the subscriber is already in
  * Supabase.
  */
-async function syncToMailerLite(email: string, name?: string): Promise<void> {
-  const apiKey = process.env.MAILERLITE_API_KEY
-  const groupId = process.env.MAILERLITE_GROUP_ID
+async function syncToMailerLite(
+  db: ReturnType<typeof getServiceClient>,
+  email: string,
+  name?: string,
+): Promise<void> {
+  if (!db) return
+  const { apiKey, groupId } = await getMailerLiteCredentials(db)
   if (!apiKey) return
 
   const body: Record<string, unknown> = { email, status: 'active' }
@@ -118,7 +123,7 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   }
 
   // Push to MailerLite (non-blocking — failure is logged, not surfaced)
-  await syncToMailerLite(subscriber.email, subscriber.name)
+  await syncToMailerLite(db, subscriber.email, subscriber.name)
 
   return NextResponse.redirect(new URL(successUrl, req.url))
 })

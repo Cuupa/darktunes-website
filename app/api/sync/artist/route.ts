@@ -18,6 +18,7 @@ import { syncSingleArtist } from '@/lib/sync/syncAll'
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
+import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { serverEnv } = await import('@/lib/env.server')
@@ -40,19 +41,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Missing required field: artistId')
   }
 
-  const {
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    DISCOGS_TOKEN,
-    SONGKICK_API_KEY,
-    BANDSINTOWN_API_KEY,
-  } = process.env
-
   const db = createClient<Database>(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } },
   )
+
+  const syncCredentials = await getSyncCredentials(db)
 
   const uploadFn = createSyncUploadFn(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -66,13 +61,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     db,
     fetch: globalThis.fetch,
     uploadToR2: uploadFn,
-    spotify:
-      SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET
-        ? { clientId: SPOTIFY_CLIENT_ID, clientSecret: SPOTIFY_CLIENT_SECRET }
-        : undefined,
-    discogsToken: DISCOGS_TOKEN,
-    songkickApiKey: SONGKICK_API_KEY,
-    bandsintownApiKey: BANDSINTOWN_API_KEY,
+    spotify: syncCredentials.spotify,
+    discogsToken: syncCredentials.discogsToken,
+    songkickApiKey: syncCredentials.songkickApiKey,
+    bandsintownApiKey: syncCredentials.bandsintownApiKey,
   })
 
   revalidateTag('releases')

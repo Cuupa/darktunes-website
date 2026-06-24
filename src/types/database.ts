@@ -142,6 +142,41 @@ export interface Database {
         }
         Relationships: []
       }
+      api_credentials: {
+        Row: {
+          label_id: string | null
+          key: string
+          value: string
+          category: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          label_id?: string | null
+          key: string
+          value?: string
+          category?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          label_id?: string | null
+          key?: string
+          value?: string
+          category?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'api_credentials_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       genres: {
         Row: {
           id: string

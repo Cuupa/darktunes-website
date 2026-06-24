@@ -13,6 +13,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { HttpError } from '@/lib/rateLimiter'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 
 // ---------------------------------------------------------------------------
 // Spotify helpers
@@ -35,11 +37,11 @@ async function getSpotifyAccessToken(clientId: string, clientSecret: string): Pr
   return data.access_token
 }
 
-async function fetchSpotifyArtistImage(spotifyId: string): Promise<string | null> {
-  const clientId = process.env.SPOTIFY_CLIENT_ID
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-  if (!clientId || !clientSecret) return null
-
+async function fetchSpotifyArtistImage(
+  spotifyId: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<string | null> {
   const token = await getSpotifyAccessToken(clientId, clientSecret)
   const response = await fetch(`https://api.spotify.com/v1/artists/${spotifyId}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -54,8 +56,10 @@ async function fetchSpotifyArtistImage(spotifyId: string): Promise<string | null
 // Discogs helpers
 // ---------------------------------------------------------------------------
 
-async function fetchDiscogsArtistImage(discogsId: string): Promise<string | null> {
-  const token = process.env.DISCOGS_TOKEN
+async function fetchDiscogsArtistImage(
+  discogsId: string,
+  token: string | null,
+): Promise<string | null> {
   const headers: Record<string, string> = {
     'User-Agent': 'darkTunes/1.0',
   }
@@ -99,12 +103,17 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Provide at least spotifyId or discogsId')
   }
 
+  const db = await createServiceRoleSupabaseClient()
+  const syncCredentials = await getSyncCredentials(db)
+  const discogsToken = syncCredentials.discogsToken ?? null
+
   // 3. Try Spotify first, then Discogs
   let imageUrl: string | null = null
 
-  if (spotifyId) {
+  if (spotifyId && syncCredentials.spotify) {
     try {
-      imageUrl = await fetchSpotifyArtistImage(spotifyId)
+      const { clientId, clientSecret } = syncCredentials.spotify
+      imageUrl = await fetchSpotifyArtistImage(spotifyId, clientId, clientSecret)
     } catch {
       // continue to Discogs fallback
     }
@@ -112,7 +121,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   if (!imageUrl && discogsId) {
     try {
-      imageUrl = await fetchDiscogsArtistImage(discogsId)
+      imageUrl = await fetchDiscogsArtistImage(discogsId, discogsToken)
     } catch {
       // no image available
     }

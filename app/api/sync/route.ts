@@ -10,6 +10,7 @@ import { syncSingleArtist } from '@/lib/sync/syncAll'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
+import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 
 const TIME_BUDGET_MS = 50_000
 
@@ -29,19 +30,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     await verifyAdmin(token)
   }
 
-  const {
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    DISCOGS_TOKEN,
-    SONGKICK_API_KEY,
-    BANDSINTOWN_API_KEY,
-  } = process.env
-
   const db = createClient<Database>(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } },
   )
+
+  const syncCredentials = await getSyncCredentials(db)
 
   void recordHealthHeartbeat(db, 'sync_execute')
 
@@ -71,13 +66,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
           db,
           fetch: globalThis.fetch,
           uploadToR2: uploadFn,
-          spotify:
-            SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET
-              ? { clientId: SPOTIFY_CLIENT_ID, clientSecret: SPOTIFY_CLIENT_SECRET }
-              : undefined,
-          discogsToken: DISCOGS_TOKEN,
-          songkickApiKey: SONGKICK_API_KEY,
-          bandsintownApiKey: BANDSINTOWN_API_KEY,
+          spotify: syncCredentials.spotify,
+          discogsToken: syncCredentials.discogsToken,
+          songkickApiKey: syncCredentials.songkickApiKey,
+          bandsintownApiKey: syncCredentials.bandsintownApiKey,
         })
 
         await markSyncJobDone(db, job.id)

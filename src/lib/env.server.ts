@@ -7,6 +7,9 @@
  * NEXT_PUBLIC_* vars are available server-side as process.env.NEXT_PUBLIC_*.
  * Non-prefixed vars (R2 keys, service role key) are server-only.
  *
+ * External integration API keys (Spotify, Resend, etc.) are stored encrypted
+ * in api_credentials — see src/lib/secrets/getExternalCredentials.ts.
+ *
  * If any required variable is missing, this module throws with a clear error
  * message so the build/startup fails loudly rather than crashing at runtime.
  */
@@ -34,55 +37,17 @@ const serverEnvSchema = z.object({
   CLOUDFLARE_R2_PUBLIC_URL: z
     .string()
     .url({ message: 'must be a valid URL (e.g. https://cdn.darktunes.com)' }),
-  // ---------------------------------------------------------------------------
-  // Optional external API keys — leave blank to disable the corresponding sync
-  // ---------------------------------------------------------------------------
-  /** Spotify Web API client ID (https://developer.spotify.com/dashboard) */
-  SPOTIFY_CLIENT_ID: z
+  /**
+   * Master key for AES-256-GCM encryption of api_credentials values.
+   * Generate with: openssl rand -hex 32
+   * Stored only in Vercel env — never in Supabase or the browser.
+   */
+  API_CREDENTIALS_ENCRYPTION_KEY: z
     .string()
-    .optional()
-    .describe('Spotify client ID — leave blank to disable Spotify sync'),
-  /** Spotify Web API client secret */
-  SPOTIFY_CLIENT_SECRET: z
-    .string()
-    .optional()
-    .describe('Spotify client secret — leave blank to disable Spotify sync'),
-  /** Discogs Personal Access Token (https://www.discogs.com/settings/developers) */
-  DISCOGS_TOKEN: z
-    .string()
-    .optional()
-    .describe('Discogs token — leave blank to disable Discogs sync'),
-  /** Songkick API key (https://www.songkick.com/developer) */
-  SONGKICK_API_KEY: z
-    .string()
-    .optional()
-    .describe('Songkick API key — leave blank to disable Songkick sync'),
-  /** Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access) */
-  BANDSINTOWN_API_KEY: z
-    .string()
-    .optional()
-    .describe('Bandsintown API key — leave blank to disable Bandsintown sync'),
-  /** Last.fm API key (https://www.last.fm/api/account/create) */
-  LASTFM_API_KEY: z
-    .string()
-    .optional()
-    .describe('Last.fm API key — leave blank to disable listener sync'),
-  /** Soundcharts API key (optional paid tier) */
-  SOUNDCHARTS_API_KEY: z
-    .string()
-    .optional()
-    .describe('Soundcharts API key — leave blank to disable Soundcharts sync'),
-  /** Resend API key — used for contact form emails and SOS statement notifications */
-  RESEND_API_KEY: z
-    .string()
-    .optional()
-    .describe('Resend API key — leave blank to disable email notifications'),
-  /** Resend verified sender address for outgoing emails */
-  RESEND_FROM_EMAIL: z
-    .string()
-    .optional()
-    .describe('Resend from address, e.g. noreply@darktunes.com'),
-  /** Cron job secret — protects the POST /api/sync endpoint from unauthorised triggers */
+    .regex(/^[0-9a-fA-F]{64}$/, {
+      message: 'must be a 64-character hex string (32 bytes). Generate with: openssl rand -hex 32',
+    }),
+  /** Cron job secret — protects sync/health cron endpoints from unauthorised triggers */
   CRON_SECRET: z
     .string()
     .optional()
@@ -101,13 +66,7 @@ function validateServerEnv(): ServerEnv {
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME,
     CLOUDFLARE_R2_PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL,
-    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
-    DISCOGS_TOKEN: process.env.DISCOGS_TOKEN,
-    SONGKICK_API_KEY: process.env.SONGKICK_API_KEY,
-    BANDSINTOWN_API_KEY: process.env.BANDSINTOWN_API_KEY,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
-    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    API_CREDENTIALS_ENCRYPTION_KEY: process.env.API_CREDENTIALS_ENCRYPTION_KEY,
     CRON_SECRET: process.env.CRON_SECRET,
   })
 
