@@ -18,6 +18,7 @@
  *   bandsintown  — sync Bandsintown concerts     (POST /api/sync-api, apiSource: bandsintown)
  *   odesli       — resolve Odesli smart links    (POST /api/sync-api, apiSource: odesli)
  *   process-queue — process pending sync_queue jobs  (POST /api/sync)
+ *   health-alert   — proactive health alert dispatcher (POST /api/health/alert)
  *
  * Usage options:
  *
@@ -64,6 +65,7 @@ type SyncType =
   | 'bandsintown'
   | 'odesli'
   | 'process-queue'
+  | 'health-alert'
 
 const VALID_TYPES = new Set<SyncType>([
   'all',
@@ -75,6 +77,7 @@ const VALID_TYPES = new Set<SyncType>([
   'bandsintown',
   'odesli',
   'process-queue',
+  'health-alert',
 ])
 
 function isValidSyncType(value: string): value is SyncType {
@@ -187,8 +190,11 @@ serve(async (req: Request) => {
     } else {
       if (syncType === 'youtube') {
         targetUrl = `${siteUrl}/api/sync-youtube`
-      } else if (syncType === 'process-queue') {
-        targetUrl = `${siteUrl}/api/sync`
+      } else if (syncType === 'process-queue' || syncType === 'health-alert') {
+        targetUrl =
+          syncType === 'health-alert'
+            ? `${siteUrl}/api/health/alert`
+            : `${siteUrl}/api/sync`
       } else {
         targetUrl = `${siteUrl}/api/sync-api`
         requestBody = {apiSource: syncType}
