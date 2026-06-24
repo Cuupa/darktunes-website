@@ -1,5 +1,5 @@
 /**
- * Client-side Bronze layer upload: raw distributor CSV → R2 via presigned PUT.
+ * Client-side Bronze layer upload: raw distributor CSV → R2 via server-side API route.
  */
 
 const MONTH_RE = /^\d{4}-\d{2}$/
@@ -60,6 +60,7 @@ export async function uploadBronzeDistributorCsv(
         filename: uploadFilename,
         file_hash: fileHash,
         row_count: params.rowCount,
+        csv_content: params.csvContent,
       }),
     })
 
@@ -73,21 +74,9 @@ export async function uploadBronzeDistributorCsv(
       return null
     }
 
-    const { batch, uploadUrl, r2Key } = (await registerRes.json()) as {
+    const { batch, r2Key } = (await registerRes.json()) as {
       batch: { id: string }
-      uploadUrl: string
       r2Key: string
-    }
-
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: params.csvContent,
-      headers: { 'Content-Type': 'text/csv; charset=utf-8' },
-    })
-
-    if (!putRes.ok) {
-      console.error('[bronzeUpload] R2 PUT failed:', putRes.status, putRes.statusText)
-      return null
     }
 
     return { batchId: batch.id, r2Key }
