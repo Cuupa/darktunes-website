@@ -118,6 +118,8 @@ export async function uploadBronzeDistributorCsv(
       ? params.filename.replace(/\.xlsx$/i, '.csv')
       : params.filename
 
+    const fileHash = await sha256HexFromBuffer(await uploadBlob.arrayBuffer())
+
     const registerPayload = JSON.stringify({
       period_start: params.periodStart,
       period_end: params.periodEnd,
@@ -125,6 +127,7 @@ export async function uploadBronzeDistributorCsv(
       filename: uploadFilename,
       row_count: params.rowCount,
       file_size: uploadBlob.size,
+      file_hash: fileHash,
     })
 
     if (registerPayload.length > MAX_REGISTRATION_JSON_BYTES) {
@@ -148,10 +151,24 @@ export async function uploadBronzeDistributorCsv(
       return null
     }
 
-    const { batch, uploadUrl, r2Key } = (await registerRes.json()) as {
-      batch: { id: string }
-      uploadUrl: string
-      r2Key: string
+    const registerJson = (await registerRes.json()) as {
+      batch: { id: string; r2Key?: string }
+      uploadUrl?: string
+      r2Key?: string
+      duplicate?: boolean
+    }
+
+    if (registerJson.duplicate) {
+      return {
+        batchId: registerJson.batch.id,
+        r2Key: registerJson.batch.r2Key ?? registerJson.r2Key ?? '',
+      }
+    }
+
+    const { batch, uploadUrl, r2Key } = registerJson
+    if (!batch?.id || !uploadUrl || !r2Key) {
+      console.error('[bronzeUpload] invalid register response')
+      return null
     }
 
     const putRes = await fetch(uploadUrl, {
@@ -166,7 +183,6 @@ export async function uploadBronzeDistributorCsv(
       return null
     }
 
-    const fileHash = await sha256HexFromBuffer(await uploadBlob.arrayBuffer())
     const confirmed = await confirmBronzeUpload(batch.id, fileHash)
     if (!confirmed) {
       console.error('[bronzeUpload] hash confirm failed after R2 PUT for batch:', batch.id)

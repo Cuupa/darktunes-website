@@ -73,8 +73,22 @@ export function PayoutManager({
     payoutInvalidIbanToast: 'Invalid IBAN',
     payoutHolderMissingToast: 'Account holder is required',
     payoutSepaSavedToast: 'Label SEPA details saved',
+    payoutLabelIbanMissingToast: 'Label IBAN missing',
+    payoutLabelIbanMissingDesc:
+      'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
+    payoutInvalidLabelIbanToast: 'Invalid label IBAN',
+    payoutInvalidLabelIbanDesc: 'The stored label IBAN failed the modulo-97 checksum validation.',
+    payoutNoArtistsSelectedToast: 'No artists selected',
+    payoutNoArtistsSelectedDesc: 'Select at least one artist with a valid IBAN.',
+    payoutSepaExportedToast: 'SEPA XML exported',
+    payoutSepaExportedDesc: '{count} transfers · {amount} total',
+    payoutSepaExportFailedToast: 'SEPA export failed',
+    payoutLabelIbanMissingBadge: 'Label IBAN missing',
   } as const
-  const t = { ...payoutFallback, ...(dict.admin?.accounting ?? {}) }
+  const t = useMemo(
+    () => ({ ...payoutFallback, ...(dict.admin?.accounting ?? {}) }),
+    [dict.admin?.accounting],
+  )
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loadingRegister, setLoadingRegister] = useState(true)
@@ -191,21 +205,20 @@ export function PayoutManager({
 
   const handleExport = useCallback(() => {
     if (!labelInfo.sepaIban) {
-      toast.error('Label IBAN missing', {
-        description:
-          'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
+      toast.error(t.payoutLabelIbanMissingToast, {
+        description: t.payoutLabelIbanMissingDesc,
       })
       return
     }
     if (!isValidIBAN(labelInfo.sepaIban)) {
-      toast.error('Invalid label IBAN', {
-        description: 'The stored label IBAN failed the modulo-97 checksum validation.',
+      toast.error(t.payoutInvalidLabelIbanToast, {
+        description: t.payoutInvalidLabelIbanDesc,
       })
       return
     }
     if (selectedPayouts.length === 0) {
-      toast.error('No artists selected', {
-        description: 'Select at least one artist with a valid IBAN.',
+      toast.error(t.payoutNoArtistsSelectedToast, {
+        description: t.payoutNoArtistsSelectedDesc,
       })
       return
     }
@@ -228,14 +241,17 @@ export function PayoutManager({
       const safeLabel = (labelInfo.name || 'sepa').toLowerCase().replace(/[^a-z0-9]/g, '-')
       const today = new Date().toISOString().slice(0, 10)
       downloadSepaXml(xml, `${safeLabel}-payouts-${today}.xml`)
-      toast.success('SEPA XML exported', {
-        description: `${selectedPayouts.length} transfers · ${fmtEur(totalSelected)} total`,
+      toast.success(t.payoutSepaExportedToast, {
+        description: interpolate(t.payoutSepaExportedDesc, {
+          count: selectedPayouts.length,
+          amount: fmtEur(totalSelected),
+        }),
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('SEPA export failed', { description: message })
+      toast.error(t.payoutSepaExportFailedToast, { description: message })
     }
-  }, [selectedPayouts, labelInfo, periodStart, periodEnd, totalSelected])
+  }, [selectedPayouts, labelInfo, periodStart, periodEnd, totalSelected, t])
 
   const labelIbanOk = useMemo(
     () => !!labelInfo.sepaIban && isValidIBAN(labelInfo.sepaIban),
@@ -284,7 +300,7 @@ export function PayoutManager({
             {!labelIbanOk && (
               <span className="text-xs text-amber-400 flex items-center gap-1">
                 <Warning size={13} weight="bold" />
-                Label IBAN missing
+                {t.payoutLabelIbanMissingBadge}
               </span>
             )}
             <Button

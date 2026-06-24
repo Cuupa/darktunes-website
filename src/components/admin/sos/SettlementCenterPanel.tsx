@@ -391,8 +391,14 @@ export function SettlementCenterPanel({
     () => ({ ...SETTLEMENT_FALLBACK, ...(dict.admin?.accounting ?? {}) }),
     [dict.admin?.accounting],
   )
-  const invoiceStatusLabels = useMemo(() => buildInvoiceStatusLabels(t), [t])
-  const periodStatusLabels = useMemo(() => buildPeriodStatusLabels(t), [t])
+  const invoiceStatusLabels = useMemo(
+    () => buildInvoiceStatusLabels(t as unknown as Record<string, string | undefined>),
+    [t],
+  )
+  const periodStatusLabels = useMemo(
+    () => buildPeriodStatusLabels(t as unknown as Record<string, string | undefined>),
+    [t],
+  )
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loading, setLoading] = useState(true)

@@ -8,7 +8,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { createImportBatch, listImportBatches } from '@/lib/api/distributorImportBatches'
+import {
+  createImportBatch,
+  findImportBatchByFileHash,
+  listImportBatches,
+} from '@/lib/api/distributorImportBatches'
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
@@ -78,6 +82,15 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw new ApiError(400, 'period_start, period_end, distributor, and filename are required')
   }
 
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+
+  if (file_hash && /^[a-f0-9]{64}$/i.test(file_hash)) {
+    const existing = await findImportBatchByFileHash(serviceSupabase, file_hash)
+    if (existing) {
+      return NextResponse.json({ batch: existing, duplicate: true }, { status: 200 })
+    }
+  }
+
   const batchId = randomUUID()
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const hashPrefix = file_hash?.slice(0, 12) ?? createHash('sha256').update(`${batchId}-${filename}`).digest('hex').slice(0, 12)
@@ -102,7 +115,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     uploadExpiryForFileSize(file_size),
   )
 
-  const serviceSupabase = await createServiceRoleSupabaseClient()
   await assertSettlementPeriodWritable(serviceSupabase, period_start, period_end)
 
   const batch = await createImportBatch(serviceSupabase, {
@@ -110,7 +122,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     periodEnd: period_end,
     distributor,
     r2Key,
-    fileHash: file_hash ?? null,
     rowCount: row_count ?? 0,
     uploadedBy: user.id,
   })

@@ -76,6 +76,24 @@ export async function createImportBatch(
   return rowToBatch(row as Row)
 }
 
+export async function findImportBatchByFileHash(
+  db: DbClient,
+  fileHash: string,
+): Promise<DistributorImportBatch | null> {
+  const normalized = fileHash.toLowerCase()
+  const { data, error } = await db
+    .from('distributor_import_batches')
+    .select('*')
+    .eq('file_hash', normalized)
+    .neq('status', 'failed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? rowToBatch(data as Row) : null
+}
+
 export async function getImportBatchById(
   db: DbClient,
   id: string,

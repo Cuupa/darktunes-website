@@ -355,7 +355,7 @@ function SosGeneratorPanel() {
     expenses: ExpenseEntry[]
     ignoredEntries: IgnoredEntry[]
     csvAliases: CSVColumnAlias[]
-    trackRevenueAssignments?: TrackRevenueAssignment[]
+    trackRevenueAssignments: TrackRevenueAssignment[]
   }) => {
     setAppDefaults(preset.appDefaults)
     setEmailConfig(preset.emailConfig)
@@ -366,9 +366,7 @@ function SosGeneratorPanel() {
     setExpenses(preset.expenses)
     setIgnoredEntries(preset.ignoredEntries)
     setCsvAliases(preset.csvAliases)
-    if (preset.trackRevenueAssignments) {
-      setTrackRevenueAssignments(preset.trackRevenueAssignments)
-    }
+    setTrackRevenueAssignments(preset.trackRevenueAssignments)
   }, [])
 
   // File managers for each source
@@ -615,6 +613,7 @@ function SosGeneratorPanel() {
                 expenses={expenses}
                 ignoredEntries={ignoredEntries}
                 csvAliases={csvAliases}
+                trackRevenueAssignments={trackRevenueAssignments}
                 appDefaults={appDefaults}
                 emailConfig={emailConfig}
                 onLoad={handlePresetLoad}
@@ -738,7 +737,12 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'reporting' && (
-          hasData ? (
+          <div
+            id="accounting-subtab-panel-reporting"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-reporting"
+          >
+          {hasData ? (
             <ReportingPanel
               revenues={revenues}
               onDownloadPDF={handleDownloadPDF}
@@ -757,11 +761,17 @@ function SosGeneratorPanel() {
               <FileText size={32} className="opacity-30" />
               <p className="text-sm">{t.emptyReporting}</p>
             </div>
-          )
+          )}
+          </div>
         )}
 
         {activeSubTab === 'settlements' && (
-          hasData ? (
+          <div
+            id="accounting-subtab-panel-settlements"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-settlements"
+          >
+          {hasData ? (
             <SettlementCenterPanel
               revenues={revenues}
               labelArtists={labelArtists}
@@ -775,11 +785,17 @@ function SosGeneratorPanel() {
               <SealCheck size={32} className="opacity-30" />
               <p className="text-sm">{t.emptySettlements}</p>
             </div>
-          )
+          )}
+          </div>
         )}
 
         {activeSubTab === 'analytics' && (
-          <div className="p-6 space-y-6">
+          <div
+            id="accounting-subtab-panel-analytics"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-analytics"
+            className="p-6 space-y-6"
+          >
             <section className="space-y-4" aria-labelledby="analytics-ops-heading">
               <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
                 {t.analyticsOpsHeading}
@@ -833,7 +849,12 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'payout' && (
-          hasData ? (
+          <div
+            id="accounting-subtab-panel-payout"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-payout"
+          >
+          {hasData ? (
             <PayoutManager
               labelArtists={labelArtists}
               labelInfo={labelInfo}
@@ -846,19 +867,31 @@ function SosGeneratorPanel() {
               <Bank size={32} className="opacity-30" />
               <p className="text-sm">{t.emptyPayout}</p>
             </div>
-          )
+          )}
+          </div>
         )}
 
         {activeSubTab === 'trends' && (
+          <div
+            id="accounting-subtab-panel-trends"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-trends"
+          >
           <TrendsDashboard
             revenues={revenues}
             periodStart={detectedPeriodStart}
             periodEnd={detectedPeriodEnd}
             bronzeBatchIds={bronzeBatchIds}
           />
+          </div>
         )}
 
         {activeSubTab === 'rules' && (
+          <div
+            id="accounting-subtab-panel-rules"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-rules"
+          >
           <RulesPanel
             artistMappings={artistMappings}
             compilationFilters={compilationFilters}
@@ -895,6 +928,7 @@ function SosGeneratorPanel() {
             availableArtists={uniqueArtists ?? []}
             availableReleases={allReleaseTitles}
           />
+          </div>
         )}
       </div>
     </div>
