@@ -40,7 +40,10 @@ function toUploadBlob(body: Blob | ArrayBuffer | string, contentType: string): B
 }
 
 export async function sha256HexFromBuffer(buffer: ArrayBuffer): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', buffer)
+  // Copy bytes so jsdom Blob.arrayBuffer() buffers work with Node Web Crypto in tests/CI.
+  const bytes = new Uint8Array(buffer.byteLength)
+  bytes.set(new Uint8Array(buffer))
+  const hash = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')

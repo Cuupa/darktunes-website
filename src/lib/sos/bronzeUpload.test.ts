@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as bronzeUpload from './bronzeUpload'
-
-const { extractPeriodBounds, uploadBronzeDistributorCsv } = bronzeUpload
-const TEST_FILE_HASH = 'a'.repeat(64)
+import { extractPeriodBounds, uploadBronzeDistributorCsv } from './bronzeUpload'
 
 describe('extractPeriodBounds', () => {
   it('returns min and max valid YYYY-MM months', () => {
@@ -27,12 +24,10 @@ describe('uploadBronzeDistributorCsv', () => {
   beforeEach(() => {
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
-    vi.spyOn(bronzeUpload, 'sha256HexFromBuffer').mockResolvedValue(TEST_FILE_HASH)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
   it('abandons the batch when R2 PUT fails', async () => {
