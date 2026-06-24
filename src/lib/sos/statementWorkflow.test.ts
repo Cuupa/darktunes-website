@@ -5,10 +5,17 @@ import {
   deriveCompletedWorkflowSteps,
   emptyWorkflowStatusCounts,
   statementMatchesPeriod,
+  WORKFLOW_STATUS_LABELS,
   workflowStatusFromStatement,
 } from './statementWorkflow'
 
 describe('statementWorkflow', () => {
+  it('uses distinct labels for invoiced and acknowledged', () => {
+    expect(WORKFLOW_STATUS_LABELS.invoiced).toBe('Rechnung erstellt')
+    expect(WORKFLOW_STATUS_LABELS.acknowledged).toBe('Bestätigt')
+    expect(WORKFLOW_STATUS_LABELS.invoiced).not.toBe(WORKFLOW_STATUS_LABELS.acknowledged)
+  })
+
   it('maps statement statuses to workflow statuses', () => {
     expect(workflowStatusFromStatement(undefined, true)).toBe('not_uploaded')
     expect(workflowStatusFromStatement('draft', true)).toBe('draft')

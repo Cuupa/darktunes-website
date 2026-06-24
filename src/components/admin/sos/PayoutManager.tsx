@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DownloadSimple, Warning, CheckCircle, Bank } from '@phosphor-icons/react'
@@ -17,6 +19,7 @@ interface PayoutManagerProps {
   labelInfo: LabelInfo
   periodStart: string
   periodEnd: string
+  onLabelSepaUpdate?: (sepaIban: string, sepaAccountHolder: string) => void
 }
 
 function buildPeriodLabel(periodStart: string, periodEnd: string): string {
@@ -49,7 +52,12 @@ export function PayoutManager({
   labelInfo,
   periodStart,
   periodEnd,
+  onLabelSepaUpdate,
 }: PayoutManagerProps) {
+  const [draftSepaIban, setDraftSepaIban] = useState(labelInfo.sepaIban ?? '')
+  const [draftSepaAccountHolder, setDraftSepaAccountHolder] = useState(
+    labelInfo.sepaAccountHolder ?? labelInfo.name ?? '',
+  )
   const rows = useMemo<PayoutRow[]>(() => {
     return revenues
       .filter(r => r.finalAmount > 0)
@@ -105,7 +113,7 @@ export function PayoutManager({
   const handleExport = useCallback(() => {
     if (!labelInfo.sepaIban) {
       toast.error('Label IBAN missing', {
-        description: 'Add the label sender IBAN under Settings → Branding → SEPA sender account.',
+        description: 'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
       })
       return
     }
@@ -180,7 +188,7 @@ export function PayoutManager({
             {!labelIbanOk && (
               <span className="text-xs text-amber-400 flex items-center gap-1">
                 <Warning size={13} weight="bold" />
-                Label IBAN missing (Settings → Branding)
+                Label IBAN missing
               </span>
             )}
             <Button
@@ -194,6 +202,56 @@ export function PayoutManager({
             </Button>
           </div>
         </div>
+
+        {!labelIbanOk && onLabelSepaUpdate && (
+          <div className="mx-6 mt-4 p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-3">
+            <p className="text-sm font-medium">Label-Absenderkonto für SEPA-XML</p>
+            <p className="text-xs text-muted-foreground">
+              IBAN und Kontoinhaber werden in diesem Browser gespeichert (Accounting → SEPA Payout).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="label-sepa-holder">Kontoinhaber</Label>
+                <Input
+                  id="label-sepa-holder"
+                  value={draftSepaAccountHolder}
+                  onChange={(e) => setDraftSepaAccountHolder(e.target.value)}
+                  placeholder="z. B. darkTunes Music Group UG"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="label-sepa-iban">IBAN</Label>
+                <Input
+                  id="label-sepa-iban"
+                  value={draftSepaIban}
+                  onChange={(e) => setDraftSepaIban(e.target.value)}
+                  placeholder="DE89 3704 0044 0532 0130 00"
+                  className="font-mono text-sm"
+                />
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const iban = draftSepaIban.replace(/\s/g, '').toUpperCase()
+                if (!isValidIBAN(iban)) {
+                  toast.error('Ungültige IBAN')
+                  return
+                }
+                if (!draftSepaAccountHolder.trim()) {
+                  toast.error('Kontoinhaber fehlt')
+                  return
+                }
+                onLabelSepaUpdate(iban, draftSepaAccountHolder)
+                toast.success('Label-SEPA-Daten gespeichert')
+              }}
+            >
+              SEPA-Daten speichern
+            </Button>
+          </div>
+        )}
 
         <div className="overflow-x-auto flex-1">
           {rows.length === 0 ? (

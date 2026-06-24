@@ -259,7 +259,7 @@ export function SettlementCenterPanel({
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [lockDialogOpen, setLockDialogOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
-  const [paymentAmountCents, setPaymentAmountCents] = useState('')
+  const [paymentAmountsEur, setPaymentAmountsEur] = useState<Record<string, string>>({})
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('sepa')
   const [paymentReference, setPaymentReference] = useState('')
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false)
@@ -561,25 +561,28 @@ export function SettlementCenterPanel({
     }
   }
 
+  const defaultOutstandingEur = (target: MasterRow): string => {
+    const cents =
+      target.outstandingAmountCents ??
+      (target.payout != null ? Math.round(target.payout * 100) : undefined)
+    return cents != null ? (cents / 100).toFixed(2) : ''
+  }
+
   const openPaymentDialog = () => {
     if (selectedPaymentTargets.length === 0) return
-    const first = selectedPaymentTargets[0]
-    const defaultCents =
-      first.outstandingAmountCents ??
-      (first.payout != null ? Math.round(first.payout * 100) : undefined)
-    setPaymentAmountCents(defaultCents != null ? String(defaultCents) : '')
+    const amounts: Record<string, string> = {}
+    for (const target of selectedPaymentTargets) {
+      if (target.invoiceId) {
+        amounts[target.invoiceId] = defaultOutstandingEur(target)
+      }
+    }
+    setPaymentAmountsEur(amounts)
     setPaymentMethod('sepa')
     setPaymentReference('')
     setPaymentDialogOpen(true)
   }
 
   const runRecordPayment = async () => {
-    const amountCents = Number.parseInt(paymentAmountCents, 10)
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
-      toast.error('Bitte einen gültigen Betrag in Cent eingeben')
-      return
-    }
-
     setRecordingPayment(true)
     try {
       const token = await getAdminAccessToken()
@@ -587,6 +590,22 @@ export function SettlementCenterPanel({
 
       let recorded = 0
       for (const target of selectedPaymentTargets) {
+        if (!target.invoiceId) continue
+        const eurRaw = paymentAmountsEur[target.invoiceId] ?? ''
+        const amountEur = Number.parseFloat(eurRaw.replace(',', '.'))
+        if (!Number.isFinite(amountEur) || amountEur <= 0) {
+          throw new Error(`Ungültiger Betrag für ${target.artistName}`)
+        }
+        const amountCents = Math.round(amountEur * 100)
+        const maxCents =
+          target.outstandingAmountCents ??
+          (target.payout != null ? Math.round(target.payout * 100) : undefined)
+        if (maxCents != null && amountCents > maxCents) {
+          throw new Error(
+            `Betrag für ${target.artistName} übersteigt den offenen Betrag (${(maxCents / 100).toFixed(2)} EUR)`,
+          )
+        }
+
         const response = await fetch(`/api/admin/invoices/${target.invoiceId}/payment`, {
           method: 'PATCH',
           headers: {
@@ -1198,21 +1217,39 @@ export function SettlementCenterPanel({
           <DialogHeader>
             <DialogTitle>Zahlung erfassen</DialogTitle>
             <DialogDescription>
-              Erfasst dieselbe Zahlung für {selectedPaymentTargets.length} ausgewählte Rechnung
-              {selectedPaymentTargets.length === 1 ? '' : 'en'}.
+              {selectedPaymentTargets.length === 1
+                ? 'Betrag in EUR für die ausgewählte Rechnung erfassen.'
+                : `Je Rechnung einen eigenen Betrag in EUR erfassen (${selectedPaymentTargets.length} ausgewählt).`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="payment-amount">Betrag (Cent)</Label>
-              <Input
-                id="payment-amount"
-                type="number"
-                min={1}
-                value={paymentAmountCents}
-                onChange={(event) => setPaymentAmountCents(event.target.value)}
-                placeholder="z. B. 12500"
-              />
+            <div className="space-y-3">
+              {selectedPaymentTargets.map((target) => {
+                if (!target.invoiceId) return null
+                const outstanding = defaultOutstandingEur(target)
+                return (
+                  <div key={target.invoiceId} className="space-y-1.5 rounded-md border border-border p-3">
+                    <Label htmlFor={`payment-amount-${target.invoiceId}`}>
+                      {target.artistName}
+                      {outstanding ? ` · offen ${outstanding} EUR` : ''}
+                    </Label>
+                    <Input
+                      id={`payment-amount-${target.invoiceId}`}
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={paymentAmountsEur[target.invoiceId] ?? ''}
+                      onChange={(event) =>
+                        setPaymentAmountsEur((prev) => ({
+                          ...prev,
+                          [target.invoiceId!]: event.target.value,
+                        }))
+                      }
+                      placeholder="z. B. 125,00"
+                    />
+                  </div>
+                )
+              })}
             </div>
             <div className="space-y-2">
               <Label>Zahlungsmethode</Label>

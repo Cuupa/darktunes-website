@@ -61,6 +61,44 @@ function makeProcessedArtist(artist: string): SafeProcessedArtistData {
   } as unknown as SafeProcessedArtistData
 }
 
+describe('useSosExports.handleDownloadPDF', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+    mockIsValidArtistId.mockReturnValue(true)
+    mockIsValidPeriod.mockReturnValue(true)
+  })
+
+  it('downloads PDF locally without portal upload when autoUploadToPortal is false', async () => {
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        [],
+        false,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadPDF('Artist One')
+    })
+
+    expect(mockUploadStatement).not.toHaveBeenCalled()
+    expect(mockDownloadBlob).toHaveBeenCalledOnce()
+    expect(mockToastSuccess).toHaveBeenCalledWith('PDF for "Artist One" downloaded')
+  })
+})
+
 describe('useSosExports.handlePublishToPortal', () => {
   beforeEach(() => {
     vi.clearAllMocks()

@@ -32,7 +32,14 @@ export function SosAnalyticsPersistPanel({
 }: SosAnalyticsPersistPanelProps) {
   const [isPending, startTransition] = useTransition()
 
+  const canPersist = territoryMetrics.length > 0
+  const missingTerritoryHint =
+    !canPersist && revenues.length > 0
+      ? ' Territory metrics require processed CSV data with portal-linked artists.'
+      : ''
+
   const handlePersist = () => {
+    if (!canPersist) return
     startTransition(async () => {
       const periodSummary =
         revenues.length > 0 && periodStart
@@ -98,17 +105,19 @@ export function SosAnalyticsPersistPanel({
       <div>
         <p className="text-sm font-medium">Portal Analytics</p>
         <p className="text-xs text-muted-foreground">
-          Persist territory metrics, merch orders, period summary, and correlations for linked artists ({territoryMetrics.length} metric rows, {merchOrderRows.length} merch rows).
+          Persist territory metrics, merch orders, period summary, and correlations for linked artists (
+          {territoryMetrics.length} metric rows, {merchOrderRows.length} merch rows).
           {bronzeBatchIds.length > 0 && (
             <> {bronzeBatchIds.length} Bronze CSV archive{bronzeBatchIds.length === 1 ? '' : 's'} linked.</>
           )}
+          {missingTerritoryHint}
         </p>
       </div>
       <Button
         type="button"
         size="sm"
         onClick={handlePersist}
-        disabled={disabled || isPending || territoryMetrics.length === 0}
+        disabled={disabled || isPending || !canPersist}
       >
         <CloudArrowUp size={16} className="mr-1.5" />
         {isPending ? 'Saving…' : 'Save to Portal'}

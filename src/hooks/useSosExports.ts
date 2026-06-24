@@ -44,6 +44,15 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
 }
 
+function resolveBronzeBatchLineage(bronzeBatchIds: string[] | undefined) {
+  const batchIds = bronzeBatchIds ?? []
+  return {
+    batchIds,
+    /** Statement row stores a single primary batch; full lineage lives on period summaries. */
+    primaryBatchId: batchIds[0],
+  }
+}
+
 function buildUploadPayload(
   artistData: SafeProcessedArtistData,
   periodStart: string,
@@ -81,7 +90,7 @@ export function useExports(
   labelArtists?: LabelArtist[],
   emailConfig?: Partial<EmailConfig>,
   compilationFilters: CompilationFilter[] = [],
-  autoUploadToPortal = true,
+  autoUploadToPortal = false,
   persistContext?: SosExportPersistContext,
 ) {
   const emailOptions = useMemo(
@@ -149,14 +158,16 @@ export function useExports(
 
           const pdfBase64 = await blobToBase64(blob)
           const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
-          const batchId = persistContext?.bronzeBatchIds[0]
+          const { batchIds, primaryBatchId } = resolveBronzeBatchLineage(
+            persistContext?.bronzeBatchIds,
+          )
           const result = await uploadStatement({
             artistId: artistInfo.artistId,
             filename,
             period: validPeriod,
             amountEur: artistData.finalPayout,
             ...analyticsPayload,
-            batchId,
+            batchId: primaryBatchId,
             pdfBase64,
           })
 
@@ -170,11 +181,13 @@ export function useExports(
                 merchOrderRows: persistContext.merchOrderRows,
                 labelArtists: labelArtists ?? [],
                 revenues: persistContext.revenues,
-                bronzeBatchIds: persistContext.bronzeBatchIds,
-                batchId,
+                bronzeBatchIds: batchIds,
+                batchId: primaryBatchId,
               })
             }
-            toast.success('Statement uploaded! Artist will receive an email notification.', { id: 'sos-upload' })
+            toast.success('Draft statement saved to portal. Approve in Settlement Center to notify the artist.', {
+              id: 'sos-upload',
+            })
           } else {
             toast.error(`Upload failed: ${result.error ?? 'Unknown error'}. PDF saved locally instead.`, { id: 'sos-upload' })
             downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
@@ -344,14 +357,16 @@ export function useExports(
         const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
         const pdfBase64 = await blobToBase64(blob)
         const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
-        const batchId = persistContext?.bronzeBatchIds[0]
+        const { batchIds, primaryBatchId } = resolveBronzeBatchLineage(
+          persistContext?.bronzeBatchIds,
+        )
         const result = await uploadStatement({
           artistId: artistInfo.artistId,
           filename,
           period: validPeriod,
           amountEur: artistData.finalPayout,
           ...analyticsPayload,
-          batchId,
+          batchId: primaryBatchId,
           pdfBase64,
         })
 
@@ -368,8 +383,8 @@ export function useExports(
             merchOrderRows: persistContext.merchOrderRows,
             labelArtists: labelArtists ?? [],
             revenues: persistContext.revenues,
-            bronzeBatchIds: persistContext.bronzeBatchIds,
-            batchId,
+            bronzeBatchIds: batchIds,
+            batchId: primaryBatchId,
           })
         }
 

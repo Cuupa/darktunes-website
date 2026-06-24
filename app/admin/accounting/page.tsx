@@ -10,12 +10,19 @@
 
 import { AccountingPanel } from '@/components/admin/AccountingPanel'
 import { AdminPageShell } from '../_components/AdminPageShell'
+import { useDict } from '@/contexts/DictContext'
 
 export default function AccountingPage() {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? {
+    pageTitle: 'Accounting',
+    pageDescription: 'Generate royalty statements for artists and review statement history.',
+  }
+
   return (
     <AdminPageShell
-      title="Accounting"
-      description="Generate royalty statements for artists and review statement history."
+      title={t.pageTitle}
+      description={t.pageDescription}
     >
       <AccountingPanel />
     </AdminPageShell>

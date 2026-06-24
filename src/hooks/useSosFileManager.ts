@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useLocalKV'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
 import { parseCSVContentStreaming } from '@/lib/sos/ingest/streaming-csv-parser'
 import { parseShopifyCSV } from '@/lib/sos/ingest/shopify-parser'
 import { extractPeriodBounds, uploadBronzeDistributorCsv } from '@/lib/sos/bronzeUpload'
@@ -29,7 +30,20 @@ interface FileEventCallbacks {
  * to IndexedDB. Only file metadata (name, size, stats, etc.) is persisted.
  * This avoids storing hundreds of MB of text in the browser's storage.
  */
+const FILE_FALLBACK = {
+  fileUploadSuccess: '"{filename}" uploaded successfully',
+  filesUploadSuccess: '{count} file(s) uploaded successfully',
+  filesUploadFailed: '{count} file(s) failed to upload',
+  fileProcessFailed: 'Failed to process "{filename}"',
+  fileReplaceSuccess: '"{filename}" replaced successfully',
+  fileReplaceFailed: 'Failed to replace file',
+  fileRemoved: 'File removed',
+  xlsxConvertWarning: '"{filename}" could not be converted from XLSX — file may be corrupted or unsupported.',
+} as const
+
 export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? FILE_FALLBACK
   // Metadata persisted in IndexedDB (no raw CSV data).
   const [fileMetas, setFileMetas] = useKV<UploadedFileMeta[]>(`${type}-files`, [])
   // Raw CSV strings kept in memory only — lost on page reload, no storage limit issues.
@@ -84,7 +98,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         if (csvText) {
           data = csvText
         } else {
-          toast.warning(`"${rawFile.name}" could not be converted from XLSX — file may be corrupted or unsupported.`)
+          toast.warning(t.xlsxConvertWarning.replace('{filename}', rawFile.name))
         }
       }
 
@@ -138,7 +152,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         const bronze = await uploadBronzeDistributorCsv({
           distributor: type,
           filename: rawFile.name,
-          csvContent: data,
+          uploadBody: data,
           rowCount: rowsParsed,
           periodStart,
           periodEnd,
@@ -157,7 +171,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
 
       return { data, rowsParsed, rowsSkipped, uniqueArtists }
     },
-    [type, setFileState, setFileMetas]
+    [type, setFileState, setFileMetas, t.xlsxConvertWarning]
   )
 
   const addFiles = useCallback(
@@ -204,7 +218,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to process file'
             setFileState(id, { status: 'error', progress: 0, error: message })
-            toast.error(`Failed to process "${rawFile.name}"`, { description: message })
+            toast.error(t.fileProcessFailed.replace('{filename}', rawFile.name), { description: message })
             throw err
           }
         })
@@ -216,15 +230,15 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       if (succeeded > 0) {
         toast.success(
           succeeded === 1
-            ? `"${rawFiles[0].name}" uploaded successfully`
-            : `${succeeded} file(s) uploaded successfully`
+            ? t.fileUploadSuccess.replace('{filename}', rawFiles[0].name)
+            : t.filesUploadSuccess.replace('{count}', String(succeeded))
         )
       }
       if (failed > 0) {
-        toast.error(`${failed} file(s) failed to upload`)
+        toast.error(t.filesUploadFailed.replace('{count}', String(failed)))
       }
     },
-    [type, processAndStore, setFileMetas, setFileState, callbacks]
+    [type, processAndStore, setFileMetas, setFileState, callbacks, t]
   )
 
   const removeFile = useCallback(
@@ -237,9 +251,9 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       })
       removeFileState(id)
       callbacks?.onFileRemoved?.(id)
-      toast.info('File removed')
+      toast.info(t.fileRemoved)
     },
-    [setFileMetas, removeFileState, callbacks]
+    [setFileMetas, removeFileState, callbacks, t.fileRemoved]
   )
 
   const replaceFile = useCallback(
@@ -270,14 +284,14 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
           uniqueArtistsCount: uniqueArtists,
         }
         callbacks?.onFileAdded?.(uploadedFile, rowsParsed, rowsSkipped, uniqueArtists)
-        toast.success(`"${rawFile.name}" replaced successfully`)
+        toast.success(t.fileReplaceSuccess.replace('{filename}', rawFile.name))
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to process file'
         setFileState(id, { status: 'error', progress: 0, error: message })
-        toast.error(`Failed to replace file`, { description: message })
+        toast.error(t.fileReplaceFailed, { description: message })
       }
     },
-    [processAndStore, setFileMetas, setFileState, type, callbacks]
+    [processAndStore, setFileMetas, setFileState, type, callbacks, t]
   )
 
   /** Removes every file and clears all in-memory state for this manager. */

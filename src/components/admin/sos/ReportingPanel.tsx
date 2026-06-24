@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
 import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig } from '@/lib/sos/types'
 import { buildMailtoLink } from '@/lib/sos/utils'
 
@@ -31,7 +32,7 @@ interface ReportingPanelProps {
   emailConfig?: Partial<EmailConfig>
   periodStart?: string
   periodEnd?: string
-  onGoToReleaseWorkflow?: () => void
+  onGoToSettlementCenter?: () => void
 }
 
 function fmtEur(value: number) {
@@ -71,8 +72,15 @@ export function ReportingPanel({
   emailConfig,
   periodStart,
   periodEnd,
-  onGoToReleaseWorkflow,
+  onGoToSettlementCenter,
 }: ReportingPanelProps) {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? {
+    reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',
+    reportingSettlementAlertBody:
+      'Review payouts here, then open Settlement Center to create draft statements, approve them, and notify artists.',
+    reportingSettlementCta: 'Open Settlement Center',
+  }
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
@@ -193,17 +201,15 @@ export function ReportingPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {onGoToReleaseWorkflow && (
+      {onGoToSettlementCenter && (
         <div className="px-6 pt-4">
           <Alert className="border-primary/30 bg-primary/5">
             <SealCheck size={16} className="text-primary" />
-            <AlertTitle className="text-sm">Use the Release Workflow for portal publishing</AlertTitle>
+            <AlertTitle className="text-sm">{t.reportingSettlementAlertTitle}</AlertTitle>
             <AlertDescription className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Review payouts here, then move to Release Workflow to create draft statements, approve them, and notify artists.
-              </span>
-              <Button size="sm" className="gap-1.5 shrink-0" onClick={onGoToReleaseWorkflow}>
-                Open Release Workflow
+              <span>{t.reportingSettlementAlertBody}</span>
+              <Button size="sm" className="gap-1.5 shrink-0" onClick={onGoToSettlementCenter}>
+                {t.reportingSettlementCta}
                 <ArrowRight size={14} />
               </Button>
             </AlertDescription>

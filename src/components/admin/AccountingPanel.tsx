@@ -25,7 +25,8 @@ import type {
   ManualRevenue, ExpenseEntry, IgnoredEntry,
   CSVColumnAlias, EmailConfig, TrackRevenueAssignment,
 } from '@/lib/sos/types'
-import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG } from '@/lib/sos/defaults'
+import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
+import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
@@ -53,6 +54,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
+import { useDict } from '@/contexts/DictContext'
 
 const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
@@ -60,7 +62,40 @@ const StatementsManager = lazy(
 
 type SubTab = 'upload' | 'reporting' | 'settlements' | 'analytics' | 'payout' | 'rules' | 'trends'
 
+const ACCOUNTING_FALLBACK = {
+  pageTitle: 'Accounting',
+  pageDescription: 'Generate royalty statements for artists and review statement history.',
+  tabGenerate: 'Generate Statements',
+  tabHistory: 'Statement History',
+  subTabUpload: 'Upload',
+  subTabReporting: 'Reporting',
+  subTabSettlements: 'Settlement Center',
+  subTabAnalytics: 'Analytics',
+  subTabPayout: 'SEPA Payout',
+  subTabTrends: 'Trends',
+  subTabRules: 'Rules',
+  presets: 'Presets',
+  presetsTitle: 'Rule Presets',
+  csvProfiles: 'CSV Profiles',
+  csvProfilesTitle: 'CSV Import Profiles',
+  workspace: 'Workspace',
+  workspaceTitle: 'Workspace Import / Export',
+  pdfSettings: 'PDF Settings',
+  detectedPeriod: 'Detected period:',
+  processing: '(processing…)',
+  emptyReporting: 'Upload CSV files first to see reporting data.',
+  emptySettlements: 'Upload CSV files first to open the settlement center.',
+  emptyAnalytics: 'Upload CSV files first to see analytics.',
+  emptyPayout: 'Upload CSV files first to calculate payouts.',
+  analyticsOpsHeading: 'Portal data & operations',
+  analyticsPreviewHeading: 'Session preview (not in portal)',
+  analyticsSessionBanner:
+    'Charts below use in-memory CSV data. Artists only see metrics after you click Save to Portal.',
+} as const
+
 function SosGeneratorPanel() {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
   const {
@@ -73,12 +108,28 @@ function SosGeneratorPanel() {
   // Map portal artists to SOS LabelArtist[]
   const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
 
-  // Map SiteSettings to LabelInfo
+  const [labelBranding, setLabelBranding] = useKV<LabelInfo>('sos-label-info', DEFAULT_LABEL_INFO)
+
+  // Site settings override public branding fields; SEPA/bank details persist in IndexedDB.
   const labelInfo = useMemo<LabelInfo>(() => ({
-    name:    settings.labelName    ?? 'darkTunes',
-    address: settings.impressumAddress ?? '',
-    taxId:   settings.impressumVatId   ?? '',
-  }), [settings])
+    ...DEFAULT_LABEL_INFO,
+    ...labelBranding,
+    name: settings.labelName ?? labelBranding?.name ?? DEFAULT_LABEL_INFO.name,
+    address: settings.impressumAddress ?? labelBranding?.address ?? DEFAULT_LABEL_INFO.address,
+    taxId: settings.impressumVatId ?? labelBranding?.taxId ?? DEFAULT_LABEL_INFO.taxId,
+  }), [labelBranding, settings])
+
+  const handleLabelSepaUpdate = useCallback(
+    (sepaIban: string, sepaAccountHolder: string) => {
+      setLabelBranding((current) => ({
+        ...DEFAULT_LABEL_INFO,
+        ...current,
+        sepaIban: sepaIban.replace(/\s/g, '').toUpperCase(),
+        sepaAccountHolder: sepaAccountHolder.trim(),
+      }))
+    },
+    [setLabelBranding],
+  )
 
   // PDF settings state
   const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
@@ -368,7 +419,7 @@ function SosGeneratorPanel() {
       labelArtists,
       emailConfig,
       compilationFilters,
-      true,
+      false,
       exportPersistContext,
     )
 
@@ -379,26 +430,26 @@ function SosGeneratorPanel() {
 
   // Sub-tabs definition
   const subTabs: { id: SubTab; label: React.ReactNode }[] = [
-    { id: 'upload',    label: 'Upload' },
-    { id: 'reporting', label: 'Reporting' },
+    { id: 'upload',    label: t.subTabUpload },
+    { id: 'reporting', label: t.subTabReporting },
     {
       id: 'settlements',
       label: (
         <>
           <SealCheck size={13} className="inline mr-1" />
-          Abrechnungszentrale
+          {t.subTabSettlements}
         </>
       ),
     },
-    { id: 'analytics', label: <><ChartBar size={13} className="inline mr-1" />Analytics</> },
-    { id: 'payout',    label: 'SEPA Payout' },
-    { id: 'trends',    label: <><TrendUp size={13} className="inline mr-1" />Trends</> },
+    { id: 'analytics', label: <><ChartBar size={13} className="inline mr-1" />{t.subTabAnalytics}</> },
+    { id: 'payout',    label: t.subTabPayout },
+    { id: 'trends',    label: <><TrendUp size={13} className="inline mr-1" />{t.subTabTrends}</> },
     {
       id: 'rules',
       label: (
         <>
           <Sliders size={14} className="inline mr-1" />
-          Rules
+          {t.subTabRules}
           {rulesCount > 0 && (
             <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 ml-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
               {rulesCount}
@@ -432,12 +483,12 @@ function SosGeneratorPanel() {
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
-              <BookmarkSimple size={13} /> Presets
+              <BookmarkSimple size={13} /> {t.presets}
             </Button>
           </SheetTrigger>
           <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-lenis-prevent>
             <SheetHeader>
-              <SheetTitle>Rule Presets</SheetTitle>
+              <SheetTitle>{t.presetsTitle}</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               <CsvProfileManager
@@ -460,12 +511,12 @@ function SosGeneratorPanel() {
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
-              <Table size={13} /> CSV Profiles
+              <Table size={13} /> {t.csvProfiles}
             </Button>
           </SheetTrigger>
           <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-lenis-prevent>
             <SheetHeader>
-              <SheetTitle>CSV Import Profiles</SheetTitle>
+              <SheetTitle>{t.csvProfilesTitle}</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               <CsvImportProfileEditor
@@ -482,12 +533,12 @@ function SosGeneratorPanel() {
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
-              <DownloadSimple size={13} /> Workspace
+              <DownloadSimple size={13} /> {t.workspace}
             </Button>
           </SheetTrigger>
           <SheetContent className="w-full sm:max-w-md overflow-y-auto" data-lenis-prevent>
             <SheetHeader>
-              <SheetTitle>Workspace Import / Export</SheetTitle>
+              <SheetTitle>{t.workspaceTitle}</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               <WorkspaceManager
@@ -511,7 +562,7 @@ function SosGeneratorPanel() {
           onClick={() => setShowPdfSettings(v => !v)}
           className="text-xs text-muted-foreground hover:text-foreground px-2 pb-2"
         >
-          PDF Settings
+          {t.pdfSettings}
         </button>
       </div>
 
@@ -520,11 +571,11 @@ function SosGeneratorPanel() {
         <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
           <FileText size={14} className="text-primary" />
           <AlertDescription className="text-xs">
-            Detected period: <strong>{detectedPeriodStart}</strong>
+            {t.detectedPeriod} <strong>{detectedPeriodStart}</strong>
             {detectedPeriodEnd && detectedPeriodEnd !== detectedPeriodStart && (
               <> – <strong>{detectedPeriodEnd}</strong></>
             )}
-            {isProcessing && ' (processing…)'}
+            {isProcessing && ` ${t.processing}`}
           </AlertDescription>
         </Alert>
       )}
@@ -565,12 +616,12 @@ function SosGeneratorPanel() {
               appDefaults={appDefaults}
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
-              onGoToReleaseWorkflow={() => setActiveSubTab('settlements')}
+              onGoToSettlementCenter={() => setActiveSubTab('settlements')}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
               <FileText size={32} className="opacity-30" />
-              <p className="text-sm">Upload CSV files first to see reporting data.</p>
+              <p className="text-sm">{t.emptyReporting}</p>
             </div>
           )
         )}
@@ -587,17 +638,20 @@ function SosGeneratorPanel() {
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
               <SealCheck size={32} className="opacity-30" />
-              <p className="text-sm">CSV-Dateien hochladen, um die Abrechnungszentrale zu starten.</p>
+              <p className="text-sm">{t.emptySettlements}</p>
             </div>
           )
         )}
 
         {activeSubTab === 'analytics' && (
-          <div className="p-6 space-y-4">
-            <ImportBatchesPanel labelArtists={labelArtists} />
-            <ExternalMetricsSyncPanel />
-            {hasData ? (
-              <>
+          <div className="p-6 space-y-6">
+            <section className="space-y-4" aria-labelledby="analytics-ops-heading">
+              <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
+                {t.analyticsOpsHeading}
+              </h3>
+              <ImportBatchesPanel labelArtists={labelArtists} />
+              <ExternalMetricsSyncPanel />
+              {hasData ? (
                 <SosAnalyticsPersistPanel
                   periodStart={detectedPeriodStart}
                   periodEnd={detectedPeriodEnd}
@@ -608,17 +662,31 @@ function SosGeneratorPanel() {
                   bronzeBatchIds={bronzeBatchIds}
                   disabled={isProcessing}
                 />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3 border border-dashed border-border rounded-lg">
+                  <ChartBar size={32} className="opacity-30" />
+                  <p className="text-sm">{t.emptyAnalytics}</p>
+                </div>
+              )}
+            </section>
+
+            {hasData && (
+              <section className="space-y-4" aria-labelledby="analytics-preview-heading">
+                <div className="space-y-2">
+                  <h3 id="analytics-preview-heading" className="text-sm font-semibold text-foreground">
+                    {t.analyticsPreviewHeading}
+                  </h3>
+                  <Alert className="border-amber-500/30 bg-amber-500/5">
+                    <ChartBar size={14} className="text-amber-600" />
+                    <AlertDescription className="text-xs">{t.analyticsSessionBanner}</AlertDescription>
+                  </Alert>
+                </div>
                 <AdminEnterpriseAnalytics
                   revenues={revenues}
                   periodStart={detectedPeriodStart}
                   periodEnd={detectedPeriodEnd}
                 />
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-                <ChartBar size={32} className="opacity-30" />
-                <p className="text-sm">Upload CSV files first to see analytics.</p>
-              </div>
+              </section>
             )}
           </div>
         )}
@@ -631,11 +699,12 @@ function SosGeneratorPanel() {
               labelInfo={labelInfo}
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
+              onLabelSepaUpdate={handleLabelSepaUpdate}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
               <Bank size={32} className="opacity-30" />
-              <p className="text-sm">Upload CSV files first to calculate payouts.</p>
+              <p className="text-sm">{t.emptyPayout}</p>
             </div>
           )
         )}
@@ -693,17 +762,20 @@ function SosGeneratorPanel() {
 }
 
 export function AccountingPanel() {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
+
   return (
     <Tabs defaultValue="generate" className="flex flex-col h-full">
       <div className="border-b border-border px-6 pt-4">
         <TabsList className="h-9">
           <TabsTrigger value="generate" className="gap-1.5 text-xs">
             <Wallet size={14} />
-            Generate Statements
+            {t.tabGenerate}
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-1.5 text-xs">
             <ClockCounterClockwise size={14} />
-            Statement History
+            {t.tabHistory}
           </TabsTrigger>
         </TabsList>
       </div>

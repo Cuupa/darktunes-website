@@ -41,7 +41,7 @@ export const WORKFLOW_STATUS_LABELS: Record<ArtistStatementWorkflowStatus, strin
   viewed: 'Gesehen',
   invoiced: 'Rechnung erstellt',
   paid: 'Bezahlt',
-  acknowledged: 'Rechnung erstellt',
+  acknowledged: 'Bestätigt',
   superseded: 'Ersetzt',
   cancelled: 'Storniert',
 }

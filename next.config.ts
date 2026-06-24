@@ -8,6 +8,17 @@ const withSerwist = withSerwistInit({
   swDest: 'public/sw.js',
   // Never intercept admin / API / auth routes in the service worker
   exclude: [/\/api\//, /\/admin\//, /\/portal\//, /\/press\//, /\/promo-pool\//],
+  // Hashed JS chunks are cached at runtime (CacheFirst in sw.ts). Precaching them
+  // causes bad-precaching-response 404s after deploy when old chunk hashes 404.
+  manifestTransforms: [
+    async (manifestEntries) => ({
+      manifest: manifestEntries.filter((entry) => {
+        const url = typeof entry === 'string' ? entry : entry.url
+        return !/\/_next\/static\/chunks\//.test(url)
+      }),
+      warnings: [],
+    }),
+  ],
 })
 
 const withBundleAnalyzer = withBundleAnalyzerInit({

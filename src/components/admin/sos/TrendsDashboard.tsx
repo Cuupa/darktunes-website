@@ -7,7 +7,7 @@
  * Displays revenue and payout over time using recharts AreaChart.
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   AreaChart,
@@ -74,11 +74,14 @@ export function TrendsDashboard({
     setIsLoading(true)
     try {
       const res = await fetch('/api/admin/sos/period-summaries')
-      if (!res.ok) return
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(payload.error ?? 'Failed to load period summaries')
+      }
       const data = await res.json() as { summaries: PeriodSummary[] }
       setSummaries((data.summaries ?? []).sort((a, b) => a.period_start.localeCompare(b.period_start)))
-    } catch {
-      // Non-fatal
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load period summaries')
     } finally {
       setIsLoading(false)
     }
@@ -108,12 +111,12 @@ export function TrendsDashboard({
           source_batch_ids: bronzeBatchIds,
         }),
       })
+      const payload = await res.json().catch(() => ({})) as { error?: string; updated?: boolean }
       if (res.ok) {
-        toast.success('Period summary saved')
+        toast.success(payload.updated ? 'Period summary updated' : 'Period summary saved')
         await loadSummaries()
       } else {
-        const payload = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(payload.message ?? 'Failed to save period summary')
+        toast.error(payload.error ?? 'Failed to save period summary')
       }
     } finally {
       setIsSaving(false)
@@ -128,6 +131,15 @@ export function TrendsDashboard({
 
   const latestRevenue = summaries.at(-1)?.total_revenue ?? 0
   const latestPayout = summaries.at(-1)?.total_payout ?? 0
+
+  const effectivePeriodEnd = periodEnd || periodStart
+  const currentPeriodExists = useMemo(
+    () =>
+      summaries.some(
+        (s) => s.period_start === periodStart && s.period_end === effectivePeriodEnd,
+      ),
+    [summaries, periodStart, effectivePeriodEnd],
+  )
 
   return (
     <div className="p-6 space-y-6">
@@ -145,7 +157,8 @@ export function TrendsDashboard({
             disabled={isSaving}
             className="gap-1.5 text-xs"
           >
-            <FloppyDisk size={13} /> Save period {periodStart}
+            <FloppyDisk size={13} />{' '}
+            {currentPeriodExists ? `Update period ${periodStart}` : `Save period ${periodStart}`}
           </Button>
         )}
       </div>
@@ -166,7 +179,9 @@ export function TrendsDashboard({
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
           <CalendarBlank size={32} className="opacity-30" />
           <p className="text-sm">No historical data yet.</p>
-          <p className="text-xs">Upload CSV files and click &quot;Save period&quot; to start tracking trends.</p>
+          <p className="text-xs">
+            Upload CSV files and click &quot;Save period&quot; (or use Save to Portal in Analytics) to start tracking trends.
+          </p>
         </div>
       )}
 
