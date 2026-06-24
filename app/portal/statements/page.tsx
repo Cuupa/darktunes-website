@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { listArtistInvoices } from '@/lib/api/artistInvoices'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
@@ -51,16 +52,22 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
   }
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
-  const statements = artist ? await getSalesStatementsByArtistId(supabase, artist.id).catch(() => []) : []
-  const { invoices } = artist
-    ? await listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
-    : { invoices: [] }
+  const [statements, invoiceList, billingProfile] = await Promise.all([
+    artist ? getSalesStatementsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+    artist
+      ? listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
+      : Promise.resolve({ invoices: [], total: 0 }),
+    artist ? getBillingProfile(supabase, artist.id).catch(() => null) : Promise.resolve(null),
+  ])
 
   return (
     <StatementsTable
       artistId={artist?.id}
+      billingProfileComplete={isBillingProfileComplete(billingProfile)}
       dict={dict.portal}
-      invoicedStatementIds={invoices.flatMap((invoice) => (invoice.statementId ? [invoice.statementId] : []))}
+      invoicedStatementIds={invoiceList.invoices.flatMap((invoice) =>
+        invoice.statementId ? [invoice.statementId] : [],
+      )}
       statements={statements}
     />
   )

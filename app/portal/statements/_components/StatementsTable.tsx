@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -19,9 +18,11 @@ import { DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
 import { getStatementPresignedUrl } from '../_actions/presignedUrl'
+import { QuickInvoiceButton } from '../../analytics/_components/QuickInvoiceButton'
 
 interface StatementsTableProps {
   artistId?: string
+  billingProfileComplete: boolean
   dict: Dictionary['portal']
   invoicedStatementIds: string[]
   statements: SalesStatement[]
@@ -58,7 +59,60 @@ function statusVariant(status: SalesStatement['status']): 'outline' | 'secondary
   }
 }
 
-export function StatementsTable({ artistId, dict, invoicedStatementIds, statements }: StatementsTableProps) {
+function StatementActions({
+  artistId,
+  billingProfileComplete,
+  dict,
+  hasInvoice,
+  loadingId,
+  onDownload,
+  statement,
+}: {
+  artistId?: string
+  billingProfileComplete: boolean
+  dict: Dictionary['portal']
+  hasInvoice: boolean
+  loadingId: string | null
+  onDownload: (id: string) => void
+  statement: SalesStatement
+}) {
+  const canInvoice = statement.status === 'label_approved' && !hasInvoice
+
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-border hover:bg-primary/10 hover:text-primary"
+        disabled={loadingId === statement.id}
+        onClick={() => onDownload(statement.id)}
+      >
+        {loadingId === statement.id ? (
+          <Spinner size={14} className="mr-1 animate-spin" aria-hidden="true" />
+        ) : (
+          <DownloadSimple size={14} className="mr-1" aria-hidden="true" />
+        )}
+        {dict.statements_download}
+      </Button>
+      {canInvoice && artistId && (
+        <QuickInvoiceButton
+          artistId={artistId}
+          billingProfileComplete={billingProfileComplete}
+          dict={dict}
+          statement={statement}
+        />
+      )}
+    </div>
+  )
+}
+
+export function StatementsTable({
+  artistId,
+  billingProfileComplete,
+  dict,
+  invoicedStatementIds,
+  statements,
+}: StatementsTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const linkedStatementIds = new Set(invoicedStatementIds)
 
@@ -93,56 +147,76 @@ export function StatementsTable({ artistId, dict, invoicedStatementIds, statemen
           <CardHeader>
             <CardTitle className="text-base">{dict.statements_heading}</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
+          <CardContent className="p-4 pt-0 space-y-3 md:hidden">
+            {statements.map((statement) => {
+              const hasInvoice = linkedStatementIds.has(statement.id)
+              return (
+                <div
+                  key={statement.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border p-3"
+                >
+                  <div>
+                    <p className="font-mono text-sm font-medium">{statement.period}</p>
+                    <p className="text-xs text-muted-foreground truncate">{statement.filename}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant={statusVariant(statement.status)}>
+                        {statusLabel(statement.status, dict)}
+                      </Badge>
+                      <span className="text-sm tabular-nums">{formatAmountEur(statement.amountEur)}</span>
+                    </div>
+                    {hasInvoice && (
+                      <Badge variant="secondary" className="mt-2">{dict.analytics_invoice_exists}</Badge>
+                    )}
+                  </div>
+                  <StatementActions
+                    artistId={artistId}
+                    billingProfileComplete={billingProfileComplete}
+                    dict={dict}
+                    hasInvoice={hasInvoice}
+                    loadingId={loadingId}
+                    onDownload={handleDownload}
+                    statement={statement}
+                  />
+                </div>
+              )
+            })}
+          </CardContent>
+          <CardContent className="hidden md:block overflow-x-auto p-0">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="whitespace-nowrap">{dict.statements_period}</TableHead>
                   <TableHead>{dict.statements_filename}</TableHead>
-                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">{dict.statements_status}</TableHead>
                   <TableHead className="whitespace-nowrap text-right">{dict.statements_amount}</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Aktionen</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">{dict.statements_actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {statements.map((statement) => {
                   const hasInvoice = linkedStatementIds.has(statement.id)
-                  const createInvoiceHref = artistId
-                    ? `/portal/invoices?artistId=${artistId}&statement=${statement.id}`
-                    : `/portal/invoices?statement=${statement.id}`
-
                   return (
                     <TableRow key={statement.id} className="border-border hover:bg-muted/50">
                       <TableCell className="whitespace-nowrap font-mono text-sm">{statement.period}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{statement.filename}</TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(statement.status)}>{statusLabel(statement.status, dict)}</Badge>
+                        <Badge variant={statusVariant(statement.status)}>
+                          {statusLabel(statement.status, dict)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right font-mono text-sm">
                         {formatAmountEur(statement.amountEur)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-border hover:bg-primary/10 hover:text-primary"
-                            disabled={loadingId === statement.id}
-                            onClick={() => handleDownload(statement.id)}
-                          >
-                            {loadingId === statement.id ? (
-                              <Spinner size={14} className="mr-1 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <DownloadSimple size={14} className="mr-1" aria-hidden="true" />
-                            )}
-                            {dict.statements_download}
-                          </Button>
-                          {statement.status === 'label_approved' && !hasInvoice && (
-                            <Button asChild size="sm">
-                              <Link href={createInvoiceHref}>{dict.statements_create_invoice}</Link>
-                            </Button>
-                          )}
-                        </div>
+                        <StatementActions
+                          artistId={artistId}
+                          billingProfileComplete={billingProfileComplete}
+                          dict={dict}
+                          hasInvoice={hasInvoice}
+                          loadingId={loadingId}
+                          onDownload={handleDownload}
+                          statement={statement}
+                        />
                       </TableCell>
                     </TableRow>
                   )

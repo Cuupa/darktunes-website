@@ -13,6 +13,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3'
 
 /**
@@ -136,4 +137,26 @@ export async function deleteObjectFromR2(
       Key: r2Key,
     }),
   )
+}
+
+/**
+ * Downloads an R2 object body as UTF-8 text (for bronze CSV re-processing).
+ */
+export async function downloadObjectFromR2(
+  r2Key: string,
+  s3: S3Client,
+  bucket: string,
+): Promise<string> {
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: r2Key,
+    }),
+  )
+
+  if (!response.Body) {
+    throw new Error(`R2 object body empty: ${r2Key}`)
+  }
+
+  return response.Body.transformToString('utf-8')
 }

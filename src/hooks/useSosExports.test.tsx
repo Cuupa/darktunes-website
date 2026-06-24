@@ -46,13 +46,19 @@ vi.mock('../../app/portal/statements/_actions/uploadStatement', () => ({
   uploadStatement: mockUploadStatement,
 }))
 
+vi.mock('@/lib/sos/persistAfterStatementUpload', () => ({
+  persistAnalyticsAfterStatementUpload: vi.fn(async () => undefined),
+}))
+
 const labelInfo: LabelInfo = { name: 'darkTunes', address: '', invoiceNumberPrefix: 'SOS' }
 
 function makeProcessedArtist(artist: string): SafeProcessedArtistData {
   return {
     artist,
     finalPayout: 123.45,
-  } as SafeProcessedArtistData
+    platformBreakdown: [],
+    countryBreakdown: [],
+  } as unknown as SafeProcessedArtistData
 }
 
 describe('useSosExports.handlePublishToPortal', () => {

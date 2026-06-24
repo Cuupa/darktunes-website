@@ -84,6 +84,7 @@ export interface Database {
           artist_count: number
           artist_breakdowns: unknown[]
           platform_breakdowns: unknown[]
+          source_batch_ids: string[]
           created_at: string
         }
         Insert: {
@@ -95,6 +96,7 @@ export interface Database {
           artist_count?: number
           artist_breakdowns?: unknown[]
           platform_breakdowns?: unknown[]
+          source_batch_ids?: string[]
           created_at?: string
         }
         Update: {
@@ -106,6 +108,7 @@ export interface Database {
           artist_count?: number
           artist_breakdowns?: unknown[]
           platform_breakdowns?: unknown[]
+          source_batch_ids?: string[]
         }
         Relationships: []
       }
@@ -353,6 +356,8 @@ export interface Database {
           storage_quota_bytes: number | null
           smart_links: Array<{ label: string; url: string }> | null
           bandsintown_api_key: string | null
+          lastfm_name: string | null
+          soundcharts_id: string | null
           image_position_x: number | null
           image_position_y: number | null
           image_scale: number | null
@@ -397,6 +402,8 @@ export interface Database {
           storage_quota_bytes?: number | null
           smart_links?: Array<{ label: string; url: string }> | null
           bandsintown_api_key?: string | null
+          lastfm_name?: string | null
+          soundcharts_id?: string | null
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null
@@ -441,6 +448,8 @@ export interface Database {
           storage_quota_bytes?: number | null
           smart_links?: Array<{ label: string; url: string }> | null
           bandsintown_api_key?: string | null
+          lastfm_name?: string | null
+          soundcharts_id?: string | null
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null
@@ -895,6 +904,10 @@ export interface Database {
           status: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
           label_notes: string | null
           label_approved_at: string | null
+          period_start: string | null
+          period_end: string | null
+          total_streams: number
+          batch_id: string | null
           created_at: string
         }
         Insert: {
@@ -907,6 +920,10 @@ export interface Database {
           status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
           label_notes?: string | null
           label_approved_at?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          total_streams?: number
+          batch_id?: string | null
           created_at?: string
         }
         Update: {
@@ -919,7 +936,206 @@ export interface Database {
           status?: 'draft' | 'label_approved' | 'artist_notified' | 'acknowledged'
           label_notes?: string | null
           label_approved_at?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          total_streams?: number
+          batch_id?: string | null
           created_at?: string
+        }
+        Relationships: []
+      }
+      distributor_import_batches: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          distributor: string
+          r2_key: string
+          file_hash: string | null
+          row_count: number
+          status: 'uploaded' | 'processing' | 'completed' | 'failed'
+          rules_preset_id: string | null
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          distributor: string
+          r2_key: string
+          file_hash?: string | null
+          row_count?: number
+          status?: 'uploaded' | 'processing' | 'completed' | 'failed'
+          rules_preset_id?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          distributor?: string
+          r2_key?: string
+          file_hash?: string | null
+          row_count?: number
+          status?: 'uploaded' | 'processing' | 'completed' | 'failed'
+          rules_preset_id?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      artist_listener_metrics: {
+        Row: {
+          id: string
+          artist_id: string
+          source: string
+          metric_type: string
+          period: string
+          value: number
+          country: string
+          fetched_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          source: string
+          metric_type: string
+          period: string
+          value?: number
+          country?: string
+          fetched_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          source?: string
+          metric_type?: string
+          period?: string
+          value?: number
+          country?: string
+          fetched_at?: string
+        }
+        Relationships: []
+      }
+      artist_territory_metrics: {
+        Row: {
+          id: string
+          artist_id: string
+          period: string
+          platform: string
+          country: string
+          streams: number
+          revenue_eur: number
+          quantity: number
+          source_batch_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          period: string
+          platform?: string
+          country?: string
+          streams?: number
+          revenue_eur?: number
+          quantity?: number
+          source_batch_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          period?: string
+          platform?: string
+          country?: string
+          streams?: number
+          revenue_eur?: number
+          quantity?: number
+          source_batch_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sales_statement_line_items: {
+        Row: {
+          id: string
+          statement_id: string
+          release_id: string | null
+          platform: string | null
+          country: string | null
+          streams: number
+          revenue_eur: number
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          statement_id: string
+          release_id?: string | null
+          platform?: string | null
+          country?: string | null
+          streams?: number
+          revenue_eur?: number
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          statement_id?: string
+          release_id?: string | null
+          platform?: string | null
+          country?: string | null
+          streams?: number
+          revenue_eur?: number
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      event_impact: {
+        Row: {
+          id: string
+          concert_id: string
+          artist_id: string
+          country: string
+          window_days: number
+          streams_before: number
+          streams_after: number
+          delta_streams: number
+          delta_pct: number
+          revenue_before: number
+          revenue_after: number
+          calculated_at: string
+        }
+        Insert: {
+          id?: string
+          concert_id: string
+          artist_id: string
+          country: string
+          window_days?: number
+          streams_before?: number
+          streams_after?: number
+          delta_streams?: number
+          delta_pct?: number
+          revenue_before?: number
+          revenue_after?: number
+          calculated_at?: string
+        }
+        Update: {
+          id?: string
+          concert_id?: string
+          artist_id?: string
+          country?: string
+          window_days?: number
+          streams_before?: number
+          streams_after?: number
+          delta_streams?: number
+          delta_pct?: number
+          revenue_before?: number
+          revenue_after?: number
+          calculated_at?: string
         }
         Relationships: []
       }

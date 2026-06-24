@@ -29,14 +29,19 @@ import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
+import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
+import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
+import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
 import dynamic from 'next/dynamic'
-const AnalyticsDashboard = dynamic(() => import('@/components/admin/sos/AnalyticsDashboard').then(mod => mod.AnalyticsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
+import { CsvImportProfileEditor } from '@/components/admin/sos/CsvImportProfileEditor'
+import { AdminEnterpriseAnalytics } from '@/components/admin/sos/AdminEnterpriseAnalytics'
+import { useCsvImportProfiles } from '@/hooks/useCsvImportProfiles'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 import {
   Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
-  ChartBar, TrendUp, BookmarkSimple, DownloadSimple,
+  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -55,6 +60,12 @@ type SubTab = 'upload' | 'reporting' | 'analytics' | 'payout' | 'rules' | 'trend
 function SosGeneratorPanel() {
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
+  const {
+    profiles: csvImportProfiles,
+    customProfiles,
+    saveProfile: saveCsvProfile,
+    deleteProfile: deleteCsvProfile,
+  } = useCsvImportProfiles()
 
   // Map portal artists to SOS LabelArtist[]
   const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
@@ -223,6 +234,7 @@ function SosGeneratorPanel() {
     detectedPeriodEnd,
     uniqueArtists,
     releaseTitlesByArtistIncFeaturing,
+    territoryMetrics,
   } = useCSVProcessor(
     believeManager.files,
     bandcampManager.files,
@@ -259,7 +271,40 @@ function SosGeneratorPanel() {
     return Array.from(titles).sort()
   }, [releaseTitlesByArtistIncFeaturing])
 
-  // Export handlers — now passes emailConfig
+  const hasData = revenues.length > 0
+
+  const bronzeBatchIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const file of [
+      ...believeManager.files,
+      ...bandcampManager.files,
+      ...shopifyManager.files,
+      ...printfulManager.files,
+      ...darkmerchManager.files,
+    ]) {
+      if (file.bronzeBatchId) ids.add(file.bronzeBatchId)
+    }
+    return Array.from(ids)
+  }, [
+    believeManager.files,
+    bandcampManager.files,
+    shopifyManager.files,
+    printfulManager.files,
+    darkmerchManager.files,
+  ])
+
+  const exportPersistContext = useMemo(
+    () =>
+      hasData && territoryMetrics.length > 0
+        ? {
+            territoryMetrics,
+            revenues,
+            bronzeBatchIds,
+          }
+        : undefined,
+    [hasData, territoryMetrics, revenues, bronzeBatchIds],
+  )
+
   const { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal } =
     useExports(
       processedData,
@@ -271,9 +316,9 @@ function SosGeneratorPanel() {
       labelArtists,
       emailConfig,
       compilationFilters,
+      true,
+      exportPersistContext,
     )
-
-  const hasData = revenues.length > 0
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -350,6 +395,28 @@ function SosGeneratorPanel() {
           </SheetContent>
         </Sheet>
 
+        {/* CSV import profiles */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
+              <Table size={13} /> CSV Profiles
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-lenis-prevent>
+            <SheetHeader>
+              <SheetTitle>CSV Import Profiles</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6">
+              <CsvImportProfileEditor
+                profiles={csvImportProfiles}
+                customProfiles={customProfiles}
+                onSave={saveCsvProfile}
+                onDelete={deleteCsvProfile}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+
         {/* Workspace sheet */}
         <Sheet>
           <SheetTrigger asChild>
@@ -416,6 +483,7 @@ function SosGeneratorPanel() {
               shopifyManager={shopifyManager}
               printfulManager={printfulManager}
               darkmerchManager={darkmerchManager}
+              csvProfiles={csvImportProfiles}
               onAddAliases={aliases => {
                 aliases.forEach(alias => handleAddCsvAlias(alias))
               }}
@@ -447,14 +515,33 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'analytics' && (
-          hasData ? (
-            <AnalyticsDashboard revenues={revenues} />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-              <ChartBar size={32} className="opacity-30" />
-              <p className="text-sm">Upload CSV files first to see analytics.</p>
-            </div>
-          )
+          <div className="p-6 space-y-4">
+            <ImportBatchesPanel labelArtists={labelArtists} />
+            <ExternalMetricsSyncPanel />
+            {hasData ? (
+              <>
+                <SosAnalyticsPersistPanel
+                  periodStart={detectedPeriodStart}
+                  periodEnd={detectedPeriodEnd}
+                  territoryMetrics={territoryMetrics}
+                  labelArtists={labelArtists}
+                  revenues={revenues}
+                  bronzeBatchIds={bronzeBatchIds}
+                  disabled={isProcessing}
+                />
+                <AdminEnterpriseAnalytics
+                  revenues={revenues}
+                  periodStart={detectedPeriodStart}
+                  periodEnd={detectedPeriodEnd}
+                />
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                <ChartBar size={32} className="opacity-30" />
+                <p className="text-sm">Upload CSV files first to see analytics.</p>
+              </div>
+            )}
+          </div>
         )}
 
         {activeSubTab === 'payout' && (
@@ -479,6 +566,7 @@ function SosGeneratorPanel() {
             revenues={revenues}
             periodStart={detectedPeriodStart}
             periodEnd={detectedPeriodEnd}
+            bronzeBatchIds={bronzeBatchIds}
           />
         )}
 

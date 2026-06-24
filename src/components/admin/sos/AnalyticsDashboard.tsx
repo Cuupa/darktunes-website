@@ -52,6 +52,7 @@ import type { ArtistRevenue } from '@/lib/sos/types'
 
 interface AnalyticsDashboardProps {
   revenues: ArtistRevenue[]
+  showSummaryKpis?: boolean
 }
 
 const CHART_COLORS = [
@@ -74,7 +75,7 @@ function fmtShort(n: number) {
   return fmtEur(n)
 }
 
-export function AnalyticsDashboard({ revenues }: AnalyticsDashboardProps) {
+export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: AnalyticsDashboardProps) {
   const [selectedArtist, setSelectedArtist] = useState<string>('all')
   const [selectedCountry, setSelectedCountry] = useState<string>('all')
 
@@ -177,7 +178,7 @@ export function AnalyticsDashboard({ revenues }: AnalyticsDashboardProps) {
 
   return (
     <div className="p-6 space-y-6">
-      {/* KPI cards */}
+      {showSummaryKpis && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <RevenueSummaryCard
           label="Total Revenue"
@@ -205,6 +206,7 @@ export function AnalyticsDashboard({ revenues }: AnalyticsDashboardProps) {
           icon={<MapPin size={18} />}
         />
       </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">

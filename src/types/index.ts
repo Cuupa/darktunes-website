@@ -32,6 +32,8 @@ export interface Artist {
   songkickId?: string
   bandsintownId?: string
   bandsintownApiKey?: string
+  lastfmName?: string
+  soundchartsId?: string
   lastSyncedAt?: string
   isVisible: boolean
   /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */

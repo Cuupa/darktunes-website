@@ -24,6 +24,10 @@ export interface CreateSalesStatementData {
   r2Key: string
   period: string
   amountEur?: number | null
+  periodStart?: string | null
+  periodEnd?: string | null
+  totalStreams?: number | null
+  batchId?: string | null
 }
 
 function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
@@ -53,6 +57,10 @@ export async function createSalesStatement(
       r2_key: data.r2Key,
       period: data.period,
       amount_eur: data.amountEur ?? null,
+      period_start: data.periodStart ?? null,
+      period_end: data.periodEnd ?? null,
+      total_streams: data.totalStreams ?? 0,
+      batch_id: data.batchId ?? null,
     })
     .select()
     .single()

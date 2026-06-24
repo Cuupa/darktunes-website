@@ -47,6 +47,8 @@ function artistToFormData(artist: Artist): ArtistFormData {
     songkickId: artist.songkickId ?? '',
     bandsintownId: artist.bandsintownId ?? '',
     bandsintownApiKey: artist.bandsintownApiKey ?? '',
+    lastfmName: artist.lastfmName ?? '',
+    soundchartsId: artist.soundchartsId ?? '',
     storageQuotaMb: artist.storageQuotaBytes != null
       ? String(Math.round(artist.storageQuotaBytes / (1024 * 1024)))
       : '',
@@ -89,6 +91,8 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     songkick_id: data.songkickId || null,
     bandsintown_id: data.bandsintownId || null,
     bandsintown_api_key: data.bandsintownApiKey || null,
+    lastfm_name: data.lastfmName || null,
+    soundcharts_id: data.soundchartsId || null,
     storage_quota_bytes: quotaMb != null && !Number.isNaN(quotaMb) ? quotaMb * 1024 * 1024 : null,
     smart_links: data.smartLinks?.length ? data.smartLinks : null,
     image_position_x: data.imagePositionX,

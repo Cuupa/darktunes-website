@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import {
   AreaChart,
   Area,
@@ -31,6 +32,7 @@ interface PeriodSummary {
   total_revenue: number
   total_payout: number
   artist_count: number
+  source_batch_ids?: string[]
   created_at: string
 }
 
@@ -39,6 +41,7 @@ interface TrendsDashboardProps {
   revenues?: ArtistRevenue[]
   periodStart?: string
   periodEnd?: string
+  bronzeBatchIds?: string[]
 }
 
 function fmtEur(n: number) {
@@ -57,7 +60,12 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 }
 
-export function TrendsDashboard({ revenues = [], periodStart = '', periodEnd = '' }: TrendsDashboardProps) {
+export function TrendsDashboard({
+  revenues = [],
+  periodStart = '',
+  periodEnd = '',
+  bronzeBatchIds = [],
+}: TrendsDashboardProps) {
   const [summaries, setSummaries] = useState<PeriodSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -97,15 +105,20 @@ export function TrendsDashboard({ revenues = [], periodStart = '', periodEnd = '
           artist_count: revenues.length,
           artist_breakdowns: revenues.map(r => ({ artist: r.artist, revenue: r.totalRevenue, payout: r.finalAmount })),
           platform_breakdowns: revenues.flatMap(r => r.platformBreakdown),
+          source_batch_ids: bronzeBatchIds,
         }),
       })
       if (res.ok) {
+        toast.success('Period summary saved')
         await loadSummaries()
+      } else {
+        const payload = await res.json().catch(() => ({})) as { message?: string }
+        toast.error(payload.message ?? 'Failed to save period summary')
       }
     } finally {
       setIsSaving(false)
     }
-  }, [revenues, periodStart, periodEnd, loadSummaries])
+  }, [revenues, periodStart, periodEnd, bronzeBatchIds, loadSummaries])
 
   const chartData = summaries.map(s => ({
     period: s.period_start,

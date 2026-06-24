@@ -45,6 +45,10 @@ const mockStatementRow: SalesStatementRow = {
   status: 'draft',
   label_notes: null,
   label_approved_at: null,
+  period_start: null,
+  period_end: null,
+  total_streams: 0,
+  batch_id: null,
   created_at: '2024-04-01T00:00:00Z',
 }
 

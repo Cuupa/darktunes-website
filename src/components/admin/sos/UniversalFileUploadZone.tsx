@@ -27,6 +27,7 @@ import {
   Warning,
   WarningCircle,
   Info,
+  CloudArrowUp,
 } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { UploadedFile, FileProcessingState, LabelArtist } from '@/lib/sos/types'
@@ -59,7 +60,9 @@ import {
   SYSTEM_PRINTFUL_PROFILE_ID,
   SYSTEM_BANDCAMP_PROFILE_ID,
   SYSTEM_BANDCAMP_DDS_PROFILE_ID,
+  SYSTEM_DARKMERCH_PROFILE_ID,
 } from '@/lib/sos/ingest/default-profiles'
+import { suggestColumnMappings } from '@/lib/sos/ingest/columnMappingSuggestions'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -184,6 +187,9 @@ async function detectCSVSource(
       if (matched.id === SYSTEM_BANDCAMP_PROFILE_ID || matched.id === SYSTEM_BANDCAMP_DDS_PROFILE_ID) {
         return { source: 'bandcamp', headers: rawHeaders, matchedProfile: matched }
       }
+      if (matched.id === SYSTEM_DARKMERCH_PROFILE_ID) {
+        return { source: 'darkmerch', headers: rawHeaders, matchedProfile: matched }
+      }
       // Any other financial profile routes to the generic believe parser
       return { source: 'profile-financial', headers: rawHeaders, matchedProfile: matched }
     }
@@ -193,7 +199,10 @@ async function detectCSVSource(
   if (normalizedHeaders.some(h => h === 'bandcamp transaction id')) {
     return { source: 'bandcamp', headers: normalizedHeaders }
   }
-  if (normalizedHeaders.some(h => h === 'sales month') && normalizedHeaders.some(h => h === 'isrc')) {
+  if (
+    normalizedHeaders.some((h) => h.includes('sales month')) &&
+    normalizedHeaders.some((h) => h === 'isrc')
+  ) {
     return { source: 'believe', headers: normalizedHeaders }
   }
   // Darkmerch CSV: has BAND and NET REVENUE columns
@@ -290,6 +299,14 @@ function ProfileSelectionDialog({
   const [revenue, setRevenue] = useState('')
   const [date, setDate] = useState('')
   const [mode, setMode] = useState<'profile' | 'manual'>('profile')
+
+  useEffect(() => {
+    if (!open) return
+    const suggestions = suggestColumnMappings(headers)
+    if (suggestions.artistName) setArtist(suggestions.artistName)
+    if (suggestions.netRevenue) setRevenue(suggestions.netRevenue)
+    if (suggestions.salesMonth) setDate(suggestions.salesMonth)
+  }, [open, headers])
 
   const financialProfiles = profiles.filter(p => p.type === 'financial')
   const canConfirmProfile = selectedProfileId !== ''
@@ -426,6 +443,14 @@ function UnknownCSVMappingDialog({ open, headers, fileName, onConfirm, onCancel 
   const [artist, setArtist] = useState('')
   const [revenue, setRevenue] = useState('')
   const [date, setDate] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    const suggestions = suggestColumnMappings(headers)
+    if (suggestions.artistName) setArtist(suggestions.artistName)
+    if (suggestions.netRevenue) setRevenue(suggestions.netRevenue)
+    if (suggestions.salesMonth) setDate(suggestions.salesMonth)
+  }, [open, headers])
 
   const canConfirm = artist && revenue && date
 
@@ -564,6 +589,23 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
                 )}
                 {file.rowsSkipped != null && file.rowsSkipped > 0 && (
                   <StatPill label="skipped" value={formatCount(file.rowsSkipped)} />
+                )}
+                {file.bronzeBatchId && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
+                    <CloudArrowUp size={11} weight="bold" />
+                    R2 archived
+                  </span>
+                )}
+                {state?.bronzeStatus === 'uploading' && !file.bronzeBatchId && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                    <Spinner size={11} className="animate-spin" />
+                    Archiving…
+                  </span>
+                )}
+                {state?.bronzeStatus === 'error' && !file.bronzeBatchId && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
+                    R2 archive failed
+                  </span>
                 )}
               </div>
             )}

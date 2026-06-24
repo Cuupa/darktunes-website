@@ -82,3 +82,34 @@ export function getAggregatedStreamsByPlatform(stats: StreamingStat[]): Platform
     totalStreams,
   }))
 }
+
+export interface UpsertStreamingStatInput {
+  artistId: string
+  platform: string
+  period: string
+  streams: number
+}
+
+/**
+ * Upserts monthly platform stream totals (rolled up from territory metrics).
+ */
+export async function upsertStreamingStats(
+  db: DbClient,
+  rows: UpsertStreamingStatInput[],
+): Promise<number> {
+  if (rows.length === 0) return 0
+
+  const payload = rows.map((r) => ({
+    artist_id: r.artistId,
+    platform: r.platform,
+    period: r.period,
+    streams: r.streams,
+  }))
+
+  const { error } = await db
+    .from('streaming_stats')
+    .upsert(payload, { onConflict: 'artist_id,platform,period' })
+
+  if (error) throw new Error(error.message)
+  return rows.length
+}
