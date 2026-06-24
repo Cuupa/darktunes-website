@@ -9,7 +9,7 @@
  *  Tab B — "Statement History": read-only view of uploaded PDFs (StatementsManager).
  */
 
-import { lazy, Suspense, useState, useMemo, useCallback, useEffect } from 'react'
+import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
@@ -27,6 +27,7 @@ import type {
   CSVColumnAlias, EmailConfig, TrackRevenueAssignment,
 } from '@/lib/sos/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
+import { EMPTY_SOS_RULES_BUNDLE, type SosRulesBundle } from '@/lib/sos/sosRulesBundle'
 import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
@@ -101,6 +102,8 @@ const ACCOUNTING_FALLBACK = {
   playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
   playbookStep2: 'Click Save to Portal below to persist territory metrics for linked artists.',
   playbookStep3: 'Review saved trends and roster health in Label Intelligence.',
+  subTabListLabel: 'Accounting workflow sections',
+  rulesLocalBanner: 'Rules are saved locally in this browser (IndexedDB).',
 } as const
 
 const SUB_TAB_IDS: SubTab[] = ['upload', 'reporting', 'settlements', 'analytics', 'payout', 'trends', 'rules']
@@ -169,6 +172,73 @@ function SosGeneratorPanel() {
   const [ignoredEntries, setIgnoredEntries] = useState<IgnoredEntry[]>([])
   const [csvAliases, setCsvAliases] = useState<CSVColumnAlias[]>([])
   const [trackRevenueAssignments, setTrackRevenueAssignments] = useState<TrackRevenueAssignment[]>([])
+
+  const [savedRules, setSavedRules, , rulesLoaded] = useKV<SosRulesBundle>(
+    'sos-rules-state',
+    EMPTY_SOS_RULES_BUNDLE,
+  )
+  const rulesHydratedRef = useRef(false)
+
+  useEffect(() => {
+    if (!rulesLoaded || rulesHydratedRef.current) return
+    rulesHydratedRef.current = true
+    const bundle = savedRules ?? EMPTY_SOS_RULES_BUNDLE
+    setArtistMappings(bundle.artistMappings)
+    setCompilationFilters(bundle.compilationFilters)
+    setSplitFees(bundle.splitFees)
+    setManualRevenues(bundle.manualRevenues)
+    setExpenses(bundle.expenses)
+    setIgnoredEntries(bundle.ignoredEntries)
+    setCsvAliases(bundle.csvAliases)
+    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
+    setAppDefaults(bundle.appDefaults)
+    setEmailConfig(bundle.emailConfig)
+  }, [rulesLoaded, savedRules])
+
+  useEffect(() => {
+    if (!rulesHydratedRef.current) return
+    setSavedRules({
+      artistMappings,
+      compilationFilters,
+      splitFees,
+      manualRevenues,
+      expenses,
+      ignoredEntries,
+      csvAliases,
+      trackRevenueAssignments,
+      appDefaults,
+      emailConfig,
+    })
+  }, [
+    artistMappings,
+    compilationFilters,
+    splitFees,
+    manualRevenues,
+    expenses,
+    ignoredEntries,
+    csvAliases,
+    trackRevenueAssignments,
+    appDefaults,
+    emailConfig,
+    setSavedRules,
+  ])
+
+  const handleSubTabKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, tabId: SubTab) => {
+      const currentIndex = SUB_TAB_IDS.indexOf(tabId)
+      if (currentIndex < 0) return
+      let nextIndex = currentIndex
+      if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % SUB_TAB_IDS.length
+      else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + SUB_TAB_IDS.length) % SUB_TAB_IDS.length
+      else if (event.key === 'Home') nextIndex = 0
+      else if (event.key === 'End') nextIndex = SUB_TAB_IDS.length - 1
+      else return
+      event.preventDefault()
+      const nextTab = SUB_TAB_IDS[nextIndex]
+      if (nextTab) setActiveSubTab(nextTab)
+    },
+    [setActiveSubTab],
+  )
 
   // Artist mapping handlers
   const handleAddMapping = useCallback((m: Omit<ArtistMapping, 'id'>) => {
@@ -282,6 +352,7 @@ function SosGeneratorPanel() {
     expenses: ExpenseEntry[]
     ignoredEntries: IgnoredEntry[]
     csvAliases: CSVColumnAlias[]
+    trackRevenueAssignments?: TrackRevenueAssignment[]
   }) => {
     setAppDefaults(preset.appDefaults)
     setEmailConfig(preset.emailConfig)
@@ -292,6 +363,9 @@ function SosGeneratorPanel() {
     setExpenses(preset.expenses)
     setIgnoredEntries(preset.ignoredEntries)
     setCsvAliases(preset.csvAliases)
+    if (preset.trackRevenueAssignments) {
+      setTrackRevenueAssignments(preset.trackRevenueAssignments)
+    }
   }, [])
 
   // File managers for each source
@@ -485,11 +559,22 @@ function SosGeneratorPanel() {
   return (
     <div className="space-y-0">
       {/* Sub-tab navigation */}
-      <div className="flex items-center gap-1 px-6 pt-4 border-b border-border overflow-x-auto">
+      <div
+        className="flex items-center gap-1 px-6 pt-4 border-b border-border overflow-x-auto"
+        role="tablist"
+        aria-label={t.subTabListLabel}
+      >
         {subTabs.map(tab => (
           <button
             key={tab.id}
+            type="button"
+            role="tab"
+            id={`accounting-subtab-${tab.id}`}
+            aria-selected={activeSubTab === tab.id}
+            aria-controls={`accounting-subtab-panel-${tab.id}`}
+            tabIndex={activeSubTab === tab.id ? 0 : -1}
             onClick={() => setActiveSubTab(tab.id)}
+            onKeyDown={(event) => handleSubTabKeyDown(event, tab.id)}
             className={`px-3 py-2 text-sm font-medium rounded-t-md transition-colors flex items-center gap-1 whitespace-nowrap ${
               activeSubTab === tab.id
                 ? 'border border-b-0 border-border bg-background text-foreground'
@@ -613,9 +698,20 @@ function SosGeneratorPanel() {
         <PdfExportSettingsPanel settings={pdfSettings} onUpdate={setPdfSettings} />
       )}
 
+      {rulesLoaded && (
+        <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
+          {t.rulesLocalBanner}
+        </p>
+      )}
+
       {/* Sub-tab content */}
       <div className="min-h-[500px]">
         {activeSubTab === 'upload' && (
+          <div
+            id="accounting-subtab-panel-upload"
+            role="tabpanel"
+            aria-labelledby="accounting-subtab-upload"
+          >
           <div className="p-6">
             <UniversalFileUploadZone
               believeManager={believeManager}
@@ -628,6 +724,7 @@ function SosGeneratorPanel() {
                 aliases.forEach(alias => handleAddCsvAlias(alias))
               }}
             />
+          </div>
           </div>
         )}
 

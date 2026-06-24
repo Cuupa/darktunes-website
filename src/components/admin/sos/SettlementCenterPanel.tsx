@@ -72,6 +72,8 @@ import {
   SealCheck,
   TrayArrowDown,
 } from '@phosphor-icons/react'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface SettlementCenterPanelProps {
   revenues: ArtistRevenue[]
@@ -114,21 +116,144 @@ function canCorrectStatement(row: MasterRow): boolean {
 
 type PaymentMethod = 'sepa' | 'paypal' | 'manual' | 'other'
 
-const INVOICE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Entwurf',
-  sent: 'Gesendet',
-  received: 'Eingegangen',
-  partially_paid: 'Teilweise bezahlt',
-  paid: 'Bezahlt',
-  cancelled: 'Storniert',
+const SETTLEMENT_FALLBACK = {
+  settlementInvoiceDraft: 'Draft',
+  settlementInvoiceSent: 'Sent',
+  settlementInvoiceReceived: 'Received',
+  settlementInvoicePartial: 'Partially paid',
+  settlementInvoicePaid: 'Paid',
+  settlementInvoiceCancelled: 'Cancelled',
+  settlementPeriodOpen: 'Open',
+  settlementPeriodReview: 'Under review',
+  settlementPeriodApproved: 'Approved',
+  settlementPeriodLocked: 'Locked',
+  settlementPeriodArchived: 'Archived',
+  settlementHeading: 'Settlement Center',
+  settlementDescription: 'Master ledger for drafts, invoices, payments, and period close.',
+  settlementSessionExpired: 'Session expired',
+  settlementBulkApproveFailed: 'Bulk approval failed',
+  settlementApproveFailed: 'Approval failed',
+  settlementMarkReceivedFailed: 'Mark as received failed',
+  settlementInvoiceMarkFailedFor: 'Could not mark invoice for {artist} as received',
+  settlementInvalidAmountFor: 'Invalid amount for {artist}',
+  settlementAmountExceedsFor: 'Amount for {artist} exceeds outstanding balance ({amount} EUR)',
+  settlementPaymentFailedFor: 'Payment for {artist} failed',
+  settlementRecordPaymentFailed: 'Failed to record payment',
+  settlementLockFailed: 'Failed to lock period',
+  settlementLockFailedToast: 'Lock failed',
+  settlementCorrectionInvalidAmount: 'Please enter a valid amount in EUR',
+  settlementCorrectionFailed: 'Failed to create correction',
+  settlementCorrectionFailedToast: 'Correction failed',
+  settlementArchiveFailed: 'Failed to archive period',
+  settlementArchiveFailedToast: 'Archive failed',
+  settlementDraftsCreated: '{count} draft(s) created',
+  settlementApprovedToast: '{approved} statement(s) approved',
+  settlementNotificationsSent: ', {emailed} notification(s) sent',
+  settlementInvoicesMarkedReceived: '{count} invoice(s) marked as received',
+  settlementPaymentsRecorded: '{count} payment(s) recorded',
+  settlementPeriodLockedToast: 'Settlement period locked',
+  settlementCorrectionCreated: 'Correction draft created for {artist}. The original statement was replaced.',
+  settlementPeriodArchivedToast: 'Period archived; carry-forwards booked to next period',
+  settlementCurrentPeriod: 'Current period',
+  settlementPeriodAlertTitle: 'Period: {period}',
+  settlementPeriodAlertBody:
+    'Drafts do not notify artists. Approval sends the portal notification and enables invoice creation.',
+  settlementKpiApproved: 'Approved',
+  settlementKpiApprovedHint: 'Statements with label approval',
+  settlementKpiViewed: 'Viewed',
+  settlementKpiViewedHint: 'Opened by artist in portal',
+  settlementKpiInvoiced: 'Invoices',
+  settlementKpiInvoicedHint: 'Invoices created',
+  settlementKpiReceived: 'Received',
+  settlementKpiReceivedHint: 'Invoices received at label',
+  settlementKpiPaid: 'Paid',
+  settlementKpiPaidHint: 'Payments fully recorded',
+  settlementOpenBalance: 'Open balance',
+  settlementOpenBalanceHint: 'Sum of all open ledger balances',
+  settlementApprovalNotesLabel: 'Internal approval notes (optional)',
+  settlementApprovalNotesPlaceholder: 'Notes for selected approvals…',
+  settlementCreateDrafts: 'Create drafts ({count})',
+  settlementApproveNotify: 'Approve & notify ({count})',
+  settlementMarkReceived: 'Mark received ({count})',
+  settlementRecordPayment: 'Record payment ({count})',
+  settlementLockPeriod: 'Lock period',
+  settlementArchivePeriod: 'Archive period',
+  settlementFilterPlaceholder: 'Filter artists…',
+  settlementDeselectAll: 'Clear selection',
+  settlementSelectActionable: 'Select actionable rows',
+  settlementLoadingRegister: 'Loading settlement register…',
+  settlementNoArtistsFilter: 'No artists match the current filter.',
+  settlementColViewed: 'Viewed',
+  settlementColInvoice: 'Invoice',
+  settlementColOpenBalance: 'Open balance',
+  settlementColCarryForward: 'Carry-forward',
+  settlementColArtist: 'Artist',
+  settlementColStatement: 'Statement',
+  settlementColReceived: 'Received',
+  settlementColPaid: 'Paid',
+  settlementColActions: 'Actions',
+  settlementSelectArtist: 'Select {artist}',
+  settlementSelectActionableAria: 'Select actionable rows',
+  settlementDraftBtn: 'Draft',
+  settlementApproveBtn: 'Approve',
+  settlementCorrectionBtn: 'Correction',
+  settlementCorrectionAria: 'Correction for {artist}',
+  settlementCorrectionTitle: 'Statement correction',
+  settlementCorrectionDesc:
+    'Creates a new correction draft and marks the previous statement as replaced. The correction draft must be approved again.',
+  settlementPreviousAmount: 'Previous amount:',
+  settlementChangeAmount: 'Change:',
+  settlementInvoiceExistsWarning:
+    'This artist already has an invoice. Review payment and ledger impacts manually after the correction.',
+  settlementCorrectedAmountLabel: 'Corrected amount (EUR)',
+  settlementCorrectedAmountPlaceholder: 'e.g. 1234.56',
+  settlementInternalNoteLabel: 'Internal note (optional)',
+  settlementCorrectionReasonPlaceholder: 'Reason for correction…',
+  settlementCancel: 'Cancel',
+  settlementCreateCorrectionDraft: 'Create correction draft',
+  settlementPaymentTitle: 'Record payment',
+  settlementPaymentDescSingle: 'Enter amount in EUR for the selected invoice.',
+  settlementPaymentDescMulti: 'Enter a separate amount in EUR per invoice ({count} selected).',
+  settlementOutstandingSuffix: ' · outstanding {amount} EUR',
+  settlementPaymentAmountPlaceholder: 'e.g. 125.00',
+  settlementPaymentMethod: 'Payment method',
+  settlementPaymentManual: 'Manual',
+  settlementPaymentOther: 'Other',
+  settlementPaymentReferenceLabel: 'Reference (optional)',
+  settlementPaymentReferencePlaceholder: 'Payment reference / transaction ID',
+  settlementSavePayment: 'Save payment',
+  settlementLockTitle: 'Lock period?',
+  settlementLockDesc: 'Locked periods cannot be edited. Statements and invoices remain viewable.',
+  settlementLocking: 'Locking…',
+  settlementLockConfirm: 'Lock period',
+  settlementArchiveTitle: 'Archive period?',
+  settlementArchiveDesc:
+    'Open balances will be carried forward to the next period. This action cannot be undone.',
+  settlementNextPeriodStart: 'Next period start (YYYY-MM-DD)',
+  settlementNextPeriodEnd: 'Next period end (YYYY-MM-DD)',
+  settlementArchiving: 'Archiving…',
+  settlementArchiveConfirm: 'Archive & book carry-forwards',
+} as const
+
+function buildInvoiceStatusLabels(t: Record<string, string | undefined>) {
+  return {
+    draft: t.settlementInvoiceDraft ?? SETTLEMENT_FALLBACK.settlementInvoiceDraft,
+    sent: t.settlementInvoiceSent ?? SETTLEMENT_FALLBACK.settlementInvoiceSent,
+    received: t.settlementInvoiceReceived ?? SETTLEMENT_FALLBACK.settlementInvoiceReceived,
+    partially_paid: t.settlementInvoicePartial ?? SETTLEMENT_FALLBACK.settlementInvoicePartial,
+    paid: t.settlementInvoicePaid ?? SETTLEMENT_FALLBACK.settlementInvoicePaid,
+    cancelled: t.settlementInvoiceCancelled ?? SETTLEMENT_FALLBACK.settlementInvoiceCancelled,
+  }
 }
 
-const PERIOD_STATUS_LABELS: Record<string, string> = {
-  open: 'Offen',
-  under_review: 'In Prüfung',
-  approved: 'Freigegeben',
-  locked: 'Gesperrt',
-  archived: 'Archiviert',
+function buildPeriodStatusLabels(t: Record<string, string | undefined>) {
+  return {
+    open: t.settlementPeriodOpen ?? SETTLEMENT_FALLBACK.settlementPeriodOpen,
+    under_review: t.settlementPeriodReview ?? SETTLEMENT_FALLBACK.settlementPeriodReview,
+    approved: t.settlementPeriodApproved ?? SETTLEMENT_FALLBACK.settlementPeriodApproved,
+    locked: t.settlementPeriodLocked ?? SETTLEMENT_FALLBACK.settlementPeriodLocked,
+    archived: t.settlementPeriodArchived ?? SETTLEMENT_FALLBACK.settlementPeriodArchived,
+  }
 }
 
 function fmtEur(value: number) {
@@ -190,7 +315,13 @@ function registerToMasterRow(row: SettlementRegisterRow): MasterRow {
   }
 }
 
-function PeriodStatusBadge({ status }: { status: string }) {
+function PeriodStatusBadge({
+  status,
+  labels,
+}: {
+  status: string
+  labels: Record<string, string>
+}) {
   const className =
     status === 'locked'
       ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
@@ -202,12 +333,18 @@ function PeriodStatusBadge({ status }: { status: string }) {
 
   return (
     <Badge variant="outline" className={className}>
-      {PERIOD_STATUS_LABELS[status] ?? status}
+      {labels[status] ?? status}
     </Badge>
   )
 }
 
-function InvoiceStatusBadge({ status }: { status: string | undefined }) {
+function InvoiceStatusBadge({
+  status,
+  labels,
+}: {
+  status: string | undefined
+  labels: Record<string, string>
+}) {
   if (!status) {
     return <span className="text-xs text-muted-foreground">—</span>
   }
@@ -223,7 +360,7 @@ function InvoiceStatusBadge({ status }: { status: string | undefined }) {
 
   return (
     <Badge variant="outline" className={className}>
-      {INVOICE_STATUS_LABELS[status] ?? status}
+      {labels[status] ?? status}
     </Badge>
   )
 }
@@ -244,6 +381,14 @@ export function SettlementCenterPanel({
   periodEnd,
   onCreateDraft,
 }: SettlementCenterPanelProps) {
+  const dict = useDict()
+  const t = useMemo(
+    () => ({ ...SETTLEMENT_FALLBACK, ...(dict.admin?.accounting ?? {}) }),
+    [dict.admin?.accounting],
+  )
+  const invoiceStatusLabels = useMemo(() => buildInvoiceStatusLabels(t), [t])
+  const periodStatusLabels = useMemo(() => buildPeriodStatusLabels(t), [t])
+
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -273,7 +418,7 @@ export function SettlementCenterPanel({
   const periodLabel =
     periodStart && periodEnd && periodEnd !== periodStart
       ? `${periodStart} – ${periodEnd}`
-      : periodStart || periodEnd || 'Aktueller Zeitraum'
+      : periodStart || periodEnd || t.settlementCurrentPeriod
 
   const defaultNextPeriod = useMemo(() => {
     if (!periodStartDate || !periodEndDate) return { start: '', end: '' }
@@ -484,7 +629,7 @@ export function SettlementCenterPanel({
 
     await refreshRegister()
     setCreatingDrafts(false)
-    toast.success(`${created} Entwurf${created === 1 ? '' : 'e'} erstellt`)
+    toast.success(interpolate(t.settlementDraftsCreated, { count: created }))
   }
 
   const runApproval = async (statementIds: string[]) => {
@@ -493,7 +638,7 @@ export function SettlementCenterPanel({
 
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       const response = await fetch('/api/admin/sales-statements/bulk-approve', {
         method: 'POST',
@@ -512,19 +657,18 @@ export function SettlementCenterPanel({
         | null
 
       if (!response.ok) {
-        throw new Error(json?.error ?? 'Massenfreigabe fehlgeschlagen')
+        throw new Error(json?.error ?? t.settlementBulkApproveFailed)
       }
 
       await refreshRegister()
       setSelectedArtists(new Set())
+      const emailed = json?.emailed ?? 0
       toast.success(
-        `${json?.approved ?? 0} Statement${(json?.approved ?? 0) === 1 ? '' : 's'} freigegeben` +
-          ((json?.emailed ?? 0) > 0
-            ? `, ${json?.emailed} Benachrichtigung${json?.emailed === 1 ? '' : 'en'} versendet`
-            : ''),
+        interpolate(t.settlementApprovedToast, { approved: json?.approved ?? 0 }) +
+          (emailed > 0 ? interpolate(t.settlementNotificationsSent, { emailed }) : ''),
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Freigabe fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementApproveFailed)
     } finally {
       setApproving(false)
     }
@@ -536,7 +680,7 @@ export function SettlementCenterPanel({
 
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       let updated = 0
       for (const target of targets) {
@@ -546,16 +690,19 @@ export function SettlementCenterPanel({
         })
         const json = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) {
-          throw new Error(json?.error ?? `Rechnung für ${target.artistName} konnte nicht markiert werden`)
+          throw new Error(
+            json?.error ??
+              interpolate(t.settlementInvoiceMarkFailedFor, { artist: target.artistName }),
+          )
         }
         updated += 1
       }
 
       await refreshRegister()
       setSelectedArtists(new Set())
-      toast.success(`${updated} Rechnung${updated === 1 ? '' : 'en'} als eingegangen markiert`)
+      toast.success(interpolate(t.settlementInvoicesMarkedReceived, { count: updated }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Markierung fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementMarkReceivedFailed)
     } finally {
       setMarkingReceived(false)
     }
@@ -586,7 +733,7 @@ export function SettlementCenterPanel({
     setRecordingPayment(true)
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       let recorded = 0
       for (const target of selectedPaymentTargets) {
@@ -594,7 +741,7 @@ export function SettlementCenterPanel({
         const eurRaw = paymentAmountsEur[target.invoiceId] ?? ''
         const amountEur = Number.parseFloat(eurRaw.replace(',', '.'))
         if (!Number.isFinite(amountEur) || amountEur <= 0) {
-          throw new Error(`Ungültiger Betrag für ${target.artistName}`)
+          throw new Error(interpolate(t.settlementInvalidAmountFor, { artist: target.artistName }))
         }
         const amountCents = Math.round(amountEur * 100)
         const maxCents =
@@ -602,7 +749,10 @@ export function SettlementCenterPanel({
           (target.payout != null ? Math.round(target.payout * 100) : undefined)
         if (maxCents != null && amountCents > maxCents) {
           throw new Error(
-            `Betrag für ${target.artistName} übersteigt den offenen Betrag (${(maxCents / 100).toFixed(2)} EUR)`,
+            interpolate(t.settlementAmountExceedsFor, {
+              artist: target.artistName,
+              amount: (maxCents / 100).toFixed(2),
+            }),
           )
         }
 
@@ -620,7 +770,9 @@ export function SettlementCenterPanel({
         })
         const json = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) {
-          throw new Error(json?.error ?? `Zahlung für ${target.artistName} fehlgeschlagen`)
+          throw new Error(
+            json?.error ?? interpolate(t.settlementPaymentFailedFor, { artist: target.artistName }),
+          )
         }
         recorded += 1
       }
@@ -628,9 +780,9 @@ export function SettlementCenterPanel({
       await refreshRegister()
       setSelectedArtists(new Set())
       setPaymentDialogOpen(false)
-      toast.success(`${recorded} Zahlung${recorded === 1 ? '' : 'en'} erfasst`)
+      toast.success(interpolate(t.settlementPaymentsRecorded, { count: recorded }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Zahlungserfassung fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementRecordPaymentFailed)
     } finally {
       setRecordingPayment(false)
     }
@@ -641,7 +793,7 @@ export function SettlementCenterPanel({
     setLocking(true)
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       const response = await fetch(`/api/admin/settlements/periods/${period.id}/lock`, {
         method: 'POST',
@@ -649,14 +801,14 @@ export function SettlementCenterPanel({
       })
       const json = (await response.json().catch(() => null)) as { error?: string } | null
       if (!response.ok) {
-        throw new Error(json?.error ?? 'Periode konnte nicht gesperrt werden')
+        throw new Error(json?.error ?? t.settlementLockFailed)
       }
 
       await refreshRegister()
       setLockDialogOpen(false)
-      toast.success('Abrechnungsperiode gesperrt')
+      toast.success(t.settlementPeriodLockedToast)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Sperren fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementLockFailedToast)
     } finally {
       setLocking(false)
     }
@@ -683,14 +835,14 @@ export function SettlementCenterPanel({
     if (!correctionTarget?.statementId) return
     const amountEur = Number.parseFloat(correctionAmountEur.replace(',', '.'))
     if (!Number.isFinite(amountEur)) {
-      toast.error('Bitte einen gültigen Betrag in EUR eingeben')
+      toast.error(t.settlementCorrectionInvalidAmount)
       return
     }
 
     setCorrecting(true)
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       const response = await fetch(
         `/api/admin/sales-statements/${correctionTarget.statementId}/correction`,
@@ -712,17 +864,17 @@ export function SettlementCenterPanel({
         | null
 
       if (!response.ok) {
-        throw new Error(json?.error ?? 'Korrektur konnte nicht erstellt werden')
+        throw new Error(json?.error ?? t.settlementCorrectionFailed)
       }
 
       await refreshRegister()
       setCorrectionDialogOpen(false)
       setCorrectionTarget(null)
       toast.success(
-        `Korrektur-Entwurf für ${correctionTarget.artistName} erstellt. Das ursprüngliche Statement wurde ersetzt.`,
+        interpolate(t.settlementCorrectionCreated, { artist: correctionTarget.artistName }),
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Korrektur fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementCorrectionFailedToast)
     } finally {
       setCorrecting(false)
     }
@@ -738,13 +890,13 @@ export function SettlementCenterPanel({
           onClick={() => void runDraftCreation([row])}
         >
           {isBusy ? <CircleNotch size={14} className="animate-spin" /> : <FileArrowUp size={14} />}
-          Entwurf
+          {t.settlementDraftBtn}
         </Button>
       )}
       {row.workflowStatus === 'draft' && row.statementId && periodWritable && (
         <Button size="sm" disabled={approving} onClick={() => void runApproval([row.statementId!])}>
           <PaperPlaneTilt size={14} />
-          Freigeben
+          {t.settlementApproveBtn}
         </Button>
       )}
       {canCorrectStatement(row) && periodWritable && (
@@ -753,10 +905,10 @@ export function SettlementCenterPanel({
           variant="outline"
           disabled={correcting}
           onClick={() => openCorrectionDialog(row)}
-          aria-label={`Korrektur für ${row.artistName}`}
+          aria-label={interpolate(t.settlementCorrectionAria, { artist: row.artistName })}
         >
           <PencilSimple size={14} />
-          Korrektur
+          {t.settlementCorrectionBtn}
         </Button>
       )}
       {(row.workflowStatus === 'artist_notified' ||
@@ -773,7 +925,7 @@ export function SettlementCenterPanel({
     setArchiving(true)
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
       const response = await fetch(`/api/admin/settlements/periods/${period.id}/archive`, {
         method: 'POST',
@@ -788,14 +940,14 @@ export function SettlementCenterPanel({
       })
       const json = (await response.json().catch(() => null)) as { error?: string } | null
       if (!response.ok) {
-        throw new Error(json?.error ?? 'Periode konnte nicht archiviert werden')
+        throw new Error(json?.error ?? t.settlementArchiveFailed)
       }
 
       await refreshRegister()
       setArchiveDialogOpen(false)
-      toast.success('Periode archiviert, Überträge in Folgeperiode gebucht')
+      toast.success(t.settlementPeriodArchivedToast)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Archivierung fehlgeschlagen')
+      toast.error(err instanceof Error ? err.message : t.settlementArchiveFailedToast)
     } finally {
       setArchiving(false)
     }
@@ -805,55 +957,53 @@ export function SettlementCenterPanel({
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-semibold">Abrechnungszentrale</h2>
-          {period && <PeriodStatusBadge status={period.status} />}
+          <h2 className="text-lg font-semibold">{t.settlementHeading}</h2>
+          {period && <PeriodStatusBadge status={period.status} labels={periodStatusLabels} />}
         </div>
         <p className="text-sm text-muted-foreground max-w-3xl">
-          Gesamtübersicht über Statements, Rechnungen, Zahlungen und offene Salden je Künstler für die
-          gewählte Periode.
+          {t.settlementDescription}
         </p>
       </div>
 
       <Alert className="border-primary/30 bg-primary/5">
         <SealCheck size={16} className="text-primary" />
-        <AlertTitle className="text-sm">Periode: {periodLabel}</AlertTitle>
-        <AlertDescription className="text-xs">
-          Entwürfe benachrichtigen Künstler nicht. Freigabe sendet die Portal-Benachrichtigung und
-          ermöglicht Rechnungserstellung.
-        </AlertDescription>
+        <AlertTitle className="text-sm">
+          {interpolate(t.settlementPeriodAlertTitle, { period: periodLabel })}
+        </AlertTitle>
+        <AlertDescription className="text-xs">{t.settlementPeriodAlertBody}</AlertDescription>
       </Alert>
 
       <WorkflowStepper activeStep={activeStep} completedSteps={completedSteps} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <WorkflowSummaryCard
-          label="Freigegeben"
+          label={t.settlementKpiApproved}
           value={kpis.approved}
-          hint="Statements mit Label-Freigabe"
+          hint={t.settlementKpiApprovedHint}
           tone={kpis.approved > 0 ? 'success' : 'muted'}
         />
         <WorkflowSummaryCard
-          label="Gesehen"
+          label={t.settlementKpiViewed}
           value={kpis.viewed}
-          hint="Vom Künstler im Portal geöffnet"
+          hint={t.settlementKpiViewedHint}
           tone={kpis.viewed > 0 ? 'default' : 'muted'}
         />
         <WorkflowSummaryCard
-          label="Rechnungen"
+          label={t.settlementKpiInvoiced}
           value={kpis.invoiced}
-          hint="Rechnungen erstellt"
+          hint={t.settlementKpiInvoicedHint}
           tone={kpis.invoiced > 0 ? 'default' : 'muted'}
         />
         <WorkflowSummaryCard
-          label="Eingegangen"
+          label={t.settlementKpiReceived}
           value={kpis.received}
-          hint="Rechnungen beim Label eingegangen"
+          hint={t.settlementKpiReceivedHint}
           tone={kpis.received > 0 ? 'default' : 'muted'}
         />
         <WorkflowSummaryCard
-          label="Bezahlt"
+          label={t.settlementKpiPaid}
           value={kpis.paid}
-          hint="Zahlungen vollständig erfasst"
+          hint={t.settlementKpiPaidHint}
           tone={kpis.paid > 0 ? 'success' : 'muted'}
         />
         <div
@@ -863,9 +1013,9 @@ export function SettlementCenterPanel({
               : 'border-border bg-card/30'
           }`}
         >
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Offener Saldo</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t.settlementOpenBalance}</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtEur(kpis.openBalanceEur)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Summe aller offenen Ledger-Salden</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t.settlementOpenBalanceHint}</p>
         </div>
       </div>
 
@@ -873,12 +1023,12 @@ export function SettlementCenterPanel({
         <div className="flex flex-col gap-4 border-b border-border p-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3 flex-1">
             <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Interne Freigabe-Notizen (optional)
+              {t.settlementApprovalNotesLabel}
             </label>
             <Textarea
               value={approvalNotes}
               onChange={(event) => setApprovalNotes(event.target.value)}
-              placeholder="Notizen für die ausgewählten Freigaben…"
+              placeholder={t.settlementApprovalNotesPlaceholder}
               className="min-h-[72px] resize-y"
               disabled={!periodWritable}
             />
@@ -892,7 +1042,7 @@ export function SettlementCenterPanel({
               onClick={() => void runDraftCreation(selectedDraftTargets)}
             >
               {creatingDrafts ? <CircleNotch size={18} className="animate-spin" /> : <FileArrowUp size={18} />}
-              Entwürfe erstellen ({selectedDraftTargets.length})
+              {interpolate(t.settlementCreateDrafts, { count: selectedDraftTargets.length })}
             </Button>
             <Button
               size="default"
@@ -901,7 +1051,7 @@ export function SettlementCenterPanel({
               onClick={() => void runApproval(selectedApproveTargets.map((row) => row.statementId!))}
             >
               {approving ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} />}
-              Freigeben &amp; benachrichtigen ({selectedApproveTargets.length})
+              {interpolate(t.settlementApproveNotify, { count: selectedApproveTargets.length })}
             </Button>
             <Button
               size="default"
@@ -915,7 +1065,7 @@ export function SettlementCenterPanel({
               ) : (
                 <TrayArrowDown size={18} />
               )}
-              Als eingegangen ({selectedReceivedTargets.length})
+              {interpolate(t.settlementMarkReceived, { count: selectedReceivedTargets.length })}
             </Button>
             <Button
               size="default"
@@ -925,7 +1075,7 @@ export function SettlementCenterPanel({
               onClick={openPaymentDialog}
             >
               <CurrencyEur size={18} />
-              Zahlung erfassen ({selectedPaymentTargets.length})
+              {interpolate(t.settlementRecordPayment, { count: selectedPaymentTargets.length })}
             </Button>
             <Button
               size="default"
@@ -935,7 +1085,7 @@ export function SettlementCenterPanel({
               onClick={() => setLockDialogOpen(true)}
             >
               {locking ? <CircleNotch size={18} className="animate-spin" /> : <Lock size={18} />}
-              Periode sperren
+              {t.settlementLockPeriod}
             </Button>
             <Button
               size="default"
@@ -945,7 +1095,7 @@ export function SettlementCenterPanel({
               onClick={() => setArchiveDialogOpen(true)}
             >
               {archiving ? <CircleNotch size={18} className="animate-spin" /> : <Archive size={18} />}
-              Periode archivieren
+              {t.settlementArchivePeriod}
             </Button>
           </div>
         </div>
@@ -959,20 +1109,20 @@ export function SettlementCenterPanel({
             <Input
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
-              placeholder="Künstler filtern…"
+              placeholder={t.settlementFilterPlaceholder}
               className="pl-8 h-9"
             />
           </div>
           <Button variant="ghost" size="sm" onClick={toggleSelectAll} disabled={selectableRows.length === 0}>
-            {allSelected ? 'Auswahl aufheben' : 'Aktionszeilen auswählen'}
+            {allSelected ? t.settlementDeselectAll : t.settlementSelectActionable}
           </Button>
         </div>
 
         <div className="space-y-3 border-b border-border p-4 lg:hidden">
           {loading ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Abrechnungsregister wird geladen…</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{t.settlementLoadingRegister}</p>
           ) : filteredRows.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Keine Künstler für den aktuellen Filter.</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{t.settlementNoArtistsFilter}</p>
           ) : (
             filteredRows.map((row) => {
               const actionable = rowIsSelectable(row)
@@ -988,27 +1138,27 @@ export function SettlementCenterPanel({
                       <Checkbox
                         checked={selectedArtists.has(row.artistName)}
                         onCheckedChange={() => toggleArtist(row.artistName)}
-                        aria-label={`${row.artistName} auswählen`}
+                        aria-label={interpolate(t.settlementSelectArtist, { artist: row.artistName })}
                       />
                     )}
                   </div>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                     <div>
-                      <dt className="text-muted-foreground">Gesehen</dt>
+                      <dt className="text-muted-foreground">{t.settlementColViewed}</dt>
                       <dd>{fmtDate(row.firstViewedAt)}</dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Rechnung</dt>
+                      <dt className="text-muted-foreground">{t.settlementColInvoice}</dt>
                       <dd>
-                        <InvoiceStatusBadge status={row.invoiceStatus} />
+                        <InvoiceStatusBadge status={row.invoiceStatus} labels={invoiceStatusLabels} />
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Offener Saldo</dt>
+                      <dt className="text-muted-foreground">{t.settlementColOpenBalance}</dt>
                       <dd className="tabular-nums">{fmtEur(row.ledgerBalanceEur)}</dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Übertrag</dt>
+                      <dt className="text-muted-foreground">{t.settlementColCarryForward}</dt>
                       <dd className="tabular-nums">
                         {row.carryForwardEur != null ? fmtEur(row.carryForwardEur) : '—'}
                       </dd>
@@ -1029,32 +1179,32 @@ export function SettlementCenterPanel({
                   <Checkbox
                     checked={allSelected}
                     onCheckedChange={toggleSelectAll}
-                    aria-label="Aktionszeilen auswählen"
+                    aria-label={t.settlementSelectActionableAria}
                     disabled={selectableRows.length === 0}
                   />
                 </TableHead>
-                <TableHead>Künstler</TableHead>
-                <TableHead>Statement</TableHead>
-                <TableHead>Gesehen</TableHead>
-                <TableHead>Rechnung</TableHead>
-                <TableHead>Eingegangen</TableHead>
-                <TableHead>Bezahlt</TableHead>
-                <TableHead className="text-right">Offener Saldo</TableHead>
-                <TableHead className="text-right">Übertrag</TableHead>
-                <TableHead className="text-right">Aktionen</TableHead>
+                <TableHead>{t.settlementColArtist}</TableHead>
+                <TableHead>{t.settlementColStatement}</TableHead>
+                <TableHead>{t.settlementColViewed}</TableHead>
+                <TableHead>{t.settlementColInvoice}</TableHead>
+                <TableHead>{t.settlementColReceived}</TableHead>
+                <TableHead>{t.settlementColPaid}</TableHead>
+                <TableHead className="text-right">{t.settlementColOpenBalance}</TableHead>
+                <TableHead className="text-right">{t.settlementColCarryForward}</TableHead>
+                <TableHead className="text-right">{t.settlementColActions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                    Abrechnungsregister wird geladen…
+                    {t.settlementLoadingRegister}
                   </TableCell>
                 </TableRow>
               ) : filteredRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                    Keine Künstler für den aktuellen Filter.
+                    {t.settlementNoArtistsFilter}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -1068,7 +1218,7 @@ export function SettlementCenterPanel({
                         <Checkbox
                           checked={selectedArtists.has(row.artistName)}
                           onCheckedChange={() => toggleArtist(row.artistName)}
-                          aria-label={`${row.artistName} auswählen`}
+                          aria-label={interpolate(t.settlementSelectArtist, { artist: row.artistName })}
                           disabled={!actionable}
                         />
                       </TableCell>
@@ -1079,7 +1229,7 @@ export function SettlementCenterPanel({
                       <TableCell className="text-sm">{fmtDate(row.firstViewedAt)}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <InvoiceStatusBadge status={row.invoiceStatus} />
+                          <InvoiceStatusBadge status={row.invoiceStatus} labels={invoiceStatusLabels} />
                           {row.invoiceNumber && (
                             <span className="text-[10px] text-muted-foreground">{row.invoiceNumber}</span>
                           )}
@@ -1131,18 +1281,15 @@ export function SettlementCenterPanel({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Statement-Korrektur</DialogTitle>
-            <DialogDescription>
-              Erstellt einen neuen Korrektur-Entwurf und markiert das bisherige Statement als ersetzt.
-              Anschließend muss der Korrektur-Entwurf erneut freigegeben werden.
-            </DialogDescription>
+            <DialogTitle>{t.settlementCorrectionTitle}</DialogTitle>
+            <DialogDescription>{t.settlementCorrectionDesc}</DialogDescription>
           </DialogHeader>
           {correctionTarget && (
             <div className="space-y-4 py-2">
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
                 <p className="font-medium">{correctionTarget.artistName}</p>
                 <p className="mt-1 text-muted-foreground">
-                  Bisheriger Betrag:{' '}
+                  {t.settlementPreviousAmount}{' '}
                   <span className="tabular-nums text-foreground">
                     {correctionTarget.statementAmountEur != null
                       ? fmtEur(correctionTarget.statementAmountEur)
@@ -1153,7 +1300,7 @@ export function SettlementCenterPanel({
                 </p>
                 {correctionDeltaEur != null && (
                   <p className="mt-1 text-muted-foreground">
-                    Änderung:{' '}
+                    {t.settlementChangeAmount}{' '}
                     <span
                       className={`tabular-nums ${
                         correctionDeltaEur > 0
@@ -1172,29 +1319,28 @@ export function SettlementCenterPanel({
               {correctionTarget.invoiceId && (
                 <Alert className="border-amber-500/30 bg-amber-500/5">
                   <AlertDescription className="text-xs">
-                    Für diesen Künstler existiert bereits eine Rechnung. Prüfen Sie Auswirkungen auf
-                    Zahlung und Ledger manuell nach der Korrektur.
+                    {t.settlementInvoiceExistsWarning}
                   </AlertDescription>
                 </Alert>
               )}
               <div className="space-y-2">
-                <Label htmlFor="correction-amount">Korrigierter Betrag (EUR)</Label>
+                <Label htmlFor="correction-amount">{t.settlementCorrectedAmountLabel}</Label>
                 <Input
                   id="correction-amount"
                   type="text"
                   inputMode="decimal"
                   value={correctionAmountEur}
                   onChange={(event) => setCorrectionAmountEur(event.target.value)}
-                  placeholder="z. B. 1234,56"
+                  placeholder={t.settlementCorrectedAmountPlaceholder}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="correction-notes">Interne Notiz (optional)</Label>
+                <Label htmlFor="correction-notes">{t.settlementInternalNoteLabel}</Label>
                 <Textarea
                   id="correction-notes"
                   value={correctionNotes}
                   onChange={(event) => setCorrectionNotes(event.target.value)}
-                  placeholder="Grund der Korrektur…"
+                  placeholder={t.settlementCorrectionReasonPlaceholder}
                   className="min-h-[72px] resize-y"
                 />
               </div>
@@ -1202,11 +1348,11 @@ export function SettlementCenterPanel({
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCorrectionDialogOpen(false)}>
-              Abbrechen
+              {t.settlementCancel}
             </Button>
             <Button disabled={correcting || !correctionTarget} onClick={() => void runCorrection()}>
               {correcting ? <CircleNotch size={16} className="animate-spin" /> : null}
-              Korrektur-Entwurf erstellen
+              {t.settlementCreateCorrectionDraft}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1215,11 +1361,13 @@ export function SettlementCenterPanel({
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Zahlung erfassen</DialogTitle>
+            <DialogTitle>{t.settlementPaymentTitle}</DialogTitle>
             <DialogDescription>
               {selectedPaymentTargets.length === 1
-                ? 'Betrag in EUR für die ausgewählte Rechnung erfassen.'
-                : `Je Rechnung einen eigenen Betrag in EUR erfassen (${selectedPaymentTargets.length} ausgewählt).`}
+                ? t.settlementPaymentDescSingle
+                : interpolate(t.settlementPaymentDescMulti, {
+                    count: selectedPaymentTargets.length,
+                  })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1231,7 +1379,9 @@ export function SettlementCenterPanel({
                   <div key={target.invoiceId} className="space-y-1.5 rounded-md border border-border p-3">
                     <Label htmlFor={`payment-amount-${target.invoiceId}`}>
                       {target.artistName}
-                      {outstanding ? ` · offen ${outstanding} EUR` : ''}
+                      {outstanding
+                        ? interpolate(t.settlementOutstandingSuffix, { amount: outstanding })
+                        : ''}
                     </Label>
                     <Input
                       id={`payment-amount-${target.invoiceId}`}
@@ -1245,14 +1395,14 @@ export function SettlementCenterPanel({
                           [target.invoiceId!]: event.target.value,
                         }))
                       }
-                      placeholder="z. B. 125,00"
+                      placeholder={t.settlementPaymentAmountPlaceholder}
                     />
                   </div>
                 )
               })}
             </div>
             <div className="space-y-2">
-              <Label>Zahlungsmethode</Label>
+              <Label>{t.settlementPaymentMethod}</Label>
               <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -1260,28 +1410,28 @@ export function SettlementCenterPanel({
                 <SelectContent>
                   <SelectItem value="sepa">SEPA</SelectItem>
                   <SelectItem value="paypal">PayPal</SelectItem>
-                  <SelectItem value="manual">Manuell</SelectItem>
-                  <SelectItem value="other">Sonstige</SelectItem>
+                  <SelectItem value="manual">{t.settlementPaymentManual}</SelectItem>
+                  <SelectItem value="other">{t.settlementPaymentOther}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="payment-reference">Referenz (optional)</Label>
+              <Label htmlFor="payment-reference">{t.settlementPaymentReferenceLabel}</Label>
               <Input
                 id="payment-reference"
                 value={paymentReference}
                 onChange={(event) => setPaymentReference(event.target.value)}
-                placeholder="Verwendungszweck / Transaktions-ID"
+                placeholder={t.settlementPaymentReferencePlaceholder}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
-              Abbrechen
+              {t.settlementCancel}
             </Button>
             <Button disabled={recordingPayment} onClick={() => void runRecordPayment()}>
               {recordingPayment ? <CircleNotch size={16} className="animate-spin" /> : null}
-              Zahlung speichern
+              {t.settlementSavePayment}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1290,16 +1440,13 @@ export function SettlementCenterPanel({
       <AlertDialog open={lockDialogOpen} onOpenChange={setLockDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Periode sperren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Gesperrte Perioden können nicht mehr bearbeitet werden. Statements und Rechnungen bleiben
-              einsehbar.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t.settlementLockTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.settlementLockDesc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t.settlementCancel}</AlertDialogCancel>
             <AlertDialogAction disabled={locking} onClick={() => void runLockPeriod()}>
-              {locking ? 'Wird gesperrt…' : 'Periode sperren'}
+              {locking ? t.settlementLocking : t.settlementLockConfirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1308,15 +1455,12 @@ export function SettlementCenterPanel({
       <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Periode archivieren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Offene Salden werden als Übertrag in die Folgeperiode gebucht. Diese Aktion kann nicht
-              rückgängig gemacht werden.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t.settlementArchiveTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.settlementArchiveDesc}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid gap-3 py-2">
             <div className="space-y-2">
-              <Label htmlFor="next-period-start">Folgeperiode Start (YYYY-MM-DD)</Label>
+              <Label htmlFor="next-period-start">{t.settlementNextPeriodStart}</Label>
               <Input
                 id="next-period-start"
                 value={nextPeriodStart}
@@ -1324,7 +1468,7 @@ export function SettlementCenterPanel({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="next-period-end">Folgeperiode Ende (YYYY-MM-DD)</Label>
+              <Label htmlFor="next-period-end">{t.settlementNextPeriodEnd}</Label>
               <Input
                 id="next-period-end"
                 value={nextPeriodEnd}
@@ -1333,9 +1477,9 @@ export function SettlementCenterPanel({
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t.settlementCancel}</AlertDialogCancel>
             <AlertDialogAction disabled={archiving} onClick={() => void runArchivePeriod()}>
-              {archiving ? 'Wird archiviert…' : 'Archivieren & Überträge buchen'}
+              {archiving ? t.settlementArchiving : t.settlementArchiveConfirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

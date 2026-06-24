@@ -8,6 +8,8 @@ import { persistSosAnalytics } from '@/lib/sos/persistSosAnalyticsAction'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface SosAnalyticsPersistPanelProps {
   periodStart: string
@@ -20,6 +22,19 @@ interface SosAnalyticsPersistPanelProps {
   disabled?: boolean
 }
 
+const PERSIST_FALLBACK = {
+  persistTitle: 'Portal Analytics',
+  persistDescription:
+    'Persist territory metrics, merch orders, period summary, and correlations for linked artists ({metrics} metric rows, {merch} merch rows).',
+  persistBronzeLinked: '{count} Bronze CSV archive(s) linked.',
+  persistTerritoryHint:
+    ' Territory metrics require processed CSV data with portal-linked artists.',
+  persistSave: 'Save to Portal',
+  persistSaving: 'Saving…',
+  persistSuccess: 'Analytics saved: {metrics} metrics for {artists} artists{extras}',
+  persistFailed: 'Failed to persist analytics',
+} as const
+
 export function SosAnalyticsPersistPanel({
   periodStart,
   periodEnd,
@@ -30,13 +45,13 @@ export function SosAnalyticsPersistPanel({
   bronzeBatchIds = [],
   disabled = false,
 }: SosAnalyticsPersistPanelProps) {
+  const dict = useDict()
+  const t = { ...PERSIST_FALLBACK, ...dict.admin?.accounting }
   const [isPending, startTransition] = useTransition()
 
   const canPersist = territoryMetrics.length > 0
   const missingTerritoryHint =
-    !canPersist && revenues.length > 0
-      ? ' Territory metrics require processed CSV data with portal-linked artists.'
-      : ''
+    !canPersist && revenues.length > 0 ? t.persistTerritoryHint : ''
 
   const handlePersist = () => {
     if (!canPersist) return
@@ -82,7 +97,11 @@ export function SosAnalyticsPersistPanel({
             ? ` · ${result.merchOrdersUpserted} merch orders`
             : ''
         toast.success(
-          `Analytics saved: ${result.metricsUpserted ?? 0} metrics for ${result.artistsProcessed ?? 0} artists${impactNote}${merchNote}`,
+          interpolate(t.persistSuccess, {
+            metrics: result.metricsUpserted ?? 0,
+            artists: result.artistsProcessed ?? 0,
+            extras: `${impactNote}${merchNote}`,
+          }),
         )
         if (result.eventImpactWarnings?.length) {
           toast.warning('Event impact partially failed', {
@@ -95,7 +114,7 @@ export function SosAnalyticsPersistPanel({
           })
         }
       } else {
-        toast.error(result.error ?? 'Failed to persist analytics')
+        toast.error(result.error ?? t.persistFailed)
       }
     })
   }
@@ -103,12 +122,14 @@ export function SosAnalyticsPersistPanel({
   return (
     <div className="flex items-center justify-between gap-4 p-4 border border-border rounded-lg bg-card/50">
       <div>
-        <p className="text-sm font-medium">Portal Analytics</p>
+        <p className="text-sm font-medium">{t.persistTitle}</p>
         <p className="text-xs text-muted-foreground">
-          Persist territory metrics, merch orders, period summary, and correlations for linked artists (
-          {territoryMetrics.length} metric rows, {merchOrderRows.length} merch rows).
+          {interpolate(t.persistDescription, {
+            metrics: territoryMetrics.length,
+            merch: merchOrderRows.length,
+          })}
           {bronzeBatchIds.length > 0 && (
-            <> {bronzeBatchIds.length} Bronze CSV archive{bronzeBatchIds.length === 1 ? '' : 's'} linked.</>
+            <> {interpolate(t.persistBronzeLinked, { count: bronzeBatchIds.length })}</>
           )}
           {missingTerritoryHint}
         </p>
@@ -120,7 +141,7 @@ export function SosAnalyticsPersistPanel({
         disabled={disabled || isPending || !canPersist}
       >
         <CloudArrowUp size={16} className="mr-1.5" />
-        {isPending ? 'Saving…' : 'Save to Portal'}
+        {isPending ? t.persistSaving : t.persistSave}
       </Button>
     </div>
   )

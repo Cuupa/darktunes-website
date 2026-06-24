@@ -24,6 +24,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RevenueSummaryCard } from './RevenueSummaryCard'
 import type { ArtistRevenue } from '@/lib/sos/types'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface PeriodSummary {
   id: string
@@ -66,6 +68,27 @@ export function TrendsDashboard({
   periodEnd = '',
   bronzeBatchIds = [],
 }: TrendsDashboardProps) {
+  const dict = useDict()
+  const trendsFallback = {
+    trendsSavePeriod: 'Save period {period}',
+    trendsUpdatePeriod: 'Update period {period}',
+    trendsLoadFailed: 'Failed to load period summaries',
+    trendsSaved: 'Period summary saved',
+    trendsUpdated: 'Period summary updated',
+    trendsHeading: 'Revenue Trends',
+    trendsLatestRevenue: 'Latest Revenue',
+    trendsLatestPayout: 'Latest Payout',
+    trendsPeriodsTracked: 'Periods tracked',
+    trendsLoading: 'Loading historical data…',
+    trendsEmptyTitle: 'No historical data yet.',
+    trendsEmptyHint:
+      'Upload CSV files and click "Save period" (or use Save to Portal in Analytics) to start tracking trends.',
+    trendsChartTitle: 'Revenue & Payout Over Time',
+    trendsOnePeriodHint: '1 period saved. Save at least one more to see a trend chart.',
+    trendsSaveFailed: 'Failed to save period summary',
+  } as const
+  const t = { ...trendsFallback, ...(dict.admin?.accounting ?? {}) }
+
   const [summaries, setSummaries] = useState<PeriodSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -81,11 +104,11 @@ export function TrendsDashboard({
       const data = await res.json() as { summaries: PeriodSummary[] }
       setSummaries((data.summaries ?? []).sort((a, b) => a.period_start.localeCompare(b.period_start)))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load period summaries')
+      toast.error(err instanceof Error ? err.message : t.trendsLoadFailed)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t.trendsLoadFailed])
 
   useEffect(() => {
     void loadSummaries()
@@ -113,15 +136,15 @@ export function TrendsDashboard({
       })
       const payload = await res.json().catch(() => ({})) as { error?: string; updated?: boolean }
       if (res.ok) {
-        toast.success(payload.updated ? 'Period summary updated' : 'Period summary saved')
+        toast.success(payload.updated ? t.trendsUpdated : t.trendsSaved)
         await loadSummaries()
       } else {
-        toast.error(payload.error ?? 'Failed to save period summary')
+        toast.error(payload.error ?? t.trendsSaveFailed)
       }
     } finally {
       setIsSaving(false)
     }
-  }, [revenues, periodStart, periodEnd, bronzeBatchIds, loadSummaries])
+  }, [revenues, periodStart, periodEnd, bronzeBatchIds, loadSummaries, t.trendsSaved, t.trendsUpdated, t.trendsSaveFailed])
 
   const chartData = summaries.map(s => ({
     period: s.period_start,
@@ -146,7 +169,7 @@ export function TrendsDashboard({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <TrendUp size={20} weight="bold" className="text-primary" />
-          <h3 className="font-semibold">Revenue Trends</h3>
+          <h3 className="font-semibold">{t.trendsHeading}</h3>
         </div>
 
         {revenues.length > 0 && periodStart && (
@@ -158,36 +181,36 @@ export function TrendsDashboard({
             className="gap-1.5 text-xs"
           >
             <FloppyDisk size={13} />{' '}
-            {currentPeriodExists ? `Update period ${periodStart}` : `Save period ${periodStart}`}
+            {currentPeriodExists
+              ? interpolate(t.trendsUpdatePeriod, { period: periodStart })
+              : interpolate(t.trendsSavePeriod, { period: periodStart })}
           </Button>
         )}
       </div>
 
       {summaries.length >= 2 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <RevenueSummaryCard label="Latest Revenue" value={fmtEur(latestRevenue)} />
-          <RevenueSummaryCard label="Latest Payout" value={fmtEur(latestPayout)} />
-          <RevenueSummaryCard label="Periods tracked" value={String(summaries.length)} />
+          <RevenueSummaryCard label={t.trendsLatestRevenue} value={fmtEur(latestRevenue)} />
+          <RevenueSummaryCard label={t.trendsLatestPayout} value={fmtEur(latestPayout)} />
+          <RevenueSummaryCard label={t.trendsPeriodsTracked} value={String(summaries.length)} />
         </div>
       )}
 
       {isLoading && (
-        <p className="text-sm text-muted-foreground animate-pulse">Loading historical data…</p>
+        <p className="text-sm text-muted-foreground animate-pulse">{t.trendsLoading}</p>
       )}
 
       {!isLoading && chartData.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
           <CalendarBlank size={32} className="opacity-30" />
-          <p className="text-sm">No historical data yet.</p>
-          <p className="text-xs">
-            Upload CSV files and click &quot;Save period&quot; (or use Save to Portal in Analytics) to start tracking trends.
-          </p>
+          <p className="text-sm">{t.trendsEmptyTitle}</p>
+          <p className="text-xs">{t.trendsEmptyHint}</p>
         </div>
       )}
 
       {!isLoading && chartData.length >= 2 && (
         <Card className="p-4">
-          <p className="text-sm font-semibold mb-4">Revenue &amp; Payout Over Time</p>
+          <p className="text-sm font-semibold mb-4">{t.trendsChartTitle}</p>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData} margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
               <defs>
@@ -229,7 +252,7 @@ export function TrendsDashboard({
 
       {!isLoading && chartData.length === 1 && (
         <Card className="p-4 text-sm text-muted-foreground text-center">
-          1 period saved. Save at least one more to see a trend chart.
+          {t.trendsOnePeriodHint}
         </Card>
       )}
     </div>

@@ -57,7 +57,7 @@ export function ListenersChart({ dict, metrics }: ListenersChartProps) {
   if (metrics.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold">{dict.analytics_listeners_heading}</h1>
+        <h2 className="text-xl font-semibold">{dict.analytics_listeners_heading}</h2>
         <p className="text-muted-foreground">{dict.analytics_listeners_noData}</p>
       </div>
     )

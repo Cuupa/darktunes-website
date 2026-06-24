@@ -21,6 +21,10 @@ const {
   mockIsValidPeriod: vi.fn(),
 }))
 
+vi.mock('@/contexts/DictContext', () => ({
+  useDict: () => ({ admin: { accounting: {} } }),
+}))
+
 vi.mock('sonner', () => ({
   toast: {
     success: mockToastSuccess,
@@ -142,7 +146,9 @@ describe('useSosExports.handlePublishToPortal', () => {
         pdfBase64: expect.any(String),
       })
     )
-    expect(mockToastSuccess).toHaveBeenCalledWith('Draft statement saved to portal')
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
+    )
   })
 
   it('shows upload error and does not fall back to local download', async () => {

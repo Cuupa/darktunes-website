@@ -54,11 +54,17 @@ interface ColDef {
   align: 'left' | 'right'
 }
 
-const INITIAL_COLUMNS: ColDef[] = [
-  { id: 'artist',       label: 'Artist',        defaultWidth: 220, minWidth: 100, align: 'left'  },
-  { id: 'totalRevenue', label: 'Total Revenue',  defaultWidth: 150, minWidth: 90,  align: 'right' },
-  { id: 'payout',       label: 'Payout',         defaultWidth: 150, minWidth: 90,  align: 'right' },
-]
+function buildColumns(t: {
+  reportingColArtist: string
+  reportingColRevenue: string
+  reportingColPayout: string
+}): ColDef[] {
+  return [
+    { id: 'artist', label: t.reportingColArtist, defaultWidth: 220, minWidth: 100, align: 'left' },
+    { id: 'totalRevenue', label: t.reportingColRevenue, defaultWidth: 150, minWidth: 90, align: 'right' },
+    { id: 'payout', label: t.reportingColPayout, defaultWidth: 150, minWidth: 90, align: 'right' },
+  ]
+}
 
 export function ReportingPanel({
   revenues,
@@ -75,12 +81,18 @@ export function ReportingPanel({
   onGoToSettlementCenter,
 }: ReportingPanelProps) {
   const dict = useDict()
-  const t = dict.admin?.accounting ?? {
+  const reportingFallback = {
     reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',
     reportingSettlementAlertBody:
       'Review payouts here, then open Settlement Center to create draft statements, approve them, and notify artists.',
     reportingSettlementCta: 'Open Settlement Center',
-  }
+    reportingColArtist: 'Artist',
+    reportingColRevenue: 'Total Revenue',
+    reportingColPayout: 'Payout',
+    reportingNoEmailTemplate:
+      'No email template configured. Add one under Branding → Email template.',
+  } as const
+  const t = { ...reportingFallback, ...(dict.admin?.accounting ?? {}) }
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
@@ -96,7 +108,7 @@ export function ReportingPanel({
       const artistEmail = roster?.email ?? ''
       const template = labelInfo?.emailTemplate ?? ''
       if (!template) {
-        toast.error('No email template configured. Please add one under Branding → Email template.')
+        toast.error(t.reportingNoEmailTemplate)
         return
       }
       const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.finalAmount)
@@ -115,9 +127,10 @@ export function ReportingPanel({
     [labelArtists, labelInfo, appDefaults, emailConfig, period]
   )
 
-  const [colOrder, setColOrder] = useState<ColId[]>(INITIAL_COLUMNS.map(c => c.id))
+  const columns = useMemo(() => buildColumns(t), [t])
+  const [colOrder, setColOrder] = useState<ColId[]>(columns.map(c => c.id))
   const [colWidths, setColWidths] = useState<Record<ColId, number>>(
-    Object.fromEntries(INITIAL_COLUMNS.map(c => [c.id, c.defaultWidth])) as Record<ColId, number>
+    Object.fromEntries(columns.map(c => [c.id, c.defaultWidth])) as Record<ColId, number>
   )
 
   const resizeRef = useRef<{ id: ColId; startX: number; startW: number } | null>(null)
@@ -129,7 +142,7 @@ export function ReportingPanel({
 
     function onMove(ev: MouseEvent) {
       if (!resizeRef.current) return
-      const def = INITIAL_COLUMNS.find(c => c.id === resizeRef.current!.id)!
+      const def = columns.find(c => c.id === resizeRef.current!.id)!
       const newW = Math.max(def.minWidth, resizeRef.current.startW + ev.clientX - resizeRef.current.startX)
       setColWidths(prev => ({ ...prev, [resizeRef.current!.id]: newW }))
     }
@@ -197,7 +210,7 @@ export function ReportingPanel({
   function exportSelected() { onDownloadSelected(Array.from(selectedArtists)) }
 
   const selectedCount = selectedArtists.size
-  const orderedCols = colOrder.map(id => INITIAL_COLUMNS.find(c => c.id === id)!).filter(Boolean)
+  const orderedCols = colOrder.map(id => columns.find(c => c.id === id)!).filter(Boolean)
 
   return (
     <div className="flex flex-col h-full">

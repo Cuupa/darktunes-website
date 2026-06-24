@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 import {
   generatePDF,
   generateExcel,
@@ -93,6 +95,22 @@ export function useExports(
   autoUploadToPortal = false,
   persistContext?: SosExportPersistContext,
 ) {
+  const dict = useDict()
+  const exportFallback = {
+    exportNoArtistData: 'No data found for artist "{artist}"',
+    exportPdfDownloaded: 'PDF for "{artist}" downloaded',
+    exportPdfFailed: 'PDF export failed',
+    exportExcelDownloaded: 'Excel for "{artist}" downloaded',
+    exportExcelFailed: 'Excel export failed',
+    exportZipDownloaded: 'ZIP with {count} statements downloaded',
+    exportZipFailed: 'ZIP export failed',
+    exportPortalDraftSaved:
+      'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
+    exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
+    exportPortalUploading: 'Uploading statement to portal…',
+  } as const
+  const t = { ...exportFallback, ...(dict.admin?.accounting ?? {}) }
+
   const emailOptions = useMemo(
     () =>
       appDefaults
@@ -118,7 +136,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -154,7 +172,7 @@ export function useExports(
           // If period doesn't match expected format (YYYY-MM or Q{N}-YYYY), fall back to current year
           const validPeriod = isValidPeriod(period) ? period : `Q1-${new Date().getFullYear()}`
 
-          toast.loading('Uploading statement to portal…', { id: 'sos-upload' })
+          toast.loading(t.exportPortalUploading, { id: 'sos-upload' })
 
           const pdfBase64 = await blobToBase64(blob)
           const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
@@ -185,20 +203,25 @@ export function useExports(
                 batchId: primaryBatchId,
               })
             }
-            toast.success('Draft statement saved to portal. Approve in Settlement Center to notify the artist.', {
+            toast.success(t.exportPortalDraftSaved, {
               id: 'sos-upload',
             })
           } else {
-            toast.error(`Upload failed: ${result.error ?? 'Unknown error'}. PDF saved locally instead.`, { id: 'sos-upload' })
+            toast.error(
+              interpolate(t.exportPortalUploadFailed, {
+                error: result.error ?? 'Unknown error',
+              }),
+              { id: 'sos-upload' },
+            )
             downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
           }
         } else {
           downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
-          toast.success(`PDF for "${artist}" downloaded`)
+          toast.success(interpolate(t.exportPdfDownloaded, { artist }))
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error('PDF export failed', { description: message })
+        toast.error(t.exportPdfFailed, { description: message })
         console.error('PDF export error:', err)
       }
     },
@@ -209,7 +232,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -223,10 +246,10 @@ export function useExports(
           pdfSettings
         )
         downloadBlob(blob, `${createSafeFilename(artist)}_statement.xlsx`)
-        toast.success(`Excel for "${artist}" downloaded`)
+        toast.success(interpolate(t.exportExcelDownloaded, { artist }))
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error('Excel export failed', { description: message })
+        toast.error(t.exportExcelFailed, { description: message })
         console.error('Excel export error:', err)
       }
     },
@@ -270,7 +293,7 @@ export function useExports(
       toast.success(`All ${total} statements downloaded`, { id: toastId })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('ZIP export failed', { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
@@ -316,7 +339,7 @@ export function useExports(
       toast.success(`${total} selected statement${total !== 1 ? 's' : ''} downloaded`, { id: toastId })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('ZIP export failed', { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
@@ -325,7 +348,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -388,7 +411,7 @@ export function useExports(
           })
         }
 
-        toast.success('Draft statement saved to portal')
+        toast.success(t.exportPortalDraftSaved)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         toast.error(message)

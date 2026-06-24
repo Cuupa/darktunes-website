@@ -12,6 +12,8 @@ import type { ArtistRevenue, LabelArtist, LabelInfo } from '@/lib/sos/types'
 import { isValidIBAN, maskIBAN } from '@/lib/sos/iban-validator'
 import { generateSepaXml, downloadSepaXml } from '@/lib/sos/sepa-generator'
 import type { SepaPayoutEntry } from '@/lib/sos/sepa-generator'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface PayoutManagerProps {
   revenues: ArtistRevenue[]
@@ -54,6 +56,36 @@ export function PayoutManager({
   periodEnd,
   onLabelSepaUpdate,
 }: PayoutManagerProps) {
+  const dict = useDict()
+  const payoutFallback = {
+    payoutValidIbanCount: '{count} artists with valid IBAN',
+    payoutInvalidIbanCount: '{count} missing or invalid IBAN',
+    payoutSelectedSummary: '{amount} · {count} selected',
+    payoutExportSepa: 'Export SEPA XML',
+    payoutNoDataTitle: 'No payouts calculated yet.',
+    payoutNoDataHint: 'Upload CSV files first, then run the statement calculation.',
+    payoutColArtist: 'Artist',
+    payoutColHolder: 'Account holder',
+    payoutColIban: 'IBAN',
+    payoutColAmount: 'Payout',
+    payoutColStatus: 'Status',
+    payoutIbanMissing: 'IBAN missing',
+    payoutStatusOk: 'OK',
+    payoutStatusInvalid: 'Invalid',
+    payoutStatusMissing: 'Missing',
+    payoutInvalidIbanTooltip: 'Checksum invalid. SEPA export blocked.',
+    payoutSepaFormTitle: 'Label sender account for SEPA XML',
+    payoutSepaFormHint:
+      'IBAN and account holder are stored locally in this browser (Accounting → SEPA Payout).',
+    payoutSepaHolderLabel: 'Account holder',
+    payoutSepaIbanLabel: 'IBAN',
+    payoutSepaSave: 'Save SEPA details',
+    payoutInvalidIbanToast: 'Invalid IBAN',
+    payoutHolderMissingToast: 'Account holder is required',
+    payoutSepaSavedToast: 'Label SEPA details saved',
+  } as const
+  const t = { ...payoutFallback, ...(dict.admin?.accounting ?? {}) }
+
   const [draftSepaIban, setDraftSepaIban] = useState(labelInfo.sepaIban ?? '')
   const [draftSepaAccountHolder, setDraftSepaAccountHolder] = useState(
     labelInfo.sepaAccountHolder ?? labelInfo.name ?? '',
@@ -169,17 +201,24 @@ export function PayoutManager({
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <div className="flex items-center gap-1.5">
               <CheckCircle size={14} className="text-emerald-400" />
-              <span className="text-muted-foreground">{validRows.length} artists with valid IBAN</span>
+              <span className="text-muted-foreground">
+                {interpolate(t.payoutValidIbanCount, { count: validRows.length })}
+              </span>
             </div>
             {invalidRows.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <Warning size={14} className="text-red-400" />
-                <span className="text-muted-foreground">{invalidRows.length} missing or invalid IBAN</span>
+                <span className="text-muted-foreground">
+                  {interpolate(t.payoutInvalidIbanCount, { count: invalidRows.length })}
+                </span>
               </div>
             )}
             {syncedSelected.size > 0 && (
               <div className="font-medium tabular-nums text-emerald-400">
-                {fmtEur(totalSelected)} · {syncedSelected.size} selected
+                {interpolate(t.payoutSelectedSummary, {
+                  amount: fmtEur(totalSelected),
+                  count: syncedSelected.size,
+                })}
               </div>
             )}
           </div>
@@ -198,20 +237,18 @@ export function PayoutManager({
               disabled={syncedSelected.size === 0}
             >
               <DownloadSimple size={14} />
-              Export SEPA XML
+              {t.payoutExportSepa}
             </Button>
           </div>
         </div>
 
         {!labelIbanOk && onLabelSepaUpdate && (
           <div className="mx-6 mt-4 p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-3">
-            <p className="text-sm font-medium">Label-Absenderkonto für SEPA-XML</p>
-            <p className="text-xs text-muted-foreground">
-              IBAN und Kontoinhaber werden in diesem Browser gespeichert (Accounting → SEPA Payout).
-            </p>
+            <p className="text-sm font-medium">{t.payoutSepaFormTitle}</p>
+            <p className="text-xs text-muted-foreground">{t.payoutSepaFormHint}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="label-sepa-holder">Kontoinhaber</Label>
+                <Label htmlFor="label-sepa-holder">{t.payoutSepaHolderLabel}</Label>
                 <Input
                   id="label-sepa-holder"
                   value={draftSepaAccountHolder}
@@ -220,7 +257,7 @@ export function PayoutManager({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="label-sepa-iban">IBAN</Label>
+                <Label htmlFor="label-sepa-iban">{t.payoutSepaIbanLabel}</Label>
                 <Input
                   id="label-sepa-iban"
                   value={draftSepaIban}
@@ -237,18 +274,18 @@ export function PayoutManager({
               onClick={() => {
                 const iban = draftSepaIban.replace(/\s/g, '').toUpperCase()
                 if (!isValidIBAN(iban)) {
-                  toast.error('Ungültige IBAN')
+                  toast.error(t.payoutInvalidIbanToast)
                   return
                 }
                 if (!draftSepaAccountHolder.trim()) {
-                  toast.error('Kontoinhaber fehlt')
+                  toast.error(t.payoutHolderMissingToast)
                   return
                 }
                 onLabelSepaUpdate(iban, draftSepaAccountHolder)
-                toast.success('Label-SEPA-Daten gespeichert')
+                toast.success(t.payoutSepaSavedToast)
               }}
             >
-              SEPA-Daten speichern
+              {t.payoutSepaSave}
             </Button>
           </div>
         )}
@@ -257,10 +294,8 @@ export function PayoutManager({
           {rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <Bank size={32} className="opacity-30" />
-              <p className="text-sm">No payouts calculated yet.</p>
-              <p className="text-xs text-muted-foreground/60">
-                Upload CSV files first, then run the statement calculation.
-              </p>
+              <p className="text-sm">{t.payoutNoDataTitle}</p>
+              <p className="text-xs text-muted-foreground/60">{t.payoutNoDataHint}</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -275,11 +310,11 @@ export function PayoutManager({
                       disabled={validRows.length === 0}
                     />
                   </th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Artist</th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">Account holder</th>
-                  <th className="py-3 text-left font-medium text-muted-foreground px-4">IBAN</th>
-                  <th className="py-3 text-right font-medium text-muted-foreground px-4">Payout</th>
-                  <th className="py-3 text-center font-medium text-muted-foreground px-4">Status</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColArtist}</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColHolder}</th>
+                  <th className="py-3 text-left font-medium text-muted-foreground px-4">{t.payoutColIban}</th>
+                  <th className="py-3 text-right font-medium text-muted-foreground px-4">{t.payoutColAmount}</th>
+                  <th className="py-3 text-center font-medium text-muted-foreground px-4">{t.payoutColStatus}</th>
                 </tr>
               </thead>
               <tbody>
@@ -315,7 +350,7 @@ export function PayoutManager({
                       </td>
                       <td className="py-3 px-4 font-mono text-xs">
                         {row.ibanStatus === 'missing' ? (
-                          <span className="text-red-400 text-xs font-sans font-medium">IBAN missing</span>
+                          <span className="text-red-400 text-xs font-sans font-medium">{t.payoutIbanMissing}</span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -324,7 +359,7 @@ export function PayoutManager({
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs text-xs bg-red-900/90 text-red-100 border-red-700">
-                              Checksum invalid. SEPA export blocked.
+                              {t.payoutInvalidIbanTooltip}
                             </TooltipContent>
                           </Tooltip>
                         ) : (
@@ -337,15 +372,15 @@ export function PayoutManager({
                       <td className="py-3 px-4 text-center">
                         {row.ibanStatus === 'valid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                            <CheckCircle size={10} />OK
+                            <CheckCircle size={10} />{t.payoutStatusOk}
                           </span>
                         ) : row.ibanStatus === 'invalid' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/15 text-red-400 border border-red-500/25">
-                            <Warning size={10} weight="bold" />Invalid
+                            <Warning size={10} weight="bold" />{t.payoutStatusInvalid}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                            <Warning size={10} weight="bold" />Missing
+                            <Warning size={10} weight="bold" />{t.payoutStatusMissing}
                           </span>
                         )}
                       </td>

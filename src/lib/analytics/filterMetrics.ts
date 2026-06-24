@@ -1,6 +1,8 @@
 import type { StreamingStat } from '@/lib/api/streamingStats'
 import type { ArtistTerritoryMetric } from '@/lib/api/artistTerritoryMetrics'
 import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
+import type { EventImpact } from '@/lib/api/eventImpact'
+import type { ArtistLineItemWithContext } from '@/lib/api/salesStatementLineItems'
 
 export interface AnalyticsFilterState {
   periodFrom: string
@@ -78,4 +80,24 @@ export function filterListenerMetrics(
   filters: AnalyticsFilterState,
 ): ArtistListenerMetric[] {
   return metrics.filter((m) => inPeriodRange(m.period, filters.periodFrom, filters.periodTo))
+}
+
+export function filterEventImpacts(
+  impacts: EventImpact[],
+  filters: AnalyticsFilterState,
+): EventImpact[] {
+  if (!filters.country) return impacts
+  return impacts.filter((impact) => impact.country === filters.country)
+}
+
+export function filterLineItemsByPeriod(
+  items: ArtistLineItemWithContext[],
+  filters: AnalyticsFilterState,
+): ArtistLineItemWithContext[] {
+  if (!filters.periodFrom && !filters.periodTo) return items
+  return items.filter((item) => {
+    const period = item.periodStart?.slice(0, 7) ?? item.periodEnd?.slice(0, 7) ?? ''
+    if (!period) return true
+    return inPeriodRange(period, filters.periodFrom, filters.periodTo)
+  })
 }

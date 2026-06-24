@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
 import type { LabelArtist } from '@/lib/sos/types'
 import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface ImportBatchesPanelProps {
   labelArtists: LabelArtist[]
@@ -78,8 +79,8 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
         const rowCount = String(data.rowCount ?? 0)
         toast.success(
           persist
-            ? t.bronzeReprocessSaved.replace('{metricCount}', metricCount).replace('{rowCount}', rowCount)
-            : t.bronzeReprocessValidated.replace('{rowCount}', rowCount).replace('{metricCount}', metricCount),
+            ? interpolate(t.bronzeReprocessSaved, { metricCount, rowCount })
+            : interpolate(t.bronzeReprocessValidated, { rowCount, metricCount }),
         )
         await loadBatches()
       } catch (err) {

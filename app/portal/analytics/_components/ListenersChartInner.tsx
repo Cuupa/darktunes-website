@@ -38,7 +38,7 @@ export function ListenersChartInner({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">{dict.analytics_listeners_heading}</h1>
+        <h2 className="text-xl font-semibold">{dict.analytics_listeners_heading}</h2>
         <p className="text-sm text-muted-foreground mt-1">{dict.analytics_listeners_hint}</p>
       </div>
 
