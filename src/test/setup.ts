@@ -1,11 +1,18 @@
 import '@testing-library/jest-dom'
 import { webcrypto } from 'node:crypto'
 
-// jsdom may not expose Web Crypto; bronze upload tests hash file bodies before fetch.
-if (typeof globalThis.crypto?.subtle === 'undefined') {
-  Object.defineProperty(globalThis, 'crypto', {
-    value: webcrypto,
+// jsdom exposes crypto.subtle in CI but it may not digest buffers; use Node Web Crypto.
+const testCrypto = webcrypto as Crypto
+Object.defineProperty(globalThis, 'crypto', {
+  value: testCrypto,
+  writable: true,
+  configurable: true,
+})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'crypto', {
+    value: testCrypto,
     writable: true,
+    configurable: true,
   })
 }
 
