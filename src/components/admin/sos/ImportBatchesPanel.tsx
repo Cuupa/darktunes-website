@@ -7,12 +7,34 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
 import type { LabelArtist } from '@/lib/sos/types'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface ImportBatchesPanelProps {
   labelArtists: LabelArtist[]
 }
 
+const BRONZE_FALLBACK = {
+  bronzeLoading: 'Loading Bronze archives…',
+  bronzeEmpty: 'No Bronze CSV archives yet. Upload distributor files to archive them in R2.',
+  bronzeTitle: 'Bronze CSV Archives',
+  bronzeRefresh: 'Refresh',
+  bronzeColDistributor: 'Distributor',
+  bronzeColPeriod: 'Period',
+  bronzeColRows: 'Rows',
+  bronzeColStatus: 'Status',
+  bronzeColActions: 'Actions',
+  bronzeValidate: 'Validate',
+  bronzeRebuildGold: 'Rebuild Gold',
+  bronzeLoadError: 'Failed to load import batches',
+  bronzeReprocessError: 'Reprocess failed',
+  bronzeReprocessSaved: 'Reprocessed & saved {metricCount} metrics from {rowCount} rows',
+  bronzeReprocessValidated: 'Validated {rowCount} rows ({metricCount} metric groups)',
+} as const
+
 export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? BRONZE_FALLBACK
   const [batches, setBatches] = useState<DistributorImportBatch[]>([])
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
@@ -21,15 +43,15 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/sos/import-batches')
-      if (!res.ok) throw new Error('Failed to load import batches')
+      if (!res.ok) throw new Error(t.bronzeLoadError)
       const data = (await res.json()) as { batches: DistributorImportBatch[] }
       setBatches(data.batches ?? [])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load batches')
+      toast.error(err instanceof Error ? err.message : t.bronzeLoadError)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t.bronzeLoadError])
 
   useEffect(() => {
     void loadBatches()
@@ -51,29 +73,31 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
         })
         const data = await res.json()
         if (!res.ok) {
-          throw new Error(typeof data?.error === 'string' ? data.error : 'Reprocess failed')
+          throw new Error(typeof data?.error === 'string' ? data.error : t.bronzeReprocessError)
         }
+        const metricCount = String(data.metricCount ?? 0)
+        const rowCount = String(data.rowCount ?? 0)
         toast.success(
           persist
-            ? `Reprocessed & saved ${data.metricCount ?? 0} metrics from ${data.rowCount ?? 0} rows`
-            : `Validated ${data.rowCount ?? 0} rows (${data.metricCount ?? 0} metric groups)`,
+            ? interpolate(t.bronzeReprocessSaved, { metricCount, rowCount })
+            : interpolate(t.bronzeReprocessValidated, { rowCount, metricCount }),
         )
         await loadBatches()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Reprocess failed')
+        toast.error(err instanceof Error ? err.message : t.bronzeReprocessError)
       }
     })
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground p-4">Loading Bronze archives…</p>
+    return <p className="text-sm text-muted-foreground p-4">{t.bronzeLoading}</p>
   }
 
   if (batches.length === 0) {
     return (
       <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground border border-dashed border-border rounded-lg">
         <Database size={18} />
-        No Bronze CSV archives yet. Upload distributor files to archive them in R2.
+        {t.bronzeEmpty}
       </div>
     )
   }
@@ -83,21 +107,21 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
       <div className="px-4 py-3 border-b border-border bg-card/50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Database size={16} />
-          Bronze CSV Archives
+          {t.bronzeTitle}
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => void loadBatches()} disabled={isPending}>
-          Refresh
+          {t.bronzeRefresh}
         </Button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">
-              <th className="px-4 py-2" scope="col">Distributor</th>
-              <th className="px-4 py-2" scope="col">Period</th>
-              <th className="px-4 py-2" scope="col">Rows</th>
-              <th className="px-4 py-2" scope="col">Status</th>
-              <th className="px-4 py-2 text-right" scope="col">Actions</th>
+              <th className="px-4 py-2" scope="col">{t.bronzeColDistributor}</th>
+              <th className="px-4 py-2" scope="col">{t.bronzeColPeriod}</th>
+              <th className="px-4 py-2" scope="col">{t.bronzeColRows}</th>
+              <th className="px-4 py-2" scope="col">{t.bronzeColStatus}</th>
+              <th className="px-4 py-2 text-right" scope="col">{t.bronzeColActions}</th>
             </tr>
           </thead>
           <tbody>
@@ -121,7 +145,7 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
                     disabled={isPending}
                     onClick={() => handleReprocess(batch.id, false)}
                   >
-                    Validate
+                    {t.bronzeValidate}
                   </Button>
                   <Button
                     type="button"
@@ -130,7 +154,7 @@ export function ImportBatchesPanel({ labelArtists }: ImportBatchesPanelProps) {
                     onClick={() => handleReprocess(batch.id, true)}
                   >
                     <ArrowsClockwise size={14} className="mr-1" />
-                    Rebuild Gold
+                    {t.bronzeRebuildGold}
                   </Button>
                 </td>
               </tr>

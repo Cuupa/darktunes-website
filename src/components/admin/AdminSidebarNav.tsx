@@ -51,9 +51,12 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
+import { useDict } from '@/contexts/DictContext'
 
 interface NavItem {
   label: string
+  /** When set, overrides `label` with `dict.admin.nav[labelDictKey]` when available. */
+  labelDictKey?: 'labelIntelligence'
   href: string
   icon: React.ElementType
   adminOnly: boolean
@@ -96,7 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
       { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
-      { label: 'Analytics',   href: '/admin/analytics',   icon: ChartLine,       adminOnly: true  },
+      { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
       { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
       { label: 'Promo Log',   href: '/admin/promo-log',   icon: MegaphoneSimple, adminOnly: false },
@@ -118,6 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
 export function AdminSidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const dict = useDict()
   const { isAdmin, isEditor, user, profile, signOut } = useAuthContext()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -142,9 +146,17 @@ export function AdminSidebarNav() {
     return pathname.startsWith(href)
   }
 
+  const resolveNavLabel = (item: NavItem) => {
+    if (item.labelDictKey === 'labelIntelligence') {
+      return dict.admin?.nav?.labelIntelligence ?? item.label
+    }
+    return item.label
+  }
+
   const renderNavItem = (item: NavItem, onNavigate?: () => void) => {
     const Icon = item.icon
     const active = isActive(item.href)
+    const label = resolveNavLabel(item)
     return (
       <li key={item.href}>
         <Link
@@ -159,7 +171,7 @@ export function AdminSidebarNav() {
           aria-current={active ? 'page' : undefined}
         >
           <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
-          {item.label}
+          {label}
         </Link>
       </li>
     )

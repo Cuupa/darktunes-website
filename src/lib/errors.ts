@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { type ErrorCode, ERROR_MESSAGES } from './errorCodes'
+import { SettlementPeriodNotWritableError } from '@/lib/api/settlementPeriods'
 
 // ---------------------------------------------------------------------------
 // ApiError — structured error thrown inside route handlers
@@ -138,6 +139,10 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       const routePath = (() => {
         try { return new URL(req.url).pathname } catch { return req.url }
       })()
+
+      if (err instanceof SettlementPeriodNotWritableError) {
+        return buildErrorResponse(err.message, 409)
+      }
 
       if (err instanceof ApiError) {
         if (err.status >= 500) {

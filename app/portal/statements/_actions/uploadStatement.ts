@@ -12,16 +12,20 @@
  *   - Credentials never leave the server
  */
 
-import { randomUUID } from 'crypto'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
-import { createSalesStatement } from '@/lib/api/salesStatements'
-import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
+import { createSalesStatement, DuplicateDraftStatementError } from '@/lib/api/salesStatements'
+import {
+  assertSettlementPeriodWritable,
+  getOrCreateSettlementPeriod,
+  SettlementPeriodNotWritableError,
+} from '@/lib/api/settlementPeriods'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
-import { createR2Client } from '@/lib/r2Utils'
-import { generatePresignedUploadUrl } from '@/lib/portal/presignedUrl'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import {
+  buildStatementR2Key,
+  uploadStatementPdfToR2,
+} from '@/lib/portal/statementPdfStorage'
 
 export interface UploadStatementLineItemInput {
   platform?: string
@@ -86,38 +90,17 @@ export async function uploadStatement(
       return { success: false, error: `Artist ${input.artistId} not found` }
     }
 
-    // 3. Build the R2 key and generate a presigned PUT URL
-    const { serverEnv } = await import('@/lib/env.server')
-    const safeName = input.filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const r2Key = `statements/${input.artistId}/${randomUUID()}_${safeName}`
-
-    const s3 = createR2Client(
-      serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
-      serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
-      serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-    )
-
-    const uploadUrl = await generatePresignedUploadUrl(r2Key, 'application/pdf', {
-      getSignedUrl,
-      s3Client: s3,
-      bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
-    })
-
-    // 4. Upload the PDF blob directly to R2 via the presigned URL
-    const pdfBuffer = Buffer.from(input.pdfBase64, 'base64')
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: pdfBuffer,
-      headers: { 'Content-Type': 'application/pdf' },
-    })
-
-    if (!uploadRes.ok) {
-      return { success: false, error: `R2 upload failed (${uploadRes.status})` }
-    }
-
-    // 5. Persist the DB record via service-role client (bypasses RLS)
     const periodStart = input.periodStart ?? null
     const periodEnd = input.periodEnd ?? null
+    if (periodStart && periodEnd) {
+      await assertSettlementPeriodWritable(serviceSupabase, periodStart, periodEnd)
+    }
+
+    // 3. Build the R2 key and upload the PDF
+    const r2Key = buildStatementR2Key(input.artistId, input.filename)
+    await uploadStatementPdfToR2(input.pdfBase64, r2Key)
+
+    // 4. Persist the DB record via service-role client (bypasses RLS)
     const settlementPeriod =
       periodStart && periodEnd
         ? await getOrCreateSettlementPeriod(serviceSupabase, periodStart, periodEnd)
@@ -174,6 +157,9 @@ export async function uploadStatement(
 
     return { success: true, statementId: statement.id }
   } catch (err) {
+    if (err instanceof SettlementPeriodNotWritableError || err instanceof DuplicateDraftStatementError) {
+      return { success: false, error: err.message }
+    }
     const message = err instanceof Error ? err.message : 'Unexpected error'
     console.error('[uploadStatement] Error:', err)
     return { success: false, error: message }

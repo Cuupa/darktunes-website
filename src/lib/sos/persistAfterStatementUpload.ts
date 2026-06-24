@@ -31,10 +31,6 @@ export async function persistAnalyticsAfterStatementUpload(
   )
   if (artistMetrics.length === 0) return
 
-  const artistRevenue = ctx.revenues.find(
-    (r) => r.artist.trim().toLowerCase() === ctx.artistName.trim().toLowerCase(),
-  )
-
   const batchIds = [
     ...new Set([
       ...ctx.bronzeBatchIds,
@@ -42,6 +38,8 @@ export async function persistAnalyticsAfterStatementUpload(
     ]),
   ]
 
+  // Period summaries are label-wide snapshots — upsert only via Trends / Save to Portal
+  // (full roster). Draft uploads must not overwrite sos_period_summaries per artist.
   const result = await persistSosAnalytics({
     periodStart: ctx.periodStart,
     periodEnd: ctx.periodEnd,
@@ -52,22 +50,6 @@ export async function persistAnalyticsAfterStatementUpload(
       name: la.name,
       artistId: la.artistId,
     })),
-    periodSummary: artistRevenue
-      ? {
-          periodStart: ctx.periodStart,
-          periodEnd: ctx.periodEnd || ctx.periodStart,
-          totalRevenue: artistRevenue.totalRevenue,
-          totalPayout: artistRevenue.finalAmount,
-          artistCount: 1,
-          artistBreakdowns: [{
-            artist: artistRevenue.artist,
-            revenue: artistRevenue.totalRevenue,
-            payout: artistRevenue.finalAmount,
-          }],
-          platformBreakdowns: artistRevenue.platformBreakdown,
-          sourceBatchIds: batchIds,
-        }
-      : undefined,
   })
 
   if (!result.success) {

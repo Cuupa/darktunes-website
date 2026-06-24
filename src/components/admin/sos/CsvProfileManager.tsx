@@ -3,13 +3,13 @@
 /**
  * src/components/admin/sos/CsvProfileManager.tsx
  *
- * Save / load named SOS rule presets to localStorage.
- * A preset bundles: artistMappings, compilationFilters, splitFees,
- * manualRevenues, expenses, ignoredEntries, csvAliases, appDefaults, emailConfig.
+ * Save / load named SOS rule presets via Supabase (sos_rules_presets).
+ * One-time migration from legacy localStorage presets on first mount.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { FloppyDisk, FolderOpen, Trash, BookmarkSimple, Warning } from '@phosphor-icons/react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { FloppyDisk, FolderOpen, Trash, BookmarkSimple, Warning, CircleNotch } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -25,11 +25,15 @@ import type {
   ArtistMapping, CompilationFilter, SplitFee,
   ManualRevenue, ExpenseEntry, IgnoredEntry,
   CSVColumnAlias, AppDefaults, EmailConfig,
+  TrackRevenueAssignment,
 } from '@/lib/sos/types'
+import { useSosRulesPresets, type PresetConfig } from '@/hooks/useSosRulesPresets'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
-const STORAGE_KEY = 'darktunes_sos_presets'
+const LEGACY_STORAGE_KEY = 'darktunes_sos_presets'
 
-export interface SosPreset {
+interface LegacySosPreset {
   id: string
   name: string
   savedAt: string
@@ -45,7 +49,6 @@ export interface SosPreset {
 }
 
 interface CsvProfileManagerProps {
-  // Current state to save
   artistMappings: ArtistMapping[]
   compilationFilters: CompilationFilter[]
   splitFees: SplitFee[]
@@ -53,46 +56,105 @@ interface CsvProfileManagerProps {
   expenses: ExpenseEntry[]
   ignoredEntries: IgnoredEntry[]
   csvAliases: CSVColumnAlias[]
+  trackRevenueAssignments: TrackRevenueAssignment[]
   appDefaults: AppDefaults
   emailConfig: Partial<EmailConfig>
-  // Load callback — replaces current state with preset
-  onLoad: (preset: Omit<SosPreset, 'id' | 'name' | 'savedAt'>) => void
+  onLoad: (preset: PresetConfig) => void
 }
 
-function loadPresets(): SosPreset[] {
+function loadLegacyPresets(): LegacySosPreset[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as SosPreset[]) : []
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as LegacySosPreset[]) : []
   } catch {
     return []
   }
 }
 
-function savePresets(presets: SosPreset[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
+function legacyToConfig(preset: LegacySosPreset): PresetConfig {
+  return {
+    artistMappings: preset.artistMappings ?? [],
+    compilationFilters: preset.compilationFilters ?? [],
+    splitFees: preset.splitFees ?? [],
+    manualRevenues: preset.manualRevenues ?? [],
+    expenses: preset.expenses ?? [],
+    ignoredEntries: preset.ignoredEntries ?? [],
+    csvAliases: preset.csvAliases ?? [],
+    appDefaults: preset.appDefaults,
+    emailConfig: preset.emailConfig ?? {},
+    trackRevenueAssignments: [],
+  }
+}
+
+function countRules(config: PresetConfig): number {
+  return (
+    config.artistMappings.length +
+    config.compilationFilters.length +
+    config.splitFees.length +
+    config.manualRevenues.length +
+    config.expenses.length +
+    config.ignoredEntries.length +
+    config.csvAliases.length +
+    config.trackRevenueAssignments.length
+  )
 }
 
 export function CsvProfileManager({
   artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
-  ignoredEntries, csvAliases, appDefaults, emailConfig, onLoad,
+  ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig, onLoad,
 }: CsvProfileManagerProps) {
-  const [presets, setPresets] = useState<SosPreset[]>([])
+  const dict = useDict()
+  const t = dict.admin?.accounting ?? {}
+  const { presets, isLoading, isSaving, savePreset, deletePreset, reloadPresets } =
+    useSosRulesPresets()
+
   const [name, setName] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [loadedId, setLoadedId] = useState<string | null>(null)
+  const migrationStarted = useRef(false)
 
   useEffect(() => {
-    setPresets(loadPresets())
-  }, [])
+    if (migrationStarted.current || isLoading) return
+    migrationStarted.current = true
 
-  const handleSave = useCallback(() => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    const existing = presets.find(p => p.name.toLowerCase() === trimmed.toLowerCase())
-    const newPreset: SosPreset = {
-      id: existing?.id ?? crypto.randomUUID(),
-      name: trimmed,
-      savedAt: new Date().toISOString(),
+    const legacy = loadLegacyPresets()
+    if (legacy.length === 0) return
+
+    const existingNames = new Set(presets.map((p) => p.name.toLowerCase()))
+    const toMigrate = legacy.filter((p) => !existingNames.has(p.name.toLowerCase()))
+    if (toMigrate.length === 0) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+      return
+    }
+
+    void (async () => {
+      let migrated = 0
+      for (const preset of toMigrate) {
+        try {
+          const res = await fetch('/api/admin/sos/presets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: preset.name, config: legacyToConfig(preset) }),
+          })
+          if (res.ok) migrated += 1
+        } catch {
+          // Non-fatal — user can re-save manually
+        }
+      }
+      if (migrated > 0) {
+        toast.success(
+          interpolate(t.presetMigratedToast ?? 'Migrated {count} preset(s) from local storage', {
+            count: migrated,
+          }),
+        )
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+        await reloadPresets()
+      }
+    })()
+  }, [isLoading, presets, reloadPresets, t.presetMigratedToast])
+
+  const currentConfig = useCallback(
+    (): PresetConfig => ({
       artistMappings,
       compilationFilters,
       splitFees,
@@ -102,115 +164,129 @@ export function CsvProfileManager({
       csvAliases,
       appDefaults,
       emailConfig,
-    }
-    const updated = existing
-      ? presets.map(p => p.id === existing.id ? newPreset : p)
-      : [...presets, newPreset]
-    setPresets(updated)
-    savePresets(updated)
+      trackRevenueAssignments,
+    }),
+    [
+      artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
+      ignoredEntries, csvAliases, appDefaults, emailConfig, trackRevenueAssignments,
+    ],
+  )
+
+  const handleSave = useCallback(async () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await savePreset(trimmed, currentConfig())
     setName('')
-  }, [
-    name, presets, artistMappings, compilationFilters, splitFees, manualRevenues,
-    expenses, ignoredEntries, csvAliases, appDefaults, emailConfig,
-  ])
+  }, [name, savePreset, currentConfig])
 
-  const handleLoad = useCallback((preset: SosPreset) => {
-    onLoad({
-      artistMappings: preset.artistMappings ?? [],
-      compilationFilters: preset.compilationFilters ?? [],
-      splitFees: preset.splitFees ?? [],
-      manualRevenues: preset.manualRevenues ?? [],
-      expenses: preset.expenses ?? [],
-      ignoredEntries: preset.ignoredEntries ?? [],
-      csvAliases: preset.csvAliases ?? [],
-      appDefaults: preset.appDefaults,
-      emailConfig: preset.emailConfig ?? {},
-    })
-    setLoadedId(preset.id)
-    setTimeout(() => setLoadedId(null), 2000)
-  }, [onLoad])
+  const handleLoad = useCallback(
+    (config: PresetConfig, id: string) => {
+      onLoad(config)
+      setLoadedId(id)
+      setTimeout(() => setLoadedId(null), 2000)
+    },
+    [onLoad],
+  )
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = presets.filter(p => p.id !== id)
-    setPresets(updated)
-    savePresets(updated)
-    setConfirmDeleteId(null)
-  }, [presets])
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await deletePreset(id)
+      setConfirmDeleteId(null)
+    },
+    [deletePreset],
+  )
 
-  const totalRules =
-    artistMappings.length + compilationFilters.length + splitFees.length +
-    manualRevenues.length + expenses.length + ignoredEntries.length + csvAliases.length
+  const totalRules = countRules(currentConfig())
+  const deleteTarget = presets.find((p) => p.id === confirmDeleteId)
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <BookmarkSimple size={20} weight="bold" className="text-primary" />
-        <h3 className="font-semibold">Rule Presets</h3>
+        <h3 className="font-semibold">{t.presetsTitle ?? 'Rule Presets'}</h3>
         {totalRules > 0 && (
-          <Badge variant="secondary" className="text-xs">{totalRules} rules loaded</Badge>
+          <Badge variant="secondary" className="text-xs">
+            {interpolate(t.presetRulesLoaded ?? '{count} rules loaded', { count: totalRules })}
+          </Badge>
         )}
       </div>
 
-      {/* Save current state */}
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold">Save Current Rules</h4>
+        <h4 className="text-sm font-semibold">{t.presetSaveHeading ?? 'Save Current Rules'}</h4>
         <div className="flex gap-2">
           <Input
             value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Preset name, e.g. Q1-2025"
-            onKeyDown={e => e.key === 'Enter' && handleSave()}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t.presetNamePlaceholder ?? 'Preset name, e.g. Q1-2025'}
+            onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
             className="flex-1"
           />
-          <Button onClick={handleSave} disabled={!name.trim()} className="gap-1.5">
-            <FloppyDisk size={15} weight="bold" /> Save
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!name.trim() || isSaving}
+            className="gap-1.5"
+          >
+            {isSaving ? (
+              <CircleNotch size={15} className="animate-spin" />
+            ) : (
+              <FloppyDisk size={15} weight="bold" />
+            )}
+            {t.presetSaveButton ?? 'Save'}
           </Button>
         </div>
       </div>
 
-      {/* Preset list */}
-      {presets.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+          <CircleNotch size={20} className="animate-spin" />
+          <span className="text-sm">{t.bronzeLoading ?? 'Loading…'}</span>
+        </div>
+      ) : presets.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground">
           <BookmarkSimple size={28} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No presets saved yet.</p>
+          <p className="text-sm">{t.presetEmpty ?? 'No presets saved yet.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          <h4 className="text-sm font-semibold">Saved Presets ({presets.length})</h4>
-          {presets.map(p => {
-            const ruleCount =
-              (p.artistMappings?.length ?? 0) +
-              (p.compilationFilters?.length ?? 0) +
-              (p.splitFees?.length ?? 0) +
-              (p.manualRevenues?.length ?? 0) +
-              (p.expenses?.length ?? 0) +
-              (p.ignoredEntries?.length ?? 0) +
-              (p.csvAliases?.length ?? 0)
+          <h4 className="text-sm font-semibold">
+            {interpolate(t.presetSavedList ?? 'Saved Presets ({count})', { count: presets.length })}
+          </h4>
+          {presets.map((p) => {
+            const ruleCount = countRules(p.config)
             return (
               <Card key={p.id} className="p-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {ruleCount} rules · saved {new Date(p.savedAt).toLocaleDateString()}
+                    {interpolate(t.presetRulesCount ?? '{count} rules · saved {date}', {
+                      count: ruleCount,
+                      date: new Date(p.updated_at).toLocaleDateString(),
+                    })}
                   </p>
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleLoad(p)}
+                    onClick={() => handleLoad(p.config, p.id)}
                     className="h-7 gap-1 text-xs"
                   >
-                    {loadedId === p.id
-                      ? <><span className="text-green-600">✓</span> Loaded</>
-                      : <><FolderOpen size={13} /> Load</>
-                    }
+                    {loadedId === p.id ? (
+                      <>
+                        <span className="text-green-600">✓</span> {t.presetLoaded ?? 'Loaded'}
+                      </>
+                    ) : (
+                      <>
+                        <FolderOpen size={13} /> {t.presetLoadButton ?? 'Load'}
+                      </>
+                    )}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setConfirmDeleteId(p.id)}
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`${t.presetDeleteButton ?? 'Delete'} ${p.name}`}
                   >
                     <Trash size={13} />
                   </Button>
@@ -221,25 +297,30 @@ export function CsvProfileManager({
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
       <Dialog open={confirmDeleteId !== null} onOpenChange={() => setConfirmDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Warning size={18} className="text-destructive" /> Delete Preset
+              <Warning size={18} className="text-destructive" />
+              {t.presetDeleteTitle ?? 'Delete Preset'}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete &quot;{presets.find(p => p.id === confirmDeleteId)?.name}&quot;?
-            This cannot be undone.
+            {interpolate(
+              t.presetDeleteConfirm ??
+                'Are you sure you want to delete "{name}"? This cannot be undone.',
+              { name: deleteTarget?.name ?? '' },
+            )}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+              {t.presetDeleteCancel ?? 'Cancel'}
+            </Button>
             <Button
               variant="destructive"
-              onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+              onClick={() => confirmDeleteId && void handleDelete(confirmDeleteId)}
             >
-              Delete
+              {t.presetDeleteButton ?? 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

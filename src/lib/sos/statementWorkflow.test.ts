@@ -5,10 +5,19 @@ import {
   deriveCompletedWorkflowSteps,
   emptyWorkflowStatusCounts,
   statementMatchesPeriod,
+  WORKFLOW_STATUS_IDS,
   workflowStatusFromStatement,
 } from './statementWorkflow'
 
 describe('statementWorkflow', () => {
+  it('exports distinct workflow status ids including invoiced and acknowledged', () => {
+    expect(WORKFLOW_STATUS_IDS).toContain('invoiced')
+    expect(WORKFLOW_STATUS_IDS).toContain('acknowledged')
+    expect(WORKFLOW_STATUS_IDS.indexOf('invoiced')).not.toBe(
+      WORKFLOW_STATUS_IDS.indexOf('acknowledged'),
+    )
+  })
+
   it('maps statement statuses to workflow statuses', () => {
     expect(workflowStatusFromStatement(undefined, true)).toBe('not_uploaded')
     expect(workflowStatusFromStatement('draft', true)).toBe('draft')

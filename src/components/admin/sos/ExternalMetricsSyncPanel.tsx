@@ -4,8 +4,22 @@ import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { ArrowsClockwise, Waveform } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
+
+const SYNC_FALLBACK = {
+  syncTitle: 'External Listener Data',
+  syncDescription:
+    'Pull monthly listener trends from Last.fm (free) and Soundcharts (optional API key).',
+  syncButton: 'Sync Listeners',
+  syncing: 'Syncing…',
+  syncSuccess: 'Synced listeners: {lastfm} Last.fm, {soundcharts} Soundcharts{errors}',
+  syncFailed: 'Listener sync failed',
+} as const
 
 export function ExternalMetricsSyncPanel() {
+  const dict = useDict()
+  const t = { ...SYNC_FALLBACK, ...dict.admin?.accounting }
   const [isPending, startTransition] = useTransition()
 
   const handleSync = () => {
@@ -14,15 +28,18 @@ export function ExternalMetricsSyncPanel() {
         const res = await fetch('/api/admin/analytics/sync-listeners', { method: 'POST' })
         const data = await res.json()
         if (!res.ok) {
-          throw new Error(typeof data?.error === 'string' ? data.error : 'Sync failed')
+          throw new Error(typeof data?.error === 'string' ? data.error : t.syncFailed)
         }
         const errCount = Array.isArray(data.errors) ? data.errors.length : 0
         toast.success(
-          `Synced listeners: ${data.lastfmRows ?? 0} Last.fm, ${data.soundchartsRows ?? 0} Soundcharts` +
-            (errCount > 0 ? ` (${errCount} artist errors)` : ''),
+          interpolate(t.syncSuccess, {
+            lastfm: data.lastfmRows ?? 0,
+            soundcharts: data.soundchartsRows ?? 0,
+            errors: errCount > 0 ? ` (${errCount} artist errors)` : '',
+          }),
         )
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Listener sync failed')
+        toast.error(err instanceof Error ? err.message : t.syncFailed)
       }
     })
   }
@@ -32,15 +49,13 @@ export function ExternalMetricsSyncPanel() {
       <div>
         <p className="text-sm font-medium flex items-center gap-1.5">
           <Waveform size={16} />
-          External Listener Data
+          {t.syncTitle}
         </p>
-        <p className="text-xs text-muted-foreground">
-          Pull monthly listener trends from Last.fm (free) and Soundcharts (optional API key).
-        </p>
+        <p className="text-xs text-muted-foreground">{t.syncDescription}</p>
       </div>
       <Button type="button" size="sm" onClick={handleSync} disabled={isPending}>
         <ArrowsClockwise size={14} className="mr-1" />
-        {isPending ? 'Syncing…' : 'Sync Listeners'}
+        {isPending ? t.syncing : t.syncButton}
       </Button>
     </div>
   )

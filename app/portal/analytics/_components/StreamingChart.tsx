@@ -80,7 +80,7 @@ export function StreamingChart({ dict, stats, aggregates, concerts }: StreamingC
   if (stats.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold">{dict.analytics_heading}</h1>
+        <h2 className="text-xl font-semibold">{dict.analytics_heading}</h2>
         <p className="text-muted-foreground">{dict.analytics_noData}</p>
       </div>
     )

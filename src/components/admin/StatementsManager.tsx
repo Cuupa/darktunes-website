@@ -1,12 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Table,
   TableBody,
@@ -31,6 +32,8 @@ import {
   WorkflowSummaryCard,
 } from '@/components/admin/sos/statementWorkflowUi'
 import { CircleNotch, PaperPlaneTilt, SealCheck } from '@phosphor-icons/react'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 type StatementRow = {
   id: string
@@ -43,6 +46,53 @@ type StatementRow = {
   created_at: string
   artists: { name: string }
 }
+
+const STATEMENTS_FALLBACK = {
+  historyReadOnlyTitle: 'Read-only history',
+  historyReadOnlyBody:
+    'Approve statements, record payments, and manage invoices in Settlement Center — not here.',
+  historyManageInSettlement: 'Manage in Settlement Center',
+  historyDraftPending: '{count} draft(s) awaiting approval in Settlement Center',
+  historyTitle: 'Statement History',
+  historyDescriptionReadOnly:
+    'All uploaded statements with approval status. Approvals and payments happen in Settlement Center.',
+  historyDescriptionEditable:
+    'All uploaded statements with approval status. For the full settlement workflow, use Settlement Center in the SOS generator.',
+  historyLoadingAria: 'Loading statements',
+  historyLoadError: 'Could not load statements',
+  historyEmpty: 'No statements uploaded yet.',
+  historySuperseded: 'Superseded',
+  historyApprove: 'Approve',
+  historyApproveSuccess: '{approved} statement(s) approved{emailed}',
+  historyApproveEmailed: ', {emailed} notification(s) sent',
+  historyApproveFailed: 'Approval failed',
+  historySessionExpired: 'Session expired',
+  historyFilterPlaceholder: 'Filter by artist, period, or filename…',
+  historySelectAllDrafts: 'Select all drafts',
+  historyApproveSelection: 'Approve selection ({count})',
+  historyApproveAllDrafts: 'All drafts ({count})',
+  historyColArtist: 'Artist',
+  historyColPeriod: 'Period',
+  historyColStatus: 'Status',
+  historyColAmount: 'Amount',
+  historyColFilename: 'Filename',
+  historyColCreated: 'Created',
+  historyColActions: 'Actions',
+  historySelectArtist: 'Select {artist}',
+  historySelectColumn: 'Selection',
+  historyKpiDraftPending: 'Approval pending',
+  historyKpiDraftHint: 'Drafts',
+  historyKpiNotified: 'Notified',
+  historyKpiNotifiedHint: 'Email sent',
+  historyKpiViewed: 'Viewed',
+  historyKpiViewedHint: 'Opened in portal',
+  historyKpiInvoiced: 'Invoice',
+  historyKpiInvoicedHint: 'Invoice created',
+  historyKpiPaid: 'Paid',
+  historyKpiPaidHint: 'Complete',
+  historyKpiSuperseded: 'Superseded',
+  historyKpiSupersededHint: 'Replaced by correction',
+} as const
 
 function formatEur(amount: number | null): string {
   if (amount === null) return '—'
@@ -59,13 +109,24 @@ function formatDate(value: string): string {
   }).format(new Date(value))
 }
 
-export function StatementsManager() {
+interface StatementsManagerProps {
+  /** When true (default), hides approve actions — use Settlement Center instead. */
+  readOnly?: boolean
+  /** Deep link to Settlement Center tab in Accounting. */
+  settlementHref?: string
+}
+
+export function StatementsManager({
+  readOnly = true,
+  settlementHref = '/admin/accounting?subTab=settlements',
+}: StatementsManagerProps) {
+  const dict = useDict()
+  const t = { ...STATEMENTS_FALLBACK, ...dict.admin?.accounting }
+
   const [statements, setStatements] = useState<StatementRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approving, setApproving] = useState(false)
-  const [noteEditorId, setNoteEditorId] = useState<string | null>(null)
-  const [notesById, setNotesById] = useState<Record<string, string>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
 
@@ -95,14 +156,7 @@ export function StatementsManager() {
       return
     }
 
-    const rows = (data ?? []) as StatementRow[]
-    setStatements(rows)
-    setNotesById(
-      rows.reduce<Record<string, string>>((acc, row) => {
-        acc[row.id] = row.label_notes ?? ''
-        return acc
-      }, {}),
-    )
+    setStatements((data ?? []) as StatementRow[])
     setLoading(false)
   }, [])
 
@@ -152,15 +206,14 @@ export function StatementsManager() {
   const selectedDraftIds = Array.from(selectedIds).filter((id) =>
     filteredStatements.some((statement) => statement.id === id && statement.status === 'draft'),
   )
-  const allDraftSelected = draftIds.length > 0 && draftIds.every((id) => selectedIds.has(id))
 
   const handleApprove = async (statementIds: string[]) => {
-    if (statementIds.length === 0) return
+    if (readOnly || statementIds.length === 0) return
     setApproving(true)
 
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.historySessionExpired)
 
       const response = await fetch('/api/admin/sales-statements/bulk-approve', {
         method: 'POST',
@@ -168,10 +221,7 @@ export function StatementsManager() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ids: statementIds,
-          notes: statementIds.length === 1 ? notesById[statementIds[0]] || undefined : undefined,
-        }),
+        body: JSON.stringify({ ids: statementIds }),
       })
 
       const json = (await response.json().catch(() => null)) as
@@ -179,27 +229,52 @@ export function StatementsManager() {
         | null
 
       if (!response.ok) {
-        throw new Error(json?.error ?? 'Freigabe fehlgeschlagen')
+        throw new Error(json?.error ?? t.historyApproveFailed)
       }
 
       await fetchStatements()
       setSelectedIds(new Set())
-      setNoteEditorId(null)
+
+      const emailedSuffix =
+        (json?.emailed ?? 0) > 0
+          ? interpolate(t.historyApproveEmailed, { emailed: json?.emailed ?? 0 })
+          : ''
+
       toast.success(
-        `${json?.approved ?? 0} Statement${(json?.approved ?? 0) === 1 ? '' : 's'} freigegeben` +
-          ((json?.emailed ?? 0) > 0
-            ? `, ${json?.emailed} Benachrichtigung${json?.emailed === 1 ? '' : 'en'} versendet`
-            : ''),
+        interpolate(t.historyApproveSuccess, {
+          approved: json?.approved ?? 0,
+          emailed: emailedSuffix,
+        }),
       )
     } catch (approvalError) {
-      toast.error(approvalError instanceof Error ? approvalError.message : 'Freigabe fehlgeschlagen')
+      toast.error(
+        approvalError instanceof Error ? approvalError.message : t.historyApproveFailed,
+      )
     } finally {
       setApproving(false)
     }
   }
 
-  const renderStatementActions = (statement: StatementRow, workflowStatus: ArtistStatementWorkflowStatus) => {
+  const renderStatementActions = (
+    statement: StatementRow,
+    workflowStatus: ArtistStatementWorkflowStatus,
+  ) => {
     const isDraft = statement.status === 'draft'
+
+    if (readOnly) {
+      return (
+        <div className="flex flex-wrap justify-end gap-2">
+          {isDraft && (
+            <Button size="sm" variant="outline" className="gap-1" asChild>
+              <Link href={settlementHref}>{t.historyManageInSettlement}</Link>
+            </Button>
+          )}
+          {workflowStatus === 'superseded' && (
+            <span className="text-xs text-muted-foreground self-center">{t.historySuperseded}</span>
+          )}
+        </div>
+      )
+    }
 
     return (
       <div className="flex flex-wrap justify-end gap-2">
@@ -211,32 +286,11 @@ export function StatementsManager() {
             className="gap-1"
           >
             {approving ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
-            Freigeben
+            {t.historyApprove}
           </Button>
         )}
-        <Button
-          onClick={() => setNoteEditorId((current) => (current === statement.id ? null : statement.id))}
-          size="sm"
-          variant="outline"
-        >
-          Notizen
-        </Button>
-        {noteEditorId === statement.id && (
-          <Textarea
-            aria-label={`Notizen für ${statement.period}`}
-            className="w-full min-w-[12rem] sm:max-w-xs"
-            placeholder="Interne Label-Notizen"
-            value={notesById[statement.id] ?? ''}
-            onChange={(event) =>
-              setNotesById((current) => ({
-                ...current,
-                [statement.id]: event.target.value,
-              }))
-            }
-          />
-        )}
         {workflowStatus === 'superseded' && (
-          <span className="text-xs text-muted-foreground self-center">Ersetzt</span>
+          <span className="text-xs text-muted-foreground self-center">{t.historySuperseded}</span>
         )}
       </div>
     )
@@ -244,7 +298,7 @@ export function StatementsManager() {
 
   if (loading) {
     return (
-      <div aria-busy="true" aria-label="Statements werden geladen" className="space-y-2">
+      <div aria-busy="true" aria-label={t.historyLoadingAria} className="space-y-2">
         {Array.from({ length: 5 }).map((_, index) => (
           <Skeleton key={index} className="h-10 w-full" />
         ))}
@@ -253,76 +307,119 @@ export function StatementsManager() {
   }
 
   if (error) {
-    return <p className="text-sm text-destructive">Statements konnten nicht geladen werden: {error}</p>
+    return (
+      <p className="text-sm text-destructive">
+        {t.historyLoadError}: {error}
+      </p>
+    )
   }
 
   if (statements.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-muted-foreground">
-        Noch keine Statements hochgeladen.
-      </p>
+      <p className="py-4 text-center text-sm text-muted-foreground">{t.historyEmpty}</p>
     )
   }
 
   return (
     <div className="space-y-6">
+      {readOnly && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <SealCheck size={16} className="text-primary" />
+          <AlertTitle className="text-sm">{t.historyReadOnlyTitle}</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <span>{t.historyReadOnlyBody}</span>
+            <Button size="sm" className="shrink-0" asChild>
+              <Link href={settlementHref}>{t.historyManageInSettlement}</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold">Statement-Historie</h2>
+        <h2 className="text-lg font-semibold">{t.historyTitle}</h2>
         <p className="text-sm text-muted-foreground max-w-3xl">
-          Alle hochgeladenen Statements mit Freigabe-Status. Für den vollständigen Abrechnungsworkflow
-          nutzen Sie die Abrechnungszentrale im SOS-Generator.
+          {readOnly ? t.historyDescriptionReadOnly : t.historyDescriptionEditable}
         </p>
+        {readOnly && counts.draft > 0 && (
+          <p className="text-xs text-amber-400">
+            {interpolate(t.historyDraftPending, { count: counts.draft })}
+          </p>
+        )}
       </div>
 
       <WorkflowStepper activeStep={activeStep} completedSteps={completedSteps} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <WorkflowSummaryCard
-          label="Freigabe ausstehend"
+          label={t.historyKpiDraftPending}
           value={counts.draft}
-          hint="Entwürfe"
+          hint={t.historyKpiDraftHint}
           tone={counts.draft > 0 ? 'warning' : 'muted'}
         />
-        <WorkflowSummaryCard label="Benachrichtigt" value={counts.artist_notified} hint="E-Mail versendet" />
-        <WorkflowSummaryCard label="Gesehen" value={counts.viewed} hint="Im Portal geöffnet" />
-        <WorkflowSummaryCard label="Rechnung" value={counts.invoiced + counts.acknowledged} hint="Rechnung erstellt" />
-        <WorkflowSummaryCard label="Bezahlt" value={counts.paid} hint="Abgeschlossen" tone={counts.paid > 0 ? 'success' : 'muted'} />
-        <WorkflowSummaryCard label="Ersetzt" value={counts.superseded} hint="Durch Korrektur ersetzt" tone="muted" />
+        <WorkflowSummaryCard
+          label={t.historyKpiNotified}
+          value={counts.artist_notified}
+          hint={t.historyKpiNotifiedHint}
+        />
+        <WorkflowSummaryCard
+          label={t.historyKpiViewed}
+          value={counts.viewed}
+          hint={t.historyKpiViewedHint}
+        />
+        <WorkflowSummaryCard
+          label={t.historyKpiInvoiced}
+          value={counts.invoiced + counts.acknowledged}
+          hint={t.historyKpiInvoicedHint}
+        />
+        <WorkflowSummaryCard
+          label={t.historyKpiPaid}
+          value={counts.paid}
+          hint={t.historyKpiPaidHint}
+          tone={counts.paid > 0 ? 'success' : 'muted'}
+        />
+        <WorkflowSummaryCard
+          label={t.historyKpiSuperseded}
+          value={counts.superseded}
+          hint={t.historyKpiSupersededHint}
+          tone="muted"
+        />
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card/40 p-4 lg:flex-row lg:items-center lg:justify-between">
         <Input
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          placeholder="Nach Künstler, Periode oder Dateiname filtern…"
+          placeholder={t.historyFilterPlaceholder}
           className="w-full lg:max-w-md"
         />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            disabled={draftIds.length === 0}
-            onClick={() => setSelectedIds(new Set(draftIds))}
-          >
-            Alle Entwürfe auswählen
-          </Button>
-          <Button
-            className="gap-2"
-            disabled={approving || selectedDraftIds.length === 0}
-            onClick={() => void handleApprove(selectedDraftIds)}
-          >
-            {approving ? <CircleNotch size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
-            Auswahl freigeben ({selectedDraftIds.length})
-          </Button>
-          <Button
-            variant="secondary"
-            className="gap-2"
-            disabled={approving || counts.draft === 0}
-            onClick={() => void handleApprove(draftIds)}
-          >
-            <SealCheck size={16} />
-            Alle Entwürfe ({counts.draft})
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={draftIds.length === 0}
+              onClick={() => setSelectedIds(new Set(draftIds))}
+            >
+              {t.historySelectAllDrafts}
+            </Button>
+            <Button
+              className="gap-2"
+              disabled={approving || selectedDraftIds.length === 0}
+              onClick={() => void handleApprove(selectedDraftIds)}
+            >
+              {approving ? <CircleNotch size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
+              {interpolate(t.historyApproveSelection, { count: selectedDraftIds.length })}
+            </Button>
+            <Button
+              variant="secondary"
+              className="gap-2"
+              disabled={approving || counts.draft === 0}
+              onClick={() => void handleApprove(draftIds)}
+            >
+              <SealCheck size={16} />
+              {interpolate(t.historyApproveAllDrafts, { count: counts.draft })}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 md:hidden">
@@ -340,27 +437,21 @@ export function StatementsManager() {
                   <p className="font-medium truncate">{statement.artists.name}</p>
                   <p className="text-sm text-muted-foreground font-mono">{statement.period}</p>
                 </div>
-                {isDraft && (
-                  <Checkbox
-                    checked={selectedIds.has(statement.id)}
-                    onCheckedChange={() => {
-                      setSelectedIds((current) => {
-                        const next = new Set(current)
-                        if (next.has(statement.id)) next.delete(statement.id)
-                        else next.add(statement.id)
-                        return next
-                      })
-                    }}
-                    aria-label={`${statement.artists.name} auswählen`}
-                  />
-                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <WorkflowStatusBadge status={workflowStatus} />
                 <span className="text-sm tabular-nums">{formatEur(statement.amount_eur)}</span>
+                {readOnly && isDraft && (
+                  <span className="text-[10px] uppercase tracking-wide text-amber-400">
+                    {t.historyManageInSettlement}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate font-mono">{statement.filename}</p>
               <p className="text-xs text-muted-foreground">{formatDate(statement.created_at)}</p>
+              {statement.label_notes && (
+                <p className="text-xs text-muted-foreground italic">{statement.label_notes}</p>
+              )}
               {renderStatementActions(statement, workflowStatus)}
             </div>
           )
@@ -371,24 +462,14 @@ export function StatementsManager() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allDraftSelected}
-                  onCheckedChange={() => {
-                    if (allDraftSelected) setSelectedIds(new Set())
-                    else setSelectedIds(new Set(draftIds))
-                  }}
-                  aria-label="Alle ausstehenden Entwürfe auswählen"
-                  disabled={draftIds.length === 0}
-                />
-              </TableHead>
-              <TableHead>Künstler</TableHead>
-              <TableHead>Periode</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Betrag</TableHead>
-              <TableHead>Dateiname</TableHead>
-              <TableHead>Erstellt</TableHead>
-              <TableHead className="text-right">Aktionen</TableHead>
+              {!readOnly && <TableHead className="w-12">{t.historySelectColumn}</TableHead>}
+              <TableHead>{t.historyColArtist}</TableHead>
+              <TableHead>{t.historyColPeriod}</TableHead>
+              <TableHead>{t.historyColStatus}</TableHead>
+              <TableHead className="text-right">{t.historyColAmount}</TableHead>
+              <TableHead>{t.historyColFilename}</TableHead>
+              <TableHead>{t.historyColCreated}</TableHead>
+              <TableHead className="text-right">{t.historyColActions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -398,21 +479,25 @@ export function StatementsManager() {
 
               return (
                 <TableRow key={statement.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(statement.id)}
-                      onCheckedChange={() => {
-                        setSelectedIds((current) => {
-                          const next = new Set(current)
-                          if (next.has(statement.id)) next.delete(statement.id)
-                          else next.add(statement.id)
-                          return next
-                        })
-                      }}
-                      aria-label={`${statement.artists.name} auswählen`}
-                      disabled={!isDraft}
-                    />
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(statement.id)}
+                        onCheckedChange={() => {
+                          setSelectedIds((current) => {
+                            const next = new Set(current)
+                            if (next.has(statement.id)) next.delete(statement.id)
+                            else next.add(statement.id)
+                            return next
+                          })
+                        }}
+                        aria-label={interpolate(t.historySelectArtist, {
+                          artist: statement.artists.name,
+                        })}
+                        disabled={!isDraft}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>{statement.artists.name}</TableCell>
                   <TableCell className="whitespace-nowrap font-mono text-sm">{statement.period}</TableCell>
                   <TableCell>

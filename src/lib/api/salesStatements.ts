@@ -7,6 +7,8 @@ type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
 export type SalesStatementStatus = SalesStatementRow['status']
 
+export type SalesStatementDocumentType = SalesStatementRow['document_type']
+
 export interface SalesStatement {
   id: string
   artistId: string
@@ -23,6 +25,8 @@ export interface SalesStatement {
   lastViewedAt: string | undefined
   viewCount: number
   settlementPeriodId: string | undefined
+  documentType: SalesStatementDocumentType
+  correctionOfId: string | undefined
   isArchived: boolean
   createdAt: string
 }
@@ -37,6 +41,35 @@ export interface CreateSalesStatementData {
   periodEnd?: string | null
   totalStreams?: number | null
   batchId?: string | null
+}
+
+export class DuplicateDraftStatementError extends Error {
+  constructor() {
+    super('A draft statement already exists for this artist and period')
+    this.name = 'DuplicateDraftStatementError'
+  }
+}
+
+async function assertNoDuplicateDraft(
+  db: DbClient,
+  artistId: string,
+  periodStart: string | null | undefined,
+  periodEnd: string | null | undefined,
+): Promise<void> {
+  if (!periodStart || !periodEnd) return
+
+  const { data, error } = await db
+    .from('sales_statements')
+    .select('id')
+    .eq('artist_id', artistId)
+    .eq('period_start', periodStart)
+    .eq('period_end', periodEnd)
+    .eq('status', 'draft')
+    .neq('document_type', 'storno')
+    .limit(1)
+
+  if (error) throw new Error(error.message)
+  if (data && data.length > 0) throw new DuplicateDraftStatementError()
 }
 
 function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
@@ -56,6 +89,8 @@ function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
     lastViewedAt: row.last_viewed_at ?? undefined,
     viewCount: row.view_count ?? 0,
     settlementPeriodId: row.settlement_period_id ?? undefined,
+    documentType: row.document_type ?? 'original',
+    correctionOfId: row.correction_of_id ?? undefined,
     isArchived: row.is_archived ?? false,
     createdAt: row.created_at,
   }
@@ -65,6 +100,8 @@ export async function createSalesStatement(
   db: DbClient,
   data: CreateSalesStatementData,
 ): Promise<SalesStatement> {
+  await assertNoDuplicateDraft(db, data.artistId, data.periodStart, data.periodEnd)
+
   const { data: row, error } = await db
     .from('sales_statements')
     .insert({
@@ -230,6 +267,20 @@ export async function linkApprovedStatementToSettlement(
     .update({ settlement_period_id: period.id })
     .eq('id', statement.id)
 
+  // Correction drafts already book the payout delta when created (if the original
+  // was on the settlement ledger). Approving must not add a second full payout.
+  if (statement.documentType === 'correction' && statement.correctionOfId) {
+    const { data: original, error } = await db
+      .from('sales_statements')
+      .select('settlement_period_id')
+      .eq('id', statement.correctionOfId)
+      .single()
+
+    if (!error && original?.settlement_period_id) {
+      return
+    }
+  }
+
   await appendLedgerEntry(db, {
     artistId: statement.artistId,
     settlementPeriodId: period.id,
@@ -252,6 +303,7 @@ const CORRECTABLE_STATUSES: SalesStatementStatus[] = [
 
 export interface CreateCorrectionStatementInput {
   amountEur: number
+  r2Key: string
   labelNotes?: string
 }
 
@@ -283,7 +335,7 @@ export async function createCorrectionStatement(
     .insert({
       artist_id: originalRow.artist_id,
       filename: originalRow.filename.replace(/\.pdf$/i, '') + '-Korrektur.pdf',
-      r2_key: originalRow.r2_key,
+      r2_key: input.r2Key,
       period: originalRow.period,
       amount_eur: input.amountEur,
       status: 'draft',

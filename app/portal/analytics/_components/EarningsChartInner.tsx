@@ -29,7 +29,7 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">{dict.analytics_earnings_heading}</h1>
+      <h2 className="text-xl font-semibold">{dict.analytics_earnings_heading}</h2>
 
       {/* KPI summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

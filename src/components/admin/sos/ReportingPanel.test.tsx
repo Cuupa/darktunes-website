@@ -4,6 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReportingPanel } from './ReportingPanel'
 import type { ArtistRevenue } from '@/lib/sos/types'
 
+vi.mock('@/contexts/DictContext', () => ({
+  useDict: () => ({
+    admin: {
+      accounting: {
+        reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',
+        reportingSettlementAlertBody: 'Review payouts here, then open Settlement Center.',
+        reportingSettlementCta: 'Open Settlement Center',
+      },
+    },
+  }),
+}))
+
 vi.mock('@/components/ui/button', () => ({
   Button: ({ children, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
     <button onClick={onClick} disabled={disabled} {...props}>{children}</button>
@@ -57,13 +69,13 @@ function makeRevenue(artist: string): ArtistRevenue {
   }
 }
 
-describe('ReportingPanel release workflow CTA', () => {
+describe('ReportingPanel settlement center CTA', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('shows the release workflow banner when callback is provided', () => {
-    const onGoToReleaseWorkflow = vi.fn()
+  it('shows the settlement center banner when callback is provided', () => {
+    const onGoToSettlementCenter = vi.fn()
 
     render(
       <ReportingPanel
@@ -72,12 +84,12 @@ describe('ReportingPanel release workflow CTA', () => {
         onDownloadExcel={vi.fn()}
         onDownloadAll={vi.fn()}
         onDownloadSelected={vi.fn()}
-        onGoToReleaseWorkflow={onGoToReleaseWorkflow}
+        onGoToSettlementCenter={onGoToSettlementCenter}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Open Release Workflow/i }))
-    expect(onGoToReleaseWorkflow).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: /Open Settlement Center/i }))
+    expect(onGoToSettlementCenter).toHaveBeenCalledTimes(1)
   })
 
   it('does not render publish buttons anymore', () => {

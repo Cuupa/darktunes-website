@@ -3,31 +3,122 @@
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
-  WORKFLOW_STEPS,
-  WORKFLOW_STATUS_LABELS,
+  WORKFLOW_STEP_IDS,
   type ArtistStatementWorkflowStatus,
   type StatementWorkflowStep,
 } from '@/lib/sos/statementWorkflow'
 import { Check, Circle } from '@phosphor-icons/react'
+import { useDict } from '@/contexts/DictContext'
+
+export interface WorkflowStepLabel {
+  label: string
+  description: string
+}
+
+export interface WorkflowLabels {
+  stepperAriaLabel: string
+  steps: Record<StatementWorkflowStep, WorkflowStepLabel>
+  statuses: Record<ArtistStatementWorkflowStatus, string>
+}
+
+const WORKFLOW_STEP_FALLBACK: Record<StatementWorkflowStep, WorkflowStepLabel> = {
+  review: { label: 'Review data', description: 'Validate CSV import and payouts in Reporting' },
+  draft: { label: 'Drafts', description: 'Upload PDFs to the portal (no email)' },
+  approve: { label: 'Approval', description: 'Label approval and artist notification' },
+  notified: { label: 'Notified', description: 'Artist informed by email' },
+  viewed: { label: 'Viewed', description: 'Artist opened the statement' },
+  invoiced: { label: 'Invoice', description: 'Artist created an invoice' },
+  paid: { label: 'Paid', description: 'Payment recorded and complete' },
+}
+
+const WORKFLOW_STATUS_FALLBACK: Record<ArtistStatementWorkflowStatus, string> = {
+  not_linked: 'Not linked',
+  not_uploaded: 'Ready for draft',
+  draft: 'Approval pending',
+  label_approved: 'Approved',
+  artist_notified: 'Notified',
+  viewed: 'Viewed',
+  invoiced: 'Invoice created',
+  paid: 'Paid',
+  acknowledged: 'Acknowledged',
+  superseded: 'Superseded',
+  cancelled: 'Cancelled',
+}
+
+type WorkflowStepsDict = Partial<
+  Record<StatementWorkflowStep, { label?: string; description?: string }>
+>
+type WorkflowStatusesDict = Partial<Record<ArtistStatementWorkflowStatus, string>>
+
+function buildWorkflowLabels(
+  accounting: {
+    workflowStepperAria?: string
+    workflowSteps?: WorkflowStepsDict
+    workflowStatuses?: WorkflowStatusesDict
+  } | undefined,
+): WorkflowLabels {
+  const steps = Object.fromEntries(
+    WORKFLOW_STEP_IDS.map((id) => {
+      const fromDict = accounting?.workflowSteps?.[id]
+      const fallback = WORKFLOW_STEP_FALLBACK[id]
+      return [
+        id,
+        {
+          label: fromDict?.label ?? fallback.label,
+          description: fromDict?.description ?? fallback.description,
+        },
+      ]
+    }),
+  ) as Record<StatementWorkflowStep, WorkflowStepLabel>
+
+  const statuses = Object.fromEntries(
+    (Object.keys(WORKFLOW_STATUS_FALLBACK) as ArtistStatementWorkflowStatus[]).map((id) => [
+      id,
+      accounting?.workflowStatuses?.[id] ?? WORKFLOW_STATUS_FALLBACK[id],
+    ]),
+  ) as Record<ArtistStatementWorkflowStatus, string>
+
+  return {
+    stepperAriaLabel: accounting?.workflowStepperAria ?? 'Statement approval workflow',
+    steps,
+    statuses,
+  }
+}
+
+export function useWorkflowLabels(): WorkflowLabels {
+  const dict = useDict()
+  return buildWorkflowLabels(dict.admin?.accounting)
+}
 
 export function WorkflowStepper({
   activeStep,
   completedSteps,
+  labels: labelsProp,
 }: {
   activeStep: StatementWorkflowStep
   completedSteps: Set<StatementWorkflowStep>
+  labels?: WorkflowLabels
 }) {
-  const activeIndex = Math.max(0, WORKFLOW_STEPS.findIndex((step) => step.id === activeStep))
+  const dictLabels = useWorkflowLabels()
+  const labels = labelsProp ?? dictLabels
+  const activeIndex = Math.max(
+    0,
+    WORKFLOW_STEP_IDS.findIndex((step) => step === activeStep),
+  )
 
   return (
-    <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7" aria-label="Statement approval workflow">
-      {WORKFLOW_STEPS.map((step, index) => {
-        const isComplete = completedSteps.has(step.id) || index < activeIndex
-        const isActive = step.id === activeStep
+    <ol
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7"
+      aria-label={labels.stepperAriaLabel}
+    >
+      {WORKFLOW_STEP_IDS.map((stepId, index) => {
+        const step = labels.steps[stepId]
+        const isComplete = completedSteps.has(stepId) || index < activeIndex
+        const isActive = stepId === activeStep
 
         return (
           <li
-            key={step.id}
+            key={stepId}
             className={cn(
               'rounded-lg border p-4 transition-colors',
               isActive && 'border-primary/50 bg-primary/5',
@@ -59,7 +150,16 @@ export function WorkflowStepper({
   )
 }
 
-export function WorkflowStatusBadge({ status }: { status: ArtistStatementWorkflowStatus }) {
+export function WorkflowStatusBadge({
+  status,
+  labels: labelsProp,
+}: {
+  status: ArtistStatementWorkflowStatus
+  labels?: WorkflowLabels
+}) {
+  const dictLabels = useWorkflowLabels()
+  const labels = labelsProp ?? dictLabels
+
   const variant =
     status === 'draft'
       ? 'outline'
@@ -92,7 +192,7 @@ export function WorkflowStatusBadge({ status }: { status: ArtistStatementWorkflo
 
   return (
     <Badge variant={variant} className={className}>
-      {WORKFLOW_STATUS_LABELS[status]}
+      {labels.statuses[status]}
     </Badge>
   )
 }

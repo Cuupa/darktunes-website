@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
+import { useDict } from '@/contexts/DictContext'
+import { interpolate } from '@/lib/i18n/interpolate'
 import {
   generatePDF,
   generateExcel,
@@ -44,6 +46,15 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
 }
 
+function resolveBronzeBatchLineage(bronzeBatchIds: string[] | undefined) {
+  const batchIds = bronzeBatchIds ?? []
+  return {
+    batchIds,
+    /** Statement row stores a single primary batch; full lineage lives on period summaries. */
+    primaryBatchId: batchIds[0],
+  }
+}
+
 function buildUploadPayload(
   artistData: SafeProcessedArtistData,
   periodStart: string,
@@ -81,9 +92,25 @@ export function useExports(
   labelArtists?: LabelArtist[],
   emailConfig?: Partial<EmailConfig>,
   compilationFilters: CompilationFilter[] = [],
-  autoUploadToPortal = true,
+  autoUploadToPortal = false,
   persistContext?: SosExportPersistContext,
 ) {
+  const dict = useDict()
+  const exportFallback = {
+    exportNoArtistData: 'No data found for artist "{artist}"',
+    exportPdfDownloaded: 'PDF for "{artist}" downloaded',
+    exportPdfFailed: 'PDF export failed',
+    exportExcelDownloaded: 'Excel for "{artist}" downloaded',
+    exportExcelFailed: 'Excel export failed',
+    exportZipDownloaded: 'ZIP with {count} statements downloaded',
+    exportZipFailed: 'ZIP export failed',
+    exportPortalDraftSaved:
+      'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
+    exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
+    exportPortalUploading: 'Uploading statement to portal…',
+  } as const
+  const t = { ...exportFallback, ...(dict.admin?.accounting ?? {}) }
+
   const emailOptions = useMemo(
     () =>
       appDefaults
@@ -109,7 +136,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -145,18 +172,20 @@ export function useExports(
           // If period doesn't match expected format (YYYY-MM or Q{N}-YYYY), fall back to current year
           const validPeriod = isValidPeriod(period) ? period : `Q1-${new Date().getFullYear()}`
 
-          toast.loading('Uploading statement to portal…', { id: 'sos-upload' })
+          toast.loading(t.exportPortalUploading, { id: 'sos-upload' })
 
           const pdfBase64 = await blobToBase64(blob)
           const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
-          const batchId = persistContext?.bronzeBatchIds[0]
+          const { batchIds, primaryBatchId } = resolveBronzeBatchLineage(
+            persistContext?.bronzeBatchIds,
+          )
           const result = await uploadStatement({
             artistId: artistInfo.artistId,
             filename,
             period: validPeriod,
             amountEur: artistData.finalPayout,
             ...analyticsPayload,
-            batchId,
+            batchId: primaryBatchId,
             pdfBase64,
           })
 
@@ -170,22 +199,29 @@ export function useExports(
                 merchOrderRows: persistContext.merchOrderRows,
                 labelArtists: labelArtists ?? [],
                 revenues: persistContext.revenues,
-                bronzeBatchIds: persistContext.bronzeBatchIds,
-                batchId,
+                bronzeBatchIds: batchIds,
+                batchId: primaryBatchId,
               })
             }
-            toast.success('Statement uploaded! Artist will receive an email notification.', { id: 'sos-upload' })
+            toast.success(t.exportPortalDraftSaved, {
+              id: 'sos-upload',
+            })
           } else {
-            toast.error(`Upload failed: ${result.error ?? 'Unknown error'}. PDF saved locally instead.`, { id: 'sos-upload' })
+            toast.error(
+              interpolate(t.exportPortalUploadFailed, {
+                error: result.error ?? 'Unknown error',
+              }),
+              { id: 'sos-upload' },
+            )
             downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
           }
         } else {
           downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
-          toast.success(`PDF for "${artist}" downloaded`)
+          toast.success(interpolate(t.exportPdfDownloaded, { artist }))
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error('PDF export failed', { description: message })
+        toast.error(t.exportPdfFailed, { description: message })
         console.error('PDF export error:', err)
       }
     },
@@ -196,7 +232,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -210,10 +246,10 @@ export function useExports(
           pdfSettings
         )
         downloadBlob(blob, `${createSafeFilename(artist)}_statement.xlsx`)
-        toast.success(`Excel for "${artist}" downloaded`)
+        toast.success(interpolate(t.exportExcelDownloaded, { artist }))
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error('Excel export failed', { description: message })
+        toast.error(t.exportExcelFailed, { description: message })
         console.error('Excel export error:', err)
       }
     },
@@ -257,7 +293,7 @@ export function useExports(
       toast.success(`All ${total} statements downloaded`, { id: toastId })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('ZIP export failed', { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
@@ -303,7 +339,7 @@ export function useExports(
       toast.success(`${total} selected statement${total !== 1 ? 's' : ''} downloaded`, { id: toastId })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('ZIP export failed', { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
@@ -312,7 +348,7 @@ export function useExports(
     async (artist: string) => {
       const artistData = processedData.find(d => d.artist === artist)
       if (!artistData) {
-        toast.error(`No data found for artist "${artist}"`)
+        toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
 
@@ -344,14 +380,16 @@ export function useExports(
         const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
         const pdfBase64 = await blobToBase64(blob)
         const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
-        const batchId = persistContext?.bronzeBatchIds[0]
+        const { batchIds, primaryBatchId } = resolveBronzeBatchLineage(
+          persistContext?.bronzeBatchIds,
+        )
         const result = await uploadStatement({
           artistId: artistInfo.artistId,
           filename,
           period: validPeriod,
           amountEur: artistData.finalPayout,
           ...analyticsPayload,
-          batchId,
+          batchId: primaryBatchId,
           pdfBase64,
         })
 
@@ -368,12 +406,12 @@ export function useExports(
             merchOrderRows: persistContext.merchOrderRows,
             labelArtists: labelArtists ?? [],
             revenues: persistContext.revenues,
-            bronzeBatchIds: persistContext.bronzeBatchIds,
-            batchId,
+            bronzeBatchIds: batchIds,
+            batchId: primaryBatchId,
           })
         }
 
-        toast.success('Draft statement saved to portal')
+        toast.success(t.exportPortalDraftSaved)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         toast.error(message)
@@ -382,5 +420,54 @@ export function useExports(
     [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists]
   )
 
-  return { handleDownloadPDF, handleDownloadExcel, handleDownloadAll, handleDownloadSelected, handlePublishToPortal }
+  const buildCorrectionPdfBase64 = useCallback(
+    async (artist: string, amountEur: number): Promise<string | null> => {
+      const artistData = processedData.find((d) => d.artist === artist)
+      if (!artistData) return null
+
+      const artistInfo = artistInfoMap.get(artist.toLowerCase())
+
+      try {
+        const currentYear = new Date().getFullYear()
+        const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
+        const artistSlug = artist.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4) || '0001'
+        const invoiceNumber = `${prefix}-${currentYear}-${artistSlug}`
+        const correctedData = { ...artistData, finalPayout: amountEur }
+        const blob = await generatePDF(
+          correctedData,
+          labelInfo,
+          periodStart || undefined,
+          periodEnd || undefined,
+          invoiceNumber,
+          pdfSettings,
+          emailOptions,
+          artistInfo,
+          compilationFilters,
+        )
+        return blobToBase64(blob)
+      } catch (err) {
+        console.error('Correction PDF generation error:', err)
+        return null
+      }
+    },
+    [
+      processedData,
+      artistInfoMap,
+      labelInfo,
+      periodStart,
+      periodEnd,
+      pdfSettings,
+      emailOptions,
+      compilationFilters,
+    ],
+  )
+
+  return {
+    handleDownloadPDF,
+    handleDownloadExcel,
+    handleDownloadAll,
+    handleDownloadSelected,
+    handlePublishToPortal,
+    buildCorrectionPdfBase64,
+  }
 }

@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { ChartPie, MusicNote, Storefront, TShirt } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import type { ArtistRevenue } from '@/lib/sos/types'
+import { useDict } from '@/contexts/DictContext'
 
 interface SourceMixPanelProps {
   revenues: ArtistRevenue[]
@@ -16,6 +17,11 @@ function fmtEur(n: number) {
 }
 
 export function SourceMixPanel({ revenues, periodStart, periodEnd }: SourceMixPanelProps) {
+  const dict = useDict()
+  const sourceMixSubtitle =
+    dict.admin?.accounting?.sourceMixSubtitle ??
+    'SOS session — distributor view (in-memory CSV data)'
+
   const totals = useMemo(() => {
     let believe = 0
     let bandcamp = 0
@@ -44,7 +50,10 @@ export function SourceMixPanel({ revenues, periodStart, periodEnd }: SourceMixPa
     <Card className="p-4 space-y-3 border-border bg-card/50">
       <div className="flex items-center gap-2">
         <ChartPie size={18} className="text-primary" />
-        <p className="text-sm font-medium">Revenue by Source</p>
+        <div>
+          <p className="text-sm font-medium">Revenue by Source</p>
+          <p className="text-[11px] text-muted-foreground">{sourceMixSubtitle}</p>
+        </div>
         {(periodStart || periodEnd) && (
           <span className="text-xs text-muted-foreground ml-auto">
             {periodStart}{periodEnd && periodEnd !== periodStart ? ` – ${periodEnd}` : ''}

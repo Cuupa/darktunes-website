@@ -160,13 +160,13 @@ export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: Analyti
       .sort((a, b) => a.month.localeCompare(b.month))
   }, [filteredRevenues])
 
-  // Artist pie
+  // Artist pie respects active artist/country filters
   const artistPieData = useMemo(() =>
-    revenues
+    filteredRevenues
       .map(r => ({ name: r.artist, value: r.totalRevenue }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8),
-    [revenues]
+    [filteredRevenues]
   )
 
   const tooltipStyle = {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { extractPeriodBounds, uploadBronzeDistributorCsv } from './bronzeUpload'
 
 describe('extractPeriodBounds', () => {
@@ -19,38 +19,104 @@ describe('extractPeriodBounds', () => {
 })
 
 describe('uploadBronzeDistributorCsv', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('uploads CSV via the server route without a presigned PUT', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        batch: { id: 'batch-1' },
-        r2Key: 'sos-imports/batch-1/hash_test.csv',
-      }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
+  it('abandons the batch when R2 PUT fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-1' },
+          uploadUrl: 'https://r2.example/upload',
+          r2Key: 'sos-imports/batch-1/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Unavailable' })
+      .mockResolvedValueOnce({ ok: true })
 
     const result = await uploadBronzeDistributorCsv({
       distributor: 'believe',
-      filename: 'Believe_Q1.csv',
-      csvContent: 'artist,revenue\nTest,1.00',
+      filename: 'sales.csv',
+      uploadBody: 'a,b\n1,2',
       rowCount: 1,
-      periodStart: '2026-01',
-      periodEnd: '2026-03',
+      periodStart: '2024-01',
+      periodEnd: '2024-01',
     })
 
-    expect(result).toEqual({
-      batchId: 'batch-1',
-      r2Key: 'sos-imports/batch-1/hash_test.csv',
+    expect(result).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/admin/sos/import-batches/batch-1')
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' })
+  })
+
+  it('retries confirm and returns batch metadata on success', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-2' },
+          uploadUrl: 'https://r2.example/upload',
+          r2Key: 'sos-imports/batch-2/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadBronzeDistributorCsv({
+      distributor: 'bandcamp',
+      filename: 'report.csv',
+      uploadBody: 'header\nvalue',
+      rowCount: 1,
+      periodStart: '2024-02',
+      periodEnd: '2024-02',
     })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(init.method).toBe('POST')
-    const body = JSON.parse(String(init.body)) as { csv_content?: string; uploadUrl?: string }
-    expect(body.csv_content).toBe('artist,revenue\nTest,1.00')
-    expect(body.uploadUrl).toBeUndefined()
+
+    expect(result).toEqual({ batchId: 'batch-2', r2Key: 'sos-imports/batch-2/file.csv' })
+    const confirmCalls = fetchMock.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('/confirm'),
+    )
+    expect(confirmCalls).toHaveLength(2)
+  })
+
+  it('marks the batch failed when confirm never succeeds', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-3' },
+          uploadUrl: 'https://r2.example/upload',
+          r2Key: 'sos-imports/batch-3/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadBronzeDistributorCsv({
+      distributor: 'shopify',
+      filename: 'orders.csv',
+      uploadBody: 'x',
+      rowCount: 1,
+      periodStart: '2024-03',
+      periodEnd: '2024-03',
+    })
+
+    expect(result).toBeNull()
+    const failCall = fetchMock.mock.calls.find(
+      (call) => call[0] === '/api/admin/sos/import-batches/batch-3' && call[1]?.method === 'PATCH',
+    )
+    expect(failCall?.[1]?.body).toBe(JSON.stringify({ status: 'failed' }))
   })
 })

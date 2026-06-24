@@ -27,7 +27,7 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates, 
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">{dict.analytics_heading}</h1>
+      <h2 className="text-xl font-semibold">{dict.analytics_heading}</h2>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

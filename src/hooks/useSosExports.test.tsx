@@ -21,6 +21,10 @@ const {
   mockIsValidPeriod: vi.fn(),
 }))
 
+vi.mock('@/contexts/DictContext', () => ({
+  useDict: () => ({ admin: { accounting: {} } }),
+}))
+
 vi.mock('sonner', () => ({
   toast: {
     success: mockToastSuccess,
@@ -60,6 +64,44 @@ function makeProcessedArtist(artist: string): SafeProcessedArtistData {
     countryBreakdown: [],
   } as unknown as SafeProcessedArtistData
 }
+
+describe('useSosExports.handleDownloadPDF', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+    mockIsValidArtistId.mockReturnValue(true)
+    mockIsValidPeriod.mockReturnValue(true)
+  })
+
+  it('downloads PDF locally without portal upload when autoUploadToPortal is false', async () => {
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        [],
+        false,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadPDF('Artist One')
+    })
+
+    expect(mockUploadStatement).not.toHaveBeenCalled()
+    expect(mockDownloadBlob).toHaveBeenCalledOnce()
+    expect(mockToastSuccess).toHaveBeenCalledWith('PDF for "Artist One" downloaded')
+  })
+})
 
 describe('useSosExports.handlePublishToPortal', () => {
   beforeEach(() => {
@@ -104,7 +146,9 @@ describe('useSosExports.handlePublishToPortal', () => {
         pdfBase64: expect.any(String),
       })
     )
-    expect(mockToastSuccess).toHaveBeenCalledWith('Draft statement saved to portal')
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
+    )
   })
 
   it('shows upload error and does not fall back to local download', async () => {
@@ -135,5 +179,59 @@ describe('useSosExports.handlePublishToPortal', () => {
 
     expect(mockToastError).toHaveBeenCalledWith('Portal unavailable')
     expect(mockDownloadBlob).not.toHaveBeenCalled()
+  })
+})
+
+describe('useSosExports.buildCorrectionPdfBase64', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+  })
+
+  it('returns base64 PDF with overridden payout amount', async () => {
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+      ),
+    )
+
+    let pdfBase64: string | null = null
+    await act(async () => {
+      pdfBase64 = await result.current.buildCorrectionPdfBase64('Artist One', 250.5)
+    })
+
+    expect(pdfBase64).toBeTruthy()
+    expect(mockGeneratePDF).toHaveBeenCalledWith(
+      expect.objectContaining({ finalPayout: 250.5 }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      [],
+    )
+  })
+
+  it('returns null when artist data is missing', async () => {
+    const { result } = renderHook(() =>
+      useExports([], labelInfo, '2026-03', '2026-03', {}, {}, [], {}, []),
+    )
+
+    let pdfBase64: string | null = 'pending'
+    await act(async () => {
+      pdfBase64 = await result.current.buildCorrectionPdfBase64('Missing Artist', 10)
+    })
+
+    expect(pdfBase64).toBeNull()
   })
 })

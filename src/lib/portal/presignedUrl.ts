@@ -105,6 +105,7 @@ export async function generatePresignedUploadUrl(
   r2Key: string,
   contentType: string,
   deps: PresignedUploadUrlDeps,
+  expiresInSeconds: number = UPLOAD_EXPIRY_SECONDS,
 ): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: deps.bucket,
@@ -113,6 +114,6 @@ export async function generatePresignedUploadUrl(
   })
 
   return deps.getSignedUrl(deps.s3Client, command, {
-    expiresIn: UPLOAD_EXPIRY_SECONDS,
+    expiresIn: expiresInSeconds,
   })
 }

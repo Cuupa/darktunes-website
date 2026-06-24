@@ -9,15 +9,15 @@ export type StatementWorkflowStep =
   | 'invoiced'
   | 'paid'
 
-export const WORKFLOW_STEPS: { id: StatementWorkflowStep; label: string; description: string }[] = [
-  { id: 'review', label: 'Daten prüfen', description: 'CSV-Import und Payouts in Reporting validieren' },
-  { id: 'draft', label: 'Entwürfe', description: 'PDFs ins Portal hochladen (ohne E-Mail)' },
-  { id: 'approve', label: 'Freigabe', description: 'Label-Freigabe und Künstler-Benachrichtigung' },
-  { id: 'notified', label: 'Benachrichtigt', description: 'Künstler per E-Mail informiert' },
-  { id: 'viewed', label: 'Gesehen', description: 'Künstler hat Statement geöffnet' },
-  { id: 'invoiced', label: 'Rechnung', description: 'Künstler hat Rechnung erstellt' },
-  { id: 'paid', label: 'Bezahlt', description: 'Zahlung erfasst und abgeschlossen' },
-]
+export const WORKFLOW_STEP_IDS: readonly StatementWorkflowStep[] = [
+  'review',
+  'draft',
+  'approve',
+  'notified',
+  'viewed',
+  'invoiced',
+  'paid',
+] as const
 
 export type ArtistStatementWorkflowStatus =
   | 'not_linked'
@@ -32,19 +32,19 @@ export type ArtistStatementWorkflowStatus =
   | 'superseded'
   | 'cancelled'
 
-export const WORKFLOW_STATUS_LABELS: Record<ArtistStatementWorkflowStatus, string> = {
-  not_linked: 'Nicht verknüpft',
-  not_uploaded: 'Bereit für Entwurf',
-  draft: 'Freigabe ausstehend',
-  label_approved: 'Freigegeben',
-  artist_notified: 'Benachrichtigt',
-  viewed: 'Gesehen',
-  invoiced: 'Rechnung erstellt',
-  paid: 'Bezahlt',
-  acknowledged: 'Rechnung erstellt',
-  superseded: 'Ersetzt',
-  cancelled: 'Storniert',
-}
+export const WORKFLOW_STATUS_IDS: readonly ArtistStatementWorkflowStatus[] = [
+  'not_linked',
+  'not_uploaded',
+  'draft',
+  'label_approved',
+  'artist_notified',
+  'viewed',
+  'invoiced',
+  'paid',
+  'acknowledged',
+  'superseded',
+  'cancelled',
+] as const
 
 export interface WorkflowKpis {
   approved: number

@@ -2,6 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { ChartBar, CurrencyEur, TrendUp, Users } from '@phosphor-icons/react'
+import { useDict } from '@/contexts/DictContext'
+import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -54,12 +56,23 @@ function KpiCard({
   )
 }
 
+const LABEL_INTELLIGENCE_FALLBACK = {
+  emptyTrendsHint: 'No saved period summaries yet.',
+  playbookTitle: 'How to populate this hub',
+  playbookStep1: 'Upload distributor CSVs in Accounting and approve statements in Settlement Center.',
+  playbookStep2: 'Click Save to Portal in Accounting → Portal Data to persist territory metrics.',
+  playbookStep3: 'Return here to review trends, roster health, and audit history.',
+} as const
+
 export function LabelIntelligenceHub({
   snapshot,
   pressDownloads,
   auditEvents,
   websiteEngagement,
 }: LabelIntelligenceHubProps) {
+  const dict = useDict()
+  const t = { ...LABEL_INTELLIGENCE_FALLBACK, ...dict.admin?.labelIntelligence }
+
   const latestSummary = snapshot.periodSummaries[0]
   const trendData = [...snapshot.periodSummaries]
     .sort((a, b) => a.periodStart.localeCompare(b.periodStart))
@@ -120,9 +133,15 @@ export function LabelIntelligenceHub({
 
         <TabsContent value="trends" className="mt-0 space-y-4">
           {trendData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No saved period summaries yet. Save summaries from Accounting → Trends after processing CSVs.
-            </p>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t.emptyTrendsHint}</p>
+              <OperatorPlaybook
+                title={t.playbookTitle}
+                step1={t.playbookStep1}
+                step2={t.playbookStep2}
+                step3={t.playbookStep3}
+              />
+            </div>
           ) : (
             <TrendsChartInner data={trendData} />
           )}

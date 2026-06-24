@@ -4,6 +4,7 @@ import { logFinancialEvent } from '@/lib/api/financialAudit'
 
 type DbClient = SupabaseClient<Database>
 type SettlementPeriodRow = Database['public']['Tables']['settlement_periods']['Row']
+type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
 export type SettlementPeriodStatus = SettlementPeriodRow['status']
 
 export interface SettlementPeriod {
@@ -177,4 +178,74 @@ export async function archiveSettlementPeriod(
 
 export function isPeriodWritable(status: SettlementPeriodStatus): boolean {
   return status === 'open' || status === 'under_review' || status === 'approved'
+}
+
+export class SettlementPeriodNotWritableError extends Error {
+  constructor(public readonly periodStatus: SettlementPeriodStatus) {
+    super(`Settlement period is ${periodStatus} and cannot be modified`)
+    this.name = 'SettlementPeriodNotWritableError'
+  }
+}
+
+function assertWritableStatus(status: SettlementPeriodStatus): void {
+  if (!isPeriodWritable(status)) {
+    throw new SettlementPeriodNotWritableError(status)
+  }
+}
+
+export async function assertSettlementPeriodWritable(
+  db: DbClient,
+  periodStart: string,
+  periodEnd: string,
+): Promise<void> {
+  const { data, error } = await db
+    .from('settlement_periods')
+    .select('status')
+    .eq('period_start', periodStart)
+    .eq('period_end', periodEnd)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) return
+
+  assertWritableStatus((data as Pick<SettlementPeriodRow, 'status'>).status)
+}
+
+export async function assertSettlementPeriodWritableById(
+  db: DbClient,
+  periodId: string,
+): Promise<void> {
+  const period = await getSettlementPeriodById(db, periodId)
+  if (!period) return
+  assertWritableStatus(period.status)
+}
+
+export async function assertStatementPeriodWritable(
+  db: DbClient,
+  statementId: string,
+): Promise<void> {
+  const { data, error } = await db
+    .from('sales_statements')
+    .select('settlement_period_id, period_start, period_end')
+    .eq('id', statementId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') throw new Error('Statement not found')
+    throw new Error(error.message)
+  }
+
+  const row = data as Pick<
+    SalesStatementRow,
+    'settlement_period_id' | 'period_start' | 'period_end'
+  >
+
+  if (row.settlement_period_id) {
+    await assertSettlementPeriodWritableById(db, row.settlement_period_id)
+    return
+  }
+
+  if (row.period_start && row.period_end) {
+    await assertSettlementPeriodWritable(db, row.period_start, row.period_end)
+  }
 }

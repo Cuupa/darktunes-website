@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 import { getUserRoleWithClient } from '@/lib/getUserRole'
+import { getDictionary } from '@/i18n/getDictionary'
 import { getLabelAnalyticsSnapshot } from '@/lib/api/labelAnalytics'
 import { getAllJournalistDownloads } from '@/lib/api/journalistDownloads'
 import { listRecentFinancialAuditEvents } from '@/lib/api/financialAudit'
@@ -71,12 +72,16 @@ async function AnalyticsContent() {
   )
 }
 
-export default function AdminAnalyticsPage() {
+export default async function AdminAnalyticsPage() {
+  const dict = await getDictionary()
+  const t = dict.admin?.labelIntelligence ?? {
+    pageTitle: 'Label Intelligence',
+    pageDescription:
+      'Persisted label-wide revenue trends, roster health, press engagement, and financial audit trail.',
+  }
+
   return (
-    <AdminPageShell
-      title="Label Analytics"
-      description="Persistent revenue trends, roster health, press engagement, and financial audit trail."
-    >
+    <AdminPageShell title={t.pageTitle} description={t.pageDescription}>
       <Suspense fallback={<AnalyticsSkeleton />}>
         <AnalyticsContent />
       </Suspense>

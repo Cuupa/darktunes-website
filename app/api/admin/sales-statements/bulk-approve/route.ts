@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
@@ -6,6 +7,8 @@ import {
   getSalesStatementById,
   linkApprovedStatementToSettlement,
 } from '@/lib/api/salesStatements'
+import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
+import { logFinancialEvent } from '@/lib/api/financialAudit'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -27,6 +30,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   const supabase = await createServerSupabaseClient()
   const serviceSupabase = await createServiceRoleSupabaseClient()
+  const batchId = randomUUID()
   const results: {
     id: string
     success: boolean
@@ -47,6 +51,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
         continue
       }
 
+      await assertStatementPeriodWritable(supabase, id)
+
       const outcome = await approveAndNotifySalesStatement(
         supabase,
         id,
@@ -55,6 +61,19 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
       )
 
       await linkApprovedStatementToSettlement(supabase, outcome.statement, userId)
+
+      await logFinancialEvent(supabase, {
+        entityType: 'sales_statement',
+        entityId: id,
+        action: 'approve',
+        actorId: userId,
+        afterData: {
+          batch_id: batchId,
+          email_sent: outcome.emailSent,
+          email_error: outcome.emailError,
+          notes: parsed.data.notes,
+        },
+      })
 
       results.push({
         id,
@@ -70,6 +89,23 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   const approved = results.filter((result) => result.success).length
   const emailed = results.filter((result) => result.emailSent).length
+  const approvedIds = results.filter((result) => result.success).map((result) => result.id)
+
+  if (approvedIds.length > 0) {
+    await logFinancialEvent(supabase, {
+      entityType: 'sales_statement_batch',
+      entityId: batchId,
+      action: 'bulk_approve',
+      actorId: userId,
+      afterData: {
+        approved,
+        emailed,
+        statement_ids: approvedIds,
+        notes: parsed.data.notes,
+        results,
+      },
+    })
+  }
 
   return NextResponse.json({
     approved,

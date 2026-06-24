@@ -160,3 +160,25 @@ export async function downloadObjectFromR2(
 
   return response.Body.transformToString('utf-8')
 }
+
+/**
+ * Downloads an R2 object body as raw bytes (for integrity checks).
+ */
+export async function downloadObjectBufferFromR2(
+  r2Key: string,
+  s3: S3Client,
+  bucket: string,
+): Promise<Uint8Array> {
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: r2Key,
+    }),
+  )
+
+  if (!response.Body) {
+    throw new Error(`R2 object body empty: ${r2Key}`)
+  }
+
+  return response.Body.transformToByteArray()
+}

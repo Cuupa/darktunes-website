@@ -4,13 +4,39 @@ import type { Database } from '@/types/database'
 import {
   getSalesStatementsByArtistId,
   createSalesStatement,
+  DuplicateDraftStatementError,
   getSalesStatementById,
   approveSalesStatement,
   approveAndNotifySalesStatement,
   createCorrectionStatement,
   updateSalesStatementStatus,
   getSalesSummariesForAdmin,
+  linkApprovedStatementToSettlement,
+  type SalesStatement,
 } from './salesStatements'
+
+vi.mock('@/lib/api/settlementLedger', () => ({
+  appendLedgerEntry: vi.fn(async () => ({
+    id: 'ledger-1',
+    artistId: 'artist-uuid',
+    settlementPeriodId: 'period-1',
+    entryType: 'statement_payout',
+    amountEur: 100,
+    createdAt: '2024-01-01T00:00:00Z',
+  })),
+}))
+
+vi.mock('@/lib/api/settlementPeriods', () => ({
+  getOrCreateSettlementPeriod: vi.fn(async () => ({
+    id: 'period-1',
+    periodStart: '2025-01-01',
+    periodEnd: '2025-03-31',
+    status: 'open',
+    createdAt: '2024-01-01T00:00:00Z',
+  })),
+}))
+
+import { appendLedgerEntry } from '@/lib/api/settlementLedger'
 
 type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
@@ -26,6 +52,8 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -93,14 +121,37 @@ describe('getSalesStatementsByArtistId', () => {
   })
 })
 
+function makeCreateStatementDb(
+  selectData: unknown,
+  insertData: unknown = mockStatementRow,
+  selectError: unknown = null,
+  insertError: unknown = null,
+): DbClient {
+  let salesStatementsCalls = 0
+  return {
+    from: vi.fn((table: string) => {
+      if (table !== 'sales_statements') {
+        return makeBuilder(null, { message: `unexpected table ${table}` })
+      }
+      salesStatementsCalls += 1
+      if (salesStatementsCalls === 1) {
+        return makeBuilder(selectData, selectError)
+      }
+      return makeBuilder(insertData, insertError)
+    }),
+  } as unknown as DbClient
+}
+
 describe('createSalesStatement', () => {
   it('inserts and returns the mapped domain object', async () => {
-    const db = makeMockDb(mockStatementRow)
+    const db = makeCreateStatementDb([])
     const result = await createSalesStatement(db, {
       artistId: 'artist-uuid',
       filename: 'Statement_2024_Q1.pdf',
       r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
       period: 'Q1-2024',
+      periodStart: '2025-01-01',
+      periodEnd: '2025-03-31',
       amountEur: 1234.56,
     })
     expect(result.id).toBe('stmt-uuid-1')
@@ -109,38 +160,63 @@ describe('createSalesStatement', () => {
     expect(result.period).toBe('Q1-2024')
   })
 
+  it('rejects a second draft for the same artist and period', async () => {
+    const db = makeCreateStatementDb([{ id: 'existing-draft' }])
+    await expect(
+      createSalesStatement(db, {
+        artistId: 'artist-uuid',
+        filename: 'Statement_2024_Q1.pdf',
+        r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
+        period: 'Q1-2024',
+        periodStart: '2025-01-01',
+        periodEnd: '2025-03-31',
+      }),
+    ).rejects.toBeInstanceOf(DuplicateDraftStatementError)
+  })
+
   it('maps null amount_eur to undefined', async () => {
     const rowWithoutAmount: SalesStatementRow = { ...mockStatementRow, amount_eur: null }
-    const db = makeMockDb(rowWithoutAmount)
+    const db = makeCreateStatementDb([], rowWithoutAmount)
     const result = await createSalesStatement(db, {
       artistId: 'artist-uuid',
       filename: 'Statement_2024_Q1.pdf',
       r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
       period: 'Q1-2024',
+      periodStart: '2025-01-01',
+      periodEnd: '2025-03-31',
     })
     expect(result.amountEur).toBeUndefined()
   })
 
   it('throws on database error', async () => {
-    const db = makeMockDb(null, { message: 'duplicate key value violates unique constraint', code: '23505' })
+    const db = makeCreateStatementDb(
+      [],
+      null,
+      null,
+      { message: 'duplicate key value violates unique constraint', code: '23505' },
+    )
     await expect(
       createSalesStatement(db, {
         artistId: 'artist-uuid',
         filename: 'dup.pdf',
         r2Key: 'statements/artist-uuid/dup.pdf',
         period: 'Q2-2024',
+        periodStart: '2025-04-01',
+        periodEnd: '2025-06-30',
       }),
     ).rejects.toThrow('duplicate key value violates unique constraint')
   })
 
   it('throws when no row is returned', async () => {
-    const db = makeMockDb(null, null) // no error, no data
+    const db = makeCreateStatementDb([], null, null, null)
     await expect(
       createSalesStatement(db, {
         artistId: 'artist-uuid',
         filename: 'empty.pdf',
         r2Key: 'statements/artist-uuid/empty.pdf',
         period: 'Q3-2024',
+        periodStart: '2025-07-01',
+        periodEnd: '2025-09-30',
       }),
     ).rejects.toThrow('No data returned from createSalesStatement')
   })
@@ -268,7 +344,7 @@ describe('createCorrectionStatement', () => {
   it('rejects draft statements', async () => {
     const db = makeMockDb(mockStatementRow)
     await expect(
-      createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 99 }, 'actor-1'),
+      createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 99, r2Key: 'statements/artist-uuid/correction.pdf' }, 'actor-1'),
     ).rejects.toThrow('Cannot correct statement in status "draft"')
   })
 
@@ -311,11 +387,126 @@ describe('createCorrectionStatement', () => {
     })
 
     const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
-    const result = await createCorrectionStatement(db, 'stmt-uuid-1', { amountEur: 120 }, 'actor-1')
+    const result = await createCorrectionStatement(
+      db,
+      'stmt-uuid-1',
+      { amountEur: 120, r2Key: 'statements/artist-uuid/Statement_2024_Q1-Korrektur.pdf' },
+      'actor-1',
+    )
 
     expect(result.id).toBe('stmt-correction')
     expect(result.amountEur).toBe(120)
     expect(builder.update).toHaveBeenCalled()
+  })
+})
+
+function baseStatement(overrides: Partial<SalesStatement> = {}): SalesStatement {
+  return {
+    id: 'stmt-uuid-1',
+    artistId: 'artist-uuid',
+    filename: 'Statement_2024_Q1.pdf',
+    r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
+    period: 'Q1-2024',
+    periodStart: '2025-01-01',
+    periodEnd: '2025-03-31',
+    amountEur: 100,
+    status: 'label_approved',
+    labelNotes: undefined,
+    labelApprovedAt: undefined,
+    firstViewedAt: undefined,
+    lastViewedAt: undefined,
+    viewCount: 0,
+    settlementPeriodId: undefined,
+    documentType: 'original',
+    correctionOfId: undefined,
+    isArchived: false,
+    createdAt: '2024-04-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeLinkSettlementDb(originalSettlementPeriodId: string | null | 'skip-lookup') {
+  const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
+  const updateBuilder = {
+    update: vi.fn().mockReturnValue({ eq: updateEq }),
+  }
+  const selectSingle = vi.fn().mockResolvedValue({
+    data: { settlement_period_id: originalSettlementPeriodId },
+    error: null,
+  })
+  const selectBuilder = {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({ single: selectSingle }),
+    }),
+  }
+  let fromCalls = 0
+  const db = {
+    from: vi.fn(() => {
+      fromCalls += 1
+      return fromCalls === 1 ? updateBuilder : selectBuilder
+    }),
+  } as unknown as DbClient
+  return { db, updateEq, selectSingle }
+}
+
+describe('linkApprovedStatementToSettlement', () => {
+  it('books statement_payout for original documents', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb('skip-lookup')
+
+    await linkApprovedStatementToSettlement(db, baseStatement(), 'actor-1')
+
+    expect(appendLedgerEntry).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        entryType: 'statement_payout',
+        amountEur: 100,
+        referenceId: 'stmt-uuid-1',
+      }),
+    )
+  })
+
+  it('skips statement_payout when approving a correction on a settled original', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb('period-old')
+
+    await linkApprovedStatementToSettlement(
+      db,
+      baseStatement({
+        id: 'stmt-correction',
+        documentType: 'correction',
+        correctionOfId: 'stmt-original',
+        amountEur: 120,
+      }),
+      'actor-1',
+    )
+
+    expect(appendLedgerEntry).not.toHaveBeenCalled()
+  })
+
+  it('books statement_payout for correction when original was never on the ledger', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb(null)
+
+    await linkApprovedStatementToSettlement(
+      db,
+      baseStatement({
+        id: 'stmt-correction',
+        documentType: 'correction',
+        correctionOfId: 'stmt-original',
+        amountEur: 120,
+      }),
+      'actor-1',
+    )
+
+    expect(appendLedgerEntry).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        entryType: 'statement_payout',
+        amountEur: 120,
+        referenceId: 'stmt-correction',
+      }),
+    )
   })
 })
 

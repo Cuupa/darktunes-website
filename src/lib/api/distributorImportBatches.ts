@@ -76,6 +76,24 @@ export async function createImportBatch(
   return rowToBatch(row as Row)
 }
 
+export async function findImportBatchByFileHash(
+  db: DbClient,
+  fileHash: string,
+): Promise<DistributorImportBatch | null> {
+  const normalized = fileHash.toLowerCase()
+  const { data, error } = await db
+    .from('distributor_import_batches')
+    .select('*')
+    .eq('file_hash', normalized)
+    .neq('status', 'failed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? rowToBatch(data as Row) : null
+}
+
 export async function getImportBatchById(
   db: DbClient,
   id: string,
@@ -123,4 +141,18 @@ export async function updateImportBatchStatus(
     .eq('id', id)
 
   if (error) throw new Error(error.message)
+}
+
+/** Remove a batch that never completed upload confirmation (no file_hash). */
+export async function deleteUnconfirmedImportBatch(db: DbClient, id: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('distributor_import_batches')
+    .delete()
+    .eq('id', id)
+    .is('file_hash', null)
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data != null
 }

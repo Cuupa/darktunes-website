@@ -29,6 +29,8 @@ import {
   filterStreamingStats,
   filterTerritoryMetrics,
   filterListenerMetrics,
+  filterEventImpacts,
+  filterLineItemsByPeriod,
   type AnalyticsFilterState,
 } from '@/lib/analytics/filterMetrics'
 import {
@@ -161,9 +163,19 @@ export function AnalyticsPageClient({
     [filteredStats, filteredTerritory, filteredListeners, statements],
   )
 
+  const filteredLineItems = useMemo(
+    () => filterLineItemsByPeriod(lineItems, filters),
+    [lineItems, filters],
+  )
+
+  const filteredEventImpacts = useMemo(
+    () => filterEventImpacts(eventImpacts, filters),
+    [eventImpacts, filters],
+  )
+
   const releaseRows = useMemo(
-    () => aggregateReleasePerformance(lineItems),
-    [lineItems],
+    () => aggregateReleasePerformance(filteredLineItems),
+    [filteredLineItems],
   )
 
   const revenueMixSlices = useMemo(
@@ -176,13 +188,13 @@ export function AnalyticsPageClient({
       stats: filteredStats,
       territoryMetrics: filteredTerritory,
       listenerMetrics: filteredListeners,
-      eventImpacts,
+      eventImpacts: filteredEventImpacts,
       promoImpacts,
       releaseRows,
       epkStats,
       pressStats,
     }),
-    [filteredStats, filteredTerritory, filteredListeners, eventImpacts, promoImpacts, releaseRows, epkStats, pressStats],
+    [filteredStats, filteredTerritory, filteredListeners, filteredEventImpacts, promoImpacts, releaseRows, epkStats, pressStats],
   )
 
   const visibleTabs = useMemo(() => visibleTabIds(tabVisibility), [tabVisibility])
@@ -301,7 +313,7 @@ export function AnalyticsPageClient({
             <h2 className="text-2xl font-bold">{dict.analytics_eventImpact_heading}</h2>
             <EventImpactChart
               dict={dict}
-              impacts={eventImpacts}
+              impacts={filteredEventImpacts}
               concerts={concerts}
             />
             <PromoImpactChart
