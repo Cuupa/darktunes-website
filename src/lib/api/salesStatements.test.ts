@@ -10,7 +10,32 @@ import {
   createCorrectionStatement,
   updateSalesStatementStatus,
   getSalesSummariesForAdmin,
+  linkApprovedStatementToSettlement,
+  type SalesStatement,
 } from './salesStatements'
+
+vi.mock('@/lib/api/settlementLedger', () => ({
+  appendLedgerEntry: vi.fn(async () => ({
+    id: 'ledger-1',
+    artistId: 'artist-uuid',
+    settlementPeriodId: 'period-1',
+    entryType: 'statement_payout',
+    amountEur: 100,
+    createdAt: '2024-01-01T00:00:00Z',
+  })),
+}))
+
+vi.mock('@/lib/api/settlementPeriods', () => ({
+  getOrCreateSettlementPeriod: vi.fn(async () => ({
+    id: 'period-1',
+    periodStart: '2025-01-01',
+    periodEnd: '2025-03-31',
+    status: 'open',
+    createdAt: '2024-01-01T00:00:00Z',
+  })),
+}))
+
+import { appendLedgerEntry } from '@/lib/api/settlementLedger'
 
 type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
@@ -316,6 +341,116 @@ describe('createCorrectionStatement', () => {
     expect(result.id).toBe('stmt-correction')
     expect(result.amountEur).toBe(120)
     expect(builder.update).toHaveBeenCalled()
+  })
+})
+
+function baseStatement(overrides: Partial<SalesStatement> = {}): SalesStatement {
+  return {
+    id: 'stmt-uuid-1',
+    artistId: 'artist-uuid',
+    filename: 'Statement_2024_Q1.pdf',
+    r2Key: 'statements/artist-uuid/Statement_2024_Q1.pdf',
+    period: 'Q1-2024',
+    periodStart: '2025-01-01',
+    periodEnd: '2025-03-31',
+    amountEur: 100,
+    status: 'label_approved',
+    labelNotes: undefined,
+    labelApprovedAt: undefined,
+    firstViewedAt: undefined,
+    lastViewedAt: undefined,
+    viewCount: 0,
+    settlementPeriodId: undefined,
+    documentType: 'original',
+    correctionOfId: undefined,
+    isArchived: false,
+    createdAt: '2024-04-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeLinkSettlementDb(originalSettlementPeriodId: string | null | 'skip-lookup') {
+  const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
+  const updateBuilder = {
+    update: vi.fn().mockReturnValue({ eq: updateEq }),
+  }
+  const selectSingle = vi.fn().mockResolvedValue({
+    data: { settlement_period_id: originalSettlementPeriodId },
+    error: null,
+  })
+  const selectBuilder = {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({ single: selectSingle }),
+    }),
+  }
+  let fromCalls = 0
+  const db = {
+    from: vi.fn(() => {
+      fromCalls += 1
+      return fromCalls === 1 ? updateBuilder : selectBuilder
+    }),
+  } as unknown as DbClient
+  return { db, updateEq, selectSingle }
+}
+
+describe('linkApprovedStatementToSettlement', () => {
+  it('books statement_payout for original documents', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb('skip-lookup')
+
+    await linkApprovedStatementToSettlement(db, baseStatement(), 'actor-1')
+
+    expect(appendLedgerEntry).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        entryType: 'statement_payout',
+        amountEur: 100,
+        referenceId: 'stmt-uuid-1',
+      }),
+    )
+  })
+
+  it('skips statement_payout when approving a correction on a settled original', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb('period-old')
+
+    await linkApprovedStatementToSettlement(
+      db,
+      baseStatement({
+        id: 'stmt-correction',
+        documentType: 'correction',
+        correctionOfId: 'stmt-original',
+        amountEur: 120,
+      }),
+      'actor-1',
+    )
+
+    expect(appendLedgerEntry).not.toHaveBeenCalled()
+  })
+
+  it('books statement_payout for correction when original was never on the ledger', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    const { db } = makeLinkSettlementDb(null)
+
+    await linkApprovedStatementToSettlement(
+      db,
+      baseStatement({
+        id: 'stmt-correction',
+        documentType: 'correction',
+        correctionOfId: 'stmt-original',
+        amountEur: 120,
+      }),
+      'actor-1',
+    )
+
+    expect(appendLedgerEntry).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        entryType: 'statement_payout',
+        amountEur: 120,
+        referenceId: 'stmt-correction',
+      }),
+    )
   })
 })
 

@@ -80,4 +80,36 @@ describe('persistAnalyticsAfterStatementUpload', () => {
 
     expect(persistSosAnalytics).not.toHaveBeenCalled()
   })
+
+  it('does not upsert period summary on draft upload', async () => {
+    vi.mocked(persistSosAnalytics).mockClear()
+
+    await persistAnalyticsAfterStatementUpload({
+      artistName: 'Band A',
+      periodStart: '2024-01',
+      periodEnd: '2024-01',
+      territoryMetrics: [{
+        artistName: 'Band A',
+        period: '2024-01',
+        platform: 'Spotify',
+        country: 'DE',
+        streams: 10,
+        revenueEur: 1,
+        quantity: 0,
+      }],
+      merchOrderRows: [],
+      labelArtists: [{ id: '1', name: 'Band A', artistId: 'artist-1' }],
+      revenues: [{
+        artist: 'Band A',
+        totalRevenue: 500,
+        finalAmount: 400,
+        platformBreakdown: [],
+      }],
+      bronzeBatchIds: ['batch-1'],
+    })
+
+    expect(persistSosAnalytics).toHaveBeenCalledWith(
+      expect.not.objectContaining({ periodSummary: expect.anything() }),
+    )
+  })
 })
