@@ -74,6 +74,38 @@ export interface Database {
         }
         Relationships: []
       }
+      sos_accounting_workspaces: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          config: Record<string, unknown>
+          bronze_batch_ids: string[]
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          config?: Record<string, unknown>
+          bronze_batch_ids?: string[]
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          config?: Record<string, unknown>
+          bronze_batch_ids?: string[]
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sos_period_summaries: {
         Row: {
           id: string

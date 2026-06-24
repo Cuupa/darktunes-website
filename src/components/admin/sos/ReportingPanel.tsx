@@ -66,6 +66,18 @@ function buildColumns(t: {
   ]
 }
 
+const reportingFallback = {
+  reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',
+  reportingSettlementAlertBody:
+    'Review payouts here, then open Settlement Center to create draft statements, approve them, and notify artists.',
+  reportingSettlementCta: 'Open Settlement Center',
+  reportingColArtist: 'Artist',
+  reportingColRevenue: 'Total Revenue',
+  reportingColPayout: 'Payout',
+  reportingNoEmailTemplate:
+    'No email template configured. Add one under Branding → Email template.',
+} as const
+
 export function ReportingPanel({
   revenues,
   onDownloadPDF,
@@ -81,18 +93,10 @@ export function ReportingPanel({
   onGoToSettlementCenter,
 }: ReportingPanelProps) {
   const dict = useDict()
-  const reportingFallback = {
-    reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',
-    reportingSettlementAlertBody:
-      'Review payouts here, then open Settlement Center to create draft statements, approve them, and notify artists.',
-    reportingSettlementCta: 'Open Settlement Center',
-    reportingColArtist: 'Artist',
-    reportingColRevenue: 'Total Revenue',
-    reportingColPayout: 'Payout',
-    reportingNoEmailTemplate:
-      'No email template configured. Add one under Branding → Email template.',
-  } as const
-  const t = { ...reportingFallback, ...(dict.admin?.accounting ?? {}) }
+  const t = useMemo(
+    () => ({ ...reportingFallback, ...(dict.admin?.accounting ?? {}) }),
+    [dict.admin?.accounting],
+  )
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
@@ -124,7 +128,7 @@ export function ReportingPanel({
       )
       window.open(href, '_blank')
     },
-    [labelArtists, labelInfo, appDefaults, emailConfig, period]
+    [labelArtists, labelInfo, appDefaults, emailConfig, period, t.reportingNoEmailTemplate]
   )
 
   const columns = useMemo(() => buildColumns(t), [t])
@@ -153,7 +157,7 @@ export function ReportingPanel({
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [colWidths])
+  }, [colWidths, columns])
 
   const [dragOver, setDragOver] = useState<ColId | null>(null)
   const dragColRef = useRef<ColId | null>(null)

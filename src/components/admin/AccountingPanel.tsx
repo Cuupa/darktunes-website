@@ -46,6 +46,7 @@ import { CsvImportProfileEditor } from '@/components/admin/sos/CsvImportProfileE
 import { AdminEnterpriseAnalytics } from '@/components/admin/sos/AdminEnterpriseAnalytics'
 import { useCsvImportProfiles } from '@/hooks/useCsvImportProfiles'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
+import type { AccountingWorkspaceConfig } from '@/lib/api/sosAccountingWorkspaces'
 import {
   Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
   ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck,
@@ -57,6 +58,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
+import { toast } from 'sonner'
 import { useDict } from '@/contexts/DictContext'
 
 const StatementsManager = lazy(
@@ -98,6 +100,14 @@ const ACCOUNTING_FALLBACK = {
   analyticsPreviewHeading: 'Session preview (not in portal)',
   analyticsSessionBanner:
     'Charts below use in-memory CSV data. Artists only see metrics after you click Save to Portal.',
+  workspaceServer: 'Workspace (server):',
+  workspaceNotSaved: 'not yet saved for this period',
+  workspaceLastSaved: 'last saved',
+  workspaceReload: 'Reload from server',
+  workspaceSave: 'Save workspace to server',
+  workspaceSharedHint: 'Shared across team • period-keyed',
+  workspaceLoading: 'Loading…',
+  workspaceSaving: 'Saving…',
   playbookTitle: 'Operator playbook',
   playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
   playbookStep2: 'Click Save to Portal below to persist territory metrics for linked artists.',
@@ -377,6 +387,45 @@ function SosGeneratorPanel() {
   const darkmerchManager = useFileManager('darkmerch')
   const [carryForwardByArtist, setCarryForwardByArtist] = useState<Record<string, number>>({})
 
+  // Enterprise workspace state (declared early; functions defined after processor)
+  const [workspaceLoadedAt, setWorkspaceLoadedAt] = useState<string | null>(null)
+  const [workspaceUpdatedBy, setWorkspaceUpdatedBy] = useState<string | null>(null)
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false)
+  const [isWorkspaceSaving, setIsWorkspaceSaving] = useState(false)
+
+  // Load a bronze archive into the appropriate in-memory file manager for processing.
+  // Fetches presigned download, streams CSV text, creates synthetic File and feeds to manager.
+  // Bronze re-archive on load will dedupe via hash.
+  const loadBronzeBatch = useCallback(async (batch: { id: string; distributor: string; periodStart: string }) => {
+    try {
+      const res = await fetch(`/api/admin/sos/import-batches/${batch.id}`)
+      if (!res.ok) throw new Error('Failed to get download URL for bronze batch')
+      const json = (await res.json()) as { downloadUrl?: string }
+      if (!json.downloadUrl) throw new Error('No download URL')
+      const csvText = await (await fetch(json.downloadUrl)).text()
+      const fileName = `${batch.distributor}-${batch.periodStart || 'archive'}.csv`
+      const blob = new Blob([csvText], { type: 'text/csv; charset=utf-8' })
+      const file = new File([blob], fileName, { type: 'text/csv; charset=utf-8' })
+      const dist = batch.distributor as 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'
+      if (dist === 'believe') await believeManager.addFiles([file])
+      else if (dist === 'bandcamp') await bandcampManager.addFiles([file])
+      else if (dist === 'shopify') await shopifyManager.addFiles([file])
+      else if (dist === 'printful') await printfulManager.addFiles([file])
+      else if (dist === 'darkmerch') await darkmerchManager.addFiles([file])
+      else throw new Error(`Unsupported distributor: ${dist}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load bronze archive'
+      toast.error(msg)
+      throw err
+    }
+  }, [
+    believeManager,
+    bandcampManager,
+    shopifyManager,
+    printfulManager,
+    darkmerchManager,
+  ])
+
   // CSV processing — all config fields now wired
   const {
     isProcessing,
@@ -525,6 +574,153 @@ function SosGeneratorPanel() {
       false,
       exportPersistContext,
     )
+
+  // --- Enterprise collaborative workspace functions (after detected* available) ---
+  const currentPeriodKey = useMemo(
+    () =>
+      detectedPeriodStart
+        ? { start: detectedPeriodStart, end: detectedPeriodEnd || detectedPeriodStart }
+        : null,
+    [detectedPeriodStart, detectedPeriodEnd],
+  )
+
+  const loadWorkspaceForCurrentPeriod = useCallback(async () => {
+    if (!currentPeriodKey) return
+    setIsWorkspaceLoading(true)
+    try {
+      const params = new URLSearchParams({
+        periodStart: currentPeriodKey.start,
+        periodEnd: currentPeriodKey.end,
+      })
+      const res = await fetch(`/api/admin/sos/workspaces?${params}`)
+      if (!res.ok) {
+        setWorkspaceLoadedAt(null)
+        return
+      }
+      const json = (await res.json()) as { workspace?: { config?: AccountingWorkspaceConfig; updated_at?: string; updated_by?: string | null } }
+      const ws = json.workspace
+      if (ws?.config) {
+        const c = ws.config
+        setArtistMappings(c.artistMappings ?? [])
+        setCompilationFilters(c.compilationFilters ?? [])
+        setSplitFees(c.splitFees ?? [])
+        setManualRevenues(c.manualRevenues ?? [])
+        setExpenses(c.expenses ?? [])
+        setIgnoredEntries(c.ignoredEntries ?? [])
+        setCsvAliases(c.csvAliases ?? [])
+        setTrackRevenueAssignments(c.trackRevenueAssignments ?? [])
+        setAppDefaults(c.appDefaults ?? DEFAULT_APP_DEFAULTS)
+        setEmailConfig(c.emailConfig ?? DEFAULT_EMAIL_CONFIG)
+
+        if (rulesReady) {
+          setSavedRules({
+            artistMappings: c.artistMappings ?? [],
+            compilationFilters: c.compilationFilters ?? [],
+            splitFees: c.splitFees ?? [],
+            manualRevenues: c.manualRevenues ?? [],
+            expenses: c.expenses ?? [],
+            ignoredEntries: c.ignoredEntries ?? [],
+            csvAliases: c.csvAliases ?? [],
+            trackRevenueAssignments: c.trackRevenueAssignments ?? [],
+            appDefaults: c.appDefaults ?? DEFAULT_APP_DEFAULTS,
+            emailConfig: c.emailConfig ?? DEFAULT_EMAIL_CONFIG,
+          })
+        }
+
+        setWorkspaceLoadedAt(ws.updated_at ?? new Date().toISOString())
+        setWorkspaceUpdatedBy(ws.updated_by ?? null)
+      }
+    } catch (e) {
+      console.warn('[workspace] load failed', e)
+    } finally {
+      setIsWorkspaceLoading(false)
+    }
+  }, [currentPeriodKey, rulesReady, setSavedRules])
+
+  const saveCurrentWorkspace = useCallback(async () => {
+    if (!currentPeriodKey) {
+      toast.error('No period detected yet — upload CSVs first')
+      return
+    }
+    setIsWorkspaceSaving(true)
+    try {
+      const config: AccountingWorkspaceConfig = {
+        artistMappings,
+        compilationFilters,
+        splitFees,
+        manualRevenues,
+        expenses,
+        ignoredEntries,
+        csvAliases,
+        trackRevenueAssignments,
+        appDefaults,
+        emailConfig,
+      }
+
+      const currentBronzeIds = Array.from(
+        new Set(
+          [
+            ...believeManager.files,
+            ...bandcampManager.files,
+            ...shopifyManager.files,
+            ...printfulManager.files,
+            ...darkmerchManager.files,
+          ]
+            .map((f) => f.bronzeBatchId)
+            .filter(Boolean) as string[],
+        ),
+      )
+
+      const res = await fetch('/api/admin/sos/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period_start: currentPeriodKey.start,
+          period_end: currentPeriodKey.end,
+          config,
+          bronze_batch_ids: currentBronzeIds,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || 'Failed to save workspace')
+      }
+      const json = await res.json()
+      const ws = json.workspace
+      setWorkspaceLoadedAt(ws?.updated_at ?? new Date().toISOString())
+      setWorkspaceUpdatedBy(ws?.updated_by ?? null)
+      toast.success('Accounting workspace saved to server (collaborative)')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Save failed'
+      toast.error(msg)
+    } finally {
+      setIsWorkspaceSaving(false)
+    }
+  }, [
+    currentPeriodKey,
+    artistMappings,
+    compilationFilters,
+    splitFees,
+    manualRevenues,
+    expenses,
+    ignoredEntries,
+    csvAliases,
+    trackRevenueAssignments,
+    appDefaults,
+    emailConfig,
+    believeManager.files,
+    bandcampManager.files,
+    shopifyManager.files,
+    printfulManager.files,
+    darkmerchManager.files,
+  ])
+
+  // Load workspace when period changes (after functions defined)
+  useEffect(() => {
+    if (detectedPeriodStart) {
+      void loadWorkspaceForCurrentPeriod()
+    }
+  }, [detectedPeriodStart, detectedPeriodEnd, loadWorkspaceForCurrentPeriod])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -708,7 +904,7 @@ function SosGeneratorPanel() {
 
       {rulesLoaded && (
         <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
-          {t.rulesLocalBanner}
+          Active workspace rules are now persisted server-side for collaboration. Local browser state is a scratchpad.
         </p>
       )}
 
@@ -800,13 +996,43 @@ function SosGeneratorPanel() {
               <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
                 {t.analyticsOpsHeading}
               </h3>
+
+              {/* Enterprise collaborative workspace controls */}
+              <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/10 p-2 text-xs">
+                <span className="font-medium text-foreground">{t.workspaceServer ?? 'Workspace (server):'}</span>
+                {workspaceLoadedAt ? (
+                  <span className="text-muted-foreground">
+                    {t.workspaceLastSaved ?? 'last saved'} {new Date(workspaceLoadedAt).toLocaleString()} {workspaceUpdatedBy ? `· ${workspaceUpdatedBy.slice(0, 8)}` : ''}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">{t.workspaceNotSaved ?? 'not yet saved for this period'}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void loadWorkspaceForCurrentPeriod()}
+                  disabled={isWorkspaceLoading || !currentPeriodKey}
+                  className="rounded border px-2 py-0.5 hover:bg-background disabled:opacity-50"
+                >
+                  {isWorkspaceLoading ? (t.workspaceLoading ?? 'Loading…') : (t.workspaceReload ?? 'Reload from server')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveCurrentWorkspace()}
+                  disabled={isWorkspaceSaving || !currentPeriodKey || isProcessing}
+                  className="rounded bg-primary px-2 py-0.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isWorkspaceSaving ? (t.workspaceSaving ?? 'Saving…') : (t.workspaceSave ?? 'Save workspace to server')}
+                </button>
+                <span className="text-[10px] text-muted-foreground">{t.workspaceSharedHint ?? 'Shared across team • period-keyed'}</span>
+              </div>
+
               <OperatorPlaybook
                 title={t.playbookTitle}
                 step1={t.playbookStep1}
                 step2={t.playbookStep2}
                 step3={t.playbookStep3}
               />
-              <ImportBatchesPanel labelArtists={labelArtists} />
+              <ImportBatchesPanel labelArtists={labelArtists} onLoadBatch={loadBronzeBatch} />
               <ExternalMetricsSyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel

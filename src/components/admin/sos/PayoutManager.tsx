@@ -36,6 +36,48 @@ function fmtEur(value: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
+const payoutFallback = {
+  payoutValidIbanCount: '{count} artists with valid IBAN',
+  payoutInvalidIbanCount: '{count} missing or invalid IBAN',
+  payoutSelectedSummary: '{amount} · {count} selected',
+  payoutExportSepa: 'Export SEPA XML',
+  payoutNoDataTitle: 'No ledger payouts for this period.',
+  payoutNoDataHint: 'Approve statements and record payments in Settlement Center first.',
+  payoutLedgerSourceHint: 'Amounts come from the settlement ledger, not the CSV session.',
+  payoutLoadingRegister: 'Loading settlement ledger…',
+  payoutRegisterFailed: 'Could not load settlement ledger',
+  payoutColArtist: 'Artist',
+  payoutColHolder: 'Account holder',
+  payoutColIban: 'IBAN',
+  payoutColAmount: 'Payout',
+  payoutColStatus: 'Status',
+  payoutIbanMissing: 'IBAN missing',
+  payoutStatusOk: 'OK',
+  payoutStatusInvalid: 'Invalid',
+  payoutStatusMissing: 'Missing',
+  payoutInvalidIbanTooltip: 'Checksum invalid. SEPA export blocked.',
+  payoutSepaFormTitle: 'Label sender account for SEPA XML',
+  payoutSepaFormHint:
+    'IBAN and account holder are stored locally in this browser (Accounting → SEPA Payout).',
+  payoutSepaHolderLabel: 'Account holder',
+  payoutSepaIbanLabel: 'IBAN',
+  payoutSepaSave: 'Save SEPA details',
+  payoutInvalidIbanToast: 'Invalid IBAN',
+  payoutHolderMissingToast: 'Account holder is required',
+  payoutSepaSavedToast: 'Label SEPA details saved',
+  payoutLabelIbanMissingToast: 'Label IBAN missing',
+  payoutLabelIbanMissingDesc:
+    'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
+  payoutInvalidLabelIbanToast: 'Invalid label IBAN',
+  payoutInvalidLabelIbanDesc: 'The stored label IBAN failed the modulo-97 checksum validation.',
+  payoutNoArtistsSelectedToast: 'No artists selected',
+  payoutNoArtistsSelectedDesc: 'Select at least one artist with a valid IBAN.',
+  payoutSepaExportedToast: 'SEPA XML exported',
+  payoutSepaExportedDesc: '{count} transfers · {amount} total',
+  payoutSepaExportFailedToast: 'SEPA export failed',
+  payoutLabelIbanMissingBadge: 'Label IBAN missing',
+} as const
+
 export function PayoutManager({
   labelArtists,
   labelInfo,
@@ -44,47 +86,6 @@ export function PayoutManager({
   onLabelSepaUpdate,
 }: PayoutManagerProps) {
   const dict = useDict()
-  const payoutFallback = {
-    payoutValidIbanCount: '{count} artists with valid IBAN',
-    payoutInvalidIbanCount: '{count} missing or invalid IBAN',
-    payoutSelectedSummary: '{amount} · {count} selected',
-    payoutExportSepa: 'Export SEPA XML',
-    payoutNoDataTitle: 'No ledger payouts for this period.',
-    payoutNoDataHint: 'Approve statements and record payments in Settlement Center first.',
-    payoutLedgerSourceHint: 'Amounts come from the settlement ledger, not the CSV session.',
-    payoutLoadingRegister: 'Loading settlement ledger…',
-    payoutRegisterFailed: 'Could not load settlement ledger',
-    payoutColArtist: 'Artist',
-    payoutColHolder: 'Account holder',
-    payoutColIban: 'IBAN',
-    payoutColAmount: 'Payout',
-    payoutColStatus: 'Status',
-    payoutIbanMissing: 'IBAN missing',
-    payoutStatusOk: 'OK',
-    payoutStatusInvalid: 'Invalid',
-    payoutStatusMissing: 'Missing',
-    payoutInvalidIbanTooltip: 'Checksum invalid. SEPA export blocked.',
-    payoutSepaFormTitle: 'Label sender account for SEPA XML',
-    payoutSepaFormHint:
-      'IBAN and account holder are stored locally in this browser (Accounting → SEPA Payout).',
-    payoutSepaHolderLabel: 'Account holder',
-    payoutSepaIbanLabel: 'IBAN',
-    payoutSepaSave: 'Save SEPA details',
-    payoutInvalidIbanToast: 'Invalid IBAN',
-    payoutHolderMissingToast: 'Account holder is required',
-    payoutSepaSavedToast: 'Label SEPA details saved',
-    payoutLabelIbanMissingToast: 'Label IBAN missing',
-    payoutLabelIbanMissingDesc:
-      'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
-    payoutInvalidLabelIbanToast: 'Invalid label IBAN',
-    payoutInvalidLabelIbanDesc: 'The stored label IBAN failed the modulo-97 checksum validation.',
-    payoutNoArtistsSelectedToast: 'No artists selected',
-    payoutNoArtistsSelectedDesc: 'Select at least one artist with a valid IBAN.',
-    payoutSepaExportedToast: 'SEPA XML exported',
-    payoutSepaExportedDesc: '{count} transfers · {amount} total',
-    payoutSepaExportFailedToast: 'SEPA export failed',
-    payoutLabelIbanMissingBadge: 'Label IBAN missing',
-  } as const
   const t = useMemo(
     () => ({ ...payoutFallback, ...(dict.admin?.accounting ?? {}) }),
     [dict.admin?.accounting],
@@ -126,7 +127,7 @@ export function PayoutManager({
 
         if (!response.ok) {
           throw new Error(
-            (json as { error?: string } | null)?.error ?? payoutFallback.payoutRegisterFailed,
+            (json as { error?: string } | null)?.error ?? t.payoutRegisterFailed,
           )
         }
 
@@ -136,7 +137,7 @@ export function PayoutManager({
       } catch (err) {
         if (!cancelled) {
           setRegister(null)
-          toast.error(err instanceof Error ? err.message : payoutFallback.payoutRegisterFailed)
+          toast.error(err instanceof Error ? err.message : t.payoutRegisterFailed)
         }
       } finally {
         if (!cancelled) setLoadingRegister(false)
@@ -147,7 +148,7 @@ export function PayoutManager({
     return () => {
       cancelled = true
     }
-  }, [periodStartDate, periodEndDate])
+  }, [periodStartDate, periodEndDate, t.payoutRegisterFailed])
 
   const [draftSepaIban, setDraftSepaIban] = useState(labelInfo.sepaIban ?? '')
   const [draftSepaAccountHolder, setDraftSepaAccountHolder] = useState(

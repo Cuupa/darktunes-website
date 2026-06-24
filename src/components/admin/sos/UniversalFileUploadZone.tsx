@@ -538,7 +538,7 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
   const isProcessingFile = state?.status === 'uploading' || state?.status === 'processing'
   const isDone = !state || state.status === 'done' || state.status === 'idle'
   const hasData = Boolean(file.data)
-  const needsReupload = isDone && !hasData && !file.rowsParsed
+  const needsReupload = isDone && !hasData
   const prefersReducedMotion = useReducedMotion()
 
   return (
@@ -611,7 +611,7 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
             )}
 
             {needsReupload && (
-              <p className="text-xs text-amber-400 mt-1">Data not in memory — re-upload to process</p>
+              <p className="text-xs text-amber-400 mt-1">Data not in memory — re-upload or load from Bronze archives below</p>
             )}
 
             <FileProgressBar state={state} />

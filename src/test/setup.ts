@@ -1,4 +1,20 @@
 import '@testing-library/jest-dom'
+import { webcrypto } from 'node:crypto'
+
+// jsdom exposes crypto.subtle in CI but it may not digest buffers; use Node Web Crypto.
+const testCrypto = webcrypto as Crypto
+Object.defineProperty(globalThis, 'crypto', {
+  value: testCrypto,
+  writable: true,
+  configurable: true,
+})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'crypto', {
+    value: testCrypto,
+    writable: true,
+    configurable: true,
+  })
+}
 
 // Test-only encryption master key (32 bytes hex). Never use in production.
 if (!process.env.API_CREDENTIALS_ENCRYPTION_KEY) {

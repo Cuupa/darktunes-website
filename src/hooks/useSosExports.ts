@@ -55,6 +55,20 @@ function resolveBronzeBatchLineage(bronzeBatchIds: string[] | undefined) {
   }
 }
 
+const exportFallback = {
+  exportNoArtistData: 'No data found for artist "{artist}"',
+  exportPdfDownloaded: 'PDF for "{artist}" downloaded',
+  exportPdfFailed: 'PDF export failed',
+  exportExcelDownloaded: 'Excel for "{artist}" downloaded',
+  exportExcelFailed: 'Excel export failed',
+  exportZipDownloaded: 'ZIP with {count} statements downloaded',
+  exportZipFailed: 'ZIP export failed',
+  exportPortalDraftSaved:
+    'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
+  exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
+  exportPortalUploading: 'Uploading statement to portal…',
+} as const
+
 function buildUploadPayload(
   artistData: SafeProcessedArtistData,
   periodStart: string,
@@ -96,20 +110,10 @@ export function useExports(
   persistContext?: SosExportPersistContext,
 ) {
   const dict = useDict()
-  const exportFallback = {
-    exportNoArtistData: 'No data found for artist "{artist}"',
-    exportPdfDownloaded: 'PDF for "{artist}" downloaded',
-    exportPdfFailed: 'PDF export failed',
-    exportExcelDownloaded: 'Excel for "{artist}" downloaded',
-    exportExcelFailed: 'Excel export failed',
-    exportZipDownloaded: 'ZIP with {count} statements downloaded',
-    exportZipFailed: 'ZIP export failed',
-    exportPortalDraftSaved:
-      'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
-    exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
-    exportPortalUploading: 'Uploading statement to portal…',
-  } as const
-  const t = { ...exportFallback, ...(dict.admin?.accounting ?? {}) }
+  const t = useMemo(
+    () => ({ ...exportFallback, ...(dict.admin?.accounting ?? {}) }),
+    [dict.admin?.accounting],
+  )
 
   const emailOptions = useMemo(
     () =>
@@ -225,7 +229,7 @@ export function useExports(
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t]
   )
 
   const handleDownloadExcel = useCallback(
@@ -253,7 +257,7 @@ export function useExports(
         console.error('Excel export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings]
+    [processedData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings, t]
   )
 
   /**
@@ -296,7 +300,7 @@ export function useExports(
       toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
-  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
+  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, t])
 
   /**
    * Queued batch export for a specific subset of artists — same async queue
@@ -342,7 +346,7 @@ export function useExports(
       toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
-  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters])
+  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, t])
 
   const handlePublishToPortal = useCallback(
     async (artist: string) => {
@@ -417,7 +421,7 @@ export function useExports(
         toast.error(message)
       }
     },
-    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t]
   )
 
   const buildCorrectionPdfBase64 = useCallback(
