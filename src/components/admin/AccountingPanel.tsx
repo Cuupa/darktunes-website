@@ -394,15 +394,13 @@ function SosGeneratorPanel() {
   const [isWorkspaceSaving, setIsWorkspaceSaving] = useState(false)
 
   // Load a bronze archive into the appropriate in-memory file manager for processing.
-  // Fetches presigned download, streams CSV text, creates synthetic File and feeds to manager.
+  // CSV is proxied server-side (never fetch presigned R2 URLs from the browser — no bucket CORS).
   // Bronze re-archive on load will dedupe via hash.
   const loadBronzeBatch = useCallback(async (batch: { id: string; distributor: string; periodStart: string }) => {
     try {
-      const res = await fetch(`/api/admin/sos/import-batches/${batch.id}`)
-      if (!res.ok) throw new Error('Failed to get download URL for bronze batch')
-      const json = (await res.json()) as { downloadUrl?: string }
-      if (!json.downloadUrl) throw new Error('No download URL')
-      const csvText = await (await fetch(json.downloadUrl)).text()
+      const res = await fetch(`/api/admin/sos/import-batches/${batch.id}/download`)
+      if (!res.ok) throw new Error('Failed to download bronze batch')
+      const csvText = await res.text()
       const fileName = `${batch.distributor}-${batch.periodStart || 'archive'}.csv`
       const blob = new Blob([csvText], { type: 'text/csv; charset=utf-8' })
       const file = new File([blob], fileName, { type: 'text/csv; charset=utf-8' })

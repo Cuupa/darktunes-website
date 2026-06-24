@@ -104,22 +104,31 @@ WHERE id = (
 2. Create API token with read/write permissions
 3. Note your Account ID, Access Key ID, and Secret Access Key
 
-### 3. Configure CORS (if needed)
+### 3. Configure CORS (optional — not required for bronze CSVs)
+
+R2 bucket CORS is **not** configured for `www.darktunes.com` in production. That is intentional: admin bronze distributor CSVs (SOS Accounting) upload and download **only** through same-origin Next.js Route Handlers (`/api/admin/sos/import-batches/...`), including chunked multipart for files \> 45 MB.
+
+Only configure CORS if you explicitly need **browser-direct** PUT/GET to `*.r2.cloudflarestorage.com` (e.g. legacy EPK presigned upload). Example:
+
 ```json
 [
   {
-    "AllowedOrigins": ["https://your-domain.com"],
-    "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+    "AllowedOrigins": ["https://www.darktunes.com", "https://darktunes.com"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3000
   }
 ]
 ```
 
+**Do not** point admin bronze CSV flows at presigned URLs unless this CORS policy is in place.
+
 ### 4. File Uploads via Next.js Route Handler
 
-File uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin uploads, plus portal routes like `app/api/portal/upload-photo/route.ts`, `app/api/portal/upload-release-cover/route.ts`, and `app/api/portal/upload-asset/route.ts`).
-This eliminates CORS issues that arise from client-side direct uploads. No Supabase Edge Functions are needed for uploads.
+Most uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin assets, portal routes like `app/api/portal/upload-photo/route.ts`, and SOS bronze CSV routes under `app/api/admin/sos/import-batches/`). This avoids R2 CORS. No Supabase Edge Functions are needed for uploads.
+
+**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): single upload ≤ 45 MB; multipart chunked upload up to 200 MB (20 MB per chunk).
 
 The Route Handler:
 1. Verifies the Bearer token and requires an `admin` or `editor` role

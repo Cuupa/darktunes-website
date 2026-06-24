@@ -16,8 +16,8 @@
  * Returns: { r2Key, publicUrl }
  *
  * Note: Vercel's serverless body limit is 4.5 MB on Hobby and 50 MB on Pro.
- * For larger files, configure CLOUDFLARE_R2_CORS_ORIGINS in the Cloudflare
- * dashboard instead (see DEPLOYMENT.md).
+ * SOS bronze CSVs use chunked multipart via /api/admin/sos/import-batches/* instead.
+ * Browser presigned PUT requires R2 bucket CORS (see DEPLOYMENT.md §3).
  */
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'

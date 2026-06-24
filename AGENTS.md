@@ -25,6 +25,7 @@ No PR with failing checks. No `as any`, `@ts-ignore`, or `eslint-disable` to sil
 - **Route handlers:** `withErrorHandler`; admin routes use `src/lib/adminAuth.ts`
 - **WCAG 2.1 AA** on all public UI
 - **Minimal changes:** Smallest diff that fully solves the task
+- **Bronze CSV (SOS):** Never browser `fetch()` to presigned R2 URLs — use `/api/admin/sos/import-batches/*` routes; limits in `src/lib/sos/bronzeUploadLimits.ts`
 
 ## Detailed guidelines
 

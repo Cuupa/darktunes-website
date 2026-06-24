@@ -90,6 +90,9 @@ Key prefixes (NEVER deviate):
   artist-documents/{artistId}/{uuid}_{originalFilename}    → portal document vault (PDF/DOCX contracts, GEMA, splits)
   press-kit/{category}/{uuid}.{ext}                        → EPK assets (press photos, etc.)
   promo-tracks/{uuid}.{ext}                                → journalist promo audio
+  sos-imports/{batchId}/{hashPrefix}_{filename}            → bronze distributor CSV archives (`distributor_import_batches.r2_key`)
+
+Bronze CSV upload limits are defined only in `src/lib/sos/bronzeUploadLimits.ts` — never hard-code 45 MB / 200 MB elsewhere.
 
 ## Deprecated Imports
 

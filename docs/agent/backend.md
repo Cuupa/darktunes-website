@@ -188,6 +188,21 @@ Admin System Tab (Health, Logs, Maintenance)
       - `POST /api/sync/requeue` — resets `sync_queue` rows with `status='failed'` back to `pending` (admin Maintenance tab).
   All maintenance routes require admin auth via `verifyAdmin`. All are wrapped with `withErrorHandler`.
 
+## Bronze CSV Import (SOS Accounting)
+
+Admin Accounting archives raw distributor CSVs in R2 (`distributor_import_batches`). Client orchestration: `src/lib/sos/bronzeUpload.ts`. Server multipart helpers: `src/lib/sos/bronzeMultipartUpload.ts`. Limits (SSOT): `src/lib/sos/bronzeUploadLimits.ts`.
+
+**Upload decision tree (mandatory — do not use presigned browser PUT for bronze):**
+- ≤ `MAX_BRONZE_CSV_SERVER_BYTES` (45 MB): `POST /api/admin/sos/import-batches/[id]/upload`
+- \> 45 MB, ≤ `MAX_BRONZE_CSV_BYTES` (200 MB): chunked R2 multipart via `…/multipart/init|part|complete` (20 MB chunks)
+- On failure mid-multipart: client calls `…/multipart/abort`; orphan batches: `DELETE /api/admin/sos/import-batches/[id]`
+
+**Download:** Admin UI loads archives via `GET /api/admin/sos/import-batches/[id]/download` (server streams from R2). `GET …/[id]` may return a presigned URL for server-side tooling only — never `fetch(downloadUrl)` from a Client Component.
+
+**Confirm:** `PATCH …/confirm` downloads the R2 object server-side, verifies SHA-256, sets `file_hash` + `status = completed`.
+
+**Reprocess:** `POST …/reprocess` downloads CSV server-side, re-parses, optionally persists gold metrics.
+
 ## SOS Upload
 
 SOS (Statement of Sales) — Direct Server Action Upload

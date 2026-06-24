@@ -44,7 +44,17 @@ Enterprise settlement lifecycle for SOS statements and artist invoices. Admin UI
 
 **Shared client helpers:** `getAdminAccessToken()` in `src/lib/admin/getAccessToken.ts` (admin API auth from client components). Workflow step derivation: `deriveActiveWorkflowStep` / `deriveCompletedWorkflowSteps` in `statementWorkflow.ts`.
 
-**CSP:** `src/lib/security/contentSecurityPolicy.ts` is the single source of truth (imported by `next.config.ts`). `connect-src` must include `https://*.r2.cloudflarestorage.com` for browser-side R2 presigned uploads.
+**Bronze CSV archives (distributor raw data):** On SOS file upload, `uploadBronzeDistributorCsv()` in `src/lib/sos/bronzeUpload.ts` registers a `distributor_import_batches` row and archives the raw CSV in R2 under `sos-imports/{batchId}/{hashPrefix}_{filename}`. Size limits live in `src/lib/sos/bronzeUploadLimits.ts` (SSOT). **Never** upload or download bronze CSVs via browser presigned R2 URLs — the bucket has no CORS for `www.darktunes.com`. Use same-origin Route Handlers only:
+
+| File size | Upload path |
+|---|---|
+| ≤ 45 MB | `POST /api/admin/sos/import-batches/[id]/upload` (single server proxy) |
+| 45 MB – 200 MB | `POST …/multipart/init` → `…/part` (20 MB chunks) → `…/complete` |
+| Download (admin UI) | `GET /api/admin/sos/import-batches/[id]/download` (server proxy) |
+
+After upload: `PATCH …/confirm` with client-computed SHA-256. UI: `ImportBatchesPanel` + bronze status in `UniversalFileUploadZone`.
+
+**CSP:** `src/lib/security/contentSecurityPolicy.ts` is the single source of truth (imported by `next.config.ts`). `connect-src` includes `https://*.r2.cloudflarestorage.com` for portal/press presigned **downloads** and legacy EPK flows — not for admin bronze CSV upload/download.
 
 Portal Analytics page (`app/portal/analytics/page.tsx`) — tabs: Streaming, Listeners, Territories, Events (concert + **promo impact** from `promo_impact`), Earnings, Releases, Revenue Mix, EPK & Press, **Settlement** (`artist_settlement_ledger` read-only), **Website** (`page_events`), **Merch** (`merch_orders`). Promo impact precomputed in `src/lib/analytics/promoImpactCompute.ts` on SOS persist. Merch orders normalised in the SOS worker (`buildMerchOrderRows`) and upserted on persist. Overview (`/portal`) shows **Intelligence** panel via `src/lib/analytics/overviewInsights.ts`. Auto-insights in `src/lib/analytics/insights.ts`.
 

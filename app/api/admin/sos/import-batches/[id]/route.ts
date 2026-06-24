@@ -1,5 +1,6 @@
 /**
- * GET    /api/admin/sos/import-batches/[id] — fetch batch + short-lived presigned download URL (for loading into workspace)
+ * GET    /api/admin/sos/import-batches/[id] — fetch batch metadata + presigned download URL (server-side use only)
+ *          Admin UI must load CSV via GET /download — never fetch downloadUrl from the browser (R2 CORS).
  * PATCH  /api/admin/sos/import-batches/[id] — mark unconfirmed upload as failed
  * DELETE /api/admin/sos/import-batches/[id] — delete batch + its R2 object (confirmed or not)
  */

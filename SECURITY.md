@@ -77,6 +77,9 @@ Upstash Redis rate limiter.
 | `/api/portal/upload-release-cover` | 5 MB |
 | `/api/portal/upload-asset` | 20 MB |
 | `/api/portal/documents/upload` | 20 MB (PDF/DOCX) |
+| `/api/admin/sos/import-batches/[id]/upload` | 45 MB (single server proxy) |
+| `/api/admin/sos/import-batches/[id]/multipart/part` | 21 MB per chunk (20 MB + overhead) |
+| Bronze CSV total (multipart) | 200 MB (`src/lib/sos/bronzeUploadLimits.ts`) |
 
 
 - Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

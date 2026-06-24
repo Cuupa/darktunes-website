@@ -94,7 +94,11 @@ fit. Migrations from Route Handlers to Server Actions happen incrementally.
 | Form submissions from Client Components (portal, newsletter, EPK) | Server Action (`"use server"`) |
 | External API consumers (cron jobs, webhooks, SOS generator) | Route Handler (`route.ts`) |
 | Admin JWT-protected mutations called from JS `fetch()` | Route Handler |
-| File uploads > 4.5 MB (use presigned URL flow instead) | Route Handler with presigned R2 URL |
+| Admin bronze CSV ≤ 45 MB | `POST /api/admin/sos/import-batches/[id]/upload` (server proxy to R2) |
+| Admin bronze CSV 45–200 MB | Chunked multipart via `…/multipart/*` Route Handlers (never browser presigned PUT) |
+| Portal/admin file uploads ≤ route limit | Server-side Route Handler (`FormData` → R2) |
+| Server-to-R2 uploads (SOS PDF generator, Server Actions) | Presigned PUT from server process — not from browser |
+| Browser presigned R2 PUT (EPK — legacy) | Only when R2 bucket CORS is configured; prefer server proxy (`/api/upload-epk`) |
 
 Server Actions CANNOT be called from outside the Next.js app.
 Route Handlers MUST be wrapped with `withErrorHandler`.
