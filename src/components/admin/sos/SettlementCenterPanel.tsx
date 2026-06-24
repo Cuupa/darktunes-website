@@ -410,6 +410,7 @@ export function SettlementCenterPanel({
   const [lockDialogOpen, setLockDialogOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [paymentAmountsEur, setPaymentAmountsEur] = useState<Record<string, string>>({})
+  const [paymentIdempotencyKeys, setPaymentIdempotencyKeys] = useState<Record<string, string>>({})
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('sepa')
   const [paymentReference, setPaymentReference] = useState('')
   const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false)
@@ -723,12 +724,15 @@ export function SettlementCenterPanel({
   const openPaymentDialog = () => {
     if (selectedPaymentTargets.length === 0) return
     const amounts: Record<string, string> = {}
+    const idempotencyKeys: Record<string, string> = {}
     for (const target of selectedPaymentTargets) {
       if (target.invoiceId) {
         amounts[target.invoiceId] = defaultOutstandingEur(target)
+        idempotencyKeys[target.invoiceId] = crypto.randomUUID()
       }
     }
     setPaymentAmountsEur(amounts)
+    setPaymentIdempotencyKeys(idempotencyKeys)
     setPaymentMethod('sepa')
     setPaymentReference('')
     setPaymentDialogOpen(true)
@@ -771,6 +775,7 @@ export function SettlementCenterPanel({
             amountCents,
             paymentMethod,
             paymentReference: paymentReference.trim() || undefined,
+            idempotencyKey: paymentIdempotencyKeys[target.invoiceId],
           }),
         })
         const json = (await response.json().catch(() => null)) as { error?: string } | null

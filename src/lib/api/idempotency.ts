@@ -22,6 +22,12 @@ export type IdempotencyResourceType =
   | 'sos-confirm'
   | 'submit-release'
   | 'payout-request'
+  | 'invoice-payment'
+
+export interface IdempotencyKeyRecord {
+  resourceType: IdempotencyResourceType
+  resourceId: string | null
+}
 
 const TTL_HOURS = 24
 
@@ -77,6 +83,32 @@ export async function checkAndClaimIdempotencyKey(
  * has been created. Useful for returning the ID of a created record to
  * the caller on retry.
  */
+export async function getIdempotencyKeyRecord(
+  db: DbClient,
+  key: string,
+): Promise<IdempotencyKeyRecord | null> {
+  const { data, error } = await db
+    .from('idempotency_keys')
+    .select('resource_type, resource_id')
+    .eq('key', key)
+    .maybeSingle()
+
+  if (error) throw new Error(`Idempotency lookup failed: ${error.message}`)
+  if (!data) return null
+
+  return {
+    resourceType: data.resource_type as IdempotencyResourceType,
+    resourceId: data.resource_id,
+  }
+}
+
+export async function releaseIdempotencyKey(db: DbClient, key: string): Promise<void> {
+  const { error } = await db.from('idempotency_keys').delete().eq('key', key)
+  if (error) {
+    console.warn('[idempotency] Failed to release key:', error.message)
+  }
+}
+
 export async function updateIdempotencyKeyResourceId(
   db: DbClient,
   key: string,
