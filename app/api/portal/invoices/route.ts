@@ -18,6 +18,8 @@ import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
 import { LABEL_BILLING_PARTY, LABEL_CLIENT_EMAIL } from '@/lib/portal/labelBilling'
 import { createR2Client } from '@/lib/r2Utils'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 const lineItemSchema = z.object({
   description: z.string().min(1).max(500),
@@ -74,6 +76,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const { serverEnv } = await import('@/lib/env.server')
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const emailCredentials = await getEmailCredentials(serviceDb)
 
   const statement = input.statement_id
     ? await getSalesStatementById(supabase, input.statement_id, artist.id)
@@ -191,8 +195,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         pdfUrl,
       },
       {
-        resendApiKey: serverEnv.RESEND_API_KEY ?? '',
-        resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? '',
+        resendApiKey: emailCredentials.resendApiKey ?? '',
+        resendFromEmail: emailCredentials.resendFromEmail ?? '',
         fetch: globalThis.fetch,
       },
     )
@@ -208,8 +212,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         pdfUrl,
       },
       {
-        resendApiKey: serverEnv.RESEND_API_KEY ?? '',
-        resendFromEmail: serverEnv.RESEND_FROM_EMAIL ?? '',
+        resendApiKey: emailCredentials.resendApiKey ?? '',
+        resendFromEmail: emailCredentials.resendFromEmail ?? '',
         fetch: globalThis.fetch,
       },
     )

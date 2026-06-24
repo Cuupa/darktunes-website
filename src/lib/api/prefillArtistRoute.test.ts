@@ -35,10 +35,18 @@ describe('POST /api/admin/prefill-artist', () => {
   it('returns prefill payload for an admin token', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
-    process.env.SPOTIFY_CLIENT_ID = 'client-id'
-    process.env.SPOTIFY_CLIENT_SECRET = 'client-secret'
+    process.env.API_CREDENTIALS_ENCRYPTION_KEY =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
     mockSupabaseClient({ role: 'admin' })
+    vi.doMock('@/lib/secrets/getExternalCredentials', () => ({
+      getSyncCredentials: vi.fn(async () => ({
+        spotify: { clientId: 'client-id', clientSecret: 'client-secret' },
+      })),
+    }))
+    vi.doMock('@/lib/supabase/server', () => ({
+      createServiceRoleSupabaseClient: vi.fn(async () => ({})),
+    }))
     vi.doMock('@/lib/rateLimiter', async () => {
       const actual = await vi.importActual<typeof import('@/lib/rateLimiter')>('@/lib/rateLimiter')
       return {
@@ -86,9 +94,6 @@ describe('POST /api/admin/prefill-artist', () => {
   it('returns 403 when user is not admin or editor', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
-    process.env.SPOTIFY_CLIENT_ID = 'client-id'
-    process.env.SPOTIFY_CLIENT_SECRET = 'client-secret'
-
     mockSupabaseClient({ role: 'user' })
     const { POST } = await loadRoute()
     const response = await POST(

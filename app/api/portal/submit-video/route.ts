@@ -5,6 +5,7 @@ import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createVideoSubmission } from '@/lib/api/videoSubmissions'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -61,8 +62,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   // Send label notification email (fire-and-forget; failure does not block the response)
-  const resendApiKey = process.env.RESEND_API_KEY ?? ''
-  const resendFromEmail = process.env.RESEND_FROM_EMAIL ?? ''
+  const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
+    await getEmailCredentials(serviceRole)
+  const resendApiKey = storedResendKey ?? ''
+  const resendFromEmail = storedFromEmail ?? ''
   const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
   void sendSubmissionNotificationEmail(

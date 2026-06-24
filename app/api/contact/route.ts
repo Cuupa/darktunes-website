@@ -4,13 +4,15 @@
  * POST /api/contact
  *
  * Validates the form payload, checks the honeypot, optionally sends an email
- * via Resend (when RESEND_API_KEY is set), and returns a success response.
+ * via Resend (when configured in Admin → API Keys), and returns a success response.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -45,10 +47,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   const recipientEmail = process.env.CONTACT_EMAIL ?? 'info@darktunes.com'
-  const resendApiKey = process.env.RESEND_API_KEY
+  const db = await createServiceRoleSupabaseClient()
+  const { resendApiKey, resendFromEmail } = await getEmailCredentials(db)
 
   if (resendApiKey) {
-    const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'noreply@darktunes.com'
+    const fromEmail = resendFromEmail ?? 'noreply@darktunes.com'
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {

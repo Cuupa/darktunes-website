@@ -150,34 +150,28 @@ Set these in your Vercel project settings (Dashboard → Project → Settings �
 - `CLOUDFLARE_R2_BUCKET_NAME`: R2 bucket name (e.g. `darktunes-assets`)
 - `CLOUDFLARE_R2_PUBLIC_URL`: R2 public CDN base URL (e.g. `https://cdn.darktunes.com`)
 
-### External API Keys (optional — Artist Auto-Sync)
-These are used by `POST /api/sync-artist` to enrich artist profiles. iTunes sync works without any key; the others require keys from the respective developer portals.
-- `SPOTIFY_CLIENT_ID`: Spotify app client ID (https://developer.spotify.com/dashboard → Create App)
-- `SPOTIFY_CLIENT_SECRET`: Spotify app client secret
-- `DISCOGS_TOKEN`: Discogs personal access token (https://www.discogs.com/settings/developers)
-- `SONGKICK_API_KEY`: Songkick API key (https://www.songkick.com/developer → Request API key)
-- `BANDSINTOWN_API_KEY`: Bandsintown API key (https://www.bandsintown.com/api/app_id → Request access) — used by `src/lib/sync/bandsintownApi.ts` for concert sync
+### API Credentials Encryption (required)
+- `API_CREDENTIALS_ENCRYPTION_KEY`: 64-character hex string (32 bytes). Generate with `openssl rand -hex 32`. Encrypts external integration keys before they are stored in Supabase `api_credentials`. **Never** store this key in Supabase or commit it to git.
+
+External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are **not** Vercel env vars anymore. Configure them in **Admin → API Keys** (`/admin/api-keys`). Values are encrypted with AES-256-GCM and persisted in `api_credentials` (admin-only RLS). iTunes and Odesli sync work without keys.
+
+**Migrating from env vars:** After deploying, log in as admin → API Keys → **Import from environment variables** (one-time). Then remove the legacy `SPOTIFY_*`, `DISCOGS_*`, `RESEND_*`, etc. from Vercel.
 
 ### Contact Form (optional — email delivery)
 - `CONTACT_EMAIL`: The email address that receives contact form submissions from `POST /api/contact`. Defaults to `info@darktunes.com` if not set. Use a monitored inbox.
 
-### YouTube Video Sync (optional — sync channel videos)
-- `YOUTUBE_API_KEY`: Google Cloud API key with YouTube Data API v3 enabled. See https://console.developers.google.com → Enable YouTube Data API v3.
-- `YOUTUBE_CHANNEL_ID`: Your YouTube channel ID (starts with `UC`). Used by `POST /api/sync-youtube` to fetch and upsert the latest videos.
-- `CRON_SECRET`: Optional shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync`, `/api/sync-youtube`, and `/api/sync-api`. If set, callers must send `Authorization: Bearer <CRON_SECRET>`. Also required by the `trigger-sync` Supabase Edge Function (see below).
+### Cron & infra secrets (optional — remain in Vercel env)
+- `CRON_SECRET`: Shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync-youtube`, and `/api/sync-api`. Also required by the `trigger-sync` Supabase Edge Function (see below).
+- `NEXT_PUBLIC_SITE_URL`: Public site URL without trailing slash (e.g. `https://darktunes.com`).
+- `LABEL_NOTIFICATION_EMAIL`: Label inbox for portal submission and health-alert emails. Leave blank to disable.
+- `HEALTH_ALERT_WEBHOOK_URL`: Configure in Admin → API Keys (encrypted in DB), not env.
 
-### Newsletter Double Opt-In (optional — confirmation email delivery)
-These variables are shared between the **Supabase Edge Function** (`newsletter-confirm`) and the Next.js app. Configure `RESEND_*` both as Supabase Edge Function secrets (for DOI emails) and in Vercel when you want the contact form Route Handler to send mail.
-- `RESEND_API_KEY`: API key from https://resend.com — used to send DOI confirmation emails and contact-form emails.
-- `RESEND_FROM_EMAIL`: Verified sender address, e.g. `noreply@darktunes.com`. Must be a domain verified in Resend.
-- `NEXT_PUBLIC_SITE_URL`: The public site URL without trailing slash (e.g. `https://darktunes.com`) — used to build the confirmation link inside the email. Also set this as a Vercel env var (with the `NEXT_PUBLIC_` prefix) so the confirmation page can be rendered.
-- `LABEL_NOTIFICATION_EMAIL`: Label inbox address that receives an email whenever an artist submits a release or video via the portal. Leave blank to disable submission notification emails (they are silently skipped if this variable is unset).
+### Newsletter Double Opt-In
+- **Next.js routes** (contact form, portal notifications): Resend credentials from Admin → API Keys.
+- **Supabase Edge Function** `newsletter-confirm`: still uses Supabase Edge Function secrets (see below) until migrated.
 
-### Newsletter — MailerLite sync (optional — marketing list)
-After DOI confirmation, verified subscribers are pushed to MailerLite server-to-server via `GET /api/newsletter/verify`. Both vars are optional — omit to store subscribers in Supabase only.
-- `MAILERLITE_API_KEY`: MailerLite API key from https://app.mailerlite.com/integrations/api/
-- `MAILERLITE_GROUP_ID`: MailerLite group/segment ID to add subscribers to.
-  - To find your Group ID: log in at https://app.mailerlite.com → Subscribers → Groups → click the group → the ID appears in the URL (`/groups/{id}/...`).
+### Newsletter — MailerLite sync (optional)
+Configure `mailerlite_api_key` and `mailerlite_group_id` in Admin → API Keys. Called from `GET /api/newsletter/verify` after DOI confirmation.
 
 ### ISR Webhook Revalidation (optional — Supabase-triggered cache busting)
 - `REVALIDATE_SECRET`: A random, high-entropy ****** checked by `POST /api/revalidate`. Required when you configure Supabase webhooks to call this endpoint after DB writes so the ISR cache is busted automatically. Generate with `openssl rand -hex 32`. Share this value with the Supabase webhook configuration (Authorization header value).
@@ -239,8 +233,8 @@ These secrets power the Deno runtime inside Supabase Edge Functions. They are
 does NOT make them available to Edge Functions.
 
 Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
-- `RESEND_API_KEY` — same value as your Vercel `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL` — same value as your Vercel `RESEND_FROM_EMAIL`
+- `RESEND_API_KEY` — Resend API key (can match Admin → API Keys value)
+- `RESEND_FROM_EMAIL` — verified sender address
 - `NEXT_PUBLIC_SITE_URL` — your production URL (e.g. `https://darktunes.com`)
 
 Without these secrets, the `newsletter-confirm` Edge Function will fail silently
@@ -300,8 +294,8 @@ Body:    { "type": "bandsintown" }
 > **Bandsintown sync note:** The `bandsintown` sync type iterates through every
 > artist in the database that has **both** `bandsintown_id` **and** `bandsintown_api_key`
 > (per-artist field) set. Artists missing either field are silently skipped.
-> No global `BANDSINTOWN_API_KEY` env var is required — the per-artist key is
-> used exclusively.
+> A global `bandsintown_api_key` in Admin → API Keys is optional fallback when
+> per-artist `bandsintown_api_key` is unset. Artists without `bandsintown_id` are skipped.
 
 ---
 

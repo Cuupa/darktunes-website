@@ -203,7 +203,7 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | Contact page + API route | ✅ Implemented | `/contact` RSC with SubmitHub link; `POST /api/contact` (Zod, honeypot, Resend delivery); `CONTACT_EMAIL` env var |
 | SubmitHub link | ✅ Implemented | Footer → "Submit Your Music" link + Contact page SubmitHub section |
 | Shopify/Darkmerch shop link | ✅ Implemented | `shopifyStoreUrl` in `SiteSettings` (`site_settings` KV key `shopify_store_url`); conditional display in Footer |
-| YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID`, supports daily Vercel cron and maps videos to artists via `videos.artist_id` title matching |
+| YouTube API video sync | ✅ Implemented | `src/lib/api/youtubeApi.ts` + `POST /api/sync-youtube`; requires `youtube_api_key` + `youtube_channel_id` in Admin → API Keys, supports daily Vercel cron and maps videos to artists via `videos.artist_id` title matching |
 | ContentPagination component | ✅ Implemented | `src/components/ContentPagination.tsx` — reusable shadcn-based paginator with ellipsis support |
 | Artist Portal — Document Vault | ✅ Implemented | `/portal/documents` — artists upload and manage PDF/DOCX contracts, GEMA forms, and splits documents; stored in R2 under `artist-documents/{artistId}/`; `artist_documents` table with RLS; `POST /api/portal/documents/upload` (20 MB max); `DELETE /api/portal/documents/[id]` |
 | Artist Portal — Calendar | ✅ Implemented | `/portal/calendar` — tour date / event calendar view for the artist's own concerts |

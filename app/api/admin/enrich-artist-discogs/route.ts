@@ -20,6 +20,8 @@ import { fetchDiscogsArtistProfile } from '@/lib/sync/discogsApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { extractDiscogsArtistId } from '@/lib/parsers/platformUrlParser'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getApiCredential } from '@/lib/secrets/getExternalCredentials'
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -51,14 +53,12 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(400, 'Invalid Discogs artist ID or URL. Provide a numeric ID or full Discogs artist URL.')
   }
 
-  // 3. Fetch from Discogs
-  // Direct process.env access: serverEnv validates all vars including R2,
-  // but this route only needs the optional DISCOGS_TOKEN.
-  const discogsToken = process.env.DISCOGS_TOKEN
+  const db = await createServiceRoleSupabaseClient()
+  const discogsToken = await getApiCredential(db, 'discogs_token')
 
   try {
     const profile = await withExponentialBackoff(() =>
-      fetchDiscogsArtistProfile(numericId, discogsToken, globalThis.fetch),
+      fetchDiscogsArtistProfile(numericId, discogsToken ?? undefined, globalThis.fetch),
     )
 
     return NextResponse.json({

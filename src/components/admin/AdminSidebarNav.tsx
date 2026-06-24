@@ -40,6 +40,7 @@ import {
   Palette,
   Gear,
   Cpu,
+  Key,
   SignOut,
   List,
 } from '@phosphor-icons/react'
@@ -106,6 +107,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Feature Flags', href: '/admin/features', icon: ToggleRight, adminOnly: true },
       { label: 'Colors',        href: '/admin/colors',   icon: Palette,     adminOnly: true },
       { label: 'Settings',      href: '/admin/settings', icon: Gear,        adminOnly: true },
+      { label: 'API Keys',      href: '/admin/api-keys', icon: Key,         adminOnly: true },
       { label: 'System',        href: '/admin/system',   icon: Cpu,         adminOnly: true },
     ],
   },

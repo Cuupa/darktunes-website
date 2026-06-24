@@ -18,6 +18,10 @@ import { processHealthAlerts } from '@/lib/health/alertNotifier'
 import { buildHealthSnapshot } from '@/lib/health/healthSnapshot'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
+import {
+  getEmailCredentials,
+  getHealthAlertWebhookUrl,
+} from '@/lib/secrets/getExternalCredentials'
 
 export const maxDuration = 60
 
@@ -41,14 +45,19 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     auth: { persistSession: false },
   })
 
+  const [emailCredentials, healthAlertWebhookUrl] = await Promise.all([
+    getEmailCredentials(db),
+    getHealthAlertWebhookUrl(db),
+  ])
+
   const snapshot = await buildHealthSnapshot({ db })
   const dispatch = await processHealthAlerts(snapshot, {
     db,
     fetch: globalThis.fetch,
-    resendApiKey: process.env.RESEND_API_KEY,
-    resendFromEmail: process.env.RESEND_FROM_EMAIL,
+    resendApiKey: emailCredentials.resendApiKey ?? undefined,
+    resendFromEmail: emailCredentials.resendFromEmail ?? undefined,
     labelNotificationEmail: process.env.LABEL_NOTIFICATION_EMAIL,
-    healthAlertWebhookUrl: process.env.HEALTH_ALERT_WEBHOOK_URL,
+    healthAlertWebhookUrl: healthAlertWebhookUrl ?? undefined,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
   })
 

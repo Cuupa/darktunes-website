@@ -211,7 +211,7 @@ The **SOS Generator** tab in the same Accounting page lets admins upload royalty
 1. Verifies the caller's admin/editor session via cookie-based Supabase auth.
 2. Generates a presigned R2 PUT URL and uploads the PDF from the browser directly to R2.
 3. Inserts the `sales_statements` row with the service-role client to bypass RLS.
-4. Sends an email notification to the artist via Resend (non-blocking, silently skipped when `RESEND_API_KEY` is not set).
+4. Sends an email notification to the artist via Resend (non-blocking, silently skipped when Resend is not configured in Admin → API Keys).
 
 **Do NOT** use a webhook or external HTTP POST to upload statements — the Server Action is the only supported upload path.
 

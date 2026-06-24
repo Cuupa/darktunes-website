@@ -7,7 +7,7 @@
  * search API because playlistItems supports cursor-based pagination via
  * nextPageToken / prevPageToken and is not subject to search quota limits.
  *
- * Requires YOUTUBE_API_KEY to be set as a server-side environment variable.
+ * Requires youtube_api_key to be configured in Admin → API Keys.
  */
 
 export interface YouTubeVideoItem {

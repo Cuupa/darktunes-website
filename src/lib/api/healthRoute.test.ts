@@ -21,6 +21,7 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
   return {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
@@ -44,6 +45,9 @@ function mockSupabaseClientOnline(): void {
         }
         if (table === 'sync_logs') {
           return makeThenableBuilder([SAMPLE_LOG_ROW])
+        }
+        if (table === 'api_credentials') {
+          return makeThenableBuilder([])
         }
         if (table === 'sync_queue') {
           return {
@@ -92,6 +96,8 @@ describe('app/api/health/route', () => {
   it('HEAD returns 200 when GET is healthy', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+    process.env.API_CREDENTIALS_ENCRYPTION_KEY =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
     mockSupabaseClientOnline()
 

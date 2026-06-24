@@ -1,14 +1,16 @@
 'use server'
 
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 async function sendPressApplicationNotification(data: {
   name: string
   email: string
   publication: string
 }): Promise<void> {
-  const resendApiKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'noreply@darktunes.com'
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const { resendApiKey, resendFromEmail } = await getEmailCredentials(serviceDb)
+  const fromEmail = resendFromEmail ?? 'noreply@darktunes.com'
   const adminEmail = process.env.CONTACT_EMAIL ?? 'info@darktunes.com'
   if (!resendApiKey) return
 

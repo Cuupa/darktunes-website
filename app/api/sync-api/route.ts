@@ -24,6 +24,10 @@ import { isValidCronSecret } from '@/lib/cronAuth'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
+import {
+  getSyncCredentials,
+  getYouTubeCredentials,
+} from '@/lib/secrets/getExternalCredentials'
 
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -68,14 +72,14 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw buildApiError('CONFIG_ERROR', 500)
   }
 
+  const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+
   // 4. YouTube — handled separately (no R2 needed)
   if (apiSource === 'youtube') {
-    const youtubeApiKey = process.env.YOUTUBE_API_KEY
-    const youtubeChannelId = process.env.YOUTUBE_CHANNEL_ID
+    const { apiKey: youtubeApiKey, channelId: youtubeChannelId } =
+      await getYouTubeCredentials(db)
     if (!youtubeApiKey) throw buildApiError('CONFIG_ERROR', 500)
     if (!youtubeChannelId) throw buildApiError('CONFIG_ERROR', 500)
-
-    const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
     let videos
     try {
@@ -144,12 +148,9 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_BUCKET_NAME,
     CLOUDFLARE_R2_PUBLIC_URL,
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    DISCOGS_TOKEN,
-    SONGKICK_API_KEY,
-    BANDSINTOWN_API_KEY,
   } = process.env
+
+  const syncCredentials = await getSyncCredentials(db)
 
   if (
     !CLOUDFLARE_R2_ACCOUNT_ID ||
@@ -162,8 +163,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       throw buildApiError('CONFIG_ERROR', 500)
     }
   }
-
-  const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
   const uploadFn: (imageUrl: string, keyPrefix: string) => Promise<string> =
     CLOUDFLARE_R2_ACCOUNT_ID &&
@@ -190,13 +189,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     db,
     fetch: globalThis.fetch,
     uploadToR2: uploadFn,
-    spotify:
-      SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET
-        ? { clientId: SPOTIFY_CLIENT_ID, clientSecret: SPOTIFY_CLIENT_SECRET }
-        : undefined,
-    discogsToken: DISCOGS_TOKEN,
-    songkickApiKey: SONGKICK_API_KEY,
-    bandsintownApiKey: BANDSINTOWN_API_KEY,
+    spotify: syncCredentials.spotify,
+    discogsToken: syncCredentials.discogsToken,
+    songkickApiKey: syncCredentials.songkickApiKey,
+    bandsintownApiKey: syncCredentials.bandsintownApiKey,
     onlyApi: apiSource,
   })
 

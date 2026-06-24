@@ -151,19 +151,19 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket name (e.g. `darktunes-assets`) |
 | `CLOUDFLARE_R2_PUBLIC_URL` | R2 public CDN base URL (e.g. `https://cdn.darktunes.com`) |
 
-### External API Keys (optional — Artist Auto-Sync)
+### API credentials (encrypted in Supabase)
 
 | Variable | Description |
 |---|---|
-| `SPOTIFY_CLIENT_ID` | Spotify app client ID (sync releases by Spotify Artist ID) |
-| `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
-| `DISCOGS_TOKEN` | Discogs personal access token (sync releases by Discogs Artist ID) |
-| `SONGKICK_API_KEY` | Songkick API key (sync tour dates by Songkick Artist ID) |
-| `BANDSINTOWN_API_KEY` | Bandsintown API key (sync tour dates by Bandsintown artist name) |
-| `YOUTUBE_API_KEY` | Google API key with YouTube Data API v3 (sync videos via `POST /api/sync-youtube`) |
-| `YOUTUBE_CHANNEL_ID` | YouTube channel ID (starts with `UC`) |
-| `CRON_SECRET` | Optional secret for Vercel cron requests to `POST /api/sync-youtube` (Bearer token) |
-| `CONTACT_EMAIL` | Email address for contact form submissions (defaults to `info@darktunes.com`) |
+| `API_CREDENTIALS_ENCRYPTION_KEY` | Required. 64-char hex master key for AES-256-GCM encryption of `api_credentials` values (`openssl rand -hex 32`) |
+
+External integration keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are configured in **Admin → API Keys**, not env vars. See `SECURITY.md` and `DEPLOYMENT.md`.
+
+| Variable | Description |
+|---|---|
+| `CRON_SECRET` | Optional secret for Vercel cron / `trigger-sync` (Bearer token) |
+| `CONTACT_EMAIL` | Contact form recipient (defaults to `info@darktunes.com`) |
+| `LABEL_NOTIFICATION_EMAIL` | Label inbox for portal submissions and health alerts |
 
 ### Supabase Read Replica (optional — Supabase Pro plan)
 

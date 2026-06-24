@@ -1009,6 +1009,55 @@ CREATE TRIGGER trg_site_settings_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_site_settings_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: api_credentials  (admin-managed external API keys, AES-256-GCM ciphertext)
+-- label_id NULL = default single-label tenant; future multi-label SaaS uses per-label rows.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.api_credentials (
+  label_id   UUID        NULL,
+  key        TEXT        NOT NULL,
+  value      TEXT        NOT NULL DEFAULT '',
+  category   TEXT        NOT NULL DEFAULT 'integration',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by UUID        REFERENCES public.users (id) ON DELETE SET NULL,
+  PRIMARY KEY (label_id, key)
+);
+
+ALTER TABLE public.api_credentials ADD COLUMN IF NOT EXISTS label_id   UUID NULL;
+ALTER TABLE public.api_credentials ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'integration';
+
+-- Migrate legacy single-column PK (key-only) to composite PK when upgrading existing DBs.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+    WHERE c.conrelid = 'public.api_credentials'::regclass
+      AND c.contype = 'p'
+      AND a.attname = 'key'
+      AND array_length(c.conkey, 1) = 1
+  ) THEN
+    ALTER TABLE public.api_credentials DROP CONSTRAINT api_credentials_pkey;
+    UPDATE public.api_credentials SET label_id = NULL;
+    ALTER TABLE public.api_credentials ADD PRIMARY KEY (label_id, key);
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.set_api_credentials_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_api_credentials_updated_at ON public.api_credentials;
+CREATE TRIGGER trg_api_credentials_updated_at
+  BEFORE UPDATE ON public.api_credentials
+  FOR EACH ROW EXECUTE FUNCTION public.set_api_credentials_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- TABLE: sync_logs
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.sync_logs (
@@ -1884,6 +1933,7 @@ ALTER TABLE public.news_posts            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.videos                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assets                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.api_credentials       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_logs             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.concerts              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_epks       ENABLE ROW LEVEL SECURITY;
@@ -2215,6 +2265,17 @@ CREATE POLICY "site_settings_admin_write" ON public.site_settings
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: api_credentials
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "api_credentials_admin_only" ON public.api_credentials;
+
+-- Admin-only: external API keys must not be readable by editors or the public.
+CREATE POLICY "api_credentials_admin_only" ON public.api_credentials
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: sync_logs

@@ -19,6 +19,7 @@ import { isValidCronSecret } from '@/lib/cronAuth'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
+import { getYouTubeCredentials } from '@/lib/secrets/getExternalCredentials'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
 // Fetching and upserting up to 200 YouTube videos can take longer than the default timeout.
@@ -52,18 +53,24 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     await verifyToken(authHeader.slice(7))
   }
 
-  // 2. Read required config
-  const youtubeApiKey = process.env.YOUTUBE_API_KEY
-  const youtubeChannelId = process.env.YOUTUBE_CHANNEL_ID
-
-  if (!youtubeApiKey) throw new ApiError(500, 'YOUTUBE_API_KEY is not configured', 'MISSING_CONFIG')
-  if (!youtubeChannelId)
-    throw new ApiError(500, 'YOUTUBE_CHANNEL_ID is not configured', 'MISSING_CONFIG')
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) {
     throw new ApiError(500, 'Supabase is not configured', 'MISSING_SUPABASE_CONFIG')
+  }
+
+  const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { apiKey: youtubeApiKey, channelId: youtubeChannelId } = await getYouTubeCredentials(db)
+
+  if (!youtubeApiKey) {
+    throw new ApiError(500, 'YouTube API key is not configured in Admin → API Keys', 'MISSING_CONFIG')
+  }
+  if (!youtubeChannelId) {
+    throw new ApiError(
+      500,
+      'YouTube channel ID is not configured in Admin → API Keys',
+      'MISSING_CONFIG',
+    )
   }
 
   // 3. Fetch from YouTube
@@ -84,10 +91,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   // 4. Upsert into Supabase
-  const db = createClient<Database>(supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  })
-
   const { data: artists, error: artistsError } = await db
     .from('artists')
     .select('id, name')

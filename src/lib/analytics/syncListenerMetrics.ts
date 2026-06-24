@@ -48,7 +48,9 @@ export async function syncListenerMetricsForArtists(
   const hasSoundcharts = isSoundchartsConfigured(deps.soundchartsApiKey)
 
   if (!hasLastfm && !hasSoundcharts) {
-    throw new Error('No external listener API configured (set LASTFM_API_KEY or SOUNDCHARTS_API_KEY)')
+    throw new Error(
+      'No external listener API configured (set Last.fm or Soundcharts in Admin → API Keys)',
+    )
   }
 
   for (const artist of artists) {

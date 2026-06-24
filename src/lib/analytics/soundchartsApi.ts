@@ -1,6 +1,6 @@
 /**
  * Soundcharts API client (optional paid tier).
- * Disabled when SOUNDCHARTS_API_KEY is not configured.
+ * Disabled when the Soundcharts API key is not configured in Admin → API Keys.
  */
 
 export interface SoundchartsListenerPoint {

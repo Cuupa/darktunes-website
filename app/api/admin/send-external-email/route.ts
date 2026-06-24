@@ -9,14 +9,13 @@
  * Request body:
  *   { to: string, subject: string, html: string, text?: string, replyTo?: string }
  *
- * Transport:
- *   RESEND_API_KEY  – required
- *   RESEND_FROM_EMAIL – optional, fallback: noreply@darktunes.com
+ * Transport: Resend credentials from Admin → API Keys (encrypted in api_credentials).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
@@ -37,19 +36,20 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   if (typeof subject !== 'string' || !subject.trim()) throw new ApiError(400, 'Missing "subject" field')
   if (typeof html !== 'string' || !html.trim()) throw new ApiError(400, 'Missing "html" field')
 
-  const apiKey = process.env['RESEND_API_KEY']
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const { resendApiKey: apiKey, resendFromEmail } = await getEmailCredentials(serviceDb)
   if (!apiKey) {
     return NextResponse.json(
       {
         ok: false,
         error: 'Email not configured',
-        hint: 'Set RESEND_API_KEY and optionally RESEND_FROM_EMAIL environment variables.',
+        hint: 'Configure Resend credentials in Admin → API Keys.',
       },
       { status: 501 },
     )
   }
 
-  const from = process.env['RESEND_FROM_EMAIL'] ?? 'noreply@darktunes.com'
+  const from = resendFromEmail ?? 'noreply@darktunes.com'
 
   const payload: Record<string, unknown> = {
     from,
