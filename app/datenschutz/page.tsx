@@ -15,7 +15,7 @@ import { getSiteSettings } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
 import type { Database } from '@/types/database'
 import { DatenschutzContent } from './_components/DatenschutzContent'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getLocale, getTranslations } from 'next-intl/server'
 
 // Cookie-free public client — safe inside unstable_cache callbacks where
 // Next.js Dynamic APIs (cookies, headers) are unavailable. site_settings has
@@ -36,10 +36,9 @@ const getCachedSettings = unstable_cache(
 )
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const t = await getTranslations('datenschutz')
   return {
-    title: dict.datenschutz.metaTitle,
+    title: t('metaTitle'),
     robots: { index: false },
   }
 }
@@ -223,14 +222,17 @@ export default async function DatenschutzPage() {
     ),
     getLocale(),
   ])
-  const dict = await getDictionary(locale)
+  const [tDatenschutz, tPages] = await Promise.all([
+    getTranslations('datenschutz'),
+    getTranslations('pages'),
+  ])
 
   const isEn = locale === 'en'
   const content = isEn
     ? (settings.datenschutzContentEn || getDefaultContentEn(settings))
     : (settings.datenschutzContent || getDefaultContentDe(settings))
 
-  const dateLabel = dict.datenschutz.dateLabel
+  const dateLabel = tDatenschutz('dateLabel')
   const formattedDate = new Date().toLocaleDateString(isEn ? 'en-GB' : 'de-DE', {
     year: 'numeric',
     month: 'long',
@@ -243,11 +245,11 @@ export default async function DatenschutzPage() {
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
         >
-          {dict.pages.backToHome}
+          {tPages('backToHome')}
         </Link>
 
         <h1 className="text-4xl lg:text-5xl font-bold mb-10 tracking-tight uppercase">
-          {dict.datenschutz.heading}
+          {tDatenschutz('heading')}
         </h1>
 
         <DatenschutzContent content={content} />

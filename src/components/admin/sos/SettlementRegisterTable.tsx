@@ -1,17 +1,11 @@
 'use client'
 
+import type { ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { AdminDataTable, useAdminTable } from '@/components/admin/DataTable'
 import {
   canCorrectStatement,
   fmtCents,
@@ -87,6 +81,7 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
     runApproval,
     openCorrectionDialog,
   } = settlement
+
   const renderRowActions = (row: MasterRow, isBusy: boolean) => (
     <div className="flex flex-wrap gap-2">
       {row.workflowStatus === 'not_uploaded' && row.artistId && periodWritable && (
@@ -126,6 +121,126 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         row.workflowStatus === 'paid') && <WorkflowProgressIcon complete />}
     </div>
   )
+
+  const columns: ColumnDef<MasterRow>[] = [
+    {
+      id: 'select',
+      header: () => (
+        <Checkbox
+          checked={allSelected}
+          onCheckedChange={toggleSelectAll}
+          aria-label={t.settlementSelectActionableAria}
+          disabled={selectableRows.length === 0}
+        />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => {
+        const actionable = rowIsSelectable(row.original)
+        return (
+          <Checkbox
+            checked={selectedArtists.has(row.original.artistName)}
+            onCheckedChange={() => toggleArtist(row.original.artistName)}
+            aria-label={interpolate(t.settlementSelectArtist, { artist: row.original.artistName })}
+            disabled={!actionable}
+          />
+        )
+      },
+    },
+    {
+      accessorKey: 'artistName',
+      header: t.settlementColArtist,
+      enableSorting: false,
+      cell: ({ row }) => <span className="font-medium">{row.original.artistName}</span>,
+    },
+    {
+      id: 'statement',
+      header: t.settlementColStatement,
+      enableSorting: false,
+      cell: ({ row }) => <WorkflowStatusBadge status={row.original.workflowStatus} />,
+    },
+    {
+      id: 'viewed',
+      header: t.settlementColViewed,
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-sm">{fmtDate(row.original.firstViewedAt)}</span>,
+    },
+    {
+      id: 'invoice',
+      header: t.settlementColInvoice,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1">
+          <InvoiceStatusBadge status={row.original.invoiceStatus} labels={invoiceStatusLabels} />
+          {row.original.invoiceNumber && (
+            <span className="text-[10px] text-muted-foreground">{row.original.invoiceNumber}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'received',
+      header: t.settlementColReceived,
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-sm">{fmtDate(row.original.receivedAt)}</span>,
+    },
+    {
+      id: 'paid',
+      header: t.settlementColPaid,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm">{fmtDate(row.original.paidAt)}</span>
+          {row.original.paidAmountCents > 0 && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {fmtCents(row.original.paidAmountCents)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'balance',
+      header: () => <span className="text-right block w-full">{t.settlementColOpenBalance}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span
+          className={`block text-right tabular-nums ${
+            row.original.ledgerBalanceEur > 0
+              ? 'text-amber-300'
+              : row.original.ledgerBalanceEur < 0
+                ? 'text-sky-300'
+                : ''
+          }`}
+        >
+          {fmtEur(row.original.ledgerBalanceEur)}
+        </span>
+      ),
+    },
+    {
+      id: 'carryForward',
+      header: () => <span className="text-right block w-full">{t.settlementColCarryForward}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="block text-right tabular-nums text-muted-foreground">
+          {row.original.carryForwardEur != null ? fmtEur(row.original.carryForwardEur) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="text-right block w-full">{t.settlementColActions}</span>,
+      enableSorting: false,
+      cell: ({ row }) =>
+        renderRowActions(row.original, busyArtists.has(row.original.artistName)),
+    },
+  ]
+
+  const table = useAdminTable({
+    data: filteredRows,
+    columns,
+    enableSorting: false,
+    getRowId: (row) => row.artistName,
+  })
 
   return (
     <>
@@ -200,104 +315,13 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         )}
       </div>
 
-      <div className="hidden lg:block overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label={t.settlementSelectActionableAria}
-                  disabled={selectableRows.length === 0}
-                />
-              </TableHead>
-              <TableHead>{t.settlementColArtist}</TableHead>
-              <TableHead>{t.settlementColStatement}</TableHead>
-              <TableHead>{t.settlementColViewed}</TableHead>
-              <TableHead>{t.settlementColInvoice}</TableHead>
-              <TableHead>{t.settlementColReceived}</TableHead>
-              <TableHead>{t.settlementColPaid}</TableHead>
-              <TableHead className="text-right">{t.settlementColOpenBalance}</TableHead>
-              <TableHead className="text-right">{t.settlementColCarryForward}</TableHead>
-              <TableHead className="text-right">{t.settlementColActions}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                  {t.settlementLoadingRegister}
-                </TableCell>
-              </TableRow>
-            ) : filteredRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                  {t.settlementNoArtistsFilter}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredRows.map((row) => {
-                const actionable = rowIsSelectable(row)
-                const isBusy = busyArtists.has(row.artistName)
-
-                return (
-                  <TableRow key={row.artistName}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedArtists.has(row.artistName)}
-                        onCheckedChange={() => toggleArtist(row.artistName)}
-                        aria-label={interpolate(t.settlementSelectArtist, { artist: row.artistName })}
-                        disabled={!actionable}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{row.artistName}</TableCell>
-                    <TableCell>
-                      <WorkflowStatusBadge status={row.workflowStatus} />
-                    </TableCell>
-                    <TableCell className="text-sm">{fmtDate(row.firstViewedAt)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <InvoiceStatusBadge status={row.invoiceStatus} labels={invoiceStatusLabels} />
-                        {row.invoiceNumber && (
-                          <span className="text-[10px] text-muted-foreground">{row.invoiceNumber}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{fmtDate(row.receivedAt)}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex flex-col">
-                        <span>{fmtDate(row.paidAt)}</span>
-                        {row.paidAmountCents > 0 && (
-                          <span className="text-[10px] text-muted-foreground tabular-nums">
-                            {fmtCents(row.paidAmountCents)}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span
-                        className={
-                          row.ledgerBalanceEur > 0
-                            ? 'text-amber-300'
-                            : row.ledgerBalanceEur < 0
-                              ? 'text-sky-300'
-                              : undefined
-                        }
-                      >
-                        {fmtEur(row.ledgerBalanceEur)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {row.carryForwardEur != null ? fmtEur(row.carryForwardEur) : '—'}
-                    </TableCell>
-                    <TableCell className="text-right">{renderRowActions(row, isBusy)}</TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+      <div className="hidden lg:block">
+        <AdminDataTable
+          table={table}
+          loading={loading}
+          emptyMessage={t.settlementNoArtistsFilter}
+          skeletonRowCount={6}
+        />
       </div>
     </>
   )

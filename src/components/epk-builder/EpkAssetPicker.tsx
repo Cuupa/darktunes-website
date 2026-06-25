@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { UploadSimple } from '@phosphor-icons/react'
 import {
@@ -19,11 +20,9 @@ import { Button } from '@/components/ui/button'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { ArtistAsset } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { toast } from 'sonner'
 
 interface EpkAssetPickerProps {
-  dict: Dictionary['portal']
   artistId: string
   open: boolean
   onClose: () => void
@@ -36,13 +35,13 @@ function isImageAsset(asset: ArtistAsset): boolean {
 }
 
 export function EpkAssetPicker({
-  dict,
   artistId,
   open,
   onClose,
   initialAssets,
   onSelect,
 }: EpkAssetPickerProps) {
+  const t = useTranslations('portal')
   const [assets, setAssets] = useState(() => initialAssets.filter(isImageAsset))
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -55,7 +54,7 @@ export function EpkAssetPicker({
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        toast.error(dict.epk_builder_export_auth_error)
+        toast.error(t('epk_builder_export_auth_error'))
         return
       }
 
@@ -69,7 +68,7 @@ export function EpkAssetPicker({
       })
 
       if (!response.ok) {
-        throw new Error(dict.epk_assets_upload_error)
+        throw new Error(t('epk_assets_upload_error'))
       }
 
       const payload = (await response.json()) as {
@@ -106,13 +105,13 @@ export function EpkAssetPicker({
       }
       onSelect(newAsset.publicUrl)
       onClose()
-      toast.success(dict.epk_assets_upload_success)
+      toast.success(t('epk_assets_upload_success'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.epk_assets_upload_error)
+      toast.error(err instanceof Error ? err.message : t('epk_assets_upload_error'))
     } finally {
       setUploading(false)
     }
-  }, [artistId, dict, onClose, onSelect])
+  }, [artistId, t, onClose, onSelect])
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
@@ -121,7 +120,7 @@ export function EpkAssetPicker({
         aria-labelledby="epk-asset-picker-title"
       >
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle id="epk-asset-picker-title">{dict.epk_assets_title}</DialogTitle>
+          <DialogTitle id="epk-asset-picker-title">{t('epk_assets_title')}</DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] p-6 space-y-4" data-lenis-prevent>
@@ -145,12 +144,12 @@ export function EpkAssetPicker({
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadSimple className="mr-2 h-4 w-4" aria-hidden="true" />
-              {uploading ? dict.epk_assets_uploading : dict.epk_assets_upload}
+              {uploading ? t('epk_assets_uploading') : t('epk_assets_upload')}
             </Button>
           </div>
 
           {assets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_assets_empty}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_assets_empty')}</p>
           ) : (
             <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3 list-none">
               {assets.map((asset) => (

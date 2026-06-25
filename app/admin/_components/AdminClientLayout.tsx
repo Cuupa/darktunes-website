@@ -28,6 +28,7 @@
  */
 
 import { Suspense } from 'react'
+import { useMessages } from 'next-intl'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { DictContext } from '@/contexts/DictContext'
 import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav'
@@ -35,10 +36,11 @@ import type { Dictionary } from '@/i18n/types'
 
 interface AdminClientLayoutProps {
   children: React.ReactNode
-  dict: Dictionary
 }
 
-export function AdminClientLayout({ children, dict }: AdminClientLayoutProps) {
+export function AdminClientLayout({ children }: AdminClientLayoutProps) {
+  const dict = useMessages() as Dictionary
+
   return (
     <AuthProvider>
       <DictContext.Provider value={dict}>

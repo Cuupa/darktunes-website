@@ -2,20 +2,14 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { AdminDataTable, useAdminTable } from '@/components/admin/DataTable'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import type { SalesStatementStatus } from '@/lib/api/salesStatements'
@@ -32,7 +26,7 @@ import {
   WorkflowSummaryCard,
 } from '@/components/admin/sos/statementWorkflowUi'
 import { CircleNotch, PaperPlaneTilt, SealCheck } from '@phosphor-icons/react'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 type StatementRow = {
@@ -120,8 +114,7 @@ export function StatementsManager({
   readOnly = true,
   settlementHref = '/admin/accounting?subTab=settlements',
 }: StatementsManagerProps) {
-  const dict = useDict()
-  const t = { ...STATEMENTS_FALLBACK, ...dict.admin?.accounting }
+  const t = useMergedAccountingLabels(STATEMENTS_FALLBACK)
 
   const [statements, setStatements] = useState<StatementRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -296,6 +289,101 @@ export function StatementsManager({
     )
   }
 
+  const columns: ColumnDef<StatementRow>[] = [
+    ...(!readOnly
+      ? [
+          {
+            id: 'select',
+            header: t.historySelectColumn,
+            enableSorting: false,
+            cell: ({ row }: { row: { original: StatementRow } }) => {
+              const isDraft = row.original.status === 'draft'
+              return (
+                <Checkbox
+                  checked={selectedIds.has(row.original.id)}
+                  onCheckedChange={() => {
+                    setSelectedIds((current) => {
+                      const next = new Set(current)
+                      if (next.has(row.original.id)) next.delete(row.original.id)
+                      else next.add(row.original.id)
+                      return next
+                    })
+                  }}
+                  aria-label={interpolate(t.historySelectArtist, {
+                    artist: row.original.artists.name,
+                  })}
+                  disabled={!isDraft}
+                />
+              )
+            },
+          } satisfies ColumnDef<StatementRow>,
+        ]
+      : []),
+    {
+      id: 'artist',
+      header: t.historyColArtist,
+      enableSorting: false,
+      cell: ({ row }) => row.original.artists.name,
+    },
+    {
+      accessorKey: 'period',
+      header: t.historyColPeriod,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap font-mono text-sm">{row.original.period}</span>
+      ),
+    },
+    {
+      id: 'status',
+      header: t.historyColStatus,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <WorkflowStatusBadge status={workflowStatusFromStatement(row.original.status, true)} />
+      ),
+    },
+    {
+      accessorKey: 'amount_eur',
+      header: () => <span className="text-right block w-full">{t.historyColAmount}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="block text-right tabular-nums whitespace-nowrap">
+          {formatEur(row.original.amount_eur)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'filename',
+      header: t.historyColFilename,
+      enableSorting: false,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.filename}</span>,
+    },
+    {
+      accessorKey: 'created_at',
+      header: t.historyColCreated,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm">{formatDate(row.original.created_at)}</span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="text-right block w-full">{t.historyColActions}</span>,
+      enableSorting: false,
+      cell: ({ row }) =>
+        renderStatementActions(
+          row.original,
+          workflowStatusFromStatement(row.original.status, true),
+        ),
+    },
+  ]
+
+  const table = useAdminTable({
+    data: filteredStatements,
+    columns,
+    enableSorting: false,
+    getRowId: (row) => row.id,
+  })
+
   if (loading) {
     return (
       <div aria-busy="true" aria-label={t.historyLoadingAria} className="space-y-2">
@@ -458,66 +546,8 @@ export function StatementsManager({
         })}
       </div>
 
-      <div className="hidden md:block overflow-x-auto rounded-xl border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {!readOnly && <TableHead className="w-12">{t.historySelectColumn}</TableHead>}
-              <TableHead>{t.historyColArtist}</TableHead>
-              <TableHead>{t.historyColPeriod}</TableHead>
-              <TableHead>{t.historyColStatus}</TableHead>
-              <TableHead className="text-right">{t.historyColAmount}</TableHead>
-              <TableHead>{t.historyColFilename}</TableHead>
-              <TableHead>{t.historyColCreated}</TableHead>
-              <TableHead className="text-right">{t.historyColActions}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredStatements.map((statement) => {
-              const workflowStatus = workflowStatusFromStatement(statement.status, true)
-              const isDraft = statement.status === 'draft'
-
-              return (
-                <TableRow key={statement.id}>
-                  {!readOnly && (
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(statement.id)}
-                        onCheckedChange={() => {
-                          setSelectedIds((current) => {
-                            const next = new Set(current)
-                            if (next.has(statement.id)) next.delete(statement.id)
-                            else next.add(statement.id)
-                            return next
-                          })
-                        }}
-                        aria-label={interpolate(t.historySelectArtist, {
-                          artist: statement.artists.name,
-                        })}
-                        disabled={!isDraft}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell>{statement.artists.name}</TableCell>
-                  <TableCell className="whitespace-nowrap font-mono text-sm">{statement.period}</TableCell>
-                  <TableCell>
-                    <WorkflowStatusBadge status={workflowStatus} />
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums whitespace-nowrap">
-                    {formatEur(statement.amount_eur)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-mono text-xs">{statement.filename}</span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm">{formatDate(statement.created_at)}</TableCell>
-                  <TableCell className="text-right">
-                    {renderStatementActions(statement, workflowStatus)}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+      <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+        <AdminDataTable table={table} emptyMessage={t.historyEmpty} />
       </div>
     </div>
   )

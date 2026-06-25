@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
@@ -14,8 +13,6 @@ export const metadata: Metadata = {
 }
 
 export default async function PressPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
   const supabase = await createServerSupabaseClient()
 
   const [artists, pressReleases, siteSettings] = await Promise.all([
@@ -44,7 +41,6 @@ export default async function PressPage() {
       artists={artists}
       pressReleases={pressReleases}
       siteSettings={siteSettings}
-      dict={dict}
     />
   )
 }

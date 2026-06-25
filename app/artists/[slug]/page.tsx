@@ -29,7 +29,7 @@ import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
 import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
 import { getArtistAssets } from '@/lib/api/artistAssets'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 import { buildMusicGroupSchema, serializeJsonLd } from '@/lib/seo/jsonld'
 
@@ -121,12 +121,8 @@ export default async function ArtistDetailPage({ params }: Props) {
   const { slug } = await params
   // Do NOT swallow errors here — a Supabase failure must propagate so that
   // Next.js returns a 500 (uncached) rather than caching a false 404 for 60s.
-  const [data, locale] = await Promise.all([
-    makeGetArtistData(slug)(),
-    getLocale(),
-  ])
+  const data = await makeGetArtistData(slug)()
   if (!data) notFound()
-  const dict = await getDictionary(locale)
   const { artist, releases, concerts, videos, news, assets, relatedArtists } = data
   return (
     <>
@@ -144,9 +140,6 @@ export default async function ArtistDetailPage({ params }: Props) {
         news={news}
         assets={assets}
         relatedArtists={relatedArtists}
-        dict={dict.artistDetail}
-        consentDict={dict.consent}
-        locale={locale}
       />
     </>
   )

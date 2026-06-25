@@ -33,8 +33,8 @@ import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 import { trackShopClick, trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
@@ -48,9 +48,6 @@ interface ArtistDetailContentProps {
   news: NewsPost[]
   assets: ArtistAsset[]
   relatedArtists?: Artist[]
-  dict: Dictionary['artistDetail']
-  consentDict: Dictionary['consent']
-  locale: Locale
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -100,10 +97,10 @@ export function ArtistDetailContent({
   news,
   assets,
   relatedArtists = [],
-  dict,
-  consentDict,
-  locale,
 }: ArtistDetailContentProps) {
+  const t = useTranslations('artistDetail')
+  const tConsent = useTranslations('consent')
+  const locale = useLocale()
   const prefersReducedMotion = useReducedMotion()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const youtubeId = artist.youtubeUrl ? extractYouTubeId(artist.youtubeUrl) : null
@@ -138,8 +135,8 @@ export function ArtistDetailContent({
     { url: artist.websiteUrl, icon: Globe, label: `${artist.name} official website` },
   ]
 
-  const collapseLabel = dict.collapse ?? 'Collapse'
-  const expandLabel = dict.expand ?? 'Expand'
+  const collapseLabel = t('collapse')
+  const expandLabel = t('expand')
 
   const collapseVariants = {
     open: { opacity: 1, height: 'auto' },
@@ -177,7 +174,7 @@ export function ArtistDetailContent({
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
           >
             <ArrowLeft size={16} weight="bold" aria-hidden="true" />
-            {dict.backToArtists}
+            {t('backToArtists')}
           </Link>
 
           {/* Two-column hero on desktop: photo | metadata */}
@@ -253,7 +250,7 @@ export function ArtistDetailContent({
                   {artist.foundedYear && (
                     <span className="flex items-center gap-1">
                       <Calendar size={12} aria-hidden="true" />
-                      {dict.since} {artist.foundedYear}
+                      {t('since')} {artist.foundedYear}
                     </span>
                   )}
                 </div>
@@ -333,7 +330,7 @@ export function ArtistDetailContent({
                       onClick={() => trackShopClick(artist.id, `/artists/${artist.slug}`)}
                     >
                       <ShoppingBag size={18} weight="fill" className="mr-2" aria-hidden="true" />
-                      {dict.shopMerch}
+                      {t('shopMerch')}
                     </a>
                   </Button>
                 )}
@@ -400,10 +397,10 @@ export function ArtistDetailContent({
                   title={artist.name}
                   text={artist.bio ? artist.bio.slice(0, 120) : undefined}
                   labels={{
-                    share: dict.share,
-                    shareSuccess: dict.shareSuccess,
-                    shareLinkCopied: dict.shareLinkCopied,
-                    shareError: dict.shareError,
+                    share: t('share'),
+                    shareSuccess: t('shareSuccess'),
+                    shareLinkCopied: t('shareLinkCopied'),
+                    shareError: t('shareError'),
                   }}
                 />
               </div>
@@ -429,7 +426,7 @@ export function ArtistDetailContent({
             {/* Biography */}
             {artist.bio && (
               <div>
-                <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{dict.fullBio}</h2>
+                <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground">{t('fullBio')}</h2>
                 {/^\s*<[a-z]/i.test(artist.bio) ? (
                   <div
                     suppressHydrationWarning
@@ -453,15 +450,15 @@ export function ArtistDetailContent({
               <div className="lg:sticky lg:top-36 max-w-sm lg:max-w-none">
                 <h2 className="text-xl font-bold mb-4 tracking-tight text-foreground flex items-center gap-2">
                   <SpotifyLogo size={22} weight="fill" className="text-[#1DB954]" aria-hidden="true" />
-                  {dict.listenOn}
+                  {t('listenOn')}
                 </h2>
                 <ConsentGate
-                  label={consentDict.spotifyBtnLabel}
-                  title={consentDict.spotifyTitle}
+                  label={tConsent('spotifyBtnLabel')}
+                  title={tConsent('spotifyTitle')}
                   providerIcon={<SpotifyLogo size={20} weight="fill" className="text-[#1DB954]" aria-hidden="true" />}
-                  gateText={consentDict.gateText}
+                  gateText={tConsent('gateText')}
                   privacyPolicyUrl="/datenschutz"
-                  privacyPolicyLabel={consentDict.privacyLink}
+                  privacyPolicyLabel={tConsent('privacyLink')}
                 >
                   <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/60">
                     <iframe
@@ -490,7 +487,7 @@ export function ArtistDetailContent({
           >
             <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground flex items-center gap-2">
               <Images size={28} weight="duotone" aria-hidden="true" />
-              {dict.bandPhotos}
+              {t('bandPhotos')}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {assets.map((asset) => (
@@ -522,7 +519,7 @@ export function ArtistDetailContent({
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
             <SectionHeader
-              title={dict.latestVideo}
+              title={t('latestVideo')}
               isOpen={openSections.videos}
               onToggle={() => toggleSection('videos')}
               collapseLabel={collapseLabel}
@@ -593,7 +590,7 @@ export function ArtistDetailContent({
                     </ul>
                   ) : youtubeId ? (
                     <div className="max-w-3xl">
-                      <ConsentGate label={consentDict.loadYouTube} gateText={consentDict.gateText}>
+                      <ConsentGate label={tConsent('loadYouTube')} gateText={tConsent('gateText')}>
                         <div className="aspect-video rounded-xl overflow-hidden">
                           <iframe
                             src={`https://www.youtube.com/embed/${youtubeId}`}
@@ -621,7 +618,7 @@ export function ArtistDetailContent({
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
             <SectionHeader
-              title={dict.discography}
+              title={t('discography')}
               isOpen={openSections.discography}
               onToggle={() => toggleSection('discography')}
               collapseLabel={collapseLabel}
@@ -695,7 +692,7 @@ export function ArtistDetailContent({
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
           >
             <SectionHeader
-              title={dict.news}
+              title={t('news')}
               isOpen={openSections.news}
               onToggle={() => toggleSection('news')}
               collapseLabel={collapseLabel}
@@ -756,7 +753,7 @@ export function ArtistDetailContent({
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
           <SectionHeader
-            title={dict.tourDates}
+            title={t('tourDates')}
             isOpen={openSections.tourDates}
             onToggle={() => toggleSection('tourDates')}
             collapseLabel={collapseLabel}
@@ -774,7 +771,7 @@ export function ArtistDetailContent({
                 style={{ overflow: 'hidden' }}
               >
                 {concerts.length === 0 ? (
-                  <p className="text-foreground/70 font-serif">{dict.noShows}</p>
+                  <p className="text-foreground/70 font-serif">{t('noShows')}</p>
                 ) : (
                   <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 list-none">
                     {concerts.map((concert) => (
@@ -808,7 +805,7 @@ export function ArtistDetailContent({
                             aria-label={`Tickets for ${concert.eventName}`}
                           >
                             <Ticket size={16} weight="fill" aria-hidden="true" />
-                            {dict.getTickets}
+                            {t('getTickets')}
                           </a>
                         )}
                       </li>
@@ -822,14 +819,14 @@ export function ArtistDetailContent({
 
         {/* Related Artists */}
         {relatedArtists.length > 0 && (
-          <RelatedArtists artists={relatedArtists} heading={dict.relatedArtists} />
+          <RelatedArtists artists={relatedArtists} heading={t('relatedArtists')} />
         )}
       </div>
       <VideoModal
         video={selectedVideo}
         open={isVideoModalOpen}
         onClose={() => setIsVideoModalOpen(false)}
-        youtubeLabel={consentDict.loadYouTube}
+        youtubeLabel={tConsent('loadYouTube')}
       />
     </div>
   )

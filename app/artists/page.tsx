@@ -8,7 +8,7 @@
 
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { getCachedPublicArtists } from '@/lib/cache/publicQueries'
 import { ArtistsGridContent } from './_components/ArtistsGridContent'
 
@@ -21,12 +21,10 @@ export const metadata: Metadata = {
 }
 
 export default async function ArtistsPage() {
-  const [artists, locale] = await Promise.all([
+  const [artists, tNav] = await Promise.all([
     getCachedPublicArtists(),
-    getLocale(),
+    getTranslations('navigation'),
   ])
-
-  const dict = await getDictionary(locale)
 
   return (
     <main id="main-content" className="min-h-screen bg-background">
@@ -36,9 +34,9 @@ export default async function ArtistsPage() {
             href="/"
             className="text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-6 inline-block"
           >
-            ← {dict.navigation.home}
+            ← {tNav('home')}
           </Link>
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{dict.navigation.artists}</h1>
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{tNav('artists')}</h1>
         </div>
         <ArtistsGridContent artists={artists} />
       </div>

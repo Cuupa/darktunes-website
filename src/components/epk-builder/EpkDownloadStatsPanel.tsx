@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ChartBar } from '@phosphor-icons/react'
 import {
   Dialog,
@@ -16,21 +17,19 @@ import {
 } from '@/components/ui/dialog'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { EpkDownloadStats } from '@/lib/api/epkDownloadEvents'
-import type { Dictionary } from '@/i18n/types'
 
 interface EpkDownloadStatsPanelProps {
   open: boolean
   onClose: () => void
   artistId: string
-  dict: Dictionary['portal']
 }
 
 export function EpkDownloadStatsPanel({
   open,
   onClose,
   artistId,
-  dict,
 }: EpkDownloadStatsPanelProps) {
+  const t = useTranslations('portal')
   const [stats, setStats] = useState<EpkDownloadStats | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -69,37 +68,37 @@ export function EpkDownloadStatsPanel({
         <DialogHeader className="p-6 pb-0">
           <DialogTitle id="epk-analytics-title" className="flex items-center gap-2">
             <ChartBar size={20} aria-hidden="true" />
-            {dict.epk_analytics_title}
+            {t('epk_analytics_title')}
           </DialogTitle>
         </DialogHeader>
         <div className="overflow-y-auto max-h-[70vh] p-6 space-y-4">
           {loading ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_analytics_loading}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_analytics_loading')}</p>
           ) : !stats ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_analytics_error}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_analytics_error')}</p>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg border border-border p-4">
-                  <p className="text-xs text-muted-foreground">{dict.epk_analytics_total}</p>
+                  <p className="text-xs text-muted-foreground">{t('epk_analytics_total')}</p>
                   <p className="text-2xl font-bold tabular-nums">{stats.total}</p>
                 </div>
                 <div className="rounded-lg border border-border p-4">
-                  <p className="text-xs text-muted-foreground">{dict.epk_analytics_last_30}</p>
+                  <p className="text-xs text-muted-foreground">{t('epk_analytics_last_30')}</p>
                   <p className="text-2xl font-bold tabular-nums">{stats.last30Days}</p>
                 </div>
               </div>
               <ul className="space-y-2 text-sm">
                 <li className="flex justify-between rounded-lg border border-border px-4 py-3">
-                  <span>{dict.epk_analytics_source_portal}</span>
+                  <span>{t('epk_analytics_source_portal')}</span>
                   <span className="font-medium tabular-nums">{stats.bySource.portal}</span>
                 </li>
                 <li className="flex justify-between rounded-lg border border-border px-4 py-3">
-                  <span>{dict.epk_analytics_source_share}</span>
+                  <span>{t('epk_analytics_source_share')}</span>
                   <span className="font-medium tabular-nums">{stats.bySource.share}</span>
                 </li>
                 <li className="flex justify-between rounded-lg border border-border px-4 py-3">
-                  <span>{dict.epk_analytics_source_press}</span>
+                  <span>{t('epk_analytics_source_press')}</span>
                   <span className="font-medium tabular-nums">{stats.bySource.press}</span>
                 </li>
               </ul>

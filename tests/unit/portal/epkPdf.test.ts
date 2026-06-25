@@ -10,11 +10,15 @@ describe('generateEpkPdf', () => {
     const { buildEpkPdfMessages, generateEpkPdf } = await import('../../../app/portal/profile/_components/epkPdf')
 
     const root = document.createElement('article')
-    const messages = buildEpkPdfMessages({
-      profile_epk_error_popup_blocked: 'popup',
-      profile_epk_error_preview_unavailable: 'preview',
-      profile_epk_error_print_failed: 'print',
-    } as Parameters<typeof buildEpkPdfMessages>[0])
+    const mockT = ((key: string) => {
+      const labels: Record<string, string> = {
+        profile_epk_error_popup_blocked: 'popup',
+        profile_epk_error_preview_unavailable: 'preview',
+        profile_epk_error_print_failed: 'print',
+      }
+      return labels[key] ?? key
+    }) as unknown as Parameters<typeof buildEpkPdfMessages>[0]
+    const messages = buildEpkPdfMessages(mockT)
 
     await generateEpkPdf(
       { artistName: 'Test Artist', epkOrientation: 'landscape' },

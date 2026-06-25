@@ -42,10 +42,8 @@ const EMPTY_FORM: ArtistFormData = {
   imageScale: 1,
 }
 
-vi.mock('@/contexts/DictContext', () => ({
-  useDict: () => ({
-    errors: { SERVER_ERROR: 'Server error' },
-  }),
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
 }))
 
 vi.mock('@/lib/supabase/client', () => ({

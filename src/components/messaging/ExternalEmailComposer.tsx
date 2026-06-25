@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 
@@ -42,7 +42,7 @@ export function ExternalEmailComposer({
   defaultHtml = '',
   onSent,
 }: ExternalEmailComposerProps) {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const [open, setOpen] = useState(false)
   const [to, setTo] = useState(defaultTo)
   const [subject, setSubject] = useState(defaultSubject)
@@ -66,9 +66,9 @@ export function ExternalEmailComposer({
       const data = await res.json() as ApiErrorResponse & { ok?: boolean; hint?: string }
       if (!res.ok) {
         if (res.status === 501) {
-          setError(dict.errors.EMAIL_NOT_CONFIGURED)
+          setError(tErrors('EMAIL_NOT_CONFIGURED'))
         } else {
-          setError(getErrorMessage(data, dict))
+          setError(getErrorMessage(data, tErrors))
         }
         return
       }
@@ -80,11 +80,11 @@ export function ExternalEmailComposer({
       setReplyTo('')
       onSent?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : dict.errors.SERVER_ERROR)
+      setError(e instanceof Error ? e.message : tErrors('SERVER_ERROR'))
     } finally {
       setSending(false)
     }
-  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent, dict])
+  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent, tErrors])
 
   return (
     <Dialog

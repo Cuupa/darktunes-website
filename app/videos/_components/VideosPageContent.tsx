@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Video } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 
 const VideoModal = lazy(() =>
   import('@/components/VideoModal').then((m) => ({ default: m.VideoModal }))
@@ -19,9 +19,6 @@ const VideoModal = lazy(() =>
 
 interface VideosPageContentProps {
   videos: Video[]
-  dict: Dictionary['videos']
-  consentDict: Dictionary['consent']
-  locale: Locale
   placeholderUrl?: string
   videosPerPage: number
 }
@@ -38,12 +35,12 @@ const itemVariants = {
 
 export function VideosPageContent({
   videos,
-  dict,
-  consentDict,
-  locale,
   placeholderUrl,
   videosPerPage,
 }: VideosPageContentProps) {
+  const t = useTranslations('videos')
+  const tConsent = useTranslations('consent')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const [query, setQuery] = useState('')
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
@@ -85,8 +82,8 @@ export function VideosPageContent({
 
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h1>
-          <p className="text-xl text-muted-foreground font-serif mb-8">{dict.subheading}</p>
+          <h1 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{t('heading')}</h1>
+          <p className="text-xl text-muted-foreground font-serif mb-8">{t('subheading')}</p>
 
           {/* Search */}
           <div className="relative max-w-md">
@@ -97,11 +94,11 @@ export function VideosPageContent({
             />
             <Input
               type="search"
-              placeholder={dict.searchPlaceholder}
+              placeholder={t('searchPlaceholder')}
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               className="pl-10"
-              aria-label={dict.searchPlaceholder}
+              aria-label={t('searchPlaceholder')}
             />
           </div>
         </div>
@@ -115,7 +112,7 @@ export function VideosPageContent({
 
         {filtered.length === 0 ? (
           <p className="text-center text-muted-foreground font-mono py-16">
-            {dict.noVideos}
+            {t('noVideos')}
           </p>
         ) : (
           <>
@@ -217,7 +214,7 @@ export function VideosPageContent({
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           placeholderUrl={placeholderUrl}
-          youtubeLabel={consentDict.loadYouTube}
+          youtubeLabel={tConsent('loadYouTube')}
         />
       </Suspense>
     </div>

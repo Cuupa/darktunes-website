@@ -50,7 +50,7 @@ import {
 } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 
@@ -103,7 +103,7 @@ async function getAuthHeader(supabase: ReturnType<typeof createBrowserSupabaseCl
 // ---------------------------------------------------------------------------
 
 function SystemRolesTab() {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving]   = useState(false)
@@ -115,18 +115,18 @@ function SystemRolesTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch('/api/admin/roles/permissions', { headers })
-      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
+      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, tErrors)) }
       const rows = (await res.json()) as DbRolePermissions[]
       const map: PermissionsMap = {}
       for (const row of rows) map[row.role as Role] = row
       setServerData(map)
       setLocal(map)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, dict])
+  }, [supabase, tErrors])
 
   useEffect(() => { void loadPermissions() }, [loadPermissions])
 
@@ -168,7 +168,7 @@ function SystemRolesTab() {
           })
           if (!res.ok) {
             const body = (await res.json().catch(() => ({}))) as ApiErrorResponse
-            throw new Error(getErrorMessage(body, dict))
+            throw new Error(getErrorMessage(body, tErrors))
           }
           const updated = (await res.json()) as DbRolePermissions
           setServerData((prev) => ({ ...prev, [role]: updated }))
@@ -177,7 +177,7 @@ function SystemRolesTab() {
       )
       toast.success('Role permissions saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsSaving(false)
     }
@@ -251,7 +251,7 @@ interface RoleFormState {
 }
 
 function CustomRolesTab() {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [roles, setRoles]             = useState<CustomRole[]>([])
   const [permDefs, setPermDefs]       = useState<CustomPermDef[]>([])
@@ -270,16 +270,16 @@ function CustomRolesTab() {
         fetch('/api/admin/roles/custom', { headers }),
         fetch('/api/admin/roles/permissions-def', { headers }),
       ])
-      if (!rolesRes.ok) { const body = (await rolesRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
-      if (!permsRes.ok) { const body = (await permsRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
+      if (!rolesRes.ok) { const body = (await rolesRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, tErrors)) }
+      if (!permsRes.ok) { const body = (await permsRes.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, tErrors)) }
       setRoles((await rolesRes.json()) as CustomRole[])
       setPermDefs((await permsRes.json()) as CustomPermDef[])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, dict])
+  }, [supabase, tErrors])
 
   useEffect(() => { void loadData() }, [loadData])
 
@@ -305,8 +305,8 @@ function CustomRolesTab() {
   }
 
   const handleSave = async () => {
-    if (!form.label.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
-    if (!editingRole && !form.name.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
+    if (!form.label.trim()) { toast.error(tErrors('VALIDATION_ERROR')); return }
+    if (!editingRole && !form.name.trim()) { toast.error(tErrors('VALIDATION_ERROR')); return }
     setIsSaving(true)
     try {
       const headers = { ...(await getAuthHeader(supabase)), 'Content-Type': 'application/json' }
@@ -316,20 +316,20 @@ function CustomRolesTab() {
           headers,
           body: JSON.stringify({ label: form.label, description: form.description || null, permissions: form.permissions }),
         })
-        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       } else {
         const res = await fetch('/api/admin/roles/custom', {
           method: 'POST',
           headers,
           body: JSON.stringify({ name: form.name, label: form.label, description: form.description || undefined, permissions: form.permissions }),
         })
-        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       }
       toast.success(editingRole ? 'Role updated' : 'Role created')
       setShowForm(false)
       void loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsSaving(false)
     }
@@ -340,12 +340,12 @@ function CustomRolesTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/custom/${deleteTarget.id}`, { method: 'DELETE', headers })
-      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       toast.success('Role deleted')
       setDeleteTarget(null)
       void loadData()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     }
   }
 
@@ -504,7 +504,7 @@ function CustomRolesTab() {
 // ---------------------------------------------------------------------------
 
 function CustomPermissionsTab() {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [defs, setDefs]             = useState<CustomPermDef[]>([])
   const [isLoading, setIsLoading]   = useState(true)
@@ -519,14 +519,14 @@ function CustomPermissionsTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch('/api/admin/roles/permissions-def', { headers })
-      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, dict)) }
+      if (!res.ok) { const body = (await res.json()) as ApiErrorResponse; throw new Error(getErrorMessage(body, tErrors)) }
       setDefs((await res.json()) as CustomPermDef[])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, dict])
+  }, [supabase, tErrors])
 
   useEffect(() => { void loadDefs() }, [loadDefs])
 
@@ -543,7 +543,7 @@ function CustomPermissionsTab() {
   }
 
   const handleSave = async () => {
-    if (!form.label.trim()) { toast.error(dict.errors.VALIDATION_ERROR); return }
+    if (!form.label.trim()) { toast.error(tErrors('VALIDATION_ERROR')); return }
     if (!editingDef && !form.name.trim()) { toast.error('Name is required'); return }
     setIsSaving(true)
     try {
@@ -554,20 +554,20 @@ function CustomPermissionsTab() {
           headers,
           body: JSON.stringify({ label: form.label, description: form.description || null }),
         })
-        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       } else {
         const res = await fetch('/api/admin/roles/permissions-def', {
           method: 'POST',
           headers,
           body: JSON.stringify({ name: form.name, label: form.label, description: form.description || undefined }),
         })
-        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+        if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       }
       toast.success(editingDef ? 'Permission updated' : 'Permission created')
       setShowForm(false)
       void loadDefs()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsSaving(false)
     }
@@ -578,12 +578,12 @@ function CustomPermissionsTab() {
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/permissions-def/${deleteTarget.id}`, { method: 'DELETE', headers })
-      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, dict))
+      if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
       toast.success('Permission definition deleted')
       setDeleteTarget(null)
       void loadDefs()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     }
   }
 
@@ -715,7 +715,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 function RbacAuditTab() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const [entries, setEntries] = useState<RbacAuditEntry[]>([])
   const [total, setTotal]     = useState(0)
   const [page, setPage]       = useState(0)
@@ -734,11 +734,11 @@ function RbacAuditTab() {
       setEntries(body.data)
       setTotal(body.total)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setLoading(false)
     }
-  }, [supabase, page, dict.errors.SERVER_ERROR])
+  }, [supabase, page, tErrors])
 
   useEffect(() => { setPage(0) }, [search])
   useEffect(() => { void load() }, [load])

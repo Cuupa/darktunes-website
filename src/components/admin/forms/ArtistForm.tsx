@@ -28,7 +28,7 @@ import { toSlug } from '@/lib/slugify'
 import { AssetPicker } from '../file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
@@ -254,7 +254,7 @@ type PrefillItunesResponse = {
 }
 
 export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistId }: Props) {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset, getValues, control } = useForm<ArtistFormData>({
     defaultValues: value,
@@ -343,13 +343,13 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const { imageUrl } = (await res.json()) as { imageUrl: string }
       setValue('imageUrl', imageUrl)
       toast.success('Image fetched successfully')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsFetchingImage(false)
     }
@@ -374,7 +374,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const profile = (await res.json()) as {
         spotifyId: string; name: string; imageUrl: string | null; genres: string[]; spotifyUrl: string
@@ -387,7 +387,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       setValue('spotifyUrl', profile.spotifyUrl)
       toast.success('Artist data prefilled from Spotify')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsPrefillingSpotify(false)
     }
@@ -410,7 +410,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const profile = (await res.json()) as { name: string; bio: string | null; imageUrl: string | null; urls: string[] }
       const current = getValues()
@@ -435,7 +435,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         : `Discogs enrichment applied for "${profile.name}"`
       toast.success(msg)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsEnrichingDiscogs(false)
     }
@@ -458,7 +458,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const { concertsUpserted } = (await res.json()) as { concertsUpserted: number }
       toast.success(
@@ -467,7 +467,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
           : `Bandsintown sync complete — ${concertsUpserted} concert${concertsUpserted !== 1 ? 's' : ''} imported`,
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsSyncingBandsintown(false)
     }
@@ -490,7 +490,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const profile: PrefillItunesResponse = await res.json()
       const current = getValues()
@@ -500,7 +500,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       setValue('appleMusicUrl', profile.appleMusicUrl)
       toast.success('Artist data prefilled from Apple Music')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsPrefillingItunes(false)
     }

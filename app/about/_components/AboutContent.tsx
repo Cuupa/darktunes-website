@@ -13,8 +13,8 @@ import {
   TiktokLogo, Globe, MusicNote,
 } from '@phosphor-icons/react'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import { useTranslations } from 'next-intl'
 import type { SiteSettings, Artist, NewsPost, CustomSocialLink } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 const SOCIAL_ICON_MAP: Record<string, React.ElementType> = {
   InstagramLogo,
@@ -32,7 +32,6 @@ interface AboutContentProps {
   siteSettings: SiteSettings | null
   artists: Artist[]
   news: NewsPost[]
-  dict: Dictionary['about']
 }
 
 /** Returns true when content looks like HTML rather than Markdown. */
@@ -40,11 +39,12 @@ function isHtml(str: string) {
   return /^\s*<[a-z]/i.test(str)
 }
 
-export function AboutContent({ siteSettings, artists, news, dict }: AboutContentProps) {
+export function AboutContent({ siteSettings, artists, news }: AboutContentProps) {
+  const t = useTranslations('about')
   const prefersReducedMotion = useReducedMotion()
 
-  const heading = siteSettings?.aboutHeadline || dict.heading
-  const subheading = siteSettings?.aboutSubheading || dict.subheading
+  const heading = siteSettings?.aboutHeadline || t('heading')
+  const subheading = siteSettings?.aboutSubheading || t('subheading')
   const body = siteSettings?.aboutBody || ''
 
   const bodyHtml = useMemo(() => {
@@ -75,7 +75,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
       {/* Breadcrumb */}
       <div>
         <Link href="/" className="text-xs text-muted-foreground hover:text-foreground font-mono uppercase tracking-widest mb-6 inline-block transition-colors">
-          {dict.backToHome}
+          {t('backToHome')}
         </Link>
         <motion.div
           initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
@@ -123,7 +123,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.historyHeading}</h2>
+          <h2 className="text-3xl font-bold mb-6 tracking-tight">{t('historyHeading')}</h2>
           <p className="text-foreground/80 font-serif text-lg leading-relaxed max-w-3xl">
             {siteSettings.heroDescription || siteSettings.labelTagline}
           </p>
@@ -138,7 +138,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.statsHeading}</h2>
+          <h2 className="text-3xl font-bold mb-6 tracking-tight">{t('statsHeading')}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
             {stats.map((stat) => (
               <Card key={stat.label} className="glow-card bg-card border-border p-6 text-center hover:border-accent/50 hover:shadow-[0_0_20px_rgba(73,54,135,0.3)] transition-all duration-300">
@@ -177,7 +177,7 @@ export function AboutContent({ siteSettings, artists, news, dict }: AboutContent
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          <h2 className="text-3xl font-bold mb-6 tracking-tight">{dict.linksHeading}</h2>
+          <h2 className="text-3xl font-bold mb-6 tracking-tight">{t('linksHeading')}</h2>
           <div className="flex flex-wrap gap-4">
             {socialLinks.map(({ url, icon: Icon, label }) => (
               <a

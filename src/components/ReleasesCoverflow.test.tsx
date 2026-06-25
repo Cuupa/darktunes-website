@@ -112,19 +112,19 @@ describe('ReleasesCoverflow', () => {
   })
 
   it('renders without crashing with a list of releases', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     expect(screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })).toBeInTheDocument()
   })
 
   it('renders active release title in metadata block', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     expect(screen.getByText(releases[0].title)).toBeInTheDocument()
   })
 
   it('uses overlay link href for the first release on initial render', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
@@ -134,7 +134,7 @@ describe('ReleasesCoverflow', () => {
   })
 
   it('updates overlay link href after slide transition ends', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     act(() => {
       triggerSlideTransitionEnd(1)
@@ -152,7 +152,7 @@ describe('ReleasesCoverflow', () => {
       .spyOn(Date.prototype, 'toLocaleDateString')
       .mockReturnValue('client-formatted-date')
 
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     await waitFor(() => {
       expect(screen.getByText('client-formatted-date')).toBeInTheDocument()
@@ -166,7 +166,7 @@ describe('ReleasesCoverflow', () => {
   })
 
   it('prevents overlay navigation after a drag and allows it again on the next click', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
@@ -197,7 +197,7 @@ describe('ReleasesCoverflow', () => {
 
   it('uses overflow-clip on the Swiper wrapper', () => {
     const { container } = render(
-      <ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />,
+      <ReleasesCoverflow releases={releases} />,
     )
 
     expect(container.querySelector('[data-lenis-prevent]')).toHaveClass('overflow-clip')
@@ -206,26 +206,26 @@ describe('ReleasesCoverflow', () => {
   it('sets Swiper speed to 0 when reduced motion is enabled', () => {
     mockedState.reducedMotion = true
 
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     expect(mockedState.latestSwiperProps?.speed).toBe(0)
   })
 
   it('renders the expected aria-label on the region container', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     expect(screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })).toBeInTheDocument()
   })
 
   it('renders previous and next buttons with proper aria-labels', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     expect(screen.getByRole('button', { name: enDict.releases.previousReleaseAriaLabel })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: enDict.releases.nextReleaseAriaLabel })).toBeInTheDocument()
   })
 
   it('marks active dot with aria-pressed=true', () => {
-    render(<ReleasesCoverflow releases={releases} dict={enDict.releases} locale="en" consentDict={enDict.consent} />)
+    render(<ReleasesCoverflow releases={releases} />)
 
     const firstDot = screen.getByRole('button', {
       name: enDict.releases.goToReleaseAriaLabelTemplate

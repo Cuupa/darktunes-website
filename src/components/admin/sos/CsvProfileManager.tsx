@@ -31,7 +31,7 @@ import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
 import { DEFAULT_PRESET_NAME } from '@/lib/sos/sosAccountingSettings'
 import { useSosRulesPresets, type PresetConfig } from '@/hooks/useSosRulesPresets'
-import { useDict } from '@/contexts/DictContext'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 const LEGACY_STORAGE_KEY = 'darktunes_sos_presets'
@@ -113,8 +113,7 @@ export function CsvProfileManager({
   ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig,
   labelInfo, pdfSettings, csvImportProfiles, onLoad,
 }: CsvProfileManagerProps) {
-  const dict = useDict()
-  const t = dict.admin?.accounting ?? {}
+  const t = useAccountingLabels()
   const { presets, isLoading, isSaving, savePreset, deletePreset, reloadPresets } =
     useSosRulesPresets()
 

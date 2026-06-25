@@ -25,8 +25,8 @@ const Videos = dynamic(
 )
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { useTranslations } from 'next-intl'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection, Artist } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 import { selectHeroItems } from '@/lib/heroItems'
 
 interface HomePageContentProps {
@@ -36,8 +36,6 @@ interface HomePageContentProps {
   concerts: Concert[]
   siteSettings: SiteSettings
   artists?: Artist[]
-  dict: Dictionary
-  locale: Locale
 }
 
 const SpotifyMultiPlayer = dynamic(
@@ -53,9 +51,6 @@ const SpotifyMultiPlayer = dynamic(
  * Data is fetched server-side in app/page.tsx (RSC) and passed as props.
  * This component handles all interactive UI — animations, modals, smooth scroll.
  *
- * The `dict` prop is loaded server-side and distributed to child components
- * following the Inversion of Control principle: no child needs to load its
- * own translations.
  */
 export function HomePageContent({
   releases,
@@ -64,9 +59,8 @@ export function HomePageContent({
   concerts,
   siteSettings,
   artists,
-  dict,
-  locale,
 }: HomePageContentProps) {
+  const tSpotify = useTranslations('spotify')
   const prefersReducedMotion = useReducedMotion()
   const heroItems = useMemo<(Release | NewsPost)[]>(() => {
     return selectHeroItems(releases, news, siteSettings)
@@ -120,14 +114,9 @@ export function HomePageContent({
           >
             <Releases
               releases={releases}
-              dict={{
-                ...dict.releases,
-                ...(siteSettings.releasesSectionHeading && { heading: siteSettings.releasesSectionHeading }),
-                ...(siteSettings.releasesSectionSubheading && { subheading: siteSettings.releasesSectionSubheading }),
-              }}
-              locale={locale}
+              heading={siteSettings.releasesSectionHeading}
+              subheading={siteSettings.releasesSectionSubheading}
               autoplayMs={siteSettings.carouselAutoplayMs ?? 0}
-              consentDict={dict.consent}
             />
           </motion.div>
         )
@@ -143,10 +132,10 @@ export function HomePageContent({
                 className="mb-8 text-center"
               >
                 <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
-                  {siteSettings.spotifySectionHeading || dict.spotify.heading}
+                  {siteSettings.spotifySectionHeading || tSpotify('heading')}
                 </h2>
                 <p className="text-lg text-muted-foreground font-serif">
-                  {siteSettings.spotifySectionSubheading || dict.spotify.subheading}
+                  {siteSettings.spotifySectionSubheading || tSpotify('subheading')}
                 </p>
               </motion.div>
               <SpotifyMultiPlayer
@@ -161,13 +150,8 @@ export function HomePageContent({
             <Videos
               videos={videos}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
-              dict={{
-                ...dict.videos,
-                ...(siteSettings.videosSectionHeading && { heading: siteSettings.videosSectionHeading }),
-                ...(siteSettings.videosSectionSubheading && { subheading: siteSettings.videosSectionSubheading }),
-              }}
-              consentDict={dict.consent}
-              locale={locale}
+              heading={siteSettings.videosSectionHeading}
+              subheading={siteSettings.videosSectionSubheading}
               videosPerPage={siteSettings.videosPerPage}
               videosLinkToPage={siteSettings.videosLinkToPage}
             />
@@ -178,12 +162,8 @@ export function HomePageContent({
           <div key="concerts" id="concerts">
             <Concerts
               concerts={concerts}
-              dict={{
-                ...dict.concerts,
-                ...(siteSettings.concertsSectionHeading && { heading: siteSettings.concertsSectionHeading }),
-                ...(siteSettings.concertsSectionSubheading && { subheading: siteSettings.concertsSectionSubheading }),
-              }}
-              locale={locale}
+              heading={siteSettings.concertsSectionHeading}
+              subheading={siteSettings.concertsSectionSubheading}
               concertsPerPage={siteSettings.concertsPerPage}
               concertsLinkToPage={siteSettings.concertsLinkToPage}
             />
@@ -194,12 +174,8 @@ export function HomePageContent({
           <div key="news" id="news">
             <News
               news={news}
-              dict={{
-                ...dict.news,
-                ...(siteSettings.newsSectionHeading && { heading: siteSettings.newsSectionHeading }),
-                ...(siteSettings.newsSectionSubheading && { subheading: siteSettings.newsSectionSubheading }),
-              }}
-              locale={locale}
+              heading={siteSettings.newsSectionHeading}
+              subheading={siteSettings.newsSectionSubheading}
               sneakPeekCount={siteSettings.homepageNewsCount}
             />
           </div>
@@ -208,11 +184,8 @@ export function HomePageContent({
         return (
           <div key="newsletter" id="newsletter">
             <NewsletterSection
-              dict={{
-                ...dict.newsletter,
-                ...(siteSettings.newsletterHeading && { heading: siteSettings.newsletterHeading }),
-                ...(siteSettings.newsletterDescription && { description: siteSettings.newsletterDescription }),
-              }}
+              heading={siteSettings.newsletterHeading}
+              description={siteSettings.newsletterDescription}
             />
           </div>
         )
@@ -233,7 +206,7 @@ export function HomePageContent({
               exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
               transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeInOut' }}
             >
-              <Hero heroItem={currentHeroItem} siteSettings={siteSettings} artistSlug={heroArtistSlug} dict={dict.hero} />
+              <Hero heroItem={currentHeroItem} siteSettings={siteSettings} artistSlug={heroArtistSlug} />
             </motion.div>
           </AnimatePresence>
           {heroItems.length > 1 && (

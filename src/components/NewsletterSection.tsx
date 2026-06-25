@@ -1,11 +1,12 @@
 'use client'
 
 import { Envelope } from '@phosphor-icons/react'
+import { useTranslations } from 'next-intl'
 import { ScrollReveal } from '@/components/animations/ScrollReveal'
-import type { Dictionary } from '@/i18n/types'
 
 interface NewsletterSectionProps {
-  dict: Dictionary['newsletter']
+  heading?: string
+  description?: string
 }
 
 /**
@@ -13,7 +14,11 @@ interface NewsletterSectionProps {
  * page directly via an iframe. The CSP frame-src in next.config.ts
  * explicitly allows https://darkmerch.com so the embed is permitted.
  */
-export function NewsletterSection({ dict }: NewsletterSectionProps) {
+export function NewsletterSection({ heading, description }: NewsletterSectionProps) {
+  const t = useTranslations('newsletter')
+  const sectionHeading = heading ?? t('heading')
+  const sectionDescription = description ?? t('description')
+
   return (
     <section id="newsletter" className="py-24 px-4 lg:px-16">
       <div className="container mx-auto max-w-2xl">
@@ -22,10 +27,10 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
             <Envelope size={28} weight="fill" className="text-primary" />
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold mb-4 tracking-tight uppercase">
-            {dict.heading}
+            {sectionHeading}
           </h2>
           <p className="text-lg text-muted-foreground font-serif max-w-md mx-auto">
-            {dict.description}
+            {sectionDescription}
           </p>
         </ScrollReveal>
 
@@ -37,7 +42,7 @@ export function NewsletterSection({ dict }: NewsletterSectionProps) {
 
           <iframe
             src="https://darkmerch.com/pages/newsletter"
-            title={dict.heading}
+            title={sectionHeading}
             width="100%"
             height="260"
             loading="lazy"

@@ -22,10 +22,8 @@ import type { EpkTemplate } from '@/lib/api/epkTemplates'
 import { EpkFontLoader } from './EpkFontLoader'
 import { EpkFontManager, type EpkFontAsset } from './EpkFontManager'
 import type { ArtistAsset } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 interface EpkBuilderShellProps {
-  dict: Dictionary['portal']
   artistId: string
   initialAssets: ArtistAsset[]
   initialFonts: EpkFontAsset[]
@@ -36,7 +34,6 @@ interface EpkBuilderShellProps {
 }
 
 export function EpkBuilderShell({
-  dict,
   artistId,
   initialAssets,
   initialFonts,
@@ -93,7 +90,6 @@ export function EpkBuilderShell({
     <div className="space-y-4">
       <EpkFontLoader />
       <EpkToolbar
-        dict={dict}
         onSave={onSave}
         onSaveSnapshot={onSaveSnapshot}
         onOpenAssetPicker={() => setAssetPickerOpen(true)}
@@ -106,15 +102,14 @@ export function EpkBuilderShell({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
         <EpkCanvas />
         <div className="space-y-4">
-          <EpkPagesPanel dict={dict} />
-          <EpkLayersPanel dict={dict} />
-          <EpkFontManager dict={dict} artistId={artistId} initialFonts={initialFonts} />
-          <EpkPropertiesPanel dict={dict} />
+          <EpkPagesPanel />
+          <EpkLayersPanel />
+          <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
+          <EpkPropertiesPanel />
         </div>
       </div>
 
       <EpkAssetPicker
-        dict={dict}
         artistId={artistId}
         open={assetPickerOpen}
         onClose={() => setAssetPickerOpen(false)}
@@ -123,7 +118,6 @@ export function EpkBuilderShell({
       />
 
       <EpkVersionHistoryPanel
-        dict={dict}
         artistId={artistId}
         open={versionHistoryOpen}
         onClose={() => setVersionHistoryOpen(false)}
@@ -132,21 +126,18 @@ export function EpkBuilderShell({
       />
 
       <EpkShareLinkPanel
-        dict={dict}
         artistId={artistId}
         open={shareLinksOpen}
         onClose={() => setShareLinksOpen(false)}
       />
 
       <EpkDownloadStatsPanel
-        dict={dict}
         artistId={artistId}
         open={analyticsOpen}
         onClose={() => setAnalyticsOpen(false)}
       />
 
       <EpkTemplatePicker
-        dict={dict}
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         onApply={handleApplyTemplate}

@@ -4,6 +4,7 @@
  * src/components/epk-builder/EpkToolbar.tsx
  */
 
+import { useTranslations } from 'next-intl'
 import {
   ArrowCounterClockwise,
   ArrowClockwise,
@@ -25,10 +26,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useEpkEditorStore, useEpkEditorStoreApi, useEpkEditorTemporal } from '@/lib/epk/editor/EpkEditorProvider'
-import type { Dictionary } from '@/i18n/types'
 
 interface EpkToolbarProps {
-  dict: Dictionary['portal']
   onSave: () => void
   onSaveSnapshot: () => void
   onOpenAssetPicker: () => void
@@ -40,7 +39,6 @@ interface EpkToolbarProps {
 }
 
 export function EpkToolbar({
-  dict,
   onSave,
   onSaveSnapshot,
   onOpenAssetPicker,
@@ -50,6 +48,7 @@ export function EpkToolbar({
   onOpenTemplates,
   isSaving,
 }: EpkToolbarProps) {
+  const t = useTranslations('portal')
   const store = useEpkEditorStoreApi()
   const addElement = useEpkEditorStore((s) => s.addElement)
   const deleteSelected = useEpkEditorStore((s) => s.deleteSelected)
@@ -70,7 +69,7 @@ export function EpkToolbar({
     <div
       className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2"
       role="toolbar"
-      aria-label={dict.epk_editor_toolbar_label}
+      aria-label={t('epk_editor_toolbar_label')}
     >
       <Button
         type="button"
@@ -78,7 +77,7 @@ export function EpkToolbar({
         size="sm"
         className="min-h-[44px] min-w-[44px]"
         disabled={!canUndo}
-        aria-label={dict.epk_editor_undo}
+        aria-label={t('epk_editor_undo')}
         onClick={() => store.temporal.getState().undo()}
       >
         <ArrowCounterClockwise size={18} aria-hidden="true" />
@@ -89,7 +88,7 @@ export function EpkToolbar({
         size="sm"
         className="min-h-[44px] min-w-[44px]"
         disabled={!canRedo}
-        aria-label={dict.epk_editor_redo}
+        aria-label={t('epk_editor_redo')}
         onClick={() => store.temporal.getState().redo()}
       >
         <ArrowClockwise size={18} aria-hidden="true" />
@@ -105,7 +104,7 @@ export function EpkToolbar({
         onClick={() => addElement('text')}
       >
         <TextT size={18} className="mr-2" aria-hidden="true" />
-        {dict.epk_editor_add_text}
+        {t('epk_editor_add_text')}
       </Button>
       <Button
         type="button"
@@ -115,7 +114,7 @@ export function EpkToolbar({
         onClick={() => addElement('shape')}
       >
         <Square size={18} className="mr-2" aria-hidden="true" />
-        {dict.epk_editor_add_shape}
+        {t('epk_editor_add_shape')}
       </Button>
       <Button
         type="button"
@@ -125,7 +124,7 @@ export function EpkToolbar({
         onClick={onOpenAssetPicker}
       >
         <ImageIcon size={18} className="mr-2" aria-hidden="true" />
-        {dict.epk_editor_add_image}
+        {t('epk_editor_add_image')}
       </Button>
 
       <Button
@@ -134,7 +133,7 @@ export function EpkToolbar({
         size="sm"
         className="min-h-[44px] min-w-[44px]"
         disabled={selectedIds.length === 0}
-        aria-label={dict.epk_editor_delete}
+        aria-label={t('epk_editor_delete')}
         onClick={() => deleteSelected()}
       >
         <Trash size={18} aria-hidden="true" />
@@ -145,7 +144,7 @@ export function EpkToolbar({
         size="sm"
         className="min-h-[44px] min-w-[44px]"
         disabled={selectedIds.length < 2}
-        aria-label={dict.epk_editor_group}
+        aria-label={t('epk_editor_group')}
         onClick={() => groupSelected()}
       >
         <SquaresFour size={18} aria-hidden="true" />
@@ -156,7 +155,7 @@ export function EpkToolbar({
         size="sm"
         className="min-h-[44px] min-w-[44px]"
         disabled={selectedIds.length === 0}
-        aria-label={dict.epk_editor_ungroup}
+        aria-label={t('epk_editor_ungroup')}
         onClick={() => ungroupSelected()}
       >
         <SquareHalf size={18} aria-hidden="true" />
@@ -169,7 +168,7 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_editor_zoom_out}
+        aria-label={t('epk_editor_zoom_out')}
         onClick={() => setZoom(zoom - 0.1)}
       >
         <MagnifyingGlassMinus size={18} aria-hidden="true" />
@@ -182,7 +181,7 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_editor_zoom_in}
+        aria-label={t('epk_editor_zoom_in')}
         onClick={() => setZoom(zoom + 0.1)}
       >
         <MagnifyingGlassPlus size={18} aria-hidden="true" />
@@ -195,19 +194,19 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px]"
-        aria-label={dict.epk_versions_snapshot}
+        aria-label={t('epk_versions_snapshot')}
         onClick={() => void onSaveSnapshot()}
         disabled={isSaving}
       >
         <BookmarkSimple size={18} className="mr-2" aria-hidden="true" />
-        <span className="hidden sm:inline">{dict.epk_versions_snapshot}</span>
+        <span className="hidden sm:inline">{t('epk_versions_snapshot')}</span>
       </Button>
       <Button
         type="button"
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_versions_title}
+        aria-label={t('epk_versions_title')}
         onClick={onOpenVersionHistory}
       >
         <ClockCounterClockwise size={18} aria-hidden="true" />
@@ -217,7 +216,7 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_share_title}
+        aria-label={t('epk_share_title')}
         onClick={onOpenShareLinks}
       >
         <LinkIcon size={18} aria-hidden="true" />
@@ -227,7 +226,7 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_analytics_title}
+        aria-label={t('epk_analytics_title')}
         onClick={onOpenAnalytics}
       >
         <ChartBar size={18} aria-hidden="true" />
@@ -237,7 +236,7 @@ export function EpkToolbar({
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
-        aria-label={dict.epk_templates_title}
+        aria-label={t('epk_templates_title')}
         onClick={onOpenTemplates}
       >
         <Layout size={18} aria-hidden="true" />
@@ -252,7 +251,7 @@ export function EpkToolbar({
         onClick={() => void onSave()}
       >
         <FloppyDisk size={18} className="mr-2" aria-hidden="true" />
-        {isSaving ? dict.epk_editor_saving : dict.epk_editor_save}
+        {isSaving ? t('epk_editor_saving') : t('epk_editor_save')}
       </Button>
     </div>
   )

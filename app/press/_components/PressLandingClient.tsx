@@ -10,16 +10,15 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useTranslations } from 'next-intl'
 import { ObfuscatedText } from '@/components/press/ObfuscatedText'
 import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
-import type { Dictionary } from '@/i18n/types'
 import type { Artist, NewsPost, SiteSettings } from '@/types'
 
 interface PressLandingClientProps {
   artists: Artist[]
   pressReleases: NewsPost[]
   siteSettings: Pick<SiteSettings, 'labelName' | 'labelTagline' | 'contactEmail' | 'impressumPhone' | 'impressumEmail'>
-  dict: Dictionary
 }
 
 function formatDate(date: string) {
@@ -36,10 +35,9 @@ export function PressLandingClient({
   artists,
   pressReleases,
   siteSettings,
-  dict,
 }: PressLandingClientProps) {
-  const t = dict.pressLanding
-  const releasesDict = dict.pressReleases
+  const t = useTranslations('pressLanding')
+  const tReleases = useTranslations('pressReleases')
 
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('nameAsc')
@@ -74,13 +72,13 @@ export function PressLandingClient({
           <div className="space-y-5">
             <Badge className="w-fit gap-2 bg-primary/20 text-primary hover:bg-primary/20">
               <Newspaper size={14} weight="bold" aria-hidden="true" />
-              {t.heroBadge}
+              {t('heroBadge')}
             </Badge>
             <h1 id="press-hero-title" className="text-4xl font-bold tracking-tight sm:text-5xl">
               {siteSettings.labelName}
             </h1>
             <p className="max-w-3xl text-lg text-muted-foreground">
-              {siteSettings.labelTagline || t.heroDescription}
+              {siteSettings.labelTagline || t('heroDescription')}
             </p>
           </div>
         </section>
@@ -90,22 +88,22 @@ export function PressLandingClient({
           <TabsList className="mb-6 flex w-full flex-wrap gap-1 h-auto">
             <TabsTrigger value="roster" className="flex items-center gap-2">
               <Users size={15} weight="bold" aria-hidden="true" />
-              {t.tabs.roster}
+              {t('tabs.roster')}
             </TabsTrigger>
             <TabsTrigger value="releases" className="flex items-center gap-2">
               <Newspaper size={15} weight="bold" aria-hidden="true" />
-              {t.tabs.releases}
+              {t('tabs.releases')}
             </TabsTrigger>
             <TabsTrigger value="contact" className="flex items-center gap-2">
               <EnvelopeSimple size={15} weight="bold" aria-hidden="true" />
-              {t.tabs.contact}
+              {t('tabs.contact')}
             </TabsTrigger>
           </TabsList>
 
           {/* ── Artist Roster ── */}
           <TabsContent value="roster">
             <section aria-labelledby="press-roster-title" className="space-y-5">
-              <h2 id="press-roster-title" className="sr-only">{t.tabs.roster}</h2>
+              <h2 id="press-roster-title" className="sr-only">{t('tabs.roster')}</h2>
 
               {/* Search & sort controls */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -118,28 +116,28 @@ export function PressLandingClient({
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder={t.rosterSearch}
+                    placeholder={t('rosterSearch')}
                     className="pl-9"
-                    aria-label={t.rosterSearch}
+                    aria-label={t('rosterSearch')}
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 text-sm text-muted-foreground">{t.rosterSort.label}</span>
+                  <span className="shrink-0 text-sm text-muted-foreground">{t('rosterSort.label')}</span>
                   <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
                     <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="nameAsc">{t.rosterSort.nameAsc}</SelectItem>
-                      <SelectItem value="nameDesc">{t.rosterSort.nameDesc}</SelectItem>
-                      <SelectItem value="genreAsc">{t.rosterSort.genreAsc}</SelectItem>
+                      <SelectItem value="nameAsc">{t('rosterSort.nameAsc')}</SelectItem>
+                      <SelectItem value="nameDesc">{t('rosterSort.nameDesc')}</SelectItem>
+                      <SelectItem value="genreAsc">{t('rosterSort.genreAsc')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               {filteredArtists.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t.noResults}</p>
+                <p className="text-sm text-muted-foreground">{t('noResults')}</p>
               ) : (
                 <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredArtists.map((artist) => (
@@ -184,15 +182,15 @@ export function PressLandingClient({
             <section aria-labelledby="press-releases-title" className="space-y-5">
               <div className="flex items-center justify-between gap-4">
                 <h2 id="press-releases-title" className="text-2xl font-bold tracking-tight">
-                  {releasesDict.heading}
+                  {tReleases('heading')}
                 </h2>
                 <Button asChild variant="outline">
-                  <Link href="/press/dashboard/press-releases">{t.releasesButton}</Link>
+                  <Link href="/press/dashboard/press-releases">{t('releasesButton')}</Link>
                 </Button>
               </div>
 
               {pressReleases.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{releasesDict.noResults}</p>
+                <p className="text-sm text-muted-foreground">{tReleases('noResults')}</p>
               ) : (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                   {pressReleases.map((post) => (
@@ -216,7 +214,7 @@ export function PressLandingClient({
                         <h3 className="text-xl font-semibold leading-tight">{post.title}</h3>
                         <p className="line-clamp-3 text-sm text-muted-foreground">{post.excerpt || post.content}</p>
                         <Button asChild variant="link" className="px-0 text-primary">
-                          <Link href={`/press/releases/${post.slug}`}>{t.readRelease}</Link>
+                          <Link href={`/press/releases/${post.slug}`}>{t('readRelease')}</Link>
                         </Button>
                       </CardContent>
                     </Card>
@@ -230,9 +228,9 @@ export function PressLandingClient({
           <TabsContent value="contact">
             <section aria-labelledby="press-contact-title" className="space-y-6">
               <h2 id="press-contact-title" className="text-2xl font-bold tracking-tight">
-                {t.contact.title}
+                {t('contact.title')}
               </h2>
-              <p className="max-w-3xl text-muted-foreground">{t.contact.description}</p>
+              <p className="max-w-3xl text-muted-foreground">{t('contact.description')}</p>
 
               <Card className="border-border bg-card/70">
                 <CardContent className="space-y-4 p-6">
@@ -246,7 +244,7 @@ export function PressLandingClient({
                       />
                       <div>
                         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                          {t.contact.emailLabel}
+                          {t('contact.emailLabel')}
                         </p>
                         <ObfuscatedText
                           value={contactEmail}
@@ -268,7 +266,7 @@ export function PressLandingClient({
                       />
                       <div>
                         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                          {t.contact.phoneLabel}
+                          {t('contact.phoneLabel')}
                         </p>
                         <ObfuscatedText
                           value={contactPhone}
@@ -284,10 +282,10 @@ export function PressLandingClient({
 
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">
-                  <Link href="/press/apply">{t.contact.applyButton}</Link>
+                  <Link href="/press/apply">{t('contact.applyButton')}</Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/login">{t.contact.dashboardButton}</Link>
+                  <Link href="/login">{t('contact.dashboardButton')}</Link>
                 </Button>
               </div>
             </section>

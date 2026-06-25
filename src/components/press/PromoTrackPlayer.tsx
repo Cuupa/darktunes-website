@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Download, Pause, Play } from '@phosphor-icons/react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,11 +19,9 @@ import { Label } from '@/components/ui/label'
 import { getPromoStreamUrl } from '../../../app/press/dashboard/promo-pool/_actions/stream'
 import { getJournalistDownloadUrl } from '../../../app/press/dashboard/_actions/download'
 import type { PromoTrack } from '@/lib/api/promoTracks'
-import type { Dictionary } from '@/i18n/types'
 
 interface PromoTrackPlayerProps {
   track: PromoTrack
-  dict: Dictionary['promoPool']
 }
 
 function formatDuration(seconds: number): string {
@@ -31,7 +30,8 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function PromoTrackPlayer({ track, dict }: PromoTrackPlayerProps) {
+export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
+  const t = useTranslations('promoPool')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -54,7 +54,7 @@ export function PromoTrackPlayer({ track, dict }: PromoTrackPlayerProps) {
       }
       const { url } = await getPromoStreamUrl(track.r2Key)
       if (!url) {
-        toast.error(dict.streamError)
+        toast.error(t('streamError'))
         return
       }
       const audio = new Audio(url)
@@ -63,7 +63,7 @@ export function PromoTrackPlayer({ track, dict }: PromoTrackPlayerProps) {
       await audio.play()
       setIsPlaying(true)
     } catch {
-      toast.error(dict.streamError)
+      toast.error(t('streamError'))
     } finally {
       setLoadingPreview(false)
     }

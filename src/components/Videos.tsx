@@ -12,8 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Video } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 // VideoModal is interaction-only — lazy-load to exclude it from the initial bundle.
@@ -23,9 +23,8 @@ interface VideosProps extends SectionProps {
   videos: Video[]
   /** Optional R2 placeholder image URL for the ConsentGate in VideoModal. */
   placeholderUrl?: string
-  dict: Dictionary['videos']
-  consentDict: Dictionary['consent']
-  locale: Locale
+  heading?: string
+  subheading?: string
   /** Number of videos per page (default: 9). */
   videosPerPage?: number
   /** When true, show only the first page and add a "View all" link to /videos. */
@@ -103,8 +102,13 @@ function VideoCard({
   )
 }
 
-export function Videos({ videos, placeholderUrl, dict, consentDict, locale, videosPerPage = 9, videosLinkToPage = false }: VideosProps) {
+export function Videos({ videos, placeholderUrl, heading, subheading, videosPerPage = 9, videosLinkToPage = false }: VideosProps) {
+  const t = useTranslations('videos')
+  const tConsent = useTranslations('consent')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const sectionHeading = heading ?? t('heading')
+  const sectionSubheading = subheading ?? t('subheading')
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [page, setPage] = useState(1)
@@ -148,13 +152,13 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
         <div className="container mx-auto">
           <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-              <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+              <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{sectionHeading}</h2>
+              <p className="text-xl text-muted-foreground font-serif">{sectionSubheading}</p>
             </div>
-            {dict.viewAll && (
+            {(
               <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
                 <Link href="/videos">
-                  {dict.viewAll}
+                  {t('viewAll')}
                   <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
                 </Link>
               </Button>
@@ -172,15 +176,15 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={dict.searchPlaceholder}
+              placeholder={t('searchPlaceholder')}
               className="pl-9"
-              aria-label={dict.searchPlaceholder}
+              aria-label={t('searchPlaceholder')}
             />
           </div>
 
           {filteredVideos.length === 0 && (
             <p className="text-center text-muted-foreground font-mono py-12">
-              {dict.noVideos}
+              {t('noVideos')}
             </p>
           )}
 
@@ -238,7 +242,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
               )}
               {videosLinkToPage && filteredVideos.length > perPage && (
                 <Button asChild variant="outline" size="lg" className="min-w-[160px]">
-                  <Link href="/videos">{dict.viewAll ?? 'View all videos'}</Link>
+                  <Link href="/videos">{t('viewAll')}</Link>
                 </Button>
               )}
             </div>
@@ -252,7 +256,7 @@ export function Videos({ videos, placeholderUrl, dict, consentDict, locale, vide
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           placeholderUrl={placeholderUrl}
-          youtubeLabel={consentDict.loadYouTube}
+          youtubeLabel={tConsent('loadYouTube')}
         />
       </Suspense>
     </>

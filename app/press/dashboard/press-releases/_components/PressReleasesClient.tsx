@@ -3,20 +3,21 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
-import type { Dictionary } from '@/i18n/types'
 import type { NewsPost } from '@/types'
 
 interface PressReleasesClientProps {
   posts: NewsPost[]
-  dict: Dictionary['pressReleases']
 }
 
-function categoryKey(category?: string | null): keyof Dictionary['pressReleases']['categories'] {
+type PressReleaseCategoryKey = 'albumAnnouncement' | 'tour' | 'labelNews' | 'other'
+
+function categoryKey(category?: string | null): PressReleaseCategoryKey {
   const normalized = (category ?? '').toLowerCase().replace(/\s+/g, '')
   if (normalized === 'albumannouncement') return 'albumAnnouncement'
   if (normalized === 'tour') return 'tour'
@@ -24,9 +25,10 @@ function categoryKey(category?: string | null): keyof Dictionary['pressReleases'
   return 'other'
 }
 
-export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
+export function PressReleasesClient({ posts }: PressReleasesClientProps) {
+  const t = useTranslations('pressReleases')
   const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState<'all' | keyof Dictionary['pressReleases']['categories']>('all')
+  const [activeCategory, setActiveCategory] = useState<'all' | PressReleaseCategoryKey>('all')
   const [currentTimestamp] = useState(() => Date.now())
 
   const categories = useMemo(() => {
@@ -48,8 +50,8 @@ export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold">{dict.heading}</h1>
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={dict.search} />
+        <h1 className="text-3xl font-bold">{t('heading')}</h1>
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search')} />
         <div className="flex flex-wrap gap-2">
           <Button
             variant={activeCategory === 'all' ? 'default' : 'outline'}
@@ -57,7 +59,7 @@ export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
             onClick={() => setActiveCategory('all')}
             aria-pressed={activeCategory === 'all'}
           >
-            {dict.filterAll}
+            {t('filterAll')}
           </Button>
           {categories.map((category) => (
             <Button
@@ -67,14 +69,14 @@ export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
               onClick={() => setActiveCategory(category)}
               aria-pressed={activeCategory === category}
             >
-              {dict.categories[category]}
+              {t(`categories.${category}`)}
             </Button>
           ))}
         </div>
       </div>
 
       {filteredPosts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{dict.noResults}</p>
+        <p className="text-sm text-muted-foreground">{t('noResults')}</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {filteredPosts.map((post) => {
@@ -95,7 +97,7 @@ export function PressReleasesClient({ posts, dict }: PressReleasesClientProps) {
                 )}
                 <CardContent className="space-y-4 p-5">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="secondary">{dict.categories[category]}</Badge>
+                    <Badge variant="secondary">{t(`categories.${category}`)}</Badge>
                     <time dateTime={post.publishedAt}>{new Date(post.publishedAt).toLocaleDateString()}</time>
                     {embargoFuture && <Badge variant="destructive">Embargo</Badge>}
                   </div>

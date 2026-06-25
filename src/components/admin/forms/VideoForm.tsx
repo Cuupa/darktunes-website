@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import type { Artist } from '@/types'
 import { ImageUploadButton } from './ImageUploadButton'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 
@@ -41,7 +41,7 @@ type Props = AdminPanelProps<VideoFormData> & { artists?: Artist[] }
 const localExtractYouTubeId = extractYouTubeVideoId
 
 export function VideoForm({ value, onChange, isLoading, artists }: Props) {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset } = useForm<VideoFormData>({
     defaultValues: value,
@@ -107,7 +107,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
 
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
 
       const info = (await res.json()) as {
@@ -123,7 +123,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
       if (info.thumbnailUrl) setValue('thumbnailUrl', info.thumbnailUrl)
       toast.success('Video info fetched from YouTube')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsFetchingInfo(false)
     }

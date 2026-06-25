@@ -26,8 +26,7 @@ import {
   deriveCompletedWorkflowSteps,
   workflowStatusFromStatement,
 } from '@/lib/sos/statementWorkflow'
-import { useDict } from '@/contexts/DictContext'
-import { mergeAccountingLabels } from '@/lib/i18n/accountingFallbacks'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 import {
   buildInvoiceStatusLabels,
@@ -53,11 +52,7 @@ export function useSettlementCenter({
   onCreateDraft,
   onBuildCorrectionPdf,
 }: SettlementCenterPanelProps) {
-  const dict = useDict()
-  const t = useMemo(
-    () => mergeAccountingLabels(dict.admin?.accounting),
-    [dict.admin?.accounting],
-  )
+  const t = useAccountingLabels()
   const invoiceStatusLabels = useMemo(() => buildInvoiceStatusLabels(t), [t])
   const periodStatusLabels = useMemo(() => buildPeriodStatusLabels(t), [t])
 

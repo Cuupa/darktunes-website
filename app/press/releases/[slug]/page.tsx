@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { getPressReleaseBySlug } from '@/lib/api/pressReleases'
 import { PressReleaseDetailClient } from './_components/PressReleaseDetailClient'
 import { buildPressArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -17,12 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PressReleaseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const locale = await getLocale()
   const supabase = await createServerSupabaseClient()
-  const [post, dict] = await Promise.all([
-    getPressReleaseBySlug(supabase, slug).catch(() => null),
-    getDictionary(locale),
-  ])
+  const post = await getPressReleaseBySlug(supabase, slug).catch(() => null)
   if (!post) notFound()
 
   return (
@@ -31,7 +26,7 @@ export default async function PressReleaseDetailPage({ params }: { params: Promi
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildPressArticleSchema({ post })) }}
       />
-      <PressReleaseDetailClient post={post} dict={dict.pressReleases} />
+      <PressReleaseDetailClient post={post} />
     </>
   )
 }

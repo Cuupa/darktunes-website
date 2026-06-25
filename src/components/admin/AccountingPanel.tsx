@@ -65,8 +65,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'sonner'
-import { useDict } from '@/contexts/DictContext'
-import { ACCOUNTING_FALLBACK } from '@/lib/i18n/accountingFallbacks'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
@@ -83,9 +82,8 @@ function isSubTab(value: string | null): value is SubTab {
 }
 
 function SosGeneratorPanel() {
-  const dict = useDict()
   const searchParams = useSearchParams()
-  const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
+  const t = useAccountingLabels()
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
   // Map portal artists to SOS LabelArtist[]
@@ -1095,8 +1093,7 @@ function SosGeneratorPanel() {
 }
 
 export function AccountingPanel() {
-  const dict = useDict()
-  const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
+  const t = useAccountingLabels()
 
   return (
     <Tabs defaultValue="generate" className="flex flex-col h-full">

@@ -72,7 +72,7 @@ beforeEach(() => {
 describe('Concerts homepage section', () => {
   it('renders a full-card overlay link to the event detail page', () => {
     render(
-      <Concerts concerts={[concert]} dict={enDict.concerts} locale="en" editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
+      <Concerts concerts={[concert]} editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
     )
 
     const overlayLink = screen.getByRole('link', {
@@ -101,7 +101,7 @@ describe('Concerts homepage section', () => {
 
   it('ticket link is interactive (pointer-events-auto, z-20) and not nested inside the overlay link', () => {
     render(
-      <Concerts concerts={[concert]} dict={enDict.concerts} locale="en" editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
+      <Concerts concerts={[concert]} editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
     )
 
     const overlayLink = screen.getByRole('link', {

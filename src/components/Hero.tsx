@@ -11,8 +11,8 @@ import { Play, ArrowDown } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import logoImage from '@/assets/images/logo_(1).png'
+import { useTranslations } from 'next-intl'
 import type { Release, NewsPost, SiteSettings } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 interface HeroProps extends SectionProps {
@@ -21,14 +21,14 @@ interface HeroProps extends SectionProps {
   /** Slug of the artist associated with the current hero item. When present,
    *  the secondary "Explore Artist" button links to /artists/[artistSlug]. */
   artistSlug?: string
-  dict: Dictionary['hero']
 }
 
 function isRelease(item: Release | NewsPost): item is Release {
   return 'artistName' in item
 }
 
-export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
+export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
+  const t = useTranslations('hero')
   const prefersReducedMotion = useReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
   // Stop the bounce animation as soon as the hero scrolls out of view so the
@@ -115,7 +115,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
   const primaryLabel =
     rawPrimary?.label ||
     siteSettings.heroDefaultPrimaryBtnLabel ||
-    (!itemIsRelease ? dict.readMore ?? 'Read More' : dict.listenNow)
+    (!itemIsRelease ? t('readMore') : t('listenNow'))
   const primaryAction = rawPrimary?.action || 'link'
   const primaryHref = rawPrimary?.href || heroLink
 
@@ -124,7 +124,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
   const secondaryLabel =
     rawSecondary?.label ||
     siteSettings.heroDefaultSecondaryBtnLabel ||
-    dict.exploreArtist
+    t('exploreArtist')
   // Default action: navigate to the artist page when a slug is known,
   // otherwise fall back to scrolling the relevant section.
   const defaultSecondaryAction = artistSlug ? 'link' : 'scroll'
@@ -275,7 +275,7 @@ export function Hero({ heroItem, siteSettings, artistSlug, dict }: HeroProps) {
             : { duration: 0 }
         }
       >
-        <p className="text-sm uppercase tracking-widest font-mono">{dict.scrollDown}</p>
+        <p className="text-sm uppercase tracking-widest font-mono">{t('scrollDown')}</p>
         <ArrowDown size={20} weight="bold" />
       </motion.div>
     </section>

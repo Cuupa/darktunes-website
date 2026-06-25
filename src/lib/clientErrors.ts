@@ -8,7 +8,8 @@
  *   const res = await fetch('/api/some-route', { ... })
  *   if (!res.ok) {
  *     const body = await res.json() as ApiErrorResponse
- *     toast.error(getErrorMessage(body, dict))
+ *     const tErrors = useTranslations('errors')
+ *     toast.error(getErrorMessage(body, tErrors))
  *     return
  *   }
  *
@@ -27,32 +28,38 @@ import { ERROR_CODES } from './errorCodes'
  *
  * 1. Checks if the response `code` matches a known ErrorCode.
  * 2. If so, returns the dictionary translation for that code.
- * 3. Otherwise falls back to `dict.errors.SERVER_ERROR`.
+ * 3. Otherwise falls back to `errors.SERVER_ERROR`.
  *
- * @param body   - Parsed JSON body from a non-ok API response.
- * @param dict   - The active locale's full dictionary.
+ * @param body    - Parsed JSON body from a non-ok API response.
+ * @param tErrors - `useTranslations('errors')` (or compatible translator).
  */
-export function getErrorMessage(body: ApiErrorResponse, dict: Dictionary): string {
+export function getErrorMessage(
+  body: ApiErrorResponse,
+  tErrors: (code: keyof Dictionary['errors']) => string,
+): string {
   const code = body.code
   if (code && (ERROR_CODES as readonly string[]).includes(code)) {
-    return dict.errors[code as keyof Dictionary['errors']]
+    return tErrors(code as keyof Dictionary['errors'])
   }
-  return dict.errors.SERVER_ERROR
+  return tErrors('SERVER_ERROR')
 }
 
 /**
  * Parses the JSON body of an API response and calls `getErrorMessage`.
- * Returns `dict.errors.SERVER_ERROR` if JSON parsing fails.
+ * Returns `errors.SERVER_ERROR` if JSON parsing fails.
  *
- * @param res    - A non-ok `Response` object from `fetch`.
- * @param dict   - The active locale's full dictionary.
+ * @param res     - A non-ok `Response` object from `fetch`.
+ * @param tErrors - `useTranslations('errors')` (or compatible translator).
  */
-export async function getResponseErrorMessage(res: Response, dict: Dictionary): Promise<string> {
+export async function getResponseErrorMessage(
+  res: Response,
+  tErrors: (code: keyof Dictionary['errors']) => string,
+): Promise<string> {
   try {
     const body = (await res.json()) as ApiErrorResponse
-    return getErrorMessage(body, dict)
+    return getErrorMessage(body, tErrors)
   } catch {
-    return dict.errors.SERVER_ERROR
+    return tErrors('SERVER_ERROR')
   }
 }
 

@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarBlank } from '@phosphor-icons/react'
-import { useDict } from '@/contexts/DictContext'
+
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 // EventManager lives under app/ (not src/) — relative import is required
 import { EventManager } from '../../../app/portal/events/_components/EventManager'
@@ -37,7 +37,6 @@ import type { Artist, Concert, NewsPost } from '@/types'
 const NO_ARTIST = '__none__'
 
 export function AdminConcertsManager() {
-  const dict = useDict()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const [artists, setArtists] = useState<Pick<Artist, 'id' | 'name'>[]>([])
@@ -185,7 +184,6 @@ export function AdminConcertsManager() {
           </div>
         ) : (
           <EventManager
-            dict={dict.portal}
             concerts={concerts}
             artistId={selectedArtistId}
             allArtists={artists as Artist[]}

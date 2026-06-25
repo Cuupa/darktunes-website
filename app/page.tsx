@@ -14,7 +14,7 @@ import { unstable_cache } from 'next/cache'
 import type { Metadata } from 'next'
 import { HomePageContent } from './_components/HomePageContent'
 import { getSiteSettings } from '@/lib/api/siteSettings'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+
 import {
   getCachedPublicReleases,
   getCachedPublicNews,
@@ -106,17 +106,14 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, news, videos, concerts, siteSettings, artists, locale] = await Promise.all([
+  const [releases, news, videos, concerts, siteSettings, artists] = await Promise.all([
     getCachedPublicReleases(),
     getCachedPublicNews(),
     getCachedPublicVideos(),
     getCachedPublicConcerts(),
     getCachedSiteSettings(),
     getCachedPublicArtists(),
-    getLocale(),
   ])
-
-  const dict = await getDictionary(locale)
 
   return (
     <>
@@ -135,8 +132,6 @@ export default async function HomePage() {
         concerts={concerts}
         siteSettings={siteSettings}
         artists={artists}
-        dict={dict}
-        locale={locale}
       />
     </>
   )

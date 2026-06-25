@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { toast } from 'sonner'
 import { Eye, EyeSlash, ArrowSquareIn, Trash } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 import {
@@ -41,7 +41,7 @@ function secretMaskStyle(hidden: boolean): CSSProperties | undefined {
 }
 
 export function ApiCredentialsManager() {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [credentials, setCredentials] = useState<CredentialStatus[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,24 +53,24 @@ export function ApiCredentialsManager() {
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
+    if (!session?.access_token) throw new Error(tErrors('AUTH_REQUIRED'))
 
     const res = await fetch('/api/admin/api-credentials', {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorResponse
-      throw new Error(getErrorMessage(body, dict))
+      throw new Error(getErrorMessage(body, tErrors))
     }
     const body = (await res.json()) as { credentials: CredentialStatus[] }
     setCredentials(body.credentials)
-  }, [supabase, dict])
+  }, [supabase, tErrors])
 
   useEffect(() => {
     void fetchCredentials()
-      .catch((err) => toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR))
+      .catch((err) => toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR')))
       .finally(() => setLoading(false))
-  }, [fetchCredentials, dict])
+  }, [fetchCredentials, tErrors])
 
   const saveCredential = async (key: string) => {
     const value = drafts[key] ?? ''
@@ -79,7 +79,7 @@ export function ApiCredentialsManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
+      if (!session?.access_token) throw new Error(tErrors('AUTH_REQUIRED'))
 
       const res = await fetch('/api/admin/api-credentials', {
         method: 'PUT',
@@ -91,7 +91,7 @@ export function ApiCredentialsManager() {
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       const body = (await res.json()) as { credentials: CredentialStatus[] }
       setCredentials(body.credentials)
@@ -102,7 +102,7 @@ export function ApiCredentialsManager() {
       })
       toast.success('Credential saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setSavingKey(null)
     }
@@ -114,7 +114,7 @@ export function ApiCredentialsManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
+      if (!session?.access_token) throw new Error(tErrors('AUTH_REQUIRED'))
 
       const res = await fetch(`/api/admin/api-credentials/${encodeURIComponent(key)}`, {
         method: 'DELETE',
@@ -122,7 +122,7 @@ export function ApiCredentialsManager() {
       })
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       await fetchCredentials()
       setDrafts((prev) => {
@@ -132,7 +132,7 @@ export function ApiCredentialsManager() {
       })
       toast.success('Credential cleared')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setSavingKey(null)
     }

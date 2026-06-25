@@ -166,8 +166,8 @@ function makeMockSettlement(overrides?: Partial<SettlementCenterState>): Settlem
 
 const mockUseSettlementCenter = vi.fn(() => makeMockSettlement())
 
-vi.mock('@/contexts/DictContext', () => ({
-  useDict: () => ({ admin: { accounting: {} } }),
+vi.mock('next-intl', () => ({
+  useMessages: () => ({ admin: { accounting: {} } }),
 }))
 
 vi.mock('@/hooks/useSettlementCenter', () => ({

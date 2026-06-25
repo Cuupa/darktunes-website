@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Layout } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -18,16 +19,15 @@ import {
 } from '@/components/ui/dialog'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { EpkTemplate } from '@/lib/api/epkTemplates'
-import type { Dictionary } from '@/i18n/types'
 
 interface EpkTemplatePickerProps {
   open: boolean
   onClose: () => void
-  dict: Dictionary['portal']
   onApply: (template: EpkTemplate) => void
 }
 
-export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplatePickerProps) {
+export function EpkTemplatePicker({ open, onClose, onApply }: EpkTemplatePickerProps) {
+  const t = useTranslations('portal')
   const [templates, setTemplates] = useState<EpkTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -40,7 +40,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        toast.error(dict.epk_builder_export_auth_error)
+        toast.error(t('epk_builder_export_auth_error'))
         return
       }
 
@@ -51,11 +51,11 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
       const data = (await res.json()) as { templates: EpkTemplate[] }
       setTemplates(data.templates)
     } catch {
-      toast.error(dict.epk_templates_load_error)
+      toast.error(t('epk_templates_load_error'))
     } finally {
       setLoading(false)
     }
-  }, [dict.epk_builder_export_auth_error, dict.epk_templates_load_error])
+  }, [t])
 
   useEffect(() => {
     if (open) void fetchTemplates()
@@ -65,7 +65,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
     onApply(template)
     setConfirmId(null)
     onClose()
-    toast.success(dict.epk_templates_apply_success)
+    toast.success(t('epk_templates_apply_success'))
   }
 
   return (
@@ -77,15 +77,15 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
         <DialogHeader className="p-6 pb-0">
           <DialogTitle id="epk-templates-title" className="flex items-center gap-2">
             <Layout size={20} aria-hidden="true" />
-            {dict.epk_templates_title}
+            {t('epk_templates_title')}
           </DialogTitle>
         </DialogHeader>
         <div className="overflow-y-auto max-h-[70vh] p-6 space-y-4">
-          <p className="text-sm text-muted-foreground">{dict.epk_templates_description}</p>
+          <p className="text-sm text-muted-foreground">{t('epk_templates_description')}</p>
           {loading ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_templates_loading}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_templates_loading')}</p>
           ) : templates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_templates_empty}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_templates_empty')}</p>
           ) : (
             <ul className="space-y-3">
               {templates.map((template) => (
@@ -102,7 +102,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
                   {confirmId === template.id ? (
                     <div className="flex flex-wrap gap-2">
                       <p className="w-full text-sm text-muted-foreground">
-                        {dict.epk_templates_apply_confirm}
+                        {t('epk_templates_apply_confirm')}
                       </p>
                       <Button
                         type="button"
@@ -110,7 +110,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
                         className="min-h-[44px]"
                         onClick={() => handleApply(template)}
                       >
-                        {dict.epk_templates_apply_confirm_yes}
+                        {t('epk_templates_apply_confirm_yes')}
                       </Button>
                       <Button
                         type="button"
@@ -119,7 +119,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
                         className="min-h-[44px]"
                         onClick={() => setConfirmId(null)}
                       >
-                        {dict.epk_templates_apply_confirm_no}
+                        {t('epk_templates_apply_confirm_no')}
                       </Button>
                     </div>
                   ) : (
@@ -130,7 +130,7 @@ export function EpkTemplatePicker({ open, onClose, dict, onApply }: EpkTemplateP
                       className="min-h-[44px]"
                       onClick={() => setConfirmId(template.id)}
                     >
-                      {dict.epk_templates_apply}
+                      {t('epk_templates_apply')}
                     </Button>
                   )}
                 </li>

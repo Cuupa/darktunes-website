@@ -7,22 +7,22 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { List, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { useTranslations, useLocale } from 'next-intl'
 import logoImage from '@/assets/images/logo_(1).png'
 import { buildNavItems } from '@/config/sections'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
-import type { Dictionary, Locale } from '@/i18n/types'
 import type { HomepageSection } from '@/types'
 
 interface HeaderProps {
-  dict: Dictionary['navigation']
-  locale: Locale
   logoUrl?: string
   sectionOrder?: HomepageSection[]
   showAbout?: boolean
   aboutNavLabel?: string
 }
 
-export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNavLabel }: HeaderProps) {
+export function Header({ logoUrl, sectionOrder, showAbout, aboutNavLabel }: HeaderProps) {
+  const t = useTranslations('navigation')
+  const locale = useLocale()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
@@ -42,7 +42,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
 
   const navItems = buildNavItems(sectionOrder, { showAbout: showAbout ?? true, aboutLabel: aboutNavLabel }).map((item) => ({
     id: item.id,
-    label: item.id === 'about' && aboutNavLabel ? aboutNavLabel : dict[item.labelKey],
+    label: item.id === 'about' && aboutNavLabel ? aboutNavLabel : t(item.labelKey),
     // On sub-pages convert anchor hrefs (e.g. #releases) to absolute homepage
     // links (e.g. /#releases) so the navigation still works from any route.
     href: !isHomePage && item.routeType === 'anchor' ? `/${item.href}` : item.href,
@@ -122,7 +122,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
               className="ml-2 min-w-[44px] min-h-[44px] text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1"
               aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
             >
-              {dict.switchLocale}
+              {t('switchLocale')}
             </Button>
           </nav>
 
@@ -185,7 +185,7 @@ export function Header({ dict, locale, logoUrl, sectionOrder, showAbout, aboutNa
                 className="mt-2 self-start min-w-[44px] min-h-[44px] text-xs font-mono text-muted-foreground hover:text-accent-foreground border border-border/40 hover:border-accent/40 px-2 py-1"
                 aria-label={locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
               >
-                {dict.switchLocale}
+                {t('switchLocale')}
               </Button>
             </nav>
           </motion.div>

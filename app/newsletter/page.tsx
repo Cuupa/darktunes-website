@@ -7,7 +7,7 @@
  */
 
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import Link from 'next/link'
 
@@ -18,8 +18,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewsletterPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const tPages = await getTranslations('pages')
 
   return (
     <main id="main-content" className="min-h-screen bg-background flex flex-col">
@@ -28,10 +27,10 @@ export default async function NewsletterPage() {
           href="/"
           className="inline-block text-sm text-muted-foreground underline hover:text-accent transition-colors"
         >
-          {dict.pages.backToHome}
+          {tPages('backToHome')}
         </Link>
       </div>
-      <NewsletterSection dict={dict.newsletter} />
+      <NewsletterSection />
     </main>
   )
 }

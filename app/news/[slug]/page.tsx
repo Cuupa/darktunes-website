@@ -10,7 +10,7 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getNewsPostBySlug } from '@/lib/api/news'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
 import { ShareButton } from '@/components/ShareButton'
@@ -68,9 +68,9 @@ export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params
   const locale = await getLocale()
 
-  const [post, dict] = await Promise.all([
+  const [post, tNewsPage] = await Promise.all([
     makeGetNewsPost(slug)().catch(() => null),
-    getDictionary(locale),
+    getTranslations('newsPage'),
   ])
 
   if (!post) notFound()
@@ -86,7 +86,7 @@ export default async function NewsDetailPage({ params }: Props) {
           href="/news"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
         >
-          {dict.newsPage.backToNews}
+          {tNewsPage('backToNews')}
         </Link>
 
         {post.imageUrl && (
@@ -118,10 +118,10 @@ export default async function NewsDetailPage({ params }: Props) {
             title={post.title}
             text={post.excerpt ?? undefined}
             labels={{
-              share: dict.newsPage.share,
-              shareSuccess: dict.newsPage.shareSuccess,
-              shareLinkCopied: dict.newsPage.shareLinkCopied,
-              shareError: dict.newsPage.shareError,
+              share: tNewsPage('share'),
+              shareSuccess: tNewsPage('shareSuccess'),
+              shareLinkCopied: tNewsPage('shareLinkCopied'),
+              shareError: tNewsPage('shareError'),
             }}
           />
         </div>

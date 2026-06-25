@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -11,31 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { InterviewRequest } from '@/types'
 
 interface InterviewRequestsClientProps {
-  title: string
   initialRequests: InterviewRequest[]
   artists: Array<{ id: string; name: string }>
-  labels: {
-    artist: string
-    subject: string
-    message: string
-    preferredDate: string
-    submit: string
-    submitting: string
-    empty: string
-    error: string
-    success: string
-    pending: string
-    accepted: string
-    rejected: string
-  }
 }
 
 export function InterviewRequestsClient({
-  title,
   initialRequests,
   artists,
-  labels,
 }: InterviewRequestsClientProps) {
+  const t = useTranslations('pressDashboard')
   const [items, setItems] = useState(initialRequests)
   const [artistId, setArtistId] = useState(artists[0]?.id ?? '')
   const [subject, setSubject] = useState('')
@@ -44,9 +29,9 @@ export function InterviewRequestsClient({
   const [submitting, setSubmitting] = useState(false)
 
   const getStatusLabel = (status: string) => {
-    if (status === 'pending') return labels.pending
-    if (status === 'accepted') return labels.accepted
-    if (status === 'rejected') return labels.rejected
+    if (status === 'pending') return t('pending')
+    if (status === 'accepted') return t('accepted')
+    if (status === 'rejected') return t('rejected')
     return status
   }
 
@@ -60,7 +45,7 @@ export function InterviewRequestsClient({
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error(labels.error)
+      if (!session?.access_token) throw new Error(t('error'))
 
       const res = await fetch('/api/press/interview-requests', {
         method: 'POST',
@@ -75,15 +60,15 @@ export function InterviewRequestsClient({
           preferredDate: preferredDate || null,
         }),
       })
-      if (!res.ok) throw new Error(labels.error)
+      if (!res.ok) throw new Error(t('error'))
       const created = (await res.json()) as InterviewRequest
       setItems((prev) => [created, ...prev])
       setSubject('')
       setMessage('')
       setPreferredDate('')
-      toast.success(labels.success)
+      toast.success(t('success'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : labels.error)
+      toast.error(error instanceof Error ? error.message : t('error'))
     } finally {
       setSubmitting(false)
     }
@@ -91,10 +76,10 @@ export function InterviewRequestsClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{title}</h1>
+      <h1 className="text-3xl font-bold">{t('interviews')}</h1>
       <form onSubmit={submit} className="rounded-lg border border-border p-4 space-y-3">
         <div className="space-y-1">
-          <Label>{labels.artist}</Label>
+          <Label>{t('artist')}</Label>
           <Select value={artistId} onValueChange={setArtistId}>
             <SelectTrigger className="min-h-[44px]">
               <SelectValue />
@@ -109,19 +94,19 @@ export function InterviewRequestsClient({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label>{labels.subject}</Label>
+          <Label>{t('subject')}</Label>
           <Input value={subject} onChange={(e) => setSubject(e.target.value)} required />
         </div>
         <div className="space-y-1">
-          <Label>{labels.message}</Label>
+          <Label>{t('message')}</Label>
           <Textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4} />
         </div>
         <div className="space-y-1">
-          <Label>{labels.preferredDate}</Label>
+          <Label>{t('preferredDate')}</Label>
           <Input type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} />
         </div>
         <Button type="submit" className="min-h-[44px]" disabled={submitting}>
-          {submitting ? labels.submitting : labels.submit}
+          {submitting ? t('submitting') : t('submit')}
         </Button>
       </form>
 
@@ -136,7 +121,7 @@ export function InterviewRequestsClient({
             )}
           </div>
         ))}
-        {items.length === 0 && <p className="text-sm text-muted-foreground">{labels.empty}</p>}
+        {items.length === 0 && <p className="text-sm text-muted-foreground">{t('noInterviews')}</p>}
       </div>
     </div>
   )

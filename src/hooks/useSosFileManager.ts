@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useLocalKV'
 import { toast } from 'sonner'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { parseCSVContentStreaming } from '@/lib/sos/ingest/streaming-csv-parser'
 import { parseShopifyCSV } from '@/lib/sos/ingest/shopify-parser'
 import { extractPeriodBounds, uploadBronzeDistributorCsv } from '@/lib/sos/bronzeUpload'
@@ -42,8 +42,7 @@ const FILE_FALLBACK = {
 } as const
 
 export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
-  const dict = useDict()
-  const t = dict.admin?.accounting ?? FILE_FALLBACK
+  const t = useMergedAccountingLabels(FILE_FALLBACK)
   // Metadata persisted in IndexedDB (no raw CSV data).
   const [fileMetas, setFileMetas] = useKV<UploadedFileMeta[]>(`${type}-files`, [])
   // Raw CSV strings kept in memory only — lost on page reload, no storage limit issues.

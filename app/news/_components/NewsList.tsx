@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { ContentPagination } from '@/components/ContentPagination'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import type { Dictionary } from '@/i18n/types'
+import { useTranslations } from 'next-intl'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { NewsPost } from '@/types'
 
@@ -15,7 +15,6 @@ const ITEMS_PER_PAGE = 6
 
 interface NewsListProps {
   posts: NewsPost[]
-  dict: Dictionary['newsPage']
 }
 
 function formatDate(dateStr: string): string {
@@ -26,7 +25,8 @@ function formatDate(dateStr: string): string {
   })
 }
 
-export function NewsList({ posts, dict }: NewsListProps) {
+export function NewsList({ posts }: NewsListProps) {
+  const t = useTranslations('newsPage')
   const [currentPage, setCurrentPage] = useState(1)
 
   const totalPages = Math.ceil(posts.length / ITEMS_PER_PAGE)
@@ -41,7 +41,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-muted-foreground">
         <Newspaper size={48} weight="thin" />
-        <p className="text-center">{dict.noNews}</p>
+        <p className="text-center">{t('noNews')}</p>
       </div>
     )
   }
@@ -92,7 +92,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
                   href={`/news/${featuredPost.slug}`}
                   className="inline-flex min-h-[44px] items-center gap-2 self-start text-sm font-bold uppercase tracking-wider text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                  {dict.readMore}
+                  {t('readMore')}
                   <ArrowRight weight="bold" />
                 </Link>
               </div>
@@ -141,7 +141,7 @@ export function NewsList({ posts, dict }: NewsListProps) {
                   href={`/news/${post.slug}`}
                   className="mt-6 inline-flex min-h-[44px] items-center gap-2 self-start pt-2 text-sm font-bold uppercase tracking-wider text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                  {dict.readMore}
+                  {t('readMore')}
                   <ArrowRight weight="bold" />
                 </Link>
               </div>

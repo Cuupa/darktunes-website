@@ -6,9 +6,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import type { Dictionary } from '@/i18n/types'
+import { useLocale, useTranslations } from 'next-intl'
 import type { ContactTopicConfig } from '@/types'
-import type { Locale } from '@/i18n/types'
 
 /** Built-in fallback topics used when no custom topics are configured. */
 const DEFAULT_TOPICS: ContactTopicConfig[] = [
@@ -30,12 +29,12 @@ interface FormState {
 type Status = 'idle' | 'submitting' | 'success' | 'error'
 
 interface ContactFormProps {
-  dict: Dictionary['contact']
-  locale: Locale
   contactTopics: ContactTopicConfig[]
 }
 
-export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
+export function ContactForm({ contactTopics }: ContactFormProps) {
+  const t = useTranslations('contact')
+  const locale = useLocale()
   const topics = contactTopics.length > 0 ? contactTopics : DEFAULT_TOPICS
   const [form, setForm] = useState<FormState>({
     name: '',
@@ -50,10 +49,10 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof FormState, string>> = {}
-    if (!form.name.trim()) next.name = dict.validationName
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = dict.validationEmail
-    if (form.message.trim().length < 20) next.message = dict.validationMessage
-    if (!form.gdprConsent) next.gdprConsent = dict.validationConsent
+    if (!form.name.trim()) next.name = t('validationName')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = t('validationEmail')
+    if (form.message.trim().length < 20) next.message = t('validationMessage')
+    if (!form.gdprConsent) next.gdprConsent = t('validationConsent')
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -86,8 +85,8 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
   if (status === 'success') {
     return (
       <div className="rounded-lg border border-primary/30 bg-primary/10 p-8 text-center space-y-2">
-        <p className="text-2xl font-bold">{dict.successTitle}</p>
-        <p className="text-muted-foreground font-serif">{dict.successMessage}</p>
+        <p className="text-2xl font-bold">{t('successTitle')}</p>
+        <p className="text-muted-foreground font-serif">{t('successMessage')}</p>
       </div>
     )
   }
@@ -108,12 +107,12 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
 
       <div className="grid sm:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label htmlFor="contact-name">{dict.nameLabel}</Label>
+          <Label htmlFor="contact-name">{t('nameLabel')}</Label>
           <Input
             id="contact-name"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder={dict.namePlaceholder}
+            placeholder={t('namePlaceholder')}
             autoComplete="name"
             className={errors.name ? 'border-red-500' : ''}
           />
@@ -121,13 +120,13 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="contact-email">{dict.emailLabel}</Label>
+          <Label htmlFor="contact-email">{t('emailLabel')}</Label>
           <Input
             id="contact-email"
             type="email"
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            placeholder={dict.emailPlaceholder}
+            placeholder={t('emailPlaceholder')}
             autoComplete="email"
             className={errors.email ? 'border-red-500' : ''}
           />
@@ -136,7 +135,7 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="contact-topic">{dict.topicLabel}</Label>
+        <Label htmlFor="contact-topic">{t('topicLabel')}</Label>
         <select
           id="contact-topic"
           value={form.topic}
@@ -152,13 +151,13 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="contact-message">{dict.messageLabel}</Label>
+        <Label htmlFor="contact-message">{t('messageLabel')}</Label>
         <Textarea
           id="contact-message"
           rows={6}
           value={form.message}
           onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-          placeholder={dict.messagePlaceholder}
+          placeholder={t('messagePlaceholder')}
           className={errors.message ? 'border-red-500' : ''}
         />
         {errors.message && <p className="text-xs text-red-400">{errors.message}</p>}
@@ -175,7 +174,7 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
             className={errors.gdprConsent ? 'border-red-500' : ''}
           />
           <Label htmlFor="contact-gdpr" className="text-sm text-muted-foreground leading-snug cursor-pointer">
-            {dict.gdprConsent}
+            {t('gdprConsent')}
           </Label>
         </div>
         {errors.gdprConsent && <p className="text-xs text-red-400">{errors.gdprConsent}</p>}
@@ -183,8 +182,8 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
 
       {status === 'error' && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-sm font-semibold text-red-400">{dict.errorTitle}</p>
-          <p className="text-xs text-muted-foreground">{dict.errorMessage}</p>
+          <p className="text-sm font-semibold text-red-400">{t('errorTitle')}</p>
+          <p className="text-xs text-muted-foreground">{t('errorMessage')}</p>
         </div>
       )}
 
@@ -193,10 +192,10 @@ export function ContactForm({ dict, locale, contactTopics }: ContactFormProps) {
         disabled={status === 'submitting'}
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold uppercase tracking-wider"
       >
-        {status === 'submitting' ? dict.submitting : dict.submit}
+        {status === 'submitting' ? t('submitting') : t('submit')}
       </Button>
 
-      <p className="text-xs text-muted-foreground/60 text-center">{dict.spamDisclaimer}</p>
+      <p className="text-xs text-muted-foreground/60 text-center">{t('spamDisclaimer')}</p>
     </form>
   )
 }

@@ -61,7 +61,7 @@ const concert: Concert = {
 
 describe('EventsPageContent', () => {
   it('renders a single full-card overlay link for the event detail page', () => {
-    render(<EventsPageContent concerts={[concert]} dict={enDict.concerts} locale="en" />)
+    render(<EventsPageContent concerts={[concert]} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${concert.artistName} – ${concert.eventName}`,
@@ -91,7 +91,7 @@ describe('EventsPageContent', () => {
   })
 
   it('keeps ticket and navigation links interactive without nesting them inside the overlay link', () => {
-    render(<EventsPageContent concerts={[concert]} dict={enDict.concerts} locale="en" />)
+    render(<EventsPageContent concerts={[concert]} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${concert.artistName} – ${concert.eventName}`,
