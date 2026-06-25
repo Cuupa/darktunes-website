@@ -131,7 +131,8 @@ export function AdminSidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
   const tNav = useTranslations('admin.nav')
-  const { isAdmin, isEditor, user, profile, signOut } = useAuthContext()
+  const { isAdmin, user, profile, signOut } = useAuthContext()
+  const isEditorRole = profile?.role === 'editor'
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = useCallback(async () => {
@@ -146,11 +147,11 @@ export function AdminSidebarNav() {
 
   const canSee = (item: NavItem) => {
     if (isAdmin) return true
-    if (isEditor) return !item.adminOnly
+    if (isEditorRole) return !item.adminOnly
     return false
   }
 
-  const resolveHref = (item: NavItem) => (isEditor && item.editorHref ? item.editorHref : item.href)
+  const resolveHref = (item: NavItem) => (isEditorRole && item.editorHref ? item.editorHref : item.href)
 
   const isActive = (item: NavItem) => {
     const href = resolveHref(item)
@@ -238,9 +239,9 @@ export function AdminSidebarNav() {
     <>
       {/* Mobile header — only visible below md breakpoint */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-        <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+        <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
         <div className="flex items-center gap-2">
-          {user?.id && isEditor && <EditorNotificationBell userId={user.id} />}
+          {user?.id && isEditorRole && <EditorNotificationBell userId={user.id} />}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
@@ -251,7 +252,7 @@ export function AdminSidebarNav() {
               <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
               <div className="flex h-full flex-col bg-card">
                 <div className="px-4 py-5 border-b border-border">
-                  <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+                  <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
                 </div>
                 {renderNavLinks(() => setMobileOpen(false))}
@@ -270,10 +271,10 @@ export function AdminSidebarNav() {
         {/* Brand header */}
         <div className="px-4 py-5 border-b border-border flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+            <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
           </div>
-          {user?.id && isEditor && <EditorNotificationBell userId={user.id} />}
+          {user?.id && isEditorRole && <EditorNotificationBell userId={user.id} />}
         </div>
 
         {renderNavLinks()}

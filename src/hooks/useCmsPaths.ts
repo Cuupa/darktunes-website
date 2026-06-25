@@ -13,8 +13,8 @@ import {
 } from '@/lib/editor/cmsPaths'
 
 export function useCmsPaths() {
-  const { profile } = useAuthContext()
-  const audience = cmsAudienceFromRole(profile?.role)
+  const { profile, loading } = useAuthContext()
+  const audience = loading ? 'admin' : cmsAudienceFromRole(profile?.role)
 
   return useMemo(
     () => ({
@@ -29,6 +29,6 @@ export function useCmsPaths() {
       artistEdit: getCmsArtistEditPath,
       promoLog: getCmsPromoLogPath(audience),
     }),
-    [audience],
+    [audience, loading],
   )
 }

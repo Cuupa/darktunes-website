@@ -191,8 +191,9 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     setActiveTab(tab)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
-    router.replace(`?${params.toString()}`, { scroll: false })
-  }, [router, searchParams])
+    const nextUrl = contentOnly ? `/editor?${params.toString()}` : `?${params.toString()}`
+    router.replace(nextUrl, { scroll: false })
+  }, [router, searchParams, contentOnly])
 
   const handleSignOut = async () => {
     const { error } = await signOut()
@@ -200,6 +201,9 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
       toast.error('Failed to sign out')
     } else {
       toast.success('Signed out successfully')
+      if (standalone && (contentOnly || isEditor)) {
+        router.push('/login')
+      }
     }
   }
 
