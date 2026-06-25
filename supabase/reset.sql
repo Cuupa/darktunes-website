@@ -4286,6 +4286,9 @@ CREATE TRIGGER sos_rules_presets_updated_at
   BEFORE UPDATE ON public.sos_rules_presets
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sos_rules_presets_name_ci
+  ON public.sos_rules_presets (lower(btrim(name)));
+
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_accounting_workspaces  — server-persisted live workspace for a period
 -- Stores the full current rules bundle (as JSONB) + attached bronze batch IDs.

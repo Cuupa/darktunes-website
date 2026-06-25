@@ -85,7 +85,7 @@ export interface ShopifySale {
   netRevenue: number
 }
 
-/** Raw file record persisted in KV storage. uploadedAt is stored as ISO string. */
+/** Upload metadata persisted in IndexedDB; raw CSV content stays in memory only. */
 export interface UploadedFile {
   id: string
   name: string

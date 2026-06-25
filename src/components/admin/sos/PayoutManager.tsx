@@ -58,7 +58,7 @@ const payoutFallback = {
   payoutInvalidIbanTooltip: 'Checksum invalid. SEPA export blocked.',
   payoutSepaFormTitle: 'Label sender account for SEPA XML',
   payoutSepaFormHint:
-    'IBAN and account holder are stored locally in this browser (Accounting → SEPA Payout).',
+    'IBAN and account holder are saved to the server (Default preset or period workspace).',
   payoutSepaHolderLabel: 'Account holder',
   payoutSepaIbanLabel: 'IBAN',
   payoutSepaSave: 'Save SEPA details',
@@ -67,7 +67,7 @@ const payoutFallback = {
   payoutSepaSavedToast: 'Label SEPA details saved',
   payoutLabelIbanMissingToast: 'Label IBAN missing',
   payoutLabelIbanMissingDesc:
-    'Enter the label sender IBAN in the SEPA section below (stored locally in this browser).',
+    'Enter the label sender IBAN in the SEPA section below (saved to the server).',
   payoutInvalidLabelIbanToast: 'Invalid label IBAN',
   payoutInvalidLabelIbanDesc: 'The stored label IBAN failed the modulo-97 checksum validation.',
   payoutNoArtistsSelectedToast: 'No artists selected',

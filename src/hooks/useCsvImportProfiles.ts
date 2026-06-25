@@ -1,31 +1,28 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import { useKV } from '@/hooks/useLocalKV'
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { DEFAULT_CSV_PROFILES } from '@/lib/sos/ingest/default-profiles'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 
-const STORAGE_KEY = 'darktunes_csv_import_profiles'
-
-export function useCsvImportProfiles() {
-  const [customProfiles, setCustomProfiles] = useKV<CsvImportProfile[]>(STORAGE_KEY, [])
-
+export function useCsvImportProfiles(
+  customProfiles: CsvImportProfile[],
+  setCustomProfiles: Dispatch<SetStateAction<CsvImportProfile[]>>,
+) {
   const profiles = useMemo(
-    () => [...DEFAULT_CSV_PROFILES, ...(customProfiles ?? [])],
+    () => [...DEFAULT_CSV_PROFILES, ...customProfiles],
     [customProfiles],
   )
 
   const saveProfile = useCallback(
     (profile: CsvImportProfile) => {
       setCustomProfiles((prev) => {
-        const list = prev ?? []
-        const idx = list.findIndex((p) => p.id === profile.id)
+        const idx = prev.findIndex((p) => p.id === profile.id)
         if (idx >= 0) {
-          const next = [...list]
+          const next = [...prev]
           next[idx] = profile
           return next
         }
-        return [...list, profile]
+        return [...prev, profile]
       })
     },
     [setCustomProfiles],
@@ -33,7 +30,7 @@ export function useCsvImportProfiles() {
 
   const deleteProfile = useCallback(
     (id: string) => {
-      setCustomProfiles((prev) => (prev ?? []).filter((p) => p.id !== id))
+      setCustomProfiles((prev) => prev.filter((p) => p.id !== id))
     },
     [setCustomProfiles],
   )
@@ -42,7 +39,7 @@ export function useCsvImportProfiles() {
 
   return {
     profiles,
-    customProfiles: customProfiles ?? [],
+    customProfiles,
     saveProfile,
     deleteProfile,
     editorOpen,

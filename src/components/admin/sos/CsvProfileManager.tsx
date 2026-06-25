@@ -25,8 +25,11 @@ import type {
   ArtistMapping, CompilationFilter, SplitFee,
   ManualRevenue, ExpenseEntry, IgnoredEntry,
   CSVColumnAlias, AppDefaults, EmailConfig,
-  TrackRevenueAssignment,
+  TrackRevenueAssignment, LabelInfo, PdfExportSettings,
 } from '@/lib/sos/types'
+import type { CsvImportProfile } from '@/lib/sos/ingest/types'
+import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
+import { DEFAULT_PRESET_NAME } from '@/lib/sos/sosAccountingSettings'
 import { useSosRulesPresets, type PresetConfig } from '@/hooks/useSosRulesPresets'
 import { useDict } from '@/contexts/DictContext'
 import { interpolate } from '@/lib/i18n/interpolate'
@@ -59,6 +62,9 @@ interface CsvProfileManagerProps {
   trackRevenueAssignments: TrackRevenueAssignment[]
   appDefaults: AppDefaults
   emailConfig: Partial<EmailConfig>
+  labelInfo: Partial<LabelInfo>
+  pdfSettings: PdfExportSettings
+  csvImportProfiles: CsvImportProfile[]
   onLoad: (preset: PresetConfig) => void
 }
 
@@ -83,6 +89,9 @@ function legacyToConfig(preset: LegacySosPreset): PresetConfig {
     appDefaults: preset.appDefaults,
     emailConfig: preset.emailConfig ?? {},
     trackRevenueAssignments: [],
+    labelInfo: DEFAULT_LABEL_INFO,
+    pdfSettings: DEFAULT_PDF_EXPORT_SETTINGS,
+    csvImportProfiles: [],
   }
 }
 
@@ -101,7 +110,8 @@ function countRules(config: PresetConfig): number {
 
 export function CsvProfileManager({
   artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
-  ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig, onLoad,
+  ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig,
+  labelInfo, pdfSettings, csvImportProfiles, onLoad,
 }: CsvProfileManagerProps) {
   const dict = useDict()
   const t = dict.admin?.accounting ?? {}
@@ -165,10 +175,14 @@ export function CsvProfileManager({
       appDefaults,
       emailConfig,
       trackRevenueAssignments,
+      labelInfo,
+      pdfSettings,
+      csvImportProfiles,
     }),
     [
       artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
       ignoredEntries, csvAliases, appDefaults, emailConfig, trackRevenueAssignments,
+      labelInfo, pdfSettings, csvImportProfiles,
     ],
   )
 
@@ -190,10 +204,16 @@ export function CsvProfileManager({
 
   const handleDelete = useCallback(
     async (id: string) => {
+      const target = presets.find((p) => p.id === id)
+      if (target?.name.toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase()) {
+        toast.error(t.presetDeleteDefaultBlocked ?? 'The Default preset cannot be deleted')
+        setConfirmDeleteId(null)
+        return
+      }
       await deletePreset(id)
       setConfirmDeleteId(null)
     },
-    [deletePreset],
+    [deletePreset, presets, t.presetDeleteDefaultBlocked],
   )
 
   const totalRules = countRules(currentConfig())

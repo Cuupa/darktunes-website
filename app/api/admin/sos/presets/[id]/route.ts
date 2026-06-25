@@ -1,6 +1,4 @@
 /**
- * app/api/admin/sos/presets/[id]/route.ts
- *
  * PUT    /api/admin/sos/presets/:id  — update a preset (name and/or config)
  * DELETE /api/admin/sos/presets/:id  — delete a preset
  */
@@ -8,7 +6,13 @@
 import { NextResponse } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import {
+  deleteRulesPreset,
+  updateRulesPreset,
+  type RulesPresetConfig,
+} from '@/lib/api/sosRulesPresets'
+import { normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 async function requireAdmin() {
@@ -21,31 +25,35 @@ async function requireAdmin() {
 }
 
 export const PUT = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const supabase = await requireAdmin()
+  await requireAdmin()
   const id = new URL(req.url).pathname.split('/').at(-1) ?? ''
   if (!id) throw new ApiError(400, 'Missing preset id')
   const body = await req.json()
-  const { name, config } = body as { name?: string; config?: unknown }
-  const update: { name?: string; config?: Record<string, unknown> } = {}
-  if (name !== undefined) update.name = name.trim()
-  if (config !== undefined) update.config = config as Record<string, unknown>
-  if (Object.keys(update).length === 0) throw new ApiError(400, 'Nothing to update')
+  const { name, config } = body as { name?: string; config?: Partial<RulesPresetConfig> }
 
-  const { data, error } = await supabase
-    .from('sos_rules_presets')
-    .update(update)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw new ApiError(500, error.message)
-  return NextResponse.json({ preset: data })
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+  const preset = await updateRulesPreset(serviceSupabase, id, {
+    name,
+    config: config ? normalizeAccountingConfig(config) : undefined,
+  })
+
+  return NextResponse.json({
+    preset: {
+      id: preset.id,
+      name: preset.name,
+      config: preset.config,
+      created_at: preset.createdAt,
+      updated_at: preset.updatedAt,
+    },
+  })
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const supabase = await requireAdmin()
+  await requireAdmin()
   const id = new URL(req.url).pathname.split('/').at(-1) ?? ''
   if (!id) throw new ApiError(400, 'Missing preset id')
-  const { error } = await supabase.from('sos_rules_presets').delete().eq('id', id)
-  if (error) throw new ApiError(500, error.message)
+
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+  await deleteRulesPreset(serviceSupabase, id)
   return NextResponse.json({ ok: true })
 })

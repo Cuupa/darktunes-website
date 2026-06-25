@@ -3,9 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { AccountingWorkspaceConfig } from '@/lib/api/sosAccountingWorkspaces'
-import type { SosRulesBundle } from '@/lib/sos/sosRulesBundle'
+import {
+  DEFAULT_SOS_ACCOUNTING_SETTINGS,
+  settingsFingerprint,
+  type SosAccountingSettings,
+} from '@/lib/sos/sosAccountingSettings'
+import {
+  clearLegacyKvKeys,
+  isKvMigrationComplete,
+  markKvMigrationComplete,
+  mergeKvIntoSettings,
+  readLegacyKvSettings,
+} from '@/lib/sos/migrateKvToDb'
 
-const RULES_CACHE_KEY = 'sos-rules-state'
 const AUTO_SAVE_DEBOUNCE_MS = 2_000
 
 export interface PeriodKey {
@@ -18,94 +28,84 @@ interface WorkspaceApiResponse {
     config?: AccountingWorkspaceConfig
     updated_at?: string
     updated_by?: string | null
+  } | null
+}
+
+interface DefaultPresetApiResponse {
+  preset?: {
+    config?: AccountingWorkspaceConfig
+    updated_at?: string
   }
 }
 
 export interface UseSosWorkspaceSyncOptions {
   currentPeriodKey: PeriodKey | null
-  rulesBundle: SosRulesBundle
-  applyRulesBundle: (bundle: SosRulesBundle) => void
-  cacheRulesBundle: (bundle: SosRulesBundle) => void
+  settings: SosAccountingSettings
+  applySettings: (settings: SosAccountingSettings) => void
   bronzeBatchIds: string[]
-  rulesReady: boolean
   disabled?: boolean
-}
-
-function bundleFingerprint(bundle: SosRulesBundle): string {
-  return JSON.stringify(bundle)
-}
-
-function configToBundle(config: AccountingWorkspaceConfig): SosRulesBundle {
-  return {
-    artistMappings: config.artistMappings ?? [],
-    compilationFilters: config.compilationFilters ?? [],
-    splitFees: config.splitFees ?? [],
-    manualRevenues: config.manualRevenues ?? [],
-    expenses: config.expenses ?? [],
-    ignoredEntries: config.ignoredEntries ?? [],
-    csvAliases: config.csvAliases ?? [],
-    trackRevenueAssignments: config.trackRevenueAssignments ?? [],
-    appDefaults: config.appDefaults,
-    emailConfig: config.emailConfig ?? {},
-  }
 }
 
 export function useSosWorkspaceSync({
   currentPeriodKey,
-  rulesBundle,
-  applyRulesBundle,
-  cacheRulesBundle,
+  settings,
+  applySettings,
   bronzeBatchIds,
-  rulesReady,
   disabled = false,
 }: UseSosWorkspaceSyncOptions) {
+  const [settingsReady, setSettingsReady] = useState(false)
   const [workspaceLoadedAt, setWorkspaceLoadedAt] = useState<string | null>(null)
   const [workspaceUpdatedBy, setWorkspaceUpdatedBy] = useState<string | null>(null)
+  const [defaultPresetLoadedAt, setDefaultPresetLoadedAt] = useState<string | null>(null)
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false)
   const [isWorkspaceSaving, setIsWorkspaceSaving] = useState(false)
-  const [isRulesDirty, setIsRulesDirty] = useState(false)
+  const [isSettingsDirty, setIsSettingsDirty] = useState(false)
   const [isPeriodWorkspaceReady, setIsPeriodWorkspaceReady] = useState(false)
+  const [isDefaultPresetReady, setIsDefaultPresetReady] = useState(false)
 
   const lastSavedFingerprintRef = useRef<string | null>(null)
   const suppressAutoSaveRef = useRef(false)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bootstrapStartedRef = useRef(false)
+
+  const clearSavedFingerprint = useCallback(() => {
+    lastSavedFingerprintRef.current = null
+  }, [])
 
   const markSynced = useCallback(
-    (bundle: SosRulesBundle, updatedAt: string | null, updatedBy: string | null) => {
-      const fingerprint = bundleFingerprint(bundle)
-      lastSavedFingerprintRef.current = fingerprint
-      setIsRulesDirty(false)
+    (
+      nextSettings: SosAccountingSettings,
+      updatedAt: string | null,
+      updatedBy: string | null,
+    ) => {
+      lastSavedFingerprintRef.current = settingsFingerprint(nextSettings)
+      setIsSettingsDirty(false)
       setWorkspaceLoadedAt(updatedAt)
       setWorkspaceUpdatedBy(updatedBy)
-      cacheRulesBundle(bundle)
+      setDefaultPresetLoadedAt(null)
     },
-    [cacheRulesBundle],
+    [],
   )
 
+  const markDefaultSynced = useCallback((nextSettings: SosAccountingSettings, updatedAt: string | null) => {
+    lastSavedFingerprintRef.current = settingsFingerprint(nextSettings)
+    setIsSettingsDirty(false)
+    setDefaultPresetLoadedAt(updatedAt)
+    setWorkspaceLoadedAt(null)
+    setWorkspaceUpdatedBy(null)
+  }, [])
+
   const saveWorkspace = useCallback(
-    async (bundle: SosRulesBundle, periodKey: PeriodKey): Promise<boolean> => {
+    async (nextSettings: SosAccountingSettings, periodKey: PeriodKey): Promise<boolean> => {
       setIsWorkspaceSaving(true)
       try {
-        const config: AccountingWorkspaceConfig = {
-          artistMappings: bundle.artistMappings,
-          compilationFilters: bundle.compilationFilters,
-          splitFees: bundle.splitFees,
-          manualRevenues: bundle.manualRevenues,
-          expenses: bundle.expenses,
-          ignoredEntries: bundle.ignoredEntries,
-          csvAliases: bundle.csvAliases,
-          trackRevenueAssignments: bundle.trackRevenueAssignments,
-          appDefaults: bundle.appDefaults,
-          emailConfig: bundle.emailConfig,
-        }
-
         const res = await fetch('/api/admin/sos/workspaces', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             period_start: periodKey.start,
             period_end: periodKey.end,
-            config,
+            config: nextSettings,
             bronze_batch_ids: bronzeBatchIds,
           }),
         })
@@ -118,7 +118,7 @@ export function useSosWorkspaceSync({
         const json = (await res.json()) as WorkspaceApiResponse
         const ws = json.workspace
         markSynced(
-          bundle,
+          nextSettings,
           ws?.updated_at ?? new Date().toISOString(),
           ws?.updated_by ?? null,
         )
@@ -134,27 +134,78 @@ export function useSosWorkspaceSync({
     [bronzeBatchIds, markSynced],
   )
 
-  const loadWorkspace = useCallback(
-    async (options?: { force?: boolean }): Promise<void> => {
-      if (!currentPeriodKey) return
+  const saveDefaultPreset = useCallback(
+    async (nextSettings: SosAccountingSettings): Promise<boolean> => {
+      setIsWorkspaceSaving(true)
+      try {
+        const res = await fetch('/api/admin/sos/presets/default', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config: nextSettings }),
+        })
 
-      if (isRulesDirty && !options?.force) {
-        const confirmed = window.confirm(
-          'Reload from server? Unsaved rule changes in this browser will be replaced by the server workspace.',
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(err?.error || 'Failed to save default preset')
+        }
+
+        const json = (await res.json()) as DefaultPresetApiResponse
+        markDefaultSynced(
+          nextSettings,
+          json.preset?.updated_at ?? new Date().toISOString(),
         )
-        if (!confirmed) return
+        return true
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Save failed'
+        toast.error(msg)
+        return false
+      } finally {
+        setIsWorkspaceSaving(false)
       }
+    },
+    [markDefaultSynced],
+  )
 
+  const loadDefaultPreset = useCallback(async (): Promise<void> => {
+    setIsWorkspaceLoading(true)
+    try {
+      const res = await fetch('/api/admin/sos/presets/default')
+      if (!res.ok) return
+
+      const json = (await res.json()) as DefaultPresetApiResponse
+      const preset = json.preset
+      if (preset?.config) {
+        suppressAutoSaveRef.current = true
+        applySettings(preset.config)
+        markDefaultSynced(
+          preset.config,
+          preset.updated_at ?? new Date().toISOString(),
+        )
+      }
+    } catch (e) {
+      console.warn('[useSosWorkspaceSync] default preset load failed', e)
+    } finally {
+      setIsWorkspaceLoading(false)
+      setIsDefaultPresetReady(true)
+      window.setTimeout(() => {
+        suppressAutoSaveRef.current = false
+      }, 0)
+    }
+  }, [applySettings, markDefaultSynced])
+
+  const loadPeriodWorkspace = useCallback(
+    async (periodKey: PeriodKey): Promise<void> => {
       setIsWorkspaceLoading(true)
       try {
         const params = new URLSearchParams({
-          periodStart: currentPeriodKey.start,
-          periodEnd: currentPeriodKey.end,
+          periodStart: periodKey.start,
+          periodEnd: periodKey.end,
         })
         const res = await fetch(`/api/admin/sos/workspaces?${params}`)
         if (!res.ok) {
           setWorkspaceLoadedAt(null)
           setWorkspaceUpdatedBy(null)
+          clearSavedFingerprint()
           return
         }
 
@@ -162,44 +213,98 @@ export function useSosWorkspaceSync({
         const ws = json.workspace
         if (ws?.config) {
           suppressAutoSaveRef.current = true
-          const bundle = configToBundle(ws.config)
-          applyRulesBundle(bundle)
+          applySettings(ws.config)
           markSynced(
-            bundle,
+            ws.config,
             ws.updated_at ?? new Date().toISOString(),
             ws.updated_by ?? null,
           )
         } else {
           setWorkspaceLoadedAt(null)
           setWorkspaceUpdatedBy(null)
+          clearSavedFingerprint()
         }
       } catch (e) {
-        console.warn('[useSosWorkspaceSync] load failed', e)
+        console.warn('[useSosWorkspaceSync] period load failed', e)
+        clearSavedFingerprint()
       } finally {
         setIsWorkspaceLoading(false)
+        setIsPeriodWorkspaceReady(true)
         window.setTimeout(() => {
           suppressAutoSaveRef.current = false
         }, 0)
       }
     },
-    [applyRulesBundle, currentPeriodKey, isRulesDirty, markSynced],
+    [applySettings, clearSavedFingerprint, markSynced],
+  )
+
+  const loadFromServer = useCallback(
+    async (options?: { force?: boolean }): Promise<void> => {
+      if (isSettingsDirty && !options?.force) {
+        const confirmed = window.confirm(
+          'Reload from server? Unsaved changes in this browser will be replaced by the server copy.',
+        )
+        if (!confirmed) return
+      }
+
+      if (currentPeriodKey) {
+        await loadPeriodWorkspace(currentPeriodKey)
+        return
+      }
+
+      await loadDefaultPreset()
+    },
+    [currentPeriodKey, isSettingsDirty, loadDefaultPreset, loadPeriodWorkspace],
   )
 
   const saveCurrentWorkspace = useCallback(async (): Promise<boolean> => {
     if (!currentPeriodKey) {
-      toast.error('No period detected yet — upload CSVs first')
-      return false
+      const ok = await saveDefaultPreset(settings)
+      if (ok) toast.success('Default accounting settings saved to server')
+      return ok
     }
-    const ok = await saveWorkspace(rulesBundle, currentPeriodKey)
-    if (ok) {
-      toast.success('Accounting workspace saved to server')
-    }
+    const ok = await saveWorkspace(settings, currentPeriodKey)
+    if (ok) toast.success('Accounting workspace saved to server')
     return ok
-  }, [currentPeriodKey, rulesBundle, saveWorkspace])
+  }, [currentPeriodKey, settings, saveDefaultPreset, saveWorkspace])
 
-  // Load server workspace when period changes (server is SSOT for period-keyed rules).
+  // One-time KV migration + default preset bootstrap.
   useEffect(() => {
-    if (!currentPeriodKey) {
+    if (bootstrapStartedRef.current) return
+    bootstrapStartedRef.current = true
+
+    void (async () => {
+      try {
+        if (!isKvMigrationComplete()) {
+          const legacy = await readLegacyKvSettings()
+          if (legacy.hasData) {
+            const res = await fetch('/api/admin/sos/presets/default')
+            if (res.ok) {
+              const json = await res.json() as DefaultPresetApiResponse
+              const current = json.preset?.config ?? DEFAULT_SOS_ACCOUNTING_SETTINGS
+              const merged = mergeKvIntoSettings(current, legacy.settings)
+              await fetch('/api/admin/sos/presets/default', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: merged }),
+              })
+            }
+            await clearLegacyKvKeys()
+          }
+          markKvMigrationComplete()
+        }
+      } catch {
+        // Non-fatal — default preset load still runs
+      } finally {
+        await loadDefaultPreset()
+        setSettingsReady(true)
+      }
+    })()
+  }, [loadDefaultPreset])
+
+  // Load server workspace when period changes (server is SSOT for period-keyed settings).
+  useEffect(() => {
+    if (!currentPeriodKey || !settingsReady) {
       setIsPeriodWorkspaceReady(false)
       return
     }
@@ -207,105 +312,77 @@ export function useSosWorkspaceSync({
     setIsPeriodWorkspaceReady(false)
     let cancelled = false
     void (async () => {
-      setIsWorkspaceLoading(true)
-      try {
-        const params = new URLSearchParams({
-          periodStart: currentPeriodKey.start,
-          periodEnd: currentPeriodKey.end,
-        })
-        const res = await fetch(`/api/admin/sos/workspaces?${params}`)
-        if (!res.ok || cancelled) {
-          if (!cancelled) {
-            setWorkspaceLoadedAt(null)
-            setWorkspaceUpdatedBy(null)
-          }
-          return
-        }
-
-        const json = (await res.json()) as WorkspaceApiResponse
-        if (cancelled) return
-
-        const ws = json.workspace
-        if (ws?.config) {
-          suppressAutoSaveRef.current = true
-          const bundle = configToBundle(ws.config)
-          applyRulesBundle(bundle)
-          markSynced(
-            bundle,
-            ws.updated_at ?? new Date().toISOString(),
-            ws.updated_by ?? null,
-          )
-        } else {
-          setWorkspaceLoadedAt(null)
-          setWorkspaceUpdatedBy(null)
-        }
-      } catch (e) {
-        if (!cancelled) console.warn('[useSosWorkspaceSync] period load failed', e)
-      } finally {
-        if (!cancelled) {
-          setIsWorkspaceLoading(false)
-          setIsPeriodWorkspaceReady(true)
-        }
-        window.setTimeout(() => {
-          suppressAutoSaveRef.current = false
-        }, 0)
-      }
+      await loadPeriodWorkspace(currentPeriodKey)
+      if (cancelled) setIsPeriodWorkspaceReady(false)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [currentPeriodKey, applyRulesBundle, markSynced])
+  }, [currentPeriodKey, settingsReady, loadPeriodWorkspace])
 
-  // Track dirty state and debounced auto-save to server when a period is active.
+  // Track dirty state and debounced auto-save.
   useEffect(() => {
-    if (!rulesReady || disabled) return
+    if (!settingsReady || disabled) return
 
-    const fingerprint = bundleFingerprint(rulesBundle)
+    const fingerprint = settingsFingerprint(settings)
     const saved = lastSavedFingerprintRef.current
 
     if (!currentPeriodKey) {
-      if (saved === null) {
-        cacheRulesBundle(rulesBundle)
+      if (!isDefaultPresetReady || suppressAutoSaveRef.current) return
+
+      if (saved !== null && fingerprint === saved) {
+        setIsSettingsDirty(false)
+        return
       }
-      return
+
+      setIsSettingsDirty(true)
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = setTimeout(() => {
+        void saveDefaultPreset(settings)
+      }, AUTO_SAVE_DEBOUNCE_MS)
+      return () => {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+      }
     }
 
     if (!isPeriodWorkspaceReady || suppressAutoSaveRef.current) return
 
     if (saved !== null && fingerprint === saved) {
-      setIsRulesDirty(false)
+      setIsSettingsDirty(false)
       return
     }
 
-    setIsRulesDirty(true)
+    setIsSettingsDirty(true)
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     autoSaveTimerRef.current = setTimeout(() => {
-      void saveWorkspace(rulesBundle, currentPeriodKey)
+      void saveWorkspace(settings, currentPeriodKey)
     }, AUTO_SAVE_DEBOUNCE_MS)
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     }
   }, [
-    rulesBundle,
-    rulesReady,
+    settings,
+    settingsReady,
     currentPeriodKey,
     isPeriodWorkspaceReady,
+    isDefaultPresetReady,
     disabled,
-    cacheRulesBundle,
+    saveDefaultPreset,
     saveWorkspace,
   ])
 
   return {
+    settingsReady,
     workspaceLoadedAt,
     workspaceUpdatedBy,
+    defaultPresetLoadedAt,
     isWorkspaceLoading,
     isWorkspaceSaving,
-    isRulesDirty,
-    loadWorkspace,
+    isSettingsDirty,
+    loadFromServer,
     saveCurrentWorkspace,
-    rulesCacheKey: RULES_CACHE_KEY,
   }
 }

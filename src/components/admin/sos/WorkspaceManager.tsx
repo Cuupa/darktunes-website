@@ -1,15 +1,7 @@
 'use client'
 
 /**
- * src/components/admin/sos/WorkspaceManager.tsx
- *
- * Export the entire SOS rule configuration to a JSON file and
- * import it back in a future session.
- *
- * Exported bundle includes:
- *   appDefaults, emailConfig, artistMappings, compilationFilters,
- *   splitFees, manualRevenues, expenses, ignoredEntries,
- *   csvAliases, trackRevenueAssignments
+ * Export / import the full SOS accounting settings bundle as JSON backup.
  */
 
 import { useRef, useCallback } from 'react'
@@ -17,47 +9,33 @@ import { DownloadSimple, UploadSimple, Warning } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import type {
-  ArtistMapping, CompilationFilter, SplitFee,
-  ManualRevenue, ExpenseEntry, IgnoredEntry,
-  CSVColumnAlias, AppDefaults, EmailConfig,
-  TrackRevenueAssignment,
-} from '@/lib/sos/types'
+import type { SosAccountingSettings } from '@/lib/sos/sosAccountingSettings'
 
-const WORKSPACE_VERSION = 1
+const WORKSPACE_VERSION = 2
 
-export interface WorkspaceBundle {
+export interface WorkspaceBundle extends SosAccountingSettings {
   version: number
   exportedAt: string
-  appDefaults: AppDefaults
-  emailConfig: Partial<EmailConfig>
-  artistMappings: ArtistMapping[]
-  compilationFilters: CompilationFilter[]
-  splitFees: SplitFee[]
-  manualRevenues: ManualRevenue[]
-  expenses: ExpenseEntry[]
-  ignoredEntries: IgnoredEntry[]
-  csvAliases: CSVColumnAlias[]
-  trackRevenueAssignments: TrackRevenueAssignment[]
 }
 
-interface WorkspaceManagerProps {
-  appDefaults: AppDefaults
-  emailConfig: Partial<EmailConfig>
-  artistMappings: ArtistMapping[]
-  compilationFilters: CompilationFilter[]
-  splitFees: SplitFee[]
-  manualRevenues: ManualRevenue[]
-  expenses: ExpenseEntry[]
-  ignoredEntries: IgnoredEntry[]
-  csvAliases: CSVColumnAlias[]
-  trackRevenueAssignments: TrackRevenueAssignment[]
-  onImport: (bundle: Omit<WorkspaceBundle, 'version' | 'exportedAt'>) => void
+interface WorkspaceManagerProps extends SosAccountingSettings {
+  onImport: (bundle: Partial<SosAccountingSettings>) => void
 }
 
 export function WorkspaceManager({
-  appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
-  manualRevenues, expenses, ignoredEntries, csvAliases, trackRevenueAssignments,
+  appDefaults,
+  emailConfig,
+  artistMappings,
+  compilationFilters,
+  splitFees,
+  manualRevenues,
+  expenses,
+  ignoredEntries,
+  csvAliases,
+  trackRevenueAssignments,
+  labelInfo,
+  pdfSettings,
+  csvImportProfiles,
   onImport,
 }: WorkspaceManagerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -76,6 +54,9 @@ export function WorkspaceManager({
       ignoredEntries,
       csvAliases,
       trackRevenueAssignments,
+      labelInfo,
+      pdfSettings,
+      csvImportProfiles,
     }
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -89,6 +70,7 @@ export function WorkspaceManager({
   }, [
     appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
     manualRevenues, expenses, ignoredEntries, csvAliases, trackRevenueAssignments,
+    labelInfo, pdfSettings, csvImportProfiles,
   ])
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,7 +80,7 @@ export function WorkspaceManager({
     reader.onload = ev => {
       try {
         const raw = ev.target?.result as string
-        const bundle = JSON.parse(raw) as WorkspaceBundle
+        const bundle = JSON.parse(raw) as Partial<WorkspaceBundle>
         if (!bundle || typeof bundle !== 'object') throw new Error('Invalid workspace file')
         onImport({
           appDefaults: bundle.appDefaults,
@@ -111,12 +93,14 @@ export function WorkspaceManager({
           ignoredEntries: bundle.ignoredEntries ?? [],
           csvAliases: bundle.csvAliases ?? [],
           trackRevenueAssignments: bundle.trackRevenueAssignments ?? [],
+          labelInfo: bundle.labelInfo,
+          pdfSettings: bundle.pdfSettings,
+          csvImportProfiles: bundle.csvImportProfiles,
         })
         toast.success('Workspace imported successfully')
       } catch {
         toast.error('Failed to parse workspace file. Make sure it is a valid JSON export.')
       }
-      // Reset input so the same file can be re-imported
       if (fileRef.current) fileRef.current.value = ''
     }
     reader.readAsText(file)
@@ -125,7 +109,7 @@ export function WorkspaceManager({
   const totalRules =
     artistMappings.length + compilationFilters.length + splitFees.length +
     manualRevenues.length + expenses.length + ignoredEntries.length +
-    csvAliases.length + trackRevenueAssignments.length
+    csvAliases.length + trackRevenueAssignments.length + csvImportProfiles.length
 
   return (
     <div className="space-y-5">
@@ -135,13 +119,11 @@ export function WorkspaceManager({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Export the entire SOS configuration (rules, defaults, email settings) to a JSON file for
-        backup or to transfer to another session. Import a previously exported workspace to restore
-        all rules at once.
+        Export the entire SOS configuration (rules, label branding, PDF settings, CSV profiles) to a
+        JSON file for backup or transfer. Import restores all settings at once.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Export */}
         <Card className="p-5 space-y-3">
           <div className="flex items-center gap-2">
             <DownloadSimple size={16} className="text-primary" />
@@ -155,7 +137,6 @@ export function WorkspaceManager({
           </Button>
         </Card>
 
-        {/* Import */}
         <Card className="p-5 space-y-3">
           <div className="flex items-center gap-2">
             <UploadSimple size={16} className="text-primary" />
@@ -163,7 +144,7 @@ export function WorkspaceManager({
           </div>
           <p className="text-xs text-muted-foreground flex items-start gap-1">
             <Warning size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            Importing a workspace replaces all current rules with those from the file.
+            Importing replaces current rules and settings with those from the file.
           </p>
           <Button
             variant="outline"

@@ -9,7 +9,7 @@
  *  Tab B — "Statement History": read-only view of uploaded PDFs (StatementsManager).
  */
 
-import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
@@ -27,9 +27,12 @@ import type {
   CSVColumnAlias, EmailConfig, TrackRevenueAssignment,
 } from '@/lib/sos/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
-import { EMPTY_SOS_RULES_BUNDLE, type SosRulesBundle } from '@/lib/sos/sosRulesBundle'
+import {
+  DEFAULT_SOS_ACCOUNTING_SETTINGS,
+  type SosAccountingSettings,
+} from '@/lib/sos/sosAccountingSettings'
+import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
-import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
@@ -85,19 +88,20 @@ function SosGeneratorPanel() {
   const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
+  // Map portal artists to SOS LabelArtist[]
+  const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
+
+  const [labelBranding, setLabelBranding] = useState<Partial<LabelInfo>>(DEFAULT_LABEL_INFO)
+  const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
+  const [csvImportProfilesCustom, setCsvImportProfilesCustom] = useState<CsvImportProfile[]>([])
   const {
     profiles: csvImportProfiles,
     customProfiles,
     saveProfile: saveCsvProfile,
     deleteProfile: deleteCsvProfile,
-  } = useCsvImportProfiles()
+  } = useCsvImportProfiles(csvImportProfilesCustom, setCsvImportProfilesCustom)
 
-  // Map portal artists to SOS LabelArtist[]
-  const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
-
-  const [labelBranding, setLabelBranding] = useKV<LabelInfo>('sos-label-info', DEFAULT_LABEL_INFO)
-
-  // Site settings override public branding fields; SEPA/bank details persist in IndexedDB.
+  // Site settings override public branding fields; SEPA/bank details persist in Supabase.
   const labelInfo = useMemo<LabelInfo>(() => ({
     ...DEFAULT_LABEL_INFO,
     ...labelBranding,
@@ -115,11 +119,9 @@ function SosGeneratorPanel() {
         sepaAccountHolder: sepaAccountHolder.trim(),
       }))
     },
-    [setLabelBranding],
+    [],
   )
 
-  // PDF settings state
-  const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
   const [appDefaults, setAppDefaults] = useState<AppDefaults>(DEFAULT_APP_DEFAULTS)
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
@@ -142,31 +144,7 @@ function SosGeneratorPanel() {
   const [csvAliases, setCsvAliases] = useState<CSVColumnAlias[]>([])
   const [trackRevenueAssignments, setTrackRevenueAssignments] = useState<TrackRevenueAssignment[]>([])
 
-  const [savedRules, setSavedRules, , rulesLoaded] = useKV<SosRulesBundle>(
-    'sos-rules-state',
-    EMPTY_SOS_RULES_BUNDLE,
-  )
-  const rulesHydratedRef = useRef(false)
-  const [rulesReady, setRulesReady] = useState(false)
-
-  useEffect(() => {
-    if (!rulesLoaded || rulesHydratedRef.current) return
-    rulesHydratedRef.current = true
-    const bundle = savedRules ?? EMPTY_SOS_RULES_BUNDLE
-    setArtistMappings(bundle.artistMappings)
-    setCompilationFilters(bundle.compilationFilters)
-    setSplitFees(bundle.splitFees)
-    setManualRevenues(bundle.manualRevenues)
-    setExpenses(bundle.expenses)
-    setIgnoredEntries(bundle.ignoredEntries)
-    setCsvAliases(bundle.csvAliases)
-    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
-    setAppDefaults(bundle.appDefaults)
-    setEmailConfig(bundle.emailConfig)
-    setRulesReady(true)
-  }, [rulesLoaded, savedRules])
-
-  const rulesBundle = useMemo<SosRulesBundle>(
+  const settingsBundle = useMemo<SosAccountingSettings>(
     () => ({
       artistMappings,
       compilationFilters,
@@ -178,6 +156,9 @@ function SosGeneratorPanel() {
       trackRevenueAssignments,
       appDefaults,
       emailConfig,
+      labelInfo: labelBranding,
+      pdfSettings,
+      csvImportProfiles: csvImportProfilesCustom,
     }),
     [
       artistMappings,
@@ -190,10 +171,13 @@ function SosGeneratorPanel() {
       trackRevenueAssignments,
       appDefaults,
       emailConfig,
+      labelBranding,
+      pdfSettings,
+      csvImportProfilesCustom,
     ],
   )
 
-  const applyRulesBundle = useCallback((bundle: SosRulesBundle) => {
+  const applySettings = useCallback((bundle: SosAccountingSettings) => {
     setArtistMappings(bundle.artistMappings)
     setCompilationFilters(bundle.compilationFilters)
     setSplitFees(bundle.splitFees)
@@ -204,14 +188,10 @@ function SosGeneratorPanel() {
     setTrackRevenueAssignments(bundle.trackRevenueAssignments)
     setAppDefaults(bundle.appDefaults)
     setEmailConfig(bundle.emailConfig)
+    setLabelBranding(bundle.labelInfo ?? DEFAULT_LABEL_INFO)
+    setPdfSettings(bundle.pdfSettings ?? DEFAULT_PDF_EXPORT_SETTINGS)
+    setCsvImportProfilesCustom(bundle.csvImportProfiles ?? [])
   }, [])
-
-  const cacheRulesBundle = useCallback(
-    (bundle: SosRulesBundle) => {
-      setSavedRules(bundle)
-    },
-    [setSavedRules],
-  )
 
   const handleSubTabKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, tabId: SubTab) => {
@@ -306,55 +286,19 @@ function SosGeneratorPanel() {
     setTrackRevenueAssignments(prev => prev.filter(a => a.id !== id))
   }, [])
 
-  // Workspace import (replaces all rules at once)
-  const handleWorkspaceImport = useCallback((bundle: {
-    appDefaults: AppDefaults
-    emailConfig: Partial<EmailConfig>
-    artistMappings: ArtistMapping[]
-    compilationFilters: CompilationFilter[]
-    splitFees: SplitFee[]
-    manualRevenues: ManualRevenue[]
-    expenses: ExpenseEntry[]
-    ignoredEntries: IgnoredEntry[]
-    csvAliases: CSVColumnAlias[]
-    trackRevenueAssignments: TrackRevenueAssignment[]
-  }) => {
-    setAppDefaults(bundle.appDefaults)
-    setEmailConfig(bundle.emailConfig)
-    setArtistMappings(bundle.artistMappings)
-    setCompilationFilters(bundle.compilationFilters)
-    setSplitFees(bundle.splitFees)
-    setManualRevenues(bundle.manualRevenues)
-    setExpenses(bundle.expenses)
-    setIgnoredEntries(bundle.ignoredEntries)
-    setCsvAliases(bundle.csvAliases)
-    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
-  }, [])
+  const handleWorkspaceImport = useCallback((bundle: Partial<SosAccountingSettings>) => {
+    applySettings({
+      ...DEFAULT_SOS_ACCOUNTING_SETTINGS,
+      ...settingsBundle,
+      ...bundle,
+      labelInfo: { ...settingsBundle.labelInfo, ...bundle.labelInfo },
+      pdfSettings: { ...settingsBundle.pdfSettings, ...bundle.pdfSettings },
+    })
+  }, [applySettings, settingsBundle])
 
-  // Preset load (also replaces all rules)
-  const handlePresetLoad = useCallback((preset: {
-    appDefaults: AppDefaults
-    emailConfig: Partial<EmailConfig>
-    artistMappings: ArtistMapping[]
-    compilationFilters: CompilationFilter[]
-    splitFees: SplitFee[]
-    manualRevenues: ManualRevenue[]
-    expenses: ExpenseEntry[]
-    ignoredEntries: IgnoredEntry[]
-    csvAliases: CSVColumnAlias[]
-    trackRevenueAssignments: TrackRevenueAssignment[]
-  }) => {
-    setAppDefaults(preset.appDefaults)
-    setEmailConfig(preset.emailConfig)
-    setArtistMappings(preset.artistMappings)
-    setCompilationFilters(preset.compilationFilters)
-    setSplitFees(preset.splitFees)
-    setManualRevenues(preset.manualRevenues)
-    setExpenses(preset.expenses)
-    setIgnoredEntries(preset.ignoredEntries)
-    setCsvAliases(preset.csvAliases)
-    setTrackRevenueAssignments(preset.trackRevenueAssignments)
-  }, [])
+  const handlePresetLoad = useCallback((preset: SosAccountingSettings) => {
+    applySettings(preset)
+  }, [applySettings])
 
   // File managers for each source
   const believeManager   = useFileManager('believe')
@@ -553,20 +497,20 @@ function SosGeneratorPanel() {
   )
 
   const {
+    settingsReady,
     workspaceLoadedAt,
     workspaceUpdatedBy,
+    defaultPresetLoadedAt,
     isWorkspaceLoading,
     isWorkspaceSaving,
-    isRulesDirty,
-    loadWorkspace,
+    isSettingsDirty,
+    loadFromServer,
     saveCurrentWorkspace,
   } = useSosWorkspaceSync({
     currentPeriodKey,
-    rulesBundle,
-    applyRulesBundle,
-    cacheRulesBundle,
+    settings: settingsBundle,
+    applySettings,
     bronzeBatchIds,
-    rulesReady,
     disabled: isProcessing,
   })
 
@@ -664,14 +608,14 @@ function SosGeneratorPanel() {
     </div>
   )
 
-  const rulesStatusBanner = rulesLoaded ? (
+  const rulesStatusBanner = settingsReady ? (
     <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
       {isWorkspaceSaving
         ? t.rulesWorkspaceSaving
-        : !currentPeriodKey
-          ? t.rulesWorkspaceLocalOnly
-          : isRulesDirty
-            ? t.rulesWorkspaceDirty
+        : isSettingsDirty
+          ? t.rulesWorkspaceDirty
+          : !currentPeriodKey
+            ? `${t.rulesWorkspaceDefaultSynced}${defaultPresetLoadedAt ? ` · ${new Date(defaultPresetLoadedAt).toLocaleString()}` : ''}`
             : `${t.rulesWorkspaceSynced}${workspaceLoadedAt ? ` · ${new Date(workspaceLoadedAt).toLocaleString()}${workspaceUpdatedBy ? ` · ${workspaceUpdatedBy.slice(0, 8)}` : ''}` : ''}`}
     </p>
   ) : null
@@ -791,6 +735,9 @@ function SosGeneratorPanel() {
                 trackRevenueAssignments={trackRevenueAssignments}
                 appDefaults={appDefaults}
                 emailConfig={emailConfig}
+                labelInfo={labelBranding}
+                pdfSettings={pdfSettings}
+                csvImportProfiles={csvImportProfilesCustom}
                 onLoad={handlePresetLoad}
               />
             </div>
@@ -842,6 +789,9 @@ function SosGeneratorPanel() {
                 ignoredEntries={ignoredEntries}
                 csvAliases={csvAliases}
                 trackRevenueAssignments={trackRevenueAssignments}
+                labelInfo={labelBranding}
+                pdfSettings={pdfSettings}
+                csvImportProfiles={csvImportProfilesCustom}
                 onImport={handleWorkspaceImport}
               />
             </div>
@@ -967,17 +917,25 @@ function SosGeneratorPanel() {
               {/* Enterprise collaborative workspace controls */}
               <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/10 p-2 text-xs">
                 <span className="font-medium text-foreground">{t.workspaceServer ?? 'Workspace (server):'}</span>
-                {workspaceLoadedAt ? (
+                {currentPeriodKey ? (
+                  workspaceLoadedAt ? (
+                    <span className="text-muted-foreground">
+                      {t.workspaceLastSaved ?? 'last saved'} {new Date(workspaceLoadedAt).toLocaleString()} {workspaceUpdatedBy ? `· ${workspaceUpdatedBy.slice(0, 8)}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{t.workspaceNotSaved ?? 'not yet saved for this period'}</span>
+                  )
+                ) : defaultPresetLoadedAt ? (
                   <span className="text-muted-foreground">
-                    {t.workspaceLastSaved ?? 'last saved'} {new Date(workspaceLoadedAt).toLocaleString()} {workspaceUpdatedBy ? `· ${workspaceUpdatedBy.slice(0, 8)}` : ''}
+                    {t.workspaceDefaultSaved ?? 'Default preset saved'} {new Date(defaultPresetLoadedAt).toLocaleString()}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">{t.workspaceNotSaved ?? 'not yet saved for this period'}</span>
+                  <span className="text-muted-foreground">{t.workspaceDefaultNotSaved ?? 'Default preset not saved yet'}</span>
                 )}
                 <button
                   type="button"
-                  onClick={() => void loadWorkspace()}
-                  disabled={isWorkspaceLoading || !currentPeriodKey}
+                  onClick={() => void loadFromServer()}
+                  disabled={isWorkspaceLoading || isProcessing}
                   className="rounded border px-2 py-0.5 hover:bg-background disabled:opacity-50"
                 >
                   {isWorkspaceLoading ? (t.workspaceLoading ?? 'Loading…') : (t.workspaceReload ?? 'Reload from server')}
@@ -985,12 +943,20 @@ function SosGeneratorPanel() {
                 <button
                   type="button"
                   onClick={() => void saveCurrentWorkspace()}
-                  disabled={isWorkspaceSaving || !currentPeriodKey || isProcessing}
+                  disabled={isWorkspaceSaving || isProcessing}
                   className="rounded bg-primary px-2 py-0.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {isWorkspaceSaving ? (t.workspaceSaving ?? 'Saving…') : (t.workspaceSave ?? 'Save workspace to server')}
+                  {isWorkspaceSaving
+                    ? (t.workspaceSaving ?? 'Saving…')
+                    : currentPeriodKey
+                      ? (t.workspaceSave ?? 'Save workspace to server')
+                      : (t.workspaceSaveDefault ?? 'Save default preset')}
                 </button>
-                <span className="text-[10px] text-muted-foreground">{t.workspaceSharedHint ?? 'Shared across team • period-keyed'}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {currentPeriodKey
+                    ? (t.workspaceSharedHint ?? 'Shared across team · period-keyed')
+                    : (t.workspaceDefaultHint ?? 'Shared default settings until a period is detected')}
+                </span>
               </div>
 
               <OperatorPlaybook
