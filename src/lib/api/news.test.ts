@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getNewsPosts, createNewsPost, updateNewsPost, deleteNewsPost } from './news'
+import {
+  getNewsPosts,
+  getPublicNewsPostBySlug,
+  createNewsPost,
+  updateNewsPost,
+  deleteNewsPost,
+} from './news'
 
 type DbClient = SupabaseClient<Database>
 type NewsRow = Database['public']['Tables']['news_posts']['Row']
@@ -117,6 +123,25 @@ describe('updateNewsPost', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
     await expect(updateNewsPost(db, 'news-001', { title: 'X' })).rejects.toThrow('Update failed')
+  })
+})
+
+describe('getPublicNewsPostBySlug', () => {
+  it('returns a visible post by slug', async () => {
+    const db = makeMockDb(mockNewsRow)
+    const result = await getPublicNewsPostBySlug(db, 'blackbook-returns')
+    expect(result?.slug).toBe('blackbook-returns')
+  })
+
+  it('returns null when the post is not found', async () => {
+    const db = makeMockDb(null, { message: 'Not found', code: 'PGRST116' })
+    const result = await getPublicNewsPostBySlug(db, 'missing')
+    expect(result).toBeNull()
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Query failed', code: 'PGRST001' })
+    await expect(getPublicNewsPostBySlug(db, 'blackbook-returns')).rejects.toThrow('Query failed')
   })
 })
 

@@ -187,6 +187,28 @@ export async function getPressReleaseBySlug(db: DbClient, slug: string): Promise
   return data ? rowToNewsPost(data) : null
 }
 
+/**
+ * Public-facing: returns a single post by slug when it is visible (published or
+ * scheduled once publish time is reached). Drafts, archived, and future scheduled
+ * posts return null.
+ */
+export async function getPublicNewsPostBySlug(db: DbClient, slug: string): Promise<NewsPost | null> {
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('news_posts')
+    .select('*')
+    .eq('slug', slug)
+    .in('status', ['published', 'scheduled'])
+    .lte('published_at', now)
+    .single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(error.message)
+  }
+  return data ? rowToNewsPost(data) : null
+}
+
+/** Admin/unrestricted: returns any post by slug regardless of status or publish time. */
 export async function getNewsPostBySlug(db: DbClient, slug: string): Promise<NewsPost | null> {
   const { data, error } = await db.from('news_posts').select('*').eq('slug', slug).single()
   if (error) {

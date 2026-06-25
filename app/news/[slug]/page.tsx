@@ -9,7 +9,7 @@ import Image from 'next/image'
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getNewsPostBySlug } from '@/lib/api/news'
+import { getPublicNewsPostBySlug } from '@/lib/api/news'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -37,7 +37,7 @@ function makeGetNewsPost(slug: string) {
   return unstable_cache(
     async () => {
       const client = createPublicSupabaseClient()
-      return getNewsPostBySlug(client, slug)
+      return getPublicNewsPostBySlug(client, slug)
     },
     [`news-post-${slug}`],
     // Granular tags: 'news' invalidates all news lists;

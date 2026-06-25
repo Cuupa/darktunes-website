@@ -2187,9 +2187,18 @@ DROP POLICY IF EXISTS "news_posts: admin delete"            ON public.news_posts
 DROP POLICY IF EXISTS "news_posts: can_publish_news insert" ON public.news_posts;
 DROP POLICY IF EXISTS "news_posts: can_edit_news update"    ON public.news_posts;
 
--- Allows public read access to all news posts
+-- Public: published/scheduled posts once publish time is reached (lazy publishing).
+-- Editors, journalists, and admins can read all posts (drafts, future scheduled, etc.).
 CREATE POLICY "news_posts: public read" ON public.news_posts
-  FOR SELECT USING (TRUE);
+  FOR SELECT USING (
+    (
+      status IN ('published', 'scheduled')
+      AND published_at <= NOW()
+    )
+    OR public.has_permission('can_edit_news')
+    OR public.has_permission('can_publish_news')
+    OR public.get_my_role() IN ('admin', 'editor', 'journalist', 'press')
+  );
 
 -- Requires can_publish_news permission (admin always bypasses)
 CREATE POLICY "news_posts: can_publish_news insert" ON public.news_posts
@@ -3305,23 +3314,9 @@ CREATE POLICY "media_files: admin delete"                ON public.media_files F
   public.get_my_role() = 'admin'
 );
 
--- ============================================================
--- Scheduled news publishing (pg_cron)
--- ============================================================
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-
-SELECT cron.unschedule('publish-scheduled-news');
-
-SELECT cron.schedule(
-  'publish-scheduled-news',
-  '* * * * *',
-  $$
-    UPDATE public.news_posts
-    SET status = 'published', updated_at = NOW()
-    WHERE status = 'scheduled'
-      AND published_at <= NOW();
-  $$
-);
+-- Scheduled news: lazy publishing via published_at <= NOW() in public queries + RLS.
+-- No pg_cron job required. Unschedule legacy job if it was created manually:
+--   SELECT cron.unschedule('publish-scheduled-news');
 
 -- =============================================================================
 -- AUDIT TABLES: role_changes & ban_history
