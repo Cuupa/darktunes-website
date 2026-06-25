@@ -24,11 +24,21 @@ describe('contentSecurityPolicy', () => {
     expect(CONTENT_SECURITY_POLICY_DIRECTIVES['font-src']).toContain('https://fonts.gstatic.com')
   })
 
+  it('allows YouTube privacy-enhanced embeds in frame-src and script-src', () => {
+    expect(CONTENT_SECURITY_POLICY_DIRECTIVES['frame-src']).toContain(
+      'https://www.youtube-nocookie.com',
+    )
+    expect(CONTENT_SECURITY_POLICY_DIRECTIVES['script-src']).toContain(
+      'https://www.youtube-nocookie.com',
+    )
+  })
+
   it('builds a valid semicolon-separated policy string', () => {
     const policy = buildContentSecurityPolicy()
     expect(policy).toContain("default-src 'self'")
     expect(policy).toContain('connect-src')
     expect(policy).toContain('https://*.r2.cloudflarestorage.com')
+    expect(policy).toContain('https://www.youtube-nocookie.com')
     expect(policy.split(';').length).toBeGreaterThanOrEqual(8)
   })
 })

@@ -17,7 +17,9 @@ interface NewsBodyClientProps {
 }
 
 export function NewsBodyClient({ content }: NewsBodyClientProps) {
-  const sanitized = processHtmlImages(sanitizeHtml(content))
+  const sanitized = processHtmlImages(
+    sanitizeHtml(content, { ADD_TAGS: ['iframe'] }),
+  )
   return (
     <div
       className="prose prose-invert prose-sm max-w-none"

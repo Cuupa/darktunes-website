@@ -10,10 +10,12 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: Record<string, readonly string[
     "'wasm-unsafe-eval'",
     'https://open.spotify.com',
     'https://www.youtube.com',
+    'https://www.youtube-nocookie.com',
   ],
   'frame-src': [
     'https://open.spotify.com',
     'https://www.youtube.com',
+    'https://www.youtube-nocookie.com',
     'https://darkmerch.com',
     'https://www.openstreetmap.org',
   ],
