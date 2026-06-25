@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 import DOMPurify from 'dompurify'
@@ -50,7 +51,7 @@ function stripHtmlTags(html: string): string {
   return tmp.textContent ?? tmp.innerText ?? ''
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text, copyLabel, copiedLabel }: { text: string; copyLabel: string; copiedLabel: string }) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = async () => {
@@ -62,7 +63,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   return (
     <Button variant="outline" size="sm" onClick={() => void onCopy()} className="gap-2">
       {copied ? <Check size={14} weight="bold" aria-hidden="true" /> : <Copy size={14} weight="bold" aria-hidden="true" />}
-      {copied ? 'Copied' : label}
+      {copied ? copiedLabel : copyLabel}
     </Button>
   )
 }
@@ -82,6 +83,7 @@ export function ArtistEpkClient({
   photos,
   concerts,
 }: ArtistEpkClientProps) {
+  const t = useTranslations('press')
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -101,9 +103,9 @@ export function ArtistEpkClient({
       anchor.download = `${artist.name.replace(/\s+/g, '-').toLowerCase()}-press-kit.pdf`
       anchor.click()
       URL.revokeObjectURL(url)
-      toast.success('Press kit PDF downloaded')
+      toast.success(t('pdfDownloadSuccess'))
     } catch {
-      toast.error('PDF export failed')
+      toast.error(t('pdfExportFailed'))
     } finally {
       setExportingPdf(false)
     }
@@ -119,21 +121,21 @@ export function ArtistEpkClient({
   }
 
   const bios = [
-    { label: 'Short Bio', text: profile?.bioShort },
-    { label: 'Medium Bio', text: profile?.bioMedium },
-    { label: 'Long Bio', text: profile?.bioLong || artist.bio },
+    { label: t('bioShortHeading'), text: profile?.bioShort },
+    { label: t('bioMediumHeading'), text: profile?.bioMedium },
+    { label: t('bioLongHeading'), text: profile?.bioLong || artist.bio },
   ].filter((item): item is { label: string; text: string } => Boolean(item.text))
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8">
         <Button asChild variant="ghost" className="w-fit px-0 text-muted-foreground hover:text-foreground">
-          <Link href="/press">← Back to press portal</Link>
+          <Link href="/press">{t('backToPress')}</Link>
         </Button>
 
         <section className="grid gap-6 rounded-3xl border border-border bg-card/60 p-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:p-8">
           <div className="space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] text-primary">Artist Press Kit</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-primary">{t('artistPressKit')}</p>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{artist.name}</h1>
             <p className="text-muted-foreground">{artist.genres.join(' · ')}</p>
             <div className="flex flex-wrap gap-3">
@@ -164,7 +166,7 @@ export function ArtistEpkClient({
                   <Button asChild size="sm" variant="outline">
                     <a href={artist.logoUrl} target="_blank" rel="noopener noreferrer" download>
                       <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                      Download Logo
+                      {t('downloadLogo')}
                     </a>
                   </Button>
                 </div>
@@ -187,7 +189,7 @@ export function ArtistEpkClient({
           <section aria-labelledby="artist-canvas-epk" className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 id="artist-canvas-epk" className="text-2xl font-bold tracking-tight">
-                Press Kit Preview
+                {t('pressKitPreview')}
               </h2>
               <Button
                 type="button"
@@ -197,7 +199,7 @@ export function ArtistEpkClient({
                 onClick={() => void handleDownloadPressKitPdf()}
               >
                 <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                {exportingPdf ? 'Generating PDF…' : 'Download Press Kit PDF'}
+                {exportingPdf ? t('generatingPdf') : t('downloadPressKitPdf')}
               </Button>
             </div>
             <div className="rounded-3xl border border-border bg-card/60 p-6">
@@ -207,13 +209,13 @@ export function ArtistEpkClient({
         )}
 
         <section aria-labelledby="artist-bios" className="space-y-4">
-          <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">Bios</h2>
+          <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">{t('biosHeading')}</h2>
           <div className={`grid grid-cols-1 gap-4 ${bios.length === 2 ? 'lg:grid-cols-2' : bios.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
             {bios.map((bio) => (
               <Card key={bio.label} className="border-border bg-card/70">
                 <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
                   <CardTitle className="text-base">{bio.label}</CardTitle>
-                  <CopyButton text={bio.text} label="Copy" />
+                  <CopyButton text={bio.text} copyLabel={t('copyBio')} copiedLabel={t('bioCopied')} />
                 </CardHeader>
                 <CardContent>
                   <div
@@ -232,7 +234,7 @@ export function ArtistEpkClient({
             <div className="flex items-start gap-4">
               <Quotes size={28} weight="fill" aria-hidden="true" className="mt-1 text-primary" />
               <div className="space-y-2">
-                <h2 id="artist-quote" className="text-2xl font-bold tracking-tight">Press Quote</h2>
+                <h2 id="artist-quote" className="text-2xl font-bold tracking-tight">{t('pressQuoteHeading')}</h2>
                 <blockquote className="text-lg italic leading-relaxed text-muted-foreground">{profile.pressQuote}</blockquote>
               </div>
             </div>
@@ -241,11 +243,11 @@ export function ArtistEpkClient({
 
         <section aria-labelledby="artist-photos" className="space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <h2 id="artist-photos" className="text-2xl font-bold tracking-tight">Press Photos</h2>
-            <p className="text-sm text-muted-foreground">High-resolution downloads for editorial use.</p>
+            <h2 id="artist-photos" className="text-2xl font-bold tracking-tight">{t('pressPhotosHeading')}</h2>
+            <p className="text-sm text-muted-foreground">{t('pressPhotosDescription')}</p>
           </div>
           {photos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No press photos available.</p>
+            <p className="text-sm text-muted-foreground">{t('noPressPhotos')}</p>
           ) : (
             <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
               {photos.map((photo) => (
@@ -278,7 +280,7 @@ export function ArtistEpkClient({
                     <Button asChild variant="outline">
                       <a href={photo.publicUrl} target="_blank" rel="noopener noreferrer" download>
                         <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                        Download
+                        {t('downloadPhoto')}
                       </a>
                     </Button>
                   </div>
@@ -297,9 +299,9 @@ export function ArtistEpkClient({
         />
 
         <section aria-labelledby="artist-tour" className="space-y-4">
-          <h2 id="artist-tour" className="text-2xl font-bold tracking-tight">Tour Dates</h2>
+          <h2 id="artist-tour" className="text-2xl font-bold tracking-tight">{t('tourDatesHeading')}</h2>
           {concerts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No upcoming dates.</p>
+            <p className="text-sm text-muted-foreground">{t('noTourDates')}</p>
           ) : (
             <div className="space-y-3">
               {concerts.map((concert) => (
@@ -308,7 +310,7 @@ export function ArtistEpkClient({
                     <div className="flex items-start gap-3">
                       <CalendarBlank size={20} weight="bold" aria-hidden="true" className="mt-0.5 text-primary" />
                       <div>
-                        <p className="font-semibold">{concert.eventName || concert.venueName || 'Live show'}</p>
+                        <p className="font-semibold">{concert.eventName || concert.venueName || t('liveShow')}</p>
                         <p className="text-sm text-muted-foreground">
                           {[concert.venueName, concert.venueCity, concert.venueCountry].filter(Boolean).join(' · ')}
                         </p>
@@ -317,7 +319,7 @@ export function ArtistEpkClient({
                     </div>
                     {concert.ticketUrl && concert.status !== 'cancelled' && (
                       <Button asChild variant="outline">
-                        <a href={concert.ticketUrl} target="_blank" rel="noopener noreferrer">Tickets</a>
+                        <a href={concert.ticketUrl} target="_blank" rel="noopener noreferrer">{t('tickets')}</a>
                       </Button>
                     )}
                   </CardContent>
