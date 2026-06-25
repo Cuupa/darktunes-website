@@ -20,7 +20,7 @@
 - **Tailwind CSS v4** (PostCSS) with custom darkTunes brand tokens in `app/globals.css`
 - **Framer Motion** for page animations and modal transitions
 - **Lenis** smooth scrolling via single `LenisProvider` at root (`app/_components/Providers.tsx`). Uses `ReactLenis` from `lenis/react` (root mode) so `useLenis()` is available anywhere in the tree. `useLenis` re-exported from `src/components/animations/LenisProvider.tsx`.
-- **Vitest** unit test suite (`npm test`) — 990 tests passing (95 test files)
+- **Vitest** unit test suite (`npm test`) — 1254 tests passing (159 test files)
 - **ESLint** with TypeScript and React-Hooks rules
 - **Vercel** deployment via `vercel.json` (framework: nextjs) + `scripts/vercel-install.sh`
 - **Supabase SSR** client (`@supabase/ssr`) — server client in `src/lib/supabase/server.ts`, browser client in `src/lib/supabase/client.ts`
@@ -185,6 +185,8 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | Artist Portal — royalty statements | ✅ Implemented | `sales_statements` table + RLS + status workflow + StatementsTable + presigned URL Server Action (5 min TTL) |
 | Artist Portal — billing profiles | ✅ Implemented | `/portal/billing` + `artist_billing_profiles` + completeness gating for invoice creation |
 | Artist Portal — SOS-linked invoices | ✅ Implemented | `/portal/invoices?statement=...` pre-fills approved SOS amounts, stores artist invoice numbers, and generates §14 UStG-ready PDFs |
+| Artist Portal — inline billing | ✅ Implemented | `InlineBillingProfileStep` on invoices (`InvoiceForm`, `FreeInvoiceGenerator`), analytics earnings, and statements before invoice/PDF creation |
+| Admin — guided accounting workflow | ✅ Implemented | `/admin/accounting` — `AccountingGuidedWizard` (Upload → Review → Publish) + Advanced mode; modular Abrechnungszentrale (`SettlementCenterPanel`, `useSettlementCenter`, reconciliation warnings) |
 | Artist Portal — tour dates | ✅ Implemented | `/portal/tour` — artists can list/create/delete own concerts (RLS-protected) |
 | Artist Portal — release management + checklist | ✅ Implemented | `/portal/releases` — `release_checklists` table + RLS + expandable release cards with progress bar + PATCH `/api/portal/checklist` + empty-state CTA |
 | Artist Portal — release submission | ✅ Implemented | `/portal/releases/new` + `POST /api/portal/submit-release` (`is_visible=false` pending admin approval) + optional cover upload via `POST /api/portal/upload-release-cover` |
@@ -214,7 +216,7 @@ The HTTP handler in `app/api/sync/artist/route.ts` wires real deps and calls `sy
 | Artist Portal — Onboarding Wizard | ✅ Implemented | `/portal/onboarding` — first-run wizard guiding new artists through profile setup, photo upload, and social links |
 | Artist Portal — Help / FAQ | ✅ Implemented | `/portal/help` — FAQ and contact form for artist support requests |
 | Artist Portal — Video Submission | ✅ Implemented | `/portal/releases/videos/new` — artists submit new video entries for admin review (`is_visible=false`); stored in `videos` table pending admin approval in `/admin/video-submissions` |
-| Admin — Accounting tab | ✅ Implemented | `/admin/accounting` — SOS Generator (upload royalty PDFs for any artist via `uploadStatement` Server Action) + Statement History table (`sales_statements`); admin/editor only |
+| Admin — Accounting tab | ✅ Implemented | `/admin/accounting` — guided SOS workflow, Abrechnungszentrale settlement register, bronze CSV archives, Save to Portal, statement approval; admin/editor only |
 | Admin — System tab | ✅ Implemented | `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats) |
 | Admin — Release Submissions | ✅ Implemented | `/admin/release-submissions` — review and approve/reject artist-submitted releases (`is_visible=false` → `is_visible=true`) |
 | Admin — Video Submissions | ✅ Implemented | `/admin/video-submissions` — review and approve/reject artist-submitted videos |
