@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, Envelope } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
+import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
 import { Button } from '@/components/ui/button'
@@ -157,6 +158,7 @@ function ArtistSkeletonRows() {
 
 export function ArtistsManager() {
   const router = useRouter()
+  const cms = useCmsPaths()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -183,7 +185,7 @@ export function ArtistsManager() {
   }
 
   const openEdit = (artist: Artist) => {
-    router.push(`/admin/artists/${artist.id}/edit`)
+    router.push(cms.artistEdit(artist.id))
   }
 
   const handleSave = async (data: ArtistFormData) => {
