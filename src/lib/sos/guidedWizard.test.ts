@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   canAdvanceGuidedStep,
+  canNavigateToGuidedStep,
   deriveSuggestedGuidedStep,
   guidedStepIndex,
 } from './guidedWizard'
@@ -25,5 +26,21 @@ describe('guidedWizard', () => {
     expect(guidedStepIndex('upload')).toBe(0)
     expect(guidedStepIndex('review')).toBe(1)
     expect(guidedStepIndex('settle')).toBe(2)
+  })
+
+  it('gates stepper navigation by data readiness', () => {
+    const idle = { hasData: false, isProcessing: false }
+    const processing = { hasData: true, isProcessing: true }
+    const ready = { hasData: true, isProcessing: false }
+
+    expect(canNavigateToGuidedStep('upload', idle)).toBe(true)
+    expect(canNavigateToGuidedStep('review', idle)).toBe(false)
+    expect(canNavigateToGuidedStep('settle', idle)).toBe(false)
+
+    expect(canNavigateToGuidedStep('review', processing)).toBe(false)
+    expect(canNavigateToGuidedStep('settle', processing)).toBe(true)
+
+    expect(canNavigateToGuidedStep('review', ready)).toBe(true)
+    expect(canNavigateToGuidedStep('settle', ready)).toBe(true)
   })
 })

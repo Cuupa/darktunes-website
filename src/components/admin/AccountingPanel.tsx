@@ -28,6 +28,7 @@ import type {
 } from '@/lib/sos/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
 import { EMPTY_SOS_RULES_BUNDLE, type SosRulesBundle } from '@/lib/sos/sosRulesBundle'
+import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
 import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
@@ -131,6 +132,7 @@ const ACCOUNTING_FALLBACK = {
   guidedStepSettleDesc: 'Save analytics, create drafts, and approve',
   guidedBack: 'Back',
   guidedNext: 'Continue',
+  guidedOpenSettle: 'Open settlement',
   guidedProcessingHint: 'Processing CSV data…',
   guidedUploadHint: 'Upload at least one distributor CSV to continue.',
   guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
@@ -191,6 +193,7 @@ function SosGeneratorPanel() {
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('guided')
+  const [guidedStep, setGuidedStep] = useState<GuidedWizardStep>('upload')
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
 
   useEffect(() => {
@@ -701,7 +704,7 @@ function SosGeneratorPanel() {
       appDefaults={appDefaults}
       periodStart={detectedPeriodStart}
       periodEnd={detectedPeriodEnd}
-      onGoToSettlementCenter={() => setViewMode('guided')}
+      onGoToSettlementCenter={() => setGuidedStep('settle')}
     />
   ) : (
     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
@@ -766,6 +769,8 @@ function SosGeneratorPanel() {
         <AccountingGuidedWizard
           hasData={hasData}
           isProcessing={isProcessing}
+          activeStep={guidedStep}
+          onActiveStepChange={setGuidedStep}
           onSwitchToAdvanced={() => setViewMode('advanced')}
           uploadPanel={uploadPanel}
           reviewPanel={reviewPanel}
@@ -780,6 +785,7 @@ function SosGeneratorPanel() {
             guidedStepSettleDesc: t.guidedStepSettleDesc,
             guidedBack: t.guidedBack,
             guidedNext: t.guidedNext,
+            guidedOpenSettle: t.guidedOpenSettle,
             guidedProcessingHint: t.guidedProcessingHint,
             guidedUploadHint: t.guidedUploadHint,
             guidedReviewHint: t.guidedReviewHint,

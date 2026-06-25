@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { ArrowLeft, ArrowRight, List, UploadSimple, ChartBar, SealCheck } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   GUIDED_WIZARD_STEP_IDS,
   canAdvanceGuidedStep,
+  canNavigateToGuidedStep,
   deriveSuggestedGuidedStep,
   guidedStepIndex,
   type GuidedWizardStep,
@@ -57,6 +58,8 @@ const STEP_META: Record<
 export interface AccountingGuidedWizardProps {
   hasData: boolean
   isProcessing: boolean
+  activeStep: GuidedWizardStep
+  onActiveStepChange: (step: GuidedWizardStep) => void
   onSwitchToAdvanced: () => void
   uploadPanel: React.ReactNode
   reviewPanel: React.ReactNode
@@ -67,6 +70,8 @@ export interface AccountingGuidedWizardProps {
 export function AccountingGuidedWizard({
   hasData,
   isProcessing,
+  activeStep,
+  onActiveStepChange,
   onSwitchToAdvanced,
   uploadPanel,
   reviewPanel,
@@ -74,41 +79,51 @@ export function AccountingGuidedWizard({
   labels,
 }: AccountingGuidedWizardProps) {
   const t = useMemo(() => ({ ...GUIDED_FALLBACK, ...labels }), [labels])
-  const [step, setStep] = useState<GuidedWizardStep>('upload')
+  const settlePanelRef = useRef<HTMLDivElement>(null)
+  const stepInput = useMemo(() => ({ hasData, isProcessing }), [hasData, isProcessing])
 
   useEffect(() => {
-    setStep((current) => {
-      const suggested = deriveSuggestedGuidedStep({ hasData, isProcessing })
-      if (!hasData) return 'upload'
-      if (current === 'upload' && suggested === 'review') return 'review'
-      return current
-    })
-  }, [hasData, isProcessing])
+    if (!hasData) {
+      if (activeStep !== 'upload') onActiveStepChange('upload')
+      return
+    }
+
+    const suggested = deriveSuggestedGuidedStep(stepInput)
+    if (activeStep === 'upload' && suggested === 'review') {
+      onActiveStepChange('review')
+    }
+  }, [activeStep, hasData, onActiveStepChange, stepInput])
+
+  useEffect(() => {
+    if (activeStep !== 'settle') return
+    settlePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [activeStep])
 
   const stepHint = useMemo(() => {
-    if (step === 'upload') {
+    if (activeStep === 'upload') {
       return isProcessing ? t.guidedProcessingHint : t.guidedUploadHint
     }
-    if (step === 'review') return t.guidedReviewHint
+    if (activeStep === 'review') return t.guidedReviewHint
     return t.guidedSettleHint
-  }, [isProcessing, step, t])
+  }, [activeStep, isProcessing, t])
 
   const goBack = useCallback(() => {
-    const index = guidedStepIndex(step)
+    const index = guidedStepIndex(activeStep)
     if (index > 0) {
       const prev = GUIDED_WIZARD_STEP_IDS[index - 1]
-      if (prev) setStep(prev)
+      if (prev) onActiveStepChange(prev)
     }
-  }, [step])
+  }, [activeStep, onActiveStepChange])
 
   const goNext = useCallback(() => {
-    const index = guidedStepIndex(step)
+    const index = guidedStepIndex(activeStep)
     const next = GUIDED_WIZARD_STEP_IDS[index + 1]
-    if (next) setStep(next)
-  }, [step])
+    if (next) onActiveStepChange(next)
+  }, [activeStep, onActiveStepChange])
 
-  const canGoNext = canAdvanceGuidedStep(step, { hasData, isProcessing })
-  const canGoBack = guidedStepIndex(step) > 0
+  const canGoNext = canAdvanceGuidedStep(activeStep, stepInput)
+  const canGoBack = guidedStepIndex(activeStep) > 0
+  const nextLabel = activeStep === 'review' ? t.guidedOpenSettle : t.guidedNext
 
   return (
     <div className="flex flex-col min-h-[500px]">
@@ -118,23 +133,32 @@ export function AccountingGuidedWizard({
             {GUIDED_WIZARD_STEP_IDS.map((id, index) => {
               const meta = STEP_META[id]
               const Icon = meta.icon
-              const isActive = step === id
-              const isComplete = guidedStepIndex(step) > index
+              const isActive = activeStep === id
+              const isComplete = guidedStepIndex(activeStep) > index
+              const canNavigate = canNavigateToGuidedStep(id, stepInput)
               return (
                 <li key={id} className="flex items-center gap-2">
-                  <span
+                  <button
+                    type="button"
+                    disabled={!canNavigate}
+                    aria-current={isActive ? 'step' : undefined}
+                    aria-label={t[meta.descKey]}
+                    onClick={() => {
+                      if (canNavigate) onActiveStepChange(id)
+                    }}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
                       isActive
                         ? 'border-primary/50 bg-primary/10 text-foreground'
                         : isComplete
-                          ? 'border-border bg-background text-muted-foreground'
+                          ? 'border-border bg-background text-muted-foreground hover:text-foreground'
                           : 'border-border/60 text-muted-foreground',
+                      canNavigate ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
                     )}
                   >
                     <Icon size={14} aria-hidden="true" />
                     {t[meta.labelKey]}
-                  </span>
+                  </button>
                   {index < GUIDED_WIZARD_STEP_IDS.length - 1 && (
                     <span className="hidden sm:inline text-muted-foreground" aria-hidden="true">
                       →
@@ -162,9 +186,13 @@ export function AccountingGuidedWizard({
       </Alert>
 
       <div className="flex-1">
-        {step === 'upload' && uploadPanel}
-        {step === 'review' && reviewPanel}
-        {step === 'settle' && settlePanel}
+        {activeStep === 'upload' && uploadPanel}
+        {activeStep === 'review' && reviewPanel}
+        {activeStep === 'settle' && (
+          <div ref={settlePanelRef} id="accounting-guided-settle-panel">
+            {settlePanel}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4 bg-muted/10">
@@ -172,9 +200,9 @@ export function AccountingGuidedWizard({
           <ArrowLeft size={16} className="mr-1.5" aria-hidden="true" />
           {t.guidedBack}
         </Button>
-        {step !== 'settle' ? (
+        {activeStep !== 'settle' ? (
           <Button type="button" size="sm" disabled={!canGoNext} onClick={goNext}>
-            {t.guidedNext}
+            {nextLabel}
             <ArrowRight size={16} className="ml-1.5" aria-hidden="true" />
           </Button>
         ) : (

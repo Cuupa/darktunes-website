@@ -1500,6 +1500,7 @@
       "guidedStepSettleDesc": "Save analytics, create drafts, and approve",
       "guidedBack": "Back",
       "guidedNext": "Continue",
+      "guidedOpenSettle": "Open settlement",
       "guidedProcessingHint": "Processing CSV data…",
       "guidedUploadHint": "Upload at least one distributor CSV to continue.",
       "guidedReviewHint": "Check artist payouts, then continue to publish statements.",

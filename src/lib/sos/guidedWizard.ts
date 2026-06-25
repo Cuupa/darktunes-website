@@ -26,3 +26,12 @@ export function canAdvanceGuidedStep(
   if (step === 'review') return input.hasData
   return false
 }
+
+export function canNavigateToGuidedStep(
+  target: GuidedWizardStep,
+  input: { hasData: boolean; isProcessing: boolean },
+): boolean {
+  if (target === 'upload') return true
+  if (target === 'review') return input.hasData && !input.isProcessing
+  return input.hasData
+}

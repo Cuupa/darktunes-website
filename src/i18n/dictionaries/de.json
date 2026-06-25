@@ -1500,6 +1500,7 @@
       "guidedStepSettleDesc": "Analytics speichern, Entwürfe erstellen und freigeben",
       "guidedBack": "Zurück",
       "guidedNext": "Weiter",
+      "guidedOpenSettle": "Abrechnungszentrale öffnen",
       "guidedProcessingHint": "CSV-Daten werden verarbeitet…",
       "guidedUploadHint": "Mindestens eine Distributor-CSV hochladen, um fortzufahren.",
       "guidedReviewHint": "Künstler-Auszahlungen prüfen, dann Statements veröffentlichen.",
