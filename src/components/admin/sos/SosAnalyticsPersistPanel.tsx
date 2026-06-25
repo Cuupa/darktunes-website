@@ -8,7 +8,7 @@ import { runPersistSosAnalytics } from '@/lib/sos/runPersistSosAnalytics'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 interface SosAnalyticsPersistPanelProps {
@@ -45,8 +45,7 @@ export function SosAnalyticsPersistPanel({
   bronzeBatchIds = [],
   disabled = false,
 }: SosAnalyticsPersistPanelProps) {
-  const dict = useDict()
-  const t = { ...PERSIST_FALLBACK, ...dict.admin?.accounting }
+  const t = useMergedAccountingLabels(PERSIST_FALLBACK)
   const [isPending, startTransition] = useTransition()
 
   const canPersist = territoryMetrics.length > 0

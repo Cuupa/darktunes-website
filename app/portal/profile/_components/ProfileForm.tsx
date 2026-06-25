@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/profile/_components/ProfileForm.tsx — Client Component (leaf)
  *
@@ -40,7 +41,6 @@ import {
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { EPKPreview } from './EPKPreview'
 import type { EPKData } from './EPKPreview'
 import { usePortalProfileForm } from '@/hooks/usePortalProfileForm'
@@ -55,8 +55,6 @@ import { toast } from 'sonner'
 // ---------------------------------------------------------------------------
 
 interface ProfileFormProps {
-  dict: Dictionary['portal']
-  errors: Dictionary['errors']
   artistId: string | null
   artistName: string | null
   artistSlug: string | null
@@ -73,25 +71,29 @@ interface ProfileFormProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ dict, errors, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
+export function ProfileForm({ artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
+  const t = useTranslations('portal')
+
   if (!artistId) {
     return (
       <Card className="bg-card border-border">
         <CardContent className="pt-6">
-          <p className="text-muted-foreground">{dict.notLinked}</p>
+          <p className="text-muted-foreground">{t('notLinked')}</p>
         </CardContent>
       </Card>
     )
   }
 
-  return <ProfileFormInner dict={dict} errors={errors} artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
+  return <ProfileFormInner artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
 }
 
 interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
   artistId: string
 }
 
-function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
+function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
+  const t = useTranslations('portal')
+
   const [pdfDownloading, setPdfDownloading] = React.useState(false)
   const epkDocumentRef = React.useRef<HTMLElement>(null)
   const [genreCatalogue, setGenreCatalogue] = React.useState<Genre[]>([])
@@ -114,7 +116,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
     handleGalleryRemove,
     handleEpkSettingsChange,
     onSubmit,
-  } = usePortalProfileForm({ artistId, initialProfile, artist, dict, errors })
+  } = usePortalProfileForm({ artistId, initialProfile, artist })
 
   const { fields: customLinkFields, append: appendCustomLink, remove: removeCustomLink } =
     useFieldArray({ control: form.control, name: 'custom_links' })
@@ -169,15 +171,15 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
   // ---------------------------------------------------------------------------
 
   const linkFields = [
-    { field: 'website_url',     label: dict.profile_website      },
-    { field: 'spotify_url',     label: dict.profile_spotify      },
-    { field: 'apple_music_url', label: dict.profile_apple_music  },
-    { field: 'instagram_url',   label: dict.profile_instagram    },
-    { field: 'youtube_url',     label: dict.profile_youtube      },
-    { field: 'tiktok_url',      label: dict.profile_tiktok       },
-    { field: 'facebook_url',    label: dict.profile_facebook     },
-    { field: 'soundcloud_url',  label: dict.profile_soundcloud   },
-    { field: 'bandcamp_url',    label: dict.profile_bandcamp     },
+    { field: 'website_url',     label: t('profile_website')      },
+    { field: 'spotify_url',     label: t('profile_spotify')      },
+    { field: 'apple_music_url', label: t('profile_apple_music')  },
+    { field: 'instagram_url',   label: t('profile_instagram')    },
+    { field: 'youtube_url',     label: t('profile_youtube')      },
+    { field: 'tiktok_url',      label: t('profile_tiktok')       },
+    { field: 'facebook_url',    label: t('profile_facebook')     },
+    { field: 'soundcloud_url',  label: t('profile_soundcloud')   },
+    { field: 'bandcamp_url',    label: t('profile_bandcamp')     },
   ] as const
 
   return (
@@ -185,7 +187,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold">{dict.profile_heading}</h1>
+          <h1 className="text-3xl font-bold">{t('profile_heading')}</h1>
           {artistName && (
             <p className="text-muted-foreground text-sm mt-1">
               Artist: <span className="font-medium text-foreground">{artistName}</span>
@@ -205,24 +207,24 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
               setPdfDownloading(true)
               try {
                 const { buildEpkPdfMessages, generateEpkPdf } = await import('./epkPdf')
-                await generateEpkPdf(epkData, buildEpkPdfMessages(dict), epkDocumentRef.current)
+                await generateEpkPdf(epkData, buildEpkPdfMessages(t), epkDocumentRef.current)
               } catch (err) {
-                const message = err instanceof Error ? err.message : dict.profile_epk_error_print_failed
-                toast.error(message || dict.profile_epk_error_print_failed)
+                const message = err instanceof Error ? err.message : t('profile_epk_error_print_failed')
+                toast.error(message || t('profile_epk_error_print_failed'))
               } finally {
                 setPdfDownloading(false)
               }
             }}
           >
             <FilePdf size={16} aria-hidden="true" className="mr-1.5" />
-            {pdfDownloading ? dict.profile_epk_downloading : dict.profile_download_epk}
+            {pdfDownloading ? t('profile_epk_downloading') : t('profile_download_epk')}
           </Button>
           <Link
             href={`/portal/epk-builder?artistId=${artistId}`}
             className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
           >
             <FilePdf size={15} aria-hidden="true" />
-            {dict.epk_builder_nav}
+            {t('epk_builder_nav')}
           </Link>
           {artistSlug && (
             <Link
@@ -233,7 +235,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
               aria-label="Preview your public artist profile in a new tab"
             >
               <Eye size={15} aria-hidden="true" />
-              {dict.profile_preview_public}
+              {t('profile_preview_public')}
             </Link>
           )}
         </div>
@@ -244,23 +246,23 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
           <TabsList className="flex flex-wrap h-auto gap-1 p-1 mb-2">
             <TabsTrigger value="bio" className="gap-1.5">
               <TextAlignLeft size={14} aria-hidden="true" />
-              {dict.profile_tab_bio}
+              {t('profile_tab_bio')}
             </TabsTrigger>
             <TabsTrigger value="info" className="gap-1.5">
               <Info size={14} aria-hidden="true" />
-              {dict.profile_tab_info}
+              {t('profile_tab_info')}
             </TabsTrigger>
             <TabsTrigger value="links" className="gap-1.5">
               <LinkSimple size={14} aria-hidden="true" />
-              {dict.profile_tab_links}
+              {t('profile_tab_links')}
             </TabsTrigger>
             <TabsTrigger value="riders" className="gap-1.5">
               <FilePdf size={14} aria-hidden="true" />
-              {dict.profile_tab_riders}
+              {t('profile_tab_riders')}
             </TabsTrigger>
             <TabsTrigger value="epk" className="gap-1.5">
               <Newspaper size={14} aria-hidden="true" />
-              {dict.profile_tab_epk}
+              {t('profile_tab_epk')}
             </TabsTrigger>
           </TabsList>
 
@@ -269,8 +271,8 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             {/* Photo upload */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_photo}</CardTitle>
-                <CardDescription>{dict.profile_photo_description}</CardDescription>
+                <CardTitle className="text-base">{t('profile_photo')}</CardTitle>
+                <CardDescription>{t('profile_photo_description')}</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center gap-6">
                 <Avatar className="w-24 h-24">
@@ -296,7 +298,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                     className="border-border gap-1.5"
                   >
                     <Camera size={16} aria-hidden="true" />
-                    {isUploading ? `${uploadProgress}%` : dict.profile_photo_upload}
+                    {isUploading ? `${uploadProgress}%` : t('profile_photo_upload')}
                   </Button>
                   {uploadProgress !== null && (
                     <Progress value={uploadProgress} className="h-1 w-48" aria-label="Upload progress" />
@@ -311,7 +313,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             {/* Gallery photos */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.epk_gallery_heading}</CardTitle>
+                <CardTitle className="text-base">{t('epk_gallery_heading')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -328,7 +330,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                         size="icon"
                         variant="destructive"
                         className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label={dict.epk_gallery_remove}
+                        aria-label={t('epk_gallery_remove')}
                         onClick={() => handleGalleryRemove(url)}
                       >
                         <Trash size={12} aria-hidden="true" />
@@ -337,7 +339,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                   ))}
                   <label className="aspect-square flex flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground text-xs">
                     <Camera size={18} aria-hidden="true" />
-                    <span>{galleryUploading ? dict.epk_gallery_uploading : dict.epk_gallery_add}</span>
+                    <span>{galleryUploading ? t('epk_gallery_uploading') : t('epk_gallery_add')}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -353,11 +355,11 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             {/* Genres & Press Quote */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_genres_press}</CardTitle>
+                <CardTitle className="text-base">{t('profile_genres_press')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{dict.profile_genres}</Label>
+                  <Label>{t('profile_genres')}</Label>
                   <Controller
                     control={form.control}
                     name="genres"
@@ -378,7 +380,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="press_quote">{dict.profile_pressQuote}</Label>
+                  <Label htmlFor="press_quote">{t('profile_pressQuote')}</Label>
                   <Textarea
                     id="press_quote"
                     rows={2}
@@ -397,13 +399,13 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             {/* Bios using TiptapEditor */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_biography}</CardTitle>
-                <CardDescription>{dict.profile_biography_description}</CardDescription>
+                <CardTitle className="text-base">{t('profile_biography')}</CardTitle>
+                <CardDescription>{t('profile_biography_description')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label>{dict.profile_bio_short}</Label>
-                  <p className="text-xs text-muted-foreground">{dict.profile_bio_short_desc}</p>
+                  <Label>{t('profile_bio_short')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('profile_bio_short_desc')}</p>
                   <Controller
                     control={form.control}
                     name="bio_short"
@@ -411,15 +413,15 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                       <TiptapEditor
                         value={field.value ?? ''}
                         onChange={field.onChange}
-                        placeholder={dict.profile_bio_short}
+                        placeholder={t('profile_bio_short')}
                       />
                     )}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{dict.profile_bio_medium}</Label>
-                  <p className="text-xs text-muted-foreground">{dict.profile_bio_medium_desc}</p>
+                  <Label>{t('profile_bio_medium')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('profile_bio_medium_desc')}</p>
                   <Controller
                     control={form.control}
                     name="bio_medium"
@@ -427,15 +429,15 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                       <TiptapEditor
                         value={field.value ?? ''}
                         onChange={field.onChange}
-                        placeholder={dict.profile_bio_medium}
+                        placeholder={t('profile_bio_medium')}
                       />
                     )}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{dict.profile_bio_long}</Label>
-                  <p className="text-xs text-muted-foreground">{dict.profile_bio_long_desc}</p>
+                  <Label>{t('profile_bio_long')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('profile_bio_long_desc')}</p>
                   <Controller
                     control={form.control}
                     name="bio_long"
@@ -443,7 +445,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                       <TiptapEditor
                         value={field.value ?? ''}
                         onChange={field.onChange}
-                        placeholder={dict.profile_bio_long}
+                        placeholder={t('profile_bio_long')}
                       />
                     )}
                   />
@@ -456,13 +458,13 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
           <TabsContent value="info" className="space-y-4 mt-0">
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_info_heading}</CardTitle>
-                <CardDescription>{dict.profile_info_description}</CardDescription>
+                <CardTitle className="text-base">{t('profile_info_heading')}</CardTitle>
+                <CardDescription>{t('profile_info_description')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="founding_year">{dict.profile_founding_year}</Label>
+                    <Label htmlFor="founding_year">{t('profile_founding_year')}</Label>
                     <Input
                       id="founding_year"
                       type="number"
@@ -474,7 +476,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hometown">{dict.profile_hometown}</Label>
+                    <Label htmlFor="hometown">{t('profile_hometown')}</Label>
                     <Input
                       id="hometown"
                       className="bg-muted border-border"
@@ -485,21 +487,21 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="booking_contact">{dict.profile_booking_contact}</Label>
+                  <Label htmlFor="booking_contact">{t('profile_booking_contact')}</Label>
                   <Input
                     id="booking_contact"
                     className="bg-muted border-border"
-                    placeholder={dict.profile_contact_placeholder}
+                    placeholder={t('profile_contact_placeholder')}
                     {...form.register('booking_contact')}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="press_contact">{dict.profile_press_contact}</Label>
+                  <Label htmlFor="press_contact">{t('profile_press_contact')}</Label>
                   <Input
                     id="press_contact"
                     className="bg-muted border-border"
-                    placeholder={dict.profile_contact_placeholder}
+                    placeholder={t('profile_contact_placeholder')}
                     {...form.register('press_contact')}
                   />
                 </div>
@@ -511,8 +513,8 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
           <TabsContent value="links" className="space-y-4 mt-0">
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_online_presence}</CardTitle>
-                <CardDescription>{dict.profile_links_description}</CardDescription>
+                <CardTitle className="text-base">{t('profile_online_presence')}</CardTitle>
+                <CardDescription>{t('profile_links_description')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -586,15 +588,15 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
           <TabsContent value="riders" className="space-y-4 mt-0">
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{dict.profile_tab_riders}</CardTitle>
-                <CardDescription>{dict.profile_riders_desc}</CardDescription>
+                <CardTitle className="text-base">{t('profile_tab_riders')}</CardTitle>
+                <CardDescription>{t('profile_riders_desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {(
                   [
-                    { type: 'stage_plot',   label: dict.profile_rider_stage_plot,   key: 'riderStagePlotUrl'  },
-                    { type: 'technical',    label: dict.profile_rider_technical,    key: 'riderTechnicalUrl'  },
-                    { type: 'hospitality',  label: dict.profile_rider_hospitality,  key: 'riderHospitalityUrl' },
+                    { type: 'stage_plot',   label: t('profile_rider_stage_plot'),   key: 'riderStagePlotUrl'  },
+                    { type: 'technical',    label: t('profile_rider_technical'),    key: 'riderTechnicalUrl'  },
+                    { type: 'hospitality',  label: t('profile_rider_hospitality'),  key: 'riderHospitalityUrl' },
                   ] as const
                 ).map(({ type, label }) => (
                   <div key={type} className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -607,10 +609,10 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                           rel="noopener noreferrer"
                           className="block text-xs text-primary hover:text-primary/80 mt-1 truncate"
                         >
-                          {dict.profile_rider_download}
+                          {t('profile_rider_download')}
                         </a>
                       ) : (
-                        <p className="text-xs text-muted-foreground mt-1">{dict.profile_rider_no_file}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('profile_rider_no_file')}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -619,7 +621,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                         className="cursor-pointer inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
                       >
                         <FilePdf size={14} aria-hidden="true" />
-                        {riderUploading === type ? dict.profile_rider_uploading : dict.profile_rider_upload}
+                        {riderUploading === type ? t('profile_rider_uploading') : t('profile_rider_upload')}
                       </label>
                       <input
                         id={`rider-${type}`}
@@ -636,7 +638,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
                           size="sm"
                           className="text-destructive hover:text-destructive/80 px-2"
                           onClick={() => handleRiderDelete(type)}
-                          aria-label={`${dict.profile_rider_delete} ${label}`}
+                          aria-label={`${t('profile_rider_delete')} ${label}`}
                         >
                           <Trash size={14} aria-hidden="true" />
                         </Button>
@@ -651,7 +653,6 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
           {/* ── Tab 5: EPK Preview ───────────────────────────────────────── */}
           <TabsContent value="epk" className="mt-0" forceMount>
             <EPKPreview
-              dict={dict}
               data={epkData}
               artistSlug={artistSlug}
               epkTheme={epkSettings.epkTheme}
@@ -677,7 +678,7 @@ function ProfileFormInner({ dict, errors, artistId, artistName, artistSlug, init
             className="gap-2 min-w-32"
           >
             <FloppyDisk size={16} aria-hidden="true" />
-            {form.formState.isSubmitting ? dict.profile_saving : dict.profile_save}
+            {form.formState.isSubmitting ? t('profile_saving') : t('profile_save')}
           </Button>
         </div>
       </form>

@@ -1,4 +1,4 @@
-import type enDict from './dictionaries/en.json'
+import type enDict from './messages/en/index'
 
 /** Supported locales */
 export type Locale = 'en' | 'de'

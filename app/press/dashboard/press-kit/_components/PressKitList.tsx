@@ -2,20 +2,19 @@
 
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { DownloadSimple, FileArrowDown } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
-import type { Dictionary } from '@/i18n/types'
 import type { PressAsset } from '@/types'
 import { getJournalistDownloadUrl } from '../../_actions/download'
 import { getPressKitUrls } from '../_actions/downloadZip'
 
 interface PressKitListProps {
   assets: PressAsset[]
-  dict: Dictionary['pressKit']
 }
 
 const IMAGE_CATEGORIES = new Set(['photo', 'logo', 'social', 'promo', 'live', 'stage', 'artwork'])
@@ -24,7 +23,8 @@ function assetTitle(asset: PressAsset): string {
   return asset.pressCaption ?? asset.originalFilename
 }
 
-export function PressKitList({ assets, dict }: PressKitListProps) {
+export function PressKitList({ assets }: PressKitListProps) {
+  const t = useTranslations('pressKit')
   const [activeTab, setActiveTab] = useState<'all' | 'photo' | 'logo' | 'social' | 'document'>('all')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [preparingZip, setPreparingZip] = useState(false)
@@ -78,25 +78,25 @@ export function PressKitList({ assets, dict }: PressKitListProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold">{dict.heading}</h1>
+        <h1 className="text-3xl font-bold">{t('heading')}</h1>
         <Button onClick={() => void downloadZip()} disabled={preparingZip || filtered.length === 0} className="gap-2">
           <FileArrowDown size={16} weight="bold" aria-hidden="true" />
-          {preparingZip ? dict.preparingZip : dict.downloadZipAll}
+          {preparingZip ? t('preparingZip') : t('downloadZipAll')}
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
         <TabsList className="flex h-auto flex-wrap gap-1 p-1">
-          <TabsTrigger value="all">{dict.tabs.all}</TabsTrigger>
-          <TabsTrigger value="photo">{dict.tabs.photo}</TabsTrigger>
-          <TabsTrigger value="logo">{dict.tabs.logo}</TabsTrigger>
-          <TabsTrigger value="social">{dict.tabs.social}</TabsTrigger>
-          <TabsTrigger value="document">{dict.tabs.document}</TabsTrigger>
+          <TabsTrigger value="all">{t('tabs.all')}</TabsTrigger>
+          <TabsTrigger value="photo">{t('tabs.photo')}</TabsTrigger>
+          <TabsTrigger value="logo">{t('tabs.logo')}</TabsTrigger>
+          <TabsTrigger value="social">{t('tabs.social')}</TabsTrigger>
+          <TabsTrigger value="document">{t('tabs.document')}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{dict.noAssets}</p>
+        <p className="text-sm text-muted-foreground">{t('noAssets')}</p>
       ) : (
         <div className="space-y-6">
           {imageAssets.length > 0 && (
@@ -124,7 +124,7 @@ export function PressKitList({ assets, dict }: PressKitListProps) {
                     </div>
                     <Button size="sm" variant="outline" onClick={() => void download(asset)} disabled={loadingId === asset.id}>
                       <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                      {loadingId === asset.id ? dict.preparingZip : dict.downloadZip}
+                      {loadingId === asset.id ? t('preparingZip') : t('downloadZip')}
                     </Button>
                   </div>
                 </li>
@@ -142,7 +142,7 @@ export function PressKitList({ assets, dict }: PressKitListProps) {
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void download(asset)} disabled={loadingId === asset.id}>
                     <DownloadSimple size={16} weight="bold" aria-hidden="true" />
-                    {loadingId === asset.id ? dict.preparingZip : dict.downloadZip}
+                    {loadingId === asset.id ? t('preparingZip') : t('downloadZip')}
                   </Button>
                 </div>
               ))}

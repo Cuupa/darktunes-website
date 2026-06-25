@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import {
   BarChart,
   Bar,
@@ -12,16 +13,18 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { TerritoriesChartInnerProps } from './TerritoriesChart'
 
-export function TerritoriesChartInner({ dict, countries }: TerritoriesChartInnerProps) {
+export function TerritoriesChartInner({ countries }: TerritoriesChartInnerProps) {
+  const t = useTranslations('portal')
+
   const topCountries = countries.slice(0, 15)
 
   return (
     <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle>{dict.analytics_territories_heading}</CardTitle>
+        <CardTitle>{t('analytics_territories_heading')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div role="img" aria-label={dict.analytics_territories_heading}>
+        <div role="img" aria-label={t('analytics_territories_heading')}>
           <ResponsiveContainer width="100%" height={320}>
             <BarChart
               data={topCountries}

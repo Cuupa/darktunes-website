@@ -7,8 +7,8 @@
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getCachedPublicReleases } from '@/lib/cache/publicQueries'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { ReleasesPageContent } from './_components/ReleasesPageContent'
 
 export const revalidate = 60
@@ -19,10 +19,10 @@ export const metadata: Metadata = {
 }
 
 export default async function ReleasesPage() {
-  const locale = await getLocale()
-  const [releases, dict] = await Promise.all([
+  const [releases, tPages, tReleases] = await Promise.all([
     getCachedPublicReleases(),
-    getDictionary(locale),
+    getTranslations('pages'),
+    getTranslations('releases'),
   ])
 
   return (
@@ -33,12 +33,12 @@ export default async function ReleasesPage() {
             href="/"
             className="text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-6 inline-block"
           >
-            {dict.pages.backToHome}
+            {tPages('backToHome')}
           </Link>
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{dict.releases.heading}</h1>
-          <p className="text-xl text-muted-foreground font-serif mt-3">{dict.releases.subheading}</p>
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{tReleases('heading')}</h1>
+          <p className="text-xl text-muted-foreground font-serif mt-3">{tReleases('subheading')}</p>
         </div>
-        <ReleasesPageContent releases={releases} dict={dict.releases} />
+        <ReleasesPageContent releases={releases} />
       </div>
     </main>
   )

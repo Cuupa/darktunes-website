@@ -1,20 +1,15 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { Lightbulb, TrendDown, TrendUp, Info, ArrowRight } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { OverviewInsight } from '@/lib/analytics/overviewInsights'
-import type { Dictionary } from '@/i18n/types'
+import { portalKey } from '@/i18n/portalKey'
 import { cn } from '@/lib/utils'
 
 interface PortalIntelligencePanelProps {
-  dict: Dictionary['portal']
   insights: OverviewInsight[]
-}
-
-function interpolate(template: string, values?: Record<string, string | number>): string {
-  if (!values) return template
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`))
 }
 
 function severityIcon(severity: OverviewInsight['severity']) {
@@ -39,25 +34,25 @@ function severityClass(severity: OverviewInsight['severity']): string {
   }
 }
 
-export function PortalIntelligencePanel({ dict, insights }: PortalIntelligencePanelProps) {
-  if (insights.length === 0) return null
+export function PortalIntelligencePanel({ insights }: PortalIntelligencePanelProps) {
+  const t = useTranslations('portal')
 
-  const dictRecord = dict as Record<string, string>
+  if (insights.length === 0) return null
 
   return (
     <Card className="border-border bg-card/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Lightbulb size={16} className="text-primary" aria-hidden="true" />
-          {dict.overview_intelligence_heading}
+          {t('overview_intelligence_heading')}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">{dict.overview_intelligence_subheading}</p>
+        <p className="text-xs text-muted-foreground">{t('overview_intelligence_subheading')}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {insights.map((insight) => {
           const Icon = severityIcon(insight.severity)
-          const title = dictRecord[insight.titleKey] ?? insight.titleKey
-          const body = interpolate(dictRecord[insight.bodyKey] ?? insight.bodyKey, insight.values)
+          const title = t(portalKey(insight.titleKey))
+          const body = t(portalKey(insight.bodyKey), insight.values)
           const content = (
             <div className="flex gap-3 rounded-lg border border-border/60 bg-background/50 p-3">
               <Icon

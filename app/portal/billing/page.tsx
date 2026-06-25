@@ -4,7 +4,6 @@ import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { getPortalDictionary } from '@/i18n/getDictionary'
 import { BillingProfileForm } from './_components/BillingProfileForm'
 
 export const metadata: Metadata = {
@@ -17,7 +16,7 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-  const dict = await getPortalDictionary()
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -35,7 +34,6 @@ export default async function BillingPage({
       artistId={artist?.id ?? ''}
       billingProfile={billingProfile}
       isComplete={isBillingProfileComplete(billingProfile)}
-      dict={dict.portal}
     />
   )
 }

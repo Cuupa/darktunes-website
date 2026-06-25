@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import {
   LineChart,
   Line,
@@ -26,20 +27,20 @@ function fmtListeners(n: number): string {
   return n.toLocaleString()
 }
 
-export function ListenersChartInner({
-  dict,
-  chartData,
+export function ListenersChartInner({ chartData,
   latestLastfm,
   latestSoundcharts,
 }: ListenersChartInnerProps) {
+  const t = useTranslations('portal')
+
   const hasLastfm = chartData.some((d) => d.lastfm > 0)
   const hasSoundcharts = chartData.some((d) => d.soundcharts > 0)
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">{dict.analytics_listeners_heading}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{dict.analytics_listeners_hint}</p>
+        <h2 className="text-xl font-semibold">{t('analytics_listeners_heading')}</h2>
+        <p className="text-sm text-muted-foreground mt-1">{t('analytics_listeners_hint')}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -47,7 +48,7 @@ export function ListenersChartInner({
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.analytics_listeners_lastfm}
+                {t('analytics_listeners_lastfm')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -59,7 +60,7 @@ export function ListenersChartInner({
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.analytics_listeners_soundcharts}
+                {t('analytics_listeners_soundcharts')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -84,7 +85,7 @@ export function ListenersChartInner({
               <Line
                 type="monotone"
                 dataKey="lastfm"
-                name={dict.analytics_listeners_lastfm}
+                name={t('analytics_listeners_lastfm')}
                 stroke="oklch(0.65 0.28 295)"
                 strokeWidth={2}
                 dot={false}
@@ -94,7 +95,7 @@ export function ListenersChartInner({
               <Line
                 type="monotone"
                 dataKey="soundcharts"
-                name={dict.analytics_listeners_soundcharts}
+                name={t('analytics_listeners_soundcharts')}
                 stroke="oklch(0.60 0.25 300)"
                 strokeWidth={2}
                 dot={false}

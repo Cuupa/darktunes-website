@@ -5,7 +5,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { ContactForm } from './_components/ContactForm'
 
@@ -17,13 +17,15 @@ export const metadata: Metadata = {
 const SUBMITHUB_URL_FALLBACK = 'https://www.submithub.com/playlister/darktunes-music-group'
 
 export default async function ContactPage() {
-  const [locale, settings] = await Promise.all([getLocale(), getCachedSiteSettings().catch(() => null)])
-  const dict = await getDictionary(locale)
-  const c = dict.contact
+  const [tPages, tContact, settings] = await Promise.all([
+    getTranslations('pages'),
+    getTranslations('contact'),
+    getCachedSiteSettings().catch(() => null),
+  ])
   const submitHubUrl = settings?.submitHubUrl || SUBMITHUB_URL_FALLBACK
-  const submitHubHeading = settings?.submitHubSectionHeading || c.submitMusicHeading
-  const submitHubDescription = settings?.submitHubDescription || c.submitMusicDescription
-  const submitHubButtonLabel = settings?.submitHubLabel || c.submitMusicButton
+  const submitHubHeading = settings?.submitHubSectionHeading || tContact('submitMusicHeading')
+  const submitHubDescription = settings?.submitHubDescription || tContact('submitMusicDescription')
+  const submitHubButtonLabel = settings?.submitHubLabel || tContact('submitMusicButton')
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -32,19 +34,19 @@ export default async function ContactPage() {
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
         >
-          {dict.pages.backToHome}
+          {tPages('backToHome')}
         </Link>
 
         <div className="mb-12">
           <h1 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight uppercase">
-            {c.heading}
+            {tContact('heading')}
           </h1>
-          <p className="text-xl text-muted-foreground font-serif">{c.subheading}</p>
+          <p className="text-xl text-muted-foreground font-serif">{tContact('subheading')}</p>
         </div>
 
         {/* Contact form */}
         <section className="mb-14 rounded-xl border border-border bg-card/40 p-8">
-          <ContactForm dict={c} locale={locale} contactTopics={settings?.contactTopics ?? []} />
+          <ContactForm contactTopics={settings?.contactTopics ?? []} />
         </section>
 
         {/* Submit Music section */}

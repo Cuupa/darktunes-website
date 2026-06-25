@@ -6,12 +6,11 @@ import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { getSquareThumbnail } from '@/lib/imageUtils'
+import { useTranslations } from 'next-intl'
 import type { Release } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 interface ReleasesPageContentProps {
   releases: Release[]
-  dict: Dictionary['releases']
 }
 
 const containerVariants = {
@@ -24,7 +23,8 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 }
 
-export function ReleasesPageContent({ releases, dict }: ReleasesPageContentProps) {
+export function ReleasesPageContent({ releases }: ReleasesPageContentProps) {
+  const t = useTranslations('releases')
   const prefersReducedMotion = useReducedMotion()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -65,8 +65,8 @@ export function ReleasesPageContent({ releases, dict }: ReleasesPageContentProps
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={dict.searchPlaceholder}
-            aria-label={dict.searchPlaceholder}
+            placeholder={t('searchPlaceholder')}
+            aria-label={t('searchPlaceholder')}
             className="h-11 w-full rounded-md border border-border bg-muted pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
@@ -104,7 +104,7 @@ export function ReleasesPageContent({ releases, dict }: ReleasesPageContentProps
 
       <div className={`transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
         {filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground py-24 text-lg">{dict.noResults}</p>
+          <p className="text-center text-muted-foreground py-24 text-lg">{t('noResults')}</p>
         ) : (
           <motion.ul
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 list-none"

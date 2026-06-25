@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReportingPanel } from './ReportingPanel'
 import type { ArtistRevenue } from '@/lib/sos/types'
 
-vi.mock('@/contexts/DictContext', () => ({
-  useDict: () => ({
+vi.mock('next-intl', () => ({
+  useMessages: () => ({
     admin: {
       accounting: {
         reportingSettlementAlertTitle: 'Use Settlement Center for portal publishing',

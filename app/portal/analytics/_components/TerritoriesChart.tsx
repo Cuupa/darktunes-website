@@ -1,12 +1,11 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import type { CountryAggregate } from '@/lib/api/artistTerritoryMetrics'
-import type { Dictionary } from '@/i18n/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export interface TerritoriesChartInnerProps {
-  dict: Dictionary['portal']
   countries: CountryAggregate[]
 }
 
@@ -19,16 +18,17 @@ const TerritoriesChartInner = dynamic(
 )
 
 interface TerritoriesChartProps {
-  dict: Dictionary['portal']
   countries: CountryAggregate[]
 }
 
-export function TerritoriesChart({ dict, countries }: TerritoriesChartProps) {
+export function TerritoriesChart({ countries }: TerritoriesChartProps) {
+  const t = useTranslations('portal')
+
   if (countries.length === 0) {
     return (
-      <p className="text-muted-foreground">{dict.analytics_territories_noData}</p>
+      <p className="text-muted-foreground">{t('analytics_territories_noData')}</p>
     )
   }
 
-  return <TerritoriesChartInner dict={dict} countries={countries} />
+  return <TerritoriesChartInner countries={countries} />
 }

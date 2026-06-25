@@ -51,11 +51,11 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 
 interface NavItem {
   label: string
-  /** When set, overrides `label` with `dict.admin.nav[labelDictKey]` when available. */
+  /** When set, overrides `label` with `admin.nav[labelDictKey]` when available. */
   labelDictKey?: 'labelIntelligence'
   href: string
   icon: React.ElementType
@@ -121,7 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
 export function AdminSidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const dict = useDict()
+  const tNav = useTranslations('admin.nav')
   const { isAdmin, isEditor, user, profile, signOut } = useAuthContext()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -148,7 +148,7 @@ export function AdminSidebarNav() {
 
   const resolveNavLabel = (item: NavItem) => {
     if (item.labelDictKey === 'labelIntelligence') {
-      return dict.admin?.nav?.labelIntelligence ?? item.label
+      return tNav('labelIntelligence')
     }
     return item.label
   }

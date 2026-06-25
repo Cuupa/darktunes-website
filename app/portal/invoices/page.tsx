@@ -9,7 +9,7 @@ import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getSalesStatementById } from '@/lib/api/salesStatements'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { InvoicesClient } from './_components/InvoicesClient'
 
 export const metadata: Metadata = {
@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 }
 
 function InvoicesSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-56" />
@@ -33,7 +35,9 @@ async function InvoicesContent({
 }: {
   searchParams: Promise<{ artistId?: string; statement?: string }>
 }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId, statement } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -46,7 +50,7 @@ async function InvoicesContent({
   if (flags['artist.invoices'] === false) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{dict.portal.invoices_heading}</h1>
+        <h1 className="text-2xl font-bold">{t('invoices_heading')}</h1>
         <p className="text-muted-foreground">The Invoices feature is currently unavailable.</p>
       </div>
     )
@@ -66,7 +70,6 @@ async function InvoicesContent({
       artistId={artist?.id ?? ''}
       billingProfile={billingProfile}
       billingProfileComplete={isBillingProfileComplete(billingProfile)}
-      dict={dict.portal}
       invoices={invoices}
       statement={selectedStatement}
     />

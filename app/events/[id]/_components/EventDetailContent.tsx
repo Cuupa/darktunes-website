@@ -16,13 +16,11 @@ import {
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
 import { ShareButton } from '@/components/ShareButton'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Concert } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 
 interface EventDetailContentProps {
   concert: Concert
-  dict: Dictionary
-  locale: Locale
 }
 
 /** Extract an 11-character YouTube video ID from a URL or return null. */
@@ -73,11 +71,12 @@ function downloadIcs(concert: Concert) {
   URL.revokeObjectURL(link.href)
 }
 
-export function EventDetailContent({ concert, dict, locale }: EventDetailContentProps) {
+export function EventDetailContent({ concert }: EventDetailContentProps) {
+  const tConcerts = useTranslations('concerts')
+  const tPortal = useTranslations('portal')
+  const tConsent = useTranslations('consent')
+  const locale = useLocale()
   const prefersReducedMotion = useReducedMotion()
-  const d = dict.concerts
-  const ed = d.eventDetail
-  const portalD = dict.portal
 
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const isCancelled = concert.status === 'cancelled'
@@ -91,9 +90,9 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
 
   const eventTypeLabel = (() => {
     switch (concert.eventType) {
-      case 'gig': return portalD.tour_type_gig
-      case 'dj_set': return portalD.tour_type_dj_set
-      case 'tour': return portalD.tour_type_tour
+      case 'gig': return tPortal('tour_type_gig')
+      case 'dj_set': return tPortal('tour_type_dj_set')
+      case 'tour': return tPortal('tour_type_tour')
       default: return concert.eventType
     }
   })()
@@ -115,7 +114,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
           href="/events"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-8"
         >
-          {ed.backToEvents}
+          {tConcerts('eventDetail.backToEvents')}
         </Link>
 
         <motion.div {...fadeIn} className="space-y-8">
@@ -131,7 +130,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
               )}
               {isCancelled && (
                 <Badge variant="destructive" className="uppercase tracking-wide">
-                  {d.cancelled}
+                  {tConcerts('cancelled')}
                 </Badge>
               )}
             </div>
@@ -226,10 +225,10 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
                     href={concert.ticketUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={`${d.ticketLink} (${d.opensInNewTab})`}
+                    aria-label={`${tConcerts('ticketLink')} (${tConcerts('opensInNewTab')})`}
                   >
                     <Ticket size={18} className="mr-2" aria-hidden="true" />
-                    {d.ticketLink}
+                    {tConcerts('ticketLink')}
                   </a>
                 </Button>
               )}
@@ -242,7 +241,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
                 className="uppercase tracking-wider font-bold border-border"
               >
                 <Calendar size={18} className="mr-2" aria-hidden="true" />
-                {ed.addToCalendar}
+                {tConcerts('eventDetail.addToCalendar')}
               </Button>
 
               {/* Share button */}
@@ -251,10 +250,10 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
                 text={`${concert.artistName} live ${locale === 'de' ? 'am' : 'on'} ${new Date(concert.concertDate).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' })}${concert.venueCity ? ` in ${concert.venueCity}` : ''}`}
                 size="lg"
                 labels={{
-                  share: ed.share,
-                  shareSuccess: ed.shareSuccess,
-                  shareLinkCopied: ed.shareLinkCopied,
-                  shareError: ed.shareError,
+                  share: tConcerts('eventDetail.share'),
+                  shareSuccess: tConcerts('eventDetail.shareSuccess'),
+                  shareLinkCopied: tConcerts('eventDetail.shareLinkCopied'),
+                  shareError: tConcerts('eventDetail.shareError'),
                 }}
               />
           </div>
@@ -264,7 +263,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
             <Card className="bg-card border-border p-6 space-y-3">
               <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                 <Users size={14} aria-hidden="true" />
-                {ed.featuredArtists}
+                {tConcerts('eventDetail.featuredArtists')}
               </h2>
               <div className="flex flex-wrap gap-2">
                 {concert.featuredArtists.map((artist) => (
@@ -285,13 +284,13 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
             <Card className="bg-card border-border p-6 space-y-3">
               <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                 <Newspaper size={14} aria-hidden="true" />
-                {ed.relatedNews}
+                {tConcerts('eventDetail.relatedNews')}
               </h2>
               <Link
                 href="/news"
                 className="inline-flex items-center gap-2 text-accent hover:underline text-sm font-semibold"
               >
-                {ed.readMore}
+                {tConcerts('eventDetail.readMore')}
               </Link>
             </Card>
           )}
@@ -299,7 +298,7 @@ export function EventDetailContent({ concert, dict, locale }: EventDetailContent
           {/* Trailer video */}
           {youtubeId && (
             <Card className="bg-card border-border overflow-hidden">
-              <ConsentGate label="YouTube laden">
+              <ConsentGate label={tConsent('loadYouTube')}>
                 <div className="aspect-video">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}

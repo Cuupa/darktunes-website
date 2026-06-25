@@ -1,5 +1,9 @@
 import '@testing-library/jest-dom'
 import { webcrypto } from 'node:crypto'
+import { vi } from 'vitest'
+import { mockNextIntl } from './mockNextIntl'
+
+vi.mock('next-intl', () => mockNextIntl)
 
 // jsdom exposes crypto.subtle in CI but it may not digest buffers; use Node Web Crypto.
 const testCrypto = webcrypto as Crypto

@@ -14,9 +14,9 @@ import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artis
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProfileForm } from './_components/ProfileForm'
-import { getPortalDictionary } from '@/i18n/getDictionary'
-
 function ProfileSkeleton() {
+
+
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-64" />
@@ -34,7 +34,6 @@ function ProfileSkeleton() {
 }
 
 async function ProfileContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -54,8 +53,6 @@ async function ProfileContent({ searchParams }: { searchParams: Promise<{ artist
 
   return (
     <ProfileForm
-      dict={dict.portal}
-      errors={dict.errors}
       artistId={artist?.id ?? null}
       artistName={artist?.name ?? null}
       artistSlug={artist?.slug ?? null}

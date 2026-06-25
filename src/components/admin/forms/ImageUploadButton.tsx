@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { UploadSimple, CheckCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import type { ApiErrorResponse } from '@/lib/errors'
 import { getErrorMessage } from '@/lib/clientErrors'
 import { compressImage, formatFileSize } from '@/lib/imageResizer'
@@ -45,7 +45,7 @@ export function ImageUploadButton({
   artistId,
   maxSizeBytes = CLIENT_MAX_SIZE_BYTES,
 }: ImageUploadButtonProps) {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -89,17 +89,17 @@ export function ImageUploadButton({
                 onUploaded(data.publicUrl)
                 resolve()
               } else {
-                reject(new Error(getErrorMessage(data as ApiErrorResponse, dict)))
+                reject(new Error(getErrorMessage(data as ApiErrorResponse, tErrors)))
               }
             } catch {
-              reject(new Error(dict.errors.SERVER_ERROR))
+              reject(new Error(tErrors('SERVER_ERROR')))
             }
           } else {
             try {
               const data = JSON.parse(xhr.responseText) as ApiErrorResponse
-              reject(new Error(getErrorMessage(data, dict)))
+              reject(new Error(getErrorMessage(data, tErrors)))
             } catch {
-              reject(new Error(dict.errors.SERVER_ERROR))
+              reject(new Error(tErrors('SERVER_ERROR')))
             }
           }
         })
@@ -114,7 +114,7 @@ export function ImageUploadButton({
 
       toast.success('Image uploaded')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       // Keep progress bar visible briefly at 100% then hide
       setTimeout(() => setUploadProgress(null), 800)

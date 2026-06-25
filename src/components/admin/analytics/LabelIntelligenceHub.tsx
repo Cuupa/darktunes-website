@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { ChartBar, CurrencyEur, TrendUp, Users } from '@phosphor-icons/react'
-import { useDict } from '@/contexts/DictContext'
+import { useMessages } from 'next-intl'
+import type { Dictionary } from '@/i18n/types'
 import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -70,8 +71,8 @@ export function LabelIntelligenceHub({
   auditEvents,
   websiteEngagement,
 }: LabelIntelligenceHubProps) {
-  const dict = useDict()
-  const t = { ...LABEL_INTELLIGENCE_FALLBACK, ...dict.admin?.labelIntelligence }
+  const messages = useMessages() as Dictionary
+  const t = { ...LABEL_INTELLIGENCE_FALLBACK, ...messages.admin?.labelIntelligence }
 
   const latestSummary = snapshot.periodSummaries[0]
   const trendData = [...snapshot.periodSummaries]

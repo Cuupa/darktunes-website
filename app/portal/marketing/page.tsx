@@ -17,9 +17,11 @@ import { getPromoLogEntries } from '@/lib/api/promoLog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SmartLinks } from './_components/SmartLinks'
 import { PromoTimeline } from './_components/PromoTimeline'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 function MarketingSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-64" />
@@ -33,7 +35,9 @@ function MarketingSkeleton() {
 }
 
 async function MarketingContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
@@ -60,13 +64,13 @@ async function MarketingContent({ searchParams }: { searchParams: Promise<{ arti
       {/* Label marketing activity feed */}
       <section aria-labelledby="promo-log-heading">
         <h1 id="promo-log-heading" className="text-3xl font-bold mb-6">
-          {dict.portal.promo_log_heading}
+          {t('promo_log_heading')}
         </h1>
-        <PromoTimeline entries={promoEntries} dict={dict.portal} />
+        <PromoTimeline entries={promoEntries} />
       </section>
 
       {/* Smart links + asset management */}
-      <SmartLinks dict={dict.portal} assets={assets} artistAssets={artistAssets} />
+      <SmartLinks assets={assets} artistAssets={artistAssets} />
     </div>
   )
 }

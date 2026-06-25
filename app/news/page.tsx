@@ -4,8 +4,8 @@
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getCachedPublicNews } from '@/lib/cache/publicQueries'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { NewsList } from './_components/NewsList'
 
 export const metadata: Metadata = {
@@ -14,10 +14,10 @@ export const metadata: Metadata = {
 }
 
 export default async function NewsPage() {
-  const locale = await getLocale()
-  const [posts, dict] = await Promise.all([
+  const [posts, tPages, tNewsPage] = await Promise.all([
     getCachedPublicNews(),
-    getDictionary(locale),
+    getTranslations('pages'),
+    getTranslations('newsPage'),
   ])
 
   return (
@@ -27,17 +27,17 @@ export default async function NewsPage() {
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block"
         >
-          {dict.pages.backToHome}
+          {tPages('backToHome')}
         </Link>
 
         <div className="mb-12">
           <h1 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight uppercase">
-            {dict.newsPage.heading}
+            {tNewsPage('heading')}
           </h1>
-          <p className="text-xl text-muted-foreground">{dict.newsPage.subheading}</p>
+          <p className="text-xl text-muted-foreground">{tNewsPage('subheading')}</p>
         </div>
 
-        <NewsList posts={posts} dict={dict.newsPage} />
+        <NewsList posts={posts} />
       </div>
     </div>
   )

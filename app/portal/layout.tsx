@@ -31,7 +31,7 @@ import { PortalNotificationProvider } from './_components/PortalNotificationProv
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+
 
 export const metadata: Metadata = {
   title: 'Artist Portal — darkTunes Music Group',
@@ -39,6 +39,8 @@ export const metadata: Metadata = {
 }
 
 function PortalLayoutSkeleton() {
+
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
       {/* Desktop sidebar skeleton */}
@@ -70,6 +72,8 @@ function PortalLayoutSkeleton() {
 }
 
 export default function PortalLayout({ children }: { children: ReactNode }) {
+
+
   return (
     <Suspense fallback={<PortalLayoutSkeleton />}>
       <PortalLayoutContent>{children}</PortalLayoutContent>
@@ -78,8 +82,6 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 }
 
 async function PortalLayoutContent({ children }: { children: ReactNode }) {
-  const dict = await getPortalDictionary()
-
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -189,7 +191,6 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
         initialUnreadCount={unreadMessages}
       >
         <PortalSidebar
-          dict={dict.portal}
           artists={artists}
           userId={user?.id ?? null}
           featureFlags={featureFlags}

@@ -1,0 +1,15 @@
+{
+  "heading": "My Profile",
+  "publication": "Publication",
+  "website": "Website",
+  "applicationStatus": "Application Status",
+  "downloadCount": "Total Downloads",
+  "changePassword": "Change Password",
+  "currentPassword": "Current Password",
+  "newPassword": "New Password",
+  "confirmPassword": "Confirm Password",
+  "saveProfile": "Save Profile",
+  "savePassword": "Update Password",
+  "saving": "Saving…",
+  "saved": "Changes saved"
+}

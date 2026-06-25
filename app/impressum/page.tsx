@@ -12,7 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
 import type { Database } from '@/types/database'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 // Cookie-free public client — safe inside unstable_cache callbacks where
 // Next.js Dynamic APIs (cookies, headers) are unavailable. site_settings has
@@ -33,16 +33,15 @@ const getCachedSettings = unstable_cache(
 )
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const t = await getTranslations('impressum')
   return {
-    title: dict.impressum.metaTitle,
+    title: t('metaTitle'),
     robots: { index: false },
   }
 }
 
 export default async function ImpressumPage() {
-  const [settings, locale] = await Promise.all([
+  const [settings, tImpressum, tPages] = await Promise.all([
     getCachedSettings().catch(
       (): SiteSettings => ({
         labelName: 'darkTunes Music Group',
@@ -86,9 +85,9 @@ export default async function ImpressumPage() {
         featureToggles: { promoPool: true, editorTools: true },
       }),
     ),
-    getLocale(),
+    getTranslations('impressum'),
+    getTranslations('pages'),
   ])
-  const dict = await getDictionary(locale)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -97,11 +96,11 @@ export default async function ImpressumPage() {
           href="/"
           className="text-sm text-muted-foreground hover:text-accent transition-colors mb-8 inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
-          {dict.pages.backToHome}
+          {tPages('backToHome')}
         </Link>
 
         <h1 className="text-4xl lg:text-5xl font-bold mb-10 tracking-tight uppercase">
-          {dict.impressum.heading}
+          {tImpressum('heading')}
         </h1>
 
         <div className="space-y-8 text-sm text-foreground/90 leading-relaxed">

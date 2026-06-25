@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes } from 'react'
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import enDict from '@/i18n/dictionaries/en.json'
+import { testMessages } from '@/test/mockNextIntl'
 import type { Concert } from '@/types'
 import { EventsPageContent } from '../../../../app/events/_components/EventsPageContent'
 
@@ -61,7 +61,7 @@ const concert: Concert = {
 
 describe('EventsPageContent', () => {
   it('renders a single full-card overlay link for the event detail page', () => {
-    render(<EventsPageContent concerts={[concert]} dict={enDict.concerts} locale="en" />)
+    render(<EventsPageContent concerts={[concert]} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${concert.artistName} – ${concert.eventName}`,
@@ -91,16 +91,16 @@ describe('EventsPageContent', () => {
   })
 
   it('keeps ticket and navigation links interactive without nesting them inside the overlay link', () => {
-    render(<EventsPageContent concerts={[concert]} dict={enDict.concerts} locale="en" />)
+    render(<EventsPageContent concerts={[concert]} />)
 
     const overlayLink = screen.getByRole('link', {
       name: `${concert.artistName} – ${concert.eventName}`,
     })
     const ticketLink = screen.getByRole('link', {
-      name: `${enDict.concerts.ticketLink} (${enDict.concerts.opensInNewTab})`,
+      name: `${testMessages.concerts.ticketLink} (${testMessages.concerts.opensInNewTab})`,
     })
     const mapsLink = screen.getByRole('link', {
-      name: `${concert.eventName} – ${enDict.concerts.navLink}`,
+      name: `${concert.eventName} – ${testMessages.concerts.navLink}`,
     })
 
     expect(ticketLink).toHaveAttribute('href', concert.ticketUrl)

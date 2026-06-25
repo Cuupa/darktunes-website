@@ -13,7 +13,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -120,13 +120,12 @@ export async function completeOnboarding(
     }
 
     // Send an automatic welcome message to the artist's inbox
-    const locale = await getLocale()
-    const dict = await getDictionary(locale)
+    const t = await getTranslations('portal')
     await supabase.from('label_messages').insert({
       artist_id: artist.id,
-      subject: dict.portal.welcome_message_subject,
-      body: dict.portal.welcome_message_body,
-      body_html: dict.portal.welcome_message_body,
+      subject: t('welcome_message_subject'),
+      body: t('welcome_message_body'),
+      body_html: t('welcome_message_body'),
       read: false,
     })
 

@@ -2,7 +2,7 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicNewsPosts } from '@/lib/api/news'
@@ -30,23 +30,23 @@ const getCachedAboutData = unstable_cache(
 )
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const t = await getTranslations('about')
   return {
-    title: `${dict.about.heading} | darkTunes Music Group`,
-    description: dict.about.subheading,
+    title: `${t('heading')} | darkTunes Music Group`,
+    description: t('subheading'),
   }
 }
 
 export default async function AboutPage() {
-  const [{ siteSettings, artists, news }, locale] = await Promise.all([
-    getCachedAboutData().catch(() => ({ siteSettings: null, artists: [], news: [] })),
-    getLocale(),
-  ])
-  const dict = await getDictionary(locale)
+  const { siteSettings, artists, news } = await getCachedAboutData().catch(() => ({
+    siteSettings: null,
+    artists: [],
+    news: [],
+  }))
+
   return (
     <main id="main-content" className="min-h-screen bg-background">
-      <AboutContent siteSettings={siteSettings} artists={artists} news={news} dict={dict.about} />
+      <AboutContent siteSettings={siteSettings} artists={artists} news={news} />
     </main>
   )
 }

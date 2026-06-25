@@ -1,6 +1,10 @@
+import { useMessages } from 'next-intl'
+import { useMemo } from 'react'
+import type { Dictionary } from '@/i18n/types'
+
 /**
  * English fallback strings for admin accounting and settlement UI.
- * Merged with `dict.admin.accounting` from locale JSON when translations exist.
+ * Merged with `admin.accounting` locale messages when translations exist.
  */
 
 export const ACCOUNTING_FALLBACK = {
@@ -76,6 +80,22 @@ export const ACCOUNTING_FALLBACK = {
   guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
   guidedSettleHint: 'Save portal analytics and run the settlement workflow below.',
   guidedStepperAria: 'Accounting guided workflow',
+  bronzeLoading: 'Loading Bronze archives…',
+  presetSaveHeading: 'Save Current Rules',
+  presetNamePlaceholder: 'Preset name, e.g. Q1-2025',
+  presetSaveButton: 'Save',
+  presetRulesLoaded: '{count} rules loaded',
+  presetEmpty: 'No presets saved yet.',
+  presetSavedList: 'Saved Presets ({count})',
+  presetRulesCount: '{count} rules · saved {date}',
+  presetLoaded: 'Loaded',
+  presetLoadButton: 'Load',
+  presetDeleteTitle: 'Delete Preset',
+  presetDeleteConfirm: 'Are you sure you want to delete "{name}"? This cannot be undone.',
+  presetDeleteCancel: 'Cancel',
+  presetDeleteButton: 'Delete',
+  presetMigratedToast: 'Migrated {count} preset(s) from local storage to the server',
+  sourceMixSubtitle: 'SOS session — distributor view (in-memory CSV data)',
 } as const
 
 export const SETTLEMENT_FALLBACK = {
@@ -221,10 +241,30 @@ export type AccountingLabelOverrides = Partial<AccountingLabels>
 
 /**
  * Merges locale dictionary overrides onto English fallbacks.
- * @param overrides - Partial labels from `dict.admin.accounting`
+ * @param overrides - Partial labels from `admin.accounting` messages
  */
 export function mergeAccountingLabels(
   overrides?: AccountingLabelOverrides,
 ): AccountingLabels {
   return { ...ACCOUNTING_FALLBACK, ...SETTLEMENT_FALLBACK, ...overrides }
+}
+
+export type AccountingMessages = Dictionary['admin']['accounting']
+
+/** Locale `admin.accounting` slice from next-intl messages (for fallback merges). */
+export function useAccountingMessages(): Partial<AccountingMessages> | undefined {
+  const messages = useMessages() as Dictionary
+  return messages.admin?.accounting
+}
+
+export function useAccountingLabels(): AccountingLabels {
+  const overrides = useAccountingMessages()
+  return useMemo(() => mergeAccountingLabels(overrides), [overrides])
+}
+
+export function useMergedAccountingLabels<T extends Record<string, string>>(
+  fallback: T,
+): T & AccountingLabelOverrides {
+  const overrides = useAccountingMessages()
+  return useMemo(() => ({ ...fallback, ...overrides }), [fallback, overrides]) as T & AccountingLabelOverrides
 }

@@ -8,14 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Calendar } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { useLocale, useTranslations } from 'next-intl'
 import type { NewsPost } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 interface NewsProps extends SectionProps {
   news: NewsPost[]
-  dict: Dictionary['news']
-  locale: Locale
+  heading?: string
+  subheading?: string
   /** Number of news items shown as a sneak peek. Defaults to 3. */
   sneakPeekCount?: number
 }
@@ -23,8 +23,12 @@ interface NewsProps extends SectionProps {
 /** Number of news items shown as a sneak peek on the homepage. */
 const DEFAULT_SNEAK_PEEK_COUNT = 3
 
-export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
+export function News({ news, heading, subheading, sneakPeekCount }: NewsProps) {
+  const t = useTranslations('news')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const sectionHeading = heading ?? t('heading')
+  const sectionSubheading = subheading ?? t('subheading')
   const count = sneakPeekCount && sneakPeekCount > 0 ? sneakPeekCount : DEFAULT_SNEAK_PEEK_COUNT
   const sneakPeek = news.slice(0, count)
   const hasMore = news.length > count
@@ -33,12 +37,12 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
       <div className="container mx-auto">
         <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-            <p className="text-xl text-muted-foreground">{dict.subheading}</p>
+            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{sectionHeading}</h2>
+            <p className="text-xl text-muted-foreground">{sectionSubheading}</p>
           </div>
           <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
             <Link href="/news">
-              {dict.viewAll}
+              {t('viewAll')}
               <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
             </Link>
           </Button>
@@ -79,7 +83,7 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
                   <span
                     className="self-start group/btn flex items-center text-accent px-0 uppercase tracking-wider font-bold text-xs mt-auto"
                   >
-                    {dict.readFullStory}
+                    {t('readFullStory')}
                     <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" weight="bold" />
                   </span>
                 </div>
@@ -94,7 +98,7 @@ export function News({ news, dict, locale, sneakPeekCount }: NewsProps) {
           <ScrollReveal className="mt-10 flex justify-center">
             <Button size="lg" variant="outline" className="gap-2 font-bold uppercase tracking-wider hover:bg-accent hover:text-accent-foreground hover:border-accent" asChild>
               <Link href="/news">
-                {dict.viewAll}
+                {t('viewAll')}
                 <ArrowRight weight="bold" />
               </Link>
             </Button>

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { getTranslations } from 'next-intl/server'
 import { AccreditationClient } from './_components/AccreditationClient'
 
 export default async function AccreditationPage() {
@@ -13,7 +14,8 @@ export default async function AccreditationPage() {
 
   const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
   if (flags['journalist.accreditation'] === false) {
-    return <p className="text-muted-foreground">Accreditation requests are currently disabled.</p>
+    const t = await getTranslations('pressDashboard')
+    return <p className="text-muted-foreground">{t('accreditationDisabled')}</p>
   }
 
   const { data } = await supabase

@@ -14,13 +14,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
+import { useTranslations } from 'next-intl'
 
-interface CentralLoginFormProps {
-  dict: Dictionary['portal']
-}
-
-export function CentralLoginForm({ dict }: CentralLoginFormProps) {
+export function CentralLoginForm() {
+  const t = useTranslations('portal')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -34,7 +31,7 @@ export function CentralLoginForm({ dict }: CentralLoginFormProps) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        toast.error(dict.login_error)
+        toast.error(t('login_error'))
       } else {
         // Use a hard navigation instead of router.push so the full HTTP
         // request carries the newly-set auth cookie, ensuring the server
@@ -42,7 +39,7 @@ export function CentralLoginForm({ dict }: CentralLoginFormProps) {
         window.location.assign('/login')
       }
     } catch {
-      toast.error(dict.login_error)
+      toast.error(t('login_error'))
     } finally {
       setIsLoading(false)
     }
@@ -58,17 +55,17 @@ export function CentralLoginForm({ dict }: CentralLoginFormProps) {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold">
-            {dict.login_title}
+            {t('login_title')}
           </CardTitle>
           <CardDescription>
-            {dict.login_description}
+            {t('login_description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">
-                {dict.login_email}
+                {t('login_email')}
               </Label>
               <Input
                 id="email"
@@ -83,7 +80,7 @@ export function CentralLoginForm({ dict }: CentralLoginFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">
-                {dict.login_password}
+                {t('login_password')}
               </Label>
               <Input
                 id="password"
@@ -97,12 +94,12 @@ export function CentralLoginForm({ dict }: CentralLoginFormProps) {
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading} size="lg">
-              {isLoading ? dict.login_submitting : dict.login_submit}
+              {isLoading ? t('login_submitting') : t('login_submit')}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
             <a href="/press/apply" className="text-primary hover:underline">
-              {dict.login_request_press}
+              {t('login_request_press')}
             </a>
           </div>
         </CardContent>

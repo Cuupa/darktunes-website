@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -11,16 +12,16 @@ import { Label } from '@/components/ui/label'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
-import type { Dictionary } from '@/i18n/types'
 
 interface BillingProfileFormProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   isComplete: boolean
-  dict: Dictionary['portal']
 }
 
-export function BillingProfileForm({ artistId, billingProfile, isComplete, dict }: BillingProfileFormProps) {
+export function BillingProfileForm({ artistId, billingProfile, isComplete }: BillingProfileFormProps) {
+  const t = useTranslations('portal')
+
   const [form, setForm] = useState({
     legalName: billingProfile?.legalName ?? '',
     street: billingProfile?.street ?? '',
@@ -51,7 +52,7 @@ export function BillingProfileForm({ artistId, billingProfile, isComplete, dict 
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (!session) throw new Error(dict.profile_error)
+      if (!session) throw new Error(t('profile_error'))
 
       const response = await fetch('/api/portal/billing-profile', {
         method: 'POST',
@@ -77,13 +78,13 @@ export function BillingProfileForm({ artistId, billingProfile, isComplete, dict 
 
       const json = (await response.json().catch(() => null)) as { error?: string; isComplete?: boolean } | null
       if (!response.ok) {
-        throw new Error(json?.error ?? dict.billing_error)
+        throw new Error(json?.error ?? t('billing_error'))
       }
 
       setComplete(Boolean(json?.isComplete))
-      toast.success(dict.billing_saved)
+      toast.success(t('billing_saved'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.billing_error)
+      toast.error(error instanceof Error ? error.message : t('billing_error'))
     } finally {
       setSaving(false)
     }
@@ -93,8 +94,8 @@ export function BillingProfileForm({ artistId, billingProfile, isComplete, dict 
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{dict.billing_heading}</h1>
-          <p className="text-sm text-muted-foreground">{dict.billing_completeness_hint}</p>
+          <h1 className="text-3xl font-bold">{t('billing_heading')}</h1>
+          <p className="text-sm text-muted-foreground">{t('billing_completeness_hint')}</p>
         </div>
         <div
           className={cn(
@@ -105,55 +106,55 @@ export function BillingProfileForm({ artistId, billingProfile, isComplete, dict 
           )}
         >
           {complete ? <CheckCircle size={16} aria-hidden="true" /> : <WarningCircle size={16} aria-hidden="true" />}
-          {complete ? dict.billing_complete : dict.billing_incomplete}
+          {complete ? t('billing_complete') : t('billing_incomplete')}
         </div>
       </div>
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle>{dict.billing_heading}</CardTitle>
+          <CardTitle>{t('billing_heading')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="billing-legal-name">{dict.billing_legal_name}</Label>
+                <Label htmlFor="billing-legal-name">{t('billing_legal_name')}</Label>
                 <Input id="billing-legal-name" required value={form.legalName} onChange={(event) => updateField('legalName', event.target.value)} />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="billing-street">{dict.billing_street}</Label>
+                <Label htmlFor="billing-street">{t('billing_street')}</Label>
                 <Input id="billing-street" required value={form.street} onChange={(event) => updateField('street', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-postal-code">{dict.billing_postal_code}</Label>
+                <Label htmlFor="billing-postal-code">{t('billing_postal_code')}</Label>
                 <Input id="billing-postal-code" required value={form.postalCode} onChange={(event) => updateField('postalCode', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-city">{dict.billing_city}</Label>
+                <Label htmlFor="billing-city">{t('billing_city')}</Label>
                 <Input id="billing-city" required value={form.city} onChange={(event) => updateField('city', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-country">{dict.billing_country}</Label>
+                <Label htmlFor="billing-country">{t('billing_country')}</Label>
                 <Input id="billing-country" required value={form.country} onChange={(event) => updateField('country', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-tax-number">{dict.billing_tax_number}</Label>
+                <Label htmlFor="billing-tax-number">{t('billing_tax_number')}</Label>
                 <Input id="billing-tax-number" value={form.taxNumber} onChange={(event) => updateField('taxNumber', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-vat-id">{dict.billing_vat_id}</Label>
+                <Label htmlFor="billing-vat-id">{t('billing_vat_id')}</Label>
                 <Input id="billing-vat-id" value={form.vatId} onChange={(event) => updateField('vatId', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-iban">{dict.billing_iban}</Label>
+                <Label htmlFor="billing-iban">{t('billing_iban')}</Label>
                 <Input id="billing-iban" value={form.iban} onChange={(event) => updateField('iban', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-bic">{dict.billing_bic}</Label>
+                <Label htmlFor="billing-bic">{t('billing_bic')}</Label>
                 <Input id="billing-bic" value={form.bic} onChange={(event) => updateField('bic', event.target.value)} />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="billing-paypal-email">{dict.billing_paypal}</Label>
+                <Label htmlFor="billing-paypal-email">{t('billing_paypal')}</Label>
                 <Input id="billing-paypal-email" type="email" value={form.paypalEmail} onChange={(event) => updateField('paypalEmail', event.target.value)} />
               </div>
             </div>
@@ -165,13 +166,13 @@ export function BillingProfileForm({ artistId, billingProfile, isComplete, dict 
                 onCheckedChange={(checked) => updateField('isSmallBusiness', checked === true)}
               />
               <Label className="cursor-pointer text-sm leading-6" htmlFor="billing-small-business">
-                {dict.billing_small_business}
+                {t('billing_small_business')}
               </Label>
             </div>
 
             <div className="flex justify-end">
               <Button disabled={saving || !artistId} type="submit">
-                {saving ? dict.profile_saving : dict.billing_save}
+                {saving ? t('profile_saving') : t('billing_save')}
               </Button>
             </div>
           </form>

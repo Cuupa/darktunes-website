@@ -12,17 +12,14 @@ import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import { cn } from '@/lib/utils'
-import type { Dictionary, Locale } from '@/i18n/types'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Release } from '@/types'
 import 'swiper/css'
 import 'swiper/css/effect-coverflow'
 
 export interface ReleasesCoverflowProps {
   releases: Release[]
-  dict: Dictionary['releases']
-  locale: Locale
   autoplayMs?: number
-  consentDict: Dictionary['consent']
 }
 
 const MAX_DOTS = 12
@@ -103,7 +100,9 @@ function SlideContent({
   )
 }
 
-export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: ReleasesCoverflowProps) {
+export function ReleasesCoverflow({ releases, autoplayMs = 0 }: ReleasesCoverflowProps) {
+  const t = useTranslations('releases')
+  const locale = useLocale()
   const total = releases.length
   const prefersReducedMotion = useReducedMotion() ?? false
   const swiperRef = useRef<SwiperType | null>(null)
@@ -205,7 +204,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
     <div
       className="relative py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-w-6xl mx-auto"
       role="region"
-      aria-label={dict.coverflowRegionLabel}
+      aria-label={t('coverflowRegionLabel')}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft') { e.preventDefault(); handlePrev() }
@@ -251,8 +250,8 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                   release={release}
                   isActive={isActive}
                   onOverlayClick={handleOverlayClick}
-                  featuredLabel={dict.featured}
-                  openAriaLabel={`${release.title} by ${release.artistName} – ${dict.openReleaseAriaSuffix}`}
+                  featuredLabel={t('featured')}
+                  openAriaLabel={`${release.title} by ${release.artistName} – ${t('openReleaseAriaSuffix')}`}
                   onActivate={() => {
                     if (!isDragging.current) goToIndex(index)
                   }}
@@ -292,7 +291,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
         <div className="mt-5 flex items-center justify-center gap-6">
           <button
             onClick={handlePrev}
-            aria-label={dict.previousReleaseAriaLabel}
+            aria-label={t('previousReleaseAriaLabel')}
             className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <CaretLeft size={22} weight="bold" />
@@ -304,9 +303,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
                 <button
                   key={release.id}
                   onClick={() => goToIndex(index)}
-                  aria-label={dict.goToReleaseAriaLabelTemplate
-                    .replace('{index}', String(index + 1))
-                    .replace('{title}', release.title)}
+                  aria-label={t('goToReleaseAriaLabelTemplate', { index: index + 1, title: release.title })}
                   aria-pressed={index === displayIndex}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
@@ -326,7 +323,7 @@ export function ReleasesCoverflow({ releases, dict, locale, autoplayMs = 0 }: Re
 
           <button
             onClick={handleNext}
-            aria-label={dict.nextReleaseAriaLabel}
+            aria-label={t('nextReleaseAriaLabel')}
             className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full bg-muted p-3 transition-all hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <CaretRight size={22} weight="bold" />

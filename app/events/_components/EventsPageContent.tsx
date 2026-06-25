@@ -7,16 +7,16 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Calendar, MapPin, Ticket, FunnelSimple, NavigationArrow } from '@phosphor-icons/react'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Concert } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 
 interface EventsPageContentProps {
   concerts: Concert[]
-  dict: Dictionary['concerts']
-  locale: Locale
 }
 
-export function EventsPageContent({ concerts, dict, locale }: EventsPageContentProps) {
+export function EventsPageContent({ concerts }: EventsPageContentProps) {
+  const t = useTranslations('concerts')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
 
@@ -70,7 +70,7 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                     : 'bg-transparent border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
                 }`}
               >
-                {dict.filterArtist}
+                {t('filterArtist')}
               </button>
               {artists.map((artist) => (
                 <button
@@ -101,7 +101,7 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                     : 'bg-transparent border-border text-muted-foreground hover:border-secondary/50 hover:text-foreground'
                 }`}
               >
-                {dict.filterCountry}
+                {t('filterCountry')}
               </button>
               {countries.map((country) => (
                 <button
@@ -125,8 +125,8 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
       {/* Events list */}
       {filtered.length === 0 ? (
         <Card className="bg-card border-border p-8 text-center">
-          <p className="text-lg font-semibold mb-2">{dict.noShows}</p>
-          <p className="text-muted-foreground">{dict.checkBack}</p>
+          <p className="text-lg font-semibold mb-2">{t('noShows')}</p>
+          <p className="text-muted-foreground">{t('checkBack')}</p>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -159,7 +159,7 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                         </span>
                         {isCancelled && (
                           <Badge variant="destructive" className="uppercase tracking-wide">
-                            {dict.cancelled}
+                            {t('cancelled')}
                           </Badge>
                         )}
                       </div>
@@ -180,10 +180,10 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs text-accent hover:underline ml-6 relative z-20 pointer-events-auto"
-                            aria-label={`${concert.eventName} – ${dict.navLink}`}
+                            aria-label={`${concert.eventName} – ${t('navLink')}`}
                           >
                             <NavigationArrow size={12} aria-hidden="true" />
-                            {dict.navLink}
+                            {t('navLink')}
                           </a>
                         )}
                       </div>
@@ -195,10 +195,10 @@ export function EventsPageContent({ concerts, dict, locale }: EventsPageContentP
                           href={concert.ticketUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          aria-label={`${dict.ticketLink} (${dict.opensInNewTab})`}
+                          aria-label={`${t('ticketLink')} (${t('opensInNewTab')})`}
                         >
                           <Ticket size={16} className="mr-2" />
-                          {dict.ticketLink}
+                          {t('ticketLink')}
                         </a>
                       </Button>
                     )}

@@ -1,0 +1,15 @@
+{
+  "heading": "Mein Profil",
+  "publication": "Publikation",
+  "website": "Website",
+  "applicationStatus": "Bewerbungsstatus",
+  "downloadCount": "Downloads gesamt",
+  "changePassword": "Passwort ändern",
+  "currentPassword": "Aktuelles Passwort",
+  "newPassword": "Neues Passwort",
+  "confirmPassword": "Passwort bestätigen",
+  "saveProfile": "Profil speichern",
+  "savePassword": "Passwort aktualisieren",
+  "saving": "Speichern…",
+  "saved": "Änderungen gespeichert"
+}

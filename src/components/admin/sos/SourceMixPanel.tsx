@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { ChartPie, MusicNote, Storefront, TShirt } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import type { ArtistRevenue } from '@/lib/sos/types'
-import { useDict } from '@/contexts/DictContext'
+import { useAccountingMessages } from '@/lib/i18n/accountingFallbacks'
 
 interface SourceMixPanelProps {
   revenues: ArtistRevenue[]
@@ -17,9 +17,9 @@ function fmtEur(n: number) {
 }
 
 export function SourceMixPanel({ revenues, periodStart, periodEnd }: SourceMixPanelProps) {
-  const dict = useDict()
+  const accounting = useAccountingMessages()
   const sourceMixSubtitle =
-    dict.admin?.accounting?.sourceMixSubtitle ??
+    accounting?.sourceMixSubtitle ??
     'SOS session — distributor view (in-memory CSV data)'
 
   const totals = useMemo(() => {

@@ -11,11 +11,12 @@ import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getAllVisibleReleasesForCalendar } from '@/lib/api/releases'
-import { getPortalDictionary } from '@/i18n/getDictionary'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseCalendarClient } from './_components/ReleaseCalendarClient'
 
 function CalendarSkeleton() {
+
+
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-56" />
@@ -42,7 +43,7 @@ async function CalendarContent({
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-  const dict = await getPortalDictionary()
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -58,7 +59,6 @@ async function CalendarContent({
 
   return (
     <ReleaseCalendarClient
-      dict={dict.portal}
       releases={releases}
       currentArtistId={artist?.id ?? null}
     />

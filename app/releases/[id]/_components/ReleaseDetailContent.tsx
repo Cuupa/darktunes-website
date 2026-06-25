@@ -24,14 +24,12 @@ import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/o
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { ShareButton } from '@/components/ShareButton'
 import { trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Release, Artist } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 
 interface ReleaseDetailContentProps {
   release: Release
   artist?: Artist | null
-  dict: Dictionary['releaseDetail']
-  locale: Locale
 }
 
 /**
@@ -51,7 +49,9 @@ interface ReleaseDetailContentProps {
  * platform buttons are rendered for all available services (Deezer, Tidal,
  * Amazon Music, etc.) rather than only Spotify and Apple Music.
  */
-export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseDetailContentProps) {
+export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentProps) {
+  const t = useTranslations('releaseDetail')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
   const prefersReducedMotion = useReducedMotion()
   const formattedDate = new Date(release.releaseDate).toLocaleDateString(dateLocale, {
@@ -112,7 +112,7 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-10"
           >
             <ArrowLeft size={16} weight="bold" />
-            {dict.backToReleases}
+            {t('backToReleases')}
           </Link>
 
           <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
@@ -146,7 +146,7 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                 </Badge>
                 {release.featured && (
                   <Badge className="bg-secondary/90 text-secondary-foreground font-bold uppercase tracking-wider text-xs">
-                    {dict.featured}
+                    {t('featured')}
                   </Badge>
                 )}
               </div>
@@ -181,7 +181,7 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                         }}
                       >
                         <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
-                        {dict.listenEverywhere}
+                        {t('listenEverywhere')}
                       </a>
                     </Button>
                   </div>
@@ -221,10 +221,10 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                   title={release.title}
                   text={`${release.artistName} — ${release.title}`}
                   labels={{
-                    share: dict.share,
-                    shareSuccess: dict.shareSuccess,
-                    shareLinkCopied: dict.shareLinkCopied,
-                    shareError: dict.shareError,
+                    share: t('share'),
+                    shareSuccess: t('shareSuccess'),
+                    shareLinkCopied: t('shareLinkCopied'),
+                    shareError: t('shareError'),
                   }}
                 />
               </div>
@@ -233,7 +233,7 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
               {release.promoText && (
                 <div className="pt-2 border-t border-border/40">
                   <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
-                    {dict.promoText}
+                    {t('promoText')}
                   </p>
                   <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
                     {release.promoText}
@@ -258,7 +258,7 @@ export function ReleaseDetailContent({ release, artist, dict, locale }: ReleaseD
                 return (
                   <div className="pt-2 border-t border-border/40">
                     <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                      {dict.artistConnect}
+                      {t('artistConnect')}
                     </p>
                     <TooltipProvider>
                       <div className="flex flex-wrap gap-2">

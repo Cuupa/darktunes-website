@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getJournalistApplicationByUserId } from '@/lib/api/journalistApplications'
@@ -25,9 +25,6 @@ export const metadata: Metadata = {
 }
 
 export default async function PromoPoolLayout({ children }: { children: ReactNode }) {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
-
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -67,7 +64,6 @@ export default async function PromoPoolLayout({ children }: { children: ReactNod
     )
     return (
       <PromoPoolAccessGate
-        dict={dict.promoPool}
         application={application}
         userEmail={user.email ?? ''}
       />

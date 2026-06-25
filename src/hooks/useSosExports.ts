@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 import {
   generatePDF,
@@ -109,11 +109,7 @@ export function useExports(
   autoUploadToPortal = false,
   persistContext?: SosExportPersistContext,
 ) {
-  const dict = useDict()
-  const t = useMemo(
-    () => ({ ...exportFallback, ...(dict.admin?.accounting ?? {}) }),
-    [dict.admin?.accounting],
-  )
+  const t = useMergedAccountingLabels(exportFallback)
 
   const emailOptions = useMemo(
     () =>

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
 import type { LabelArtist } from '@/lib/sos/types'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 interface ImportBatchesPanelProps {
@@ -40,8 +40,7 @@ const BRONZE_FALLBACK = {
 } as const
 
 export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesPanelProps) {
-  const dict = useDict()
-  const t = dict.admin?.accounting ?? BRONZE_FALLBACK
+  const t = useMergedAccountingLabels(BRONZE_FALLBACK)
   const [batches, setBatches] = useState<DistributorImportBatch[]>([])
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()

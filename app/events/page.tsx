@@ -7,8 +7,8 @@
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getCachedPublicConcerts } from '@/lib/cache/publicQueries'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { EventsPageContent } from './_components/EventsPageContent'
 
 export const revalidate = 60
@@ -19,10 +19,10 @@ export const metadata: Metadata = {
 }
 
 export default async function EventsPage() {
-  const locale = await getLocale()
-  const [concerts, dict] = await Promise.all([
+  const [concerts, tPages, tConcerts] = await Promise.all([
     getCachedPublicConcerts(),
-    getDictionary(locale),
+    getTranslations('pages'),
+    getTranslations('concerts'),
   ])
 
   return (
@@ -33,12 +33,12 @@ export default async function EventsPage() {
             href="/"
             className="text-xs text-muted-foreground hover:text-accent font-mono uppercase tracking-widest mb-6 inline-block"
           >
-            {dict.pages.backToHome}
+            {tPages('backToHome')}
           </Link>
-          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{dict.concerts.heading}</h1>
-          <p className="text-xl text-muted-foreground font-serif mt-3">{dict.concerts.subheading}</p>
+          <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mt-2">{tConcerts('heading')}</h1>
+          <p className="text-xl text-muted-foreground font-serif mt-3">{tConcerts('subheading')}</p>
         </div>
-        <EventsPageContent concerts={concerts} dict={dict.concerts} locale={locale} />
+        <EventsPageContent concerts={concerts} />
       </div>
     </main>
   )

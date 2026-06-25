@@ -9,11 +9,9 @@ import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { ThemeBroadcastListener } from '@/components/ThemeBroadcastListener'
 import { ErrorFallback } from '@/ErrorFallback'
 import { PageTracker } from '@/components/PageTracker'
-import type { Dictionary } from '@/i18n/types'
 
 interface ProvidersProps {
   children: ReactNode
-  consentDict: Dictionary['consent']
 }
 
 /**
@@ -28,13 +26,13 @@ interface ProvidersProps {
  * - Toaster: global toast notifications
  * - ErrorBoundary: catches client-side render errors
  */
-export function Providers({ children, consentDict }: ProvidersProps) {
+export function Providers({ children }: ProvidersProps) {
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <LenisProvider>
         <PageTracker />
         {children}
-        <ConsentBanner dict={consentDict} />
+        <ConsentBanner />
         <PWAInstallPrompt />
         <ThemeBroadcastListener />
         <Toaster position="bottom-right" theme="dark" />

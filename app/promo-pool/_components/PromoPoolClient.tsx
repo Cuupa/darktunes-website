@@ -14,10 +14,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getPromoTrackStreamUrl } from '@/actions/promoTrack'
 import type { PromoTrack } from '@/lib/api/promoTracks'
-import type { Dictionary } from '@/i18n/types'
+import { useTranslations } from 'next-intl'
 
 interface Props {
-  dict: Dictionary['promoPool']
   tracks: PromoTrack[]
 }
 
@@ -32,7 +31,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function TrackCard({ track, dict }: { track: PromoTrack; dict: Dictionary['promoPool'] }) {
+function TrackCard({ track }: { track: PromoTrack }) {
+  const t = useTranslations('promoPool')
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -78,21 +78,21 @@ function TrackCard({ track, dict }: { track: PromoTrack; dict: Dictionary['promo
             onClick={handleStream}
             disabled={loading}
             className="gap-2 w-full sm:w-auto"
-            aria-label={`${dict.streamTrack}: ${track.title}`}
+            aria-label={`${t('streamTrack')}: ${track.title}`}
           >
             {loading ? (
               <SpinnerGap size={14} weight="bold" className="animate-spin" aria-hidden />
             ) : (
               <Play size={14} weight="fill" aria-hidden />
             )}
-            {loading ? dict.loading : dict.streamTrack}
+            {loading ? t('loading') : t('streamTrack')}
           </Button>
         )}
 
         {error && (
           <p className="text-destructive text-sm flex items-center gap-1" role="alert">
             <WarningCircle size={14} weight="bold" aria-hidden />
-            {dict.streamError}
+            {t('streamError')}
           </p>
         )}
 
@@ -110,22 +110,24 @@ function TrackCard({ track, dict }: { track: PromoTrack; dict: Dictionary['promo
   )
 }
 
-export function PromoPoolClient({ dict, tracks }: Props) {
+export function PromoPoolClient({ tracks }: Props) {
+  const t = useTranslations('promoPool')
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">{dict.heading}</h1>
-        <p className="text-muted-foreground">{dict.description}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('heading')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </header>
 
       <section className="space-y-4" aria-label="Promo tracks">
-        <h2 className="text-xl font-semibold">{dict.tracksHeading}</h2>
+        <h2 className="text-xl font-semibold">{t('tracksHeading')}</h2>
         {tracks.length === 0 ? (
-          <p className="text-muted-foreground">{dict.noTracks}</p>
+          <p className="text-muted-foreground">{t('noTracks')}</p>
         ) : (
           <div className="space-y-3">
             {tracks.map((track) => (
-              <TrackCard key={track.id} track={track} dict={dict} />
+              <TrackCard key={track.id} track={track} />
             ))}
           </div>
         )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/help/_components/HelpPanel.tsx — Client Component
  *
@@ -9,7 +10,6 @@
 
 import { useState } from 'react'
 import { CaretDown, CaretUp } from '@phosphor-icons/react'
-import type { Dictionary } from '@/i18n/types'
 
 interface HelpSection {
   title: string
@@ -42,21 +42,23 @@ function AccordionSection({ title, body }: HelpSection) {
   )
 }
 
-export function HelpPanel({ dict }: { dict: Dictionary['portal'] }) {
+export function HelpPanel() {
+  const t = useTranslations('portal')
+
   const sections: HelpSection[] = [
-    { title: dict.help_epk_title, body: dict.help_epk_body },
-    { title: dict.help_releases_title, body: dict.help_releases_body },
-    { title: dict.help_events_title, body: dict.help_events_body },
-    { title: dict.help_invoices_title, body: dict.help_invoices_body },
-    { title: dict.help_statements_title, body: dict.help_statements_body },
-    { title: dict.help_settings_title, body: dict.help_settings_body },
+    { title: t('help_epk_title'), body: t('help_epk_body') },
+    { title: t('help_releases_title'), body: t('help_releases_body') },
+    { title: t('help_events_title'), body: t('help_events_body') },
+    { title: t('help_invoices_title'), body: t('help_invoices_body') },
+    { title: t('help_statements_title'), body: t('help_statements_body') },
+    { title: t('help_settings_title'), body: t('help_settings_body') },
   ]
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">{dict.help_heading}</h1>
-        <p className="text-muted-foreground mt-1">{dict.help_intro}</p>
+        <h1 className="text-3xl font-bold">{t('help_heading')}</h1>
+        <p className="text-muted-foreground mt-1">{t('help_intro')}</p>
       </div>
       <div className="space-y-3">
         {sections.map((s) => (

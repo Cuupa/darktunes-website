@@ -8,6 +8,7 @@
 
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,11 +21,10 @@ import {
   uploadRiderDocument,
   saveArtistProfile,
 } from '@/lib/api/portalProfile'
-import { getErrorMessageFromErrors } from '@/lib/clientErrors'
+import { getErrorMessage } from '@/lib/clientErrors'
 import type { RiderType } from '@/lib/api/portalProfile'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { compressImage } from '@/lib/imageResizer'
 
 /** Portal photo upload hard limit at /api/portal/upload-photo (5 MB). */
@@ -73,17 +73,15 @@ interface UsePortalProfileFormOptions {
   initialProfile: ArtistProfile | null
   /** Artist row from the `artists` table — used as fallback when no profile exists yet. */
   artist?: Artist | null
-  dict: Dictionary['portal']
-  errors: Dictionary['errors']
 }
 
 export function usePortalProfileForm({
   artistId,
   initialProfile,
   artist,
-  dict,
-  errors,
 }: UsePortalProfileFormOptions) {
+  const t = useTranslations('portal')
+  const tErrors = useTranslations('errors')
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(artist?.imageUrl)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const isUploading = uploadProgress !== null && uploadProgress < 100
@@ -168,7 +166,7 @@ export function usePortalProfileForm({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(dict.profile_photoError)
+        toast.error(t('profile_photoError'))
         return
       }
 
@@ -179,9 +177,9 @@ export function usePortalProfileForm({
 
       const url = await uploadArtistPhoto(artistId, file, session.access_token, setUploadProgress)
       setPhotoUrl(url)
-      toast.success(dict.profile_photoUploaded)
+      toast.success(t('profile_photoUploaded'))
     } catch {
-      toast.error(dict.profile_photoError)
+      toast.error(t('profile_photoError'))
     } finally {
       setTimeout(() => setUploadProgress(null), 800)
     }
@@ -201,12 +199,12 @@ export function usePortalProfileForm({
     try {
       const supabase = createBrowserSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { toast.error(dict.profile_rider_upload_error); return }
+      if (!session) { toast.error(t('profile_rider_upload_error')); return }
       const url = await uploadRiderDocument(file, riderType, session.access_token)
       setRiderUrls((prev) => ({ ...prev, [riderType]: url }))
-      toast.success(dict.profile_rider_uploaded)
+      toast.success(t('profile_rider_uploaded'))
     } catch {
-      toast.error(dict.profile_rider_upload_error)
+      toast.error(t('profile_rider_upload_error'))
     } finally {
       setRiderUploading(null)
     }
@@ -214,7 +212,7 @@ export function usePortalProfileForm({
 
   const handleRiderDelete = async (riderType: RiderType) => {
     setRiderUrls((prev) => ({ ...prev, [riderType]: undefined }))
-    toast.success(dict.profile_rider_deleted)
+    toast.success(t('profile_rider_deleted'))
   }
 
   // -------------------------------------------------------------------------
@@ -228,7 +226,7 @@ export function usePortalProfileForm({
     try {
       const supabase = createBrowserSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { toast.error(dict.profile_photoError); return }
+      if (!session) { toast.error(t('profile_photoError')); return }
       // Auto-compress to stay within the 5 MB portal upload limit
       const file = raw.size > PORTAL_PHOTO_MAX_BYTES
         ? await compressImage(raw, { maxSizeBytes: PORTAL_PHOTO_MAX_BYTES })
@@ -237,9 +235,9 @@ export function usePortalProfileForm({
       const renamedFile = new File([file], `gallery-${Date.now()}-${file.name}`, { type: file.type })
       const url = await uploadArtistPhoto(artistId, renamedFile, session.access_token, () => {})
       setGalleryPhotos((prev) => [...prev, url])
-      toast.success(dict.profile_photoUploaded)
+      toast.success(t('profile_photoUploaded'))
     } catch {
-      toast.error(dict.profile_photoError)
+      toast.error(t('profile_photoError'))
     } finally {
       setGalleryUploading(false)
       e.target.value = ''
@@ -303,7 +301,7 @@ export function usePortalProfileForm({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(errors.AUTH_TOKEN_INVALID)
+        toast.error(tErrors('AUTH_TOKEN_INVALID'))
         return
       }
 
@@ -357,13 +355,13 @@ export function usePortalProfileForm({
         session.access_token,
       )
 
-      toast.success(dict.profile_saved)
+      toast.success(t('profile_saved'))
     } catch (err) {
       if (err instanceof PortalProfileSaveError) {
-        toast.error(getErrorMessageFromErrors(err.body, errors))
+        toast.error(getErrorMessage(err.body, tErrors))
         return
       }
-      toast.error(dict.profile_error)
+      toast.error(t('profile_error'))
     }
   }
 

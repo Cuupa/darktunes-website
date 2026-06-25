@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ClockCounterClockwise, ArrowRight, Prohibit, CheckCircle } from '@phosphor-icons/react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 import type { RoleChangeRecord, BanRecord } from '@/types/users'
@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function RoleChangeHistory({ userId }: Props) {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const [data, setData] = useState<HistoryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,15 +43,15 @@ export function RoleChangeHistory({ userId }: Props) {
       const res = await fetch(`/api/admin/users/${userId}/role-history`)
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
       setData((await res.json()) as HistoryResponse)
     } catch (err) {
-      setError(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      setError(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setIsLoading(false)
     }
-  }, [userId, dict])
+  }, [userId, tErrors])
 
   useEffect(() => {
     void load()

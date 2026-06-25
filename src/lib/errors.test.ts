@@ -207,33 +207,33 @@ describe('withErrorHandler', () => {
 describe('getErrorMessage (client helper)', () => {
   it('returns translated message for known error code', () => {
     const body = { error: 'The file is too large.', code: 'UPLOAD_TOO_LARGE', status: 413 }
-    const msg = getErrorMessage(body, mockDict)
+    const msg = getErrorMessage(body, (code) => mockDict.errors[code])
     expect(msg).toBe(mockDict.errors.UPLOAD_TOO_LARGE)
     expect(msg).not.toContain('413')
   })
 
   it('falls back to SERVER_ERROR for unknown code', () => {
     const body = { error: 'Some safe message', code: 'UNKNOWN_CODE_XYZ', status: 500 }
-    const msg = getErrorMessage(body, mockDict)
+    const msg = getErrorMessage(body, (code) => mockDict.errors[code])
     expect(msg).toBe(mockDict.errors.SERVER_ERROR)
   })
 
   it('falls back to SERVER_ERROR when no code is present', () => {
     const body = { error: 'Something failed', status: 500 }
-    const msg = getErrorMessage(body, mockDict)
+    const msg = getErrorMessage(body, (code) => mockDict.errors[code])
     expect(msg).toBe(mockDict.errors.SERVER_ERROR)
   })
 
   it('never returns raw HTTP status numbers', () => {
     const body = { error: 'HTTP 413', code: 'NONEXISTENT', status: 413 }
-    const msg = getErrorMessage(body, mockDict)
+    const msg = getErrorMessage(body, (code) => mockDict.errors[code])
     expect(msg).not.toMatch(/\b413\b/)
     expect(msg).not.toContain('HTTP')
   })
 
   it('handles RATE_LIMITED correctly', () => {
     const body = { error: 'Too many requests.', code: 'RATE_LIMITED', status: 429 }
-    const msg = getErrorMessage(body, mockDict)
+    const msg = getErrorMessage(body, (code) => mockDict.errors[code])
     expect(msg).toBe(mockDict.errors.RATE_LIMITED)
   })
 })

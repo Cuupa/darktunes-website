@@ -8,7 +8,7 @@ import {
   type StatementWorkflowStep,
 } from '@/lib/sos/statementWorkflow'
 import { Check, Circle } from '@phosphor-icons/react'
-import { useDict } from '@/contexts/DictContext'
+import { useAccountingMessages } from '@/lib/i18n/accountingFallbacks'
 
 export interface WorkflowStepLabel {
   label: string
@@ -86,8 +86,8 @@ function buildWorkflowLabels(
 }
 
 export function useWorkflowLabels(): WorkflowLabels {
-  const dict = useDict()
-  return buildWorkflowLabels(dict.admin?.accounting)
+  const accounting = useAccountingMessages()
+  return buildWorkflowLabels(accounting)
 }
 
 export function WorkflowStepper({

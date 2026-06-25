@@ -7,8 +7,9 @@
 
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { getLocale } from 'next-intl/server'
 import { getCachedPublicConcerts } from '@/lib/cache/publicQueries'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+
 import { EventDetailContent } from './_components/EventDetailContent'
 
 export const revalidate = 60
@@ -46,17 +47,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function EventDetailPage({ params }: Props) {
   const { id } = await params
-  const locale = await getLocale()
 
-  const [concerts, dict] = await Promise.all([
-    getCachedPublicConcerts(),
-    getDictionary(locale),
-  ])
+  const concerts = await getCachedPublicConcerts()
 
   const concert = concerts.find((c) => c.id === id)
   if (!concert) notFound()
 
   return (
-    <EventDetailContent concert={concert} dict={dict} locale={locale} />
+    <EventDetailContent concert={concert} />
   )
 }

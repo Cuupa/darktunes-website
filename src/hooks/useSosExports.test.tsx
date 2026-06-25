@@ -21,8 +21,8 @@ const {
   mockIsValidPeriod: vi.fn(),
 }))
 
-vi.mock('@/contexts/DictContext', () => ({
-  useDict: () => ({ admin: { accounting: {} } }),
+vi.mock('next-intl', () => ({
+  useMessages: () => ({ admin: { accounting: {} } }),
 }))
 
 vi.mock('sonner', () => ({

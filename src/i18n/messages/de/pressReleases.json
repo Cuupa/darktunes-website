@@ -1,0 +1,20 @@
+{
+  "heading": "Pressemitteilungen",
+  "detail": {
+    "backLink": "Zurück zu den Pressemitteilungen",
+    "mediaContact": "Pressekontakt",
+    "category": "Kategorie",
+    "embargo": "Embargo bis"
+  },
+  "categories": {
+    "albumAnnouncement": "Albumankündigung",
+    "tour": "Tour",
+    "labelNews": "Label-News",
+    "other": "Sonstiges"
+  },
+  "filterAll": "Alle",
+  "search": "Mitteilungen suchen…",
+  "noResults": "Keine Pressemitteilungen gefunden.",
+  "embargoBadge": "Embargo",
+  "openRelease": "Mitteilung öffnen"
+}

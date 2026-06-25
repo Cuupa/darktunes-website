@@ -30,9 +30,11 @@ import { getPageEngagementStats } from '@/lib/api/pageEvents'
 import { getMerchOrdersByArtistId, computeMerchOrderStats } from '@/lib/api/merchOrders'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AnalyticsPageClient } from './_components/AnalyticsPageClient'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 function AnalyticsSkeleton() {
+
+
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-64" />
@@ -54,7 +56,9 @@ async function AnalyticsContent({
 }: {
   searchParams: Promise<{ artistId?: string; tab?: string }>
 }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId, tab } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -68,8 +72,8 @@ async function AnalyticsContent({
   if (flags['artist.analytics'] === false) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{dict.portal.analytics_dashboard_heading}</h1>
-        <p className="text-muted-foreground">{dict.portal.analytics_unavailable}</p>
+        <h1 className="text-2xl font-bold">{t('analytics_dashboard_heading')}</h1>
+        <p className="text-muted-foreground">{t('analytics_unavailable')}</p>
       </div>
     )
   }
@@ -184,7 +188,6 @@ async function AnalyticsContent({
       artistId={artist?.id ?? ''}
       billingProfile={billingProfile}
       billingProfileComplete={isBillingProfileComplete(billingProfile)}
-      dict={dict.portal}
       defaultTab={defaultTab}
       invoicedStatementIds={invoiceList.invoices.flatMap((invoice) =>
         invoice.statementId ? [invoice.statementId] : [],

@@ -4,6 +4,7 @@
  * src/components/epk-builder/EpkPropertiesPanel.tsx
  */
 
+import { useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,13 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
-import type { Dictionary } from '@/i18n/types'
 
-interface EpkPropertiesPanelProps {
-  dict: Dictionary['portal']
-}
-
-export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
+export function EpkPropertiesPanel() {
+  const t = useTranslations('portal')
   const document = useEpkEditorStore((s) => s.document)
   const selectedIds = useEpkEditorStore((s) => s.selectedIds)
   const updateElement = useEpkEditorStore((s) => s.updateElement)
@@ -32,7 +29,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
   if (!element) {
     return (
       <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-sm text-muted-foreground">{dict.epk_editor_no_selection}</p>
+        <p className="text-sm text-muted-foreground">{t('epk_editor_no_selection')}</p>
       </div>
     )
   }
@@ -46,7 +43,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
   return (
     <div className="rounded-lg border border-border bg-card" data-lenis-prevent>
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">{dict.epk_editor_properties_title}</h2>
+        <h2 className="text-sm font-semibold">{t('epk_editor_properties_title')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5 capitalize">{element.type}</p>
       </div>
       <div className="space-y-4 p-4 max-h-[min(360px,50vh)] overflow-y-auto">
@@ -70,7 +67,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="epk-prop-w">{dict.epk_editor_width}</Label>
+            <Label htmlFor="epk-prop-w">{t('epk_editor_width')}</Label>
             <Input
               id="epk-prop-w"
               type="number"
@@ -80,7 +77,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="epk-prop-h">{dict.epk_editor_height}</Label>
+            <Label htmlFor="epk-prop-h">{t('epk_editor_height')}</Label>
             <Input
               id="epk-prop-h"
               type="number"
@@ -92,7 +89,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="epk-prop-rotation">{dict.epk_editor_rotation}</Label>
+          <Label htmlFor="epk-prop-rotation">{t('epk_editor_rotation')}</Label>
           <Input
             id="epk-prop-rotation"
             type="number"
@@ -102,21 +99,21 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>{dict.epk_editor_opacity}</Label>
+          <Label>{t('epk_editor_opacity')}</Label>
           <Slider
             value={[Math.round((element.style.opacity ?? 1) * 100)]}
             min={0}
             max={100}
             step={1}
             onValueChange={([v]) => patchStyle('opacity', v / 100)}
-            aria-label={dict.epk_editor_opacity}
+            aria-label={t('epk_editor_opacity')}
           />
         </div>
 
         {element.type === 'text' && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="epk-prop-content">{dict.epk_editor_text_content}</Label>
+              <Label htmlFor="epk-prop-content">{t('epk_editor_text_content')}</Label>
               <Textarea
                 id="epk-prop-content"
                 value={element.content ?? ''}
@@ -125,7 +122,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="epk-prop-font-family">{dict.epk_editor_font_family}</Label>
+              <Label htmlFor="epk-prop-font-family">{t('epk_editor_font_family')}</Label>
               <Select
                 value={element.style.fontFamily ?? 'Helvetica, Arial, sans-serif'}
                 onValueChange={(v) => patchStyle('fontFamily', v)}
@@ -135,7 +132,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Helvetica, Arial, sans-serif">
-                    {dict.epk_editor_font_default}
+                    {t('epk_editor_font_default')}
                   </SelectItem>
                   {document.fonts.map((font) => (
                     <SelectItem key={font.id} value={font.family}>
@@ -146,7 +143,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="epk-prop-font-size">{dict.epk_editor_font_size}</Label>
+              <Label htmlFor="epk-prop-font-size">{t('epk_editor_font_size')}</Label>
               <Input
                 id="epk-prop-font-size"
                 type="number"
@@ -156,7 +153,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="epk-prop-text-align">{dict.epk_editor_text_align}</Label>
+              <Label htmlFor="epk-prop-text-align">{t('epk_editor_text_align')}</Label>
               <Select
                 value={element.style.textAlign ?? 'left'}
                 onValueChange={(v) => patchStyle('textAlign', v)}
@@ -165,14 +162,14 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="left">{dict.epk_editor_align_left}</SelectItem>
-                  <SelectItem value="center">{dict.epk_editor_align_center}</SelectItem>
-                  <SelectItem value="right">{dict.epk_editor_align_right}</SelectItem>
+                  <SelectItem value="left">{t('epk_editor_align_left')}</SelectItem>
+                  <SelectItem value="center">{t('epk_editor_align_center')}</SelectItem>
+                  <SelectItem value="right">{t('epk_editor_align_right')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="epk-prop-text-color">{dict.epk_editor_fill_color}</Label>
+              <Label htmlFor="epk-prop-text-color">{t('epk_editor_fill_color')}</Label>
               <Input
                 id="epk-prop-text-color"
                 type="text"
@@ -185,7 +182,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
 
         {element.type === 'shape' && (
           <div className="space-y-2">
-            <Label htmlFor="epk-prop-fill">{dict.epk_editor_fill_color}</Label>
+            <Label htmlFor="epk-prop-fill">{t('epk_editor_fill_color')}</Label>
             <Input
               id="epk-prop-fill"
               type="text"
@@ -197,7 +194,7 @@ export function EpkPropertiesPanel({ dict }: EpkPropertiesPanelProps) {
 
         {(element.type === 'image' || element.type === 'logo') && element.src && (
           <div className="space-y-2">
-            <Label htmlFor="epk-prop-image-src">{dict.epk_editor_image_source}</Label>
+            <Label htmlFor="epk-prop-image-src">{t('epk_editor_image_source')}</Label>
             <Input
               id="epk-prop-image-src"
               type="url"

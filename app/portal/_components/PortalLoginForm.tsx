@@ -1,9 +1,10 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/_components/PortalLoginForm.tsx — Client Component
  *
- * Login + Registration form for the Artist Portal. Receives i18n dict as props (IoC).
+ * Login + Registration form for the Artist Portal.
  * Supports toggling between login and register modes, plus OAuth sign-in via Google/Spotify.
  */
 
@@ -16,13 +17,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, GoogleLogo, SpotifyLogo, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 
-interface PortalLoginFormProps {
-  dict: Dictionary['portal']
-}
-
-export function PortalLoginForm({ dict }: PortalLoginFormProps) {
+export function PortalLoginForm() {
+  const t = useTranslations('portal')
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,12 +36,12 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
 
     if (mode === 'register') {
       if (password.length < 8) {
-        toast.error(dict.register_password_too_short)
+        toast.error(t('register_password_too_short'))
         setIsLoading(false)
         return
       }
       if (password !== passwordConfirm) {
-        toast.error(dict.register_password_mismatch)
+        toast.error(t('register_password_mismatch'))
         setIsLoading(false)
         return
       }
@@ -54,14 +51,14 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
         const { error } = await supabase.auth.signUp({ email, password })
 
         if (error) {
-          toast.error(dict.register_error)
+          toast.error(t('register_error'))
         } else {
-          toast.success(dict.register_success)
+          toast.success(t('register_success'))
           router.refresh()
           router.push('/portal')
         }
       } catch {
-        toast.error(dict.register_error)
+        toast.error(t('register_error'))
       } finally {
         setIsLoading(false)
       }
@@ -71,7 +68,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
 
         if (error) {
-          toast.error(dict.login_error)
+          toast.error(t('login_error'))
         } else {
           // Use a hard navigation instead of router.push so the full HTTP
           // request carries the newly-set auth cookie, ensuring the server
@@ -79,7 +76,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
           window.location.assign('/portal')
         }
       } catch {
-        toast.error(dict.login_error)
+        toast.error(t('login_error'))
       } finally {
         setIsLoading(false)
       }
@@ -98,12 +95,12 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
         },
       })
       if (error) {
-        toast.error(dict.oauth_error)
+        toast.error(t('oauth_error'))
         setIsOAuthLoading(false)
       }
       // On success the browser redirects — no need to reset loading state
     } catch {
-      toast.error(dict.oauth_error)
+      toast.error(t('oauth_error'))
       setIsOAuthLoading(false)
     }
   }
@@ -120,23 +117,23 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold">
-            {isRegister ? dict.register_title : dict.login_title}
+            {isRegister ? t('register_title') : t('login_title')}
           </CardTitle>
           <CardDescription>
-            {isRegister ? dict.register_description : dict.login_description}
+            {isRegister ? t('register_description') : t('login_description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {errorParam === 'no_artist' && (
             <div className="flex items-start gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-400">
               <Warning size={18} weight="bold" className="mt-0.5 shrink-0" aria-hidden="true" />
-              <p>{dict.login_no_artist}</p>
+              <p>{t('login_no_artist')}</p>
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">
-                {isRegister ? dict.register_email : dict.login_email}
+                {isRegister ? t('register_email') : t('login_email')}
               </Label>
               <Input
                 id="email"
@@ -151,7 +148,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">
-                {isRegister ? dict.register_password : dict.login_password}
+                {isRegister ? t('register_password') : t('login_password')}
               </Label>
               <Input
                 id="password"
@@ -166,7 +163,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
             </div>
             {isRegister && (
               <div className="space-y-2">
-                <Label htmlFor="password-confirm">{dict.register_password_confirm}</Label>
+                <Label htmlFor="password-confirm">{t('register_password_confirm')}</Label>
                 <Input
                   id="password-confirm"
                   type="password"
@@ -181,14 +178,14 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
             )}
             <Button type="submit" className="w-full" disabled={isLoading} size="lg">
               {isRegister
-                ? isLoading ? dict.register_submitting : dict.register_submit
-                : isLoading ? dict.login_submitting : dict.login_submit}
+                ? isLoading ? t('register_submitting') : t('register_submit')
+                : isLoading ? t('login_submitting') : t('login_submit')}
             </Button>
           </form>
 
           <div className="relative flex items-center gap-3 py-1">
             <div className="flex-1 border-t border-border" />
-            <span className="text-xs text-muted-foreground shrink-0">{dict.oauth_or}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t('oauth_or')}</span>
             <div className="flex-1 border-t border-border" />
           </div>
 
@@ -201,7 +198,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
               onClick={() => handleOAuth('google')}
             >
               <GoogleLogo size={18} weight="bold" className="mr-2" />
-              {dict.oauth_google}
+              {t('oauth_google')}
             </Button>
             <Button
               type="button"
@@ -211,7 +208,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
               onClick={() => handleOAuth('spotify')}
             >
               <SpotifyLogo size={18} weight="bold" className="mr-2" />
-              {dict.oauth_spotify}
+              {t('oauth_spotify')}
             </Button>
           </div>
 
@@ -225,7 +222,7 @@ export function PortalLoginForm({ dict }: PortalLoginFormProps) {
                 setPasswordConfirm('')
               }}
             >
-              {isRegister ? dict.register_switch_to_login : dict.login_switch_to_register}
+              {isRegister ? t('register_switch_to_login') : t('login_switch_to_register')}
             </button>
           </p>
         </CardContent>

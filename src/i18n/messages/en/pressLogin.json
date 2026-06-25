@@ -1,0 +1,12 @@
+{
+  "title": "Press Dashboard Login",
+  "description": "Sign in as journalist or admin to access press tools.",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "signIn": "Sign In",
+  "signingIn": "Signing in…",
+  "errorInvalid": "Invalid email or password.",
+  "errorUnauthorized": "Your account is not authorized for the press dashboard.",
+  "applyLink": "Apply for press access",
+  "forgotPassword": "Forgot password? Email"
+}

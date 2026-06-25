@@ -3,14 +3,14 @@
  *
  * Typed error codes shared between server-side Route Handlers (ApiError) and
  * client-side helpers (getErrorMessage). Adding a code here automatically
- * requires a matching key in src/i18n/dictionaries/en.json (enforced by the
+ * requires a matching key in src/i18n/messages/en/errors.json (enforced by the
  * Dictionary type in src/i18n/types.ts).
  *
  * Rules for error messages:
  *  - NEVER expose HTTP status codes, env-var names, DB error messages, or any
  *    internal implementation detail in user-visible strings.
  *  - Every code maps to a safe, user-friendly sentence in the `errors` namespace
- *    of both dictionaries (en + de).
+ *    of both locale message bundles (en + de).
  */
 
 export const ERROR_CODES = [

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/analytics/_components/StreamingChart.tsx — Client Component (leaf)
  *
@@ -15,11 +16,9 @@ import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import type { StreamingStat, PlatformAggregate } from '@/lib/api/streamingStats'
 import type { Concert } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export interface StreamingChartInnerProps {
-  dict: Dictionary['portal']
   platforms: string[]
   monthlyData: Record<string, string | number>[]
   aggregates: PlatformAggregate[]
@@ -27,7 +26,6 @@ export interface StreamingChartInnerProps {
 }
 
 interface StreamingChartProps {
-  dict: Dictionary['portal']
   stats: StreamingStat[]
   aggregates: PlatformAggregate[]
   concerts: Concert[]
@@ -52,7 +50,9 @@ const StreamingChartInner = dynamic(
   },
 )
 
-export function StreamingChart({ dict, stats, aggregates, concerts }: StreamingChartProps) {
+export function StreamingChart({ stats, aggregates, concerts }: StreamingChartProps) {
+  const t = useTranslations('portal')
+
   // useMemo must be called before any early returns (Rules of Hooks).
   const { platforms, monthlyData, eventMarkers } = useMemo(() => {
     const _periods = [...new Set(stats.map((s) => s.period))].sort()
@@ -80,15 +80,14 @@ export function StreamingChart({ dict, stats, aggregates, concerts }: StreamingC
   if (stats.length === 0) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">{dict.analytics_heading}</h2>
-        <p className="text-muted-foreground">{dict.analytics_noData}</p>
+        <h2 className="text-xl font-semibold">{t('analytics_heading')}</h2>
+        <p className="text-muted-foreground">{t('analytics_noData')}</p>
       </div>
     )
   }
 
   return (
     <StreamingChartInner
-      dict={dict}
       platforms={platforms}
       monthlyData={monthlyData}
       aggregates={aggregates}

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ClockCounterClockwise } from '@phosphor-icons/react'
 import {
   Dialog,
@@ -27,7 +28,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
-import type { Dictionary } from '@/i18n/types'
 import { toast } from 'sonner'
 
 interface EpkVersionSummary {
@@ -38,7 +38,6 @@ interface EpkVersionSummary {
 }
 
 interface EpkVersionHistoryPanelProps {
-  dict: Dictionary['portal']
   artistId: string
   open: boolean
   onClose: () => void
@@ -47,13 +46,13 @@ interface EpkVersionHistoryPanelProps {
 }
 
 export function EpkVersionHistoryPanel({
-  dict,
   artistId,
   open,
   onClose,
   onRestored,
   onDocumentRestore,
 }: EpkVersionHistoryPanelProps) {
+  const t = useTranslations('portal')
   const [versions, setVersions] = useState<EpkVersionSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -72,16 +71,16 @@ export function EpkVersionHistoryPanel({
         `/api/portal/epk/versions?artistId=${artistId}`,
         { headers: { Authorization: `Bearer ${session.access_token}` } },
       )
-      if (!response.ok) throw new Error(dict.epk_versions_load_error)
+      if (!response.ok) throw new Error(t('epk_versions_load_error'))
 
       const payload = (await response.json()) as { versions: EpkVersionSummary[] }
       setVersions(payload.versions)
     } catch {
-      toast.error(dict.epk_versions_load_error)
+      toast.error(t('epk_versions_load_error'))
     } finally {
       setLoading(false)
     }
-  }, [artistId, dict.epk_versions_load_error])
+  }, [artistId, t])
 
   useEffect(() => {
     if (open) void loadVersions()
@@ -95,7 +94,7 @@ export function EpkVersionHistoryPanel({
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        toast.error(dict.epk_builder_export_auth_error)
+        toast.error(t('epk_builder_export_auth_error'))
         return
       }
 
@@ -108,7 +107,7 @@ export function EpkVersionHistoryPanel({
         body: JSON.stringify({ artist_id: artistId }),
       })
 
-      if (!response.ok) throw new Error(dict.epk_versions_restore_error)
+      if (!response.ok) throw new Error(t('epk_versions_restore_error'))
 
       const payload = (await response.json()) as {
         document: EpkDocumentV2
@@ -118,16 +117,16 @@ export function EpkVersionHistoryPanel({
       onDocumentRestore(payload.document)
       onRestored(payload.documentVersion)
       onClose()
-      toast.success(dict.epk_versions_restore_success)
+      toast.success(t('epk_versions_restore_success'))
       void loadVersions()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.epk_versions_restore_error)
+      toast.error(err instanceof Error ? err.message : t('epk_versions_restore_error'))
     } finally {
       setRestoringId(null)
     }
   }, [
     artistId,
-    dict,
+    t,
     loadVersions,
     onClose,
     onDocumentRestore,
@@ -143,15 +142,15 @@ export function EpkVersionHistoryPanel({
         <DialogHeader className="p-6 pb-0">
           <DialogTitle id="epk-version-history-title" className="flex items-center gap-2">
             <ClockCounterClockwise size={20} aria-hidden="true" />
-            {dict.epk_versions_title}
+            {t('epk_versions_title')}
           </DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] p-6" data-lenis-prevent>
           {loading ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_versions_loading}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_versions_loading')}</p>
           ) : versions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{dict.epk_versions_empty}</p>
+            <p className="text-sm text-muted-foreground">{t('epk_versions_empty')}</p>
           ) : (
             <ul className="space-y-3 list-none">
               {versions.map((version) => (
@@ -161,7 +160,7 @@ export function EpkVersionHistoryPanel({
                 >
                   <div>
                     <p className="text-sm font-medium">
-                      {dict.epk_versions_item.replace('{version}', String(version.versionNumber))}
+                      {t('epk_versions_item', { version: version.versionNumber })}
                     </p>
                     {version.label && (
                       <p className="text-xs text-muted-foreground mt-0.5">{version.label}</p>
@@ -179,8 +178,8 @@ export function EpkVersionHistoryPanel({
                     onClick={() => setConfirmVersionId(version.id)}
                   >
                     {restoringId === version.id
-                      ? dict.epk_versions_restoring
-                      : dict.epk_versions_restore}
+                      ? t('epk_versions_restoring')
+                      : t('epk_versions_restore')}
                   </Button>
                 </li>
               ))}
@@ -195,11 +194,11 @@ export function EpkVersionHistoryPanel({
       >
         <AlertDialogContent className="max-w-[calc(100%-2rem)] sm:max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>{dict.epk_versions_restore}</AlertDialogTitle>
-            <AlertDialogDescription>{dict.epk_versions_restore_confirm}</AlertDialogDescription>
+            <AlertDialogTitle>{t('epk_versions_restore')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('epk_versions_restore_confirm')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-[44px]">{dict.epk_versions_cancel}</AlertDialogCancel>
+            <AlertDialogCancel className="min-h-[44px]">{t('epk_versions_cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="min-h-[44px]"
               onClick={() => {
@@ -207,7 +206,7 @@ export function EpkVersionHistoryPanel({
                 setConfirmVersionId(null)
               }}
             >
-              {dict.epk_versions_restore}
+              {t('epk_versions_restore')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

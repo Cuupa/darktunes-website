@@ -3,16 +3,17 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@phosphor-icons/react'
+import { useTranslations } from 'next-intl'
 import type { SiteSettings } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
 
 interface FooterProps {
   siteSettings: SiteSettings
-  dict: Dictionary['footer']
 }
 
-export function Footer({ siteSettings, dict }: FooterProps) {
+export function Footer({ siteSettings }: FooterProps) {
+  const t = useTranslations('footer')
+
   return (
     <footer className="border-t border-border bg-background overflow-x-hidden">
       <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
@@ -41,7 +42,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           </div>
 
           <div>
-            <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.quickLinks}</h4>
+            <h4 className="font-bold mb-4 uppercase tracking-wider">{t('quickLinks')}</h4>
             <nav aria-label="Footer navigation">
               <ul className="flex flex-col gap-2 list-none">
                 <li>
@@ -49,13 +50,13 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href="/artists"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
-                    {dict.artistsLink}
+                    {t('artistsLink')}
                   </Link>
                 </li>
                 {(siteSettings?.showAboutInFooter ?? true) && (
                 <li>
                   <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
-                    {siteSettings?.aboutNavLabel || dict.aboutLink || 'About'}
+                    {siteSettings?.aboutNavLabel || t('aboutLink') || 'About'}
                   </Link>
                 </li>
                 )}
@@ -64,7 +65,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href="/releases"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
-                    {dict.releasesLink}
+                    {t('releasesLink')}
                   </Link>
                 </li>
                 <li>
@@ -72,7 +73,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href="/news"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
-                    {dict.newsLink}
+                    {t('newsLink')}
                   </Link>
                 </li>
                 <li>
@@ -80,17 +81,17 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     href="/videos"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
-                    {dict.videosLink}
+                    {t('videosLink')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/events" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
-                    {dict.tourLink}
+                    {t('tourLink')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase">
-                    {dict.contactLink}
+                    {t('contactLink')}
                   </Link>
                 </li>
                 <li>
@@ -100,7 +101,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                     rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
                   >
-                    {dict.submitMusicLink}
+                    {t('submitMusicLink')}
                   </a>
                 </li>
                 {siteSettings.shopifyStoreUrl && (
@@ -112,7 +113,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 uppercase"
                     >
                       <ShoppingBag size={14} />
-                      {dict.shopLink}
+                      {t('shopLink')}
                     </a>
                   </li>
                 )}
@@ -121,7 +122,7 @@ export function Footer({ siteSettings, dict }: FooterProps) {
           </div>
 
           <div>
-            <h4 className="font-bold mb-4 uppercase tracking-wider">{dict.followUs}</h4>
+            <h4 className="font-bold mb-4 uppercase tracking-wider">{t('followUs')}</h4>
             <div className="flex gap-3">
               {siteSettings.instagramUrl && (
                 <a
@@ -177,26 +178,26 @@ export function Footer({ siteSettings, dict }: FooterProps) {
 
         <div className="pt-8 border-t border-border flex flex-col md:flex-row md:flex-wrap justify-between items-center gap-2 md:gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} {siteSettings.labelName}. {dict.allRightsReserved}
+            © {new Date().getFullYear()} {siteSettings.labelName}. {t('allRightsReserved')}
           </p>
           <div className="flex gap-6">
             <Link
               href="/contact"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {dict.contact}
+              {t('contact')}
             </Link>
             <Link
               href="/impressum"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {dict.legalNotice}
+              {t('legalNotice')}
             </Link>
             <Link
               href="/datenschutz"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {dict.privacyPolicy}
+              {t('privacyPolicy')}
             </Link>
           </div>
           <p className="w-full text-center mt-1 text-xs text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors select-none">

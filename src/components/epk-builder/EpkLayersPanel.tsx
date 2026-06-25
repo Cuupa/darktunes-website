@@ -4,6 +4,7 @@
  * src/components/epk-builder/EpkLayersPanel.tsx
  */
 
+import { useTranslations } from 'next-intl'
 import {
   ArrowDown,
   ArrowUp,
@@ -17,11 +18,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
-import type { Dictionary } from '@/i18n/types'
-
-interface EpkLayersPanelProps {
-  dict: Dictionary['portal']
-}
 
 function layerLabel(element: EpkElement): string {
   if (element.role) return element.role
@@ -31,7 +27,8 @@ function layerLabel(element: EpkElement): string {
   return element.type
 }
 
-export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
+export function EpkLayersPanel() {
+  const t = useTranslations('portal')
   const document = useEpkEditorStore((s) => s.document)
   const activePageId = useEpkEditorStore((s) => s.activePageId)
   const selectedIds = useEpkEditorStore((s) => s.selectedIds)
@@ -47,10 +44,10 @@ export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">{dict.epk_editor_layers_title}</h2>
+        <h2 className="text-sm font-semibold">{t('epk_editor_layers_title')}</h2>
       </div>
       <ScrollArea className="h-[min(280px,40vh)]" data-lenis-prevent>
-        <ul className="p-2 space-y-1" aria-label={dict.epk_editor_layers_title}>
+        <ul className="p-2 space-y-1" aria-label={t('epk_editor_layers_title')}>
           {layers.map((element) => {
             const isSelected = selectedIds.includes(element.id)
             return (
@@ -76,7 +73,7 @@ export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
                     variant="ghost"
                     size="icon"
                     className="min-h-[44px] min-w-[44px] shrink-0"
-                    aria-label={element.visible ? dict.epk_editor_hide_layer : dict.epk_editor_show_layer}
+                    aria-label={element.visible ? t('epk_editor_hide_layer') : t('epk_editor_show_layer')}
                     aria-pressed={element.visible}
                     onClick={() => toggleElementVisibility(element.id)}
                   >
@@ -91,7 +88,7 @@ export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
                     variant="ghost"
                     size="icon"
                     className="min-h-[44px] min-w-[44px] shrink-0"
-                    aria-label={element.locked ? dict.epk_editor_unlock_layer : dict.epk_editor_lock_layer}
+                    aria-label={element.locked ? t('epk_editor_unlock_layer') : t('epk_editor_lock_layer')}
                     aria-pressed={element.locked}
                     onClick={() => toggleElementLock(element.id)}
                   >
@@ -106,7 +103,7 @@ export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
                     variant="ghost"
                     size="icon"
                     className="min-h-[44px] min-w-[44px] shrink-0"
-                    aria-label={dict.epk_editor_layer_up}
+                    aria-label={t('epk_editor_layer_up')}
                     onClick={() => moveElementZ(element.id, 'up')}
                   >
                     <ArrowUp size={16} aria-hidden="true" />
@@ -116,7 +113,7 @@ export function EpkLayersPanel({ dict }: EpkLayersPanelProps) {
                     variant="ghost"
                     size="icon"
                     className="min-h-[44px] min-w-[44px] shrink-0"
-                    aria-label={dict.epk_editor_layer_down}
+                    aria-label={t('epk_editor_layer_down')}
                     onClick={() => moveElementZ(element.id, 'down')}
                   >
                     <ArrowDown size={16} aria-hidden="true" />

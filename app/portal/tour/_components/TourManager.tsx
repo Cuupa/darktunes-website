@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { MapPin } from '@phosphor-icons/react'
@@ -25,11 +26,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 import type { Concert } from '@/types'
 
 interface TourManagerProps {
-  dict: Dictionary['portal']
   concerts: Concert[]
   artistId: string | null
 }
@@ -45,7 +44,9 @@ const EMPTY_FORM = {
   ticketUrl: '',
 }
 
-export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
+export function TourManager({ concerts, artistId }: TourManagerProps) {
+  const t = useTranslations('portal')
+
   const [items, setItems] = useState(concerts)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -59,7 +60,7 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    if (!session?.access_token) throw new Error(dict.tour_error)
+    if (!session?.access_token) throw new Error(t('tour_error'))
     return session.access_token
   }
 
@@ -87,22 +88,22 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
           status,
         }),
       })
-      if (!res.ok) throw new Error(dict.tour_error)
+      if (!res.ok) throw new Error(t('tour_error'))
 
       const data = (await res.json()) as Concert
       if (editingId) {
         setItems((prev) => prev.map((item) => (item.id === editingId ? data : item)))
-        toast.success(dict.tour_updated)
+        toast.success(t('tour_updated'))
       } else {
         setItems((prev) => [data, ...prev])
-        toast.success(dict.tour_created)
+        toast.success(t('tour_created'))
       }
 
       setEditingId(null)
       setStatus('announced')
       setForm(EMPTY_FORM)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.tour_error)
+      toast.error(error instanceof Error ? error.message : t('tour_error'))
     } finally {
       setSaving(false)
     }
@@ -138,18 +139,18 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + token },
       })
-      if (!res.ok) throw new Error(dict.tour_error)
+      if (!res.ok) throw new Error(t('tour_error'))
       setItems((prev) => prev.filter((item) => item.id !== id))
-      toast.success(dict.tour_deleted)
+      toast.success(t('tour_deleted'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.tour_error)
+      toast.error(error instanceof Error ? error.message : t('tour_error'))
     }
   }
 
   const getStatusLabel = (value: string) => {
-    if (value === 'announced') return dict.tour_status_announced
-    if (value === 'confirmed') return dict.tour_status_confirmed
-    if (value === 'cancelled') return dict.tour_status_cancelled
+    if (value === 'announced') return t('tour_status_announced')
+    if (value === 'confirmed') return t('tour_status_confirmed')
+    if (value === 'cancelled') return t('tour_status_cancelled')
     return value
   }
 
@@ -158,28 +159,28 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{dict.tour_delete_confirm}</AlertDialogTitle>
+            <AlertDialogTitle>{t('tour_delete_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {dict.tour_delete}
+              {t('tour_delete')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{dict.tour_cancel_edit}</AlertDialogCancel>
+            <AlertDialogCancel>{t('tour_cancel_edit')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void confirmRemove()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {dict.tour_delete}
+              {t('tour_delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
+      <h1 className="text-3xl font-bold">{t('tour_heading')}</h1>
 
       <form onSubmit={submit} className="rounded-lg border border-border p-4 grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
-          <Label htmlFor="tour-event">{dict.tour_event}</Label>
+          <Label htmlFor="tour-event">{t('tour_event')}</Label>
           <Input
             id="tour-event"
             ref={eventInputRef}
@@ -189,7 +190,7 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="tour-date">{dict.tour_date}</Label>
+          <Label htmlFor="tour-date">{t('tour_date')}</Label>
           <Input
             id="tour-date"
             type="date"
@@ -199,22 +200,22 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
           />
         </div>
         <Input
-          placeholder={dict.tour_venue}
+          placeholder={t('tour_venue')}
           value={form.venueName}
           onChange={(e) => setForm((value) => ({ ...value, venueName: e.target.value }))}
         />
         <Input
-          placeholder={dict.tour_city}
+          placeholder={t('tour_city')}
           value={form.venueCity}
           onChange={(e) => setForm((value) => ({ ...value, venueCity: e.target.value }))}
         />
         <Input
-          placeholder={dict.tour_country}
+          placeholder={t('tour_country')}
           value={form.venueCountry}
           onChange={(e) => setForm((value) => ({ ...value, venueCountry: e.target.value }))}
         />
         <Input
-          placeholder={dict.tour_ticket_url}
+          placeholder={t('tour_ticket_url')}
           value={form.ticketUrl}
           onChange={(e) => setForm((value) => ({ ...value, ticketUrl: e.target.value }))}
         />
@@ -224,17 +225,17 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="announced">{dict.tour_status_announced}</SelectItem>
-              <SelectItem value="confirmed">{dict.tour_status_confirmed}</SelectItem>
-              <SelectItem value="cancelled">{dict.tour_status_cancelled}</SelectItem>
+              <SelectItem value="announced">{t('tour_status_announced')}</SelectItem>
+              <SelectItem value="confirmed">{t('tour_status_confirmed')}</SelectItem>
+              <SelectItem value="cancelled">{t('tour_status_cancelled')}</SelectItem>
             </SelectContent>
           </Select>
           <Button type="submit" className="min-h-[44px]" disabled={saving}>
-            {saving ? dict.tour_saving : editingId ? dict.tour_update : dict.tour_add}
+            {saving ? t('tour_saving') : editingId ? t('tour_update') : t('tour_add')}
           </Button>
           {editingId && (
             <Button type="button" className="min-h-[44px]" variant="outline" onClick={cancelEdit}>
-              {dict.tour_cancel_edit}
+              {t('tour_cancel_edit')}
             </Button>
           )}
         </div>
@@ -251,10 +252,10 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="outline" onClick={() => startEdit(concert)}>
-                {dict.tour_edit}
+                {t('tour_edit')}
               </Button>
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="destructive" onClick={() => setDeleteTarget(concert.id)}>
-                {dict.tour_delete}
+                {t('tour_delete')}
               </Button>
             </div>
           </div>
@@ -262,9 +263,9 @@ export function TourManager({ dict, concerts, artistId }: TourManagerProps) {
         {items.length === 0 && (
           <PortalEmptyState
             icon={MapPin}
-            heading={dict.tour_noData}
-            description={dict.tour_empty_description}
-            action={{ label: dict.tour_add, onClick: () => eventInputRef.current?.focus() }}
+            heading={t('tour_noData')}
+            description={t('tour_empty_description')}
+            action={{ label: t('tour_add'), onClick: () => eventInputRef.current?.focus() }}
           />
         )}
       </div>

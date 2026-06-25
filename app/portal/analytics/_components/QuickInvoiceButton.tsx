@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { PaperPlaneTilt, Spinner } from '@phosphor-icons/react'
@@ -15,11 +16,9 @@ import {
   LABEL_CLIENT_NAME,
 } from '@/lib/portal/labelBilling'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Dictionary } from '@/i18n/types'
 
 interface QuickInvoiceButtonProps {
   artistId: string
-  dict: Dictionary['portal']
   statement: SalesStatement
 }
 
@@ -36,9 +35,10 @@ function defaultArtistInvoiceNumber(period: string): string {
 
 export function QuickInvoiceButton({
   artistId,
-  dict,
   statement,
 }: QuickInvoiceButtonProps) {
+  const t = useTranslations('portal')
+
   const [submitting, setSubmitting] = useState(false)
 
   const handleQuickInvoice = async () => {
@@ -48,7 +48,7 @@ export function QuickInvoiceButton({
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session) throw new Error(dict.profile_error)
+      if (!session) throw new Error(t('profile_error'))
 
       const amountCents = Math.round((statement.amountEur ?? 0) * 100)
       const response = await fetch('/api/portal/invoices', {
@@ -79,13 +79,13 @@ export function QuickInvoiceButton({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({})) as { message?: string }
-        throw new Error(payload.message ?? dict.invoice_error)
+        throw new Error(payload.message ?? t('invoice_error'))
       }
 
-      toast.success(dict.analytics_invoice_sent)
+      toast.success(t('analytics_invoice_sent'))
       window.location.reload()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.invoice_error)
+      toast.error(error instanceof Error ? error.message : t('invoice_error'))
     } finally {
       setSubmitting(false)
     }
@@ -103,7 +103,7 @@ export function QuickInvoiceButton({
       ) : (
         <PaperPlaneTilt size={14} aria-hidden="true" />
       )}
-      {dict.analytics_invoice_one_click}
+      {t('analytics_invoice_one_click')}
     </Button>
   )
 }

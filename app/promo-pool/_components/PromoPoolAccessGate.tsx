@@ -10,27 +10,25 @@
 
 import { useState } from 'react'
 import { HourglassMedium, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { Dictionary } from '@/i18n/types'
 import type { JournalistApplication } from '@/lib/api/journalistApplications'
 
 interface Props {
-  dict: Dictionary['promoPool']
   application: JournalistApplication | null
   userEmail: string
 }
 
 function ApplicationStatusCard({
-  dict,
   application,
 }: {
-  dict: Dictionary['promoPool']
   application: JournalistApplication
 }) {
+  const t = useTranslations('promoPool')
   const isPending = application.status === 'pending'
   const isApproved = application.status === 'approved'
 
@@ -41,10 +39,10 @@ function ApplicationStatusCard({
           {isPending && <HourglassMedium size={24} className="text-muted-foreground" weight="bold" />}
           {isApproved && <CheckCircle size={24} className="text-green-500" weight="bold" />}
           {!isPending && !isApproved && <XCircle size={24} className="text-destructive" weight="bold" />}
-          <CardTitle>{dict.accessDenied}</CardTitle>
+          <CardTitle>{t('accessDenied')}</CardTitle>
         </div>
         <CardDescription>
-          {isPending ? dict.applicationPending : dict.accessDeniedMessage}
+          {isPending ? t('applicationPending') : t('accessDeniedMessage')}
         </CardDescription>
       </CardHeader>
     </Card>
@@ -52,12 +50,11 @@ function ApplicationStatusCard({
 }
 
 function ApplicationForm({
-  dict,
   userEmail,
 }: {
-  dict: Dictionary['promoPool']
   userEmail: string
 }) {
+  const t = useTranslations('promoPool')
   const [name, setName] = useState('')
   const [email, setEmail] = useState(userEmail)
   const [outlet, setOutlet] = useState('')
@@ -88,7 +85,7 @@ function ApplicationForm({
   if (submitted) {
     return (
       <p className="text-green-400 font-medium" role="status">
-        {dict.login.applySuccess}
+        {t('login.applySuccess')}
       </p>
     )
   }
@@ -96,7 +93,7 @@ function ApplicationForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
       <div className="space-y-1">
-        <Label htmlFor="apply-name">{dict.login.applyName}</Label>
+        <Label htmlFor="apply-name">{t('login.applyName')}</Label>
         <Input
           id="apply-name"
           value={name}
@@ -106,19 +103,19 @@ function ApplicationForm({
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="apply-email">{dict.login.email}</Label>
+        <Label htmlFor="apply-email">{t('login.email')}</Label>
         <Input
           id="apply-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder={dict.login.applyEmailPlaceholder}
+          placeholder={t('login.applyEmailPlaceholder')}
           required
           className="bg-background border-input"
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="apply-outlet">{dict.login.applyOutlet}</Label>
+        <Label htmlFor="apply-outlet">{t('login.applyOutlet')}</Label>
         <Input
           id="apply-outlet"
           value={outlet}
@@ -128,7 +125,7 @@ function ApplicationForm({
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="apply-message">{dict.login.applyMessage}</Label>
+        <Label htmlFor="apply-message">{t('login.applyMessage')}</Label>
         <Textarea
           id="apply-message"
           value={message}
@@ -139,37 +136,39 @@ function ApplicationForm({
       </div>
       {error && (
         <p className="text-destructive text-sm" role="alert">
-          {dict.login.applyError}
+          {t('login.applyError')}
         </p>
       )}
       <Button type="submit" disabled={submitting} className="gap-2">
-        {submitting ? dict.login.applySubmitting : dict.login.applySubmit}
+        {submitting ? t('login.applySubmitting') : t('login.applySubmit')}
       </Button>
     </form>
   )
 }
 
-export function PromoPoolAccessGate({ dict, application, userEmail }: Props) {
+export function PromoPoolAccessGate({ application, userEmail }: Props) {
+  const t = useTranslations('promoPool')
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16 max-w-2xl space-y-8">
         <header className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">{dict.heading}</h1>
-          <p className="text-muted-foreground">{dict.accessDeniedMessage}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('heading')}</h1>
+          <p className="text-muted-foreground">{t('accessDeniedMessage')}</p>
         </header>
 
         {application ? (
-          <ApplicationStatusCard dict={dict} application={application} />
+          <ApplicationStatusCard application={application} />
         ) : (
           <>
-            <p className="text-muted-foreground">{dict.applicationApply}</p>
+            <p className="text-muted-foreground">{t('applicationApply')}</p>
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle>{dict.login.applyHeading}</CardTitle>
-                <CardDescription>{dict.login.applyDescription}</CardDescription>
+                <CardTitle>{t('login.applyHeading')}</CardTitle>
+                <CardDescription>{t('login.applyDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <ApplicationForm dict={dict} userEmail={userEmail} />
+                <ApplicationForm userEmail={userEmail} />
               </CardContent>
             </Card>
           </>

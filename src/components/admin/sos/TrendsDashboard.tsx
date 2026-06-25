@@ -24,7 +24,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RevenueSummaryCard } from './RevenueSummaryCard'
 import type { ArtistRevenue } from '@/lib/sos/types'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 interface PeriodSummary {
@@ -68,7 +68,6 @@ export function TrendsDashboard({
   periodEnd = '',
   bronzeBatchIds = [],
 }: TrendsDashboardProps) {
-  const dict = useDict()
   const trendsFallback = {
     trendsSavePeriod: 'Save period {period}',
     trendsUpdatePeriod: 'Update period {period}',
@@ -87,7 +86,7 @@ export function TrendsDashboard({
     trendsOnePeriodHint: '1 period saved. Save at least one more to see a trend chart.',
     trendsSaveFailed: 'Failed to save period summary',
   } as const
-  const t = { ...trendsFallback, ...(dict.admin?.accounting ?? {}) }
+  const t = useMergedAccountingLabels(trendsFallback)
 
   const [summaries, setSummaries] = useState<PeriodSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)

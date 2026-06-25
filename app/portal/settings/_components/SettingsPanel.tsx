@@ -1,5 +1,6 @@
 'use client'
 
+import { useLocale, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -7,16 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { Dictionary, Locale } from '@/i18n/types'
 import { updatePortalPassword } from '../_actions/updatePassword'
 
 interface SettingsPanelProps {
-  dict: Dictionary['portal']
   email: string
-  locale: Locale
 }
 
-export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
+export function SettingsPanel({ email }: SettingsPanelProps) {
+  const t = useTranslations('portal')
+  const locale = useLocale()
+
   const router = useRouter()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -26,12 +27,12 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
     e.preventDefault()
 
     if (newPassword.length < 8) {
-      toast.error(dict.settings_password_too_short)
+      toast.error(t('settings_password_too_short'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error(dict.settings_password_mismatch)
+      toast.error(t('settings_password_mismatch'))
       return
     }
 
@@ -40,9 +41,9 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
       await updatePortalPassword({ newPassword, confirmPassword })
       setNewPassword('')
       setConfirmPassword('')
-      toast.success(dict.settings_password_success)
+      toast.success(t('settings_password_success'))
     } catch {
-      toast.error(dict.settings_password_error)
+      toast.error(t('settings_password_error'))
     } finally {
       setUpdating(false)
     }
@@ -56,11 +57,11 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{dict.settings_heading}</h1>
+      <h1 className="text-3xl font-bold">{t('settings_heading')}</h1>
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>{dict.settings_email}</CardTitle>
+          <CardTitle>{t('settings_email')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Input readOnly value={email} />
@@ -69,12 +70,12 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>{dict.settings_password_heading}</CardTitle>
+          <CardTitle>{t('settings_password_heading')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="new-password">{dict.settings_password_new}</Label>
+              <Label htmlFor="new-password">{t('settings_password_new')}</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -85,7 +86,7 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">{dict.settings_password_confirm}</Label>
+              <Label htmlFor="confirm-password">{t('settings_password_confirm')}</Label>
               <Input
                 id="confirm-password"
                 type="password"
@@ -96,7 +97,7 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
               />
             </div>
             <Button type="submit" disabled={updating}>
-              {updating ? dict.settings_password_saving : dict.settings_password_save}
+              {updating ? t('settings_password_saving') : t('settings_password_save')}
             </Button>
           </form>
         </CardContent>
@@ -104,14 +105,14 @@ export function SettingsPanel({ dict, email, locale }: SettingsPanelProps) {
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>{dict.settings_language}</CardTitle>
+          <CardTitle>{t('settings_language')}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {dict.settings_language_current}: {locale === 'de' ? 'Deutsch' : 'English'}
+            {t('settings_language_current')}: {locale === 'de' ? 'Deutsch' : 'English'}
           </p>
         </CardHeader>
         <CardContent>
           <Button variant="outline" onClick={switchLocale}>
-            {dict.settings_language_switch_to} {locale === 'de' ? 'English' : 'Deutsch'}
+            {t('settings_language_switch_to')} {locale === 'de' ? 'English' : 'Deutsch'}
           </Button>
         </CardContent>
       </Card>

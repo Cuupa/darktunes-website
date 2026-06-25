@@ -8,22 +8,26 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Calendar, MapPin, Ticket, ArrowRight, ArrowLeft, MagnifyingGlass } from '@phosphor-icons/react'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Concert } from '@/types'
-import type { Dictionary, Locale } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 interface ConcertsProps extends SectionProps {
   concerts: Concert[]
-  dict: Dictionary['concerts']
-  locale: Locale
+  heading?: string
+  subheading?: string
   /** Number of concerts per page (default: 8). */
   concertsPerPage?: number
   /** When true, show only the first page and add a "View all" link to /events. */
   concertsLinkToPage?: boolean
 }
 
-export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concertsLinkToPage = false }: ConcertsProps) {
+export function Concerts({ concerts, heading, subheading, concertsPerPage = 8, concertsLinkToPage = false }: ConcertsProps) {
+  const t = useTranslations('concerts')
+  const locale = useLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const sectionHeading = heading ?? t('heading')
+  const sectionSubheading = subheading ?? t('subheading')
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -58,13 +62,13 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
       <div className="container mx-auto">
         <ScrollReveal className="mb-12 flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-            <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+            <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{sectionHeading}</h2>
+            <p className="text-xl text-muted-foreground font-serif">{sectionSubheading}</p>
           </div>
-          {dict.viewAll && (
+          {(
             <Button variant="ghost" className="group/btn hover:text-accent px-0 uppercase tracking-wider font-bold" asChild>
               <Link href="/events">
-                {dict.viewAll}
+                {t('viewAll')}
                 <ArrowRight className="ml-2 group-hover/btn:translate-x-2 transition-transform" weight="bold" />
               </Link>
             </Button>
@@ -82,21 +86,21 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={dict.searchPlaceholder}
+            placeholder={t('searchPlaceholder')}
             className="pl-9"
-            aria-label={dict.searchPlaceholder}
+            aria-label={t('searchPlaceholder')}
           />
         </div>
 
         {filteredConcerts.length === 0 && concerts.length > 0 ? (
           <p className="text-center text-muted-foreground font-mono py-12">
-            {dict.noResults}
+            {t('noResults')}
           </p>
         ) : concerts.length === 0 ? (
           <ScrollReveal>
             <Card className="bg-card border-border p-8 text-center">
-              <p className="text-lg font-semibold mb-2">{dict.noShows}</p>
-              <p className="text-muted-foreground">{dict.checkBack}</p>
+              <p className="text-lg font-semibold mb-2">{t('noShows')}</p>
+              <p className="text-muted-foreground">{t('checkBack')}</p>
             </Card>
           </ScrollReveal>
         ) : (
@@ -126,7 +130,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
                           </span>
                           {isCancelled && (
                             <Badge variant="destructive" className="uppercase tracking-wide">
-                              {dict.cancelled}
+                              {t('cancelled')}
                             </Badge>
                           )}
                         </div>
@@ -144,10 +148,10 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
                             href={concert.ticketUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label={`${dict.ticketLink} (${dict.opensInNewTab})`}
+                            aria-label={`${t('ticketLink')} (${t('opensInNewTab')})`}
                           >
                             <Ticket size={16} className="mr-2" />
-                            {dict.ticketLink}
+                            {t('ticketLink')}
                           </a>
                         </Button>
                       )}
@@ -189,7 +193,7 @@ export function Concerts({ concerts, dict, locale, concertsPerPage = 8, concerts
             )}
             {concertsLinkToPage && filteredConcerts.length > perPage && (
               <Button asChild variant="outline" size="lg" className="min-w-[160px]">
-                <Link href="/events">{dict.viewAll ?? 'View all events'}</Link>
+                <Link href="/events">{t('viewAll')}</Link>
               </Button>
             )}
           </div>

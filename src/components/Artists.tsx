@@ -21,13 +21,12 @@ import {
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import { trackShopClick } from '@/lib/analytics/trackPageEvent'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
+import { useTranslations } from 'next-intl'
 import type { Artist } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import type { SectionProps } from '@/lib/component-contracts'
 
 interface ArtistsProps extends SectionProps {
   artists: Artist[]
-  dict: Dictionary['artists']
 }
 
 const MAX_VISIBLE = 6
@@ -54,7 +53,8 @@ function sortArtists(items: Artist[]): Artist[] {
   })
 }
 
-export function Artists({ artists, dict }: ArtistsProps) {
+export function Artists({ artists }: ArtistsProps) {
+  const t = useTranslations('artists')
   const [searchQuery, setSearchQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const prefersReducedMotion = useReducedMotion()
@@ -90,8 +90,8 @@ export function Artists({ artists, dict }: ArtistsProps) {
       <section id="artists" className="py-24 px-4 lg:px-16 bg-card/20 scroll-mt-36">
       <div className="container mx-auto">
         <ScrollReveal className="mb-12">
-          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{dict.heading}</h2>
-          <p className="text-xl text-muted-foreground font-serif">{dict.subheading}</p>
+          <h2 className="text-5xl lg:text-6xl font-bold mb-4 tracking-tight">{t('heading')}</h2>
+          <p className="text-xl text-muted-foreground font-serif">{t('subheading')}</p>
         </ScrollReveal>
 
         <div className="relative mb-6">
@@ -104,14 +104,14 @@ export function Artists({ artists, dict }: ArtistsProps) {
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={dict.searchPlaceholder}
+            placeholder={t('searchPlaceholder')}
             className="h-11 w-full rounded-md border border-border bg-muted pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={dict.searchPlaceholder}
+            aria-label={t('searchPlaceholder')}
           />
         </div>
 
         {filteredArtists.length === 0 ? (
-          <p className="text-muted-foreground font-serif">{dict.noResults}</p>
+          <p className="text-muted-foreground font-serif">{t('noResults')}</p>
         ) : (
           <motion.ul
             ref={listRef}
@@ -294,8 +294,8 @@ export function Artists({ artists, dict }: ArtistsProps) {
               className="px-6 py-2.5 rounded-md border border-border text-sm font-medium tracking-wider text-muted-foreground hover:text-foreground hover:border-accent/50 transition-colors"
             >
               {showAll
-                ? dict.showLess
-                : dict.showAll.replace('{total}', String(artists.length))}
+                ? t('showLess')
+                : t('showAll', { total: artists.length })}
             </button>
           </div>
         )}

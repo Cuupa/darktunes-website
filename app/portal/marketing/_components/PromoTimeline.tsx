@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/marketing/_components/PromoTimeline.tsx
  *
@@ -15,11 +16,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { PromoLogEntry } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 interface PromoTimelineProps {
   entries: PromoLogEntry[]
-  dict: Dictionary['portal']
 }
 
 function formatBudget(amount: number, currency: string): string {
@@ -39,19 +38,21 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PromoTimeline({ entries, dict }: PromoTimelineProps) {
+export function PromoTimeline({ entries }: PromoTimelineProps) {
+  const t = useTranslations('portal')
+
   if (entries.length === 0) {
     return (
       <PortalEmptyState
         icon={MegaphoneSimple}
-        heading={dict.promo_log_empty_heading}
-        description={dict.promo_log_empty_description}
+        heading={t('promo_log_empty_heading')}
+        description={t('promo_log_empty_description')}
       />
     )
   }
 
   return (
-    <ol className="relative space-y-0" aria-label={dict.promo_log_heading}>
+    <ol className="relative space-y-0" aria-label={t('promo_log_heading')}>
       {entries.map((entry, idx) => (
         <li key={entry.id} className="relative pl-8 pb-8 last:pb-0">
           {/* Vertical timeline line */}
@@ -100,11 +101,11 @@ export function PromoTimeline({ entries, dict }: PromoTimelineProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block rounded-md overflow-hidden border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  aria-label={`${dict.promo_log_view_proof} — ${entry.description}`}
+                  aria-label={`${t('promo_log_view_proof')} — ${entry.description}`}
                 >
                   <Image
                     src={getOptimizedImageUrl(entry.proofUrl, 800)}
-                    alt={`${dict.promo_log_proof_alt} — ${entry.description}`}
+                    alt={`${t('promo_log_proof_alt')} — ${entry.description}`}
                     width={640}
                     height={360}
                     className="w-full h-auto object-cover max-h-64"

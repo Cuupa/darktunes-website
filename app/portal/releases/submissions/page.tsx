@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { getPortalDictionary, getLocale } from '@/i18n/getDictionary'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getReleaseSubmissionsByArtistId } from '@/lib/api/releaseSubmissions'
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import type { ReleaseSubmission } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 function statusBadgeVariant(status: ReleaseSubmission['status']) {
   switch (status) {
@@ -21,19 +20,23 @@ function statusBadgeVariant(status: ReleaseSubmission['status']) {
   }
 }
 
-function statusLabel(status: ReleaseSubmission['status'], dict: Dictionary['portal']) {
+function statusLabel(status: ReleaseSubmission['status'], t: Awaited<ReturnType<typeof getTranslations<'portal'>>>) {
+
+
   switch (status) {
-    case 'received': return dict.releases_status_received
-    case 'reviewed': return dict.releases_status_reviewed
-    case 'accepted': return dict.releases_status_accepted
-    case 'rejected': return dict.releases_status_rejected
+    case 'received': return t('releases_status_received')
+    case 'reviewed': return t('releases_status_reviewed')
+    case 'accepted': return t('releases_status_accepted')
+    case 'rejected': return t('releases_status_rejected')
     default: return status
   }
 }
 
 export default async function ReleaseSubmissionsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+
+  const t = await getTranslations('portal')
   const locale = await getLocale()
-  const dict = await getPortalDictionary()
+
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
 
@@ -46,14 +49,14 @@ export default async function ReleaseSubmissionsPage({ searchParams }: { searchP
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{dict.portal.releases_submissions_heading}</h1>
+        <h1 className="text-3xl font-bold">{t('releases_submissions_heading')}</h1>
         <Button asChild>
-          <Link href="/portal/releases/new">{dict.portal.releases_submit_new}</Link>
+          <Link href="/portal/releases/new">{t('releases_submit_new')}</Link>
         </Button>
       </div>
 
       {submissions.length === 0 ? (
-        <p className="text-muted-foreground">{dict.portal.releases_submissions_empty}</p>
+        <p className="text-muted-foreground">{t('releases_submissions_empty')}</p>
       ) : (
         <div className="space-y-4">
           {submissions.map((sub) => (
@@ -61,7 +64,7 @@ export default async function ReleaseSubmissionsPage({ searchParams }: { searchP
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-base font-medium">{sub.title}</CardTitle>
                 <Badge variant={statusBadgeVariant(sub.status)}>
-                  {statusLabel(sub.status, dict.portal)}
+                  {statusLabel(sub.status, t)}
                 </Badge>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -74,7 +77,7 @@ export default async function ReleaseSubmissionsPage({ searchParams }: { searchP
                 </div>
                 {sub.adminReply && (
                   <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
-                    <p className="text-xs font-medium mb-1">{dict.portal.releases_admin_reply_heading}</p>
+                    <p className="text-xs font-medium mb-1">{t('releases_admin_reply_heading')}</p>
                     <p className="text-muted-foreground">{sub.adminReply}</p>
                   </div>
                 )}

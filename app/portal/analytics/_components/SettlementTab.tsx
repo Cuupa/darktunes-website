@@ -1,13 +1,13 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { ArtistSettlementSummary } from '@/lib/api/settlementLedger'
 import type { LedgerEntry } from '@/lib/api/settlementLedger'
-import type { Dictionary } from '@/i18n/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CurrencyEur, Scales } from '@phosphor-icons/react'
+import type { PortalMessageKey } from '@/i18n/portalKey'
 
 interface SettlementTabProps {
-  dict: Dictionary['portal']
   summary: ArtistSettlementSummary
 }
 
@@ -21,7 +21,7 @@ function formatTimestamp(iso: string): string {
   )
 }
 
-const ENTRY_TYPE_KEYS: Record<LedgerEntry['entryType'], keyof Dictionary['portal']> = {
+const ENTRY_TYPE_KEYS: Record<LedgerEntry['entryType'], PortalMessageKey> = {
   statement_payout: 'analytics_settlement_type_statement_payout',
   invoice_liability: 'analytics_settlement_type_invoice_liability',
   payment: 'analytics_settlement_type_payment',
@@ -32,18 +32,20 @@ const ENTRY_TYPE_KEYS: Record<LedgerEntry['entryType'], keyof Dictionary['portal
   partial_payment: 'analytics_settlement_type_partial_payment',
 }
 
-export function SettlementTab({ dict, summary }: SettlementTabProps) {
+export function SettlementTab({ summary }: SettlementTabProps) {
+  const t = useTranslations('portal')
+
   if (summary.recentEntries.length === 0 && summary.balanceEur === 0) {
     return (
-      <p className="text-muted-foreground">{dict.analytics_settlement_noData}</p>
+      <p className="text-muted-foreground">{t('analytics_settlement_noData')}</p>
     )
   }
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold">{dict.analytics_settlement_heading}</h2>
-        <p className="text-sm text-muted-foreground">{dict.analytics_settlement_hint}</p>
+        <h2 className="text-2xl font-bold">{t('analytics_settlement_heading')}</h2>
+        <p className="text-sm text-muted-foreground">{t('analytics_settlement_hint')}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -51,7 +53,7 @@ export function SettlementTab({ dict, summary }: SettlementTabProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-1">
               <Scales size={12} aria-hidden="true" />
-              {dict.analytics_settlement_balance}
+              {t('analytics_settlement_balance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -63,7 +65,7 @@ export function SettlementTab({ dict, summary }: SettlementTabProps) {
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-1">
                 <CurrencyEur size={12} aria-hidden="true" />
-                {dict.analytics_settlement_carry_forward}
+                {t('analytics_settlement_carry_forward')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -78,17 +80,17 @@ export function SettlementTab({ dict, summary }: SettlementTabProps) {
       {summary.recentEntries.length > 0 && (
         <Card className="bg-card border-border overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{dict.analytics_settlement_ledger_title}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('analytics_settlement_ledger_title')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
-                    <th scope="col" className="px-4 py-3 font-medium">{dict.analytics_settlement_col_date}</th>
-                    <th scope="col" className="px-4 py-3 font-medium">{dict.analytics_settlement_col_type}</th>
-                    <th scope="col" className="px-4 py-3 font-medium">{dict.analytics_settlement_col_description}</th>
-                    <th scope="col" className="px-4 py-3 font-medium text-right">{dict.analytics_settlement_col_amount}</th>
+                    <th scope="col" className="px-4 py-3 font-medium">{t('analytics_settlement_col_date')}</th>
+                    <th scope="col" className="px-4 py-3 font-medium">{t('analytics_settlement_col_type')}</th>
+                    <th scope="col" className="px-4 py-3 font-medium">{t('analytics_settlement_col_description')}</th>
+                    <th scope="col" className="px-4 py-3 font-medium text-right">{t('analytics_settlement_col_amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -97,7 +99,7 @@ export function SettlementTab({ dict, summary }: SettlementTabProps) {
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {formatTimestamp(entry.createdAt)}
                       </td>
-                      <td className="px-4 py-3">{dict[ENTRY_TYPE_KEYS[entry.entryType]]}</td>
+                      <td className="px-4 py-3">{t(ENTRY_TYPE_KEYS[entry.entryType])}</td>
                       <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
                         {entry.description ?? '—'}
                       </td>

@@ -6,7 +6,6 @@
  */
 
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { getCachedPublicVideos, getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { VideosPageContent } from './_components/VideosPageContent'
 
@@ -22,19 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function VideosPage() {
-  const locale = await getLocale()
-  const [videos, dict, settings] = await Promise.all([
+  const [videos, settings] = await Promise.all([
     getCachedPublicVideos(),
-    getDictionary(locale),
     getCachedSiteSettings(),
   ])
 
   return (
     <VideosPageContent
       videos={videos}
-      dict={dict.videos}
-      consentDict={dict.consent}
-      locale={locale}
       placeholderUrl={settings?.consentPlaceholderUrl || undefined}
       videosPerPage={settings?.videosPerPage ?? 9}
     />

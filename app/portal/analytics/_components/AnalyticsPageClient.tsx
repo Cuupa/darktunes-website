@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,7 +22,6 @@ import type { MerchOrderStats } from '@/lib/api/merchOrders'
 import type { Concert, PromoLogEntry } from '@/types'
 import { aggregateReleasePerformance } from '@/lib/analytics/releasePerformance'
 import { computeRevenueMix } from '@/lib/analytics/revenueMix'
-import type { Dictionary } from '@/i18n/types'
 import {
   EMPTY_ANALYTICS_FILTER,
   collectAvailablePeriods,
@@ -63,7 +63,6 @@ interface AnalyticsPageClientProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
-  dict: Dictionary['portal']
   defaultTab: string
   invoicedStatementIds: string[]
   stats: StreamingStat[]
@@ -87,7 +86,6 @@ export function AnalyticsPageClient({
   artistId,
   billingProfile,
   billingProfileComplete,
-  dict,
   defaultTab,
   invoicedStatementIds,
   stats,
@@ -106,6 +104,8 @@ export function AnalyticsPageClient({
   merchStats,
   statementsEnabled,
 }: AnalyticsPageClientProps) {
+  const t = useTranslations('portal')
+
   const [filters, setFilters] = useState<AnalyticsFilterState>(EMPTY_ANALYTICS_FILTER)
   const [searchQuery, setSearchQuery] = useState('')
   const [tabVisibility, setTabVisibility] = usePortalTabVisibility()
@@ -216,18 +216,17 @@ export function AnalyticsPageClient({
     })
     const stamp = new Date().toISOString().slice(0, 10)
     triggerCsvDownload(csv, `analytics-export-${stamp}.csv`)
-    toast.success(dict.analytics_export_success)
+    toast.success(t('analytics_export_success'))
   }
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-bold">{dict.analytics_dashboard_heading}</h1>
-        <p className="text-sm text-muted-foreground">{dict.analytics_dashboard_subheading}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">{t('analytics_dashboard_heading')}</h1>
+        <p className="text-sm text-muted-foreground">{t('analytics_dashboard_subheading')}</p>
       </div>
 
       <AnalyticsToolbar
-        dict={dict}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         tabVisibility={tabVisibility}
@@ -235,13 +234,12 @@ export function AnalyticsPageClient({
         onExport={handleExport}
       />
 
-      <AnalyticsKpiGrid dict={dict} kpis={kpis} />
+      <AnalyticsKpiGrid kpis={kpis} />
 
-      <AnalyticsInsightsPanel dict={dict} insights={insights} />
+      <AnalyticsInsightsPanel insights={insights} />
 
       {showFilters && (
         <AnalyticsFilters
-          dict={dict}
           filters={filters}
           periods={periods}
           platforms={platforms}
@@ -253,44 +251,43 @@ export function AnalyticsPageClient({
       <Tabs defaultValue={activeDefaultTab} className="space-y-6">
         <TabsList className="bg-card border border-border flex-wrap h-auto w-full justify-start">
           {visibleTabs.includes('streaming') && (
-            <TabsTrigger value="streaming">{dict.analytics_tab_streaming}</TabsTrigger>
+            <TabsTrigger value="streaming">{t('analytics_tab_streaming')}</TabsTrigger>
           )}
           {visibleTabs.includes('listeners') && (
-            <TabsTrigger value="listeners">{dict.analytics_tab_listeners}</TabsTrigger>
+            <TabsTrigger value="listeners">{t('analytics_tab_listeners')}</TabsTrigger>
           )}
           {visibleTabs.includes('territories') && (
-            <TabsTrigger value="territories">{dict.analytics_tab_territories}</TabsTrigger>
+            <TabsTrigger value="territories">{t('analytics_tab_territories')}</TabsTrigger>
           )}
           {visibleTabs.includes('events') && (
-            <TabsTrigger value="events">{dict.analytics_tab_events}</TabsTrigger>
+            <TabsTrigger value="events">{t('analytics_tab_events')}</TabsTrigger>
           )}
           {visibleTabs.includes('earnings') && (
-            <TabsTrigger value="earnings">{dict.analytics_tab_earnings}</TabsTrigger>
+            <TabsTrigger value="earnings">{t('analytics_tab_earnings')}</TabsTrigger>
           )}
           {visibleTabs.includes('releases') && (
-            <TabsTrigger value="releases">{dict.analytics_tab_releases}</TabsTrigger>
+            <TabsTrigger value="releases">{t('analytics_tab_releases')}</TabsTrigger>
           )}
           {visibleTabs.includes('revenue-mix') && (
-            <TabsTrigger value="revenue-mix">{dict.analytics_tab_revenue_mix}</TabsTrigger>
+            <TabsTrigger value="revenue-mix">{t('analytics_tab_revenue_mix')}</TabsTrigger>
           )}
           {visibleTabs.includes('press') && (
-            <TabsTrigger value="press">{dict.analytics_tab_press}</TabsTrigger>
+            <TabsTrigger value="press">{t('analytics_tab_press')}</TabsTrigger>
           )}
           {statementsEnabled && visibleTabs.includes('settlement') && (
-            <TabsTrigger value="settlement">{dict.analytics_tab_settlement}</TabsTrigger>
+            <TabsTrigger value="settlement">{t('analytics_tab_settlement')}</TabsTrigger>
           )}
           {visibleTabs.includes('engagement') && (
-            <TabsTrigger value="engagement">{dict.analytics_tab_engagement}</TabsTrigger>
+            <TabsTrigger value="engagement">{t('analytics_tab_engagement')}</TabsTrigger>
           )}
           {visibleTabs.includes('merch') && (
-            <TabsTrigger value="merch">{dict.analytics_tab_merch}</TabsTrigger>
+            <TabsTrigger value="merch">{t('analytics_tab_merch')}</TabsTrigger>
           )}
         </TabsList>
 
         {visibleTabs.includes('streaming') && (
           <TabsContent value="streaming" className="mt-0">
             <StreamingChart
-              dict={dict}
               stats={filteredStats}
               aggregates={aggregates}
               concerts={concerts}
@@ -300,27 +297,25 @@ export function AnalyticsPageClient({
 
         {visibleTabs.includes('listeners') && (
           <TabsContent value="listeners" className="mt-0">
-            <ListenersChart dict={dict} metrics={filteredListeners} />
+            <ListenersChart metrics={filteredListeners} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('territories') && (
           <TabsContent value="territories" className="mt-0 space-y-4">
-            <h2 className="text-2xl font-bold">{dict.analytics_territories_heading}</h2>
-            <TerritoriesChart dict={dict} countries={countryAggregates} />
+            <h2 className="text-2xl font-bold">{t('analytics_territories_heading')}</h2>
+            <TerritoriesChart countries={countryAggregates} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('events') && (
           <TabsContent value="events" className="mt-0 space-y-6">
-            <h2 className="text-2xl font-bold">{dict.analytics_eventImpact_heading}</h2>
+            <h2 className="text-2xl font-bold">{t('analytics_eventImpact_heading')}</h2>
             <EventImpactChart
-              dict={dict}
               impacts={filteredEventImpacts}
               concerts={concerts}
             />
             <PromoImpactChart
-              dict={dict}
               impacts={promoImpacts}
               promoEntries={promoEntries}
             />
@@ -329,12 +324,11 @@ export function AnalyticsPageClient({
 
         {visibleTabs.includes('earnings') && (
           <TabsContent value="earnings" className="mt-0 space-y-6">
-            <EarningsChart dict={dict} statements={statements} />
+            <EarningsChart statements={statements} />
             <EarningsStatementsPanel
               artistId={artistId}
               billingProfile={billingProfile}
               billingProfileComplete={billingProfileComplete}
-              dict={dict}
               invoicedStatementIds={invoicedStatementIds}
               searchQuery={searchQuery}
               statements={statements}
@@ -344,37 +338,37 @@ export function AnalyticsPageClient({
 
         {visibleTabs.includes('releases') && (
           <TabsContent value="releases" className="mt-0">
-            <ReleasePerformanceChart dict={dict} rows={releaseRows} />
+            <ReleasePerformanceChart rows={releaseRows} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('revenue-mix') && (
           <TabsContent value="revenue-mix" className="mt-0">
-            <RevenueMixChart dict={dict} slices={revenueMixSlices} />
+            <RevenueMixChart slices={revenueMixSlices} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('press') && (
           <TabsContent value="press" className="mt-0">
-            <EpkPressTab dict={dict} epkStats={epkStats} pressStats={pressStats} />
+            <EpkPressTab epkStats={epkStats} pressStats={pressStats} />
           </TabsContent>
         )}
 
         {statementsEnabled && visibleTabs.includes('settlement') && (
           <TabsContent value="settlement" className="mt-0">
-            <SettlementTab dict={dict} summary={settlementSummary} />
+            <SettlementTab summary={settlementSummary} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('engagement') && (
           <TabsContent value="engagement" className="mt-0">
-            <EngagementTab dict={dict} stats={engagementStats} />
+            <EngagementTab stats={engagementStats} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('merch') && (
           <TabsContent value="merch" className="mt-0">
-            <MerchTab dict={dict} stats={merchStats} />
+            <MerchTab stats={merchStats} />
           </TabsContent>
         )}
       </Tabs>

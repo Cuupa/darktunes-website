@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes } from 'react'
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import enDict from '@/i18n/dictionaries/en.json'
+import { testMessages } from '@/test/mockNextIntl'
 import type { Concert } from '@/types'
 import { Concerts } from '@/components/Concerts'
 
@@ -72,7 +72,7 @@ beforeEach(() => {
 describe('Concerts homepage section', () => {
   it('renders a full-card overlay link to the event detail page', () => {
     render(
-      <Concerts concerts={[concert]} dict={enDict.concerts} locale="en" editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
+      <Concerts concerts={[concert]} editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
     )
 
     const overlayLink = screen.getByRole('link', {
@@ -101,14 +101,14 @@ describe('Concerts homepage section', () => {
 
   it('ticket link is interactive (pointer-events-auto, z-20) and not nested inside the overlay link', () => {
     render(
-      <Concerts concerts={[concert]} dict={enDict.concerts} locale="en" editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
+      <Concerts concerts={[concert]} editMode={false} sectionLabels={sectionLabels} onLabelChange={() => undefined} />,
     )
 
     const overlayLink = screen.getByRole('link', {
       name: `${concert.artistName} – ${concert.eventName}`,
     })
     const ticketLink = screen.getByRole('link', {
-      name: `${enDict.concerts.ticketLink} (${enDict.concerts.opensInNewTab})`,
+      name: `${testMessages.concerts.ticketLink} (${testMessages.concerts.opensInNewTab})`,
     })
 
     expect(ticketLink).toHaveAttribute('href', concert.ticketUrl)

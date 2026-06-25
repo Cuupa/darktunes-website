@@ -7,17 +7,13 @@
 
 export const dynamic = 'force-dynamic'
 
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getPromoTracks } from '@/lib/api/promoTracks'
 import { PromoPoolClient } from './_components/PromoPoolClient'
 
 export default async function PromoPoolPage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
-
   const supabase = await createServerSupabaseClient()
   const tracks = await getPromoTracks(supabase).catch(() => [])
 
-  return <PromoPoolClient dict={dict.promoPool} tracks={tracks} />
+  return <PromoPoolClient tracks={tracks} />
 }

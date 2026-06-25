@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
+import createNextIntlPlugin from 'next-intl/plugin'
 import withSerwistInit from '@serwist/next'
 import withBundleAnalyzerInit from '@next/bundle-analyzer'
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 import { buildContentSecurityPolicy } from './src/lib/security/contentSecurityPolicy'
 
 const withSerwist = withSerwistInit({
@@ -80,4 +83,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withBundleAnalyzer(withSerwist(nextConfig))
+export default withBundleAnalyzer(withSerwist(withNextIntl(nextConfig)))

@@ -1,0 +1,16 @@
+{
+  "heading": "Presseanfrage",
+  "subjectLabel": "Betreff",
+  "subjects": {
+    "interview": "Interview-Anfrage",
+    "reviewCopy": "Rezensionsexemplar",
+    "accreditation": "Event-Akkreditierung",
+    "general": "Allgemeine Anfrage"
+  },
+  "messagePlaceholder": "Schreibe deine Nachricht hier…",
+  "send": "Anfrage senden",
+  "sending": "Wird gesendet…",
+  "sent": "Deine Nachricht wurde gesendet.",
+  "backToInbox": "Zurück zum Posteingang",
+  "messageLabel": "Nachricht"
+}

@@ -6,13 +6,13 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getFeatureFlags } from '@/lib/api/featureFlags'
-import { useDict } from '@/contexts/DictContext'
+import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 import type { PortalFeatureFlag } from '@/types'
 
 export function FeatureFlagsManager() {
-  const dict = useDict()
+  const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [flags, setFlags] = useState<PortalFeatureFlag[]>([])
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -20,8 +20,8 @@ export function FeatureFlagsManager() {
   useEffect(() => {
     void getFeatureFlags(supabase)
       .then(setFlags)
-      .catch(() => toast.error(dict.errors.SERVER_ERROR))
-  }, [supabase, dict])
+      .catch(() => toast.error(tErrors('SERVER_ERROR')))
+  }, [supabase, tErrors])
 
   const toggleFlag = async (flag: PortalFeatureFlag, enabled: boolean) => {
     setLoadingId(flag.id)
@@ -29,7 +29,7 @@ export function FeatureFlagsManager() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error(dict.errors.AUTH_REQUIRED)
+      if (!session?.access_token) throw new Error(tErrors('AUTH_REQUIRED'))
 
       const res = await fetch(`/api/admin/feature-flags/${flag.id}`, {
         method: 'PATCH',
@@ -42,13 +42,13 @@ export function FeatureFlagsManager() {
 
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorResponse
-        throw new Error(getErrorMessage(body, dict))
+        throw new Error(getErrorMessage(body, tErrors))
       }
 
       setFlags((prev) => prev.map((item) => (item.id === flag.id ? { ...item, enabled } : item)))
       toast.success(`Updated ${flag.label}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.errors.SERVER_ERROR)
+      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setLoadingId(null)
     }

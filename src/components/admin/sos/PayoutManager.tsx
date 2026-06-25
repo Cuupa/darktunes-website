@@ -12,7 +12,7 @@ import type { LabelArtist, LabelInfo } from '@/lib/sos/types'
 import { isValidIBAN } from '@/lib/sos/iban-validator'
 import { generateSepaXml, downloadSepaXml } from '@/lib/sos/sepa-generator'
 import type { SepaPayoutEntry } from '@/lib/sos/sepa-generator'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
@@ -85,11 +85,7 @@ export function PayoutManager({
   periodEnd,
   onLabelSepaUpdate,
 }: PayoutManagerProps) {
-  const dict = useDict()
-  const t = useMemo(
-    () => ({ ...payoutFallback, ...(dict.admin?.accounting ?? {}) }),
-    [dict.admin?.accounting],
-  )
+  const t = useMergedAccountingLabels(payoutFallback)
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loadingRegister, setLoadingRegister] = useState(true)

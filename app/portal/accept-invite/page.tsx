@@ -10,7 +10,6 @@
 export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
 import { AcceptInviteClient } from './_components/AcceptInviteClient'
 
 export const metadata: Metadata = {
@@ -19,8 +18,6 @@ export const metadata: Metadata = {
 }
 
 export default async function AcceptInvitePage() {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
 
-  return <AcceptInviteClient dict={dict.portal} />
+  return <AcceptInviteClient />
 }

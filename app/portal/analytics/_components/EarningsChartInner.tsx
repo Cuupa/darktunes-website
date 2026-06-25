@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/analytics/_components/EarningsChartInner.tsx
  *
@@ -24,12 +25,14 @@ function formatEur(value: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
-export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, pendingCount }: EarningsChartInnerProps) {
+export function EarningsChartInner({ chartData, totalEarned, lastPayout, pendingCount }: EarningsChartInnerProps) {
+  const t = useTranslations('portal')
+
   const hasData = chartData.length > 0
 
   return (
     <div className="space-y-8">
-      <h2 className="text-xl font-semibold">{dict.analytics_earnings_heading}</h2>
+      <h2 className="text-xl font-semibold">{t('analytics_earnings_heading')}</h2>
 
       {/* KPI summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -37,7 +40,7 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-1">
               <CurrencyEur size={12} aria-hidden="true" />
-              {dict.analytics_earnings_total}
+              {t('analytics_earnings_total')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -49,7 +52,7 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-1">
               <ClockCounterClockwise size={12} aria-hidden="true" />
-              {dict.analytics_earnings_last_payout}
+              {t('analytics_earnings_last_payout')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -63,7 +66,7 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-1">
               <Hourglass size={12} aria-hidden="true" />
-              {dict.analytics_earnings_pending}
+              {t('analytics_earnings_pending')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -75,10 +78,10 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
       {hasData ? (
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle>{dict.analytics_earnings_chart_label}</CardTitle>
+            <CardTitle>{t('analytics_earnings_chart_label')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div role="img" aria-label={dict.analytics_earnings_chart_label}>
+            <div role="img" aria-label={t('analytics_earnings_chart_label')}>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#383838" />
@@ -95,13 +98,13 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
                   <Tooltip
                     contentStyle={{ backgroundColor: '#292929', border: '1px solid #383838' }}
                     labelStyle={{ color: '#fff' }}
-                    formatter={(value: number) => [formatEur(value), dict.analytics_earnings_chart_label]}
+                    formatter={(value: number) => [formatEur(value), t('analytics_earnings_chart_label')]}
                   />
                   <Bar
                     dataKey="amount"
                     fill="var(--primary)"
                     radius={[2, 2, 0, 0]}
-                    name={dict.analytics_earnings_chart_label}
+                    name={t('analytics_earnings_chart_label')}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -109,11 +112,11 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
 
             {/* Visually-hidden data table for screen readers */}
             <table className="sr-only">
-              <caption>{dict.analytics_earnings_chart_label}</caption>
+              <caption>{t('analytics_earnings_chart_label')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">{dict.statements_period}</th>
-                  <th scope="col">{dict.statements_amount}</th>
+                  <th scope="col">{t('statements_period')}</th>
+                  <th scope="col">{t('statements_amount')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,7 +134,7 @@ export function EarningsChartInner({ dict, chartData, totalEarned, lastPayout, p
         <Card className="bg-card border-border">
           <CardContent className="py-16 text-center text-muted-foreground">
             <CurrencyEur size={40} className="mx-auto mb-4 opacity-30" aria-hidden="true" />
-            <p>{dict.analytics_earnings_noData}</p>
+            <p>{t('analytics_earnings_noData')}</p>
           </CardContent>
         </Card>
       )}

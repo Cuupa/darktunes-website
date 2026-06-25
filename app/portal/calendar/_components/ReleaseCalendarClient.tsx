@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/calendar/_components/ReleaseCalendarClient.tsx
  *
@@ -33,7 +34,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getSquareThumbnail } from '@/lib/imageUtils'
-import type { Dictionary } from '@/i18n/types'
 import type { Release } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,6 @@ import type { Release } from '@/types'
 type ReleaseStatus = 'past' | 'today' | 'upcoming'
 
 interface ReleaseCalendarClientProps {
-  dict: Dictionary['portal']
   releases: Release[]
   currentArtistId: string | null
 }
@@ -91,15 +90,15 @@ const MONTH_NAMES_DE = [
 const WEEKDAY_HEADERS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const WEEKDAY_HEADERS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-function getMonthName(month: number, dict: Dictionary['portal']): string {
+function getMonthName(month: number, t: ReturnType<typeof useTranslations<'portal'>>): string {
   // Detect language from a known German key
-  const isGerman = dict.calendar_close === 'Schließen'
+  const isGerman = t('calendar_close') === 'Schließen'
   const names = isGerman ? MONTH_NAMES_DE : MONTH_NAMES_EN
   return names[month - 1] ?? ''
 }
 
-function getWeekdayHeaders(dict: Dictionary['portal']): string[] {
-  const isGerman = dict.calendar_close === 'Schließen'
+function getWeekdayHeaders(t: ReturnType<typeof useTranslations<'portal'>>): string[] {
+  const isGerman = t('calendar_close') === 'Schließen'
   return isGerman ? WEEKDAY_HEADERS_DE : WEEKDAY_HEADERS_EN
 }
 
@@ -109,28 +108,28 @@ function getWeekdayHeaders(dict: Dictionary['portal']): string[] {
 
 function StatusBadge({
   status,
-  dict,
 }: {
   status: ReleaseStatus
-  dict: Dictionary['portal']
 }) {
+  const t = useTranslations('portal')
+
   if (status === 'today') {
     return (
       <Badge className="bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5">
-        {dict.calendar_status_today}
+        {t('calendar_status_today')}
       </Badge>
     )
   }
   if (status === 'upcoming') {
     return (
       <Badge className="bg-primary/20 text-primary border border-primary/40 text-[10px] px-1.5 py-0.5">
-        {dict.calendar_status_presave}
+        {t('calendar_status_presave')}
       </Badge>
     )
   }
   return (
     <Badge variant="outline" className="text-muted-foreground text-[10px] px-1.5 py-0.5">
-      {dict.calendar_status_released}
+      {t('calendar_status_released')}
     </Badge>
   )
 }
@@ -142,11 +141,12 @@ function StatusBadge({
 interface ReleaseDetailDialogProps {
   release: Release | null
   today: string
-  dict: Dictionary['portal']
   onClose: () => void
 }
 
-function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDialogProps) {
+function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogProps) {
+  const t = useTranslations('portal')
+
   const prefersReducedMotion = useReducedMotion()
 
   if (!release) return null
@@ -181,7 +181,7 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
             <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
               <Image
                 src={getSquareThumbnail(release.coverArt, 600)}
-                alt={`${release.title} — ${dict.calendar_cover_alt}`}
+                alt={`${release.title} — ${t('calendar_cover_alt')}`}
                 fill
                 className="object-cover"
                 unoptimized
@@ -189,7 +189,7 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
               />
               {/* Status badge over cover */}
               <div className="absolute top-3 left-3">
-                <StatusBadge status={status} dict={dict} />
+                <StatusBadge status={status} />
               </div>
             </div>
           ) : (
@@ -219,7 +219,7 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
               <CalendarDots size={16} aria-hidden="true" />
               <time dateTime={release.releaseDate}>
                 {new Date(release.releaseDate + 'T12:00:00').toLocaleDateString(
-                  dict.calendar_close === 'Schließen' ? 'de-DE' : 'en-GB',
+                  t('calendar_close') === 'Schließen' ? 'de-DE' : 'en-GB',
                   { day: 'numeric', month: 'long', year: 'numeric' },
                 )}
               </time>
@@ -237,9 +237,9 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   prefersReducedMotion ? '' : 'transition-all',
                 )}
-                aria-label={`${dict.calendar_presave_link} — ${release.title}`}
+                aria-label={`${t('calendar_presave_link')} — ${release.title}`}
               >
-                {dict.calendar_presave_link}
+                {t('calendar_presave_link')}
               </Link>
             )}
 
@@ -256,9 +256,9 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
                       'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     )}
-                    aria-label={`${dict.calendar_listen_link} — ${release.title}`}
+                    aria-label={`${t('calendar_listen_link')} — ${release.title}`}
                   >
-                    {dict.calendar_listen_link}
+                    {t('calendar_listen_link')}
                   </Link>
                 )}
                 {!release.smartUrl && release.spotifyUrl && (
@@ -290,7 +290,7 @@ function ReleaseDetailDialog({ release, today, dict, onClose }: ReleaseDetailDia
             {release.promoText && (
               <div className="rounded-md border border-border bg-muted/50 p-4 space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  {dict.calendar_promo_notes}
+                  {t('calendar_promo_notes')}
                 </p>
                 <p className="text-sm text-foreground whitespace-pre-wrap">{release.promoText}</p>
               </div>
@@ -312,11 +312,12 @@ interface DayCellProps {
   releases: Release[]
   today: string
   isCurrentMonth: boolean
-  dict: Dictionary['portal']
   onSelectRelease: (r: Release) => void
 }
 
-function DayCell({ day, dateStr, releases, today, isCurrentMonth, dict, onSelectRelease }: DayCellProps) {
+function DayCell({ day, dateStr, releases, today, isCurrentMonth, onSelectRelease }: DayCellProps) {
+  const t = useTranslations('portal')
+
   const isToday = dateStr === today
   const hasReleases = releases.length > 0
 
@@ -361,7 +362,7 @@ function DayCell({ day, dateStr, releases, today, isCurrentMonth, dict, onSelect
                   ? 'bg-secondary/20 text-secondary hover:bg-secondary/30'
                   : 'bg-primary/20 text-primary hover:bg-primary/30',
               )}
-              aria-label={`${release.title} — ${dict.calendar_status_upcoming}`}
+              aria-label={`${release.title} — ${t('calendar_status_upcoming')}`}
               title={release.title}
             >
               {release.title}
@@ -382,11 +383,11 @@ function DayCell({ day, dateStr, releases, today, isCurrentMonth, dict, onSelect
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ReleaseCalendarClient({
-  dict,
-  releases,
+export function ReleaseCalendarClient({ releases,
   currentArtistId,
 }: ReleaseCalendarClientProps) {
+  const t = useTranslations('portal')
+
   const today = useMemo(() => getToday(), [])
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1) // 1-based
@@ -482,14 +483,14 @@ export function ReleaseCalendarClient({
     })
   }, [])
 
-  const weekdayHeaders = getWeekdayHeaders(dict)
-  const monthName = getMonthName(viewMonth, dict)
+  const weekdayHeaders = getWeekdayHeaders(t)
+  const monthName = getMonthName(viewMonth, t)
 
   return (
     <section aria-labelledby="calendar-heading" className="space-y-6">
       {/* Page heading */}
       <h1 id="calendar-heading" className="text-2xl font-bold">
-        {dict.calendar_heading}
+        {t('calendar_heading')}
       </h1>
 
       {/* Filter toggle */}
@@ -509,7 +510,7 @@ export function ReleaseCalendarClient({
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {dict.calendar_filter_all}
+          {t('calendar_filter_all')}
         </button>
         {currentArtistId && (
           <button
@@ -523,7 +524,7 @@ export function ReleaseCalendarClient({
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {dict.calendar_filter_mine}
+            {t('calendar_filter_mine')}
           </button>
         )}
       </div>
@@ -534,7 +535,7 @@ export function ReleaseCalendarClient({
           variant="ghost"
           size="icon"
           onClick={goToPrevMonth}
-          aria-label={dict.calendar_prev_month}
+          aria-label={t('calendar_prev_month')}
           className="min-w-[44px] min-h-[44px]"
         >
           <CaretLeft size={18} aria-hidden="true" />
@@ -548,7 +549,7 @@ export function ReleaseCalendarClient({
           variant="ghost"
           size="icon"
           onClick={goToNextMonth}
-          aria-label={dict.calendar_next_month}
+          aria-label={t('calendar_next_month')}
           className="min-w-[44px] min-h-[44px]"
         >
           <CaretRight size={18} aria-hidden="true" />
@@ -586,7 +587,6 @@ export function ReleaseCalendarClient({
               releases={dayReleases}
               today={today}
               isCurrentMonth={isCurrentMonth}
-              dict={dict}
               onSelectRelease={setSelectedRelease}
             />
           )
@@ -600,15 +600,15 @@ export function ReleaseCalendarClient({
       >
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary/30" aria-hidden="true" />
-          {dict.calendar_status_presave}
+          {t('calendar_status_presave')}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm bg-secondary/30" aria-hidden="true" />
-          {dict.calendar_status_today}
+          {t('calendar_status_today')}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" aria-hidden="true" />
-          {dict.calendar_status_released}
+          {t('calendar_status_released')}
         </span>
       </div>
 
@@ -616,7 +616,6 @@ export function ReleaseCalendarClient({
       <ReleaseDetailDialog
         release={selectedRelease}
         today={today}
-        dict={dict}
         onClose={() => setSelectedRelease(null)}
       />
     </section>

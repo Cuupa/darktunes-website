@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { Plus, Trash, DownloadSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -10,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
-import type { Dictionary } from '@/i18n/types'
 import type { GeneratePdfInput } from '../_actions/generatePdf'
 import { generateFreePdf } from '../_actions/generatePdf'
 import { InlineBillingProfileStep } from './InlineBillingProfileStep'
@@ -25,7 +25,6 @@ interface FreeInvoiceGeneratorProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
-  dict: Dictionary['portal']
 }
 
 function applyBillingProfileToSender(
@@ -59,8 +58,9 @@ export function FreeInvoiceGenerator({
   artistId,
   billingProfile: initialBillingProfile,
   billingProfileComplete: initialBillingComplete,
-  dict,
 }: FreeInvoiceGeneratorProps) {
+  const t = useTranslations('portal')
+
   const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
   const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingComplete)
   const today = new Date().toISOString().slice(0, 10)
@@ -125,7 +125,7 @@ export function FreeInvoiceGenerator({
     event.preventDefault()
 
     if (!billingProfileComplete) {
-      toast.error(dict.invoice_billing_incomplete)
+      toast.error(t('invoice_billing_incomplete'))
       return
     }
 
@@ -163,7 +163,7 @@ export function FreeInvoiceGenerator({
       const result = await generateFreePdf(input)
 
       if (result.error || !result.base64) {
-        toast.error(result.error ?? dict.invoice_generator_error)
+        toast.error(result.error ?? t('invoice_generator_error'))
         return
       }
 
@@ -176,9 +176,9 @@ export function FreeInvoiceGenerator({
       anchor.download = result.filename ?? 'rechnung.pdf'
       anchor.click()
       URL.revokeObjectURL(url)
-      toast.success(dict.invoice_generator_success)
+      toast.success(t('invoice_generator_success'))
     } catch {
-      toast.error(dict.invoice_generator_error)
+      toast.error(t('invoice_generator_error'))
     } finally {
       setGenerating(false)
     }
@@ -189,7 +189,6 @@ export function FreeInvoiceGenerator({
       <InlineBillingProfileStep
         artistId={artistId}
         billingProfile={billingProfile}
-        dict={dict}
         onComplete={(profile) => {
           setBillingProfile(profile)
           setBillingProfileComplete(true)
@@ -213,18 +212,18 @@ export function FreeInvoiceGenerator({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">{dict.invoice_generator_desc}</p>
+        <p className="text-sm text-muted-foreground">{t('invoice_generator_desc')}</p>
       </div>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
         {/* Sender */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{dict.invoice_sender_section}</CardTitle>
+            <CardTitle className="text-base">{t('invoice_sender_section')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="gen-sender-name">{dict.invoice_sender_name}</Label>
+              <Label htmlFor="gen-sender-name">{t('invoice_sender_name')}</Label>
               <Input
                 id="gen-sender-name"
                 required
@@ -234,7 +233,7 @@ export function FreeInvoiceGenerator({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-street">{dict.invoice_sender_street}</Label>
+                <Label htmlFor="gen-sender-street">{t('invoice_sender_street')}</Label>
                 <Input
                   id="gen-sender-street"
                   required
@@ -243,7 +242,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-postal">{dict.invoice_sender_postal_code}</Label>
+                <Label htmlFor="gen-sender-postal">{t('invoice_sender_postal_code')}</Label>
                 <Input
                   id="gen-sender-postal"
                   required
@@ -252,7 +251,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-city">{dict.invoice_sender_city}</Label>
+                <Label htmlFor="gen-sender-city">{t('invoice_sender_city')}</Label>
                 <Input
                   id="gen-sender-city"
                   required
@@ -261,7 +260,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-country">{dict.invoice_sender_country}</Label>
+                <Label htmlFor="gen-sender-country">{t('invoice_sender_country')}</Label>
                 <Input
                   id="gen-sender-country"
                   required
@@ -272,7 +271,7 @@ export function FreeInvoiceGenerator({
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-tax">{dict.invoice_sender_tax_number}</Label>
+                <Label htmlFor="gen-sender-tax">{t('invoice_sender_tax_number')}</Label>
                 <Input
                   id="gen-sender-tax"
                   value={senderTaxNumber}
@@ -280,7 +279,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-vat">{dict.invoice_sender_vat_id}</Label>
+                <Label htmlFor="gen-sender-vat">{t('invoice_sender_vat_id')}</Label>
                 <Input
                   id="gen-sender-vat"
                   value={senderVatId}
@@ -288,7 +287,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-sender-email">{dict.invoice_sender_email}</Label>
+                <Label htmlFor="gen-sender-email">{t('invoice_sender_email')}</Label>
                 <Input
                   id="gen-sender-email"
                   type="email"
@@ -307,7 +306,7 @@ export function FreeInvoiceGenerator({
                   setTaxRatePct(e.target.checked ? 0 : 19)
                 }}
               />
-              <span>{dict.invoice_small_business}</span>
+              <span>{t('invoice_small_business')}</span>
             </label>
           </CardContent>
         </Card>
@@ -315,12 +314,12 @@ export function FreeInvoiceGenerator({
         {/* Recipient */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{dict.invoice_client}</CardTitle>
+            <CardTitle className="text-base">{t('invoice_client')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-name">{dict.invoice_client_name}</Label>
+                <Label htmlFor="gen-rec-name">{t('invoice_client_name')}</Label>
                 <Input
                   id="gen-rec-name"
                   required
@@ -329,7 +328,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-email">{dict.invoice_client_email}</Label>
+                <Label htmlFor="gen-rec-email">{t('invoice_client_email')}</Label>
                 <Input
                   id="gen-rec-email"
                   type="email"
@@ -340,7 +339,7 @@ export function FreeInvoiceGenerator({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-street">{dict.invoice_sender_street}</Label>
+                <Label htmlFor="gen-rec-street">{t('invoice_sender_street')}</Label>
                 <Input
                   id="gen-rec-street"
                   required
@@ -349,7 +348,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-postal">{dict.invoice_sender_postal_code}</Label>
+                <Label htmlFor="gen-rec-postal">{t('invoice_sender_postal_code')}</Label>
                 <Input
                   id="gen-rec-postal"
                   required
@@ -358,7 +357,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-city">{dict.invoice_sender_city}</Label>
+                <Label htmlFor="gen-rec-city">{t('invoice_sender_city')}</Label>
                 <Input
                   id="gen-rec-city"
                   required
@@ -367,7 +366,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-rec-country">{dict.invoice_sender_country}</Label>
+                <Label htmlFor="gen-rec-country">{t('invoice_sender_country')}</Label>
                 <Input
                   id="gen-rec-country"
                   required
@@ -382,12 +381,12 @@ export function FreeInvoiceGenerator({
         {/* Invoice meta */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{dict.invoice_new}</CardTitle>
+            <CardTitle className="text-base">{t('invoice_new')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="gen-number">{dict.invoice_artist_invoice_number}</Label>
+                <Label htmlFor="gen-number">{t('invoice_artist_invoice_number')}</Label>
                 <Input
                   id="gen-number"
                   required
@@ -396,7 +395,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-issued">{dict.invoice_issued_date}</Label>
+                <Label htmlFor="gen-issued">{t('invoice_issued_date')}</Label>
                 <Input
                   id="gen-issued"
                   type="date"
@@ -406,7 +405,7 @@ export function FreeInvoiceGenerator({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-due">{dict.invoice_due_date}</Label>
+                <Label htmlFor="gen-due">{t('invoice_due_date')}</Label>
                 <Input
                   id="gen-due"
                   type="date"
@@ -417,7 +416,7 @@ export function FreeInvoiceGenerator({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="gen-currency">{dict.invoice_currency}</Label>
+                <Label htmlFor="gen-currency">{t('invoice_currency')}</Label>
                 <select
                   id="gen-currency"
                   value={currency}
@@ -431,7 +430,7 @@ export function FreeInvoiceGenerator({
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gen-tax-rate">{dict.invoice_tax_rate}</Label>
+                <Label htmlFor="gen-tax-rate">{t('invoice_tax_rate')}</Label>
                 <Input
                   id="gen-tax-rate"
                   type="number"
@@ -448,10 +447,10 @@ export function FreeInvoiceGenerator({
             {/* Line items */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>{dict.invoice_line_items}</Label>
+                <Label>{t('invoice_line_items')}</Label>
                 <Button type="button" size="sm" variant="outline" className="gap-1" onClick={addLineItem}>
                   <Plus size={14} aria-hidden="true" />
-                  {dict.invoice_line_add}
+                  {t('invoice_line_add')}
                 </Button>
               </div>
               {lineItems.map((item, index) => (
@@ -460,7 +459,7 @@ export function FreeInvoiceGenerator({
                   className="grid items-start gap-2 sm:grid-cols-[1fr_90px_140px_44px]"
                 >
                   <Input
-                    placeholder={dict.invoice_line_description}
+                    placeholder={t('invoice_line_description')}
                     required
                     value={item.description}
                     onChange={(e) => updateLineItem(index, 'description', e.target.value)}
@@ -468,7 +467,7 @@ export function FreeInvoiceGenerator({
                   <Input
                     type="number"
                     min={1}
-                    placeholder={dict.invoice_line_qty}
+                    placeholder={t('invoice_line_qty')}
                     value={item.qty}
                     onChange={(e) =>
                       updateLineItem(index, 'qty', parseInt(e.target.value, 10) || 1)
@@ -478,7 +477,7 @@ export function FreeInvoiceGenerator({
                     type="number"
                     min={0}
                     step={0.01}
-                    placeholder={dict.invoice_line_unit_price}
+                    placeholder={t('invoice_line_unit_price')}
                     value={item.unitPriceCents / 100}
                     onChange={(e) =>
                       updateLineItem(index, 'unitPriceCents', Math.round(parseFloat(e.target.value) * 100) || 0)
@@ -490,7 +489,7 @@ export function FreeInvoiceGenerator({
                     size="icon"
                     disabled={lineItems.length === 1}
                     onClick={() => removeLineItem(index)}
-                    aria-label={dict.invoice_line_remove}
+                    aria-label={t('invoice_line_remove')}
                   >
                     <Trash size={14} aria-hidden="true" />
                   </Button>
@@ -501,24 +500,24 @@ export function FreeInvoiceGenerator({
             {/* Totals */}
             <div className="space-y-1 border-t pt-3 text-sm text-muted-foreground">
               <div className="flex justify-between">
-                <span>{dict.invoice_subtotal}</span>
+                <span>{t('invoice_subtotal')}</span>
                 <span>{formatCents(subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span>
-                  {dict.invoice_tax} ({effectiveTaxRate.toFixed(2)}%)
+                  {t('invoice_tax')} ({effectiveTaxRate.toFixed(2)}%)
                 </span>
                 <span>{formatCents(tax)}</span>
               </div>
               <div className="flex justify-between font-semibold text-foreground">
-                <span>{dict.invoice_total}</span>
+                <span>{t('invoice_total')}</span>
                 <span>{formatCents(total)}</span>
               </div>
             </div>
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="gen-notes">{dict.invoice_notes}</Label>
+              <Label htmlFor="gen-notes">{t('invoice_notes')}</Label>
               <Textarea
                 id="gen-notes"
                 rows={3}
@@ -536,7 +535,7 @@ export function FreeInvoiceGenerator({
             className="gap-2"
           >
             <DownloadSimple size={16} aria-hidden="true" />
-            {generating ? dict.invoice_generating : dict.invoice_generate_download}
+            {generating ? t('invoice_generating') : t('invoice_generate_download')}
           </Button>
         </div>
       </form>

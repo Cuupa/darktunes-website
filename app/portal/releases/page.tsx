@@ -15,9 +15,9 @@ import { getOrCreateReleaseChecklist } from '@/lib/api/releaseChecklists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseChecklistPanel } from './_components/ReleaseChecklist'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
-import { getPortalDictionary } from '@/i18n/getDictionary'
-
 function ReleasesSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-64" />
@@ -29,7 +29,7 @@ function ReleasesSkeleton() {
 }
 
 async function ReleasesContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
@@ -63,7 +63,6 @@ async function ReleasesContent({ searchParams }: { searchParams: Promise<{ artis
 
   return (
     <ReleaseChecklistPanel
-      dict={dict.portal}
       releases={upcomingReleases}
       releasedReleases={releasedReleases}
       checklistsByReleaseId={checklistsByReleaseId}

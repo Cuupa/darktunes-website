@@ -7,11 +7,11 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { UploadSimple, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 import { toast } from 'sonner'
 
 export interface EpkFontAsset {
@@ -25,12 +25,12 @@ export interface EpkFontAsset {
 }
 
 interface EpkFontManagerProps {
-  dict: Dictionary['portal']
   artistId: string
   initialFonts: EpkFontAsset[]
 }
 
-export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerProps) {
+export function EpkFontManager({ artistId, initialFonts }: EpkFontManagerProps) {
+  const t = useTranslations('portal')
   const documentFonts = useEpkEditorStore((s) => s.document.fonts)
   const addDocumentFont = useEpkEditorStore((s) => s.addDocumentFont)
   const removeDocumentFont = useEpkEditorStore((s) => s.removeDocumentFont)
@@ -47,7 +47,7 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        toast.error(dict.epk_builder_export_auth_error)
+        toast.error(t('epk_builder_export_auth_error'))
         return
       }
 
@@ -60,7 +60,7 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
         body: formData,
       })
 
-      if (!response.ok) throw new Error(dict.epk_fonts_upload_error)
+      if (!response.ok) throw new Error(t('epk_fonts_upload_error'))
 
       const payload = (await response.json()) as { font: EpkFontAsset }
       setFonts((prev) => [payload.font, ...prev])
@@ -70,13 +70,13 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
         src: payload.font.publicUrl,
         r2Key: payload.font.r2Key,
       })
-      toast.success(dict.epk_fonts_upload_success)
+      toast.success(t('epk_fonts_upload_success'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.epk_fonts_upload_error)
+      toast.error(err instanceof Error ? err.message : t('epk_fonts_upload_error'))
     } finally {
       setUploading(false)
     }
-  }, [addDocumentFont, artistId, dict])
+  }, [addDocumentFont, artistId, t])
 
   const handleDelete = useCallback(async (fontId: string) => {
     setDeletingId(fontId)
@@ -86,7 +86,7 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        toast.error(dict.epk_builder_export_auth_error)
+        toast.error(t('epk_builder_export_auth_error'))
         return
       }
 
@@ -99,22 +99,22 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
         body: JSON.stringify({ id: fontId }),
       })
 
-      if (!response.ok) throw new Error(dict.epk_fonts_delete_error)
+      if (!response.ok) throw new Error(t('epk_fonts_delete_error'))
 
       setFonts((prev) => prev.filter((f) => f.id !== fontId))
       removeDocumentFont(fontId)
-      toast.success(dict.epk_fonts_delete_success)
+      toast.success(t('epk_fonts_delete_success'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.epk_fonts_delete_error)
+      toast.error(err instanceof Error ? err.message : t('epk_fonts_delete_error'))
     } finally {
       setDeletingId(null)
     }
-  }, [artistId, dict, removeDocumentFont])
+  }, [artistId, t, removeDocumentFont])
 
   return (
     <div className="rounded-lg border border-border bg-card" data-lenis-prevent>
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">{dict.epk_fonts_title}</h2>
+        <h2 className="text-sm font-semibold">{t('epk_fonts_title')}</h2>
         <input
           ref={fileInputRef}
           type="file"
@@ -135,13 +135,13 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
           onClick={() => fileInputRef.current?.click()}
         >
           <UploadSimple size={16} className="mr-2" aria-hidden="true" />
-          {uploading ? dict.epk_fonts_uploading : dict.epk_fonts_upload}
+          {uploading ? t('epk_fonts_uploading') : t('epk_fonts_upload')}
         </Button>
       </div>
 
       <div className="p-4 max-h-[min(200px,30vh)] overflow-y-auto">
         {fonts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{dict.epk_fonts_empty}</p>
+          <p className="text-sm text-muted-foreground">{t('epk_fonts_empty')}</p>
         ) : (
           <ul className="space-y-2 list-none">
             {fonts.map((font) => {
@@ -154,7 +154,7 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{font.name}</p>
                     {inDocument && (
-                      <p className="text-xs text-muted-foreground">{dict.epk_fonts_in_document}</p>
+                      <p className="text-xs text-muted-foreground">{t('epk_fonts_in_document')}</p>
                     )}
                   </div>
                   <Button
@@ -163,7 +163,7 @@ export function EpkFontManager({ dict, artistId, initialFonts }: EpkFontManagerP
                     size="sm"
                     className="min-h-[44px] min-w-[44px] shrink-0"
                     disabled={deletingId === font.id}
-                    aria-label={dict.epk_fonts_delete}
+                    aria-label={t('epk_fonts_delete')}
                     onClick={() => void handleDelete(font.id)}
                   >
                     <Trash size={16} aria-hidden="true" />

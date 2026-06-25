@@ -1,0 +1,26 @@
+{
+  "heading": "EVENTS",
+  "subheading": "Live dates, gigs & upcoming shows",
+  "ticketLink": "Get Tickets",
+  "opensInNewTab": "opens in new tab",
+  "cancelled": "Cancelled",
+  "noShows": "No upcoming events at the moment.",
+  "checkBack": "Check back soon for new dates.",
+  "viewAll": "All Events",
+  "filterArtist": "All Artists",
+  "filterCountry": "All Countries",
+  "navLink": "Navigate",
+  "searchPlaceholder": "Search events by artist or venue…",
+  "noResults": "No events match your search.",
+  "eventDetail": {
+    "backToEvents": "← All Events",
+    "addToCalendar": "Add to Calendar",
+    "relatedNews": "Related News",
+    "readMore": "Read article",
+    "featuredArtists": "Line-up",
+    "share": "Share",
+    "shareSuccess": "Shared!",
+    "shareLinkCopied": "Link copied!",
+    "shareError": "Could not share"
+  }
+}

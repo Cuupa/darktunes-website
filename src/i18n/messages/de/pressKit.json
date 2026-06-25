@@ -1,0 +1,14 @@
+{
+  "heading": "Presse-Kit",
+  "tabs": {
+    "all": "Alle",
+    "photo": "Fotos",
+    "logo": "Logos",
+    "social": "Social",
+    "document": "Dokumente"
+  },
+  "downloadZip": "ZIP herunterladen",
+  "downloadZipAll": "Alle als ZIP herunterladen",
+  "preparingZip": "ZIP wird vorbereitet…",
+  "noAssets": "Keine Assets in dieser Kategorie verfügbar."
+}

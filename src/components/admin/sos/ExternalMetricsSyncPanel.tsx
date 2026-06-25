@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { ArrowsClockwise, Waveform } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { useDict } from '@/contexts/DictContext'
+import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 const SYNC_FALLBACK = {
@@ -18,8 +18,7 @@ const SYNC_FALLBACK = {
 } as const
 
 export function ExternalMetricsSyncPanel() {
-  const dict = useDict()
-  const t = { ...SYNC_FALLBACK, ...dict.admin?.accounting }
+  const t = useMergedAccountingLabels(SYNC_FALLBACK)
   const [isPending, startTransition] = useTransition()
 
   const handleSync = () => {

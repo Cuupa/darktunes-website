@@ -8,11 +8,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 
-vi.mock('@/contexts/DictContext', () => ({
-  useDict: () => ({ errors: { SERVER_ERROR: 'Something went wrong.', AUTH_REQUIRED: 'Please sign in.', UPLOAD_TOO_LARGE: 'File too large.', UPLOAD_WRONG_TYPE: 'Wrong type.' } }),
-  DictContext: { Provider: ({ children }: React.PropsWithChildren) => children },
-}))
-
 // ─── Mock Tiptap (not available in jsdom/vitest without a browser DOM) ────────
 const mockSetResizableImage = vi.fn()
 const mockRun = vi.fn().mockReturnValue(true)

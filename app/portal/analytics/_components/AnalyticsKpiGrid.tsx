@@ -1,12 +1,11 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { ChartLineUp, Globe, MusicNote, CurrencyEur, TrendUp, Receipt } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
 import type { AnalyticsKpis } from '@/lib/analytics/insights'
-import type { Dictionary } from '@/i18n/types'
 
 interface AnalyticsKpiGridProps {
-  dict: Dictionary['portal']
   kpis: AnalyticsKpis
 }
 
@@ -24,37 +23,39 @@ function fmtPct(n: number | null): string {
   return `${sign}${n.toFixed(1)}%`
 }
 
-export function AnalyticsKpiGrid({ dict, kpis }: AnalyticsKpiGridProps) {
+export function AnalyticsKpiGrid({ kpis }: AnalyticsKpiGridProps) {
+  const t = useTranslations('portal')
+
   const cards = [
     {
-      label: dict.analytics_totalStreams,
+      label: t('analytics_totalStreams'),
       value: fmtNum(kpis.totalStreams),
       sub: kpis.streamGrowthPct !== null ? fmtPct(kpis.streamGrowthPct) : undefined,
       icon: MusicNote,
     },
     {
-      label: dict.analytics_kpi_revenue,
+      label: t('analytics_kpi_revenue'),
       value: fmtEur(kpis.totalRevenueEur),
       sub: kpis.revenueGrowthPct !== null ? fmtPct(kpis.revenueGrowthPct) : undefined,
       icon: CurrencyEur,
     },
     {
-      label: dict.analytics_kpi_top_platform,
+      label: t('analytics_kpi_top_platform'),
       value: kpis.topPlatform ?? '—',
       icon: ChartLineUp,
     },
     {
-      label: dict.analytics_kpi_top_country,
+      label: t('analytics_kpi_top_country'),
       value: kpis.topCountry ?? '—',
       icon: Globe,
     },
     {
-      label: dict.analytics_kpi_periods,
+      label: t('analytics_kpi_periods'),
       value: String(kpis.periodCount),
       icon: TrendUp,
     },
     {
-      label: dict.analytics_earnings_pending,
+      label: t('analytics_earnings_pending'),
       value: String(kpis.pendingStatements),
       sub: kpis.totalEarningsEur > 0 ? fmtEur(kpis.totalEarningsEur) : undefined,
       icon: Receipt,
