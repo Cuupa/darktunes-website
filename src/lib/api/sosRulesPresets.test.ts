@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  deleteRulesPreset,
   ensureDefaultRulesPreset,
   getRulesPresetByName,
   upsertRulesPresetByName,
@@ -85,5 +86,21 @@ describe('sosRulesPresets DAL', () => {
     const db = { from: vi.fn(() => builder) } as never
     const preset = await getRulesPresetByName(db, 'missing')
     expect(preset).toBeNull()
+  })
+
+  it('deleteRulesPreset blocks the Default preset', async () => {
+    const row = {
+      id: 'preset-default',
+      name: DEFAULT_PRESET_NAME,
+      config: {},
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    }
+    const builder = makeBuilder(row)
+    const db = { from: vi.fn(() => builder) } as never
+
+    await expect(deleteRulesPreset(db, 'preset-default')).rejects.toThrow(
+      'The Default preset cannot be deleted',
+    )
   })
 })

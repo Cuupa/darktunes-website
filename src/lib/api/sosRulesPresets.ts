@@ -132,6 +132,11 @@ export async function updateRulesPreset(
 }
 
 export async function deleteRulesPreset(db: DbClient, id: string): Promise<void> {
+  const existing = await getRulesPresetById(db, id)
+  if (existing?.name.toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase()) {
+    throw new Error('The Default preset cannot be deleted')
+  }
+
   const { error } = await db.from('sos_rules_presets').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }

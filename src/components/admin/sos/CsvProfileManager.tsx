@@ -29,6 +29,7 @@ import type {
 } from '@/lib/sos/types'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
+import { DEFAULT_PRESET_NAME } from '@/lib/sos/sosAccountingSettings'
 import { useSosRulesPresets, type PresetConfig } from '@/hooks/useSosRulesPresets'
 import { useDict } from '@/contexts/DictContext'
 import { interpolate } from '@/lib/i18n/interpolate'
@@ -203,10 +204,16 @@ export function CsvProfileManager({
 
   const handleDelete = useCallback(
     async (id: string) => {
+      const target = presets.find((p) => p.id === id)
+      if (target?.name.toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase()) {
+        toast.error(t.presetDeleteDefaultBlocked ?? 'The Default preset cannot be deleted')
+        setConfirmDeleteId(null)
+        return
+      }
       await deletePreset(id)
       setConfirmDeleteId(null)
     },
-    [deletePreset],
+    [deletePreset, presets, t.presetDeleteDefaultBlocked],
   )
 
   const totalRules = countRules(currentConfig())

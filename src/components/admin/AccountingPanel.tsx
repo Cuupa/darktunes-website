@@ -9,7 +9,7 @@
  *  Tab B — "Statement History": read-only view of uploaded PDFs (StatementsManager).
  */
 
-import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
@@ -31,13 +31,6 @@ import {
   DEFAULT_SOS_ACCOUNTING_SETTINGS,
   type SosAccountingSettings,
 } from '@/lib/sos/sosAccountingSettings'
-import {
-  clearLegacyKvKeys,
-  isKvMigrationComplete,
-  markKvMigrationComplete,
-  mergeKvIntoSettings,
-  readLegacyKvSettings,
-} from '@/lib/sos/migrateKvToDb'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
@@ -150,9 +143,6 @@ function SosGeneratorPanel() {
   const [ignoredEntries, setIgnoredEntries] = useState<IgnoredEntry[]>([])
   const [csvAliases, setCsvAliases] = useState<CSVColumnAlias[]>([])
   const [trackRevenueAssignments, setTrackRevenueAssignments] = useState<TrackRevenueAssignment[]>([])
-
-  const settingsHydratedRef = useRef(false)
-  const [settingsReady, setSettingsReady] = useState(false)
 
   const settingsBundle = useMemo<SosAccountingSettings>(
     () => ({
@@ -507,55 +497,22 @@ function SosGeneratorPanel() {
   )
 
   const {
+    settingsReady,
     workspaceLoadedAt,
     workspaceUpdatedBy,
+    defaultPresetLoadedAt,
     isWorkspaceLoading,
     isWorkspaceSaving,
     isSettingsDirty,
-    loadWorkspace,
-    loadDefaultPreset,
+    loadFromServer,
     saveCurrentWorkspace,
   } = useSosWorkspaceSync({
     currentPeriodKey,
     settings: settingsBundle,
     applySettings,
     bronzeBatchIds,
-    settingsReady,
     disabled: isProcessing,
   })
-
-  useEffect(() => {
-    if (settingsHydratedRef.current) return
-    settingsHydratedRef.current = true
-
-    void (async () => {
-      try {
-        if (!isKvMigrationComplete()) {
-          const legacy = await readLegacyKvSettings()
-          if (legacy.hasData) {
-            const res = await fetch('/api/admin/sos/presets/default')
-            if (res.ok) {
-              const json = await res.json() as { preset?: { config?: SosAccountingSettings } }
-              const current = json.preset?.config ?? DEFAULT_SOS_ACCOUNTING_SETTINGS
-              const merged = mergeKvIntoSettings(current, legacy.settings)
-              await fetch('/api/admin/sos/presets/default', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config: merged }),
-              })
-            }
-            await clearLegacyKvKeys()
-          }
-          markKvMigrationComplete()
-        }
-      } catch {
-        // Non-fatal — default preset load still runs
-      } finally {
-        await loadDefaultPreset()
-        setSettingsReady(true)
-      }
-    })()
-  }, [loadDefaultPreset])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -658,7 +615,7 @@ function SosGeneratorPanel() {
         : isSettingsDirty
           ? t.rulesWorkspaceDirty
           : !currentPeriodKey
-            ? t.rulesWorkspaceDefaultSynced
+            ? `${t.rulesWorkspaceDefaultSynced}${defaultPresetLoadedAt ? ` · ${new Date(defaultPresetLoadedAt).toLocaleString()}` : ''}`
             : `${t.rulesWorkspaceSynced}${workspaceLoadedAt ? ` · ${new Date(workspaceLoadedAt).toLocaleString()}${workspaceUpdatedBy ? ` · ${workspaceUpdatedBy.slice(0, 8)}` : ''}` : ''}`}
     </p>
   ) : null
@@ -960,17 +917,25 @@ function SosGeneratorPanel() {
               {/* Enterprise collaborative workspace controls */}
               <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/10 p-2 text-xs">
                 <span className="font-medium text-foreground">{t.workspaceServer ?? 'Workspace (server):'}</span>
-                {workspaceLoadedAt ? (
+                {currentPeriodKey ? (
+                  workspaceLoadedAt ? (
+                    <span className="text-muted-foreground">
+                      {t.workspaceLastSaved ?? 'last saved'} {new Date(workspaceLoadedAt).toLocaleString()} {workspaceUpdatedBy ? `· ${workspaceUpdatedBy.slice(0, 8)}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{t.workspaceNotSaved ?? 'not yet saved for this period'}</span>
+                  )
+                ) : defaultPresetLoadedAt ? (
                   <span className="text-muted-foreground">
-                    {t.workspaceLastSaved ?? 'last saved'} {new Date(workspaceLoadedAt).toLocaleString()} {workspaceUpdatedBy ? `· ${workspaceUpdatedBy.slice(0, 8)}` : ''}
+                    {t.workspaceDefaultSaved ?? 'Default preset saved'} {new Date(defaultPresetLoadedAt).toLocaleString()}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">{t.workspaceNotSaved ?? 'not yet saved for this period'}</span>
+                  <span className="text-muted-foreground">{t.workspaceDefaultNotSaved ?? 'Default preset not saved yet'}</span>
                 )}
                 <button
                   type="button"
-                  onClick={() => void loadWorkspace()}
-                  disabled={isWorkspaceLoading || !currentPeriodKey}
+                  onClick={() => void loadFromServer()}
+                  disabled={isWorkspaceLoading || isProcessing}
                   className="rounded border px-2 py-0.5 hover:bg-background disabled:opacity-50"
                 >
                   {isWorkspaceLoading ? (t.workspaceLoading ?? 'Loading…') : (t.workspaceReload ?? 'Reload from server')}
@@ -978,12 +943,20 @@ function SosGeneratorPanel() {
                 <button
                   type="button"
                   onClick={() => void saveCurrentWorkspace()}
-                  disabled={isWorkspaceSaving || !currentPeriodKey || isProcessing}
+                  disabled={isWorkspaceSaving || isProcessing}
                   className="rounded bg-primary px-2 py-0.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {isWorkspaceSaving ? (t.workspaceSaving ?? 'Saving…') : (t.workspaceSave ?? 'Save workspace to server')}
+                  {isWorkspaceSaving
+                    ? (t.workspaceSaving ?? 'Saving…')
+                    : currentPeriodKey
+                      ? (t.workspaceSave ?? 'Save workspace to server')
+                      : (t.workspaceSaveDefault ?? 'Save default preset')}
                 </button>
-                <span className="text-[10px] text-muted-foreground">{t.workspaceSharedHint ?? 'Shared across team • period-keyed'}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {currentPeriodKey
+                    ? (t.workspaceSharedHint ?? 'Shared across team · period-keyed')
+                    : (t.workspaceDefaultHint ?? 'Shared default settings until a period is detected')}
+                </span>
               </div>
 
               <OperatorPlaybook
