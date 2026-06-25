@@ -14,5 +14,7 @@
   },
   "filterAll": "Alle",
   "search": "Mitteilungen suchen…",
-  "noResults": "Keine Pressemitteilungen gefunden."
+  "noResults": "Keine Pressemitteilungen gefunden.",
+  "embargoBadge": "Embargo",
+  "openRelease": "Mitteilung öffnen"
 }

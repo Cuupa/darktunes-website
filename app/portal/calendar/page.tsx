@@ -11,7 +11,6 @@ import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getAllVisibleReleasesForCalendar } from '@/lib/api/releases'
-import { getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseCalendarClient } from './_components/ReleaseCalendarClient'
 
@@ -44,8 +43,6 @@ async function CalendarContent({
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-
-  const t = await getTranslations('portal')
 
   const { artistId } = await searchParams
 

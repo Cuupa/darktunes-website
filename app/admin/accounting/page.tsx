@@ -8,21 +8,17 @@
  * Tab B: Statement History (existing read-only StatementsManager).
  */
 
+import { useTranslations } from 'next-intl'
 import { AccountingPanel } from '@/components/admin/AccountingPanel'
 import { AdminPageShell } from '../_components/AdminPageShell'
-import { useDict } from '@/contexts/DictContext'
 
 export default function AccountingPage() {
-  const dict = useDict()
-  const t = dict.admin?.accounting ?? {
-    pageTitle: 'Accounting',
-    pageDescription: 'Generate royalty statements for artists and review statement history.',
-  }
+  const t = useTranslations('admin.accounting')
 
   return (
     <AdminPageShell
-      title={t.pageTitle}
-      description={t.pageDescription}
+      title={t('pageTitle')}
+      description={t('pageDescription')}
     >
       <AccountingPanel />
     </AdminPageShell>

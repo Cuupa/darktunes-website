@@ -14,5 +14,7 @@
   },
   "filterAll": "All",
   "search": "Search releases…",
-  "noResults": "No press releases found."
+  "noResults": "No press releases found.",
+  "embargoBadge": "Embargo",
+  "openRelease": "Open release"
 }

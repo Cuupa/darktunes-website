@@ -14,8 +14,6 @@ import { getNewsPosts } from '@/lib/api/news'
 import { getArtists } from '@/lib/api/artists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EventManager } from './_components/EventManager'
-import { getTranslations } from 'next-intl/server'
-
 function EventsSkeleton() {
 
 
@@ -30,8 +28,6 @@ function EventsSkeleton() {
 }
 
 async function EventsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-
-  const t = await getTranslations('portal')
 
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()

@@ -23,5 +23,20 @@
   "success": "Interview request sent.",
   "pending": "Pending",
   "accepted": "Accepted",
-  "rejected": "Rejected"
+  "rejected": "Rejected",
+  "navTitle": "Press Dashboard",
+  "navToggle": "Toggle press navigation",
+  "logout": "Logout",
+  "accreditationDisabled": "Accreditation requests are currently disabled.",
+  "accreditationForm": {
+    "eventName": "Event name",
+    "eventDate": "Event date",
+    "publication": "Publication",
+    "reason": "Reason",
+    "submit": "Submit request",
+    "submitSuccess": "Accreditation request submitted",
+    "submitError": "Failed to submit request",
+    "noRequests": "No requests submitted yet.",
+    "adminNote": "Admin note"
+  }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +17,7 @@ interface AccreditationClientProps {
 }
 
 export function AccreditationClient({ initialRequests }: AccreditationClientProps) {
+  const t = useTranslations('pressDashboard')
   const [requests, setRequests] = useState(initialRequests)
   const [form, setForm] = useState({
     eventName: '',
@@ -49,33 +51,33 @@ export function AccreditationClient({ initialRequests }: AccreditationClientProp
         ...prev,
       ])
       setForm({ eventName: '', eventDate: '', publication: '', reason: '' })
-      toast.success('Accreditation request submitted')
+      toast.success(t('accreditationForm.submitSuccess'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit request')
+      toast.error(err instanceof Error ? err.message : t('accreditationForm.submitError'))
     }
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Accreditation</h1>
+      <h1 className="text-3xl font-bold">{t('accreditation')}</h1>
       <form onSubmit={submit} className="rounded-lg border border-border p-4 space-y-3">
         <div className="space-y-1">
-          <Label>Event name</Label>
+          <Label>{t('accreditationForm.eventName')}</Label>
           <Input value={form.eventName} onChange={(e) => setForm((v) => ({ ...v, eventName: e.target.value }))} required />
         </div>
         <div className="space-y-1">
-          <Label>Event date</Label>
+          <Label>{t('accreditationForm.eventDate')}</Label>
           <Input type="date" value={form.eventDate} onChange={(e) => setForm((v) => ({ ...v, eventDate: e.target.value }))} required />
         </div>
         <div className="space-y-1">
-          <Label>Publication</Label>
+          <Label>{t('accreditationForm.publication')}</Label>
           <Input value={form.publication} onChange={(e) => setForm((v) => ({ ...v, publication: e.target.value }))} required />
         </div>
         <div className="space-y-1">
-          <Label>Reason</Label>
+          <Label>{t('accreditationForm.reason')}</Label>
           <Textarea value={form.reason} onChange={(e) => setForm((v) => ({ ...v, reason: e.target.value }))} required rows={4} />
         </div>
-        <Button type="submit">Submit request</Button>
+        <Button type="submit">{t('accreditationForm.submit')}</Button>
       </form>
 
       <div className="space-y-3">
@@ -86,11 +88,11 @@ export function AccreditationClient({ initialRequests }: AccreditationClientProp
               {request.publication} · {request.event_date} · {request.status}
             </p>
             {request.admin_note && (
-              <p className="mt-2 text-sm text-muted-foreground">Admin note: {request.admin_note}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t('accreditationForm.adminNote')}: {request.admin_note}</p>
             )}
           </div>
         ))}
-        {requests.length === 0 && <p className="text-sm text-muted-foreground">No requests submitted yet.</p>}
+        {requests.length === 0 && <p className="text-sm text-muted-foreground">{t('accreditationForm.noRequests')}</p>}
       </div>
     </div>
   )

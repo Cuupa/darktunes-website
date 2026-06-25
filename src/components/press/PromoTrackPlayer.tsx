@@ -103,19 +103,19 @@ export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
               variant="outline"
               onClick={() => void togglePlay()}
               disabled={loadingPreview}
-              aria-label={isPlaying ? `Pause ${track.title}` : `Preview ${track.title}`}
+              aria-label={isPlaying ? `${t('player.pause')} ${track.title}` : `${t('player.preview')} ${track.title}`}
             >
               {isPlaying ? <Pause size={14} weight="bold" aria-hidden="true" /> : <Play size={14} weight="bold" aria-hidden="true" />}
-              {loadingPreview ? 'Loading…' : isPlaying ? 'Pause' : 'Preview'}
+              {loadingPreview ? t('loading') : isPlaying ? t('player.pause') : t('player.preview')}
             </Button>
             <Button
               size="sm"
               onClick={handleDownload}
               disabled={loadingDownload}
-              aria-label={`Download ${track.title}`}
+              aria-label={`${t('player.download')} ${track.title}`}
             >
               <Download size={14} weight="bold" aria-hidden="true" />
-              {loadingDownload ? 'Preparing…' : 'Download'}
+              {loadingDownload ? t('player.preparing') : t('player.download')}
             </Button>
           </div>
         </div>
@@ -125,26 +125,26 @@ export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
           {track.key && <span>Key: {track.key}</span>}
           {track.durationSeconds && <span>{formatDuration(track.durationSeconds)}</span>}
           {track.releaseDate && <span>{new Date(track.releaseDate).toLocaleDateString()}</span>}
-          {track.ndaRequired && <Badge variant="destructive" className="text-xs">NDA Required</Badge>}
+          {track.ndaRequired && <Badge variant="destructive" className="text-xs">{t('nda.badge')}</Badge>}
         </div>
       </div>
 
       <Dialog open={showNdaModal} onOpenChange={setShowNdaModal}>
         <DialogContent aria-labelledby="nda-title" className="max-w-[calc(100%-2rem)] sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle id="nda-title">NDA Required</DialogTitle>
+            <DialogTitle id="nda-title">{t('nda.title')}</DialogTitle>
             <DialogDescription>
-              This track is subject to a non-disclosure agreement. By downloading you agree not to share or publish this material before the official release date.
+              {t('nda.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2 py-2">
             <Checkbox id="nda-agree" checked={ndaChecked} onCheckedChange={(value) => setNdaChecked(value === true)} />
-            <Label htmlFor="nda-agree">I agree to the NDA terms</Label>
+            <Label htmlFor="nda-agree">{t('nda.confirm')}</Label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNdaModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowNdaModal(false)}>{t('nda.cancel')}</Button>
             <Button disabled={!ndaChecked || loadingDownload} onClick={() => void doDownload()}>
-              {loadingDownload ? 'Preparing…' : 'Proceed with Download'}
+              {loadingDownload ? t('player.preparing') : t('nda.proceed')}
             </Button>
           </DialogFooter>
         </DialogContent>

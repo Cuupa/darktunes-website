@@ -36,7 +36,7 @@ export function PromoDownloads({ releases, promoTracks }: PromoDownloadsProps) {
       <h1 className="text-3xl font-bold">{t('heading')}</h1>
 
       <section className="space-y-3" aria-labelledby="promo-releases-heading">
-        <h2 id="promo-releases-heading" className="text-xl font-semibold">Promo Releases</h2>
+        <h2 id="promo-releases-heading" className="text-xl font-semibold">{t('releasesHeading')}</h2>
         {releases.map((release) => (
           <Card key={release.id} className="border-border bg-card/70">
             <CardContent className="flex items-center justify-between gap-4 p-4">
@@ -50,11 +50,11 @@ export function PromoDownloads({ releases, promoTracks }: PromoDownloadsProps) {
             </CardContent>
           </Card>
         ))}
-        {releases.length === 0 && <p className="text-sm text-muted-foreground">No promo releases available.</p>}
+        {releases.length === 0 && <p className="text-sm text-muted-foreground">{t('noReleases')}</p>}
       </section>
 
       <section className="space-y-3" aria-labelledby="promo-tracks-heading">
-        <h2 id="promo-tracks-heading" className="text-xl font-semibold">Promo Tracks</h2>
+        <h2 id="promo-tracks-heading" className="text-xl font-semibold">{t('tracksHeading')}</h2>
         {promoTracks.map((track) => <PromoTrackPlayer key={track.id} track={track} />)}
         {promoTracks.length === 0 && <p className="text-sm text-muted-foreground">{t('noTracks')}</p>}
       </section>

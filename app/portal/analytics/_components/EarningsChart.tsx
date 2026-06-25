@@ -1,6 +1,5 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
 /**
  * app/portal/analytics/_components/EarningsChart.tsx
  *
@@ -43,8 +42,6 @@ const EarningsChartInner = dynamic(
 )
 
 export function EarningsChart({ statements }: EarningsChartProps) {
-  const t = useTranslations('portal')
-
   const { chartData, totalEarned, lastPayout, pendingCount } = useMemo(() => {
     // Build chart data: one bar per unique period, sum amounts
     const periodMap = new Map<string, number>()

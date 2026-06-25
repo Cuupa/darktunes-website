@@ -10,18 +10,18 @@ import { Badge } from '@/components/ui/badge'
 import { ConsentGate } from '@/components/ConsentGate'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { useTranslations } from 'next-intl'
 import type { Release } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 
 interface ReleasePreviewModalProps {
   release: Release | null
   open: boolean
   onClose: () => void
-  dict: Dictionary['releases']
-  consentDict: Dictionary['consent']
 }
 
-export function ReleasePreviewModal({ release, open, onClose, dict, consentDict }: ReleasePreviewModalProps) {
+export function ReleasePreviewModal({ release, open, onClose }: ReleasePreviewModalProps) {
+  const t = useTranslations('releases')
+  const tConsent = useTranslations('consent')
   if (!release) return null
 
   const spotifyEmbedUri = release.spotifyId ? `spotify:album:${release.spotifyId}` : undefined
@@ -75,9 +75,9 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
             {spotifyEmbedUri && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  {dict.previewTitle}
+                  {t('previewTitle')}
                 </p>
-                <ConsentGate label={consentDict.loadSpotify}>
+                <ConsentGate label={tConsent('loadSpotify')}>
                   <iframe
                     src={`https://open.spotify.com/embed${getSpotifyEmbedPath(spotifyEmbedUri)}`}
                     width="100%"
@@ -96,7 +96,7 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
             {(release.spotifyUrl || release.appleMusicUrl || release.smartUrl) && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  {dict.streamingLinks}
+                  {t('streamingLinks')}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {release.spotifyUrl && (
@@ -139,7 +139,7 @@ export function ReleasePreviewModal({ release, open, onClose, dict, consentDict 
             {/* View full page */}
             <Button asChild size="sm" variant="outline" className="mt-auto self-start">
               <Link href={`/releases/${release.id}`}>
-                {dict.viewFullPage}
+                {t('viewFullPage')}
               </Link>
             </Button>
           </div>

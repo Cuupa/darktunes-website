@@ -15,8 +15,6 @@ import { getOrCreateReleaseChecklist } from '@/lib/api/releaseChecklists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseChecklistPanel } from './_components/ReleaseChecklist'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
-import { getTranslations } from 'next-intl/server'
-
 function ReleasesSkeleton() {
 
 
@@ -31,8 +29,6 @@ function ReleasesSkeleton() {
 }
 
 async function ReleasesContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-
-  const t = await getTranslations('portal')
 
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()

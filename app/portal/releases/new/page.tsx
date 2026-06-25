@@ -4,11 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { ReleaseSubmissionForm } from './_components/ReleaseSubmissionForm'
-import { getTranslations } from 'next-intl/server'
-
 export default async function NewReleasePage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const t = await getTranslations('portal')
-
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
 

@@ -4,7 +4,6 @@ import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { getTranslations } from 'next-intl/server'
 import { BillingProfileForm } from './_components/BillingProfileForm'
 
 export const metadata: Metadata = {
@@ -17,8 +16,6 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-
-  const t = await getTranslations('portal')
 
   const { artistId } = await searchParams
 

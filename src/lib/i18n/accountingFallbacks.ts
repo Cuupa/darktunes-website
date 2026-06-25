@@ -266,5 +266,5 @@ export function useMergedAccountingLabels<T extends Record<string, string>>(
   fallback: T,
 ): T & AccountingLabelOverrides {
   const overrides = useAccountingMessages()
-  return useMemo(() => ({ ...fallback, ...overrides }), [overrides]) as T & AccountingLabelOverrides
+  return useMemo(() => ({ ...fallback, ...overrides }), [fallback, overrides]) as T & AccountingLabelOverrides
 }

@@ -1,7 +1,9 @@
 {
   "heading": "Promo Pool",
   "description": "Exklusive Vorab-Tracks für verifizierte Medienprofis.",
-  "tracksHeading": "Vorab-Tracks",
+  "releasesHeading": "Promo-Releases",
+  "noReleases": "Keine Promo-Releases verfügbar.",
+  "tracksHeading": "Promo-Tracks",
   "noTracks": "Keine Promo-Tracks verfügbar.",
   "streamTrack": "Anhören",
   "loading": "Sicherer Stream wird geladen…",
@@ -38,10 +40,12 @@
   },
   "player": {
     "preview": "Vorschau",
+    "pause": "Pause",
     "download": "Download",
     "preparing": "Wird vorbereitet…"
   },
   "nda": {
+    "badge": "NDA erforderlich",
     "title": "NDA erforderlich",
     "description": "Dieser Track unterliegt einer Vertraulichkeitsvereinbarung. Mit dem Download erklärst du dich damit einverstanden, das Material vor dem offiziellen Release-Datum weder zu teilen noch zu veröffentlichen.",
     "confirm": "Ich stimme den NDA-Bedingungen zu",

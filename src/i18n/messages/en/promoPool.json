@@ -1,7 +1,9 @@
 {
   "heading": "Promo Pool",
   "description": "Exclusive pre-release tracks for verified media professionals.",
-  "tracksHeading": "Pre-Release Tracks",
+  "releasesHeading": "Promo Releases",
+  "noReleases": "No promo releases available.",
+  "tracksHeading": "Promo Tracks",
   "noTracks": "No promo tracks available.",
   "streamTrack": "Stream",
   "loading": "Loading secure stream…",
@@ -38,10 +40,12 @@
   },
   "player": {
     "preview": "Preview",
+    "pause": "Pause",
     "download": "Download",
     "preparing": "Preparing…"
   },
   "nda": {
+    "badge": "NDA Required",
     "title": "NDA Required",
     "description": "This track is subject to a non-disclosure agreement. By downloading you agree not to share or publish this material before the official release date.",
     "confirm": "I agree to the NDA terms",

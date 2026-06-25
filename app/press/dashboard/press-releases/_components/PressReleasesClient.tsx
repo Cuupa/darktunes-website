@@ -99,14 +99,14 @@ export function PressReleasesClient({ posts }: PressReleasesClientProps) {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <Badge variant="secondary">{t(`categories.${category}`)}</Badge>
                     <time dateTime={post.publishedAt}>{new Date(post.publishedAt).toLocaleDateString()}</time>
-                    {embargoFuture && <Badge variant="destructive">Embargo</Badge>}
+                    {embargoFuture && <Badge variant="destructive">{t('embargoBadge')}</Badge>}
                   </div>
                   <div className="space-y-2">
                     <h2 className="text-xl font-semibold leading-tight">{post.title}</h2>
                     <p className="line-clamp-3 text-sm text-muted-foreground">{post.excerpt || post.content}</p>
                   </div>
                   <Button asChild variant="outline">
-                    <Link href={`/press/releases/${post.slug}`}>Open release</Link>
+                    <Link href={`/press/releases/${post.slug}`}>{t('openRelease')}</Link>
                   </Button>
                 </CardContent>
               </Card>

@@ -23,5 +23,20 @@
   "success": "Interview-Anfrage gesendet.",
   "pending": "Ausstehend",
   "accepted": "Akzeptiert",
-  "rejected": "Abgelehnt"
+  "rejected": "Abgelehnt",
+  "navTitle": "Press-Dashboard",
+  "navToggle": "Press-Navigation ein-/ausblenden",
+  "logout": "Abmelden",
+  "accreditationDisabled": "Akkreditierungsanfragen sind derzeit deaktiviert.",
+  "accreditationForm": {
+    "eventName": "Eventname",
+    "eventDate": "Eventdatum",
+    "publication": "Publikation",
+    "reason": "Begründung",
+    "submit": "Anfrage absenden",
+    "submitSuccess": "Akkreditierungsanfrage gesendet",
+    "submitError": "Anfrage konnte nicht gesendet werden",
+    "noRequests": "Noch keine Anfragen eingereicht.",
+    "adminNote": "Admin-Notiz"
+  }
 }

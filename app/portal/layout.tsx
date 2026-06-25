@@ -31,7 +31,7 @@ import { PortalNotificationProvider } from './_components/PortalNotificationProv
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getTranslations } from 'next-intl/server'
+
 
 export const metadata: Metadata = {
   title: 'Artist Portal — darkTunes Music Group',
@@ -82,9 +82,6 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 }
 
 async function PortalLayoutContent({ children }: { children: ReactNode }) {
-  const t = await getTranslations('portal')
-
-
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },

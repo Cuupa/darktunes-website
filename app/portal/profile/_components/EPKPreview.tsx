@@ -193,8 +193,6 @@ const SECTION_LABEL_KEYS: Record<EPKSectionId, keyof Dictionary['portal']> = {
 // ---------------------------------------------------------------------------
 
 function SectionHeader({ data }: { data: EPKData }) {
-  const t = useTranslations('portal')
-
   const theme = useEPKTheme()
   const layout = data.epkLayout ?? 'classic'
   const genres = data.genres
@@ -516,7 +514,6 @@ function EPKDocument({
   data: EPKData
   documentRef?: React.RefObject<HTMLElement | null>
 }) {
-  const t = useTranslations('portal')
   const theme = useEPKTheme()
   const layout = data.epkLayout ?? 'classic'
   const orientation = data.epkOrientation ?? 'portrait'
