@@ -1,0 +1,1 @@
+export const ADMIN_TABLE_PAGE_SIZE = 20
