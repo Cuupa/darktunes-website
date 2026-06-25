@@ -6,6 +6,7 @@ import {
   invoiceTotalCents,
   type CarryForwardBreakdown,
 } from '@/lib/api/settlementLedger'
+import { reconcileRegisterOpenBalance } from '@/lib/api/settlementReconciliation'
 import { listInvoicesByStatementIds } from '@/lib/api/artistInvoices'
 import { getSalesStatementsForPeriod } from '@/lib/api/salesStatements'
 import {
@@ -121,6 +122,7 @@ export async function buildSettlementRegister(
   }
 
   const activeRows = rows.filter((row) => row.statementId)
+  const openBalanceEur = rows.reduce((sum, r) => sum + r.ledgerBalanceEur, 0)
   const kpis = {
     approved: activeRows.filter((r) =>
       r.statementStatus && ['label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged'].includes(r.statementStatus),
@@ -129,7 +131,15 @@ export async function buildSettlementRegister(
     invoiced: activeRows.filter((r) => r.invoiceId).length,
     received: activeRows.filter((r) => r.receivedAt).length,
     paid: activeRows.filter((r) => r.paidAt || r.invoiceStatus === 'paid').length,
-    openBalanceEur: rows.reduce((sum, r) => sum + r.ledgerBalanceEur, 0),
+    openBalanceEur,
+  }
+
+  const balanceCheck = reconcileRegisterOpenBalance(
+    rows.map((row) => ({ artistId: row.artistId, ledgerBalanceEur: row.ledgerBalanceEur })),
+    openBalanceEur,
+  )
+  if (!balanceCheck.ok) {
+    console.warn('[buildSettlementRegister] open balance invariant failed', balanceCheck)
   }
 
   return { period, rows: rows.filter((r) => r.statementId || r.ledgerBalanceEur !== 0), kpis }

@@ -31,6 +31,7 @@ import { EMPTY_SOS_RULES_BUNDLE, type SosRulesBundle } from '@/lib/sos/sosRulesB
 import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
+import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
@@ -45,11 +46,12 @@ import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
 import { CsvImportProfileEditor } from '@/components/admin/sos/CsvImportProfileEditor'
 import { AdminEnterpriseAnalytics } from '@/components/admin/sos/AdminEnterpriseAnalytics'
 import { useCsvImportProfiles } from '@/hooks/useCsvImportProfiles'
+import { useSosWorkspaceSync } from '@/hooks/useSosWorkspaceSync'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
-import type { AccountingWorkspaceConfig } from '@/lib/api/sosAccountingWorkspaces'
+
 import {
   Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
-  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck,
+  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck, Sparkle,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -79,7 +81,7 @@ const ACCOUNTING_FALLBACK = {
   subTabAnalyticsHint:
     'Bronze archives, listener sync, and Save to Portal — data artists will see after you persist it.',
   subTabSettlementsHint:
-    'Create draft statements, approve them, track invoices, and record payments.',
+    'Save portal analytics, create draft statements, approve them, track invoices, and record payments.',
   subTabPayout: 'SEPA Payout',
   subTabTrends: 'Trends',
   subTabRules: 'Rules',
@@ -110,11 +112,33 @@ const ACCOUNTING_FALLBACK = {
   workspaceSaving: 'Saving…',
   playbookTitle: 'Operator playbook',
   playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
-  playbookStep2: 'Click Save to Portal below to persist territory metrics for linked artists.',
+  playbookStep2: 'Use Save to Portal in Settlement Center so artists see analytics with their statements.',
   playbookStep3: 'Review saved trends and roster health in Label Intelligence.',
   subTabListLabel: 'Accounting workflow sections',
-  rulesLocalBanner: 'Rules are saved locally in this browser (IndexedDB).',
+  rulesWorkspaceSynced: 'Rules synced to server workspace',
+  rulesWorkspaceDirty: 'Unsaved rule changes — saving to server…',
+  rulesWorkspaceLocalOnly: 'No period detected — rules cached locally until CSV processing sets the period.',
+  rulesWorkspaceSaving: 'Saving rules to server…',
+  guidedModeLabel: 'Guided',
+  advancedModeLabel: 'Advanced',
+  guidedSwitchAdvanced: 'Switch to advanced mode',
+  guidedSwitchGuided: 'Switch to guided mode',
+  guidedStepUpload: 'Upload',
+  guidedStepUploadDesc: 'Import distributor CSV files',
+  guidedStepReview: 'Review',
+  guidedStepReviewDesc: 'Validate payouts before publishing',
+  guidedStepSettle: 'Publish',
+  guidedStepSettleDesc: 'Save analytics, create drafts, and approve',
+  guidedBack: 'Back',
+  guidedNext: 'Continue',
+  guidedProcessingHint: 'Processing CSV data…',
+  guidedUploadHint: 'Upload at least one distributor CSV to continue.',
+  guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
+  guidedSettleHint: 'Save portal analytics and run the settlement workflow below.',
+  guidedStepperAria: 'Accounting guided workflow',
 } as const
+
+type ViewMode = 'guided' | 'advanced'
 
 const SUB_TAB_IDS: SubTab[] = ['upload', 'reporting', 'settlements', 'analytics', 'payout', 'trends', 'rules']
 
@@ -166,6 +190,7 @@ function SosGeneratorPanel() {
   const [appDefaults, setAppDefaults] = useState<AppDefaults>(DEFAULT_APP_DEFAULTS)
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('guided')
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
 
   useEffect(() => {
@@ -207,9 +232,8 @@ function SosGeneratorPanel() {
     setRulesReady(true)
   }, [rulesLoaded, savedRules])
 
-  useEffect(() => {
-    if (!rulesReady) return
-    setSavedRules({
+  const rulesBundle = useMemo<SosRulesBundle>(
+    () => ({
       artistMappings,
       compilationFilters,
       splitFees,
@@ -220,21 +244,40 @@ function SosGeneratorPanel() {
       trackRevenueAssignments,
       appDefaults,
       emailConfig,
-    })
-  }, [
-    artistMappings,
-    compilationFilters,
-    splitFees,
-    manualRevenues,
-    expenses,
-    ignoredEntries,
-    csvAliases,
-    trackRevenueAssignments,
-    appDefaults,
-    emailConfig,
-    setSavedRules,
-    rulesReady,
-  ])
+    }),
+    [
+      artistMappings,
+      compilationFilters,
+      splitFees,
+      manualRevenues,
+      expenses,
+      ignoredEntries,
+      csvAliases,
+      trackRevenueAssignments,
+      appDefaults,
+      emailConfig,
+    ],
+  )
+
+  const applyRulesBundle = useCallback((bundle: SosRulesBundle) => {
+    setArtistMappings(bundle.artistMappings)
+    setCompilationFilters(bundle.compilationFilters)
+    setSplitFees(bundle.splitFees)
+    setManualRevenues(bundle.manualRevenues)
+    setExpenses(bundle.expenses)
+    setIgnoredEntries(bundle.ignoredEntries)
+    setCsvAliases(bundle.csvAliases)
+    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
+    setAppDefaults(bundle.appDefaults)
+    setEmailConfig(bundle.emailConfig)
+  }, [])
+
+  const cacheRulesBundle = useCallback(
+    (bundle: SosRulesBundle) => {
+      setSavedRules(bundle)
+    },
+    [setSavedRules],
+  )
 
   const handleSubTabKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, tabId: SubTab) => {
@@ -386,12 +429,6 @@ function SosGeneratorPanel() {
   const printfulManager  = useFileManager('printful')
   const darkmerchManager = useFileManager('darkmerch')
   const [carryForwardByArtist, setCarryForwardByArtist] = useState<Record<string, number>>({})
-
-  // Enterprise workspace state (declared early; functions defined after processor)
-  const [workspaceLoadedAt, setWorkspaceLoadedAt] = useState<string | null>(null)
-  const [workspaceUpdatedBy, setWorkspaceUpdatedBy] = useState<string | null>(null)
-  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false)
-  const [isWorkspaceSaving, setIsWorkspaceSaving] = useState(false)
 
   // Load a bronze archive into the appropriate in-memory file manager for processing.
   // CSV is proxied server-side (never fetch presigned R2 URLs from the browser — no bucket CORS).
@@ -573,7 +610,6 @@ function SosGeneratorPanel() {
       exportPersistContext,
     )
 
-  // --- Enterprise collaborative workspace functions (after detected* available) ---
   const currentPeriodKey = useMemo(
     () =>
       detectedPeriodStart
@@ -582,143 +618,23 @@ function SosGeneratorPanel() {
     [detectedPeriodStart, detectedPeriodEnd],
   )
 
-  const loadWorkspaceForCurrentPeriod = useCallback(async () => {
-    if (!currentPeriodKey) return
-    setIsWorkspaceLoading(true)
-    try {
-      const params = new URLSearchParams({
-        periodStart: currentPeriodKey.start,
-        periodEnd: currentPeriodKey.end,
-      })
-      const res = await fetch(`/api/admin/sos/workspaces?${params}`)
-      if (!res.ok) {
-        setWorkspaceLoadedAt(null)
-        return
-      }
-      const json = (await res.json()) as { workspace?: { config?: AccountingWorkspaceConfig; updated_at?: string; updated_by?: string | null } }
-      const ws = json.workspace
-      if (ws?.config) {
-        const c = ws.config
-        setArtistMappings(c.artistMappings ?? [])
-        setCompilationFilters(c.compilationFilters ?? [])
-        setSplitFees(c.splitFees ?? [])
-        setManualRevenues(c.manualRevenues ?? [])
-        setExpenses(c.expenses ?? [])
-        setIgnoredEntries(c.ignoredEntries ?? [])
-        setCsvAliases(c.csvAliases ?? [])
-        setTrackRevenueAssignments(c.trackRevenueAssignments ?? [])
-        setAppDefaults(c.appDefaults ?? DEFAULT_APP_DEFAULTS)
-        setEmailConfig(c.emailConfig ?? DEFAULT_EMAIL_CONFIG)
-
-        if (rulesReady) {
-          setSavedRules({
-            artistMappings: c.artistMappings ?? [],
-            compilationFilters: c.compilationFilters ?? [],
-            splitFees: c.splitFees ?? [],
-            manualRevenues: c.manualRevenues ?? [],
-            expenses: c.expenses ?? [],
-            ignoredEntries: c.ignoredEntries ?? [],
-            csvAliases: c.csvAliases ?? [],
-            trackRevenueAssignments: c.trackRevenueAssignments ?? [],
-            appDefaults: c.appDefaults ?? DEFAULT_APP_DEFAULTS,
-            emailConfig: c.emailConfig ?? DEFAULT_EMAIL_CONFIG,
-          })
-        }
-
-        setWorkspaceLoadedAt(ws.updated_at ?? new Date().toISOString())
-        setWorkspaceUpdatedBy(ws.updated_by ?? null)
-      }
-    } catch (e) {
-      console.warn('[workspace] load failed', e)
-    } finally {
-      setIsWorkspaceLoading(false)
-    }
-  }, [currentPeriodKey, rulesReady, setSavedRules])
-
-  const saveCurrentWorkspace = useCallback(async () => {
-    if (!currentPeriodKey) {
-      toast.error('No period detected yet — upload CSVs first')
-      return
-    }
-    setIsWorkspaceSaving(true)
-    try {
-      const config: AccountingWorkspaceConfig = {
-        artistMappings,
-        compilationFilters,
-        splitFees,
-        manualRevenues,
-        expenses,
-        ignoredEntries,
-        csvAliases,
-        trackRevenueAssignments,
-        appDefaults,
-        emailConfig,
-      }
-
-      const currentBronzeIds = Array.from(
-        new Set(
-          [
-            ...believeManager.files,
-            ...bandcampManager.files,
-            ...shopifyManager.files,
-            ...printfulManager.files,
-            ...darkmerchManager.files,
-          ]
-            .map((f) => f.bronzeBatchId)
-            .filter(Boolean) as string[],
-        ),
-      )
-
-      const res = await fetch('/api/admin/sos/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          period_start: currentPeriodKey.start,
-          period_end: currentPeriodKey.end,
-          config,
-          bronze_batch_ids: currentBronzeIds,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || 'Failed to save workspace')
-      }
-      const json = await res.json()
-      const ws = json.workspace
-      setWorkspaceLoadedAt(ws?.updated_at ?? new Date().toISOString())
-      setWorkspaceUpdatedBy(ws?.updated_by ?? null)
-      toast.success('Accounting workspace saved to server (collaborative)')
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Save failed'
-      toast.error(msg)
-    } finally {
-      setIsWorkspaceSaving(false)
-    }
-  }, [
+  const {
+    workspaceLoadedAt,
+    workspaceUpdatedBy,
+    isWorkspaceLoading,
+    isWorkspaceSaving,
+    isRulesDirty,
+    loadWorkspace,
+    saveCurrentWorkspace,
+  } = useSosWorkspaceSync({
     currentPeriodKey,
-    artistMappings,
-    compilationFilters,
-    splitFees,
-    manualRevenues,
-    expenses,
-    ignoredEntries,
-    csvAliases,
-    trackRevenueAssignments,
-    appDefaults,
-    emailConfig,
-    believeManager.files,
-    bandcampManager.files,
-    shopifyManager.files,
-    printfulManager.files,
-    darkmerchManager.files,
-  ])
-
-  // Load workspace when period changes (after functions defined)
-  useEffect(() => {
-    if (detectedPeriodStart) {
-      void loadWorkspaceForCurrentPeriod()
-    }
-  }, [detectedPeriodStart, detectedPeriodEnd, loadWorkspaceForCurrentPeriod])
+    rulesBundle,
+    applyRulesBundle,
+    cacheRulesBundle,
+    bronzeBatchIds,
+    rulesReady,
+    disabled: isProcessing,
+  })
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -757,6 +673,124 @@ function SosGeneratorPanel() {
     },
   ]
 
+  const uploadPanel = (
+    <div className="p-6">
+      <UniversalFileUploadZone
+        believeManager={believeManager}
+        bandcampManager={bandcampManager}
+        shopifyManager={shopifyManager}
+        printfulManager={printfulManager}
+        darkmerchManager={darkmerchManager}
+        csvProfiles={csvImportProfiles}
+        onAddAliases={(aliases) => {
+          aliases.forEach((alias) => handleAddCsvAlias(alias))
+        }}
+      />
+    </div>
+  )
+
+  const reviewPanel = hasData ? (
+    <ReportingPanel
+      revenues={revenues}
+      onDownloadPDF={handleDownloadPDF}
+      onDownloadExcel={handleDownloadExcel}
+      onDownloadAll={handleDownloadAll}
+      onDownloadSelected={handleDownloadSelected}
+      labelArtists={labelArtists}
+      labelInfo={labelInfo}
+      appDefaults={appDefaults}
+      periodStart={detectedPeriodStart}
+      periodEnd={detectedPeriodEnd}
+      onGoToSettlementCenter={() => setViewMode('guided')}
+    />
+  ) : (
+    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+      <FileText size={32} className="opacity-30" />
+      <p className="text-sm">{t.emptyReporting}</p>
+    </div>
+  )
+
+  const settlePanel = hasData ? (
+    <SettlementCenterPanel
+      revenues={revenues}
+      labelArtists={labelArtists}
+      periodStart={detectedPeriodStart}
+      periodEnd={detectedPeriodEnd}
+      territoryMetrics={territoryMetrics}
+      merchOrderRows={merchOrderRows}
+      bronzeBatchIds={bronzeBatchIds}
+      persistDisabled={isProcessing}
+      onCreateDraft={handlePublishToPortal}
+      onBuildCorrectionPdf={buildCorrectionPdfBase64}
+    />
+  ) : (
+    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+      <SealCheck size={32} className="opacity-30" />
+      <p className="text-sm">{t.emptySettlements}</p>
+    </div>
+  )
+
+  const rulesStatusBanner = rulesLoaded ? (
+    <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
+      {isWorkspaceSaving
+        ? t.rulesWorkspaceSaving
+        : !currentPeriodKey
+          ? t.rulesWorkspaceLocalOnly
+          : isRulesDirty
+            ? t.rulesWorkspaceDirty
+            : `${t.rulesWorkspaceSynced}${workspaceLoadedAt ? ` · ${new Date(workspaceLoadedAt).toLocaleString()}${workspaceUpdatedBy ? ` · ${workspaceUpdatedBy.slice(0, 8)}` : ''}` : ''}`}
+    </p>
+  ) : null
+
+  const periodBanner = hasData && (detectedPeriodStart || detectedPeriodEnd) ? (
+    <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
+      <FileText size={14} className="text-primary" />
+      <AlertDescription className="text-xs">
+        {t.detectedPeriod} <strong>{detectedPeriodStart}</strong>
+        {detectedPeriodEnd && detectedPeriodEnd !== detectedPeriodStart && (
+          <> – <strong>{detectedPeriodEnd}</strong></>
+        )}
+        {isProcessing && ` ${t.processing}`}
+      </AlertDescription>
+    </Alert>
+  ) : null
+
+  if (viewMode === 'guided') {
+    return (
+      <div className="space-y-0">
+        {rulesStatusBanner}
+        {periodBanner}
+        {showPdfSettings && (
+          <PdfExportSettingsPanel settings={pdfSettings} onUpdate={setPdfSettings} />
+        )}
+        <AccountingGuidedWizard
+          hasData={hasData}
+          isProcessing={isProcessing}
+          onSwitchToAdvanced={() => setViewMode('advanced')}
+          uploadPanel={uploadPanel}
+          reviewPanel={reviewPanel}
+          settlePanel={settlePanel}
+          labels={{
+            guidedSwitchAdvanced: t.guidedSwitchAdvanced,
+            guidedStepUpload: t.guidedStepUpload,
+            guidedStepUploadDesc: t.guidedStepUploadDesc,
+            guidedStepReview: t.guidedStepReview,
+            guidedStepReviewDesc: t.guidedStepReviewDesc,
+            guidedStepSettle: t.guidedStepSettle,
+            guidedStepSettleDesc: t.guidedStepSettleDesc,
+            guidedBack: t.guidedBack,
+            guidedNext: t.guidedNext,
+            guidedProcessingHint: t.guidedProcessingHint,
+            guidedUploadHint: t.guidedUploadHint,
+            guidedReviewHint: t.guidedReviewHint,
+            guidedSettleHint: t.guidedSettleHint,
+            guidedStepperAria: t.guidedStepperAria,
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-0">
       {/* Sub-tab navigation */}
@@ -786,6 +820,16 @@ function SosGeneratorPanel() {
           </button>
         ))}
         <div className="flex-1" />
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5"
+          onClick={() => setViewMode('guided')}
+        >
+          <Sparkle size={13} aria-hidden="true" />
+          {t.guidedSwitchGuided}
+        </Button>
 
         {/* Presets sheet */}
         <Sheet>
@@ -881,30 +925,14 @@ function SosGeneratorPanel() {
         </p>
       )}
 
-      {/* Period info banner */}
-      {hasData && (detectedPeriodStart || detectedPeriodEnd) && (
-        <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
-          <FileText size={14} className="text-primary" />
-          <AlertDescription className="text-xs">
-            {t.detectedPeriod} <strong>{detectedPeriodStart}</strong>
-            {detectedPeriodEnd && detectedPeriodEnd !== detectedPeriodStart && (
-              <> – <strong>{detectedPeriodEnd}</strong></>
-            )}
-            {isProcessing && ` ${t.processing}`}
-          </AlertDescription>
-        </Alert>
-      )}
+      {periodBanner}
 
       {/* PDF Settings collapsible */}
       {showPdfSettings && (
         <PdfExportSettingsPanel settings={pdfSettings} onUpdate={setPdfSettings} />
       )}
 
-      {rulesLoaded && (
-        <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
-          Active workspace rules are now persisted server-side for collaboration. Local browser state is a scratchpad.
-        </p>
-      )}
+      {rulesStatusBanner}
 
       {/* Sub-tab content */}
       <div className="min-h-[500px]">
@@ -971,6 +999,10 @@ function SosGeneratorPanel() {
               labelArtists={labelArtists}
               periodStart={detectedPeriodStart}
               periodEnd={detectedPeriodEnd}
+              territoryMetrics={territoryMetrics}
+              merchOrderRows={merchOrderRows}
+              bronzeBatchIds={bronzeBatchIds}
+              persistDisabled={isProcessing}
               onCreateDraft={handlePublishToPortal}
               onBuildCorrectionPdf={buildCorrectionPdfBase64}
             />
@@ -1007,7 +1039,7 @@ function SosGeneratorPanel() {
                 )}
                 <button
                   type="button"
-                  onClick={() => void loadWorkspaceForCurrentPeriod()}
+                  onClick={() => void loadWorkspace()}
                   disabled={isWorkspaceLoading || !currentPeriodKey}
                   className="rounded border px-2 py-0.5 hover:bg-background disabled:opacity-50"
                 >
