@@ -1,0 +1,16 @@
+{
+  "heading": "Press Inquiry",
+  "subjectLabel": "Subject",
+  "subjects": {
+    "interview": "Interview Request",
+    "reviewCopy": "Review Copy",
+    "accreditation": "Event Accreditation",
+    "general": "General Inquiry"
+  },
+  "messagePlaceholder": "Write your message here…",
+  "send": "Send Inquiry",
+  "sending": "Sending…",
+  "sent": "Your message has been sent.",
+  "backToInbox": "Back to Inbox",
+  "messageLabel": "Message"
+}

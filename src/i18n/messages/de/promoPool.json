@@ -1,0 +1,51 @@
+{
+  "heading": "Promo Pool",
+  "description": "Exklusive Vorab-Tracks für verifizierte Medienprofis.",
+  "tracksHeading": "Vorab-Tracks",
+  "noTracks": "Keine Promo-Tracks verfügbar.",
+  "streamTrack": "Anhören",
+  "loading": "Sicherer Stream wird geladen…",
+  "streamError": "Stream konnte nicht geladen werden. Bitte erneut versuchen.",
+  "accessDenied": "Zugang gesperrt",
+  "accessDeniedMessage": "Du benötigst Journalisten-Zugang, um diesen Inhalt anzusehen.",
+  "applicationPending": "Deine Bewerbung wird geprüft. Wir benachrichtigen dich bei Freischaltung.",
+  "applicationApply": "Bewerbe dich unten für den Zugang.",
+  "login": {
+    "title": "Promo Pool Login",
+    "description": "Melde dich an, um exklusive Vorab-Inhalte zu sehen.",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Anmelden…",
+    "error": "Ungültige E-Mail oder Passwort.",
+    "applyHeading": "Zugang beantragen",
+    "applyDescription": "Bist du Journalist oder Medienprofi? Stelle unten einen Zugangsantrag.",
+    "applyName": "Vollständiger Name",
+    "applyOutlet": "Publikation / Medium",
+    "applyMessage": "Nachricht (optional)",
+    "applySubmit": "Antrag absenden",
+    "applySubmitting": "Absenden…",
+    "applySuccess": "Antrag gesendet! Wir prüfen ihn in Kürze.",
+    "applyError": "Antrag konnte nicht gesendet werden. Bitte erneut versuchen.",
+    "applyEmailPlaceholder": "deine@email.de"
+  },
+  "metadata": {
+    "genre": "Genre",
+    "bpm": "BPM",
+    "key": "Tonart",
+    "duration": "Länge",
+    "releaseDate": "Veröffentlichung"
+  },
+  "player": {
+    "preview": "Vorschau",
+    "download": "Download",
+    "preparing": "Wird vorbereitet…"
+  },
+  "nda": {
+    "title": "NDA erforderlich",
+    "description": "Dieser Track unterliegt einer Vertraulichkeitsvereinbarung. Mit dem Download erklärst du dich damit einverstanden, das Material vor dem offiziellen Release-Datum weder zu teilen noch zu veröffentlichen.",
+    "confirm": "Ich stimme den NDA-Bedingungen zu",
+    "proceed": "Download fortsetzen",
+    "cancel": "Abbrechen"
+  }
+}

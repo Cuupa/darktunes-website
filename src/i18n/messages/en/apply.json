@@ -1,0 +1,23 @@
+{
+  "heading": "Apply for Press Access",
+  "subheading": "Request access to the darkTunes press dashboard — promo tracks, press kits, and exclusive releases.",
+  "fields": {
+    "name": "Full Name",
+    "email": "Email Address",
+    "password": "Password",
+    "publication": "Publication / Outlet",
+    "website": "Website (optional)",
+    "reason": "Why are you requesting press access?"
+  },
+  "submit": "Submit Application",
+  "submitting": "Submitting…",
+  "success": {
+    "heading": "Application Submitted",
+    "message": "Thank you! We'll review your application and get back to you by email.",
+    "login": "Already approved? Sign in"
+  },
+  "errors": {
+    "emailInUse": "An account with this email already exists. Please sign in.",
+    "generic": "Submission failed. Please try again."
+  }
+}

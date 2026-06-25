@@ -1,0 +1,26 @@
+{
+  "heading": "EVENTS",
+  "subheading": "Live-Termine, Gigs & kommende Shows",
+  "ticketLink": "Tickets kaufen",
+  "opensInNewTab": "öffnet in neuem Tab",
+  "cancelled": "Abgesagt",
+  "noShows": "Aktuell keine Veranstaltungen verfügbar.",
+  "checkBack": "Schau bald wieder vorbei.",
+  "viewAll": "Alle Events",
+  "filterArtist": "Alle Künstler",
+  "filterCountry": "Alle Länder",
+  "navLink": "Navigation",
+  "searchPlaceholder": "Events nach Künstler oder Venue suchen…",
+  "noResults": "Keine Events gefunden.",
+  "eventDetail": {
+    "backToEvents": "← Alle Events",
+    "addToCalendar": "Zum Kalender hinzufügen",
+    "relatedNews": "Verwandter Artikel",
+    "readMore": "Artikel lesen",
+    "featuredArtists": "Line-up",
+    "share": "Teilen",
+    "shareSuccess": "Geteilt!",
+    "shareLinkCopied": "Link kopiert!",
+    "shareError": "Teilen fehlgeschlagen"
+  }
+}

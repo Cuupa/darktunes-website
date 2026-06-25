@@ -1,0 +1,51 @@
+{
+  "heading": "Promo Pool",
+  "description": "Exclusive pre-release tracks for verified media professionals.",
+  "tracksHeading": "Pre-Release Tracks",
+  "noTracks": "No promo tracks available.",
+  "streamTrack": "Stream",
+  "loading": "Loading secure stream…",
+  "streamError": "Failed to load stream. Please try again.",
+  "accessDenied": "Access Restricted",
+  "accessDeniedMessage": "You need journalist access to view this content.",
+  "applicationPending": "Your application is under review. We'll notify you when it's approved.",
+  "applicationApply": "Apply for access below.",
+  "login": {
+    "title": "Promo Pool Login",
+    "description": "Sign in to access exclusive pre-release content.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign In",
+    "submitting": "Signing in…",
+    "error": "Invalid email or password.",
+    "applyHeading": "Request Access",
+    "applyDescription": "Are you a journalist or media professional? Submit an access request below.",
+    "applyName": "Full Name",
+    "applyOutlet": "Publication / Outlet",
+    "applyMessage": "Message (optional)",
+    "applySubmit": "Submit Application",
+    "applySubmitting": "Submitting…",
+    "applySuccess": "Application submitted! We'll review it soon.",
+    "applyError": "Failed to submit application. Please try again.",
+    "applyEmailPlaceholder": "your@email.com"
+  },
+  "metadata": {
+    "genre": "Genre",
+    "bpm": "BPM",
+    "key": "Key",
+    "duration": "Duration",
+    "releaseDate": "Release Date"
+  },
+  "player": {
+    "preview": "Preview",
+    "download": "Download",
+    "preparing": "Preparing…"
+  },
+  "nda": {
+    "title": "NDA Required",
+    "description": "This track is subject to a non-disclosure agreement. By downloading you agree not to share or publish this material before the official release date.",
+    "confirm": "I agree to the NDA terms",
+    "proceed": "Proceed with Download",
+    "cancel": "Cancel"
+  }
+}

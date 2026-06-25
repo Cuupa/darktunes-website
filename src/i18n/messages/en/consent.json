@@ -1,0 +1,15 @@
+{
+  "bannerAriaLabel": "Cookie consent",
+  "bannerTitle": "External Content & Privacy",
+  "bannerText": "This website would like to embed content from external providers (Spotify, YouTube). By clicking \"Accept\", you consent to data being transferred to these third parties (GDPR Art. 6 para. 1 lit. a).",
+  "privacyLink": "Privacy Policy",
+  "reject": "Reject",
+  "accept": "Accept",
+  "gateText": "This content is hosted by Spotify (an external provider). Loading it will transfer data to Spotify as described in our privacy policy.",
+  "spotifyTitle": "Listen on Spotify",
+  "spotifyBtnLabel": "Load Spotify Player",
+  "loadExternal": "Load external content",
+  "loadExternalAlt": "External content — click to load",
+  "loadSpotify": "Load Spotify Player",
+  "loadYouTube": "Load YouTube"
+}

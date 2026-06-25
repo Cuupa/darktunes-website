@@ -1,0 +1,15 @@
+{
+  "bannerAriaLabel": "Cookie-Einwilligung",
+  "bannerTitle": "Externe Inhalte & Datenschutz",
+  "bannerText": "Diese Website möchte Inhalte externer Anbieter (Spotify, YouTube) einbetten. Durch Klick auf \"Akzeptieren\" stimmen Sie der Übermittlung von Daten an diese Drittanbieter zu (DSGVO Art. 6 Abs. 1 lit. a).",
+  "privacyLink": "Datenschutzerklärung",
+  "reject": "Ablehnen",
+  "accept": "Akzeptieren",
+  "gateText": "Dieser Inhalt wird von Spotify (einem externen Anbieter) bereitgestellt. Das Laden überträgt Daten an Spotify, wie in unserer Datenschutzerklärung beschrieben.",
+  "spotifyTitle": "Auf Spotify hören",
+  "spotifyBtnLabel": "Spotify-Player laden",
+  "loadExternal": "Externe Inhalte laden",
+  "loadExternalAlt": "Externer Inhalt — Klicken zum Laden",
+  "loadSpotify": "Spotify-Player laden",
+  "loadYouTube": "YouTube laden"
+}

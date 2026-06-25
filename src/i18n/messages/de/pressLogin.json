@@ -1,0 +1,12 @@
+{
+  "title": "Press-Dashboard Login",
+  "description": "Als Journalist oder Admin anmelden, um die Presse-Tools zu nutzen.",
+  "emailLabel": "E-Mail",
+  "passwordLabel": "Passwort",
+  "signIn": "Anmelden",
+  "signingIn": "Anmeldung läuft…",
+  "errorInvalid": "Ungültige E-Mail oder Passwort.",
+  "errorUnauthorized": "Dein Konto ist nicht für das Press-Dashboard freigeschaltet.",
+  "applyLink": "Pressezugang beantragen",
+  "forgotPassword": "Passwort vergessen? E-Mail an"
+}

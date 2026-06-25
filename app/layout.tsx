@@ -8,7 +8,9 @@ import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
 import { ThemeEffectsClient } from './_components/ThemeEffectsClient'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
-import { getDictionary, getLocale } from '@/i18n/getDictionary'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getMessages } from 'next-intl/server'
+import type { Locale } from '@/i18n/types'
 import { WebVitals } from './web-vitals'
 import './globals.css'
 
@@ -74,8 +76,8 @@ export const viewport: Viewport = {
  * Providers wraps the tree with client-only concerns (Lenis, Toaster, ErrorBoundary).
  */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale()
-  const dict = await getDictionary(locale)
+  const locale = (await getLocale()) as Locale
+  const messages = await getMessages()
   const settings = await getCachedSiteSettings().catch(() => null)
 
   return (
@@ -128,11 +130,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ThemeEffectsClient effects={settings?.themeConfig?.effects} />
         </NavHidingWrapper>
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
-        <Providers consentDict={dict.consent}>
-          <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
-          {children}
-          <NavHidingWrapper><SiteFooter /></NavHidingWrapper>
-        </Providers>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <Providers>
+            <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
+            {children}
+            <NavHidingWrapper><SiteFooter /></NavHidingWrapper>
+          </Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   )

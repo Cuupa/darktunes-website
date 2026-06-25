@@ -1,0 +1,18 @@
+{
+  "heading": "Newsletter",
+  "description": "Bleib auf dem Laufenden – neue Releases, Tourdaten und exklusive Inhalte direkt in deinem Postfach.",
+  "namePlaceholder": "Name (optional)",
+  "emailLabel": "E-Mail-Adresse",
+  "emailPlaceholder": "deine@email.de",
+  "submit": "Anmelden",
+  "submitting": "Anmelden…",
+  "successTitle": "Prüfe dein Postfach! 📬",
+  "successMessage": "Wir haben dir eine Bestätigungsmail geschickt. Bitte klicke auf den Link darin, um deine Anmeldung abzuschließen.",
+  "consentText": "Mit der Anmeldung stimmst du zu, gelegentlich E-Mails von darkTunes zu erhalten. Du kannst dich jederzeit abmelden.",
+  "privacyLink": "Datenschutzerklärung",
+  "validationEmail": "Bitte eine gültige E-Mail-Adresse eingeben",
+  "confirmSuccessTitle": "Anmeldung bestätigt! 🎉",
+  "confirmSuccessMessage": "Du bist jetzt für den darkTunes Newsletter angemeldet. Willkommen in der Community!",
+  "confirmErrorTitle": "Link ungültig oder abgelaufen",
+  "confirmErrorMessage": "Dieser Bestätigungslink ist ungültig oder wurde bereits verwendet. Bitte versuche dich erneut anzumelden."
+}

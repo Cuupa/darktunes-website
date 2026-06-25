@@ -1,0 +1,17 @@
+{
+  "heading": "RELEASES",
+  "subheading": "Entdecke die neueste Musik unserer Künstler",
+  "featured": "Featured",
+  "searchPlaceholder": "Releases suchen…",
+  "noResults": "Keine Releases gefunden.",
+  "viewFullPage": "Zur vollen Seite",
+  "streamingLinks": "Streaming-Links",
+  "previewTitle": "Vorschau",
+  "viewAll": "Alle Releases",
+  "coverflowRegionLabel": "Releases Coverflow",
+  "openReleaseAriaSuffix": "Release öffnen",
+  "previousReleaseAriaLabel": "Vorheriges Release",
+  "nextReleaseAriaLabel": "Nächstes Release",
+  "releaseDotsAriaLabel": "Release-Punkte",
+  "goToReleaseAriaLabelTemplate": "Gehe zu Release {index}: {title}"
+}

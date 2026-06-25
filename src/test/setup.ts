@@ -1,5 +1,24 @@
 import '@testing-library/jest-dom'
 import { webcrypto } from 'node:crypto'
+import enDict from '@/i18n/dictionaries/en.json'
+import { vi } from 'vitest'
+
+vi.mock('next-intl', () => ({
+  useTranslations: (namespace: string) => (key: string, values?: Record<string, string | number | Date>) => {
+    const slice = (enDict as Record<string, Record<string, unknown>>)[namespace]
+    let msg = typeof slice?.[key] === 'string' ? (slice[key] as string) : key
+    if (values) {
+      for (const [name, value] of Object.entries(values)) {
+        msg = msg.replaceAll(`{${name}}`, String(value))
+        msg = msg.replaceAll(`{{${name}}}`, String(value))
+      }
+    }
+    return msg
+  },
+  useLocale: () => 'en',
+  useMessages: () => enDict,
+  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
 
 // jsdom exposes crypto.subtle in CI but it may not digest buffers; use Node Web Crypto.
 const testCrypto = webcrypto as Crypto

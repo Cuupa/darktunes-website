@@ -1,0 +1,17 @@
+{
+  "title": "Press & Media",
+  "metaDescription": "Electronic Press Kit — bios, press photos, and tour dates for darkTunes Music Group artists.",
+  "bioShortHeading": "Short Bio",
+  "bioMediumHeading": "Medium Bio",
+  "bioLongHeading": "Long Bio",
+  "pressPhotosHeading": "Press Photos",
+  "pressPhotosDescription": "High-resolution photos for press use. Click to download.",
+  "downloadPhoto": "Download",
+  "tourDatesHeading": "Tour Dates",
+  "quotesHeading": "Press Quotes",
+  "noPressPhotos": "No press photos available yet.",
+  "noTourDates": "No upcoming tour dates.",
+  "noQuotes": "No press quotes available yet.",
+  "copyBio": "Copy",
+  "bioCopied": "Copied!"
+}

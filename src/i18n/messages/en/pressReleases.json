@@ -1,0 +1,18 @@
+{
+  "heading": "Press Releases",
+  "detail": {
+    "backLink": "Back to Press Releases",
+    "mediaContact": "Media Contact",
+    "category": "Category",
+    "embargo": "Embargoed until"
+  },
+  "categories": {
+    "albumAnnouncement": "Album Announcement",
+    "tour": "Tour",
+    "labelNews": "Label News",
+    "other": "Other"
+  },
+  "filterAll": "All",
+  "search": "Search releases…",
+  "noResults": "No press releases found."
+}

@@ -1,0 +1,23 @@
+{
+  "heading": "Pressezugang beantragen",
+  "subheading": "Beantrage Zugang zum darkTunes Press Dashboard — Promo-Tracks, Presse-Kits und exklusive Releases.",
+  "fields": {
+    "name": "Vollständiger Name",
+    "email": "E-Mail-Adresse",
+    "password": "Passwort",
+    "publication": "Publikation / Medium",
+    "website": "Website (optional)",
+    "reason": "Warum beantragst du Pressezugang?"
+  },
+  "submit": "Bewerbung absenden",
+  "submitting": "Wird gesendet…",
+  "success": {
+    "heading": "Bewerbung eingereicht",
+    "message": "Vielen Dank! Wir prüfen deine Bewerbung und melden uns per E-Mail bei dir.",
+    "login": "Bereits freigeschaltet? Jetzt anmelden"
+  },
+  "errors": {
+    "emailInUse": "Für diese E-Mail existiert bereits ein Konto. Bitte melde dich an.",
+    "generic": "Senden fehlgeschlagen. Bitte versuche es erneut."
+  }
+}
