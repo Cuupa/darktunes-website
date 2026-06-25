@@ -1,7 +1,8 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, ArrowUp, ArrowDown, CheckSquare } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, CheckSquare } from '@phosphor-icons/react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useReleases } from '@/hooks/useReleases'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
@@ -9,14 +10,7 @@ import { getOrCreateReleaseChecklist, toggleChecklistItem, type ReleaseChecklist
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+
 import {
   Dialog,
   DialogContent,
@@ -34,17 +28,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
+import {
+  AdminDataTable,
+  AdminSortableHeader,
+  AdminTablePagination,
+  useAdminTable,
+} from '@/components/admin/DataTable'
 import { useDict } from '@/contexts/DictContext'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
@@ -53,11 +47,6 @@ import type { Database } from '@/types/database'
 import type { SyncAllResult } from '@/lib/sync/syncAll'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
-
-const PAGE_SIZE = 20
-
-type SortField = 'title' | 'artistName' | 'releaseDate' | 'type'
-type SortDir = 'asc' | 'desc'
 
 const EMPTY_FORM: ReleaseFormData = {
   title: '',
@@ -160,15 +149,10 @@ export function ReleasesManager() {
   const [checklistItems, setChecklistItems] = useState<ReleaseChecklist[]>([])
   const [checklistLoading, setChecklistLoading] = useState(false)
 
-  // Search / sort / pagination
   const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState<SortField>('releaseDate')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [page, setPage] = useState(0)
 
   const formValue = editingRelease ? releaseToFormData(editingRelease) : EMPTY_FORM
 
-  // Derived: filtered + sorted + paginated list
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return releases.filter((r) =>
@@ -177,27 +161,6 @@ export function ReleasesManager() {
       (r.type ?? '').toLowerCase().includes(q),
     )
   }, [releases, search])
-
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'title') cmp = (a.title ?? '').localeCompare(b.title ?? '')
-      else if (sortField === 'artistName') cmp = (a.artistName ?? '').localeCompare(b.artistName ?? '')
-      else if (sortField === 'releaseDate') cmp = (a.releaseDate ?? '').localeCompare(b.releaseDate ?? '')
-      else if (sortField === 'type') cmp = (a.type ?? '').localeCompare(b.type ?? '')
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [filtered, sortField, sortDir])
-
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null
-    return sortDir === 'asc'
-      ? <ArrowUp size={12} className="inline ml-1" aria-hidden="true" />
-      : <ArrowDown size={12} className="inline ml-1" aria-hidden="true" />
-  }
 
   const openNew = () => {
     setEditingRelease(null)
@@ -391,11 +354,11 @@ export function ReleasesManager() {
     })
   }
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === paginated.length && paginated.length > 0) {
+  const toggleSelectAll = (pageRows: Release[]) => {
+    if (selectedIds.size === pageRows.length && pageRows.length > 0) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(paginated.map((r) => r.id)))
+      setSelectedIds(new Set(pageRows.map((r) => r.id)))
     }
   }
 
@@ -456,6 +419,173 @@ export function ReleasesManager() {
     }
   }
 
+  const columns: ColumnDef<Release>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => {
+        const pageRows = table.getRowModel().rows.map((row) => row.original)
+        return (
+          <Checkbox
+            checked={pageRows.length > 0 && pageRows.every((r) => selectedIds.has(r.id))}
+            onCheckedChange={() => toggleSelectAll(pageRows)}
+            aria-label="Select all on this page"
+          />
+        )
+      },
+      cell: ({ row }) => (
+        <Checkbox
+          checked={selectedIds.has(row.original.id)}
+          onCheckedChange={() => toggleSelectRelease(row.original.id)}
+          aria-label={`Select ${row.original.title}`}
+        />
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'title',
+      header: ({ column }) => <AdminSortableHeader column={column}>Title</AdminSortableHeader>,
+      cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
+    },
+    {
+      accessorKey: 'artistName',
+      header: ({ column }) => <AdminSortableHeader column={column}>Artist</AdminSortableHeader>,
+      cell: ({ row }) => (
+        <>
+          {row.original.artistName}
+          {row.original.guestArtists && (
+            <span className="block text-xs text-muted-foreground">{row.original.guestArtists}</span>
+          )}
+        </>
+      ),
+    },
+    {
+      accessorKey: 'releaseDate',
+      header: ({ column }) => <AdminSortableHeader column={column}>Date</AdminSortableHeader>,
+      cell: ({ row }) => row.original.releaseDate,
+    },
+    {
+      accessorKey: 'type',
+      header: ({ column }) => <AdminSortableHeader column={column}>Type</AdminSortableHeader>,
+      cell: ({ row }) => <Badge variant="outline">{row.original.type}</Badge>,
+    },
+    {
+      id: 'visibility',
+      header: 'Visibility',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const release = row.original
+        return (
+          <button
+            type="button"
+            onClick={() => void handleToggleVisibility(release)}
+            title={release.isVisible ? 'Click to hide' : 'Click to show'}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {release.isVisible ? (
+              <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
+                <Eye size={12} aria-hidden="true" />
+                Visible
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
+                <EyeSlash size={12} aria-hidden="true" />
+                Hidden
+              </Badge>
+            )}
+          </button>
+        )
+      },
+    },
+    {
+      id: 'featured',
+      header: 'Featured',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Switch
+          checked={row.original.featured}
+          onCheckedChange={() => void handleToggleFeatured(row.original)}
+          aria-label={`Toggle featured for ${row.original.title}`}
+        />
+      ),
+    },
+    {
+      id: 'promo',
+      header: 'Promo',
+      enableSorting: false,
+      cell: ({ row }) => (row.original.isPromo ? <Badge variant="secondary">Promo</Badge> : null),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="text-right block w-full">Actions</span>,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const release = row.original
+        return (
+          <div className="flex justify-end gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => void handleResolveSmartLink(release)}
+              disabled={resolvingSmartLinkId === release.id || (!release.spotifyUrl && !release.appleMusicUrl)}
+              title={release.smartUrl ? 'Re-resolve Odesli smart link' : 'Resolve Odesli smart link'}
+              aria-label={
+                release.smartUrl
+                  ? `Re-resolve Odesli smart link for ${release.title}`
+                  : `Resolve Odesli smart link for ${release.title}`
+              }
+            >
+              <LinkSimple
+                size={16}
+                aria-hidden="true"
+                className={resolvingSmartLinkId === release.id ? 'animate-pulse' : ''}
+                weight={release.smartUrl ? 'fill' : 'regular'}
+              />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => void openChecklist(release)}
+              title="Release checklist"
+              aria-label={`Release checklist for ${release.title}`}
+            >
+              <CheckSquare size={16} aria-hidden="true" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => openEdit(release)}
+              title="Edit"
+              aria-label={`Edit ${release.title}`}
+            >
+              <PencilSimple size={16} aria-hidden="true" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setDeleteTarget(release)}
+              title="Delete"
+              aria-label={`Delete ${release.title}`}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash size={16} aria-hidden="true" />
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
+
+  const table = useAdminTable({
+    data: filtered,
+    columns,
+    getRowId: (row) => row.id,
+    initialSorting: [{ id: 'releaseDate', desc: true }],
+  })
+
+  const emptyMessage = search
+    ? `No releases match "${search}".`
+    : 'No releases yet. Click "New Release" or sync from iTunes.'
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-card sm:flex-row sm:items-center">
@@ -507,34 +637,19 @@ export function ReleasesManager() {
 
       <Separator />
 
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <div className="relative flex-1 min-w-0">
           <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search releases…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              table.setPageIndex(0)
+            }}
             className="pl-8"
           />
         </div>
-        <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => {
-          const [f, d] = v.split(':') as [SortField, SortDir]
-          setSortField(f); setSortDir(d); setPage(0)
-        }}>
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Sort by…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="releaseDate:desc">Date (newest first)</SelectItem>
-            <SelectItem value="releaseDate:asc">Date (oldest first)</SelectItem>
-            <SelectItem value="title:asc">Title A → Z</SelectItem>
-            <SelectItem value="title:desc">Title Z → A</SelectItem>
-            <SelectItem value="artistName:asc">Artist A → Z</SelectItem>
-            <SelectItem value="artistName:desc">Artist Z → A</SelectItem>
-            <SelectItem value="type:asc">Type</SelectItem>
-          </SelectContent>
-        </Select>
         <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {releases.length}</p>
         {selectedIds.size > 0 && (
           <Button size="sm" variant="destructive" onClick={() => setBulkDeleteConfirm(true)} className="gap-2">
@@ -548,170 +663,20 @@ export function ReleasesManager() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-10">
-              <Checkbox
-                checked={paginated.length > 0 && selectedIds.size === paginated.length}
-                onCheckedChange={toggleSelectAll}
-                aria-label="Select all on this page"
-              />
-            </TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('title'); setSortDir(sortField === 'title' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
-                Title <SortIcon field="title" />
-              </button>
-            </TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('artistName'); setSortDir(sortField === 'artistName' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
-                Artist <SortIcon field="artistName" />
-              </button>
-            </TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('releaseDate'); setSortDir(sortField === 'releaseDate' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
-                Date <SortIcon field="releaseDate" />
-              </button>
-            </TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => { setSortField('type'); setSortDir(sortField === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); setPage(0) }}>
-                Type <SortIcon field="type" />
-              </button>
-            </TableHead>
-            <TableHead>Visibility</TableHead>
-            <TableHead>Featured</TableHead>
-            <TableHead>Promo</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                Loading…
-              </TableCell>
-            </TableRow>
-          ) : paginated.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                {search ? `No releases match "${search}".` : 'No releases yet. Click "New Release" or sync from iTunes.'}
-              </TableCell>
-            </TableRow>
-          ) : (
-            paginated.map((release) => (
-              <TableRow key={release.id} className={selectedIds.has(release.id) ? 'bg-muted/40' : undefined}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedIds.has(release.id)}
-                    onCheckedChange={() => toggleSelectRelease(release.id)}
-                    aria-label={`Select ${release.title}`}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{release.title}</TableCell>
-                <TableCell>
-                  {release.artistName}
-                  {release.guestArtists && (
-                    <span className="block text-xs text-muted-foreground">{release.guestArtists}</span>
-                  )}
-                </TableCell>
-                <TableCell>{release.releaseDate}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{release.type}</Badge>
-                </TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleVisibility(release)}
-                    title={release.isVisible ? 'Click to hide' : 'Click to show'}
-                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {release.isVisible ? (
-                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
-                        <Eye size={12} aria-hidden="true" />
-                        Visible
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
-                        <EyeSlash size={12} aria-hidden="true" />
-                        Hidden
-                      </Badge>
-                    )}
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <Switch
-                    checked={release.featured}
-                    onCheckedChange={() => void handleToggleFeatured(release)}
-                    aria-label={`Toggle featured for ${release.title}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  {release.isPromo && <Badge variant="secondary">Promo</Badge>}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => void handleResolveSmartLink(release)}
-                      disabled={resolvingSmartLinkId === release.id || (!release.spotifyUrl && !release.appleMusicUrl)}
-                      title={release.smartUrl ? 'Re-resolve Odesli smart link' : 'Resolve Odesli smart link'}
-                      aria-label={release.smartUrl ? `Re-resolve Odesli smart link for ${release.title}` : `Resolve Odesli smart link for ${release.title}`}
-                    >
-                      <LinkSimple
-                        size={16}
-                        aria-hidden="true"
-                        className={resolvingSmartLinkId === release.id ? 'animate-pulse' : ''}
-                        weight={release.smartUrl ? 'fill' : 'regular'}
-                      />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => void openChecklist(release)}
-                      title="Release checklist"
-                      aria-label={`Release checklist for ${release.title}`}
-                    >
-                      <CheckSquare size={16} aria-hidden="true" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(release)} title="Edit" aria-label={`Edit ${release.title}`}>
-                      <PencilSimple size={16} aria-hidden="true" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setDeleteTarget(release)}
-                      title="Delete"
-                      aria-label={`Delete ${release.title}`}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash size={16} aria-hidden="true" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      </div>
+      <AdminDataTable
+        table={table}
+        loading={isLoading}
+        emptyMessage={emptyMessage}
+        getRowClassName={(row) => (selectedIds.has(row.original.id) ? 'bg-muted/40' : undefined)}
+      />
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Page {page + 1} of {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </div>
-        </div>
+      {table.getPageCount() > 1 && (
+        <AdminTablePagination
+          pageIndex={table.getState().pagination.pageIndex}
+          totalCount={filtered.length}
+          onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
+          entityLabel="releases"
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

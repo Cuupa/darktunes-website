@@ -1,8 +1,9 @@
 'use client'
 import { useMemo, useState } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, ArrowUp, ArrowDown, Envelope } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, MagnifyingGlass, Envelope } from '@phosphor-icons/react'
 import { useArtists } from '@/hooks/useArtists'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
@@ -17,6 +18,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  AdminDataTable,
+  AdminSortableHeader,
+  AdminTablePagination,
+  useAdminTable,
+} from '@/components/admin/DataTable'
 import {
   Dialog,
   DialogContent,
@@ -33,24 +40,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import { Badge } from '@/components/ui/badge'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
 
 type ArtistInsert = Database['public']['Tables']['artists']['Insert']
-
-const PAGE_SIZE = 20
-
-type SortField = 'name' | 'country' | 'lastSyncedAt'
-type SortDir = 'asc' | 'desc'
 
 const EMPTY_FORM: ArtistFormData = {
   name: '',
@@ -169,15 +165,10 @@ export function ArtistsManager() {
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [invitingId, setInvitingId] = useState<string | null>(null)
 
-  // Search / sort / pagination
   const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [page, setPage] = useState(0)
 
   const formValue = EMPTY_FORM
 
-  // Derived: filtered + sorted + paginated list
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return artists.filter((a) =>
@@ -186,36 +177,6 @@ export function ArtistsManager() {
       a.genres.some((g) => g.toLowerCase().includes(q)),
     )
   }, [artists, search])
-
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'name') cmp = a.name.localeCompare(b.name)
-      else if (sortField === 'country') cmp = (a.country ?? '').localeCompare(b.country ?? '')
-      else if (sortField === 'lastSyncedAt') cmp = (a.lastSyncedAt ?? '').localeCompare(b.lastSyncedAt ?? '')
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [filtered, sortField, sortDir])
-
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortDir('asc')
-    }
-    setPage(0)
-  }
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null
-    return sortDir === 'asc'
-      ? <ArrowUp size={12} className="inline ml-1" aria-hidden="true" />
-      : <ArrowDown size={12} className="inline ml-1" aria-hidden="true" />
-  }
 
   const openNew = () => {
     setDialogOpen(true)
@@ -333,34 +294,157 @@ export function ArtistsManager() {
     }
   }
 
+  const columns: ColumnDef<Artist>[] = [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <AdminSortableHeader column={column}>Name</AdminSortableHeader>,
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
+      {
+        id: 'genres',
+        header: 'Genres',
+        cell: ({ row }) => row.original.genres.slice(0, 2).join(', '),
+        enableSorting: false,
+      },
+      {
+        accessorKey: 'country',
+        header: ({ column }) => <AdminSortableHeader column={column}>Country</AdminSortableHeader>,
+        cell: ({ row }) => row.original.country ?? '—',
+        sortingFn: (a, b) => (a.original.country ?? '').localeCompare(b.original.country ?? ''),
+      },
+      {
+        id: 'visibility',
+        header: 'Visibility',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const artist = row.original
+          return (
+            <button
+              type="button"
+              onClick={() => void handleToggleVisibility(artist)}
+              title={artist.isVisible ? 'Click to hide' : 'Click to show'}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {artist.isVisible ? (
+                <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
+                  <Eye size={12} aria-hidden="true" />
+                  Visible
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
+                  <EyeSlash size={12} aria-hidden="true" />
+                  Hidden
+                </Badge>
+              )}
+            </button>
+          )
+        },
+      },
+      {
+        accessorKey: 'featured',
+        header: 'Featured',
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.featured ? <Badge variant="secondary">Featured</Badge> : null,
+      },
+      {
+        accessorKey: 'lastSyncedAt',
+        header: ({ column }) => <AdminSortableHeader column={column}>Last Synced</AdminSortableHeader>,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.original.lastSyncedAt
+              ? new Date(row.original.lastSyncedAt).toLocaleDateString()
+              : '—'}
+          </span>
+        ),
+        sortingFn: (a, b) =>
+          (a.original.lastSyncedAt ?? '').localeCompare(b.original.lastSyncedAt ?? ''),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="text-right block w-full">Actions</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const artist = row.original
+          return (
+            <div className="flex justify-end gap-2">
+              {artist.email && !artist.userId && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => void handleInvite(artist)}
+                  disabled={invitingId === artist.id}
+                  title="Send Portal Invite"
+                  aria-label={`Invite ${artist.name} to the portal`}
+                  className="text-primary hover:text-primary"
+                >
+                  <Envelope size={16} aria-hidden="true" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => void handleSync(artist)}
+                disabled={syncingId === artist.id}
+                title="Sync Now"
+                aria-label={`Sync ${artist.name}`}
+              >
+                <ArrowsClockwise
+                  size={16}
+                  aria-hidden="true"
+                  className={syncingId === artist.id ? 'animate-spin' : ''}
+                />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => openEdit(artist)}
+                title="Edit"
+                aria-label={`Edit ${artist.name}`}
+              >
+                <PencilSimple size={16} aria-hidden="true" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setDeleteTarget(artist)}
+                title="Delete"
+                aria-label={`Delete ${artist.name}`}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          )
+        },
+      },
+    ]
+
+  const table = useAdminTable({
+    data: filtered,
+    columns,
+    getRowId: (row) => row.id,
+  })
+
+  const emptyMessage = search
+    ? `No artists match "${search}".`
+    : 'No artists yet. Click "New Artist" to add one.'
+
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <div className="relative flex-1 min-w-0">
           <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search artists…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              table.setPageIndex(0)
+            }}
             className="pl-8"
           />
         </div>
-        <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => {
-          const [f, d] = v.split(':') as [SortField, SortDir]
-          setSortField(f); setSortDir(d); setPage(0)
-        }}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Sort by…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name:asc">Name A → Z</SelectItem>
-            <SelectItem value="name:desc">Name Z → A</SelectItem>
-            <SelectItem value="country:asc">Country A → Z</SelectItem>
-            <SelectItem value="lastSyncedAt:desc">Last synced (newest)</SelectItem>
-            <SelectItem value="lastSyncedAt:asc">Last synced (oldest)</SelectItem>
-          </SelectContent>
-        </Select>
         <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {artists.length}</p>
         <Button size="sm" onClick={openNew} className="gap-2">
           <Plus size={16} weight="bold" />
@@ -368,140 +452,36 @@ export function ArtistsManager() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('name')}>
-                Name <SortIcon field="name" />
-              </button>
-            </TableHead>
-            <TableHead>Genres</TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('country')}>
-                Country <SortIcon field="country" />
-              </button>
-            </TableHead>
-            <TableHead>Visibility</TableHead>
-            <TableHead>Featured</TableHead>
-            <TableHead>
-              <button type="button" className="hover:text-foreground" onClick={() => toggleSort('lastSyncedAt')}>
-                Last Synced <SortIcon field="lastSyncedAt" />
-              </button>
-            </TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <ArtistSkeletonRows />
-          ) : paginated.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                {search ? `No artists match "${search}".` : 'No artists yet. Click "New Artist" to add one.'}
-              </TableCell>
-            </TableRow>
-          ) : (
-            paginated.map((artist) => (
-              <TableRow key={artist.id}>
-                <TableCell className="font-medium">{artist.name}</TableCell>
-                <TableCell>{artist.genres.slice(0, 2).join(', ')}</TableCell>
-                <TableCell>{artist.country ?? '—'}</TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleVisibility(artist)}
-                    title={artist.isVisible ? 'Click to hide' : 'Click to show'}
-                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {artist.isVisible ? (
-                      <Badge variant="outline" className="gap-1 text-green-400 border-green-400/30 cursor-pointer hover:opacity-70">
-                        <Eye size={12} aria-hidden="true" />
-                        Visible
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-muted-foreground border-border cursor-pointer hover:opacity-70">
-                        <EyeSlash size={12} aria-hidden="true" />
-                        Hidden
-                      </Badge>
-                    )}
-                  </button>
-                </TableCell>
-                <TableCell>
-                  {artist.featured && <Badge variant="secondary">Featured</Badge>}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {artist.lastSyncedAt
-                    ? new Date(artist.lastSyncedAt).toLocaleDateString()
-                    : '—'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    {artist.email && !artist.userId && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleInvite(artist)}
-                        disabled={invitingId === artist.id}
-                        title="Send Portal Invite"
-                        aria-label={`Invite ${artist.name} to the portal`}
-                        className="text-primary hover:text-primary"
-                      >
-                        <Envelope size={16} aria-hidden="true" />
-                      </Button>
-                    )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => void handleSync(artist)}
-                      disabled={syncingId === artist.id}
-                      title="Sync Now"
-                      aria-label={`Sync ${artist.name}`}
-                    >
-                      <ArrowsClockwise
-                        size={16}
-                        aria-hidden="true"
-                        className={syncingId === artist.id ? 'animate-spin' : ''}
-                      />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(artist)} title="Edit" aria-label={`Edit ${artist.name}`}>
-                      <PencilSimple size={16} aria-hidden="true" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setDeleteTarget(artist)}
-                      title="Delete"
-                      aria-label={`Delete ${artist.name}`}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash size={16} aria-hidden="true" />
-                    </Button>
-                  </div>
-                </TableCell>
+      {isLoading ? (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Genres</TableHead>
+                <TableHead>Country</TableHead>
+                <TableHead>Visibility</TableHead>
+                <TableHead>Featured</TableHead>
+                <TableHead>Last Synced</TableHead>
+                <TableHead />
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Page {page + 1} of {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </div>
+            </TableHeader>
+            <TableBody>
+              <ArtistSkeletonRows />
+            </TableBody>
+          </Table>
         </div>
+      ) : (
+        <AdminDataTable table={table} emptyMessage={emptyMessage} />
+      )}
+
+      {table.getPageCount() > 1 && (
+        <AdminTablePagination
+          pageIndex={table.getState().pagination.pageIndex}
+          totalCount={filtered.length}
+          onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
+          entityLabel="artists"
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
