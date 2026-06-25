@@ -63,6 +63,7 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
   return (
     <StatementsTable
       artistId={artist?.id}
+      billingProfile={billingProfile}
       billingProfileComplete={isBillingProfileComplete(billingProfile)}
       dict={dict.portal}
       invoicedStatementIds={invoiceList.invoices.flatMap((invoice) =>

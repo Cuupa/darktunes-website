@@ -22,11 +22,22 @@ IoC in portal: Every portal page is a Server Component that fetches data and pas
 Release checklists: `src/lib/api/releaseChecklists.ts` provides `getOrCreateReleaseChecklist(db, artistId, releaseId)` (seeds DEFAULT_RELEASE_TASKS on first call) and `toggleChecklistItem(db, id, isCompleted)`. The PATCH `/api/portal/checklist` route handler uses Bearer token auth and relies on RLS for artist-scoped enforcement.
 Bio lengths: `artist_profiles` has three bio columns — `bio_short` (≤100 words), `bio_medium` (≤300 words), `bio_long` (≤1000 words) — in addition to the general `bio` field. The profile form exposes all four.
 Portal nav items are now feature-flag aware (`portal_feature_flags`): Overview, Profile, Analytics, Releases (`/portal/releases`), Tour (`/portal/tour`), Calendar (`/portal/calendar`), Marketing (`/portal/marketing`), Documents (`/portal/documents`), Interviews (`/portal/interviews`), Statements, Messages (`/portal/messages`), Help (`/portal/help`). Settings (`/portal/settings`) is always visible (not flag-gated). Onboarding (`/portal/onboarding`) is shown only for new artists who have not completed the first-run wizard.
-Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'invoiced'` after successful creation.
+Billing master data lives in `artist_billing_profiles` and is edited at `/portal/billing`. Portal invoice creation MUST call `isBillingProfileComplete()` before generating PDFs. `InlineBillingProfileStep` collects missing billing data inline on `/portal/invoices` (`InvoiceForm`) and before one-click SOS invoices on `/portal/analytics` (Earnings tab) and `/portal/statements`. SOS-linked invoices pass through `/portal/invoices?statement={id}`, store the artist’s own bookkeeping number in `artist_invoice_number`, and set `sales_statements.status = 'invoiced'` after successful creation.
 
 ## Settlement & Abrechnungszentrale
 
-Enterprise settlement lifecycle for SOS statements and artist invoices. Admin UI: **Accounting → Abrechnungszentrale** (`SettlementCenterPanel` in `src/components/admin/sos/SettlementCenterPanel.tsx`).
+Enterprise settlement lifecycle for SOS statements and artist invoices.
+
+**Admin UI — Accounting:** Default **Guided** mode (`AccountingGuidedWizard` in `src/components/admin/AccountingPanel.tsx`) walks operators through Upload → Review → Publish. **Advanced** mode exposes all sub-tabs (Upload, Reporting, Settlement Center, Portal Data, SEPA Payout, Trends, Rules). Settlement UI is composed of:
+
+- `SettlementCenterPanel` — thin shell wiring overview, toolbar, register table, dialogs
+- `useSettlementCenter` — register fetch, bulk actions, correction/payment/lock/archive dialogs
+- `SettlementWorkflowOverview`, `SettlementActionToolbar`, `SettlementRegisterTable`, `SettlementCenterDialogs`
+- `settlementCenterModel.ts` — shared types, labels, `registerToMasterRow`
+- `useSosWorkspaceSync` — period-keyed rules workspace auto-save via `GET/POST /api/admin/sos/workspaces`
+- `settlementReconciliation.ts` — pure ledger invariant checks; open-balance mismatch surfaces as admin warning in `SettlementWorkflowOverview`
+- `trackAssignmentSplits.ts` — multi-owner track revenue split helpers used in `data-processor.ts`
+- `runPersistSosAnalytics.ts` — client wrapper for portal analytics persist server action
 
 **Workflow (7 steps):** review → draft upload → label approve + notify → artist viewed → invoice created → invoice received → paid. Status helpers live in `src/lib/sos/statementWorkflow.ts`; badges/stepper in `statementWorkflowUi.tsx`.
 

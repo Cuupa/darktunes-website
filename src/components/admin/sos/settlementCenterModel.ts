@@ -114,6 +114,9 @@ export const SETTLEMENT_FALLBACK = {
   settlementKpiPaidHint: 'Payments fully recorded',
   settlementOpenBalance: 'Open balance',
   settlementOpenBalanceHint: 'Sum of all open ledger balances',
+  settlementReconciliationTitle: 'Ledger balance mismatch',
+  settlementReconciliationBody:
+    'The register KPI ({reported} EUR) does not match the sum of per-artist ledger balances ({computed} EUR). Delta: {delta} EUR. Review ledger entries before locking the period.',
   settlementApprovalNotesLabel: 'Internal approval notes (optional)',
   settlementApprovalNotesPlaceholder: 'Notes for selected approvals…',
   settlementCreateDrafts: 'Create drafts ({count})',

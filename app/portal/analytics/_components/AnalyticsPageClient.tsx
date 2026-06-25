@@ -9,6 +9,7 @@ import type { ArtistTerritoryMetric } from '@/lib/api/artistTerritoryMetrics'
 import { aggregateMetricsByCountry } from '@/lib/api/artistTerritoryMetrics'
 import type { EventImpact } from '@/lib/api/eventImpact'
 import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
+import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { ArtistLineItemWithContext } from '@/lib/api/salesStatementLineItems'
 import type { EpkDownloadStats } from '@/lib/api/epkDownloadEvents'
@@ -60,6 +61,7 @@ import { MerchTab } from './MerchTab'
 
 interface AnalyticsPageClientProps {
   artistId: string
+  billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
   dict: Dictionary['portal']
   defaultTab: string
@@ -83,6 +85,7 @@ interface AnalyticsPageClientProps {
 
 export function AnalyticsPageClient({
   artistId,
+  billingProfile,
   billingProfileComplete,
   dict,
   defaultTab,
@@ -329,6 +332,7 @@ export function AnalyticsPageClient({
             <EarningsChart dict={dict} statements={statements} />
             <EarningsStatementsPanel
               artistId={artistId}
+              billingProfile={billingProfile}
               billingProfileComplete={billingProfileComplete}
               dict={dict}
               invoicedStatementIds={invoicedStatementIds}

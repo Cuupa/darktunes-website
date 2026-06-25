@@ -9,7 +9,7 @@ import {
   WorkflowSummaryCard,
 } from '@/components/admin/sos/statementWorkflowUi'
 import type { SettlementCenterState } from '@/hooks/useSettlementCenter'
-import { SealCheck } from '@phosphor-icons/react'
+import { SealCheck, WarningCircle } from '@phosphor-icons/react'
 import { interpolate } from '@/lib/i18n/interpolate'
 
 function PeriodStatusBadge({
@@ -59,7 +59,11 @@ export function SettlementWorkflowOverview({
     activeStep,
     completedSteps,
     kpis,
+    balanceReconciliation,
   } = settlement
+
+  const showReconciliationWarning =
+    balanceReconciliation != null && !balanceReconciliation.ok
 
   return (
     <>
@@ -80,6 +84,22 @@ export function SettlementWorkflowOverview({
         </AlertTitle>
         <AlertDescription className="text-xs">{t.settlementPeriodAlertBody}</AlertDescription>
       </Alert>
+
+      {showReconciliationWarning && balanceReconciliation && (
+        <Alert className="border-amber-500/40 bg-amber-500/10" role="status">
+          <WarningCircle size={16} className="text-amber-300" aria-hidden="true" />
+          <AlertTitle className="text-sm text-amber-100">
+            {t.settlementReconciliationTitle}
+          </AlertTitle>
+          <AlertDescription className="text-xs text-amber-100/90">
+            {interpolate(t.settlementReconciliationBody, {
+              computed: balanceReconciliation.computedOpenBalanceEur.toFixed(2),
+              reported: balanceReconciliation.reportedOpenBalanceEur.toFixed(2),
+              delta: balanceReconciliation.deltaEur.toFixed(2),
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <SosAnalyticsPersistPanel
         periodStart={periodStart}

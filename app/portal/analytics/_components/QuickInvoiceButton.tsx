@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { PaperPlaneTilt, Spinner } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -20,7 +19,6 @@ import type { Dictionary } from '@/i18n/types'
 
 interface QuickInvoiceButtonProps {
   artistId: string
-  billingProfileComplete: boolean
   dict: Dictionary['portal']
   statement: SalesStatement
 }
@@ -38,19 +36,10 @@ function defaultArtistInvoiceNumber(period: string): string {
 
 export function QuickInvoiceButton({
   artistId,
-  billingProfileComplete,
   dict,
   statement,
 }: QuickInvoiceButtonProps) {
   const [submitting, setSubmitting] = useState(false)
-
-  if (!billingProfileComplete) {
-    return (
-      <Button asChild size="sm" variant="secondary">
-        <Link href={`/portal/billing?artistId=${artistId}`}>{dict.invoice_billing_cta}</Link>
-      </Button>
-    )
-  }
 
   const handleQuickInvoice = async () => {
     setSubmitting(true)

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import type { SettlementRegister } from '@/lib/api/settlementRegister'
+import {
+  reconcileRegisterOpenBalance,
+  type RegisterReconciliationResult,
+} from '@/lib/api/settlementReconciliation'
 import { runPersistSosAnalytics } from '@/lib/sos/runPersistSosAnalytics'
 import type { LabelArtist } from '@/lib/sos/types'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
@@ -244,6 +248,18 @@ export function useSettlementCenter({
       },
     [register?.kpis],
   )
+
+  const balanceReconciliation = useMemo<RegisterReconciliationResult | null>(() => {
+    if (!register) return null
+    return reconcileRegisterOpenBalance(
+      register.rows.map((row) => ({
+        artistId: row.artistId,
+        ledgerBalanceEur: row.ledgerBalanceEur,
+      })),
+      register.kpis.openBalanceEur,
+    )
+  }, [register])
+
   const period = register?.period
   const periodWritable = period ? !['locked', 'archived'].includes(period.status) : true
 
@@ -653,6 +669,7 @@ export function useSettlementCenter({
     period,
     periodWritable,
     kpis,
+    balanceReconciliation,
     activeStep,
     completedSteps,
     canPersistAnalytics,
