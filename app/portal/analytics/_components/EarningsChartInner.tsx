@@ -98,7 +98,7 @@ export function EarningsChartInner({ chartData, totalEarned, lastPayout, pending
                   <Tooltip
                     contentStyle={{ backgroundColor: '#292929', border: '1px solid #383838' }}
                     labelStyle={{ color: '#fff' }}
-                    formatter={(value: number) => [formatEur(value), t('analytics_earnings_chart_label')]}
+                    formatter={(value) => [formatEur(Number(value ?? 0)), t('analytics_earnings_chart_label')]}
                   />
                   <Bar
                     dataKey="amount"

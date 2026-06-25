@@ -78,7 +78,7 @@ export function ListenersChartInner({ chartData,
             <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtListeners} />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
-              formatter={(v: number, name: string) => [fmtListeners(v), name]}
+              formatter={(v, name) => [fmtListeners(Number(v ?? 0)), name ?? '']}
             />
             <Legend />
             {hasLastfm && (

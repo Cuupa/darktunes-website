@@ -227,7 +227,7 @@ export function TrendsDashboard({
               <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtShort} />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(v: number, name: string) => [fmtEur(v), name]}
+                formatter={(v, name) => [fmtEur(Number(v ?? 0)), name ?? '']}
               />
               <Legend />
               <Area

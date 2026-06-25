@@ -57,7 +57,7 @@ export function RevenueMixChartInner({ slices, totalRevenue }: RevenueMixChartIn
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => formatEur(value)}
+              formatter={(value) => formatEur(Number(value ?? 0))}
               contentStyle={{
                 backgroundColor: 'hsl(var(--popover))',
                 border: '1px solid hsl(var(--border))',

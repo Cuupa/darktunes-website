@@ -49,7 +49,7 @@ export function TrendsChartInner({ data }: TrendsChartInnerProps) {
             className="text-muted-foreground"
           />
           <Tooltip
-            formatter={(value: number) => formatEur(value)}
+            formatter={(value) => formatEur(Number(value ?? 0))}
             contentStyle={TOOLTIP_STYLE}
           />
           <Legend />

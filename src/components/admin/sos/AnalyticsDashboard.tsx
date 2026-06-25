@@ -275,7 +275,7 @@ export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: Analyti
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtShort} />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number) => [fmtEur(v), 'Revenue']}
+                    formatter={(v) => [fmtEur(Number(v ?? 0)), 'Revenue']}
                   />
                   <Bar dataKey="revenue" fill={CHART_COLORS[0]} radius={[3, 3, 0, 0]} />
                 </BarChart>
@@ -301,7 +301,7 @@ export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: Analyti
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtShort} />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number) => [fmtEur(v), 'Revenue']}
+                    formatter={(v) => [fmtEur(Number(v ?? 0)), 'Revenue']}
                   />
                   <Bar dataKey="revenue" fill={CHART_COLORS[2]} radius={[3, 3, 0, 0]} />
                 </BarChart>
@@ -333,7 +333,7 @@ export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: Analyti
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtShort} />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number) => [fmtEur(v), 'Revenue']}
+                    formatter={(v) => [fmtEur(Number(v ?? 0)), 'Revenue']}
                   />
                   <Area
                     type="monotone"
@@ -376,7 +376,7 @@ export function AnalyticsDashboard({ revenues, showSummaryKpis = true }: Analyti
                     </Pie>
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(v: number) => [fmtEur(v), 'Revenue']}
+                      formatter={(v) => [fmtEur(Number(v ?? 0)), 'Revenue']}
                     />
                     <Legend formatter={(value) => <span className="text-xs">{value}</span>} />
                   </PieChart>
