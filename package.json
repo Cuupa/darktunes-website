@@ -101,7 +101,7 @@
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.7",
     "react-error-boundary": "^6.0.0",
-    "react-hook-form": "^7.77.0",
+    "react-hook-form": "^7.80.0",
     "react-konva": "^19.2.5",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.1",
