@@ -1,20 +1,14 @@
 'use client'
 
 /**
- * src/hooks/useSosRulesPresets.ts
- *
  * CRUD hook for SOS rule presets stored in Supabase (sos_rules_presets table).
- * Auto-loads presets on mount. Provides save, load (apply to state), and delete.
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import type {
-  ArtistMapping, CompilationFilter, SplitFee,
-  ManualRevenue, ExpenseEntry, IgnoredEntry,
-  CSVColumnAlias, AppDefaults, EmailConfig,
-  TrackRevenueAssignment,
-} from '@/lib/sos/types'
+import type { SosAccountingSettings } from '@/lib/sos/sosAccountingSettings'
+
+export type PresetConfig = SosAccountingSettings
 
 export interface SosRulesPreset {
   id: string
@@ -22,19 +16,6 @@ export interface SosRulesPreset {
   config: PresetConfig
   created_at: string
   updated_at: string
-}
-
-export interface PresetConfig {
-  artistMappings: ArtistMapping[]
-  compilationFilters: CompilationFilter[]
-  splitFees: SplitFee[]
-  manualRevenues: ManualRevenue[]
-  expenses: ExpenseEntry[]
-  ignoredEntries: IgnoredEntry[]
-  csvAliases: CSVColumnAlias[]
-  appDefaults: AppDefaults
-  emailConfig: Partial<EmailConfig>
-  trackRevenueAssignments: TrackRevenueAssignment[]
 }
 
 export function useSosRulesPresets() {
@@ -63,39 +44,39 @@ export function useSosRulesPresets() {
   const savePreset = useCallback(async (name: string, config: PresetConfig): Promise<void> => {
     setIsSaving(true)
     try {
-      const existing = presets.find(p => p.name.toLowerCase() === name.toLowerCase())
-      if (existing) {
-        const res = await fetch(`/api/admin/sos/presets/${existing.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, config }),
-        })
-        if (!res.ok) throw new Error('Failed to update preset')
-        const data = await res.json() as { preset: SosRulesPreset }
-        setPresets(prev => prev.map(p => p.id === existing.id ? data.preset : p))
-      } else {
-        const res = await fetch('/api/admin/sos/presets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, config }),
-        })
-        if (!res.ok) throw new Error('Failed to create preset')
-        const data = await res.json() as { preset: SosRulesPreset }
-        setPresets(prev => [data.preset, ...prev])
-      }
+      const res = await fetch('/api/admin/sos/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, config }),
+      })
+      if (!res.ok) throw new Error('Failed to save preset')
+      const data = await res.json() as { preset: SosRulesPreset }
+      setPresets((prev) => {
+        const idx = prev.findIndex((p) => p.id === data.preset.id)
+        if (idx >= 0) {
+          return prev.map((p) => (p.id === data.preset.id ? data.preset : p))
+        }
+        const byName = prev.findIndex(
+          (p) => p.name.toLowerCase() === data.preset.name.toLowerCase(),
+        )
+        if (byName >= 0) {
+          return prev.map((p, i) => (i === byName ? data.preset : p))
+        }
+        return [data.preset, ...prev]
+      })
       toast.success(`Preset "${name}" saved`)
     } catch {
       toast.error('Failed to save preset')
     } finally {
       setIsSaving(false)
     }
-  }, [presets])
+  }, [])
 
   const deletePreset = useCallback(async (id: string): Promise<void> => {
     try {
       const res = await fetch(`/api/admin/sos/presets/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete preset')
-      setPresets(prev => prev.filter(p => p.id !== id))
+      setPresets((prev) => prev.filter((p) => p.id !== id))
       toast.success('Preset deleted')
     } catch {
       toast.error('Failed to delete preset')

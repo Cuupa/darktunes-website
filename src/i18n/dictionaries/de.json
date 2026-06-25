@@ -1484,6 +1484,7 @@
       "rulesWorkspaceSynced": "Regeln mit Server-Workspace synchronisiert",
       "rulesWorkspaceDirty": "Ungespeicherte Regeländerungen — speichere auf Server…",
       "rulesWorkspaceLocalOnly": "Kein Zeitraum erkannt — Regeln lokal zwischengespeichert, bis die CSV-Verarbeitung den Zeitraum setzt.",
+      "rulesWorkspaceDefaultSynced": "Einstellungen mit Server synchronisiert (Default-Preset)",
       "rulesWorkspaceSaving": "Speichere Regeln auf Server…",
       "settlementSyncAnalyticsOnApprove": "Portal-Analytics bei Freigabe synchronisieren",
       "settlementAnalyticsSyncedOnApprove": "Portal-Analytics für diesen Zeitraum synchronisiert",

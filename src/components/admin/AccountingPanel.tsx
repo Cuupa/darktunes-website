@@ -27,9 +27,19 @@ import type {
   CSVColumnAlias, EmailConfig, TrackRevenueAssignment,
 } from '@/lib/sos/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
-import { EMPTY_SOS_RULES_BUNDLE, type SosRulesBundle } from '@/lib/sos/sosRulesBundle'
+import {
+  DEFAULT_SOS_ACCOUNTING_SETTINGS,
+  type SosAccountingSettings,
+} from '@/lib/sos/sosAccountingSettings'
+import {
+  clearLegacyKvKeys,
+  isKvMigrationComplete,
+  markKvMigrationComplete,
+  mergeKvIntoSettings,
+  readLegacyKvSettings,
+} from '@/lib/sos/migrateKvToDb'
+import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
-import { useKV } from '@/hooks/useLocalKV'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
@@ -85,19 +95,20 @@ function SosGeneratorPanel() {
   const t = dict.admin?.accounting ?? ACCOUNTING_FALLBACK
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
+  // Map portal artists to SOS LabelArtist[]
+  const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
+
+  const [labelBranding, setLabelBranding] = useState<Partial<LabelInfo>>(DEFAULT_LABEL_INFO)
+  const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
+  const [csvImportProfilesCustom, setCsvImportProfilesCustom] = useState<CsvImportProfile[]>([])
   const {
     profiles: csvImportProfiles,
     customProfiles,
     saveProfile: saveCsvProfile,
     deleteProfile: deleteCsvProfile,
-  } = useCsvImportProfiles()
+  } = useCsvImportProfiles(csvImportProfilesCustom, setCsvImportProfilesCustom)
 
-  // Map portal artists to SOS LabelArtist[]
-  const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
-
-  const [labelBranding, setLabelBranding] = useKV<LabelInfo>('sos-label-info', DEFAULT_LABEL_INFO)
-
-  // Site settings override public branding fields; SEPA/bank details persist in IndexedDB.
+  // Site settings override public branding fields; SEPA/bank details persist in Supabase.
   const labelInfo = useMemo<LabelInfo>(() => ({
     ...DEFAULT_LABEL_INFO,
     ...labelBranding,
@@ -115,11 +126,9 @@ function SosGeneratorPanel() {
         sepaAccountHolder: sepaAccountHolder.trim(),
       }))
     },
-    [setLabelBranding],
+    [],
   )
 
-  // PDF settings state
-  const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
   const [appDefaults, setAppDefaults] = useState<AppDefaults>(DEFAULT_APP_DEFAULTS)
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
@@ -142,31 +151,10 @@ function SosGeneratorPanel() {
   const [csvAliases, setCsvAliases] = useState<CSVColumnAlias[]>([])
   const [trackRevenueAssignments, setTrackRevenueAssignments] = useState<TrackRevenueAssignment[]>([])
 
-  const [savedRules, setSavedRules, , rulesLoaded] = useKV<SosRulesBundle>(
-    'sos-rules-state',
-    EMPTY_SOS_RULES_BUNDLE,
-  )
-  const rulesHydratedRef = useRef(false)
-  const [rulesReady, setRulesReady] = useState(false)
+  const settingsHydratedRef = useRef(false)
+  const [settingsReady, setSettingsReady] = useState(false)
 
-  useEffect(() => {
-    if (!rulesLoaded || rulesHydratedRef.current) return
-    rulesHydratedRef.current = true
-    const bundle = savedRules ?? EMPTY_SOS_RULES_BUNDLE
-    setArtistMappings(bundle.artistMappings)
-    setCompilationFilters(bundle.compilationFilters)
-    setSplitFees(bundle.splitFees)
-    setManualRevenues(bundle.manualRevenues)
-    setExpenses(bundle.expenses)
-    setIgnoredEntries(bundle.ignoredEntries)
-    setCsvAliases(bundle.csvAliases)
-    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
-    setAppDefaults(bundle.appDefaults)
-    setEmailConfig(bundle.emailConfig)
-    setRulesReady(true)
-  }, [rulesLoaded, savedRules])
-
-  const rulesBundle = useMemo<SosRulesBundle>(
+  const settingsBundle = useMemo<SosAccountingSettings>(
     () => ({
       artistMappings,
       compilationFilters,
@@ -178,6 +166,9 @@ function SosGeneratorPanel() {
       trackRevenueAssignments,
       appDefaults,
       emailConfig,
+      labelInfo: labelBranding,
+      pdfSettings,
+      csvImportProfiles: csvImportProfilesCustom,
     }),
     [
       artistMappings,
@@ -190,10 +181,13 @@ function SosGeneratorPanel() {
       trackRevenueAssignments,
       appDefaults,
       emailConfig,
+      labelBranding,
+      pdfSettings,
+      csvImportProfilesCustom,
     ],
   )
 
-  const applyRulesBundle = useCallback((bundle: SosRulesBundle) => {
+  const applySettings = useCallback((bundle: SosAccountingSettings) => {
     setArtistMappings(bundle.artistMappings)
     setCompilationFilters(bundle.compilationFilters)
     setSplitFees(bundle.splitFees)
@@ -204,14 +198,10 @@ function SosGeneratorPanel() {
     setTrackRevenueAssignments(bundle.trackRevenueAssignments)
     setAppDefaults(bundle.appDefaults)
     setEmailConfig(bundle.emailConfig)
+    setLabelBranding(bundle.labelInfo ?? DEFAULT_LABEL_INFO)
+    setPdfSettings(bundle.pdfSettings ?? DEFAULT_PDF_EXPORT_SETTINGS)
+    setCsvImportProfilesCustom(bundle.csvImportProfiles ?? [])
   }, [])
-
-  const cacheRulesBundle = useCallback(
-    (bundle: SosRulesBundle) => {
-      setSavedRules(bundle)
-    },
-    [setSavedRules],
-  )
 
   const handleSubTabKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, tabId: SubTab) => {
@@ -306,55 +296,19 @@ function SosGeneratorPanel() {
     setTrackRevenueAssignments(prev => prev.filter(a => a.id !== id))
   }, [])
 
-  // Workspace import (replaces all rules at once)
-  const handleWorkspaceImport = useCallback((bundle: {
-    appDefaults: AppDefaults
-    emailConfig: Partial<EmailConfig>
-    artistMappings: ArtistMapping[]
-    compilationFilters: CompilationFilter[]
-    splitFees: SplitFee[]
-    manualRevenues: ManualRevenue[]
-    expenses: ExpenseEntry[]
-    ignoredEntries: IgnoredEntry[]
-    csvAliases: CSVColumnAlias[]
-    trackRevenueAssignments: TrackRevenueAssignment[]
-  }) => {
-    setAppDefaults(bundle.appDefaults)
-    setEmailConfig(bundle.emailConfig)
-    setArtistMappings(bundle.artistMappings)
-    setCompilationFilters(bundle.compilationFilters)
-    setSplitFees(bundle.splitFees)
-    setManualRevenues(bundle.manualRevenues)
-    setExpenses(bundle.expenses)
-    setIgnoredEntries(bundle.ignoredEntries)
-    setCsvAliases(bundle.csvAliases)
-    setTrackRevenueAssignments(bundle.trackRevenueAssignments)
-  }, [])
+  const handleWorkspaceImport = useCallback((bundle: Partial<SosAccountingSettings>) => {
+    applySettings({
+      ...DEFAULT_SOS_ACCOUNTING_SETTINGS,
+      ...settingsBundle,
+      ...bundle,
+      labelInfo: { ...settingsBundle.labelInfo, ...bundle.labelInfo },
+      pdfSettings: { ...settingsBundle.pdfSettings, ...bundle.pdfSettings },
+    })
+  }, [applySettings, settingsBundle])
 
-  // Preset load (also replaces all rules)
-  const handlePresetLoad = useCallback((preset: {
-    appDefaults: AppDefaults
-    emailConfig: Partial<EmailConfig>
-    artistMappings: ArtistMapping[]
-    compilationFilters: CompilationFilter[]
-    splitFees: SplitFee[]
-    manualRevenues: ManualRevenue[]
-    expenses: ExpenseEntry[]
-    ignoredEntries: IgnoredEntry[]
-    csvAliases: CSVColumnAlias[]
-    trackRevenueAssignments: TrackRevenueAssignment[]
-  }) => {
-    setAppDefaults(preset.appDefaults)
-    setEmailConfig(preset.emailConfig)
-    setArtistMappings(preset.artistMappings)
-    setCompilationFilters(preset.compilationFilters)
-    setSplitFees(preset.splitFees)
-    setManualRevenues(preset.manualRevenues)
-    setExpenses(preset.expenses)
-    setIgnoredEntries(preset.ignoredEntries)
-    setCsvAliases(preset.csvAliases)
-    setTrackRevenueAssignments(preset.trackRevenueAssignments)
-  }, [])
+  const handlePresetLoad = useCallback((preset: SosAccountingSettings) => {
+    applySettings(preset)
+  }, [applySettings])
 
   // File managers for each source
   const believeManager   = useFileManager('believe')
@@ -557,18 +511,51 @@ function SosGeneratorPanel() {
     workspaceUpdatedBy,
     isWorkspaceLoading,
     isWorkspaceSaving,
-    isRulesDirty,
+    isSettingsDirty,
     loadWorkspace,
+    loadDefaultPreset,
     saveCurrentWorkspace,
   } = useSosWorkspaceSync({
     currentPeriodKey,
-    rulesBundle,
-    applyRulesBundle,
-    cacheRulesBundle,
+    settings: settingsBundle,
+    applySettings,
     bronzeBatchIds,
-    rulesReady,
+    settingsReady,
     disabled: isProcessing,
   })
+
+  useEffect(() => {
+    if (settingsHydratedRef.current) return
+    settingsHydratedRef.current = true
+
+    void (async () => {
+      try {
+        if (!isKvMigrationComplete()) {
+          const legacy = await readLegacyKvSettings()
+          if (legacy.hasData) {
+            const res = await fetch('/api/admin/sos/presets/default')
+            if (res.ok) {
+              const json = await res.json() as { preset?: { config?: SosAccountingSettings } }
+              const current = json.preset?.config ?? DEFAULT_SOS_ACCOUNTING_SETTINGS
+              const merged = mergeKvIntoSettings(current, legacy.settings)
+              await fetch('/api/admin/sos/presets/default', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: merged }),
+              })
+            }
+            await clearLegacyKvKeys()
+          }
+          markKvMigrationComplete()
+        }
+      } catch {
+        // Non-fatal — default preset load still runs
+      } finally {
+        await loadDefaultPreset()
+        setSettingsReady(true)
+      }
+    })()
+  }, [loadDefaultPreset])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -664,14 +651,14 @@ function SosGeneratorPanel() {
     </div>
   )
 
-  const rulesStatusBanner = rulesLoaded ? (
+  const rulesStatusBanner = settingsReady ? (
     <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
       {isWorkspaceSaving
         ? t.rulesWorkspaceSaving
-        : !currentPeriodKey
-          ? t.rulesWorkspaceLocalOnly
-          : isRulesDirty
-            ? t.rulesWorkspaceDirty
+        : isSettingsDirty
+          ? t.rulesWorkspaceDirty
+          : !currentPeriodKey
+            ? t.rulesWorkspaceDefaultSynced
             : `${t.rulesWorkspaceSynced}${workspaceLoadedAt ? ` · ${new Date(workspaceLoadedAt).toLocaleString()}${workspaceUpdatedBy ? ` · ${workspaceUpdatedBy.slice(0, 8)}` : ''}` : ''}`}
     </p>
   ) : null
@@ -791,6 +778,9 @@ function SosGeneratorPanel() {
                 trackRevenueAssignments={trackRevenueAssignments}
                 appDefaults={appDefaults}
                 emailConfig={emailConfig}
+                labelInfo={labelBranding}
+                pdfSettings={pdfSettings}
+                csvImportProfiles={csvImportProfilesCustom}
                 onLoad={handlePresetLoad}
               />
             </div>
@@ -842,6 +832,9 @@ function SosGeneratorPanel() {
                 ignoredEntries={ignoredEntries}
                 csvAliases={csvAliases}
                 trackRevenueAssignments={trackRevenueAssignments}
+                labelInfo={labelBranding}
+                pdfSettings={pdfSettings}
+                csvImportProfiles={csvImportProfilesCustom}
                 onImport={handleWorkspaceImport}
               />
             </div>

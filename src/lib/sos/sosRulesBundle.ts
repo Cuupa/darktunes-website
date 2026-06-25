@@ -37,3 +37,6 @@ export const EMPTY_SOS_RULES_BUNDLE: SosRulesBundle = {
   appDefaults: DEFAULT_APP_DEFAULTS,
   emailConfig: DEFAULT_EMAIL_CONFIG,
 }
+
+export type { SosAccountingSettings } from '@/lib/sos/sosAccountingSettings'
+export { DEFAULT_SOS_ACCOUNTING_SETTINGS } from '@/lib/sos/sosAccountingSettings'

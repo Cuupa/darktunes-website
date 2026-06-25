@@ -52,6 +52,7 @@ export const ACCOUNTING_FALLBACK = {
   rulesWorkspaceSynced: 'Rules synced to server workspace',
   rulesWorkspaceDirty: 'Unsaved rule changes — saving to server…',
   rulesWorkspaceLocalOnly: 'No period detected — rules cached locally until CSV processing sets the period.',
+  rulesWorkspaceDefaultSynced: 'Settings synced to server (Default preset)',
   rulesWorkspaceSaving: 'Saving rules to server…',
   guidedModeLabel: 'Guided',
   advancedModeLabel: 'Advanced',

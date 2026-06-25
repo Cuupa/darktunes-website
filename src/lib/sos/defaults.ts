@@ -35,7 +35,7 @@ export const DEFAULT_EMAIL_CONFIG: EmailConfig = {
 
 /**
  * Pre-filled label branding defaults for Darktunes Music Group.
- * Used as the initial value for the label-info IndexedDB key so new
+ * Used as the initial value for the Default SOS preset so new
  * installations have a fully-formed branding profile out of the box.
  * Users can overwrite any field at any time or replace it via workspace import.
  */
