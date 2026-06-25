@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star, Copy } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
+import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -47,6 +48,7 @@ const STATUS_BADGE: Record<NewsPost['status'], { label: string; className: strin
 
 export function NewsManager() {
   const router = useRouter()
+  const cms = useCmsPaths()
   const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null)
   const [isMutating, setIsMutating] = useState(false)
@@ -124,7 +126,7 @@ export function NewsManager() {
         published_at: new Date().toISOString(),
       })
       toast.success('Post duplicated as draft')
-      router.push('/admin/news')
+      router.push(cms.newsList)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Duplicate failed')
     }
@@ -179,7 +181,7 @@ export function NewsManager() {
           >
             Date {sortDir === 'desc' ? '↓' : '↑'}
           </Button>
-          <Button size="sm" onClick={() => router.push('/admin/news/new')} className="gap-2">
+          <Button size="sm" onClick={() => router.push(cms.newsNew)} className="gap-2">
             <Plus size={16} weight="bold" />
             New Post
           </Button>
@@ -272,7 +274,7 @@ export function NewsManager() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => router.push(`/admin/news/${post.id}`)}
+                        onClick={() => router.push(cms.newsEdit(post.id))}
                         title="Edit"
                       >
                         <PencilSimple size={16} />

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
+import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { NewsPost } from '@/types'
 
@@ -48,6 +49,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
 export default function NewsEditPage() {
   const params = useParams()
   const router = useRouter()
+  const cms = useCmsPaths()
   const postId = params['id'] as string
 
   const { news, isLoading, updateNewsPost } = useNews()
@@ -101,7 +103,7 @@ export default function NewsEditPage() {
         if (insertError) throw new Error(insertError.message)
       }
       toast.success('News post saved')
-      router.push('/admin/news')
+      router.push(cms.newsList)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save news post')
     } finally {
@@ -114,9 +116,9 @@ export default function NewsEditPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin">
+            <Link href={cms.home}>
               <ArrowLeft className="mr-2 w-4 h-4" />
-              Back to Admin
+              {cms.isEditor ? 'Back to Editor' : 'Back to Admin'}
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">

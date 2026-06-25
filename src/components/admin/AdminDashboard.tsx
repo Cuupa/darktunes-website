@@ -18,10 +18,14 @@ import {
   Calendar,
   Wrench,
   Tag,
+  MegaphoneSimple,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { useRolePermissions } from '@/hooks/useRolePermissions'
+import { editorCanAccessTab, type EditorDashboardTab } from '@/lib/editor/editorTabPermissions'
 import { EditorNotificationBell } from './EditorNotificationBell'
+import { EditorPromoLogPanel } from './EditorPromoLogPanel'
 
 // Heavy manager panels are lazy-loaded so each tab's JS bundle is fetched only
 // when the user first opens that tab, keeping the initial admin page lightweight.
@@ -59,7 +63,7 @@ type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'accreditations' | 'press' | 'statements'
   | 'release-submissions' | 'video-submissions' | 'submission-form'
-  | 'events' | 'genres' | 'maintenance'
+  | 'events' | 'genres' | 'maintenance' | 'promo-log'
 
 interface TabDef {
   value: TabValue
@@ -82,6 +86,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
   { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
   { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
+  { value: 'promo-log',           label: 'Promo Log',           adminOnly: false, icon: MegaphoneSimple },
   { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
   { value: 'maintenance',         label: 'Maintenance',         adminOnly: true,  icon: Wrench },
 ]
@@ -102,6 +107,7 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   statements:      { title: 'Statements',                        description: 'Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.' },
   'release-submissions': { title: 'Release Submissions',          description: 'Review and manage artist release submissions.' },
   'video-submissions':   { title: 'Video Submissions',            description: 'Review and manage artist music video submissions.' },
+  'promo-log':           { title: 'Promo Log',                    description: 'Document label marketing work per artist and keep the portal timeline up to date.' },
   'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
   'maintenance':         { title: 'Maintenance',                  description: 'System maintenance: clear logs, purge data, reset states, revalidate caches.' },
 }
@@ -127,30 +133,58 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
-  const { user, profile, signOut } = useAuthContext()
+  const { user, profile, signOut, loading: authLoading } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { settings: siteSettings, isLoading: siteSettingsLoading } = useSiteSettings()
+  const { permissions, loading: permissionsLoading, isAdmin } = useRolePermissions()
 
-  const isAdmin = profile?.role === 'admin'
   const isEditor = profile?.role === 'editor'
+
+  const canSeeTab = useCallback((tab: TabValue) => {
+    const def = TAB_DEFS.find((t) => t.value === tab)
+    if (!def) return false
+    if (isAdmin) return true
+    if (def.adminOnly) return false
+    if (isEditor) {
+      return editorCanAccessTab(tab as EditorDashboardTab, permissions)
+    }
+    if (contentOnly) return !def.adminOnly
+    return false
+  }, [contentOnly, isAdmin, isEditor, permissions])
+
+  const getDefaultTab = useCallback((): TabValue => {
+    const firstVisible = TAB_DEFS.find((def) => canSeeTab(def.value))
+    return firstVisible?.value ?? 'releases'
+  }, [canSeeTab])
 
   const getInitialTab = useCallback((): TabValue => {
     const tabParam = searchParams.get('tab')
-    return isValidTab(tabParam) ? tabParam : 'artists'
-  }, [searchParams])
+    if (isValidTab(tabParam) && canSeeTab(tabParam)) return tabParam
+    return getDefaultTab()
+  }, [searchParams, canSeeTab, getDefaultTab])
 
-  const [activeTab, setActiveTab] = useState<TabValue>(getInitialTab)
+  const [activeTab, setActiveTab] = useState<TabValue>('releases')
+
+  useEffect(() => {
+    if (authLoading || permissionsLoading) return
+    setActiveTab(getInitialTab())
+  }, [authLoading, permissionsLoading, getInitialTab])
 
   // Sync tab from URL on mount and when search params change
   useEffect(() => {
+    if (authLoading || permissionsLoading) return
     const tabParam = searchParams.get('tab')
-    if (isValidTab(tabParam) && tabParam !== activeTab) {
+    if (isValidTab(tabParam) && canSeeTab(tabParam) && tabParam !== activeTab) {
       setActiveTab(tabParam)
+      return
+    }
+    if (!canSeeTab(activeTab)) {
+      setActiveTab(getDefaultTab())
     }
     // intentionally exclude activeTab to avoid loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams, authLoading, permissionsLoading, canSeeTab, getDefaultTab])
 
   const handleTabChange = useCallback((value: string) => {
     const tab = value as TabValue
@@ -169,13 +203,16 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     }
   }
 
-  const canSeeTab = (tab: TabValue) => {
-    const def = TAB_DEFS.find((t) => t.value === tab)
-    if (!def) return false
-    if (contentOnly) return !def.adminOnly
-    if (isAdmin) return true
-    if (isEditor) return !def.adminOnly
-    return false
+  if (authLoading || permissionsLoading || siteSettingsLoading) {
+    return (
+      <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center p-4' : 'flex flex-1 items-center justify-center py-16'} aria-busy="true" aria-label="Loading dashboard">
+        <div className="w-full max-w-md space-y-4">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    )
   }
 
   // If editor tools feature is disabled, editors cannot access the admin
@@ -201,6 +238,26 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
 
   // Filtered list of tabs visible to this user
   const visibleTabs = TAB_DEFS.filter((def) => canSeeTab(def.value))
+
+  if (visibleTabs.length === 0) {
+    return (
+      <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center' : 'flex flex-1 items-center justify-center py-16'}>
+        <div className="text-center space-y-4 max-w-md px-4">
+          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label="No permissions" />
+          <h1 className="text-2xl font-bold">No Editor Permissions</h1>
+          <p className="text-muted-foreground">
+            Your account does not have any content permissions assigned. Please contact your administrator.
+          </p>
+          {standalone && (
+            <Button variant="outline" onClick={handleSignOut}>
+              <SignOut size={16} className="mr-2" aria-hidden="true" />
+              Sign Out
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={standalone ? 'min-h-screen bg-background' : undefined}>
@@ -261,6 +318,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               statements:      <StatementsManager />,
               'release-submissions': <ReleaseSubmissionsManager />,
               'video-submissions':   <VideoSubmissionsManager />,
+              'promo-log':           <EditorPromoLogPanel />,
               'submission-form':     <SubmissionFormManager />,
               'maintenance':         <MaintenanceManager />,
             }

@@ -52,12 +52,15 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
 import { useTranslations } from 'next-intl'
+import { getCmsPromoLogPath, getCmsTabPath, getCmsHomePath } from '@/lib/editor/cmsPaths'
 
 interface NavItem {
   label: string
   /** When set, overrides `label` with `admin.nav[labelDictKey]` when available. */
   labelDictKey?: 'labelIntelligence'
   href: string
+  /** Optional editor-specific destination (e.g. /editor?tab=news). */
+  editorHref?: string
   icon: React.ElementType
   adminOnly: boolean
 }
@@ -67,24 +70,30 @@ interface NavGroup {
   items: NavItem[]
 }
 
-const DASHBOARD_ITEM: NavItem = { label: 'Dashboard', href: '/admin', icon: SquaresFour, adminOnly: false }
+const DASHBOARD_ITEM: NavItem = {
+  label: 'Dashboard',
+  href: '/admin',
+  editorHref: getCmsHomePath('editor'),
+  icon: SquaresFour,
+  adminOnly: false,
+}
 
 const NAV_GROUPS: NavGroup[] = [
   {
     label: 'CONTENT',
     items: [
-      { label: 'Artists',  href: '/admin/artists',  icon: Microphone,    adminOnly: false },
-      { label: 'Releases', href: '/admin/releases', icon: VinylRecord,   adminOnly: false },
-      { label: 'News',     href: '/admin/news',     icon: Newspaper,     adminOnly: false },
-      { label: 'Videos',   href: '/admin/videos',   icon: FilmStrip,     adminOnly: false },
-      { label: 'Events',   href: '/admin/events',   icon: CalendarBlank, adminOnly: false },
+      { label: 'Artists',  href: '/admin/artists',  editorHref: getCmsTabPath('editor', 'artists'),  icon: Microphone,    adminOnly: false },
+      { label: 'Releases', href: '/admin/releases', editorHref: getCmsTabPath('editor', 'releases'), icon: VinylRecord,   adminOnly: false },
+      { label: 'News',     href: '/admin/news',     editorHref: getCmsTabPath('editor', 'news'),     icon: Newspaper,     adminOnly: false },
+      { label: 'Videos',   href: '/admin/videos',   editorHref: getCmsTabPath('editor', 'videos'),   icon: FilmStrip,     adminOnly: false },
+      { label: 'Events',   href: '/admin/events',   editorHref: getCmsTabPath('editor', 'events'),   icon: CalendarBlank, adminOnly: false },
     ],
   },
   {
     label: 'SUBMISSIONS',
     items: [
-      { label: 'Release Submissions', href: '/admin/release-submissions', icon: UploadSimple, adminOnly: false },
-      { label: 'Video Submissions',   href: '/admin/video-submissions',   icon: VideoCamera,  adminOnly: false },
+      { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false },
+      { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false },
     ],
   },
   {
@@ -102,7 +111,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
       { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
-      { label: 'Promo Log',   href: '/admin/promo-log',   icon: MegaphoneSimple, adminOnly: false },
+      { label: 'Promo Log',   href: '/admin/promo-log',   editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
       { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
     ],
   },
@@ -141,8 +150,16 @@ export function AdminSidebarNav() {
     return false
   }
 
-  const isActive = (href: string) => {
-    if (href === '/admin') return pathname === '/admin'
+  const resolveHref = (item: NavItem) => (isEditor && item.editorHref ? item.editorHref : item.href)
+
+  const isActive = (item: NavItem) => {
+    const href = resolveHref(item)
+    if (href === '/admin' || href === '/editor') {
+      return pathname === href
+    }
+    if (href.startsWith('/editor?tab=')) {
+      return pathname === '/editor'
+    }
     return pathname.startsWith(href)
   }
 
@@ -155,12 +172,13 @@ export function AdminSidebarNav() {
 
   const renderNavItem = (item: NavItem, onNavigate?: () => void) => {
     const Icon = item.icon
-    const active = isActive(item.href)
+    const href = resolveHref(item)
+    const active = isActive(item)
     const label = resolveNavLabel(item)
     return (
-      <li key={item.href}>
+      <li key={href}>
         <Link
-          href={item.href}
+          href={href}
           onClick={onNavigate}
           className={cn(
             'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -220,9 +238,9 @@ export function AdminSidebarNav() {
     <>
       {/* Mobile header — only visible below md breakpoint */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-        <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+        <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
         <div className="flex items-center gap-2">
-          {user?.id && <EditorNotificationBell userId={user.id} />}
+          {user?.id && isEditor && <EditorNotificationBell userId={user.id} />}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
@@ -233,7 +251,7 @@ export function AdminSidebarNav() {
               <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
               <div className="flex h-full flex-col bg-card">
                 <div className="px-4 py-5 border-b border-border">
-                  <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+                  <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
                 </div>
                 {renderNavLinks(() => setMobileOpen(false))}
@@ -252,10 +270,10 @@ export function AdminSidebarNav() {
         {/* Brand header */}
         <div className="px-4 py-5 border-b border-border flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold tracking-wide">darkTunes Admin</p>
+            <p className="text-sm font-bold tracking-wide">{isEditor ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
           </div>
-          {user?.id && <EditorNotificationBell userId={user.id} />}
+          {user?.id && isEditor && <EditorNotificationBell userId={user.id} />}
         </div>
 
         {renderNavLinks()}

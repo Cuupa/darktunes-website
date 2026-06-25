@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArtistForm, type ArtistFormData } from '@/components/admin/forms/ArtistForm'
 import { useArtists } from '@/hooks/useArtists'
+import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Artist } from '@/types'
 import type { Database } from '@/types/database'
@@ -104,6 +105,7 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
 export default function ArtistEditPage() {
   const params = useParams()
   const router = useRouter()
+  const cms = useCmsPaths()
   const artistId = params['id'] as string
 
   const { artists, isLoading, updateArtist } = useArtists()
@@ -118,9 +120,9 @@ export default function ArtistEditPage() {
   useEffect(() => {
     if (!isLoading && artists.length > 0 && !artist) {
       toast.error('Artist not found')
-      router.push('/admin/content?tab=artists')
+      router.push(cms.artists)
     }
-  }, [isLoading, artists.length, artist, router])
+  }, [isLoading, artists.length, artist, router, cms.artists])
 
   const handleInvite = async () => {
     if (!artist) return
@@ -167,7 +169,7 @@ export default function ArtistEditPage() {
         }
       }
 
-      router.push('/admin/content?tab=artists')
+      router.push(cms.artists)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -180,7 +182,7 @@ export default function ArtistEditPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/content?tab=artists">
+            <Link href={cms.artists}>
               <ArrowLeft className="mr-2 w-4 h-4" />
               Back to Artists
             </Link>

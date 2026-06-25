@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
+import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 const EMPTY_FORM: NewsFormData = {
@@ -38,6 +39,7 @@ const EMPTY_FORM: NewsFormData = {
 
 export default function NewsNewPage() {
   const router = useRouter()
+  const cms = useCmsPaths()
   const { createNewsPost } = useNews()
   const [isSaving, setIsSaving] = useState(false)
 
@@ -85,7 +87,7 @@ export default function NewsNewPage() {
         }
       }
       toast.success(`Created "${data.title}"`)
-      router.push('/admin/news')
+      router.push(cms.newsList)
     } finally {
       setIsSaving(false)
     }
@@ -96,9 +98,9 @@ export default function NewsNewPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin">
+            <Link href={cms.home}>
               <ArrowLeft className="mr-2 w-4 h-4" />
-              Back to Admin
+              {cms.isEditor ? 'Back to Editor' : 'Back to Admin'}
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">New News Post</h1>

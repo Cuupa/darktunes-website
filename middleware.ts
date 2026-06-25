@@ -18,6 +18,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isEditorAllowedAdminPath } from '@/lib/editor/editorAdminPaths'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
 import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 
@@ -156,11 +157,27 @@ export async function middleware(request: NextRequest) {
   if ((isAdminRoute || isEditorRoute) && user) {
     const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
 
-    if (isAdminRoute && profile?.role === 'editor') {
+    if (isEditorRoute && profile?.role === 'admin') {
+      const adminUrl = request.nextUrl.clone()
+      adminUrl.pathname = '/admin'
+      adminUrl.search = ''
+      return NextResponse.redirect(adminUrl)
+    }
+
+    if (isEditorRoute && profile && !ADMIN_ROLES.has(profile.role)) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/login'
+      loginUrl.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (isAdminRoute && profile?.role === 'editor' && !isEditorAllowedAdminPath(pathname)) {
       const editorUrl = request.nextUrl.clone()
       editorUrl.pathname = '/editor'
+      editorUrl.search = ''
       return NextResponse.redirect(editorUrl)
     }
+
     if (!hasAdminAccess) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/login'
@@ -234,6 +251,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
+    '/editor/:path*',
     '/portal/:path*',
     '/press/:path*',
     '/promo-pool/:path*',
