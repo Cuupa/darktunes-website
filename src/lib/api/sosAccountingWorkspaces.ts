@@ -18,6 +18,7 @@ import type {
   EmailConfig,
   TrackRevenueAssignment,
 } from '@/lib/sos/types'
+import { toDbRecord } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['sos_accounting_workspaces']['Row']
@@ -105,7 +106,7 @@ export async function upsertWorkspaceForPeriod(
       {
         period_start: input.periodStart,
         period_end: input.periodEnd,
-        config: input.config as unknown as Record<string, unknown>,
+        config: toDbRecord(input.config),
         bronze_batch_ids: input.bronzeBatchIds ?? [],
         updated_by: input.updatedBy ?? null,
       },

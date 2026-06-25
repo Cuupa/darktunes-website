@@ -6,7 +6,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+import { parseEpkDocumentV2, type EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+import { toDbRecord } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type EpkVersionRow = Database['public']['Tables']['epk_versions']['Row']
@@ -25,7 +26,7 @@ function rowToEpkVersion(row: EpkVersionRow): EpkVersion {
   return {
     id: row.id,
     artistId: row.artist_id,
-    document: row.document as unknown as EpkDocumentV2,
+    document: parseEpkDocumentV2(row.document),
     versionNumber: row.version_number,
     label: row.label ?? undefined,
     createdBy: row.created_by ?? undefined,
@@ -47,7 +48,7 @@ export async function createEpkVersion(
     .from('epk_versions')
     .insert({
       artist_id: data.artistId,
-      document: data.document as unknown as Record<string, unknown>,
+      document: toDbRecord(data.document),
       version_number: data.versionNumber,
       created_by: data.createdBy,
       label: data.label ?? null,

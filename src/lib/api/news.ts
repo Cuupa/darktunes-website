@@ -1,19 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { NewsPost } from '@/types'
+import { parseJunctionRows } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type NewsRow = Database['public']['Tables']['news_posts']['Row']
 export type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
 export type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
-
-/** Compact artist shape returned from the junction table join. */
-interface JunctionArtist {
-  news_post_id: string
-  artist_id: string
-  sort_order: number
-  artists: { id: string; name: string; slug: string } | null
-}
 
 function rowToNewsPost(row: NewsRow): NewsPost {
   const r = row as NewsRow & {
@@ -77,7 +70,7 @@ async function attachNewsArtists(db: DbClient, posts: NewsPost[]): Promise<NewsP
   if (error) throw new Error(`Failed to load news post artists: ${error.message}`)
 
   const byPost = new Map<string, { id: string; name: string; slug: string }[]>()
-  for (const row of (data ?? []) as unknown as JunctionArtist[]) {
+  for (const row of parseJunctionRows(data, 'news_post_id')) {
     if (!row.artists) continue
     if (!byPost.has(row.news_post_id)) byPost.set(row.news_post_id, [])
     byPost.get(row.news_post_id)!.push(row.artists)
