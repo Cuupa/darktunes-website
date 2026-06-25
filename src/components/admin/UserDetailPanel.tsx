@@ -208,6 +208,25 @@ export function UserDetailPanel() {
     }
   }
 
+  const sendPasswordReset = async () => {
+    if (!user?.email) return
+    setIsMutating(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: await authHeaders(),
+      })
+      if (!res.ok) {
+        throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
+      }
+      toast.success(`Password reset email sent to ${user.email}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send reset email')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   const handleBanToggle = async () => {
     if (!user) return
     const newBan = !isBanned(user)
@@ -341,23 +360,34 @@ export function UserDetailPanel() {
             {banned && <Badge variant="destructive">Banned</Badge>}
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-          <div>
-            <span className="font-medium text-foreground">Created: </span>
-            {new Date(user.created_at).toLocaleString()}
-          </div>
-          <div>
-            <span className="font-medium text-foreground">Last login: </span>
-            {user.last_sign_in_at
-              ? new Date(user.last_sign_in_at).toLocaleString()
-              : '—'}
-          </div>
-          {user.banned_until && (
-            <div className="col-span-2">
-              <span className="font-medium text-foreground">Banned until: </span>
-              {new Date(user.banned_until).toLocaleString()}
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+            <div>
+              <span className="font-medium text-foreground">Created: </span>
+              {new Date(user.created_at).toLocaleString()}
             </div>
-          )}
+            <div>
+              <span className="font-medium text-foreground">Last login: </span>
+              {user.last_sign_in_at
+                ? new Date(user.last_sign_in_at).toLocaleString()
+                : '—'}
+            </div>
+            {user.banned_until && (
+              <div className="col-span-2">
+                <span className="font-medium text-foreground">Banned until: </span>
+                {new Date(user.banned_until).toLocaleString()}
+              </div>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void sendPasswordReset()}
+            disabled={isMutating || banned || !user.email}
+          >
+            Send password reset email
+          </Button>
         </CardContent>
       </Card>
 

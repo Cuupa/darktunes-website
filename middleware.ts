@@ -119,6 +119,11 @@ export async function middleware(request: NextRequest) {
 
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profile) {
+    // Password recovery: session is active but user must set a new password first.
+    if (request.nextUrl.searchParams.get('type') === 'recovery') {
+      return supabaseResponse
+    }
+
     const returnTo = request.nextUrl.searchParams.get('returnTo')
     const url = request.nextUrl.clone()
 

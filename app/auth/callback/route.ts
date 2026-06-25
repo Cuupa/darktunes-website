@@ -1,27 +1,8 @@
+import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { UserRole } from '@/types/users'
-
-/**
- * Resolves the post-login destination based on the user's DB role.
- * This is the single source of truth for role-based routing — the `next`
- * query param is intentionally ignored to prevent open-redirect attacks.
- */
-function resolveRedirectPath(role: UserRole | null | undefined): string {
-  switch (role) {
-    case 'admin':
-    case 'editor':
-      return '/admin'
-    case 'artist':
-      return '/portal'
-    case 'journalist':
-      return '/press/dashboard'
-    default:
-      // 'user' or unknown role → safe fallback
-      return '/account'
-  }
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)

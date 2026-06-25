@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { CentralLoginForm } from './_components/CentralLoginForm'
 
 export const metadata: Metadata = {
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 }
 
 export default function LoginPage() {
-  return <CentralLoginForm />
+  return (
+    <Suspense fallback={null}>
+      <CentralLoginForm />
+    </Suspense>
+  )
 }
