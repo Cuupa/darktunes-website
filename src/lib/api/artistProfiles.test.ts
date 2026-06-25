@@ -173,6 +173,24 @@ describe('getArtistProfileByArtistId', () => {
     const db = makeMockDb(null, { message: 'Permission denied', code: 'PGRST301' })
     await expect(getArtistProfileByArtistId(db, 'some-id')).rejects.toThrow('Permission denied')
   })
+
+  it('maps valid custom_links JSON', async () => {
+    const db = makeMockDb({
+      ...mockProfileRow,
+      custom_links: [{ label: 'Shop', url: 'https://shop.example' }],
+    })
+    const result = await getArtistProfileByArtistId(db, 'artist-uuid')
+    expect(result?.customLinks).toEqual([{ label: 'Shop', url: 'https://shop.example' }])
+  })
+
+  it('ignores malformed custom_links JSON', async () => {
+    const db = makeMockDb({
+      ...mockProfileRow,
+      custom_links: [{ label: 'Broken link' }],
+    })
+    const result = await getArtistProfileByArtistId(db, 'artist-uuid')
+    expect(result?.customLinks).toEqual([])
+  })
 })
 
 describe('upsertArtistProfile', () => {

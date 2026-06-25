@@ -5,6 +5,15 @@ import { toast } from 'sonner'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import type { SettlementRegister } from '@/lib/api/settlementRegister'
 import {
+  archiveSettlementPeriod,
+  bulkApproveStatements,
+  createStatementCorrection,
+  fetchSettlementRegister,
+  lockSettlementPeriod,
+  markInvoiceReceived,
+  recordInvoicePayment,
+} from '@/lib/api/settlementCenterApi'
+import {
   reconcileRegisterOpenBalance,
   type RegisterReconciliationResult,
 } from '@/lib/api/settlementReconciliation'
@@ -18,6 +27,7 @@ import {
   workflowStatusFromStatement,
 } from '@/lib/sos/statementWorkflow'
 import { useDict } from '@/contexts/DictContext'
+import { mergeAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 import {
   buildInvoiceStatusLabels,
@@ -25,11 +35,9 @@ import {
   computeNextPeriod,
   registerToMasterRow,
   rowIsSelectable,
-  SETTLEMENT_FALLBACK,
   type MasterRow,
   type PaymentMethod,
   type SettlementCenterPanelProps,
-  type SettlementLabels,
 } from '@/components/admin/sos/settlementCenterModel'
 
 export type SettlementCenterState = ReturnType<typeof useSettlementCenter>
@@ -47,17 +55,11 @@ export function useSettlementCenter({
 }: SettlementCenterPanelProps) {
   const dict = useDict()
   const t = useMemo(
-    () => ({ ...SETTLEMENT_FALLBACK, ...(dict.admin?.accounting ?? {}) }),
+    () => mergeAccountingLabels(dict.admin?.accounting),
     [dict.admin?.accounting],
-  ) as SettlementLabels
-  const invoiceStatusLabels = useMemo(
-    () => buildInvoiceStatusLabels(t as unknown as Record<string, string | undefined>),
-    [t],
   )
-  const periodStatusLabels = useMemo(
-    () => buildPeriodStatusLabels(t as unknown as Record<string, string | undefined>),
-    [t],
-  )
+  const invoiceStatusLabels = useMemo(() => buildInvoiceStatusLabels(t), [t])
+  const periodStatusLabels = useMemo(() => buildPeriodStatusLabels(t), [t])
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loading, setLoading] = useState(true)
@@ -154,32 +156,21 @@ export function useSettlementCenter({
     setLoading(true)
     try {
       const token = await getAdminAccessToken()
-      if (!token) throw new Error('Sitzung abgelaufen')
+      if (!token) throw new Error(t.settlementSessionExpired)
 
-      const params = new URLSearchParams({
-        periodStart: periodStartDate,
-        periodEnd: periodEndDate,
-      })
-      const response = await fetch(`/api/admin/settlements/register?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      const json = (await response.json().catch(() => null)) as
-        | SettlementRegister
-        | { error?: string }
-        | null
-
-      if (!response.ok) {
-        throw new Error((json as { error?: string } | null)?.error ?? 'Register konnte nicht geladen werden')
-      }
-
-      setRegister(json as SettlementRegister)
+      const registerData = await fetchSettlementRegister(
+        token,
+        periodStartDate,
+        periodEndDate,
+        t.settlementRegisterLoadFailed,
+      )
+      setRegister(registerData)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Register konnte nicht geladen werden')
+      toast.error(err instanceof Error ? err.message : t.settlementRegisterLoadFailed)
     } finally {
       setLoading(false)
     }
-  }, [periodStartDate, periodEndDate])
+  }, [periodStartDate, periodEndDate, t.settlementRegisterLoadFailed, t.settlementSessionExpired])
 
   useEffect(() => {
     void refreshRegister()
@@ -356,31 +347,18 @@ export function useSettlementCenter({
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.settlementSessionExpired)
 
-      const response = await fetch('/api/admin/sales-statements/bulk-approve', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ids: statementIds,
-          notes: approvalNotes.trim() || undefined,
-        }),
-      })
-
-      const json = (await response.json().catch(() => null)) as
-        | { approved?: number; emailed?: number; error?: string }
-        | null
-
-      if (!response.ok) {
-        throw new Error(json?.error ?? t.settlementBulkApproveFailed)
-      }
+      const json = await bulkApproveStatements(
+        token,
+        statementIds,
+        approvalNotes.trim() || undefined,
+        t.settlementBulkApproveFailed,
+      )
 
       await refreshRegister()
       setSelectedArtists(new Set())
-      const emailed = json?.emailed ?? 0
+      const emailed = json.emailed ?? 0
       toast.success(
-        interpolate(t.settlementApprovedToast, { approved: json?.approved ?? 0 }) +
+        interpolate(t.settlementApprovedToast, { approved: json.approved ?? 0 }) +
           (emailed > 0 ? interpolate(t.settlementNotificationsSent, { emailed }) : ''),
       )
 
@@ -409,17 +387,12 @@ export function useSettlementCenter({
 
       let updated = 0
       for (const target of targets) {
-        const response = await fetch(`/api/admin/invoices/${target.invoiceId}/received`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const json = (await response.json().catch(() => null)) as { error?: string } | null
-        if (!response.ok) {
-          throw new Error(
-            json?.error ??
-              interpolate(t.settlementInvoiceMarkFailedFor, { artist: target.artistName }),
-          )
-        }
+        if (!target.invoiceId) continue
+        await markInvoiceReceived(
+          token,
+          target.invoiceId,
+          interpolate(t.settlementInvoiceMarkFailedFor, { artist: target.artistName }),
+        )
         updated += 1
       }
 
@@ -484,25 +457,17 @@ export function useSettlementCenter({
           )
         }
 
-        const response = await fetch(`/api/admin/invoices/${target.invoiceId}/payment`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        await recordInvoicePayment(
+          token,
+          target.invoiceId,
+          {
             amountCents,
             paymentMethod,
             paymentReference: paymentReference.trim() || undefined,
             idempotencyKey: paymentIdempotencyKeys[target.invoiceId],
-          }),
-        })
-        const json = (await response.json().catch(() => null)) as { error?: string } | null
-        if (!response.ok) {
-          throw new Error(
-            json?.error ?? interpolate(t.settlementPaymentFailedFor, { artist: target.artistName }),
-          )
-        }
+          },
+          interpolate(t.settlementPaymentFailedFor, { artist: target.artistName }),
+        )
         recorded += 1
       }
 
@@ -524,14 +489,7 @@ export function useSettlementCenter({
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.settlementSessionExpired)
 
-      const response = await fetch(`/api/admin/settlements/periods/${period.id}/lock`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const json = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) {
-        throw new Error(json?.error ?? t.settlementLockFailed)
-      }
+      await lockSettlementPeriod(token, period.id, t.settlementLockFailed)
 
       await refreshRegister()
       setLockDialogOpen(false)
@@ -584,29 +542,16 @@ export function useSettlementCenter({
         return
       }
 
-      const response = await fetch(
-        `/api/admin/sales-statements/${correctionTarget.statementId}/correction`,
+      await createStatementCorrection(
+        token,
+        correctionTarget.statementId,
         {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            amount_eur: amountEur,
-            pdf_base64: pdfBase64,
-            label_notes: correctionNotes.trim() || undefined,
-          }),
+          amountEur,
+          pdfBase64,
+          labelNotes: correctionNotes.trim() || undefined,
         },
+        t.settlementCorrectionFailed,
       )
-
-      const json = (await response.json().catch(() => null)) as
-        | { statement?: { id: string }; error?: string }
-        | null
-
-      if (!response.ok) {
-        throw new Error(json?.error ?? t.settlementCorrectionFailed)
-      }
 
       await refreshRegister()
       setCorrectionDialogOpen(false)
@@ -628,21 +573,13 @@ export function useSettlementCenter({
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.settlementSessionExpired)
 
-      const response = await fetch(`/api/admin/settlements/periods/${period.id}/archive`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nextPeriodStart,
-          nextPeriodEnd,
-        }),
-      })
-      const json = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) {
-        throw new Error(json?.error ?? t.settlementArchiveFailed)
-      }
+      await archiveSettlementPeriod(
+        token,
+        period.id,
+        nextPeriodStart,
+        nextPeriodEnd,
+        t.settlementArchiveFailed,
+      )
 
       await refreshRegister()
       setArchiveDialogOpen(false)

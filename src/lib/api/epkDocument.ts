@@ -10,6 +10,7 @@ import type { Artist } from '@/types'
 import type { ArtistProfile } from './artistProfiles'
 import type { EpkDocumentV2, EpkEditorMode } from '@/lib/epk/schema/documentV2'
 import { parseEpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+import { toDbRecord } from '@/lib/types/jsonColumns'
 import { legacyToDocumentV2 } from '@/lib/epk/migrate/legacyToDocumentV2'
 import { createEpkVersion, getEpkVersionById } from './epkVersions'
 
@@ -77,7 +78,7 @@ export async function saveEpkDocument(
     .upsert(
       {
         artist_id: artistId,
-        epk_document: parsed as unknown as Record<string, unknown>,
+        epk_document: toDbRecord(parsed),
         epk_document_version: nextVersion,
         epk_editor_mode: 'canvas',
       },
@@ -132,7 +133,7 @@ export async function ensureMigratedEpkDocument(
     .upsert(
       {
         artist_id: artistId,
-        epk_document: migrated as unknown as Record<string, unknown>,
+        epk_document: toDbRecord(migrated),
         epk_document_version: 1,
         epk_editor_mode: 'legacy',
       },

@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
 import { rowToArtist } from './artistRowMapper'
+import { parseCustomLinks } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type ArtistProfileRow = Database['public']['Tables']['artist_epks']['Row']
@@ -87,7 +88,7 @@ function rowToArtistProfile(row: ArtistProfileRow): ArtistProfile {
     epkPasswordSections: row.epk_password_sections ?? [],
     epkGalleryPhotos: row.epk_gallery_photos ?? [],
     epkCustomThemeTokens: (row.epk_custom_theme_tokens as Record<string, string> | null) ?? {},
-    customLinks: (row as unknown as { custom_links?: Array<{ label: string; url: string }> | null }).custom_links ?? [],
+    customLinks: parseCustomLinks(row.custom_links),
     epkDocument: row.epk_document ?? undefined,
     epkDocumentVersion: row.epk_document_version ?? 1,
     epkEditorMode: (row.epk_editor_mode as ArtistProfile['epkEditorMode'] | null) ?? 'legacy',

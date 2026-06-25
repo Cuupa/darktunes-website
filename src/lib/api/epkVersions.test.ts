@@ -23,13 +23,29 @@ function createMockDb(data: unknown = null, error: { message: string } | null = 
   } as unknown as SupabaseClient<Database>
 }
 
+const sampleDocument = {
+  version: 2 as const,
+  pageFormat: 'a4' as const,
+  orientation: 'portrait' as const,
+  pages: [{
+    id: 'p1',
+    name: 'Cover',
+    width: 794,
+    height: 1123,
+    background: { type: 'color' as const, color: '#101010' },
+  }],
+  elements: [],
+  fonts: [],
+  metadata: {},
+}
+
 describe('epkVersions DAL', () => {
   it('lists versions for an artist', async () => {
     const rows = [
       {
         id: 'v1',
         artist_id: 'artist-1',
-        document: { version: 2 },
+        document: sampleDocument,
         version_number: 2,
         label: 'Snapshot',
         created_by: 'user-1',

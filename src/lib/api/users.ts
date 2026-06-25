@@ -11,6 +11,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { UserRole, UserWithProfile, RoleChangeRecord, BanRecord, LinkedArtist } from '@/types/users'
+import { parseCompactArtist } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 
@@ -102,7 +103,9 @@ export async function listUsersWithProfiles(adminClient: DbClient): Promise<User
   // Build a map keyed by user_id → all artist memberships
   const artistsMap = new Map<string, LinkedArtist[]>()
   for (const m of memberships ?? []) {
-    const a = (m as unknown as { artists: { id: string; name: string; slug: string } }).artists
+    const a = parseCompactArtist(
+      (m as { artists?: unknown }).artists,
+    )
     if (a) {
       const list = artistsMap.get(m.user_id) ?? []
       list.push({ id: a.id, name: a.name, slug: a.slug, member_role: m.member_role })

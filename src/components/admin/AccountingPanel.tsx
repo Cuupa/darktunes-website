@@ -63,82 +63,13 @@ import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'sonner'
 import { useDict } from '@/contexts/DictContext'
+import { ACCOUNTING_FALLBACK } from '@/lib/i18n/accountingFallbacks'
 
 const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
 )
 
 type SubTab = 'upload' | 'reporting' | 'settlements' | 'analytics' | 'payout' | 'rules' | 'trends'
-
-const ACCOUNTING_FALLBACK = {
-  pageTitle: 'Accounting',
-  pageDescription: 'Generate royalty statements for artists and review statement history.',
-  tabGenerate: 'Generate Statements',
-  tabHistory: 'Statement History',
-  subTabUpload: 'Upload',
-  subTabReporting: 'Reporting',
-  subTabSettlements: 'Settlement Center',
-  subTabAnalytics: 'Portal Data',
-  subTabAnalyticsHint:
-    'Bronze archives, listener sync, and Save to Portal — data artists will see after you persist it.',
-  subTabSettlementsHint:
-    'Save portal analytics, create draft statements, approve them, track invoices, and record payments.',
-  subTabPayout: 'SEPA Payout',
-  subTabTrends: 'Trends',
-  subTabRules: 'Rules',
-  presets: 'Presets',
-  presetsTitle: 'Rule Presets',
-  csvProfiles: 'CSV Profiles',
-  csvProfilesTitle: 'CSV Import Profiles',
-  workspace: 'Workspace',
-  workspaceTitle: 'Workspace Import / Export',
-  pdfSettings: 'PDF Settings',
-  detectedPeriod: 'Detected period:',
-  processing: '(processing…)',
-  emptyReporting: 'Upload CSV files first to see reporting data.',
-  emptySettlements: 'Upload CSV files first to open the settlement center.',
-  emptyAnalytics: 'Upload CSV files first to see analytics.',
-  emptyPayout: 'Upload CSV files first to calculate payouts.',
-  analyticsOpsHeading: 'Portal data & operations',
-  analyticsPreviewHeading: 'Session preview (not in portal)',
-  analyticsSessionBanner:
-    'Charts below use in-memory CSV data. Artists only see metrics after you click Save to Portal.',
-  workspaceServer: 'Workspace (server):',
-  workspaceNotSaved: 'not yet saved for this period',
-  workspaceLastSaved: 'last saved',
-  workspaceReload: 'Reload from server',
-  workspaceSave: 'Save workspace to server',
-  workspaceSharedHint: 'Shared across team • period-keyed',
-  workspaceLoading: 'Loading…',
-  workspaceSaving: 'Saving…',
-  playbookTitle: 'Operator playbook',
-  playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
-  playbookStep2: 'Use Save to Portal in Settlement Center so artists see analytics with their statements.',
-  playbookStep3: 'Review saved trends and roster health in Label Intelligence.',
-  subTabListLabel: 'Accounting workflow sections',
-  rulesWorkspaceSynced: 'Rules synced to server workspace',
-  rulesWorkspaceDirty: 'Unsaved rule changes — saving to server…',
-  rulesWorkspaceLocalOnly: 'No period detected — rules cached locally until CSV processing sets the period.',
-  rulesWorkspaceSaving: 'Saving rules to server…',
-  guidedModeLabel: 'Guided',
-  advancedModeLabel: 'Advanced',
-  guidedSwitchAdvanced: 'Switch to advanced mode',
-  guidedSwitchGuided: 'Switch to guided mode',
-  guidedStepUpload: 'Upload',
-  guidedStepUploadDesc: 'Import distributor CSV files',
-  guidedStepReview: 'Review',
-  guidedStepReviewDesc: 'Validate payouts before publishing',
-  guidedStepSettle: 'Publish',
-  guidedStepSettleDesc: 'Save analytics, create drafts, and approve',
-  guidedBack: 'Back',
-  guidedNext: 'Continue',
-  guidedOpenSettle: 'Open settlement',
-  guidedProcessingHint: 'Processing CSV data…',
-  guidedUploadHint: 'Upload at least one distributor CSV to continue.',
-  guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
-  guidedSettleHint: 'Save portal analytics and run the settlement workflow below.',
-  guidedStepperAria: 'Accounting guided workflow',
-} as const
 
 type ViewMode = 'guided' | 'advanced'
 

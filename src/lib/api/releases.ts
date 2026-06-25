@@ -1,18 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Release } from '@/types'
+import { parseJunctionRows } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type ReleaseRow = Database['public']['Tables']['releases']['Row']
 export type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 export type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
-
-/** Compact artist shape returned from the junction table join. */
-interface JunctionArtist {
-  artist_id: string
-  sort_order: number
-  artists: { id: string; name: string; slug: string } | null
-}
 
 /**
  * Maximum number of UUIDs to include in a single `.in()` filter.
@@ -80,7 +74,7 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
   const ids = releases.map((r) => r.id)
 
   // Split IDs into fixed-size batches and fetch each one sequentially.
-  const allRows: (JunctionArtist & { release_id: string })[] = []
+  const allRows: ReturnType<typeof parseJunctionRows<'release_id'>> = []
   for (let i = 0; i < ids.length; i += RELEASE_ARTISTS_BATCH_SIZE) {
     const batch = ids.slice(i, i + RELEASE_ARTISTS_BATCH_SIZE)
     const { data, error } = await (db as DbClient)
@@ -97,7 +91,7 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
       break
     }
 
-    allRows.push(...((data ?? []) as unknown as (JunctionArtist & { release_id: string })[]))
+    allRows.push(...parseJunctionRows(data, 'release_id'))
   }
 
   const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()

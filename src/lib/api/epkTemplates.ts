@@ -5,9 +5,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, Json } from '@/types/database'
+import type { Database } from '@/types/database'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { safeParseEpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+import { toSupabaseJson } from '@/lib/types/jsonColumns'
 
 type DbClient = SupabaseClient<Database>
 type TemplateRow = Database['public']['Tables']['epk_templates']['Row']
@@ -83,7 +84,7 @@ export async function createEpkTemplate(
     .insert({
       name: input.name,
       description: input.description ?? null,
-      document: input.document as unknown as Json,
+      document: toSupabaseJson(input.document),
       is_published: input.isPublished ?? false,
       sort_order: input.sortOrder ?? 0,
     })
@@ -105,7 +106,7 @@ export async function updateEpkTemplate(
   const patch: Database['public']['Tables']['epk_templates']['Update'] = {}
   if (input.name !== undefined) patch.name = input.name
   if (input.description !== undefined) patch.description = input.description ?? null
-  if (input.document !== undefined) patch.document = input.document as unknown as Json
+  if (input.document !== undefined) patch.document = toSupabaseJson(input.document)
   if (input.isPublished !== undefined) patch.is_published = input.isPublished
   if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder
 

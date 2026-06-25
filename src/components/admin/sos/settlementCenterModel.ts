@@ -1,5 +1,9 @@
 import type { SettlementRegisterRow } from '@/lib/api/settlementRegister'
 import type { SalesStatementStatus } from '@/lib/api/salesStatements'
+import {
+  SETTLEMENT_FALLBACK,
+  type SettlementFallbackLabels,
+} from '@/lib/i18n/accountingFallbacks'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import {
@@ -54,137 +58,12 @@ export function canCorrectStatement(row: MasterRow): boolean {
 
 export type PaymentMethod = 'sepa' | 'paypal' | 'manual' | 'other'
 
-export const SETTLEMENT_FALLBACK = {
-  settlementInvoiceDraft: 'Draft',
-  settlementInvoiceSent: 'Sent',
-  settlementInvoiceReceived: 'Received',
-  settlementInvoicePartial: 'Partially paid',
-  settlementInvoicePaid: 'Paid',
-  settlementInvoiceCancelled: 'Cancelled',
-  settlementPeriodOpen: 'Open',
-  settlementPeriodReview: 'Under review',
-  settlementPeriodApproved: 'Approved',
-  settlementPeriodLocked: 'Locked',
-  settlementPeriodArchived: 'Archived',
-  settlementHeading: 'Settlement Center',
-  settlementDescription: 'Master ledger for drafts, invoices, payments, and period close.',
-  settlementSessionExpired: 'Session expired',
-  settlementBulkApproveFailed: 'Bulk approval failed',
-  settlementApproveFailed: 'Approval failed',
-  settlementMarkReceivedFailed: 'Mark as received failed',
-  settlementInvoiceMarkFailedFor: 'Could not mark invoice for {artist} as received',
-  settlementInvalidAmountFor: 'Invalid amount for {artist}',
-  settlementAmountExceedsFor: 'Amount for {artist} exceeds outstanding balance ({amount} EUR)',
-  settlementPaymentFailedFor: 'Payment for {artist} failed',
-  settlementRecordPaymentFailed: 'Failed to record payment',
-  settlementLockFailed: 'Failed to lock period',
-  settlementLockFailedToast: 'Lock failed',
-  settlementCorrectionInvalidAmount: 'Please enter a valid amount in EUR',
-  settlementCorrectionFailed: 'Failed to create correction',
-  settlementCorrectionFailedToast: 'Correction failed',
-  settlementCorrectionPdfRequired:
-    'Upload CSV data first so a correction PDF can be generated for this artist.',
-  settlementCorrectionPdfUnavailable: 'Correction PDF generation is not available in this view.',
-  settlementArchiveFailed: 'Failed to archive period',
-  settlementArchiveFailedToast: 'Archive failed',
-  settlementDraftsCreated: '{count} draft(s) created',
-  settlementApprovedToast: '{approved} statement(s) approved',
-  settlementNotificationsSent: ', {emailed} notification(s) sent',
-  settlementInvoicesMarkedReceived: '{count} invoice(s) marked as received',
-  settlementPaymentsRecorded: '{count} payment(s) recorded',
-  settlementPeriodLockedToast: 'Settlement period locked',
-  settlementCorrectionCreated: 'Correction draft created for {artist}. The original statement was replaced.',
-  settlementPeriodArchivedToast: 'Period archived; carry-forwards booked to next period',
-  settlementCurrentPeriod: 'Current period',
-  settlementPeriodAlertTitle: 'Period: {period}',
-  settlementPeriodAlertBody:
-    'Drafts do not notify artists. Approval sends the portal notification and enables invoice creation.',
-  settlementSyncAnalyticsOnApprove: 'Sync portal analytics when approving',
-  settlementAnalyticsSyncedOnApprove: 'Portal analytics synced for this period',
-  settlementAnalyticsSyncSkipped: 'Portal analytics not synced (no territory metrics)',
-  settlementKpiApproved: 'Approved',
-  settlementKpiApprovedHint: 'Statements with label approval',
-  settlementKpiViewed: 'Viewed',
-  settlementKpiViewedHint: 'Opened by artist in portal',
-  settlementKpiInvoiced: 'Invoices',
-  settlementKpiInvoicedHint: 'Invoices created',
-  settlementKpiReceived: 'Received',
-  settlementKpiReceivedHint: 'Invoices received at label',
-  settlementKpiPaid: 'Paid',
-  settlementKpiPaidHint: 'Payments fully recorded',
-  settlementOpenBalance: 'Open balance',
-  settlementOpenBalanceHint: 'Sum of all open ledger balances',
-  settlementReconciliationTitle: 'Ledger balance mismatch',
-  settlementReconciliationBody:
-    'The register KPI ({reported} EUR) does not match the sum of per-artist ledger balances ({computed} EUR). Delta: {delta} EUR. Review ledger entries before locking the period.',
-  settlementApprovalNotesLabel: 'Internal approval notes (optional)',
-  settlementApprovalNotesPlaceholder: 'Notes for selected approvals…',
-  settlementCreateDrafts: 'Create drafts ({count})',
-  settlementApproveNotify: 'Approve & notify ({count})',
-  settlementMarkReceived: 'Mark received ({count})',
-  settlementRecordPayment: 'Record payment ({count})',
-  settlementLockPeriod: 'Lock period',
-  settlementArchivePeriod: 'Archive period',
-  settlementFilterPlaceholder: 'Filter artists…',
-  settlementDeselectAll: 'Clear selection',
-  settlementSelectActionable: 'Select actionable rows',
-  settlementLoadingRegister: 'Loading settlement register…',
-  settlementNoArtistsFilter: 'No artists match the current filter.',
-  settlementColViewed: 'Viewed',
-  settlementColInvoice: 'Invoice',
-  settlementColOpenBalance: 'Open balance',
-  settlementColCarryForward: 'Carry-forward',
-  settlementColArtist: 'Artist',
-  settlementColStatement: 'Statement',
-  settlementColReceived: 'Received',
-  settlementColPaid: 'Paid',
-  settlementColActions: 'Actions',
-  settlementSelectArtist: 'Select {artist}',
-  settlementSelectActionableAria: 'Select actionable rows',
-  settlementDraftBtn: 'Draft',
-  settlementApproveBtn: 'Approve',
-  settlementCorrectionBtn: 'Correction',
-  settlementCorrectionAria: 'Correction for {artist}',
-  settlementCorrectionTitle: 'Statement correction',
-  settlementCorrectionDesc:
-    'Creates a new correction draft and marks the previous statement as replaced. The correction draft must be approved again.',
-  settlementPreviousAmount: 'Previous amount:',
-  settlementChangeAmount: 'Change:',
-  settlementInvoiceExistsWarning:
-    'This artist already has an invoice. Review payment and ledger impacts manually after the correction.',
-  settlementCorrectedAmountLabel: 'Corrected amount (EUR)',
-  settlementCorrectedAmountPlaceholder: 'e.g. 1234.56',
-  settlementInternalNoteLabel: 'Internal note (optional)',
-  settlementCorrectionReasonPlaceholder: 'Reason for correction…',
-  settlementCancel: 'Cancel',
-  settlementCreateCorrectionDraft: 'Create correction draft',
-  settlementPaymentTitle: 'Record payment',
-  settlementPaymentDescSingle: 'Enter amount in EUR for the selected invoice.',
-  settlementPaymentDescMulti: 'Enter a separate amount in EUR per invoice ({count} selected).',
-  settlementOutstandingSuffix: ' · outstanding {amount} EUR',
-  settlementPaymentAmountPlaceholder: 'e.g. 125.00',
-  settlementPaymentMethod: 'Payment method',
-  settlementPaymentManual: 'Manual',
-  settlementPaymentOther: 'Other',
-  settlementPaymentReferenceLabel: 'Reference (optional)',
-  settlementPaymentReferencePlaceholder: 'Payment reference / transaction ID',
-  settlementSavePayment: 'Save payment',
-  settlementLockTitle: 'Lock period?',
-  settlementLockDesc: 'Locked periods cannot be edited. Statements and invoices remain viewable.',
-  settlementLocking: 'Locking…',
-  settlementLockConfirm: 'Lock period',
-  settlementArchiveTitle: 'Archive period?',
-  settlementArchiveDesc:
-    'Open balances will be carried forward to the next period. This action cannot be undone.',
-  settlementNextPeriodStart: 'Next period start (YYYY-MM-DD)',
-  settlementNextPeriodEnd: 'Next period end (YYYY-MM-DD)',
-  settlementArchiving: 'Archiving…',
-  settlementArchiveConfirm: 'Archive & book carry-forwards',
-} as const
+export { SETTLEMENT_FALLBACK, type SettlementFallbackLabels }
+export type SettlementLabels = import('@/lib/i18n/accountingFallbacks').AccountingLabels
 
-export type SettlementLabels = typeof SETTLEMENT_FALLBACK
-
-export function buildInvoiceStatusLabels(t: Record<string, string | undefined>) {
+export function buildInvoiceStatusLabels(
+  t: Partial<Record<keyof SettlementFallbackLabels, string>>,
+) {
   return {
     draft: t.settlementInvoiceDraft ?? SETTLEMENT_FALLBACK.settlementInvoiceDraft,
     sent: t.settlementInvoiceSent ?? SETTLEMENT_FALLBACK.settlementInvoiceSent,
@@ -195,7 +74,9 @@ export function buildInvoiceStatusLabels(t: Record<string, string | undefined>) 
   }
 }
 
-export function buildPeriodStatusLabels(t: Record<string, string | undefined>) {
+export function buildPeriodStatusLabels(
+  t: Partial<Record<keyof SettlementFallbackLabels, string>>,
+) {
   return {
     open: t.settlementPeriodOpen ?? SETTLEMENT_FALLBACK.settlementPeriodOpen,
     under_review: t.settlementPeriodReview ?? SETTLEMENT_FALLBACK.settlementPeriodReview,
