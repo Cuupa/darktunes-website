@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes } from 'react'
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import enDict from '@/i18n/dictionaries/en.json'
+import { testMessages } from '@/test/mockNextIntl'
 import type { Concert } from '@/types'
 import { EventsPageContent } from '../../../../app/events/_components/EventsPageContent'
 
@@ -97,10 +97,10 @@ describe('EventsPageContent', () => {
       name: `${concert.artistName} – ${concert.eventName}`,
     })
     const ticketLink = screen.getByRole('link', {
-      name: `${enDict.concerts.ticketLink} (${enDict.concerts.opensInNewTab})`,
+      name: `${testMessages.concerts.ticketLink} (${testMessages.concerts.opensInNewTab})`,
     })
     const mapsLink = screen.getByRole('link', {
-      name: `${concert.eventName} – ${enDict.concerts.navLink}`,
+      name: `${concert.eventName} – ${testMessages.concerts.navLink}`,
     })
 
     expect(ticketLink).toHaveAttribute('href', concert.ticketUrl)

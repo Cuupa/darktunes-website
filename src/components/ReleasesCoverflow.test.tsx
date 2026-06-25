@@ -3,7 +3,7 @@ import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SwiperProps } from 'swiper/react'
-import enDict from '@/i18n/dictionaries/en.json'
+import { testMessages } from '@/test/mockNextIntl'
 import type { Release } from '@/types'
 import { ReleasesCoverflow } from './ReleasesCoverflow'
 
@@ -114,7 +114,7 @@ describe('ReleasesCoverflow', () => {
   it('renders without crashing with a list of releases', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
-    expect(screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: testMessages.releases.coverflowRegionLabel })).toBeInTheDocument()
   })
 
   it('renders active release title in metadata block', () => {
@@ -127,7 +127,7 @@ describe('ReleasesCoverflow', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
     const overlayLink = screen.getByRole('link', {
-      name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
+      name: `${releases[0].title} by ${releases[0].artistName} – ${testMessages.releases.openReleaseAriaSuffix}`,
     })
 
     expect(overlayLink).toHaveAttribute('href', `/releases/${releases[0].id}`)
@@ -141,7 +141,7 @@ describe('ReleasesCoverflow', () => {
     })
 
     const overlayLink = screen.getByRole('link', {
-      name: `${releases[1].title} by ${releases[1].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
+      name: `${releases[1].title} by ${releases[1].artistName} – ${testMessages.releases.openReleaseAriaSuffix}`,
     })
 
     expect(overlayLink).toHaveAttribute('href', `/releases/${releases[1].id}`)
@@ -169,7 +169,7 @@ describe('ReleasesCoverflow', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
     const overlayLink = screen.getByRole('link', {
-      name: `${releases[0].title} by ${releases[0].artistName} – ${enDict.releases.openReleaseAriaSuffix}`,
+      name: `${releases[0].title} by ${releases[0].artistName} – ${testMessages.releases.openReleaseAriaSuffix}`,
     })
 
     // Simulate a Swiper drag: touchStart resets isDragging, touchMove sets it to true
@@ -214,21 +214,21 @@ describe('ReleasesCoverflow', () => {
   it('renders the expected aria-label on the region container', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
-    expect(screen.getByRole('region', { name: enDict.releases.coverflowRegionLabel })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: testMessages.releases.coverflowRegionLabel })).toBeInTheDocument()
   })
 
   it('renders previous and next buttons with proper aria-labels', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
-    expect(screen.getByRole('button', { name: enDict.releases.previousReleaseAriaLabel })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: enDict.releases.nextReleaseAriaLabel })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: testMessages.releases.previousReleaseAriaLabel })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: testMessages.releases.nextReleaseAriaLabel })).toBeInTheDocument()
   })
 
   it('marks active dot with aria-pressed=true', () => {
     render(<ReleasesCoverflow releases={releases} />)
 
     const firstDot = screen.getByRole('button', {
-      name: enDict.releases.goToReleaseAriaLabelTemplate
+      name: testMessages.releases.goToReleaseAriaLabelTemplate
         .replace('{index}', '1')
         .replace('{title}', releases[0].title),
     })
