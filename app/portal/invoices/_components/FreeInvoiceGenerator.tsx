@@ -13,6 +13,7 @@ import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { Dictionary } from '@/i18n/types'
 import type { GeneratePdfInput } from '../_actions/generatePdf'
 import { generateFreePdf } from '../_actions/generatePdf'
+import { InlineBillingProfileStep } from './InlineBillingProfileStep'
 
 interface LineItem {
   description: string
@@ -21,11 +22,47 @@ interface LineItem {
 }
 
 interface FreeInvoiceGeneratorProps {
+  artistId: string
   billingProfile: ArtistBillingProfile | null
+  billingProfileComplete: boolean
   dict: Dictionary['portal']
 }
 
-export function FreeInvoiceGenerator({ billingProfile, dict }: FreeInvoiceGeneratorProps) {
+function applyBillingProfileToSender(
+  profile: ArtistBillingProfile,
+  setters: {
+    setSenderName: (value: string) => void
+    setSenderStreet: (value: string) => void
+    setSenderPostalCode: (value: string) => void
+    setSenderCity: (value: string) => void
+    setSenderCountry: (value: string) => void
+    setSenderTaxNumber: (value: string) => void
+    setSenderVatId: (value: string) => void
+    setSenderEmail: (value: string) => void
+    setIsSmallBusiness: (value: boolean) => void
+    setTaxRatePct: (value: number) => void
+  },
+) {
+  setters.setSenderName(profile.legalName ?? '')
+  setters.setSenderStreet(profile.street ?? '')
+  setters.setSenderPostalCode(profile.postalCode ?? '')
+  setters.setSenderCity(profile.city ?? '')
+  setters.setSenderCountry(profile.country ?? '')
+  setters.setSenderTaxNumber(profile.taxNumber ?? '')
+  setters.setSenderVatId(profile.vatId ?? '')
+  setters.setSenderEmail(profile.paypalEmail ?? '')
+  setters.setIsSmallBusiness(profile.isSmallBusiness ?? false)
+  setters.setTaxRatePct(profile.isSmallBusiness ? 0 : 19)
+}
+
+export function FreeInvoiceGenerator({
+  artistId,
+  billingProfile: initialBillingProfile,
+  billingProfileComplete: initialBillingComplete,
+  dict,
+}: FreeInvoiceGeneratorProps) {
+  const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
+  const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingComplete)
   const today = new Date().toISOString().slice(0, 10)
 
   // Sender fields — pre-filled from billing profile when available
@@ -87,6 +124,11 @@ export function FreeInvoiceGenerator({ billingProfile, dict }: FreeInvoiceGenera
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    if (!billingProfileComplete) {
+      toast.error(dict.invoice_billing_incomplete)
+      return
+    }
+
     const input: GeneratePdfInput = {
       invoiceNumber,
       issuedDate,
@@ -140,6 +182,32 @@ export function FreeInvoiceGenerator({ billingProfile, dict }: FreeInvoiceGenera
     } finally {
       setGenerating(false)
     }
+  }
+
+  if (!billingProfileComplete) {
+    return (
+      <InlineBillingProfileStep
+        artistId={artistId}
+        billingProfile={billingProfile}
+        dict={dict}
+        onComplete={(profile) => {
+          setBillingProfile(profile)
+          setBillingProfileComplete(true)
+          applyBillingProfileToSender(profile, {
+            setSenderName,
+            setSenderStreet,
+            setSenderPostalCode,
+            setSenderCity,
+            setSenderCountry,
+            setSenderTaxNumber,
+            setSenderVatId,
+            setSenderEmail,
+            setIsSmallBusiness,
+            setTaxRatePct,
+          })
+        }}
+      />
+    )
   }
 
   return (
@@ -462,7 +530,11 @@ export function FreeInvoiceGenerator({ billingProfile, dict }: FreeInvoiceGenera
         </Card>
 
         <div className={cn('flex justify-end')}>
-          <Button type="submit" disabled={generating} className="gap-2">
+          <Button
+            type="submit"
+            disabled={generating || !artistId || !billingProfileComplete}
+            className="gap-2"
+          >
             <DownloadSimple size={16} aria-hidden="true" />
             {generating ? dict.invoice_generating : dict.invoice_generate_download}
           </Button>

@@ -1,8 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Info, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
+import { Info, Plus, Trash } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +15,7 @@ import type { ArtistInvoice } from '@/lib/api/artistInvoices'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
 import { LABEL_CLIENT_ADDRESS, LABEL_CLIENT_EMAIL, LABEL_CLIENT_NAME } from '@/lib/portal/labelBilling'
+import { InlineBillingProfileStep } from './InlineBillingProfileStep'
 
 interface LineItem {
   description: string
@@ -47,13 +47,15 @@ function buildStatementLineItem(statement?: SalesStatement): LineItem[] {
 
 export function InvoiceForm({
   artistId,
-  billingProfile,
-  billingProfileComplete,
+  billingProfile: initialBillingProfile,
+  billingProfileComplete: initialBillingComplete,
   dict,
   onSuccess,
   onCancel,
   statement,
 }: InvoiceFormProps) {
+  const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
+  const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingComplete)
   const isStatementLinked = Boolean(statement)
   const [artistInvoiceNumber, setArtistInvoiceNumber] = useState('')
   const [clientName, setClientName] = useState(isStatementLinked ? LABEL_CLIENT_NAME : '')
@@ -151,6 +153,21 @@ export function InvoiceForm({
     }
   }
 
+  if (!billingProfileComplete) {
+    return (
+      <InlineBillingProfileStep
+        artistId={artistId}
+        billingProfile={billingProfile}
+        dict={dict}
+        onComplete={(profile) => {
+          setBillingProfile(profile)
+          setBillingProfileComplete(true)
+          setTaxRatePct(profile.isSmallBusiness ? 0 : 19)
+        }}
+      />
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -158,20 +175,6 @@ export function InvoiceForm({
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={handleSubmit}>
-          {!billingProfileComplete && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-              <div className="flex items-start gap-3">
-                <WarningCircle className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
-                <div className="space-y-2">
-                  <p className="font-medium">{dict.invoice_billing_incomplete}</p>
-                  <p className="text-amber-50/90">{dict.billing_completeness_hint}</p>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/portal/billing">{dict.invoice_billing_cta}</Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {statement && (
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">

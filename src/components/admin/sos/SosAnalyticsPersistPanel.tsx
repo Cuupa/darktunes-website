@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { CloudArrowUp } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { persistSosAnalytics } from '@/lib/sos/persistSosAnalyticsAction'
+import { runPersistSosAnalytics } from '@/lib/sos/runPersistSosAnalytics'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
@@ -56,35 +56,14 @@ export function SosAnalyticsPersistPanel({
   const handlePersist = () => {
     if (!canPersist) return
     startTransition(async () => {
-      const periodSummary =
-        revenues.length > 0 && periodStart
-          ? {
-              periodStart,
-              periodEnd: periodEnd || periodStart,
-              totalRevenue: revenues.reduce((s, r) => s + r.totalRevenue, 0),
-              totalPayout: revenues.reduce((s, r) => s + r.finalAmount, 0),
-              artistCount: revenues.length,
-              artistBreakdowns: revenues.map((r) => ({
-                artist: r.artist,
-                revenue: r.totalRevenue,
-                payout: r.finalAmount,
-              })),
-              platformBreakdowns: revenues.flatMap((r) => r.platformBreakdown),
-              sourceBatchIds: bronzeBatchIds,
-            }
-          : undefined
-
-      const result = await persistSosAnalytics({
+      const result = await runPersistSosAnalytics({
         periodStart,
         periodEnd,
-        batchIds: bronzeBatchIds,
         territoryMetrics,
         merchOrderRows,
-        labelArtists: labelArtists.map((la) => ({
-          name: la.name,
-          artistId: la.artistId,
-        })),
-        periodSummary,
+        labelArtists,
+        revenues,
+        bronzeBatchIds,
       })
 
       if (result.success) {

@@ -6,14 +6,17 @@ import { DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
 import { getStatementPresignedUrl } from '../../statements/_actions/presignedUrl'
+import { InlineBillingProfileStep } from '../../invoices/_components/InlineBillingProfileStep'
 import { QuickInvoiceButton } from './QuickInvoiceButton'
 import { matchesQuickSearch } from '@/lib/analytics/insights'
 
 interface EarningsStatementsPanelProps {
   artistId: string
+  billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
   dict: Dictionary['portal']
   invoicedStatementIds: string[]
@@ -28,17 +31,24 @@ function formatAmountEur(amount: number | undefined): string {
 
 export function EarningsStatementsPanel({
   artistId,
-  billingProfileComplete,
+  billingProfile: initialBillingProfile,
+  billingProfileComplete: initialBillingProfileComplete,
   dict,
   invoicedStatementIds,
   searchQuery,
   statements,
 }: EarningsStatementsPanelProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
+  const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingProfileComplete)
   const linkedIds = new Set(invoicedStatementIds)
 
   const filtered = statements.filter((s) =>
     matchesQuickSearch(searchQuery, s.period, s.filename, s.status, s.amountEur),
+  )
+
+  const hasInvoiceableStatement = statements.some(
+    (statement) => statement.status === 'label_approved' && !linkedIds.has(statement.id),
   )
 
   const handleDownload = async (statementId: string) => {
@@ -69,6 +79,18 @@ export function EarningsStatementsPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
+        {!billingProfileComplete && hasInvoiceableStatement && (
+          <InlineBillingProfileStep
+            artistId={artistId}
+            billingProfile={billingProfile}
+            dict={dict}
+            onComplete={(profile) => {
+              setBillingProfile(profile)
+              setBillingProfileComplete(true)
+            }}
+          />
+        )}
+
         {filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">{dict.analytics_search_no_results}</p>
         ) : (
@@ -103,10 +125,9 @@ export function EarningsStatementsPanel({
                     )}
                     {dict.statements_download}
                   </Button>
-                  {canInvoice && (
+                  {canInvoice && billingProfileComplete && (
                     <QuickInvoiceButton
                       artistId={artistId}
-                      billingProfileComplete={billingProfileComplete}
                       dict={dict}
                       statement={statement}
                     />

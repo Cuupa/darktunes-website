@@ -275,7 +275,12 @@ export function InvoicesClient({
         hidden={activeTab !== 'generator'}
       >
         {activeTab === 'generator' && (
-          <FreeInvoiceGenerator billingProfile={billingProfile} dict={dict} />
+          <FreeInvoiceGenerator
+            artistId={artistId}
+            billingProfile={billingProfile}
+            billingProfileComplete={billingProfileComplete}
+            dict={dict}
+          />
         )}
       </div>
     </div>

@@ -18,6 +18,7 @@ import type {
 } from './types'
 import { convertToEur } from './currency'
 import type { ExchangeRates, HistoricalRates } from './currency'
+import { resolveAssignmentOwners } from '@/lib/sos/trackAssignmentSplits'
 
 export interface ProcessedArtistData {
   artist: string
@@ -474,44 +475,6 @@ function buildReleaseBreakdown(transactions: SalesTransaction[]): ReleaseRevenue
 }
 
 // ── Main processing ────────────────────────────────────────────────────────────
-
-/**
- * Resolves a TrackRevenueAssignment to a normalised list of **active** owners
- * with fractional revenue shares (0–1).
- *
- * Owners with `percentage <= 0` or an empty `artist` name are excluded so that
- * no transaction is ever cloned and attributed to them. This guarantees that
- * a track assigned 100% to Artist A never appears in Artist B's statement,
- * even when Artist B is listed as a co-owner with 0%.
- *
- * Math invariant: when the original percentages summed to 100 and only
- * zero-percentage entries are dropped, the sum of the remaining fractions is
- * still exactly 1, so total revenue is preserved.
- *
- * Backward-compat: when `owners` is absent or empty, falls back to
- * `ownerArtist` at fraction 1 (100%). This preserves behaviour for all
- * workspace backups created before multi-owner support was introduced.
- *
- * @param assignment - The rule to resolve.
- * @returns An array of `{ artist, fraction }` entries for every owner whose
- *   percentage is > 0 and whose artist name is non-empty. Guaranteed
- *   non-empty in practice because the UI enforces a 100% sum with at least
- *   one positive share before allowing submission.
- */
-function resolveAssignmentOwners(
-  assignment: TrackRevenueAssignment
-): ReadonlyArray<{ readonly artist: string; readonly fraction: number }> {
-  if (assignment.owners && assignment.owners.length > 0) {
-    return assignment.owners
-      .filter(o => o.percentage > 0 && o.artist.trim() !== '')
-      .map(o => ({
-        artist: o.artist,
-        fraction: o.percentage / 100,
-      }))
-  }
-  const legacyArtist = assignment.ownerArtist ?? ''
-  return [{ artist: legacyArtist, fraction: 1 }]
-}
 
 export function processTransactions(
   transactions: SalesTransaction[],

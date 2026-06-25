@@ -15,13 +15,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
+import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { Dictionary } from '@/i18n/types'
 import { getStatementPresignedUrl } from '../_actions/presignedUrl'
+import { InlineBillingProfileStep } from '../../invoices/_components/InlineBillingProfileStep'
 import { QuickInvoiceButton } from '../../analytics/_components/QuickInvoiceButton'
 
 interface StatementsTableProps {
   artistId?: string
+  billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
   dict: Dictionary['portal']
   invoicedStatementIds: string[]
@@ -111,10 +114,9 @@ function StatementActions({
         )}
         {dict.statements_download}
       </Button>
-      {canInvoice && artistId && (
+      {canInvoice && artistId && billingProfileComplete && (
         <QuickInvoiceButton
           artistId={artistId}
-          billingProfileComplete={billingProfileComplete}
           dict={dict}
           statement={statement}
         />
@@ -125,13 +127,22 @@ function StatementActions({
 
 export function StatementsTable({
   artistId,
-  billingProfileComplete,
+  billingProfile: initialBillingProfile,
+  billingProfileComplete: initialBillingProfileComplete,
   dict,
   invoicedStatementIds,
   statements,
 }: StatementsTableProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
+  const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingProfileComplete)
   const linkedStatementIds = new Set(invoicedStatementIds)
+
+  const hasInvoiceableStatement = statements.some(
+    (statement) =>
+      ['label_approved', 'artist_notified', 'viewed'].includes(statement.status) &&
+      !linkedStatementIds.has(statement.id),
+  )
 
   const handleDownload = async (statementId: string) => {
     setLoadingId(statementId)
@@ -164,6 +175,19 @@ export function StatementsTable({
           <CardHeader>
             <CardTitle className="text-base">{dict.statements_heading}</CardTitle>
           </CardHeader>
+          {!billingProfileComplete && hasInvoiceableStatement && artistId && (
+            <CardContent className="p-4 pt-0 pb-0">
+              <InlineBillingProfileStep
+                artistId={artistId}
+                billingProfile={billingProfile}
+                dict={dict}
+                onComplete={(profile) => {
+                  setBillingProfile(profile)
+                  setBillingProfileComplete(true)
+                }}
+              />
+            </CardContent>
+          )}
           <CardContent className="p-4 pt-0 space-y-3 md:hidden">
             {statements.map((statement) => {
               const hasInvoice = linkedStatementIds.has(statement.id)
