@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus, DownloadSimple, FileText } from '@phosphor-icons/react'
@@ -20,7 +21,6 @@ import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { ArtistInvoice } from '@/lib/api/artistInvoices'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Dictionary } from '@/i18n/types'
 import { FreeInvoiceGenerator } from './FreeInvoiceGenerator'
 import { InvoiceForm } from './InvoiceForm'
 
@@ -28,7 +28,6 @@ interface InvoicesClientProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
-  dict: Dictionary['portal']
   invoices: ArtistInvoice[]
   statement: SalesStatement | null
 }
@@ -46,16 +45,16 @@ function statusBadgeVariant(status: ArtistInvoice['status']): 'default' | 'secon
   }
 }
 
-function statusLabel(status: ArtistInvoice['status'], dict: Dictionary['portal']): string {
+function statusLabel(status: ArtistInvoice['status'], t: ReturnType<typeof useTranslations<'portal'>>): string {
   switch (status) {
     case 'draft':
-      return dict.invoice_status_draft
+      return t('invoice_status_draft')
     case 'sent':
-      return dict.invoice_status_sent
+      return t('invoice_status_sent')
     case 'paid':
-      return dict.invoice_status_paid
+      return t('invoice_status_paid')
     case 'cancelled':
-      return dict.invoice_status_cancelled
+      return t('invoice_status_cancelled')
     default:
       return status
   }
@@ -67,10 +66,11 @@ export function InvoicesClient({
   artistId,
   billingProfile,
   billingProfileComplete,
-  dict,
   invoices: initialInvoices,
   statement,
 }: InvoicesClientProps) {
+  const t = useTranslations('portal')
+
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,7 +88,7 @@ export function InvoicesClient({
     setInvoices((prev) => [invoice, ...prev])
     setShowForm(false)
     clearStatementQuery()
-    toast.success(invoice.status === 'sent' ? dict.invoice_sent_success : dict.invoice_save_success)
+    toast.success(invoice.status === 'sent' ? t('invoice_sent_success') : t('invoice_save_success'))
   }
 
   const handleCancel = () => {
@@ -103,7 +103,7 @@ export function InvoicesClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{dict.invoices_heading}</h1>
+          <h1 className="text-2xl font-bold">{t('invoices_heading')}</h1>
           {statement && (
             <p className="text-sm text-muted-foreground">
               SOS {statement.period} —{' '}
@@ -116,7 +116,7 @@ export function InvoicesClient({
         {activeTab === 'my-invoices' && (
           <Button className="gap-2" onClick={() => setShowForm((current) => !current)} size="sm">
             <Plus size={16} aria-hidden="true" />
-            {dict.invoice_new}
+            {t('invoice_new')}
           </Button>
         )}
       </div>
@@ -125,7 +125,7 @@ export function InvoicesClient({
       <div
         className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1"
         role="tablist"
-        aria-label={dict.invoices_heading}
+        aria-label={t('invoices_heading')}
       >
         <button
           role="tab"
@@ -141,7 +141,7 @@ export function InvoicesClient({
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {dict.invoice_my_invoices_tab}
+          {t('invoice_my_invoices_tab')}
         </button>
         <button
           role="tab"
@@ -157,7 +157,7 @@ export function InvoicesClient({
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {dict.invoice_generator_tab}
+          {t('invoice_generator_tab')}
         </button>
       </div>
 
@@ -175,7 +175,6 @@ export function InvoicesClient({
                 artistId={artistId}
                 billingProfile={billingProfile}
                 billingProfileComplete={billingProfileComplete}
-                dict={dict}
                 onCancel={handleCancel}
                 onSuccess={handleNewInvoice}
                 statement={statement ?? undefined}
@@ -185,21 +184,21 @@ export function InvoicesClient({
             {invoices.length === 0 ? (
               <PortalEmptyState
                 icon={FileText}
-                heading={dict.invoices_heading}
-                description={dict.invoice_noData}
+                heading={t('invoices_heading')}
+                description={t('invoice_noData')}
               />
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">{dict.invoices_heading}</CardTitle>
+                  <CardTitle className="text-base">{t('invoices_heading')}</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="whitespace-nowrap">{dict.invoice_number}</TableHead>
-                        <TableHead>{dict.invoice_client}</TableHead>
-                        <TableHead className="whitespace-nowrap">{dict.invoice_total}</TableHead>
+                        <TableHead className="whitespace-nowrap">{t('invoice_number')}</TableHead>
+                        <TableHead>{t('invoice_client')}</TableHead>
+                        <TableHead className="whitespace-nowrap">{t('invoice_total')}</TableHead>
                         <TableHead className="whitespace-nowrap">Status</TableHead>
                         <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                       </TableRow>
@@ -227,7 +226,7 @@ export function InvoicesClient({
                             </TableCell>
                             <TableCell>
                               <Badge variant={statusBadgeVariant(invoice.status)}>
-                                {statusLabel(invoice.status, dict)}
+                                {statusLabel(invoice.status, t)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
@@ -240,7 +239,7 @@ export function InvoicesClient({
                                     target="_blank"
                                   >
                                     <DownloadSimple size={14} aria-hidden="true" />
-                                    {dict.invoice_download_pdf}
+                                    {t('invoice_download_pdf')}
                                   </a>
                                 </Button>
                               ) : (
@@ -251,7 +250,7 @@ export function InvoicesClient({
                                   variant="ghost"
                                 >
                                   <DownloadSimple size={14} aria-hidden="true" />
-                                  {dict.invoice_no_pdf}
+                                  {t('invoice_no_pdf')}
                                 </Button>
                               )}
                             </TableCell>
@@ -279,7 +278,6 @@ export function InvoicesClient({
             artistId={artistId}
             billingProfile={billingProfile}
             billingProfileComplete={billingProfileComplete}
-            dict={dict}
           />
         )}
       </div>

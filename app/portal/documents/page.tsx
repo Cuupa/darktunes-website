@@ -11,9 +11,11 @@ import { listArtistDocuments } from '@/lib/api/artistDocuments'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DocumentVault } from './_components/DocumentVault'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 function DocumentsSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-56" />
@@ -25,7 +27,9 @@ function DocumentsSkeleton() {
 }
 
 async function DocumentsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -36,7 +40,7 @@ async function DocumentsContent({ searchParams }: { searchParams: Promise<{ arti
   if (flags['artist.documents'] === false) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{dict.portal.documents_heading}</h1>
+        <h1 className="text-2xl font-bold">{t('documents_heading')}</h1>
         <p className="text-muted-foreground">
           The Document Vault feature is currently unavailable.
         </p>
@@ -51,7 +55,6 @@ async function DocumentsContent({ searchParams }: { searchParams: Promise<{ arti
 
   return (
     <DocumentVault
-      dict={dict.portal}
       documents={documents}
       artistId={artist?.id ?? ''}
     />

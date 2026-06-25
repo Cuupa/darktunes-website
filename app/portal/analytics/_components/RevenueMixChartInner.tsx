@@ -1,8 +1,9 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { RevenueMixSlice } from '@/lib/analytics/revenueMix'
-import type { Dictionary } from '@/i18n/types'
+import { portalKey } from '@/i18n/portalKey'
 
 const CATEGORY_COLORS: Record<RevenueMixSlice['category'], string> = {
   digital: 'hsl(var(--primary))',
@@ -12,7 +13,6 @@ const CATEGORY_COLORS: Record<RevenueMixSlice['category'], string> = {
 }
 
 export interface RevenueMixChartInnerProps {
-  dict: Dictionary['portal']
   slices: RevenueMixSlice[]
   totalRevenue: number
 }
@@ -21,16 +21,17 @@ function formatEur(value: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
-const CATEGORY_LABEL_KEYS: Record<RevenueMixSlice['category'], keyof Dictionary['portal']> = {
+const CATEGORY_LABEL_KEYS: Record<RevenueMixSlice['category'], string> = {
   digital: 'analytics_revenue_mix_digital',
   direct: 'analytics_revenue_mix_direct',
   physical: 'analytics_revenue_mix_physical',
   merch: 'analytics_revenue_mix_merch',
 }
 
-export function RevenueMixChartInner({ dict, slices, totalRevenue }: RevenueMixChartInnerProps) {
+export function RevenueMixChartInner({ slices, totalRevenue }: RevenueMixChartInnerProps) {
+  const t = useTranslations('portal')
   const chartData = slices.map((s) => ({
-    name: dict[CATEGORY_LABEL_KEYS[s.category]],
+    name: t(portalKey(CATEGORY_LABEL_KEYS[s.category])),
     value: s.revenueEur,
     category: s.category,
     pct: totalRevenue > 0 ? Math.round((s.revenueEur / totalRevenue) * 1000) / 10 : 0,

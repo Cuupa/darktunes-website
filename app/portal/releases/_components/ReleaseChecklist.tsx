@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/releases/_components/ReleaseChecklist.tsx — Client Component (leaf)
  *
@@ -19,12 +20,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
-import type { Dictionary } from '@/i18n/types'
 import type { Release } from '@/types'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
 
 interface ReleaseChecklistPanelProps {
-  dict: Dictionary['portal']
   releases: Release[]
   releasedReleases?: Release[]
   checklistsByReleaseId: Record<string, ReleaseChecklist[]>
@@ -48,14 +47,13 @@ function Progress({ completed, total }: { completed: number; total: number }) {
 }
 
 function ReleaseCard({
-  dict,
   release,
   initialChecklist,
 }: {
-  dict: Dictionary['portal']
   release: Release
   initialChecklist: ReleaseChecklist[]
 }) {
+  const t = useTranslations('portal')
   const [open, setOpen] = useState(false)
   const [checklist, setChecklist] = useState(initialChecklist)
   const [saving, setSaving] = useState<string | null>(null)
@@ -80,7 +78,7 @@ function ReleaseCard({
       })
 
       if (!res.ok) {
-        toast.error(dict.releases_saveError)
+        toast.error(t('releases_saveError'))
         return
       }
 
@@ -88,7 +86,7 @@ function ReleaseCard({
         prev.map((c) => (c.id === item.id ? { ...c, isCompleted: !c.isCompleted } : c)),
       )
     } catch {
-      toast.error(dict.releases_saveError)
+      toast.error(t('releases_saveError'))
     } finally {
       setSaving(null)
     }
@@ -148,10 +146,10 @@ function ReleaseCard({
       {open && (
         <CardContent className="pt-0">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-            {dict.releases_checklist}
+            {t('releases_checklist')}
           </p>
           {checklist.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{dict.releases_noData}</p>
+            <p className="text-sm text-muted-foreground">{t('releases_noData')}</p>
           ) : (
             <ul className="space-y-2">
               {checklist.map((item) => (
@@ -162,7 +160,7 @@ function ReleaseCard({
                     disabled={saving === item.id}
                     onClick={() => handleToggle(item)}
                     className="w-full justify-start gap-3 h-auto py-1.5 px-2 text-sm"
-                    title={item.isCompleted ? dict.releases_taskUndo : dict.releases_taskDone}
+                    title={item.isCompleted ? t('releases_taskUndo') : t('releases_taskDone')}
                   >
                     {item.isCompleted ? (
                       <CheckCircle size={18} weight="fill" className="text-primary shrink-0" />
@@ -183,40 +181,39 @@ function ReleaseCard({
   )
 }
 
-export function ReleaseChecklistPanel({
-  dict,
-  releases,
+export function ReleaseChecklistPanel({ releases,
   releasedReleases = [],
   checklistsByReleaseId,
 }: ReleaseChecklistPanelProps) {
+  const t = useTranslations('portal')
+
   const [pastOpen, setPastOpen] = useState(false)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold">{dict.releases_heading}</h1>
+        <h1 className="text-3xl font-bold">{t('releases_heading')}</h1>
         <Button asChild>
-          <Link href="/portal/releases/new">{dict.releases_submit_new}</Link>
+          <Link href="/portal/releases/new">{t('releases_submit_new')}</Link>
         </Button>
       </div>
 
       {releases.length === 0 && releasedReleases.length === 0 ? (
         <PortalEmptyState
           icon={MusicNotes}
-          heading={dict.releases_noReleases}
-          description={dict.releases_noData}
-          action={{ label: dict.releases_submit_new, href: '/portal/releases/new' }}
+          heading={t('releases_noReleases')}
+          description={t('releases_noData')}
+          action={{ label: t('releases_submit_new'), href: '/portal/releases/new' }}
         />
       ) : (
         <>
           {releases.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                {dict.releases_upcoming_heading}
+                {t('releases_upcoming_heading')}
               </p>
               {releases.map((release) => (
                 <ReleaseCard
                   key={release.id}
-                  dict={dict}
                   release={release}
                   initialChecklist={checklistsByReleaseId[release.id] ?? []}
                 />
@@ -233,11 +230,11 @@ export function ReleaseChecklistPanel({
                 aria-expanded={pastOpen}
               >
                 {pastOpen ? <CaretUp size={14} aria-hidden="true" /> : <CaretDown size={14} aria-hidden="true" />}
-                {dict.releases_past_heading} ({releasedReleases.length})
+                {t('releases_past_heading')} ({releasedReleases.length})
               </button>
               {pastOpen && (
                 <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">{dict.releases_past_desc}</p>
+                  <p className="text-xs text-muted-foreground">{t('releases_past_desc')}</p>
                   {releasedReleases.map((r) => (
                     <Card key={r.id} className="bg-card border-border">
                       <CardHeader className="py-3 px-4">

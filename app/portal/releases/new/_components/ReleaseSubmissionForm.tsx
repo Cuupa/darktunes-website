@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -17,11 +18,9 @@ import {
 } from '@/components/ui/select'
 import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 import type { Artist, SubmissionFormField } from '@/types'
 
 interface ReleaseSubmissionFormProps {
-  dict: Dictionary['portal']
   artist: Artist | null
   formSchema: SubmissionFormField[]
 }
@@ -69,7 +68,9 @@ function DynamicField({
   )
 }
 
-export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmissionFormProps) {
+export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionFormProps) {
+  const t = useTranslations('portal')
+
   const router = useRouter()
   const [title, setTitle] = useState(artist?.name ?? '')
   const [releaseDate, setReleaseDate] = useState('')
@@ -103,7 +104,7 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
     e.preventDefault()
 
     if (!coverArtVerified) {
-      toast.error(dict.releases_submit_cover_check_required)
+      toast.error(t('releases_submit_cover_check_required'))
       return
     }
 
@@ -113,7 +114,7 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(dict.releases_submit_error)
+        toast.error(t('releases_submit_error'))
         return
       }
 
@@ -143,15 +144,15 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
       })
 
       if (!res.ok) {
-        toast.error(dict.releases_submit_error)
+        toast.error(t('releases_submit_error'))
         return
       }
 
-      toast.success(dict.releases_submit_success)
+      toast.success(t('releases_submit_success'))
       router.push('/portal/releases/submissions')
       router.refresh()
     } catch {
-      toast.error(dict.releases_submit_error)
+      toast.error(t('releases_submit_error'))
     } finally {
       setSubmitting(false)
     }
@@ -159,18 +160,18 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{dict.releases_submit_heading}</h1>
-      <p className="text-sm text-muted-foreground">{dict.releases_submit_pending_notice}</p>
+      <h1 className="text-3xl font-bold">{t('releases_submit_heading')}</h1>
+      <p className="text-sm text-muted-foreground">{t('releases_submit_pending_notice')}</p>
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>{dict.releases_submit_heading}</CardTitle>
+          <CardTitle>{t('releases_submit_heading')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(e) => void submit(e)}>
             <div className="space-y-2">
               <Label htmlFor="release-title">
-                {dict.releases_submit_title}
+                {t('releases_submit_title')}
                 <span className="text-destructive ml-1">*</span>
               </Label>
               <Input id="release-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -178,12 +179,12 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="release-date">{dict.releases_submit_date}</Label>
+                <Label htmlFor="release-date">{t('releases_submit_date')}</Label>
                 <Input id="release-date" type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>
-                  {dict.releases_submit_type}
+                  {t('releases_submit_type')}
                   <span className="text-destructive ml-1">*</span>
                 </Label>
                 <Select value={type} onValueChange={(val) => setType(val as ReleaseType)}>
@@ -201,7 +202,7 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
 
             <div className="space-y-2">
               <Label htmlFor="audio-url">
-                {dict.releases_submit_audio_url}
+                {t('releases_submit_audio_url')}
                 <span className="text-destructive ml-1">*</span>
               </Label>
               <Input
@@ -216,7 +217,7 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
 
             <div className="space-y-2">
               <Label htmlFor="cover-art-url">
-                {dict.releases_submit_cover_url}
+                {t('releases_submit_cover_url')}
                 <span className="text-destructive ml-1">*</span>
               </Label>
               <Input
@@ -230,45 +231,45 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
                 placeholder="https://drive.google.com/…"
                 required
               />
-              <CoverArtAnalyzer url={coverArtUrl} dict={dict} onVerified={handleCoverArtVerified} />
+              <CoverArtAnalyzer url={coverArtUrl} onVerified={handleCoverArtVerified} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="genre">{dict.releases_submit_genre}</Label>
+              <Label htmlFor="genre">{t('releases_submit_genre')}</Label>
               <Input id="genre" value={genre} onChange={(e) => setGenre(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="catalog-number">{dict.releases_submit_catalog_number}</Label>
+                <Label htmlFor="catalog-number">{t('releases_submit_catalog_number')}</Label>
                 <Input id="catalog-number" value={catalogNumber} onChange={(e) => setCatalogNumber(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="isrc">{dict.releases_submit_isrc}</Label>
+                <Label htmlFor="isrc">{t('releases_submit_isrc')}</Label>
                 <Input id="isrc" value={isrc} onChange={(e) => setIsrc(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="label-copy">{dict.releases_submit_label_copy}</Label>
+              <Label htmlFor="label-copy">{t('releases_submit_label_copy')}</Label>
               <Input id="label-copy" value={labelCopy} onChange={(e) => setLabelCopy(e.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="spotify-url">{dict.releases_submit_spotify}</Label>
+              <Label htmlFor="spotify-url">{t('releases_submit_spotify')}</Label>
               <Input id="spotify-url" type="url" value={spotifyUrl} onChange={(e) => setSpotifyUrl(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="apple-url">{dict.releases_submit_apple}</Label>
+              <Label htmlFor="apple-url">{t('releases_submit_apple')}</Label>
               <Input id="apple-url" type="url" value={appleMusicUrl} onChange={(e) => setAppleMusicUrl(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="youtube-url">{dict.releases_submit_youtube}</Label>
+              <Label htmlFor="youtube-url">{t('releases_submit_youtube')}</Label>
               <Input id="youtube-url" type="url" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="release-notes">{dict.releases_submit_notes}</Label>
+              <Label htmlFor="release-notes">{t('releases_submit_notes')}</Label>
               <Textarea id="release-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
@@ -284,9 +285,9 @@ export function ReleaseSubmissionForm({ dict, artist, formSchema }: ReleaseSubmi
             <Button
               type="submit"
               disabled={submitting || !coverArtVerified}
-              title={!coverArtVerified ? dict.releases_submit_cover_check_required : undefined}
+              title={!coverArtVerified ? t('releases_submit_cover_check_required') : undefined}
             >
-              {submitting ? dict.releases_submit_saving : dict.releases_submit_save}
+              {submitting ? t('releases_submit_saving') : t('releases_submit_save')}
             </Button>
           </form>
         </CardContent>

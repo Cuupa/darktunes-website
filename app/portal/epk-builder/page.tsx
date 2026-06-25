@@ -16,7 +16,7 @@ import { getArtistAssets } from '@/lib/api/artistAssets'
 import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EpkBuilderClient } from './_components/EpkBuilderClient'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
@@ -27,6 +27,8 @@ export const metadata = {
 }
 
 function EpkBuilderSkeleton() {
+
+
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-64" />
@@ -36,7 +38,9 @@ function EpkBuilderSkeleton() {
 }
 
 async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -54,7 +58,7 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   if (!artist) {
     return (
-      <p className="text-muted-foreground">{dict.portal.notLinked}</p>
+      <p className="text-muted-foreground">{t('notLinked')}</p>
     )
   }
 
@@ -86,7 +90,6 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
 
   return (
     <EpkBuilderClient
-      dict={dict.portal}
       artistId={artist.id}
       artistName={artist.name}
       initialDocument={state.document}

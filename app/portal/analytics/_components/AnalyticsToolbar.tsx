@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { DownloadSimple, MagnifyingGlass, SlidersHorizontal } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -23,10 +24,9 @@ import {
   PORTAL_ANALYTICS_VIEW_STORAGE_KEY,
   type TabVisibility,
 } from '@/lib/analytics/viewPreferences'
-import type { Dictionary } from '@/i18n/types'
+import type { PortalMessageKey } from '@/i18n/portalKey'
 
 interface AnalyticsToolbarProps {
-  dict: Dictionary['portal']
   searchQuery: string
   onSearchChange: (query: string) => void
   tabVisibility: TabVisibility
@@ -34,7 +34,7 @@ interface AnalyticsToolbarProps {
   onExport: () => void
 }
 
-const TAB_LABEL_KEYS: Record<AnalyticsTabId, keyof Dictionary['portal']> = {
+const TAB_LABEL_KEYS: Record<AnalyticsTabId, PortalMessageKey> = {
   streaming: 'analytics_tab_streaming',
   listeners: 'analytics_tab_listeners',
   territories: 'analytics_tab_territories',
@@ -48,14 +48,14 @@ const TAB_LABEL_KEYS: Record<AnalyticsTabId, keyof Dictionary['portal']> = {
   merch: 'analytics_tab_merch',
 }
 
-export function AnalyticsToolbar({
-  dict,
-  searchQuery,
+export function AnalyticsToolbar({ searchQuery,
   onSearchChange,
   tabVisibility,
   onTabVisibilityChange,
   onExport,
 }: AnalyticsToolbarProps) {
+  const t = useTranslations('portal')
+
   const [localVisibility, setLocalVisibility] = useState(tabVisibility)
 
   useEffect(() => {
@@ -79,9 +79,9 @@ export function AnalyticsToolbar({
           type="search"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={dict.analytics_search_placeholder}
+          placeholder={t('analytics_search_placeholder')}
           className="pl-9 h-9"
-          aria-label={dict.analytics_search_placeholder}
+          aria-label={t('analytics_search_placeholder')}
         />
       </div>
 
@@ -90,15 +90,15 @@ export function AnalyticsToolbar({
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="h-9 gap-1.5">
               <SlidersHorizontal size={14} aria-hidden="true" />
-              <span className="hidden xs:inline">{dict.analytics_customize_views}</span>
+              <span className="hidden xs:inline">{t('analytics_customize_views')}</span>
             </Button>
           </SheetTrigger>
           <SheetContent className="w-full sm:max-w-sm" data-lenis-prevent>
             <SheetHeader>
-              <SheetTitle>{dict.analytics_customize_views}</SheetTitle>
+              <SheetTitle>{t('analytics_customize_views')}</SheetTitle>
             </SheetHeader>
             <div className="mt-6 space-y-4">
-              <p className="text-xs text-muted-foreground">{dict.analytics_customize_hint}</p>
+              <p className="text-xs text-muted-foreground">{t('analytics_customize_hint')}</p>
               {ANALYTICS_TAB_IDS.map((tabId) => (
                 <div key={tabId} className="flex items-center gap-2">
                   <Checkbox
@@ -109,12 +109,12 @@ export function AnalyticsToolbar({
                     }
                   />
                   <Label htmlFor={`tab-${tabId}`} className="text-sm font-normal cursor-pointer">
-                    {dict[TAB_LABEL_KEYS[tabId]]}
+                    {t(TAB_LABEL_KEYS[tabId])}
                   </Label>
                 </div>
               ))}
               <Button size="sm" onClick={applyVisibility} className="w-full">
-                {dict.analytics_customize_apply}
+                {t('analytics_customize_apply')}
               </Button>
             </div>
           </SheetContent>
@@ -122,7 +122,7 @@ export function AnalyticsToolbar({
 
         <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={onExport}>
           <DownloadSimple size={14} aria-hidden="true" />
-          <span className="hidden sm:inline">{dict.analytics_export_csv}</span>
+          <span className="hidden sm:inline">{t('analytics_export_csv')}</span>
         </Button>
       </div>
     </div>

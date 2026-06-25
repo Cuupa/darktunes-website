@@ -10,7 +10,7 @@ import { getSalesStatementsByArtistId } from '@/lib/api/salesStatements'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatementsTable } from './_components/StatementsTable'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 export const metadata: Metadata = {
   title: 'Statements | darkTunes Portal',
@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 }
 
 function StatementsSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-56" />
@@ -29,7 +31,9 @@ function StatementsSkeleton() {
 }
 
 async function StatementsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -43,7 +47,7 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
   if (flags['artist.statements'] === false) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{dict.portal.statements_heading}</h1>
+        <h1 className="text-2xl font-bold">{t('statements_heading')}</h1>
         <p className="text-muted-foreground">
           The Statement of Sales feature is currently unavailable. Please contact the label for more information.
         </p>
@@ -65,7 +69,6 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
       artistId={artist?.id}
       billingProfile={billingProfile}
       billingProfileComplete={isBillingProfileComplete(billingProfile)}
-      dict={dict.portal}
       invoicedStatementIds={invoiceList.invoices.flatMap((invoice) =>
         invoice.statementId ? [invoice.statementId] : [],
       )}

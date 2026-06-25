@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DownloadSimple, Spinner, Trash, UploadSimple } from '@phosphor-icons/react'
@@ -12,16 +13,16 @@ import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getMarketingAssetDownloadUrl } from '../_actions/presignedUrl'
 import { validatePortalUpload, PORTAL_ASSET_RULES } from '@/lib/portal/uploadValidation'
-import type { Dictionary } from '@/i18n/types'
 import type { Asset, ArtistAsset } from '@/types'
 
 interface SmartLinksProps {
-  dict: Dictionary['portal']
   assets: Asset[]
   artistAssets: ArtistAsset[]
 }
 
-export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: SmartLinksProps) {
+export function SmartLinks({ assets, artistAssets: initialArtistAssets }: SmartLinksProps) {
+  const t = useTranslations('portal')
+
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [artistAssets, setArtistAssets] = useState(initialArtistAssets)
   const [label, setLabel] = useState('')
@@ -35,7 +36,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
     try {
       const result = await getMarketingAssetDownloadUrl(assetId)
       if (!result.url) {
-        toast.error(dict.statements_downloadError)
+        toast.error(t('statements_downloadError'))
         return
       }
       window.open(result.url, '_blank', 'noopener,noreferrer')
@@ -59,7 +60,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(dict.marketing_asset_upload_error)
+        toast.error(t('marketing_asset_upload_error'))
         return
       }
 
@@ -77,7 +78,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       })
 
       if (!res.ok) {
-        toast.error(dict.marketing_asset_upload_error)
+        toast.error(t('marketing_asset_upload_error'))
         return
       }
 
@@ -86,16 +87,16 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       setLabel('')
       setSuggestForPress(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
-      toast.success(dict.marketing_asset_uploaded)
+      toast.success(t('marketing_asset_uploaded'))
     } catch {
-      toast.error(dict.marketing_asset_upload_error)
+      toast.error(t('marketing_asset_upload_error'))
     } finally {
       setUploading(false)
     }
   }
 
   const deleteOwnAsset = async (id: string) => {
-    if (!window.confirm(dict.marketing_asset_delete_confirm)) return
+    if (!window.confirm(t('marketing_asset_delete_confirm'))) return
 
     setDeletingId(id)
     try {
@@ -105,7 +106,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       } = await supabase.auth.getSession()
 
       if (!session) {
-        toast.error(dict.marketing_asset_delete_error)
+        toast.error(t('marketing_asset_delete_error'))
         return
       }
 
@@ -119,14 +120,14 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       })
 
       if (!res.ok) {
-        toast.error(dict.marketing_asset_delete_error)
+        toast.error(t('marketing_asset_delete_error'))
         return
       }
 
       setArtistAssets((prev) => prev.filter((asset) => asset.id !== id))
-      toast.success(dict.marketing_asset_deleted)
+      toast.success(t('marketing_asset_deleted'))
     } catch {
-      toast.error(dict.marketing_asset_delete_error)
+      toast.error(t('marketing_asset_delete_error'))
     } finally {
       setDeletingId(null)
     }
@@ -135,10 +136,10 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
   return (
     <div className="space-y-8">
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold">{dict.marketing_heading}</h1>
-        <h2 className="text-2xl font-semibold">{dict.marketing_label_assets}</h2>
+        <h1 className="text-3xl font-bold">{t('marketing_heading')}</h1>
+        <h2 className="text-2xl font-semibold">{t('marketing_label_assets')}</h2>
         {assets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{dict.marketing_label_assets_empty}</p>
+          <p className="text-sm text-muted-foreground">{t('marketing_label_assets_empty')}</p>
         ) : (
           <div className="space-y-3">
             {assets.map((asset) => (
@@ -150,7 +151,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void download(asset.id)} disabled={loadingId === asset.id}>
                     {loadingId === asset.id ? <Spinner size={14} className="mr-1 animate-spin" aria-label="Loading" /> : <DownloadSimple size={14} className="mr-1" />}
-                    {dict.marketing_asset_download}
+                    {t('marketing_asset_download')}
                   </Button>
                 </CardContent>
               </Card>
@@ -160,15 +161,15 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-2xl font-semibold">{dict.marketing_my_assets}</h2>
+        <h2 className="text-2xl font-semibold">{t('marketing_my_assets')}</h2>
 
         <Card className="bg-card border-border">
           <CardContent className="space-y-3 p-4">
             <div className="space-y-2">
-              <Label htmlFor="asset-label">{dict.marketing_asset_label}</Label>
+              <Label htmlFor="asset-label">{t('marketing_asset_label')}</Label>
               <Input id="asset-label" value={label} onChange={(e) => setLabel(e.target.value)} />
             </div>
-            <Label htmlFor="artist-asset-file" className="sr-only">{dict.marketing_upload_asset}</Label>
+            <Label htmlFor="artist-asset-file" className="sr-only">{t('marketing_upload_asset')}</Label>
             <input
               id="artist-asset-file"
               ref={fileInputRef}
@@ -186,14 +187,14 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                 onCheckedChange={(value) => setSuggestForPress(value === true)}
               />
               <Label htmlFor="press-suggest" className="text-sm font-normal">
-                {dict.marketing_press_suggest}
+                {t('marketing_press_suggest')}
               </Label>
             </div>
-            <p className="text-xs text-muted-foreground">{dict.marketing_press_suggest_hint}</p>
+            <p className="text-xs text-muted-foreground">{t('marketing_press_suggest_hint')}</p>
             <p className="text-xs text-muted-foreground">JPEG, PNG, WebP, PDF, ZIP · max 20 MB</p>
-            <Button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} aria-label={dict.marketing_upload_asset}>
+            <Button type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()} aria-label={t('marketing_upload_asset')}>
               <UploadSimple size={16} className="mr-2" />
-              {uploading ? dict.marketing_asset_uploading : dict.marketing_upload_asset}
+              {uploading ? t('marketing_asset_uploading') : t('marketing_upload_asset')}
             </Button>
           </CardContent>
         </Card>
@@ -201,8 +202,8 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
         {artistAssets.length === 0 ? (
           <PortalEmptyState
             icon={UploadSimple}
-            heading={dict.marketing_my_assets_empty}
-            description={dict.marketing_upload_asset}
+            heading={t('marketing_my_assets_empty')}
+            description={t('marketing_upload_asset')}
           />
         ) : (
           <div className="space-y-3">
@@ -215,7 +216,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                   </div>
                   <div className="flex items-center gap-2">
                     <Button size="sm" variant="outline" asChild>
-                      <a href={asset.publicUrl} target="_blank" rel="noopener noreferrer">{dict.marketing_asset_download}</a>
+                      <a href={asset.publicUrl} target="_blank" rel="noopener noreferrer">{t('marketing_asset_download')}</a>
                     </Button>
                     <Button
                       size="sm"
@@ -224,7 +225,7 @@ export function SmartLinks({ dict, assets, artistAssets: initialArtistAssets }: 
                       onClick={() => void deleteOwnAsset(asset.id)}
                     >
                       <Trash size={14} className="mr-1" />
-                      {dict.marketing_asset_delete}
+                      {t('marketing_asset_delete')}
                     </Button>
                   </div>
                 </CardContent>

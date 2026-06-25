@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { toast } from 'sonner'
@@ -13,13 +14,11 @@ import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { RichTextEditor } from '@/components/messaging/RichTextEditor'
 import type { ArtistReply, LabelMessage } from '@/types'
 import type { Database } from '@/types/database'
-import type { Dictionary } from '@/i18n/types'
 import { markPortalMessageRead } from '../_actions/messages'
 import { sendPortalReply } from '../_actions/reply'
 import { REPLY_MAX_LENGTH, REPLY_MIN_LENGTH } from '../_constants'
 
 interface MessagesInboxProps {
-  dict: Dictionary['portal']
   initialMessages: LabelMessage[]
   initialRepliesByMessageId: Record<string, ArtistReply[]>
 }
@@ -51,7 +50,9 @@ function rowToMessage(row: MessageRow): LabelMessage {
   }
 }
 
-export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId }: MessagesInboxProps) {
+export function MessagesInbox({ initialMessages, initialRepliesByMessageId }: MessagesInboxProps) {
+  const t = useTranslations('portal')
+
   const prefersReducedMotion = useReducedMotion()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [messages, setMessages] = useState(initialMessages)
@@ -128,7 +129,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
     const draft = replyDraftByMessageId[messageId] ?? { html: '', text: '' }
     const body = draft.text.trim()
     if (body.length < REPLY_MIN_LENGTH || body.length > REPLY_MAX_LENGTH) {
-      toast.error(dict.messages_reply_error)
+      toast.error(t('messages_reply_error'))
       return
     }
 
@@ -140,9 +141,9 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
         [messageId]: [...(prev[messageId] ?? []), reply],
       }))
       setReplyDraftByMessageId((prev) => ({ ...prev, [messageId]: { html: '', text: '' } }))
-      toast.success(dict.messages_reply_sent)
+      toast.success(t('messages_reply_sent'))
     } catch {
-      toast.error(dict.messages_reply_error)
+      toast.error(t('messages_reply_error'))
     } finally {
       setSendingReplyFor(null)
     }
@@ -153,7 +154,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
-      <h1 className="text-3xl font-bold">{dict.messages_heading}</h1>
+      <h1 className="text-3xl font-bold">{t('messages_heading')}</h1>
       <div className="rounded-lg border border-border divide-y divide-border">
         {messages.map((message) => {
           const replies = repliesByMessageId[message.id] ?? []
@@ -174,7 +175,7 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
                     disabled={loadingId === message.id}
                     onClick={() => void handleRead(message.id)}
                   >
-                    {dict.messages_mark_read}
+                    {t('messages_mark_read')}
                   </Button>
                 )}
               </div>
@@ -192,20 +193,20 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
                 <CollapsibleTrigger className="flex min-h-[44px] w-full items-center justify-between px-3 py-2 text-sm font-medium">
                   <span className="inline-flex items-center gap-2">
                     <ChatCircleText size={16} aria-hidden="true" />
-                    {dict.messages_reply}
+                    {t('messages_reply')}
                   </span>
                   <CaretDown size={16} className="text-muted-foreground" aria-hidden="true" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 border-t border-border p-3">
                   <div className="space-y-2">
                     <label className="sr-only" htmlFor={`reply-${message.id}`}>
-                      {dict.messages_reply}
+                      {t('messages_reply')}
                     </label>
                     <div id={`reply-${message.id}`}>
                       <RichTextEditor
                         value={replyDraftByMessageId[message.id]?.html ?? ''}
                         minHeight={120}
-                        placeholder={dict.messages_reply_placeholder}
+                        placeholder={t('messages_reply_placeholder')}
                         onChange={(html, text) =>
                           setReplyDraftByMessageId((prev) => ({
                             ...prev,
@@ -220,13 +221,13 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
                     disabled={sendingReplyFor === message.id}
                     onClick={() => void handleSendReply(message.id)}
                   >
-                    {sendingReplyFor === message.id ? dict.messages_reply_sending : dict.messages_reply_send}
+                    {sendingReplyFor === message.id ? t('messages_reply_sending') : t('messages_reply_send')}
                   </Button>
 
                   {replies.length > 0 && (
                     <div className="space-y-2 border-t border-border pt-3">
                       <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        {dict.messages_replies_heading}
+                        {t('messages_replies_heading')}
                       </h3>
                       <ul className="space-y-2">
                         {replies.map((reply) => (
@@ -254,8 +255,8 @@ export function MessagesInbox({ dict, initialMessages, initialRepliesByMessageId
           <div className="p-4">
             <PortalEmptyState
               icon={EnvelopeSimple}
-              heading={dict.messages_no_messages}
-              description={dict.messages_no_messages_desc}
+              heading={t('messages_no_messages')}
+              description={t('messages_no_messages_desc')}
             />
           </div>
         )}

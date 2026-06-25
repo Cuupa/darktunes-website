@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { Info, Plus, Trash } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -13,7 +14,6 @@ import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { ArtistInvoice } from '@/lib/api/artistInvoices'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Dictionary } from '@/i18n/types'
 import { LABEL_CLIENT_ADDRESS, LABEL_CLIENT_EMAIL, LABEL_CLIENT_NAME } from '@/lib/portal/labelBilling'
 import { InlineBillingProfileStep } from './InlineBillingProfileStep'
 
@@ -27,7 +27,6 @@ interface InvoiceFormProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
-  dict: Dictionary['portal']
   onSuccess: (invoice: ArtistInvoice) => void
   onCancel: () => void
   statement?: SalesStatement
@@ -49,11 +48,12 @@ export function InvoiceForm({
   artistId,
   billingProfile: initialBillingProfile,
   billingProfileComplete: initialBillingComplete,
-  dict,
   onSuccess,
   onCancel,
   statement,
 }: InvoiceFormProps) {
+  const t = useTranslations('portal')
+
   const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
   const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingComplete)
   const isStatementLinked = Boolean(statement)
@@ -95,12 +95,12 @@ export function InvoiceForm({
     event.preventDefault()
 
     if (!billingProfileComplete) {
-      toast.error(dict.invoice_billing_incomplete)
+      toast.error(t('invoice_billing_incomplete'))
       return
     }
 
     if (!artistInvoiceNumber.trim() || !clientName.trim() || !clientEmail.trim() || !dueDate) {
-      toast.error(dict.invoice_error)
+      toast.error(t('invoice_error'))
       return
     }
 
@@ -112,7 +112,7 @@ export function InvoiceForm({
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (!session) throw new Error(dict.profile_error)
+      if (!session) throw new Error(t('profile_error'))
 
       const response = await fetch('/api/portal/invoices', {
         method: 'POST',
@@ -142,12 +142,12 @@ export function InvoiceForm({
         | null
 
       if (!response.ok || !json?.invoice) {
-        throw new Error(json?.error ?? dict.invoice_error)
+        throw new Error(json?.error ?? t('invoice_error'))
       }
 
       onSuccess(json.invoice)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.invoice_error)
+      toast.error(error instanceof Error ? error.message : t('invoice_error'))
     } finally {
       setSubmitting(false)
     }
@@ -158,7 +158,6 @@ export function InvoiceForm({
       <InlineBillingProfileStep
         artistId={artistId}
         billingProfile={billingProfile}
-        dict={dict}
         onComplete={(profile) => {
           setBillingProfile(profile)
           setBillingProfileComplete(true)
@@ -171,7 +170,7 @@ export function InvoiceForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{dict.invoice_new}</CardTitle>
+        <CardTitle className="text-base">{t('invoice_new')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={handleSubmit}>
@@ -180,16 +179,16 @@ export function InvoiceForm({
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
               <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
                 <Info size={16} aria-hidden="true" />
-                {dict.invoice_statement_reference}
+                {t('invoice_statement_reference')}
               </div>
               <p>SOS {statement.period}</p>
-              <p>{dict.invoice_locked_amount}: {formatCents(Math.round((statement.amountEur ?? 0) * 100))}</p>
+              <p>{t('invoice_locked_amount')}: {formatCents(Math.round((statement.amountEur ?? 0) * 100))}</p>
             </div>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="artist-invoice-number">{dict.invoice_artist_invoice_number}</Label>
+              <Label htmlFor="artist-invoice-number">{t('invoice_artist_invoice_number')}</Label>
               <Input
                 id="artist-invoice-number"
                 required
@@ -198,7 +197,7 @@ export function InvoiceForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invoice-due-date">{dict.invoice_due_date}</Label>
+              <Label htmlFor="invoice-due-date">{t('invoice_due_date')}</Label>
               <Input
                 id="invoice-due-date"
                 type="date"
@@ -211,7 +210,7 @@ export function InvoiceForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="invoice-client-name">{dict.invoice_client_name}</Label>
+              <Label htmlFor="invoice-client-name">{t('invoice_client_name')}</Label>
               <Input
                 id="invoice-client-name"
                 required
@@ -221,7 +220,7 @@ export function InvoiceForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invoice-client-email">{dict.invoice_client_email}</Label>
+              <Label htmlFor="invoice-client-email">{t('invoice_client_email')}</Label>
               <Input
                 id="invoice-client-email"
                 required
@@ -232,7 +231,7 @@ export function InvoiceForm({
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="invoice-client-address">{dict.invoice_client_address}</Label>
+              <Label htmlFor="invoice-client-address">{t('invoice_client_address')}</Label>
               <Input
                 id="invoice-client-address"
                 value={clientAddress}
@@ -244,7 +243,7 @@ export function InvoiceForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="invoice-currency">{dict.invoice_currency}</Label>
+              <Label htmlFor="invoice-currency">{t('invoice_currency')}</Label>
               <select
                 id="invoice-currency"
                 value={currency}
@@ -257,7 +256,7 @@ export function InvoiceForm({
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invoice-tax-rate">{dict.invoice_tax_rate}</Label>
+              <Label htmlFor="invoice-tax-rate">{t('invoice_tax_rate')}</Label>
               <Input
                 id="invoice-tax-rate"
                 type="number"
@@ -273,18 +272,18 @@ export function InvoiceForm({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>{dict.invoice_line_items}</Label>
+              <Label>{t('invoice_line_items')}</Label>
               {!isStatementLinked && (
                 <Button className="gap-1" onClick={addLineItem} size="sm" type="button" variant="outline">
                   <Plus size={14} aria-hidden="true" />
-                  {dict.invoice_line_add}
+                  {t('invoice_line_add')}
                 </Button>
               )}
             </div>
             {lineItems.map((item, index) => (
               <div key={index} className="grid items-start gap-2 sm:grid-cols-[1fr_90px_140px_44px]">
                 <Input
-                  placeholder={dict.invoice_line_description}
+                  placeholder={t('invoice_line_description')}
                   required
                   value={item.description}
                   onChange={(event) => updateLineItem(index, 'description', event.target.value)}
@@ -293,7 +292,7 @@ export function InvoiceForm({
                   type="number"
                   min={1}
                   disabled={isStatementLinked}
-                  placeholder={dict.invoice_line_qty}
+                  placeholder={t('invoice_line_qty')}
                   value={item.qty}
                   onChange={(event) => updateLineItem(index, 'qty', parseInt(event.target.value, 10) || 1)}
                 />
@@ -302,7 +301,7 @@ export function InvoiceForm({
                   min={0}
                   step={0.01}
                   disabled={isStatementLinked}
-                  placeholder={dict.invoice_line_unit_price}
+                  placeholder={t('invoice_line_unit_price')}
                   value={item.unit_price_cents / 100}
                   onChange={(event) => updateLineItem(index, 'unit_price_cents', Math.round(parseFloat(event.target.value) * 100) || 0)}
                 />
@@ -312,7 +311,7 @@ export function InvoiceForm({
                   size="icon"
                   disabled={isStatementLinked || lineItems.length === 1}
                   onClick={() => removeLineItem(index)}
-                  aria-label={dict.invoice_line_remove}
+                  aria-label={t('invoice_line_remove')}
                 >
                   <Trash size={14} aria-hidden="true" />
                 </Button>
@@ -322,21 +321,21 @@ export function InvoiceForm({
 
           <div className="space-y-1 border-t pt-3 text-sm text-muted-foreground">
             <div className="flex justify-between">
-              <span>{dict.invoice_subtotal}</span>
+              <span>{t('invoice_subtotal')}</span>
               <span>{formatCents(subtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span>{dict.invoice_tax} ({taxRatePct.toFixed(2)}%)</span>
+              <span>{t('invoice_tax')} ({taxRatePct.toFixed(2)}%)</span>
               <span>{formatCents(tax)}</span>
             </div>
             <div className="flex justify-between font-semibold text-foreground">
-              <span>{dict.invoice_total}</span>
+              <span>{t('invoice_total')}</span>
               <span>{formatCents(total)}</span>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="invoice-notes">{dict.invoice_notes}</Label>
+            <Label htmlFor="invoice-notes">{t('invoice_notes')}</Label>
             <Textarea
               id="invoice-notes"
               rows={4}
@@ -353,7 +352,7 @@ export function InvoiceForm({
                 onChange={(event) => setSendEmail(event.target.checked)}
                 type="checkbox"
               />
-              <span>{dict.invoice_send}</span>
+              <span>{t('invoice_send')}</span>
             </label>
             <label className={cn('flex items-center gap-2', isStatementLinked && 'opacity-70')}>
               <input
@@ -362,7 +361,7 @@ export function InvoiceForm({
                 onChange={(event) => setSendToLabel(event.target.checked)}
                 type="checkbox"
               />
-              <span>{dict.invoice_send_to_label}</span>
+              <span>{t('invoice_send_to_label')}</span>
             </label>
           </div>
 
@@ -371,7 +370,7 @@ export function InvoiceForm({
               Cancel
             </Button>
             <Button disabled={submitting || !artistId || !billingProfileComplete} type="submit">
-              {submitting ? 'Creating…' : dict.invoice_send}
+              {submitting ? 'Creating…' : t('invoice_send')}
             </Button>
           </div>
         </form>

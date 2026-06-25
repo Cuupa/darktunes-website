@@ -14,9 +14,11 @@ import { getNewsPosts } from '@/lib/api/news'
 import { getArtists } from '@/lib/api/artists'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EventManager } from './_components/EventManager'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 function EventsSkeleton() {
+
+
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
@@ -28,7 +30,9 @@ function EventsSkeleton() {
 }
 
 async function EventsContent({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
@@ -45,7 +49,6 @@ async function EventsContent({ searchParams }: { searchParams: Promise<{ artistI
 
   return (
     <EventManager
-      dict={dict.portal}
       concerts={concerts}
       artistId={artist?.id ?? null}
       allArtists={allArtists}

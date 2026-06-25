@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/events/_components/EventManager.tsx
  *
@@ -33,12 +34,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 import type { Concert, Artist, NewsPost } from '@/types'
 import { COUNTRIES } from '@/lib/countries'
 
 interface EventManagerProps {
-  dict: Dictionary['portal']
   concerts: Concert[]
   artistId: string | null
   /** All artist records for the "featured artists" multi-select */
@@ -94,7 +93,9 @@ function resolveTypeInfo(eventType: string): { preset: EventType; custom: string
   return { preset: 'custom', custom: eventType }
 }
 
-export function EventManager({ dict, concerts, artistId, allArtists = [], newsPosts = [], concertsApiPath = '/api/portal/concerts', hideIcsExport = false }: EventManagerProps) {
+export function EventManager({ concerts, artistId, allArtists = [], newsPosts = [], concertsApiPath = '/api/portal/concerts', hideIcsExport = false }: EventManagerProps) {
+  const t = useTranslations('portal')
+
   const [items, setItems] = useState(concerts)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -109,7 +110,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    if (!session?.access_token) throw new Error(dict.tour_error)
+    if (!session?.access_token) throw new Error(t('tour_error'))
     return session.access_token
   }
 
@@ -128,7 +129,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
       const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
       const data = (await res.json()) as Array<{ lat: string; lon: string; place_id: number }>
       if (!data.length) {
-        toast.error(dict.tour_osm_not_found)
+        toast.error(t('tour_osm_not_found'))
         return
       }
       const { lat, lon, place_id } = data[0]
@@ -139,13 +140,13 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
         venueOsmId: String(place_id),
       }))
       setOsmMapUrl(buildOsmUrl(parseFloat(lat), parseFloat(lon)))
-      toast.success(dict.tour_osm_found)
+      toast.success(t('tour_osm_found'))
     } catch {
-      toast.error(dict.tour_osm_not_found)
+      toast.error(t('tour_osm_not_found'))
     } finally {
       setOsmLoading(false)
     }
-  }, [form.venueAddress, form.venueName, form.venueCity, form.venueCountry, dict])
+  }, [form.venueAddress, form.venueName, form.venueCity, form.venueCountry, t])
 
   /** Refresh OSM map when coordinates are already stored on load */
   useEffect(() => {
@@ -192,15 +193,15 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
           status,
         }),
       })
-      if (!res.ok) throw new Error(dict.tour_error)
+      if (!res.ok) throw new Error(t('tour_error'))
 
       const data = (await res.json()) as Concert
       if (editingId) {
         setItems((prev) => prev.map((item) => (item.id === editingId ? data : item)))
-        toast.success(dict.tour_updated)
+        toast.success(t('tour_updated'))
       } else {
         setItems((prev) => [data, ...prev])
-        toast.success(dict.tour_created)
+        toast.success(t('tour_created'))
       }
 
       setEditingId(null)
@@ -208,7 +209,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
       setForm(EMPTY_FORM)
       setOsmMapUrl(null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.tour_error)
+      toast.error(error instanceof Error ? error.message : t('tour_error'))
     } finally {
       setSaving(false)
     }
@@ -247,18 +248,18 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
   }
 
   const remove = async (id: string) => {
-    if (!window.confirm(dict.tour_delete_confirm)) return
+    if (!window.confirm(t('tour_delete_confirm'))) return
     try {
       const token = await withToken()
       const res = await fetch(`${concertsApiPath}?id=${id}`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + token },
       })
-      if (!res.ok) throw new Error(dict.tour_error)
+      if (!res.ok) throw new Error(t('tour_error'))
       setItems((prev) => prev.filter((item) => item.id !== id))
-      toast.success(dict.tour_deleted)
+      toast.success(t('tour_deleted'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.tour_error)
+      toast.error(error instanceof Error ? error.message : t('tour_error'))
     }
   }
 
@@ -281,9 +282,9 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
     } else {
       try {
         await navigator.clipboard.writeText(shareUrl)
-        toast.success(dict.tour_share_copied)
+        toast.success(t('tour_share_copied'))
       } catch {
-        toast.error(dict.tour_share_unsupported)
+        toast.error(t('tour_share_unsupported'))
       }
     }
   }
@@ -294,7 +295,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
       const res = await fetch('/api/portal/concerts/ics', {
         headers: { Authorization: 'Bearer ' + token },
       })
-      if (!res.ok) throw new Error(dict.tour_export_ics_error)
+      if (!res.ok) throw new Error(t('tour_export_ics_error'))
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -303,22 +304,22 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error(dict.tour_export_ics_error)
+      toast.error(t('tour_export_ics_error'))
     }
   }
 
   const getStatusLabel = (value: string) => {
-    if (value === 'announced') return dict.tour_status_announced
-    if (value === 'confirmed') return dict.tour_status_confirmed
-    if (value === 'cancelled') return dict.tour_status_cancelled
+    if (value === 'announced') return t('tour_status_announced')
+    if (value === 'confirmed') return t('tour_status_confirmed')
+    if (value === 'cancelled') return t('tour_status_cancelled')
     return value
   }
 
   const getTypeLabel = (eventType: string) => {
-    if (eventType === 'gig') return dict.tour_type_gig
-    if (eventType === 'dj_set') return dict.tour_type_dj_set
-    if (eventType === 'tour') return dict.tour_type_tour
-    if (eventType === 'custom') return dict.tour_type_custom
+    if (eventType === 'gig') return t('tour_type_gig')
+    if (eventType === 'dj_set') return t('tour_type_dj_set')
+    if (eventType === 'tour') return t('tour_type_tour')
+    if (eventType === 'custom') return t('tour_type_custom')
     return eventType
   }
 
@@ -334,11 +335,11 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
+        <h1 className="text-3xl font-bold">{t('tour_heading')}</h1>
         {items.length > 0 && !hideIcsExport && (
           <Button variant="outline" size="sm" className="min-h-[44px] gap-2" onClick={exportIcs}>
             <CalendarBlank size={16} aria-hidden="true" />
-            {dict.tour_export_ics}
+            {t('tour_export_ics')}
           </Button>
         )}
       </div>
@@ -348,7 +349,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
         <div className="grid gap-3 md:grid-cols-2">
           {/* Event name */}
           <div className="space-y-1">
-            <Label htmlFor="ev-name">{dict.tour_event}</Label>
+            <Label htmlFor="ev-name">{t('tour_event')}</Label>
             <Input
               id="ev-name"
               ref={eventInputRef}
@@ -360,16 +361,16 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
 
           {/* Event type */}
           <div className="space-y-1">
-            <Label htmlFor="ev-type">{dict.tour_type}</Label>
+            <Label htmlFor="ev-type">{t('tour_type')}</Label>
             <Select value={form.eventType} onValueChange={(v) => setForm((prev) => ({ ...prev, eventType: v }))}>
               <SelectTrigger id="ev-type" className="min-h-[44px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="gig">{dict.tour_type_gig}</SelectItem>
-                <SelectItem value="dj_set">{dict.tour_type_dj_set}</SelectItem>
-                <SelectItem value="tour">{dict.tour_type_tour}</SelectItem>
-                <SelectItem value="custom">{dict.tour_type_custom}</SelectItem>
+                <SelectItem value="gig">{t('tour_type_gig')}</SelectItem>
+                <SelectItem value="dj_set">{t('tour_type_dj_set')}</SelectItem>
+                <SelectItem value="tour">{t('tour_type_tour')}</SelectItem>
+                <SelectItem value="custom">{t('tour_type_custom')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -377,19 +378,19 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
           {/* Custom type label */}
           {form.eventType === 'custom' && (
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="ev-custom-type">{dict.tour_type_custom_label}</Label>
+              <Label htmlFor="ev-custom-type">{t('tour_type_custom_label')}</Label>
               <Input
                 id="ev-custom-type"
                 value={form.customType}
                 onChange={(e) => setForm((v) => ({ ...v, customType: e.target.value }))}
-                placeholder={dict.tour_type_custom}
+                placeholder={t('tour_type_custom')}
               />
             </div>
           )}
 
           {/* Date */}
           <div className="space-y-1">
-            <Label htmlFor="ev-date">{dict.tour_date}</Label>
+            <Label htmlFor="ev-date">{t('tour_date')}</Label>
             <Input
               id="ev-date"
               type="date"
@@ -401,7 +402,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
 
           {/* Time */}
           <div className="space-y-1">
-            <Label htmlFor="ev-time">{dict.tour_time}</Label>
+            <Label htmlFor="ev-time">{t('tour_time')}</Label>
             <Input
               id="ev-time"
               type="time"
@@ -412,17 +413,17 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
 
           {/* Venue */}
           <Input
-            placeholder={dict.tour_venue}
+            placeholder={t('tour_venue')}
             value={form.venueName}
             onChange={(e) => setForm((v) => ({ ...v, venueName: e.target.value }))}
           />
           <Input
-            placeholder={dict.tour_address}
+            placeholder={t('tour_address')}
             value={form.venueAddress}
             onChange={(e) => setForm((v) => ({ ...v, venueAddress: e.target.value }))}
           />
           <Input
-            placeholder={dict.tour_city}
+            placeholder={t('tour_city')}
             value={form.venueCity}
             onChange={(e) => setForm((v) => ({ ...v, venueCity: e.target.value }))}
           />
@@ -430,8 +431,8 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
             value={form.venueCountry}
             onValueChange={(val) => setForm((v) => ({ ...v, venueCountry: val }))}
           >
-            <SelectTrigger aria-label={dict.tour_country}>
-              <SelectValue placeholder={dict.tour_country} />
+            <SelectTrigger aria-label={t('tour_country')}>
+              <SelectValue placeholder={t('tour_country')} />
             </SelectTrigger>
             <SelectContent>
               {COUNTRIES.map((c) => (
@@ -451,7 +452,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               onClick={lookupVenue}
             >
               <MapPin size={16} aria-hidden="true" />
-              {osmLoading ? dict.tour_osm_loading : dict.tour_osm_lookup}
+              {osmLoading ? t('tour_osm_loading') : t('tour_osm_lookup')}
             </Button>
           </div>
         </div>
@@ -475,10 +476,10 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-              aria-label={dict.tour_nav_link}
+              aria-label={t('tour_nav_link')}
             >
               <NavigationArrow size={16} aria-hidden="true" />
-              {dict.tour_nav_link}
+              {t('tour_nav_link')}
             </a>
           </div>
         )}
@@ -499,7 +500,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
         <div className="grid gap-3 md:grid-cols-2">
           {/* Ticket URL */}
           <div className="space-y-1">
-            <Label htmlFor="ev-ticket">{dict.tour_ticket_url}</Label>
+            <Label htmlFor="ev-ticket">{t('tour_ticket_url')}</Label>
             <Input
               id="ev-ticket"
               placeholder="https://tickets.example.com"
@@ -513,7 +514,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
             <Label htmlFor="ev-trailer">
               <span className="flex items-center gap-1.5">
                 <YoutubeLogo size={15} aria-hidden="true" />
-                {dict.tour_trailer_url}
+                {t('tour_trailer_url')}
               </span>
             </Label>
             <Input
@@ -530,7 +531,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               <Label>
                 <span className="flex items-center gap-1.5">
                   <MusicNotes size={15} aria-hidden="true" />
-                  {dict.tour_featured_artists}
+                  {t('tour_featured_artists')}
                 </span>
               </Label>
               <div className="flex flex-wrap gap-2">
@@ -562,17 +563,17 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               <Label htmlFor="ev-news">
                 <span className="flex items-center gap-1.5">
                   <Newspaper size={15} aria-hidden="true" />
-                  {dict.tour_news_link}
+                  {t('tour_news_link')}
                 </span>
               </Label>
               <Select
                 value={form.newsPostId || NO_NEWS_POST}
                 onValueChange={(v) => setForm((prev) => ({ ...prev, newsPostId: v === NO_NEWS_POST ? '' : v }))}>
                 <SelectTrigger id="ev-news" className="min-h-[44px]">
-                  <SelectValue placeholder={dict.tour_news_none} />
+                  <SelectValue placeholder={t('tour_news_none')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_NEWS_POST}>{dict.tour_news_none}</SelectItem>
+                  <SelectItem value={NO_NEWS_POST}>{t('tour_news_none')}</SelectItem>
                   {newsPosts.map((post) => (
                     <SelectItem key={post.id} value={post.id}>{post.title}</SelectItem>
                   ))}
@@ -589,17 +590,17 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="announced">{dict.tour_status_announced}</SelectItem>
-              <SelectItem value="confirmed">{dict.tour_status_confirmed}</SelectItem>
-              <SelectItem value="cancelled">{dict.tour_status_cancelled}</SelectItem>
+              <SelectItem value="announced">{t('tour_status_announced')}</SelectItem>
+              <SelectItem value="confirmed">{t('tour_status_confirmed')}</SelectItem>
+              <SelectItem value="cancelled">{t('tour_status_cancelled')}</SelectItem>
             </SelectContent>
           </Select>
           <Button type="submit" className="min-h-[44px]" disabled={saving}>
-            {saving ? dict.tour_saving : editingId ? dict.tour_update : dict.tour_add}
+            {saving ? t('tour_saving') : editingId ? t('tour_update') : t('tour_add')}
           </Button>
           {editingId && (
             <Button type="button" className="min-h-[44px]" variant="outline" onClick={cancelEdit}>
-              {dict.tour_cancel_edit}
+              {t('tour_cancel_edit')}
             </Button>
           )}
         </div>
@@ -619,7 +620,7 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
                 )}
                 {concert.status === 'cancelled' && (
                   <span className="rounded-full bg-destructive/10 text-destructive text-xs px-2 py-0.5">
-                    {dict.tour_status_cancelled}
+                    {t('tour_status_cancelled')}
                   </span>
                 )}
               </div>
@@ -637,10 +638,10 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-accent hover:underline mt-0.5"
-                  aria-label={dict.tour_nav_link}
+                  aria-label={t('tour_nav_link')}
                 >
                   <NavigationArrow size={12} aria-hidden="true" />
-                  {dict.tour_nav_link}
+                  {t('tour_nav_link')}
                 </a>
               )}
               {concert.featuredArtists && concert.featuredArtists.length > 0 && (
@@ -654,16 +655,16 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
                 size="sm"
                 className="min-h-[44px] min-w-[44px]"
                 variant="ghost"
-                aria-label={dict.tour_share}
+                aria-label={t('tour_share')}
                 onClick={() => void shareEvent(concert)}
               >
                 <Share size={16} aria-hidden="true" />
               </Button>
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="outline" onClick={() => startEdit(concert)}>
-                {dict.tour_edit}
+                {t('tour_edit')}
               </Button>
               <Button size="sm" className="min-h-[44px] min-w-[44px]" variant="destructive" onClick={() => void remove(concert.id)}>
-                {dict.tour_delete}
+                {t('tour_delete')}
               </Button>
             </div>
           </div>
@@ -671,9 +672,9 @@ export function EventManager({ dict, concerts, artistId, allArtists = [], newsPo
         {items.length === 0 && (
           <PortalEmptyState
             icon={MapPin}
-            heading={dict.tour_noData}
-            description={dict.tour_empty_description}
-            action={{ label: dict.tour_add, onClick: () => eventInputRef.current?.focus() }}
+            heading={t('tour_noData')}
+            description={t('tour_empty_description')}
+            action={{ label: t('tour_add'), onClick: () => eventInputRef.current?.focus() }}
           />
         )}
       </div>

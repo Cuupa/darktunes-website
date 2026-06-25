@@ -3,11 +3,10 @@
 import { useState, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { Dictionary } from '@/i18n/types'
+import { useTranslations } from 'next-intl'
 
 interface CoverArtAnalyzerProps {
   url: string
-  dict: Dictionary['portal']
   onVerified: (verified: boolean) => void
 }
 
@@ -48,7 +47,8 @@ function checkImageDimensions(url: string): Promise<SizeInfo> {
   })
 }
 
-export function CoverArtAnalyzer({ url, dict, onVerified }: CoverArtAnalyzerProps) {
+export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
+  const t = useTranslations('portal')
   const [state, setState] = useState<CheckState>('idle')
   const [sizeInfo, setSizeInfo] = useState<SizeInfo | null>(null)
 
@@ -100,19 +100,19 @@ export function CoverArtAnalyzer({ url, dict, onVerified }: CoverArtAnalyzerProp
   const getMessage = (): string => {
     switch (state) {
       case 'ok':
-        return dict.releases_submit_cover_check_ok
+        return t('releases_submit_cover_check_ok')
       case 'wrong_size': {
-        const msg = dict.releases_submit_cover_check_wrong_size
+        const msg = t('releases_submit_cover_check_wrong_size')
         return msg
           .replace('{{width}}', String(sizeInfo?.width ?? '?'))
           .replace('{{height}}', String(sizeInfo?.height ?? '?'))
       }
       case 'wrong_format':
-        return dict.releases_submit_cover_check_wrong_format
+        return t('releases_submit_cover_check_wrong_format')
       case 'blocked':
-        return dict.releases_submit_cover_check_blocked
+        return t('releases_submit_cover_check_blocked')
       case 'verifying':
-        return dict.releases_submit_cover_check_verifying
+        return t('releases_submit_cover_check_verifying')
       default:
         return ''
     }
@@ -129,7 +129,7 @@ export function CoverArtAnalyzer({ url, dict, onVerified }: CoverArtAnalyzerProp
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium">{dict.releases_submit_cover_check_heading}</p>
+      <p className="text-sm font-medium">{t('releases_submit_cover_check_heading')}</p>
       <div className="flex items-center gap-3">
         <Button
           type="button"
@@ -138,7 +138,7 @@ export function CoverArtAnalyzer({ url, dict, onVerified }: CoverArtAnalyzerProp
           disabled={!url.trim() || state === 'verifying'}
           onClick={() => void verify()}
         >
-          {state === 'verifying' ? dict.releases_submit_cover_check_verifying : 'Check Cover Art'}
+          {state === 'verifying' ? t('releases_submit_cover_check_verifying') : 'Check Cover Art'}
         </Button>
         {state !== 'idle' && (
           <Badge variant={badgeVariant} className="text-xs">

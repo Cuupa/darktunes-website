@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -33,13 +34,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { portalKey } from '@/i18n/portalKey'
 import { toast } from 'sonner'
-import type { Dictionary } from '@/i18n/types'
 import type { Artist } from '@/types'
 import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalSidebarProps {
-  dict: Dictionary['portal']
   artists: Artist[]
   userId: string | null
   featureFlags: Record<string, boolean>
@@ -113,7 +113,9 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProps) {
+export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
+  const t = useTranslations('portal')
+
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -146,7 +148,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
   const handleSignOut = async () => {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
-    toast.success(dict.signOut)
+    toast.success(t('signOut'))
     router.push('/login')
     router.refresh()
   }
@@ -162,7 +164,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
       {navGroups.map(({ groupKey, items }) => (
         <div key={groupKey} className="mb-3">
           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            {dict[groupKey as keyof typeof dict] as string}
+            {t(portalKey(groupKey))}
           </p>
           <div className="space-y-0.5">
             {items.map(({ href, label, icon: Icon }) => {
@@ -180,7 +182,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
                   )}
                 >
                   <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
-                  <span className="truncate">{dict[label as keyof typeof dict] as string}</span>
+                  <span className="truncate">{t(portalKey(label))}</span>
                   {href === '/portal/messages' && unreadCount > 0 && (
                     <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
                       {unreadCount}
@@ -197,7 +199,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
 
   const artistBlock = activeArtist ? (
     <div className="px-6 py-4">
-      <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">{dict.title}</p>
+      <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">{t('title')}</p>
       {artists.length > 1 ? (
         // Multi-artist selector — dropdown to switch active artist
         <DropdownMenu>
@@ -234,7 +236,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
           aria-label={`Preview public profile for ${activeArtist.name}`}
         >
           <Eye size={13} aria-hidden="true" />
-          {dict.profile_preview_public}
+          {t('profile_preview_public')}
         </Link>
       )}
     </div>
@@ -265,7 +267,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
                   onClick={handleSignOut}
                 >
                   <SignOut size={18} aria-hidden="true" />
-                  {dict.signOut}
+                  {t('signOut')}
                 </Button>
               </div>
             </div>
@@ -288,7 +290,7 @@ export function PortalSidebar({ dict, artists, featureFlags }: PortalSidebarProp
             onClick={handleSignOut}
           >
             <SignOut size={18} aria-hidden="true" />
-            {dict.signOut}
+            {t('signOut')}
           </Button>
         </div>
       </aside>

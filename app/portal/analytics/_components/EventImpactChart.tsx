@@ -1,20 +1,21 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { EventImpact } from '@/lib/api/eventImpact'
 import type { Concert } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface EventImpactChartProps {
-  dict: Dictionary['portal']
   impacts: EventImpact[]
   concerts: Concert[]
 }
 
-export function EventImpactChart({ dict, impacts, concerts }: EventImpactChartProps) {
+export function EventImpactChart({ impacts, concerts }: EventImpactChartProps) {
+  const t = useTranslations('portal')
+
   if (impacts.length === 0) {
     return (
-      <p className="text-muted-foreground">{dict.analytics_eventImpact_noData}</p>
+      <p className="text-muted-foreground">{t('analytics_eventImpact_noData')}</p>
     )
   }
 
@@ -27,18 +28,18 @@ export function EventImpactChart({ dict, impacts, concerts }: EventImpactChartPr
   return (
     <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle>{dict.analytics_eventImpact_heading}</CardTitle>
-        <p className="text-sm text-muted-foreground">{dict.analytics_eventImpact_hint}</p>
+        <CardTitle>{t('analytics_eventImpact_heading')}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('analytics_eventImpact_hint')}</p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-4" scope="col">{dict.analytics_eventImpact_event}</th>
-                <th className="py-2 pr-4" scope="col">{dict.analytics_eventImpact_country}</th>
-                <th className="py-2 pr-4 text-right" scope="col">{dict.analytics_eventImpact_delta}</th>
-                <th className="py-2 text-right" scope="col">{dict.analytics_eventImpact_pct}</th>
+                <th className="py-2 pr-4" scope="col">{t('analytics_eventImpact_event')}</th>
+                <th className="py-2 pr-4" scope="col">{t('analytics_eventImpact_country')}</th>
+                <th className="py-2 pr-4 text-right" scope="col">{t('analytics_eventImpact_delta')}</th>
+                <th className="py-2 text-right" scope="col">{t('analytics_eventImpact_pct')}</th>
               </tr>
             </thead>
             <tbody>

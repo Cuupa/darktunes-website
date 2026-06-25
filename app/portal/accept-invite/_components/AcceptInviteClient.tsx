@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/accept-invite/_components/AcceptInviteClient.tsx
  *
@@ -23,13 +24,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Dictionary } from '@/i18n/types'
 
-interface AcceptInviteClientProps {
-  dict: Dictionary['portal']
-}
-
-export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
+export function AcceptInviteClient() {
+  const t = useTranslations('portal')
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -68,12 +65,12 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
     e.preventDefault()
 
     if (password.length < 8) {
-      toast.error(dict.register_password_too_short)
+      toast.error(t('register_password_too_short'))
       return
     }
 
     if (password !== passwordConfirm) {
-      toast.error(dict.acceptInvite_mismatch)
+      toast.error(t('acceptInvite_mismatch'))
       return
     }
 
@@ -82,15 +79,15 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
       const supabase = createBrowserSupabaseClient()
       const { error } = await supabase.auth.updateUser({ password })
       if (error) {
-        setSessionError(dict.acceptInvite_error)
-        toast.error(dict.acceptInvite_error)
+        setSessionError(t('acceptInvite_error'))
+        toast.error(t('acceptInvite_error'))
         return
       }
-      toast.success(dict.acceptInvite_success)
+      toast.success(t('acceptInvite_success'))
       router.push('/portal/onboarding')
     } catch {
-      setSessionError(dict.acceptInvite_error)
-      toast.error(dict.acceptInvite_error)
+      setSessionError(t('acceptInvite_error'))
+      toast.error(t('acceptInvite_error'))
     } finally {
       setIsLoading(false)
     }
@@ -106,8 +103,8 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
               <MusicNote size={32} className="text-primary" aria-hidden="true" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">{dict.acceptInvite_title}</h1>
-          <p className="text-muted-foreground">{dict.acceptInvite_subtitle}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('acceptInvite_title')}</h1>
+          <p className="text-muted-foreground">{t('acceptInvite_subtitle')}</p>
         </div>
 
         {/* Session error — invite link expired or invalid */}
@@ -124,13 +121,13 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
         {!sessionError && (
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-lg">{dict.acceptInvite_title}</CardTitle>
-              <CardDescription>{dict.acceptInvite_subtitle}</CardDescription>
+              <CardTitle className="text-lg">{t('acceptInvite_title')}</CardTitle>
+              <CardDescription>{t('acceptInvite_subtitle')}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ai-password">{dict.acceptInvite_password}</Label>
+                  <Label htmlFor="ai-password">{t('acceptInvite_password')}</Label>
                   <Input
                     id="ai-password"
                     type="password"
@@ -144,7 +141,7 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ai-password-confirm">{dict.acceptInvite_confirm}</Label>
+                  <Label htmlFor="ai-password-confirm">{t('acceptInvite_confirm')}</Label>
                   <Input
                     id="ai-password-confirm"
                     type="password"
@@ -170,7 +167,7 @@ export function AcceptInviteClient({ dict }: AcceptInviteClientProps) {
                   disabled={isLoading || !sessionReady}
                 >
                   <CheckCircle size={16} aria-hidden="true" />
-                  {isLoading ? '…' : dict.acceptInvite_submit}
+                  {isLoading ? '…' : t('acceptInvite_submit')}
                 </Button>
               </form>
             </CardContent>

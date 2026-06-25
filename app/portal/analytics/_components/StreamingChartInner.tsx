@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/analytics/_components/StreamingChartInner.tsx
  *
@@ -22,19 +23,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PLATFORM_COLORS, formatPlatformLabel } from './streamingChartUtils'
 import type { StreamingChartInnerProps } from './StreamingChart'
 
-export function StreamingChartInner({ dict, platforms, monthlyData, aggregates, eventMarkers }: StreamingChartInnerProps) {
+export function StreamingChartInner({ platforms, monthlyData, aggregates, eventMarkers }: StreamingChartInnerProps) {
+  const t = useTranslations('portal')
+
   const totalStreams = aggregates.reduce((sum, a) => sum + a.totalStreams, 0)
 
   return (
     <div className="space-y-8">
-      <h2 className="text-xl font-semibold">{dict.analytics_heading}</h2>
+      <h2 className="text-xl font-semibold">{t('analytics_heading')}</h2>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-card border-border col-span-2 md:col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground uppercase tracking-widest">
-              {dict.analytics_totalStreams}
+              {t('analytics_totalStreams')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -59,10 +62,10 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates, 
       {/* Monthly bar chart */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>{dict.analytics_monthlyTrend}</CardTitle>
+          <CardTitle>{t('analytics_monthlyTrend')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div role="img" aria-label={dict.analytics_monthlyTrend}>
+          <div role="img" aria-label={t('analytics_monthlyTrend')}>
           <ResponsiveContainer
             width="100%"
             height={300}
@@ -105,7 +108,7 @@ export function StreamingChartInner({ dict, platforms, monthlyData, aggregates, 
 
           {/* Visually-hidden data table for screen readers */}
           <table className="sr-only">
-            <caption>{dict.analytics_monthlyTrend}</caption>
+            <caption>{t('analytics_monthlyTrend')}</caption>
             <thead>
               <tr>
                 <th scope="col">Period</th>

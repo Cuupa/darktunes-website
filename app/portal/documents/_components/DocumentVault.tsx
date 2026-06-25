@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/documents/_components/DocumentVault.tsx
  *
@@ -25,23 +26,21 @@ import {
 import { UploadSimple, DownloadSimple, Trash, Folder, Spinner } from '@phosphor-icons/react'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import type { ArtistDocument } from '@/lib/api/artistDocuments'
-import type { Dictionary } from '@/i18n/types'
 
 const CATEGORIES = ['contract', 'split_agreement', 'gema', 'other'] as const
 type Category = typeof CATEGORIES[number]
 
 interface DocumentVaultProps {
-  dict: Dictionary['portal']
   documents: ArtistDocument[]
   artistId: string
 }
 
-function categoryLabel(cat: string, dict: Dictionary['portal']): string {
+function categoryLabel(cat: string, t: ReturnType<typeof useTranslations<'portal'>>): string {
   switch (cat) {
-    case 'contract': return dict.documents_category_contract
-    case 'split_agreement': return dict.documents_category_split_agreement
-    case 'gema': return dict.documents_category_gema
-    default: return dict.documents_category_other
+    case 'contract': return t('documents_category_contract')
+    case 'split_agreement': return t('documents_category_split_agreement')
+    case 'gema': return t('documents_category_gema')
+    default: return t('documents_category_other')
   }
 }
 
@@ -52,7 +51,9 @@ function formatBytes(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function DocumentVault({ dict, documents: initialDocuments, artistId: _artistId }: DocumentVaultProps) {
+export function DocumentVault({ documents: initialDocuments, artistId: _artistId }: DocumentVaultProps) {
+  const t = useTranslations('portal')
+
   const [documents, setDocuments] = useState<ArtistDocument[]>(initialDocuments)
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all')
   const [uploading, setUploading] = useState(false)
@@ -84,7 +85,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
     setUploading(true)
     try {
       const session = await getSession()
-      if (!session) { toast.error(dict.profile_error); return }
+      if (!session) { toast.error(t('profile_error')); return }
 
       const form = new FormData()
       form.append('file', file)
@@ -108,9 +109,9 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
       setUploadLabel('')
       setUploadNotes('')
       if (fileInputRef.current) fileInputRef.current.value = ''
-      toast.success(dict.documents_upload)
+      toast.success(t('documents_upload'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : dict.profile_error)
+      toast.error(err instanceof Error ? err.message : t('profile_error'))
     } finally {
       setUploading(false)
     }
@@ -120,7 +121,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
     setDownloadingId(docId)
     try {
       const session = await getSession()
-      if (!session) { toast.error(dict.profile_error); return }
+      if (!session) { toast.error(t('profile_error')); return }
 
       const res = await fetch(`/api/portal/documents/${docId}/download`, {
         headers: { Authorization: ['Bearer', session.access_token].join(' ') },
@@ -129,18 +130,18 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
       const { url } = await res.json() as { url: string }
       window.open(url, '_blank', 'noopener')
     } catch {
-      toast.error(dict.profile_error)
+      toast.error(t('profile_error'))
     } finally {
       setDownloadingId(null)
     }
   }
 
   const handleDelete = async (docId: string) => {
-    if (!confirm(dict.documents_delete_confirm)) return
+    if (!confirm(t('documents_delete_confirm'))) return
     setDeletingId(docId)
     try {
       const session = await getSession()
-      if (!session) { toast.error(dict.profile_error); return }
+      if (!session) { toast.error(t('profile_error')); return }
 
       const res = await fetch(`/api/portal/documents/${docId}`, {
         method: 'DELETE',
@@ -148,9 +149,9 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
       })
       if (!res.ok) throw new Error('Delete failed')
       setDocuments((prev) => prev.filter((d) => d.id !== docId))
-      toast.success(dict.documents_heading)
+      toast.success(t('documents_heading'))
     } catch {
-      toast.error(dict.profile_error)
+      toast.error(t('profile_error'))
     } finally {
       setDeletingId(null)
     }
@@ -158,12 +159,12 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{dict.documents_heading}</h1>
+      <h1 className="text-2xl font-bold">{t('documents_heading')}</h1>
 
       {/* Upload section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{dict.documents_upload}</CardTitle>
+          <CardTitle className="text-base">{t('documents_upload')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -185,7 +186,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{categoryLabel(cat, dict)}</option>
+                  <option key={cat} value={cat}>{categoryLabel(cat, t)}</option>
                 ))}
               </select>
             </div>
@@ -211,7 +212,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
               {uploading
                 ? <Spinner size={14} className="animate-spin" aria-hidden="true" />
                 : <UploadSimple size={14} aria-hidden="true" />}
-              {dict.documents_upload}
+              {t('documents_upload')}
             </Button>
             <span className="text-xs text-muted-foreground">PDF / DOCX · max 20 MB</span>
           </div>
@@ -235,7 +236,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
             size="sm"
             onClick={() => setActiveCategory(cat)}
           >
-            {cat === 'all' ? 'All' : categoryLabel(cat, dict)}
+            {cat === 'all' ? 'All' : categoryLabel(cat, t)}
           </Button>
         ))}
       </div>
@@ -244,8 +245,8 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
       {filtered.length === 0 ? (
         <PortalEmptyState
           icon={Folder}
-          heading={dict.documents_heading}
-          description={dict.documents_upload}
+          heading={t('documents_heading')}
+          description={t('documents_upload')}
         />
       ) : (
         <Card>
@@ -270,7 +271,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{categoryLabel(doc.category, dict)}</Badge>
+                      <Badge variant="outline">{categoryLabel(doc.category, t)}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatBytes(doc.fileSizeBytes)}
@@ -285,7 +286,7 @@ export function DocumentVault({ dict, documents: initialDocuments, artistId: _ar
                           size="sm"
                           disabled={downloadingId === doc.id}
                           onClick={() => handleDownload(doc.id)}
-                          aria-label={dict.documents_download}
+                          aria-label={t('documents_download')}
                         >
                           {downloadingId === doc.id
                             ? <Spinner size={14} className="animate-spin" aria-hidden="true" />

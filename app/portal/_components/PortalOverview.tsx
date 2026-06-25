@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import {
   Avatar,
@@ -11,14 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { getSquareThumbnail } from '@/lib/imageUtils'
-import type { Dictionary } from '@/i18n/types'
 import type { CompletionField } from '@/lib/portal/profileCompletion'
 import type { OverviewInsight } from '@/lib/analytics/overviewInsights'
 import { PortalIntelligencePanel } from './PortalIntelligencePanel'
 import { useUnreadMessages } from './PortalNotificationProvider'
 
 interface PortalOverviewProps {
-  dict: Dictionary['portal']
   artistName: string | null
   profileImageUrl: string | null
   totalStreams: number
@@ -33,9 +32,7 @@ interface PortalOverviewProps {
   overviewInsights: OverviewInsight[]
 }
 
-export function PortalOverview({
-  dict,
-  artistName,
+export function PortalOverview({ artistName,
   profileImageUrl,
   totalStreams,
   releaseCount,
@@ -48,6 +45,8 @@ export function PortalOverview({
   missingFields,
   overviewInsights,
 }: PortalOverviewProps) {
+  const t = useTranslations('portal')
+
   const isEnabled = (id: string) => featureFlags[id] ?? true
   const { unreadCount } = useUnreadMessages()
   const initials = artistName
@@ -66,17 +65,17 @@ export function PortalOverview({
         </Avatar>
         <div className="min-w-0 flex-1">
           <h1 className="bg-gradient-to-r from-foreground to-primary/70 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
-            {dict.welcomeBack}
+            {t('welcomeBack')}
             {artistName ? `, ${artistName}` : ''}
           </h1>
           {!artistName && (
-            <p className="mt-1 text-muted-foreground">{dict.notLinked}</p>
+            <p className="mt-1 text-muted-foreground">{t('notLinked')}</p>
           )}
         </div>
       </div>
 
       {overviewInsights.length > 0 && (
-        <PortalIntelligencePanel dict={dict} insights={overviewInsights} />
+        <PortalIntelligencePanel insights={overviewInsights} />
       )}
 
       {/* Profile Completion Card — hidden when 100% complete */}
@@ -84,7 +83,7 @@ export function PortalOverview({
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {dict.completion_title}
+              {t('completion_title')}
             </CardTitle>
             <span className="text-sm font-bold text-primary">{completionScore}%</span>
           </CardHeader>
@@ -92,7 +91,7 @@ export function PortalOverview({
             <Progress
               value={completionScore}
               className="h-2"
-              aria-label={`${dict.completion_title}: ${completionScore}%`}
+              aria-label={`${t('completion_title')}: ${completionScore}%`}
             />
             {missingFields.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -102,7 +101,7 @@ export function PortalOverview({
                       variant="outline"
                       className="text-xs cursor-pointer hover:border-primary/50 hover:text-primary transition-colors gap-1"
                     >
-                      {dict[field.labelKey] as string}
+                      {t(field.labelKey)}
                       <ArrowRight size={10} aria-hidden="true" />
                     </Badge>
                   </Link>
@@ -110,7 +109,7 @@ export function PortalOverview({
                 {missingFields.length > 3 && (
                   <Link href="/portal/profile">
                     <Badge variant="outline" className="text-xs cursor-pointer hover:border-primary/50">
-                      +{missingFields.length - 3} {dict.completion_cta}
+                      +{missingFields.length - 3} {t('completion_cta')}
                     </Badge>
                   </Link>
                 )}
@@ -125,7 +124,7 @@ export function PortalOverview({
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.profile}
+                {t('profile')}
               </CardTitle>
               <User size={18} className="text-primary" />
             </CardHeader>
@@ -140,13 +139,13 @@ export function PortalOverview({
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.analytics}
+                {t('analytics')}
               </CardTitle>
               <ChartBar size={18} className="text-primary" />
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{totalStreams.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">{dict.analytics_totalStreams}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('analytics_totalStreams')}</p>
             </CardContent>
           </Card>
         </Link>
@@ -156,13 +155,13 @@ export function PortalOverview({
             <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {dict.statements}
+                  {t('statements')}
                 </CardTitle>
                 <FileText size={18} className="text-primary" />
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{statementCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">{dict.statements_heading}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('statements_heading')}</p>
               </CardContent>
             </Card>
           </Link>
@@ -172,7 +171,7 @@ export function PortalOverview({
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.overview_totalReleases}
+                {t('overview_totalReleases')}
               </CardTitle>
               <MusicNotes size={18} className="text-primary" />
             </CardHeader>
@@ -187,13 +186,13 @@ export function PortalOverview({
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {dict.overview_upcomingShows}
+                {t('overview_upcomingShows')}
               </CardTitle>
               <MapPin size={18} className="text-primary" />
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{upcomingShowCount}</p>
-              <p className="text-xs text-muted-foreground mt-1">{dict.tour_heading}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('tour_heading')}</p>
             </CardContent>
           </Card>
         </Link>
@@ -202,12 +201,12 @@ export function PortalOverview({
           <Link href="/portal/marketing">
             <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{dict.marketing}</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t('marketing')}</CardTitle>
                 <MegaphoneSimple size={18} className="text-primary" />
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{assetCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">{dict.overview_labelAssets}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('overview_labelAssets')}</p>
               </CardContent>
             </Card>
           </Link>
@@ -216,7 +215,7 @@ export function PortalOverview({
         <Link href="/portal/messages">
           <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{dict.messages}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t('messages')}</CardTitle>
               <ChatCircleText size={18} className="text-primary" />
             </CardHeader>
             <CardContent>

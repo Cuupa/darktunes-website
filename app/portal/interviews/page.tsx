@@ -4,10 +4,11 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getInterviewRequestsByArtistId } from '@/lib/api/interviewRequests'
 import { PortalInterviewsClient } from './_components/PortalInterviewsClient'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 export default async function PortalInterviewsPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
@@ -18,5 +19,5 @@ export default async function PortalInterviewsPage({ searchParams }: { searchPar
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const requests = artist ? await getInterviewRequestsByArtistId(supabase, artist.id).catch(() => []) : []
 
-  return <PortalInterviewsClient dict={dict.portal} initialRequests={requests} />
+  return <PortalInterviewsClient initialRequests={requests} />
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { DownloadSimple, FileText, Spinner } from '@phosphor-icons/react'
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Dictionary } from '@/i18n/types'
 import { getStatementPresignedUrl } from '../../statements/_actions/presignedUrl'
 import { InlineBillingProfileStep } from '../../invoices/_components/InlineBillingProfileStep'
 import { QuickInvoiceButton } from './QuickInvoiceButton'
@@ -18,7 +18,6 @@ interface EarningsStatementsPanelProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
-  dict: Dictionary['portal']
   invoicedStatementIds: string[]
   searchQuery: string
   statements: SalesStatement[]
@@ -33,11 +32,12 @@ export function EarningsStatementsPanel({
   artistId,
   billingProfile: initialBillingProfile,
   billingProfileComplete: initialBillingProfileComplete,
-  dict,
   invoicedStatementIds,
   searchQuery,
   statements,
 }: EarningsStatementsPanelProps) {
+  const t = useTranslations('portal')
+
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [billingProfile, setBillingProfile] = useState(initialBillingProfile)
   const [billingProfileComplete, setBillingProfileComplete] = useState(initialBillingProfileComplete)
@@ -53,16 +53,16 @@ export function EarningsStatementsPanel({
 
   const handleDownload = async (statementId: string) => {
     setLoadingId(statementId)
-    toast.info(dict.statements_downloading)
+    toast.info(t('statements_downloading'))
     try {
       const result = await getStatementPresignedUrl(statementId)
       if (result.error || !result.url) {
-        toast.error(dict.statements_downloadError)
+        toast.error(t('statements_downloadError'))
         return
       }
       window.open(result.url, '_blank', 'noopener,noreferrer')
     } catch {
-      toast.error(dict.statements_downloadError)
+      toast.error(t('statements_downloadError'))
     } finally {
       setLoadingId(null)
     }
@@ -75,7 +75,7 @@ export function EarningsStatementsPanel({
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <FileText size={18} aria-hidden="true" />
-          {dict.analytics_statements_heading}
+          {t('analytics_statements_heading')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
@@ -83,7 +83,6 @@ export function EarningsStatementsPanel({
           <InlineBillingProfileStep
             artistId={artistId}
             billingProfile={billingProfile}
-            dict={dict}
             onComplete={(profile) => {
               setBillingProfile(profile)
               setBillingProfileComplete(true)
@@ -92,7 +91,7 @@ export function EarningsStatementsPanel({
         )}
 
         {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{dict.analytics_search_no_results}</p>
+          <p className="text-sm text-muted-foreground">{t('analytics_search_no_results')}</p>
         ) : (
           filtered.map((statement) => {
             const hasInvoice = linkedIds.has(statement.id)
@@ -110,7 +109,7 @@ export function EarningsStatementsPanel({
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                   {hasInvoice && (
-                    <Badge variant="secondary">{dict.analytics_invoice_exists}</Badge>
+                    <Badge variant="secondary">{t('analytics_invoice_exists')}</Badge>
                   )}
                   <Button
                     size="sm"
@@ -123,12 +122,11 @@ export function EarningsStatementsPanel({
                     ) : (
                       <DownloadSimple size={14} className="mr-1" aria-hidden="true" />
                     )}
-                    {dict.statements_download}
+                    {t('statements_download')}
                   </Button>
                   {canInvoice && billingProfileComplete && (
                     <QuickInvoiceButton
                       artistId={artistId}
-                      dict={dict}
                       statement={statement}
                     />
                   )}

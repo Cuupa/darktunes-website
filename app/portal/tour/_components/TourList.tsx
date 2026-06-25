@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { MapPin } from '@phosphor-icons/react'
@@ -14,19 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Dictionary } from '@/i18n/types'
 import type { Concert } from '@/types'
 import { createTourDate, deleteTourDate } from '../_actions/tour'
 
 interface TourListProps {
-  dict: Dictionary['portal']
   concerts: Concert[]
   artistId: string | null
 }
 
 type Status = 'announced' | 'confirmed' | 'cancelled'
 
-export function TourList({ dict, concerts, artistId }: TourListProps) {
+export function TourList({ concerts, artistId }: TourListProps) {
+  const t = useTranslations('portal')
+
   const [items, setItems] = useState(concerts)
   const eventInputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<Status>('announced')
@@ -103,7 +104,7 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{dict.tour_heading}</h1>
+      <h1 className="text-3xl font-bold">{t('tour_heading')}</h1>
 
       <form onSubmit={submit} className="rounded-lg border border-border p-4 grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
@@ -150,7 +151,7 @@ export function TourList({ dict, concerts, artistId }: TourListProps) {
         {items.length === 0 && (
           <PortalEmptyState
             icon={MapPin}
-            heading={dict.tour_noData}
+            heading={t('tour_noData')}
             description="No tour dates yet."
             action={{ label: '+ Add Date', onClick: () => eventInputRef.current?.focus() }}
           />

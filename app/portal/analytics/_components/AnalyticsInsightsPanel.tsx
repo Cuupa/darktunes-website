@@ -1,19 +1,14 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Lightbulb, TrendDown, TrendUp, Info } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { AnalyticsInsight } from '@/lib/analytics/insights'
-import type { Dictionary } from '@/i18n/types'
+import { portalKey } from '@/i18n/portalKey'
 import { cn } from '@/lib/utils'
 
 interface AnalyticsInsightsPanelProps {
-  dict: Dictionary['portal']
   insights: AnalyticsInsight[]
-}
-
-function interpolate(template: string, values?: Record<string, string | number>): string {
-  if (!values) return template
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`))
 }
 
 function severityIcon(severity: AnalyticsInsight['severity']) {
@@ -38,24 +33,24 @@ function severityClass(severity: AnalyticsInsight['severity']): string {
   }
 }
 
-export function AnalyticsInsightsPanel({ dict, insights }: AnalyticsInsightsPanelProps) {
-  if (insights.length === 0) return null
+export function AnalyticsInsightsPanel({ insights }: AnalyticsInsightsPanelProps) {
+  const t = useTranslations('portal')
 
-  const dictRecord = dict as Record<string, string>
+  if (insights.length === 0) return null
 
   return (
     <Card className="border-border bg-card/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Lightbulb size={16} className="text-primary" aria-hidden="true" />
-          {dict.analytics_insights_heading}
+          {t('analytics_insights_heading')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {insights.slice(0, 6).map((insight) => {
           const Icon = severityIcon(insight.severity)
-          const title = dictRecord[insight.titleKey] ?? insight.titleKey
-          const body = interpolate(dictRecord[insight.bodyKey] ?? insight.bodyKey, insight.values)
+          const title = t(portalKey(insight.titleKey))
+          const body = t(portalKey(insight.bodyKey), insight.values)
           return (
             <div
               key={insight.id}

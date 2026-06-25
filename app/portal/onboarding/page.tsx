@@ -11,14 +11,15 @@ export const dynamic = 'force-dynamic'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { OnboardingWizard } from './_components/OnboardingWizard'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 export default async function OnboardingPage({
   searchParams,
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-  const dict = await getPortalDictionary()
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -33,10 +34,10 @@ export default async function OnboardingPage({
   if (!artist) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <p className="text-muted-foreground text-center max-w-sm">{dict.portal.notLinked}</p>
+        <p className="text-muted-foreground text-center max-w-sm">{t('notLinked')}</p>
       </div>
     )
   }
 
-  return <OnboardingWizard dict={dict.portal} artistId={artist.id} />
+  return <OnboardingWizard artistId={artist.id} />
 }

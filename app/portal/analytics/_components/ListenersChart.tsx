@@ -1,20 +1,18 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
-import type { Dictionary } from '@/i18n/types'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export interface ListenersChartInnerProps {
-  dict: Dictionary['portal']
   chartData: Array<{ period: string; lastfm: number; soundcharts: number }>
   latestLastfm: number
   latestSoundcharts: number
 }
 
 interface ListenersChartProps {
-  dict: Dictionary['portal']
   metrics: ArtistListenerMetric[]
 }
 
@@ -26,7 +24,9 @@ const ListenersChartInner = dynamic(
   },
 )
 
-export function ListenersChart({ dict, metrics }: ListenersChartProps) {
+export function ListenersChart({ metrics }: ListenersChartProps) {
+  const t = useTranslations('portal')
+
   const { chartData, latestLastfm, latestSoundcharts } = useMemo(() => {
     const periods = new Set<string>()
     const lastfmByPeriod = new Map<string, number>()
@@ -57,15 +57,14 @@ export function ListenersChart({ dict, metrics }: ListenersChartProps) {
   if (metrics.length === 0) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">{dict.analytics_listeners_heading}</h2>
-        <p className="text-muted-foreground">{dict.analytics_listeners_noData}</p>
+        <h2 className="text-xl font-semibold">{t('analytics_listeners_heading')}</h2>
+        <p className="text-muted-foreground">{t('analytics_listeners_noData')}</p>
       </div>
     )
   }
 
   return (
     <ListenersChartInner
-      dict={dict}
       chartData={chartData}
       latestLastfm={latestLastfm}
       latestSoundcharts={latestSoundcharts}

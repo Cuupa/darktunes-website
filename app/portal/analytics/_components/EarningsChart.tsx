@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/analytics/_components/EarningsChart.tsx
  *
@@ -11,10 +12,8 @@ import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SalesStatement } from '@/lib/api/salesStatements'
-import type { Dictionary } from '@/i18n/types'
 
 export interface EarningsChartInnerProps {
-  dict: Dictionary['portal']
   chartData: { period: string; amount: number }[]
   totalEarned: number
   lastPayout: number | undefined
@@ -22,7 +21,6 @@ export interface EarningsChartInnerProps {
 }
 
 interface EarningsChartProps {
-  dict: Dictionary['portal']
   statements: SalesStatement[]
 }
 
@@ -44,7 +42,9 @@ const EarningsChartInner = dynamic(
   },
 )
 
-export function EarningsChart({ dict, statements }: EarningsChartProps) {
+export function EarningsChart({ statements }: EarningsChartProps) {
+  const t = useTranslations('portal')
+
   const { chartData, totalEarned, lastPayout, pendingCount } = useMemo(() => {
     // Build chart data: one bar per unique period, sum amounts
     const periodMap = new Map<string, number>()
@@ -74,7 +74,6 @@ export function EarningsChart({ dict, statements }: EarningsChartProps) {
 
   return (
     <EarningsChartInner
-      dict={dict}
       chartData={chartData}
       totalEarned={totalEarned}
       lastPayout={lastPayout}

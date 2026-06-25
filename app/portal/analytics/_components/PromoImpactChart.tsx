@@ -1,17 +1,18 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { PromoImpact } from '@/lib/api/promoImpact'
 import type { PromoLogEntry } from '@/types'
-import type { Dictionary } from '@/i18n/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface PromoImpactChartProps {
-  dict: Dictionary['portal']
   impacts: PromoImpact[]
   promoEntries: PromoLogEntry[]
 }
 
-export function PromoImpactChart({ dict, impacts, promoEntries }: PromoImpactChartProps) {
+export function PromoImpactChart({ impacts, promoEntries }: PromoImpactChartProps) {
+  const t = useTranslations('portal')
+
   if (impacts.length === 0) {
     return null
   }
@@ -27,18 +28,18 @@ export function PromoImpactChart({ dict, impacts, promoEntries }: PromoImpactCha
   return (
     <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle>{dict.analytics_promoImpact_heading}</CardTitle>
-        <p className="text-sm text-muted-foreground">{dict.analytics_promoImpact_hint}</p>
+        <CardTitle>{t('analytics_promoImpact_heading')}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t('analytics_promoImpact_hint')}</p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-4" scope="col">{dict.analytics_promoImpact_action}</th>
-                <th className="py-2 pr-4" scope="col">{dict.analytics_promoImpact_date}</th>
-                <th className="py-2 pr-4 text-right" scope="col">{dict.analytics_eventImpact_delta}</th>
-                <th className="py-2 text-right" scope="col">{dict.analytics_eventImpact_pct}</th>
+                <th className="py-2 pr-4" scope="col">{t('analytics_promoImpact_action')}</th>
+                <th className="py-2 pr-4" scope="col">{t('analytics_promoImpact_date')}</th>
+                <th className="py-2 pr-4 text-right" scope="col">{t('analytics_eventImpact_delta')}</th>
+                <th className="py-2 text-right" scope="col">{t('analytics_eventImpact_pct')}</th>
               </tr>
             </thead>
             <tbody>

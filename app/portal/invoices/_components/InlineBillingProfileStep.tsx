@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -13,21 +14,20 @@ import {
   isBillingProfileComplete,
   type ArtistBillingProfile,
 } from '@/lib/api/artistBillingProfiles'
-import type { Dictionary } from '@/i18n/types'
 
 interface InlineBillingProfileStepProps {
   artistId: string
   billingProfile: ArtistBillingProfile | null
-  dict: Dictionary['portal']
   onComplete: (profile: ArtistBillingProfile) => void
 }
 
 export function InlineBillingProfileStep({
   artistId,
   billingProfile,
-  dict,
   onComplete,
 }: InlineBillingProfileStepProps) {
+  const t = useTranslations('portal')
+
   const [form, setForm] = useState({
     legalName: billingProfile?.legalName ?? '',
     street: billingProfile?.street ?? '',
@@ -53,7 +53,7 @@ export function InlineBillingProfileStep({
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      if (!session) throw new Error(dict.profile_error)
+      if (!session) throw new Error(t('profile_error'))
 
       const response = await fetch('/api/portal/billing-profile', {
         method: 'POST',
@@ -79,18 +79,18 @@ export function InlineBillingProfileStep({
         | null
 
       if (!response.ok || !json?.profile) {
-        throw new Error(json?.error ?? dict.billing_error)
+        throw new Error(json?.error ?? t('billing_error'))
       }
 
       if (!isBillingProfileComplete(json.profile)) {
-        toast.error(dict.invoice_billing_incomplete)
+        toast.error(t('invoice_billing_incomplete'))
         return
       }
 
-      toast.success(dict.billing_saved)
+      toast.success(t('billing_saved'))
       onComplete(json.profile)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : dict.billing_error)
+      toast.error(error instanceof Error ? error.message : t('billing_error'))
     } finally {
       setSaving(false)
     }
@@ -101,15 +101,15 @@ export function InlineBillingProfileStep({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <WarningCircle size={18} className="text-amber-300" aria-hidden="true" />
-          {dict.invoice_billing_inline_title}
+          {t('invoice_billing_inline_title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="mb-4 text-sm text-muted-foreground">{dict.invoice_billing_inline_desc}</p>
+        <p className="mb-4 text-sm text-muted-foreground">{t('invoice_billing_inline_desc')}</p>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="inline-billing-legal-name">{dict.billing_legal_name}</Label>
+              <Label htmlFor="inline-billing-legal-name">{t('billing_legal_name')}</Label>
               <Input
                 id="inline-billing-legal-name"
                 required
@@ -118,7 +118,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="inline-billing-street">{dict.billing_street}</Label>
+              <Label htmlFor="inline-billing-street">{t('billing_street')}</Label>
               <Input
                 id="inline-billing-street"
                 required
@@ -127,7 +127,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inline-billing-postal">{dict.billing_postal_code}</Label>
+              <Label htmlFor="inline-billing-postal">{t('billing_postal_code')}</Label>
               <Input
                 id="inline-billing-postal"
                 required
@@ -136,7 +136,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inline-billing-city">{dict.billing_city}</Label>
+              <Label htmlFor="inline-billing-city">{t('billing_city')}</Label>
               <Input
                 id="inline-billing-city"
                 required
@@ -145,7 +145,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inline-billing-country">{dict.billing_country}</Label>
+              <Label htmlFor="inline-billing-country">{t('billing_country')}</Label>
               <Input
                 id="inline-billing-country"
                 required
@@ -154,7 +154,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inline-billing-tax">{dict.billing_tax_number}</Label>
+              <Label htmlFor="inline-billing-tax">{t('billing_tax_number')}</Label>
               <Input
                 id="inline-billing-tax"
                 value={form.taxNumber}
@@ -162,7 +162,7 @@ export function InlineBillingProfileStep({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="inline-billing-vat">{dict.billing_vat_id}</Label>
+              <Label htmlFor="inline-billing-vat">{t('billing_vat_id')}</Label>
               <Input
                 id="inline-billing-vat"
                 value={form.vatId}
@@ -176,14 +176,14 @@ export function InlineBillingProfileStep({
               checked={form.isSmallBusiness}
               onCheckedChange={(checked) => updateField('isSmallBusiness', checked === true)}
             />
-            <span>{dict.billing_small_business}</span>
+            <span>{t('billing_small_business')}</span>
           </label>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <p className="text-xs text-muted-foreground">{dict.billing_completeness_hint}</p>
+            <p className="text-xs text-muted-foreground">{t('billing_completeness_hint')}</p>
             <Button type="submit" disabled={saving || !artistId} className="gap-2">
               <CheckCircle size={16} aria-hidden="true" />
-              {saving ? dict.billing_save : dict.invoice_billing_continue}
+              {saving ? t('billing_save') : t('invoice_billing_continue')}
             </Button>
           </div>
         </form>

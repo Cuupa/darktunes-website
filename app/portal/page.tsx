@@ -21,10 +21,12 @@ import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { calcProfileCompletion } from '@/lib/portal/profileCompletion'
 import { safeHeadCount } from '@/lib/portal/safeQuery'
 import { PortalOverview } from './_components/PortalOverview'
-import { getPortalDictionary } from '@/i18n/getDictionary'
+import { getTranslations } from 'next-intl/server'
 
 export default async function PortalPage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
-  const dict = await getPortalDictionary()
+
+  const t = await getTranslations('portal')
+
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -97,7 +99,6 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
 
   return (
     <PortalOverview
-      dict={dict.portal}
       artistName={artist?.name ?? null}
       profileImageUrl={artist?.imageUrl ?? null}
       totalStreams={totalStreams}
