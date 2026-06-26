@@ -316,19 +316,24 @@ export function ReleasesManager() {
       if (!rawText.trim()) {
         throw new Error(res.ok ? tErrors('SERVER_ERROR') : `Request failed (${res.status})`)
       }
-      let body: ApiErrorResponse & { smartUrl?: string }
+      let body: ApiErrorResponse & { smartUrl?: string; platforms?: Record<string, string> }
       try {
-        body = JSON.parse(rawText) as ApiErrorResponse & { smartUrl?: string }
+        body = JSON.parse(rawText) as ApiErrorResponse & {
+          smartUrl?: string
+          platforms?: Record<string, string>
+        }
       } catch {
         throw new Error(rawText.trim().slice(0, 200) || tErrors('SERVER_ERROR'))
       }
       if (!res.ok) {
         throw new Error(getErrorMessage(body, tErrors))
       }
-      const smartUrl = body.smartUrl
-      if (!smartUrl) throw new Error(tErrors('SERVER_ERROR'))
+      const platformCount = Object.keys(body.platforms ?? {}).length
+      if (platformCount === 0 && !body.smartUrl) throw new Error(tErrors('SERVER_ERROR'))
       toast.success(
-        `Smart link resolved for "${release.title}": ${smartUrl.slice(0, 50)}…`,
+        platformCount > 0
+          ? `Platform links resolved for "${release.title}" (${platformCount} service${platformCount === 1 ? '' : 's'}).`
+          : `Smart link resolved for "${release.title}".`,
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
@@ -536,18 +541,26 @@ export function ReleasesManager() {
               variant="ghost"
               onClick={() => void handleResolveSmartLink(release)}
               disabled={resolvingSmartLinkId === release.id || (!release.spotifyUrl && !release.appleMusicUrl)}
-              title={release.smartUrl ? 'Re-resolve Odesli smart link' : 'Resolve Odesli smart link'}
+              title={
+                release.platformLinks && Object.keys(release.platformLinks).length > 0
+                  ? 'Re-resolve platform links (Odesli)'
+                  : 'Resolve platform links (Odesli)'
+              }
               aria-label={
-                release.smartUrl
-                  ? `Re-resolve Odesli smart link for ${release.title}`
-                  : `Resolve Odesli smart link for ${release.title}`
+                release.platformLinks && Object.keys(release.platformLinks).length > 0
+                  ? `Re-resolve platform links for ${release.title}`
+                  : `Resolve platform links for ${release.title}`
               }
             >
               <LinkSimple
                 size={16}
                 aria-hidden="true"
                 className={resolvingSmartLinkId === release.id ? 'animate-pulse' : ''}
-                weight={release.smartUrl ? 'fill' : 'regular'}
+                weight={
+                  release.platformLinks && Object.keys(release.platformLinks).length > 0
+                    ? 'fill'
+                    : 'regular'
+                }
               />
             </Button>
             <Button

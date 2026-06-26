@@ -91,9 +91,9 @@ export function useReleases() {
           Authorization: `Bearer ${session.access_token}`,
         },
       })
+      const queueText = await resQueue.text()
       if (!resQueue.ok) {
-        const text = await resQueue.text()
-        throw new Error(`Queue failed: ${text}`)
+        throw new Error(`Queue failed: ${queueText.slice(0, 200) || resQueue.status}`)
       }
 
       const res = await fetch('/api/sync', {
@@ -103,11 +103,18 @@ export function useReleases() {
         },
       })
 
+      const syncText = await res.text()
       if (!res.ok) {
-        const text = await res.text()
-        throw new Error(`Sync failed: ${text}`)
+        throw new Error(`Sync failed: ${syncText.slice(0, 200) || res.status}`)
       }
-      const raw = (await res.json()) as Record<string, unknown>
+      let raw: Record<string, unknown> = {}
+      if (syncText.trim()) {
+        try {
+          raw = JSON.parse(syncText) as Record<string, unknown>
+        } catch {
+          return null
+        }
+      }
       // Async queue executor: { accepted: true } — results arrive via background jobs.
       if ('accepted' in raw || 'queued' in raw) return null
       // Legacy direct-result format: { results, totalErrors, … }
