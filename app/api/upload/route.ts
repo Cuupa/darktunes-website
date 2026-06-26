@@ -52,9 +52,10 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const artistId = (formData.get('artistId') as string | null) || null
   const mimeType = file.type || 'application/octet-stream'
 
-  // Compute SHA-256 hash via Web Crypto API (async, non-blocking)
-  const ab = await file.arrayBuffer()
-  const hashBuf = await crypto.subtle.digest('SHA-256', ab)
+  // Read once — arrayBuffer() consumes the FormData File; reusing file.stream()
+  // afterwards makes the AWS SDK fail with "Unable to calculate hash for flowing readable stream".
+  const fileBuffer = Buffer.from(await file.arrayBuffer())
+  const hashBuf = await crypto.subtle.digest('SHA-256', fileBuffer)
   const sha256Hash = Array.from(new Uint8Array(hashBuf))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
@@ -96,14 +97,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
 
-  // Stream file directly to R2 — avoids buffering an extra copy in Node.js memory
   await r2.send(
     new PutObjectCommand({
       Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
       Key: r2Key,
-      Body: file.stream(),
+      Body: fileBuffer,
       ContentType: mimeType,
-      ContentLength: file.size,
+      ContentLength: fileBuffer.length,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
