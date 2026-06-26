@@ -29,6 +29,9 @@ import {
   getYouTubeCredentials,
 } from '@/lib/secrets/getExternalCredentials'
 
+// Odesli resolves every release — allow long runs on Vercel Pro.
+export const maxDuration = 300
+
 async function verifyToken(token: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

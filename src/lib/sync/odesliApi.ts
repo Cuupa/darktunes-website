@@ -97,7 +97,9 @@ export function isSkippableOdesliError(err: string): boolean {
     err.includes('405') ||
     err.includes('UNSUPPORTED_URL') ||
     err.includes('422') ||
-    err.includes('URL type not supported by Odesli')
+    err.includes('URL type not supported by Odesli') ||
+    err.includes('could_not_fetch_entity_data') ||
+    err.includes('non-JSON response')
   )
 }
 
@@ -137,7 +139,9 @@ export async function resolveOdesliSmartLink(
   try {
     data = JSON.parse(text) as OdesliResponse
   } catch {
-    throw new HttpError(response.status, `Odesli returned non-JSON response: ${text.slice(0, 200)}`)
+    // Odesli occasionally returns 200 with plain text (e.g. "An error occurred…").
+    // Use 502 so withExponentialBackoff retries transient gateway failures.
+    throw new HttpError(502, `Odesli returned non-JSON response: ${text.slice(0, 200)}`)
   }
 
   if (!data.pageUrl) {

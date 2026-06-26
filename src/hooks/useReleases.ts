@@ -108,9 +108,10 @@ export function useReleases() {
         throw new Error(`Sync failed: ${text}`)
       }
       const raw = (await res.json()) as Record<string, unknown>
-      // New async queue format: { queued, total, message }
-      if ('queued' in raw) return null
+      // Async queue executor: { accepted: true } — results arrive via background jobs.
+      if ('accepted' in raw || 'queued' in raw) return null
       // Legacy direct-result format: { results, totalErrors, … }
+      if (!Array.isArray(raw.results)) return null
       return raw as unknown as SyncAllResult
     } finally {
       setIsSyncing(false)

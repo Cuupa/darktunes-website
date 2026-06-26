@@ -47,6 +47,17 @@ interface SystemHealthWidgetProps {
   bearerToken: string
 }
 
+/** Reads response text first so Vercel/plain-text error pages never crash res.json(). */
+async function parseAdminFetchJson(res: Response): Promise<Record<string, unknown>> {
+  const rawText = await res.text()
+  if (!rawText.trim()) return {}
+  try {
+    return JSON.parse(rawText) as Record<string, unknown>
+  } catch {
+    throw new Error(rawText.trim().slice(0, 200) || `Request failed (${res.status})`)
+  }
+}
+
 function formatRelativeTime(isoDate: string | null): string {
   if (!isoDate) return 'Never'
   const diff = Date.now() - new Date(isoDate).getTime()
@@ -158,7 +169,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
     try {
       const res = await fetch('/api/health')
       if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
-      const data: HealthResponse = await res.json()
+      const data = (await parseAdminFetchJson(res)) as unknown as HealthResponse
       setHealth(data)
     } catch (err) {
       toast.error(`Health check failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -186,8 +197,12 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
-      const dataQueue = (await resQueue.json()) as { queued?: number; error?: string }
-      if (!resQueue.ok) throw new Error(dataQueue.error ?? `Queue failed (${resQueue.status})`)
+      const dataQueue = await parseAdminFetchJson(resQueue)
+      if (!resQueue.ok) {
+        throw new Error(
+          typeof dataQueue.error === 'string' ? dataQueue.error : `Queue failed (${resQueue.status})`,
+        )
+      }
 
       const resExecute = await fetch('/api/sync', {
         method: 'POST',
@@ -196,10 +211,16 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
-      const dataExecute = (await resExecute.json()) as { accepted?: boolean; error?: string }
-      if (!resExecute.ok) throw new Error(dataExecute.error ?? `Execute failed (${resExecute.status})`)
+      const dataExecute = await parseAdminFetchJson(resExecute)
+      if (!resExecute.ok) {
+        throw new Error(
+          typeof dataExecute.error === 'string'
+            ? dataExecute.error
+            : `Execute failed (${resExecute.status})`,
+        )
+      }
 
-      const queued = dataQueue.queued ?? 0
+      const queued = (dataQueue.queued as number | undefined) ?? 0
       toast.success(
         queued > 0
           ? `${queued} job(s) enqueued — background executor accepted the run.`
@@ -225,14 +246,18 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           'Content-Type': 'application/json',
         },
       })
-      const data = (await res.json()) as { synced?: number; count?: number; message?: string; error?: string }
-      if (!res.ok) throw new Error(data.error ?? `YouTube sync failed (${res.status})`)
+      const data = await parseAdminFetchJson(res)
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : `YouTube sync failed (${res.status})`,
+        )
+      }
 
-      const syncedCount = data.synced ?? data.count
+      const syncedCount = (data.synced as number | undefined) ?? (data.count as number | undefined)
       toast.success(
         typeof syncedCount === 'number'
           ? `YouTube sync completed (${syncedCount} video${syncedCount === 1 ? '' : 's'}).`
-          : (data.message ?? 'YouTube sync completed.'),
+          : (typeof data.message === 'string' ? data.message : 'YouTube sync completed.'),
       )
       await fetchHealth()
     } catch (err) {
@@ -259,15 +284,18 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
             body: JSON.stringify({ apiSource: api }),
           })
 
-      const data = (await res.json()) as {
-        error?: string
-        lastfmRows?: number
-        soundchartsRows?: number
+      const data = await parseAdminFetchJson(res)
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : `Sync failed (${res.status})`,
+        )
       }
-      if (!res.ok) throw new Error(data.error ?? `Sync failed (${res.status})`)
 
       if (LISTENER_SYNC_APIS.has(api)) {
-        const rows = api === 'soundcharts' ? data.soundchartsRows : data.lastfmRows
+        const rows =
+          api === 'soundcharts'
+            ? (data.soundchartsRows as number | undefined)
+            : (data.lastfmRows as number | undefined)
         toast.success(
           `${getApiMeta(api).label} sync completed (${rows ?? 0} metric row${rows === 1 ? '' : 's'}).`,
         )
