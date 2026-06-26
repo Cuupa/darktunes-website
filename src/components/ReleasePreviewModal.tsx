@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { SpotifyLogo, AppleLogo, LinkSimple, X } from '@phosphor-icons/react'
+import { Globe, X } from '@phosphor-icons/react'
+import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
+import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -25,6 +27,13 @@ export function ReleasePreviewModal({ release, open, onClose }: ReleasePreviewMo
   if (!release) return null
 
   const spotifyEmbedUri = release.spotifyId ? `spotify:album:${release.spotifyId}` : undefined
+  const platformEntries = buildPlatformLinkEntries({
+    platformLinks: release.platformLinks,
+    spotifyUrl: release.spotifyUrl,
+    appleMusicUrl: release.appleMusicUrl,
+    youtubeUrl: release.youtubeUrl,
+    bandcampUrl: release.bandcampUrl,
+  })
 
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
@@ -92,46 +101,29 @@ export function ReleasePreviewModal({ release, open, onClose }: ReleasePreviewMo
               </div>
             )}
 
-            {/* Streaming links */}
-            {(release.spotifyUrl || release.appleMusicUrl || release.smartUrl) && (
+            {platformEntries.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                   {t('streamingLinks')}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {release.spotifyUrl && (
-                    <a
-                      href={release.spotifyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary/10 text-secondary border border-secondary/30 hover:bg-secondary/20 transition-colors"
-                    >
-                      <SpotifyLogo size={12} weight="fill" />
-                      Spotify
-                    </a>
-                  )}
-                  {release.appleMusicUrl && (
-                    <a
-                      href={release.appleMusicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition-colors"
-                    >
-                      <AppleLogo size={12} weight="fill" />
-                      Apple Music
-                    </a>
-                  )}
-                  {release.smartUrl && (
-                    <a
-                      href={release.smartUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-colors"
-                    >
-                      <LinkSimple size={12} />
-                      All Links
-                    </a>
-                  )}
+                  {platformEntries.map(({ key, url }) => {
+                    const cfg = ODESLI_PLATFORM_CONFIG[key]
+                    const Icon = cfg?.icon ?? Globe
+                    const label = cfg?.label ?? key
+                    return (
+                      <a
+                        key={key}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-muted/60 border border-border hover:bg-muted transition-colors"
+                      >
+                        <Icon size={12} weight="fill" aria-hidden="true" />
+                        {label}
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             )}

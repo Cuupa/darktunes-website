@@ -30,7 +30,8 @@ import {
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
 import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
-import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
+import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
+import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { useLocale, useTranslations } from 'next-intl'
@@ -276,23 +277,13 @@ export function ArtistDetailContent({
               <div className="flex flex-wrap gap-3 pt-2">
                 {/* Per-platform streaming buttons from Odesli, or fallback to individual URL fields */}
                 {(() => {
-                  const platformLinks = artist.platformLinks
-                  const platformEntries: Array<{ key: string; url: string }> = (() => {
-                    if (platformLinks && Object.keys(platformLinks).length > 0) {
-                      const known = ODESLI_PLATFORM_ORDER.filter((k) => platformLinks[k])
-                      const unknown = Object.keys(platformLinks)
-                        .filter((k) => !ODESLI_PLATFORM_ORDER.includes(k))
-                        .sort()
-                      return [...known, ...unknown].map((k) => ({ key: k, url: platformLinks[k] }))
-                    }
-                    // Fallback: use individual URL fields
-                    const fallback: Array<{ key: string; url: string }> = []
-                    if (artist.spotifyUrl)    fallback.push({ key: 'spotify',    url: artist.spotifyUrl })
-                    if (artist.appleMusicUrl) fallback.push({ key: 'appleMusic', url: artist.appleMusicUrl })
-                    if (artist.youtubeUrl)    fallback.push({ key: 'youtube',    url: artist.youtubeUrl })
-                    if (artist.bandcampUrl)   fallback.push({ key: 'bandcamp',   url: artist.bandcampUrl })
-                    return fallback
-                  })()
+                  const platformEntries = buildPlatformLinkEntries({
+                    platformLinks: artist.platformLinks,
+                    spotifyUrl: artist.spotifyUrl,
+                    appleMusicUrl: artist.appleMusicUrl,
+                    youtubeUrl: artist.youtubeUrl,
+                    bandcampUrl: artist.bandcampUrl,
+                  })
 
                   if (platformEntries.length === 0) return null
                   return (

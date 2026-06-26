@@ -241,8 +241,13 @@ export function ArtistsManager() {
       }
 
       const result = (await res.json()) as {
-        results: Array<{ api: string; releasesUpserted: number; concertsUpserted: number; errors: string[] }>
-        totalErrors: number
+        results?: Array<{ api: string; releasesUpserted: number; concertsUpserted: number; errors: string[] }>
+        totalErrors?: number
+      }
+      if (!Array.isArray(result.results)) {
+        toast.success(`Sync triggered for "${artist.name}"`)
+        await reload()
+        return
       }
       const releasesSynced = result.results.reduce((sum, r) => sum + r.releasesUpserted, 0)
       const concertsSynced = result.results.reduce((sum, r) => sum + r.concertsUpserted, 0)
@@ -253,7 +258,7 @@ export function ArtistsManager() {
         .filter(Boolean)
         .join(', ')
 
-      if (result.totalErrors > 0) {
+      if ((result.totalErrors ?? 0) > 0) {
         toast.warning(
           `Sync for "${artist.name}" completed with ${result.totalErrors} error(s).${syncedSummary ? ` ${syncedSummary} synced.` : ''}`,
         )

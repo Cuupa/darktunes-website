@@ -21,6 +21,7 @@ import {
   CaretLeft,
   CaretRight,
   CalendarDots,
+  Globe,
   MusicNote,
 } from '@phosphor-icons/react'
 import {
@@ -34,6 +35,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getSquareThumbnail } from '@/lib/imageUtils'
+import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
+import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import type { Release } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -158,16 +161,17 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
       : release.artistName
 
   const hasPresaveLink = status !== 'past' && !!release.smartlinkUrl
-  const hasStreamingLinks =
+  const platformEntries =
     status === 'past' || status === 'today'
-      ? !!(
-          release.smartUrl ||
-          release.spotifyUrl ||
-          release.appleMusicUrl ||
-          release.youtubeUrl ||
-          release.bandcampUrl
-        )
-      : false
+      ? buildPlatformLinkEntries({
+          platformLinks: release.platformLinks,
+          spotifyUrl: release.spotifyUrl,
+          appleMusicUrl: release.appleMusicUrl,
+          youtubeUrl: release.youtubeUrl,
+          bandcampUrl: release.bandcampUrl,
+        })
+      : []
+  const hasStreamingLinks = platformEntries.length > 0
 
   return (
     <Dialog open={!!release} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -246,43 +250,32 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
             {/* Streaming links (past/today) */}
             {hasStreamingLinks && (
               <div className="flex flex-wrap gap-2">
-                {release.smartUrl && (
-                  <Link
-                    href={release.smartUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium',
-                      'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    )}
-                    aria-label={`${t('calendar_listen_link')} — ${release.title}`}
-                  >
-                    {t('calendar_listen_link')}
-                  </Link>
-                )}
-                {!release.smartUrl && release.spotifyUrl && (
-                  <Link
-                    href={release.spotifyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-[#1DB954] text-white hover:bg-[#1DB954]/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Spotify — ${release.title}`}
-                  >
-                    Spotify
-                  </Link>
-                )}
-                {!release.smartUrl && release.appleMusicUrl && (
-                  <Link
-                    href={release.appleMusicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-muted text-foreground hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Apple Music — ${release.title}`}
-                  >
-                    Apple Music
-                  </Link>
-                )}
+                {platformEntries.map(({ key, url }) => {
+                  const cfg = ODESLI_PLATFORM_CONFIG[key]
+                  const Icon = cfg?.icon ?? Globe
+                  const label = cfg?.label ?? key
+                  const bg = cfg?.bg
+                  const textColor = cfg?.textColor ?? 'text-white'
+                  return (
+                    <Link
+                      key={key}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        textColor,
+                        !bg && 'bg-muted text-foreground hover:bg-muted/70',
+                      )}
+                      style={bg ? { backgroundColor: bg } : undefined}
+                      aria-label={`${label} — ${release.title}`}
+                    >
+                      <Icon size={16} weight="fill" aria-hidden="true" />
+                      {label}
+                    </Link>
+                  )
+                })}
               </div>
             )}
 
