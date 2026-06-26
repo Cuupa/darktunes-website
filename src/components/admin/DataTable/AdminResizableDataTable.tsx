@@ -80,7 +80,7 @@ export function AdminResizableDataTable<TData>({
   const minWidth = leafColumns.reduce((sum, col) => sum + col.getSize(), 0)
 
   return (
-    <div className={cn('overflow-x-auto flex-1', className)}>
+    <div className={cn('overflow-x-auto overscroll-contain flex-1', className)} data-lenis-prevent>
       <table
         className="w-full text-sm"
         style={{ tableLayout: 'fixed', minWidth }}

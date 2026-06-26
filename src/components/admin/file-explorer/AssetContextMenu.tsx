@@ -123,7 +123,7 @@ export function AssetContextMenu({
               <FolderSimple aria-hidden="true" />
               Move to…
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="max-h-72 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
+            <ContextMenuSubContent className="max-h-72 overflow-y-auto overscroll-contain">
               <ContextMenuItem onClick={() => onMoveToFolder(null)}>Root</ContextMenuItem>
               {renderFolderTree(folderTree, folderId ?? null, onMoveToFolder)}
             </ContextMenuSubContent>
@@ -160,7 +160,7 @@ export function AssetContextMenu({
                   autoFocus={false}
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
+              <div className="max-h-60 overflow-y-auto overscroll-contain" data-lenis-prevent>
                 {filteredArtists.length === 0 ? (
                   <p className="py-3 text-center text-xs text-muted-foreground">No artists found</p>
                 ) : (
@@ -208,7 +208,7 @@ export function AssetContextMenu({
                   autoFocus={false}
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
+              <div className="max-h-60 overflow-y-auto overscroll-contain" data-lenis-prevent>
                 <ContextMenuRadioGroup
                   value={selectedReleaseId ?? ''}
                   onValueChange={(value) => onAssignRelease(value === '' ? null : value)}

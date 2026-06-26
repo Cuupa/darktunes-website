@@ -150,7 +150,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
           {t.bronzeRefresh}
         </Button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">

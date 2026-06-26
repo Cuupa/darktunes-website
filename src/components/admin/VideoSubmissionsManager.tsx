@@ -157,7 +157,7 @@ export function VideoSubmissionsManager() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">

@@ -6,7 +6,8 @@ function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      data-lenis-prevent
+      className="relative w-full overflow-x-auto overscroll-contain"
     >
       <table
         data-slot="table"

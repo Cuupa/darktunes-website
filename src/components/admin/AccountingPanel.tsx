@@ -674,7 +674,8 @@ function SosGeneratorPanel() {
     <div className="space-y-0">
       {/* Sub-tab navigation */}
       <div
-        className="flex items-center gap-1 px-6 pt-4 border-b border-border overflow-x-auto"
+        className="flex items-center gap-1 px-6 pt-4 border-b border-border overflow-x-auto overscroll-contain"
+        data-lenis-prevent
         role="tablist"
         aria-label={t.subTabListLabel}
       >

@@ -134,7 +134,7 @@ export function RulesPanel({
   return (
     <div className="space-y-0">
       {/* Rules sub-navigation */}
-      <div className="flex items-center gap-0.5 border-b border-border px-2 pt-1 overflow-x-auto">
+      <div className="flex items-center gap-0.5 border-b border-border px-2 pt-1 overflow-x-auto overscroll-contain" data-lenis-prevent>
         {TABS.map(({ id, label }) => (
           <button
             key={id}

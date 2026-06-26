@@ -364,7 +364,7 @@ export function PayoutManager({
           </div>
         )}
 
-        <div className="overflow-x-auto flex-1">
+        <div className="overflow-x-auto overscroll-contain flex-1" data-lenis-prevent>
           {loadingRegister ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <CircleNotch size={32} className="animate-spin opacity-50" />

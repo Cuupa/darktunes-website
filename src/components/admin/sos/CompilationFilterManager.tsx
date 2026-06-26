@@ -135,7 +135,7 @@ export function CompilationFilterManager({
                       className="pl-8"
                     />
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1 border rounded-md p-1">
+                  <div className="max-h-40 overflow-y-auto overscroll-contain space-y-0.5 pr-1 border rounded-md p-1" data-lenis-prevent>
                     {filteredReleases.slice(0, 20).map(title => (
                       <button
                         key={title}

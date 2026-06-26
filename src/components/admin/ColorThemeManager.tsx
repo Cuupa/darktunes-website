@@ -764,7 +764,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           <p className="text-sm text-muted-foreground">
             WCAG 2.1 contrast ratios for all key color pairs. AA requires ≥ 4.5:1 for normal text, ≥ 3:1 for large text / UI components.
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">

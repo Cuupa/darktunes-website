@@ -145,7 +145,7 @@ export function SubmissionFormManager() {
             <p className="text-muted-foreground">Loading…</p>
           ) : (
             <div className="space-y-2">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">

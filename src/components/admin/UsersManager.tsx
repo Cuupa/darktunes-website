@@ -299,7 +299,7 @@ export function UsersManager() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
         <Table>
           <TableHeader>
             <TableRow>

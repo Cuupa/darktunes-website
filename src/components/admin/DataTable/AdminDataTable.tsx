@@ -32,7 +32,7 @@ export function AdminDataTable<TData>({
   const rows = table.getRowModel().rows
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (

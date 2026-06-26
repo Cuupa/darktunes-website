@@ -115,7 +115,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
           Select one or more artists from the label roster. The first selected artist becomes the primary one.
           Use the &quot;Guest / Featured Artists&quot; field above for non-roster collaborators.
         </p>
-        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto rounded border border-border p-3">
+        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto overscroll-contain rounded border border-border p-3" data-lenis-prevent>
           {artists.length === 0 && (
             <p className="text-xs text-muted-foreground">No label artists found.</p>
           )}

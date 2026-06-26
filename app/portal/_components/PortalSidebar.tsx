@@ -160,7 +160,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   }
 
   const renderNav = (onNavigate?: () => void) => (
-    <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Artist portal navigation">
+    <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4" data-lenis-prevent aria-label="Artist portal navigation">
       {navGroups.map(({ groupKey, items }) => (
         <div key={groupKey} className="mb-3">
           <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">

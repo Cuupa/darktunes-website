@@ -393,7 +393,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
           </Button>
         </div>
         <Separator />
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-2" data-lenis-prevent>
           <FolderTree
             selected={selectedFolder}
             onSelect={setSelectedFolder}
@@ -426,7 +426,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
         </div>
 
         {/* Message list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain" data-lenis-prevent>
           {isLoading ? (
             <div className="flex items-center justify-center h-24">
               <Spinner size={20} className="animate-spin text-muted-foreground" aria-label="Loading" />
@@ -542,7 +542,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4" data-lenis-prevent>
               {selectedMessage.bodyHtml ? (
                 <div
                   className="prose prose-sm dark:prose-invert max-w-none"

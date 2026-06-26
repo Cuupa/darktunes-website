@@ -168,7 +168,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
         <p className="text-xs text-muted-foreground">
           Associate one or more artists with this news post (e.g. for featurings). The first selected artist is the primary artist.
         </p>
-        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto rounded border border-border p-3">
+        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto overscroll-contain rounded border border-border p-3" data-lenis-prevent>
           {artists.length === 0 && (
             <p className="text-xs text-muted-foreground">No artists found.</p>
           )}

@@ -136,7 +136,8 @@ export function GenreTagPicker({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md"
+          className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto overscroll-contain rounded-md border border-border bg-popover shadow-md"
+          data-lenis-prevent
         >
           {filtered.map((g) => (
             <li

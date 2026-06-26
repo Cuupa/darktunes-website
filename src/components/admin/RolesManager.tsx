@@ -451,7 +451,7 @@ function CustomRolesTab() {
               {allPermissions.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No permissions defined. Create some in the Permissions tab.</p>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-48 overflow-y-auto overscroll-contain pr-1" data-lenis-prevent>
                   {allPermissions.map(({ name, label, isSystem }) => (
                     <div key={name} className="flex items-center justify-between gap-3">
                       <div>
@@ -604,7 +604,7 @@ function CustomPermissionsTab() {
       ) : defs.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">No custom permissions yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
           <Table>
             <TableHeader>
               <TableRow>
@@ -788,7 +788,7 @@ function RbacAuditTab() {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">No RBAC audit entries found.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
           <Table>
             <TableHeader>
               <TableRow>

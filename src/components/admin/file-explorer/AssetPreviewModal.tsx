@@ -190,7 +190,7 @@ export function AssetPreviewModal({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {/* Preview area */}
-          <div className="relative flex flex-1 items-center justify-center overflow-auto bg-background/40 p-4 lg:min-w-0">
+          <div className="relative flex flex-1 items-center justify-center overflow-auto overscroll-contain bg-background/40 p-4 lg:min-w-0" data-lenis-prevent>
             {isImage ? (
               <div
                 className="relative inline-block"
@@ -234,7 +234,7 @@ export function AssetPreviewModal({
           </div>
 
           {onSavePress && isImage && (
-            <div className="overflow-y-auto max-h-[40vh] lg:max-h-[70vh] border-t lg:border-t-0 lg:border-l border-border p-6 lg:w-80 xl:w-96 shrink-0">
+            <div className="overflow-y-auto overscroll-contain max-h-[40vh] lg:max-h-[70vh] border-t lg:border-t-0 lg:border-l border-border p-6 lg:w-80 xl:w-96 shrink-0" data-lenis-prevent>
               <AssetPressFields
                 asset={asset}
                 artists={artists}

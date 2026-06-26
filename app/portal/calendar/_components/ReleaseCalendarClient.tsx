@@ -179,7 +179,7 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
         className="max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-xl p-0"
         aria-labelledby="release-detail-title"
       >
-        <div className="overflow-y-auto max-h-[80vh]">
+        <div className="overflow-y-auto overscroll-contain max-h-[80vh]" data-lenis-prevent>
           {/* Cover art */}
           {release.coverArt ? (
             <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">

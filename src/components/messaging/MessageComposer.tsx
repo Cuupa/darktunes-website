@@ -212,7 +212,7 @@ export function MessageComposer({
             )}
           </button>
           {dropdownOpen && (
-            <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
+            <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-md border border-border bg-popover shadow-lg" data-lenis-prevent>
               <button
                 type="button"
                 className="flex min-h-[44px] w-full items-center gap-2 border-b border-border px-3 py-2 text-sm font-semibold hover:bg-accent hover:text-accent-foreground"

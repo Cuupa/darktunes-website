@@ -32,7 +32,7 @@ export function RosterHealthTable({ rows }: RosterHealthTableProps) {
         <CardTitle className="text-sm font-medium">Roster health matrix</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">

@@ -250,7 +250,7 @@ export function DocumentVault({ documents: initialDocuments, artistId: _artistId
         />
       ) : (
         <Card>
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent className="p-0 overflow-x-auto overscroll-contain" data-lenis-prevent>
             <Table>
               <TableHeader>
                 <TableRow>

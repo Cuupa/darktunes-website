@@ -441,7 +441,7 @@ export function MessagesManager() {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mailbox</p>
           {totalUnread > 0 && <Badge className="text-xs px-1.5 py-0">{totalUnread}</Badge>}
         </div>
-        <div className="flex-1 overflow-y-auto px-1" style={{ overscrollBehavior: 'contain' }}>
+        <div className="flex-1 overflow-y-auto px-1" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
           <FolderTree
             selected={selectedFolder}
             onSelect={(id) => { setSelectedFolder(id); setSelectedMessageId(null) }}
@@ -504,7 +504,7 @@ export function MessagesManager() {
         </div>
 
         {/* Message list */}
-        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
           {filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground text-sm gap-2">
               <p>No messages</p>
@@ -639,7 +639,7 @@ export function MessagesManager() {
             </div>
 
             {/* Message body */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }}>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
               {selectedMessage.bodyHtml ? (
                 <div
                   suppressHydrationWarning
