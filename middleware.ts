@@ -97,6 +97,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginPage = route.isLoginPage
+  const isPasswordRecoveryLogin =
+    isLoginPage && request.nextUrl.searchParams.get('type') === 'recovery'
+
+  // Recovery links must apply to the emailed account — never a stale browser session.
+  if (isPasswordRecoveryLogin) {
+    if (user) {
+      await supabase.auth.signOut()
+    }
+    return supabaseResponse
+  }
+
   const isAdminRoute = route.isAdminRoute
   const isEditorRoute = route.isEditorRoute
   const isPortalAcceptInvitePage = route.isPortalAcceptInvitePage
@@ -119,11 +130,6 @@ export async function middleware(request: NextRequest) {
 
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profile) {
-    // Password recovery: session is active but user must set a new password first.
-    if (request.nextUrl.searchParams.get('type') === 'recovery') {
-      return supabaseResponse
-    }
-
     const returnTo = request.nextUrl.searchParams.get('returnTo')
     const url = request.nextUrl.clone()
 

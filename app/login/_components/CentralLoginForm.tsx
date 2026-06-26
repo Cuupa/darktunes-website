@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { isRecoverySessionEvent } from '@/lib/auth/recoverySession'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
@@ -49,37 +50,60 @@ export function CentralLoginForm() {
     if (view !== 'recovery') return
 
     const supabase = createBrowserSupabaseClient()
+    let cancelled = false
+    let codeExchangeSucceeded = false
+    let hashFallbackTimer: number | undefined
 
     const markReady = () => {
+      if (cancelled) return
       setSessionReady(true)
       setRecoveryError(null)
     }
 
+    const fail = () => {
+      if (cancelled) return
+      setRecoveryError(t('login_recovery_error'))
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (
-        session &&
-        (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY')
-      ) {
+      if (!session || cancelled) return
+      if (isRecoverySessionEvent(event, { codeExchangeSucceeded })) {
         markReady()
       }
     })
 
     void (async () => {
+      setSessionReady(false)
+      setRecoveryError(null)
+
+      // Clear any existing session so the reset link applies to the emailed account.
+      await supabase.auth.signOut({ scope: 'local' })
+
       if (recoveryCode) {
         const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode)
         if (error) {
-          setRecoveryError(t('login_recovery_error'))
+          fail()
           return
         }
+        codeExchangeSucceeded = true
         markReady()
         return
       }
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) markReady()
+      // Hash-based recovery: give Supabase time to parse #access_token after sign-out.
+      hashFallbackTimer = window.setTimeout(() => {
+        if (cancelled) return
+        void supabase.auth.getSession().then(({ data: { session } }) => {
+          if (cancelled) return
+          if (session) markReady()
+          else fail()
+        })
+      }, 500)
     })()
 
     return () => {
+      cancelled = true
+      if (hashFallbackTimer !== undefined) window.clearTimeout(hashFallbackTimer)
       subscription.unsubscribe()
     }
   }, [view, recoveryCode, t])
