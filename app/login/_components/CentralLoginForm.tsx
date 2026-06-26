@@ -16,10 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import {
-  getPasswordRecoveryRedirectUrl,
-  resolveRedirectPath,
-} from '@/lib/auth/resolveRedirectPath'
+import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
 
@@ -131,11 +128,13 @@ export function CentralLoginForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createBrowserSupabaseClient()
-      const redirectTo = getPasswordRecoveryRedirectUrl(window.location.origin)
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo })
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
 
-      if (error) {
+      if (!res.ok) {
         toast.error(t('login_forgot_error'))
       } else {
         toast.success(t('login_forgot_success'))
