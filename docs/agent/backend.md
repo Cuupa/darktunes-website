@@ -62,7 +62,7 @@ Public: `POST /api/auth/forgot-password` (rate-limited, enumeration-safe). Admin
 Both use `requestPasswordReset()` in `src/lib/auth/requestPasswordReset.ts`:
 
 1. **Resend configured** (Admin → API Keys): `auth.admin.generateLink({ type: 'recovery' })` → branded HTML via `sendPasswordResetEmail()` with impressum footer from `site_settings`.
-2. **Resend not configured**: falls back to `auth.resetPasswordForEmail()` (Supabase built-in template).
+2. **Resend not configured or send fails**: falls back to `auth.resetPasswordForEmail()` (Supabase built-in template).
 
 Recovery landing page unchanged: `/login?type=recovery`.
 

@@ -7,7 +7,7 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 
 const baseDeps = {
   recipientEmail: 'user@example.com',
-  resetUrl: 'https://darktunes.com/login?type=recovery&code=abc123',
+  resetUrl: 'https://darktunes.com/login?type=recovery&code=abc123&token=xyz',
   settings: {
     ...SITE_SETTINGS_DEFAULTS,
     impressumCompanyName: 'darkTunes Music Group GmbH',
@@ -66,7 +66,8 @@ describe('sendPasswordResetEmail', () => {
     expect(body.subject).toBe(PASSWORD_RESET_EMAIL_SUBJECT)
     expect(body.from).toContain('darkTunes Music Group')
     expect(body.html).toContain('Reset password')
-    expect(body.html).toContain(baseDeps.resetUrl)
+    expect(body.html).toContain('type=recovery&amp;code=abc123&amp;token=xyz')
+    expect(body.html).not.toMatch(/href="[^"]*&code=/)
     expect(body.html).toContain('darkTunes Music Group GmbH')
     expect(body.html).toContain('legal@darktunes.com')
     expect(body.text).toContain(baseDeps.resetUrl)

@@ -13,6 +13,11 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#x27;')
 }
 
+/** Escape a URL for safe use inside an HTML href attribute (ampersands in query strings). */
+export function escapeHref(url: string): string {
+  return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
+
 function formatAddress(address: string): string {
   return escapeHtml(address).replace(/\n/g, '<br />')
 }
@@ -115,10 +120,11 @@ export function buildTransactionalEmailHtml(options: TransactionalEmailLayoutOpt
 }
 
 export function buildCtaButtonHtml(label: string, href: string): string {
+  const safeHref = escapeHref(href)
   return `<table cellpadding="0" cellspacing="0" style="margin: 24px 0;">
     <tr>
       <td style="border-radius: 6px; background-color: #493687;">
-        <a href="${href}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 6px; background-color: #493687;">
+        <a href="${safeHref}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 6px; background-color: #493687;">
           ${escapeHtml(label)}
         </a>
       </td>
@@ -127,8 +133,9 @@ export function buildCtaButtonHtml(label: string, href: string): string {
 }
 
 export function buildPlainUrlFallbackHtml(url: string): string {
+  const safeHref = escapeHref(url)
   return `<p style="margin: 16px 0 0; color: #666666; font-size: 13px; line-height: 1.6;">
     If the button does not work, copy and paste this link into your browser:<br />
-    <a href="${url}" style="color: #493687; word-break: break-all;">${escapeHtml(url)}</a>
+    <a href="${safeHref}" style="color: #493687; word-break: break-all;">${escapeHtml(url)}</a>
   </p>`
 }

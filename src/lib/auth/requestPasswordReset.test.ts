@@ -113,15 +113,19 @@ describe('requestPasswordReset', () => {
     expect(mockSendPasswordResetEmail).not.toHaveBeenCalled()
   })
 
-  it('returns error when Resend send fails', async () => {
+  it('falls back to Supabase when Resend send fails', async () => {
     mockGenerateLink.mockResolvedValue({
       data: { properties: { action_link: 'https://darktunes.com/login?type=recovery&code=xyz' } },
       error: null,
     })
     mockSendPasswordResetEmail.mockResolvedValue({ success: false, error: 'Resend down' })
+    mockResetPasswordForEmail.mockResolvedValue({ error: null })
 
     const result = await requestPasswordReset(makeAdminClient() as never, 'user@example.com', baseDeps)
 
-    expect(result).toEqual({ sent: false, error: 'Resend down', channel: 'resend' })
+    expect(result).toEqual({ sent: true, channel: 'supabase_fallback' })
+    expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
+      redirectTo: 'https://darktunes.com/login?type=recovery',
+    })
   })
 })

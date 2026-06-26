@@ -48,7 +48,7 @@ export async function requestPasswordReset(
   email: string,
   deps: RequestPasswordResetDeps,
 ): Promise<RequestPasswordResetResult> {
-  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedEmail = email.trim()
   const siteUrl = deps.siteUrl.replace(/\/$/, '')
 
   if (!deps.resendApiKey) {
@@ -84,7 +84,11 @@ export async function requestPasswordReset(
   })
 
   if (!sendResult.success) {
-    return { sent: false, error: sendResult.error, channel: 'resend' }
+    console.warn(
+      '[requestPasswordReset] Resend send failed — falling back to Supabase recovery email:',
+      sendResult.error,
+    )
+    return sendViaSupabaseFallback(adminClient, normalizedEmail, siteUrl)
   }
 
   return { sent: true, channel: 'resend' }
