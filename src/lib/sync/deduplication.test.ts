@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   deduplicateReleases,
   findCrossSourceMergeTarget,
+  registerSyncedRelease,
   normTitle,
   extractYear,
   type SpotifyReleaseInput,
@@ -152,6 +153,47 @@ describe('normTitle / extractYear', () => {
   })
 })
 
+describe('registerSyncedRelease', () => {
+  it('appends new rows for non-merged inserts', () => {
+    const existing: CrossSourceReleaseRow[] = []
+    registerSyncedRelease(
+      existing,
+      {
+        id: 'rel-new',
+        title: 'Album',
+        release_date: '2024-01-01',
+        spotify_id: 'sp-1',
+      },
+      false,
+    )
+    expect(existing).toHaveLength(1)
+    expect(existing[0].spotify_id).toBe('sp-1')
+  })
+
+  it('updates external IDs on merged rows', () => {
+    const existing: CrossSourceReleaseRow[] = [
+      {
+        id: 'rel-manual',
+        title: 'Album',
+        release_date: '2024-01-01',
+        spotify_id: null,
+        itunes_id: null,
+      },
+    ]
+    registerSyncedRelease(
+      existing,
+      {
+        id: 'rel-manual',
+        title: 'Album',
+        release_date: '2024-01-01',
+        spotify_id: 'sp-1',
+      },
+      true,
+    )
+    expect(existing[0].spotify_id).toBe('sp-1')
+  })
+})
+
 describe('findCrossSourceMergeTarget', () => {
   const spotifyRow: CrossSourceReleaseRow = {
     id: 'rel-spotify',
@@ -162,25 +204,75 @@ describe('findCrossSourceMergeTarget', () => {
   }
 
   it('merges iTunes into an existing Spotify row by title + year', () => {
-    const target = findCrossSourceMergeTarget([spotifyRow], 'Dark Matter', '2023-04-01')
+    const target = findCrossSourceMergeTarget(
+      [spotifyRow],
+      { title: 'Dark Matter', releaseDate: '2023-04-01' },
+      'itunes',
+    )
     expect(target?.id).toBe('rel-spotify')
   })
 
-  it('skips rows that already have an itunes_id', () => {
+  it('skips rows that already have an itunes_id for iTunes source', () => {
     const rowWithItunes: CrossSourceReleaseRow = { ...spotifyRow, itunes_id: 'it1' }
-    expect(findCrossSourceMergeTarget([rowWithItunes], 'Dark Matter', '2023-03-15')).toBeNull()
+    expect(
+      findCrossSourceMergeTarget(
+        [rowWithItunes],
+        { title: 'Dark Matter', releaseDate: '2023-03-15' },
+        'itunes',
+      ),
+    ).toBeNull()
   })
 
-  it('skips rows without spotify_id', () => {
-    const itunesOnly: CrossSourceReleaseRow = { ...spotifyRow, spotify_id: null }
-    expect(findCrossSourceMergeTarget([itunesOnly], 'Dark Matter', '2023-03-15')).toBeNull()
+  it('merges into manual rows without external IDs', () => {
+    const manualRow: CrossSourceReleaseRow = {
+      id: 'rel-manual',
+      title: 'Dark Matter',
+      release_date: '2023-03-15',
+      spotify_id: null,
+      itunes_id: null,
+    }
+    const target = findCrossSourceMergeTarget(
+      [manualRow],
+      { title: 'Dark Matter', releaseDate: '2023-04-01' },
+      'spotify',
+    )
+    expect(target?.id).toBe('rel-manual')
+  })
+
+  it('matches by ISRC before title', () => {
+    const manualRow: CrossSourceReleaseRow = {
+      id: 'rel-isrc',
+      title: 'Different Title',
+      release_date: '2020-01-01',
+      spotify_id: null,
+      itunes_id: null,
+      isrc: 'US123',
+    }
+    const target = findCrossSourceMergeTarget(
+      [manualRow],
+      { title: 'Other', releaseDate: '2024-01-01', isrc: 'US123' },
+      'spotify',
+    )
+    expect(target?.id).toBe('rel-isrc')
   })
 
   it('returns null when years differ by more than one year', () => {
-    expect(findCrossSourceMergeTarget([spotifyRow], 'Dark Matter', '2020-01-01')).toBeNull()
+    expect(
+      findCrossSourceMergeTarget(
+        [spotifyRow],
+        { title: 'Dark Matter', releaseDate: '2020-01-01' },
+        'itunes',
+      ),
+    ).toBeNull()
   })
 
   it('returns null when titles differ', () => {
-    expect(findCrossSourceMergeTarget([spotifyRow], 'Other Album', '2023-03-15')).toBeNull()
+    expect(
+      findCrossSourceMergeTarget(
+        [spotifyRow],
+        { title: 'Other Album', releaseDate: '2023-03-15' },
+        'itunes',
+      ),
+    ).toBeNull()
   })
 })

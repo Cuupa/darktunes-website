@@ -21,6 +21,7 @@ import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 import { isValidCronSecret } from '@/lib/cronAuth'
+import { enqueueOdesliSyncJob, enqueueSpotifySyncJobs } from '@/lib/api/syncQueue'
 import { syncAll } from '@/lib/sync/syncAll'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
 import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
@@ -165,6 +166,27 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     if (!NO_R2_APIS.has(apiSource ?? '')) {
       throw buildApiError('CONFIG_ERROR', 500)
     }
+  }
+
+  if (apiSource === 'spotify') {
+    const queued = await enqueueSpotifySyncJobs(db)
+    return NextResponse.json({
+      accepted: true,
+      queued,
+      message: `${queued} Spotify sync job(s) enqueued.`,
+    })
+  }
+
+  if (apiSource === 'odesli') {
+    const queued = await enqueueOdesliSyncJob(db)
+    return NextResponse.json({
+      accepted: true,
+      queued,
+      message:
+        queued > 0
+          ? 'Odesli sync job enqueued.'
+          : 'Odesli sync already pending or running.',
+    })
   }
 
   const uploadFn: (imageUrl: string, keyPrefix: string) => Promise<string> =

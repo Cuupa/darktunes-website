@@ -317,16 +317,26 @@ Body:    { "type": "bandsintown" }
 
 ---
 
-## ✅ Vercel Cron Job Validation
+## ✅ Supabase Cron Validation (sync scheduling)
 
-After deployment, verify that Vercel cron jobs are active:
-1. Vercel Dashboard → Project → **Cron Jobs** tab.
-2. Confirm all three cron entries appear:
-   - `/api/sync-youtube` — daily 06:00 UTC (YouTube channel sync)
-   - `/api/sync` — daily 03:00 UTC (enqueues async artist sync jobs)
-   - `/api/sync` — every 5 minutes (claims and processes pending `sync_queue` jobs)
-3. Check **Last execution** timestamp and status after 24 hours.
-4. If a cron fails: Admin Panel → **Logs** tab → **Error Log** → filter by `api_source`.
+Sync is scheduled via **Supabase Cron** calling the `trigger-sync` Edge Function (not Vercel Cron). After deployment, configure in Supabase Dashboard → **Integrations → Cron** (or Database → Cron Jobs):
+
+| Schedule | `trigger-sync` type | Action |
+|----------|---------------------|--------|
+| `0 3 * * *` | `all` | Enqueue full artist sync |
+| `*/5 * * * *` | `process-queue` | Process `sync_queue` jobs |
+| `0 6 * * *` | `youtube` | YouTube channel sync |
+
+Optional daily: `requeue-failed` → `POST /api/sync/requeue`.
+
+Before applying `releases_spotify_id_key` / `releases_discogs_id_key` UNIQUE constraints from `reset.sql`, dedupe existing rows:
+
+```sql
+SELECT spotify_id, COUNT(*) FROM releases WHERE spotify_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+SELECT discogs_id, COUNT(*) FROM releases WHERE discogs_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+```
+
+If a sync fails: Admin → **System** → Error Log → filter by `api_source`.
 
 ---
 

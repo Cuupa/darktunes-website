@@ -16,16 +16,25 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { withExponentialBackoff } from '@/lib/rateLimiter'
 import { searchItunesArtist } from '@/lib/itunesApi'
-import { upsertReleaseByItunesId } from '@/lib/api/releases'
+import { syncReleaseFromExternalSource } from '@/lib/api/releases'
 import { mapWithConcurrency } from '@/lib/mapWithConcurrency'
-import {
-  findCrossSourceMergeTarget,
-  type CrossSourceReleaseRow,
-} from '@/lib/sync/deduplication'
+import { withApiRetry } from '@/lib/sync/retryPolicy'
+import type { CrossSourceReleaseRow } from '@/lib/sync/deduplication'
 
 const RELEASE_SYNC_CONCURRENCY = 5
+
+/** Serialises merge/upsert so parallel workers share one consistent in-memory release list. */
+let releaseSyncLock: Promise<void> = Promise.resolve()
+
+async function withReleaseSyncLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = releaseSyncLock.then(fn)
+  releaseSyncLock = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
 
 export interface SyncDeps {
   /** Supabase client with service-role access for writes */
@@ -105,44 +114,27 @@ async function processItunesRelease(
   const itunesId = String(release.collectionId)
 
   try {
-    const mergeTarget = findCrossSourceMergeTarget(
-      existingReleases,
-      release.collectionName,
-      releaseDate,
-    )
-
-    if (mergeTarget) {
-      const { error: mergeErr } = await db
-        .from('releases')
-        .update({
-          itunes_id: itunesId,
+    const { release: upsertedRelease, merged } = await withReleaseSyncLock(() =>
+      syncReleaseFromExternalSource(
+        db,
+        'itunes',
+        {
+          title: release.collectionName,
+          artist_id: artistId,
+          release_date: releaseDate,
+          cover_art: artworkUrl ?? null,
+          type: deriveReleaseType(release.trackCount),
           apple_music_url: release.collectionViewUrl,
-          ...(artworkUrl ? { cover_art: artworkUrl } : {}),
-        })
-        .eq('id', mergeTarget.id)
-
-      if (mergeErr) throw new Error(mergeErr.message)
-
-      mergeTarget.itunes_id = itunesId
-      await cacheCoverArt(db, uploadToR2, mergeTarget.id, release.collectionName, artworkUrl, releaseErrors)
-
-      return { upserted: true, merged: true, errors: releaseErrors }
-    }
-
-    const upsertedRelease = await upsertReleaseByItunesId(db, {
-      title: release.collectionName,
-      artist_id: artistId,
-      release_date: releaseDate,
-      cover_art: artworkUrl ?? null,
-      type: deriveReleaseType(release.trackCount),
-      apple_music_url: release.collectionViewUrl,
-      itunes_id: itunesId,
-      featured: false,
-    })
+          itunes_id: itunesId,
+          featured: false,
+        },
+        existingReleases,
+      ),
+    )
 
     await cacheCoverArt(db, uploadToR2, upsertedRelease.id, release.collectionName, artworkUrl, releaseErrors)
 
-    return { upserted: true, merged: false, errors: releaseErrors }
+    return { upserted: true, merged, errors: releaseErrors }
   } catch (err) {
     return {
       upserted: false,
@@ -185,7 +177,7 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
 
   const { data: existingReleaseRows } = await db
     .from('releases')
-    .select('id, title, release_date, spotify_id, itunes_id')
+    .select('id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode')
     .eq('artist_id', artistId)
 
   const existingReleases: CrossSourceReleaseRow[] = (existingReleaseRows ?? []).map((row) => ({
@@ -194,12 +186,15 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
     release_date: row.release_date,
     spotify_id: row.spotify_id,
     itunes_id: row.itunes_id,
+    discogs_id: row.discogs_id,
+    isrc: row.isrc,
+    barcode: row.barcode,
   }))
 
   // 2. Fetch iTunes releases with exponential backoff
   let itunesReleases: Awaited<ReturnType<typeof searchItunesArtist>> = []
   try {
-    itunesReleases = await withExponentialBackoff(() =>
+    itunesReleases = await withApiRetry('itunes', () =>
       searchItunesArtist(artistRow.name, fetchFn, itunesArtistId ?? undefined),
     )
   } catch (err) {

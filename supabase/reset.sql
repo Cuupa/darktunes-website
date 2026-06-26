@@ -761,8 +761,18 @@ CREATE INDEX IF NOT EXISTS idx_releases_release_date ON public.releases (release
 CREATE INDEX IF NOT EXISTS idx_releases_featured     ON public.releases (featured);
 CREATE INDEX IF NOT EXISTS idx_releases_itunes_id    ON public.releases (itunes_id);
 CREATE INDEX IF NOT EXISTS idx_releases_visible      ON public.releases (is_visible);
-CREATE UNIQUE INDEX IF NOT EXISTS releases_spotify_id_key
-  ON public.releases (spotify_id) WHERE spotify_id IS NOT NULL;
+-- Full UNIQUE constraints (required for PostgREST upsert — partial indexes are unsupported).
+-- Before applying on a live DB, dedupe: SELECT spotify_id, COUNT(*) FROM releases
+-- WHERE spotify_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+DROP INDEX IF EXISTS releases_spotify_id_key;
+DO $$ BEGIN
+  ALTER TABLE public.releases ADD CONSTRAINT releases_spotify_id_key UNIQUE (spotify_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE public.releases ADD CONSTRAINT releases_discogs_id_key UNIQUE (discogs_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 DROP TRIGGER IF EXISTS trg_releases_updated_at ON public.releases;
 CREATE TRIGGER trg_releases_updated_at
@@ -1936,7 +1946,7 @@ DROP POLICY IF EXISTS "idempotency_keys: service_role only" ON public.idempotenc
 CREATE TABLE IF NOT EXISTS public.sync_queue (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id     UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
-  job_type      TEXT        NOT NULL DEFAULT 'full',  -- 'full' | 'spotify' | 'discogs' | 'youtube'
+  job_type      TEXT        NOT NULL DEFAULT 'full',  -- 'full' | 'spotify' | 'discogs' | 'youtube' | 'odesli'
   status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed'
   scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at    TIMESTAMPTZ,

@@ -216,13 +216,14 @@ The **SOS Generator** tab in the same Accounting page lets admins upload royalty
 
 **Do NOT** use a webhook or external HTTP POST to upload statements — the Server Action is the only supported upload path.
 
-## Monitoring Cron Jobs
+## Monitoring Sync Schedules
 
-Daily cron jobs run automatically via Vercel. To verify they ran:
-1. Vercel Dashboard → Project → Cron Jobs → view last execution time and status
-2. Admin Panel → Logs tab → Audit Log → filter by `api_source`
+Sync runs via **Supabase Cron** → `trigger-sync` Edge Function (not Vercel Cron). To verify:
+1. Supabase Dashboard → Cron Jobs → last execution time and status
+2. Admin → System → Health widget (queue stats, last sync per API)
+3. Admin → System → Audit Log → filter by `api_source`
 
-If a cron fails: check Admin → Logs → Error Log for the failed sync_logs entry.
+If sync fails: check Error Log for failed `sync_logs` entries; re-queue via System health or `POST /api/sync/requeue`.
 
 ## Creating a Journalist Account
 

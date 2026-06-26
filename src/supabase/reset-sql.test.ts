@@ -312,6 +312,13 @@ describe('supabase/reset.sql — static analysis', () => {
     expect(hasPermissionLine).toBeLessThan(usersCreateLine)
   })
 
+  it('defines full UNIQUE constraints for release external IDs (PostgREST upsert)', () => {
+    const sql = readFileSync(SQL_PATH, 'utf-8')
+    expect(sql).toMatch(/ADD CONSTRAINT releases_spotify_id_key UNIQUE \(spotify_id\)/)
+    expect(sql).toMatch(/ADD CONSTRAINT releases_discogs_id_key UNIQUE \(discogs_id\)/)
+    expect(sql).toMatch(/DROP INDEX IF EXISTS releases_spotify_id_key/)
+  })
+
   it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {
     const violations: string[] = []
 

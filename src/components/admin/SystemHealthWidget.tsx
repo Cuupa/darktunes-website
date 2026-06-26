@@ -299,6 +299,15 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         toast.success(
           `${getApiMeta(api).label} sync completed (${rows ?? 0} metric row${rows === 1 ? '' : 's'}).`,
         )
+      } else if (api === 'spotify' || api === 'odesli') {
+        const queued = data.queued as number | undefined
+        toast.success(
+          typeof queued === 'number' && queued > 0
+            ? `${getApiMeta(api).label} sync queued (${queued} job${queued === 1 ? '' : 's'}).`
+            : (typeof data.message === 'string'
+                ? data.message
+                : `${getApiMeta(api).label} sync already queued.`),
+        )
       } else {
         toast.success(`${getApiMeta(api).label} sync completed.`)
       }
