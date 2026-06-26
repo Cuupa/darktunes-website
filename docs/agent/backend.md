@@ -55,6 +55,17 @@ Health (`buildHealthSnapshot`), sync logs, app errors, maintenance routes. Cron 
 
 `subscribeToNewsletter` Server Action → pending row → Edge Function email → `GET /api/newsletter/verify`.
 
+## Password recovery email
+
+Public: `POST /api/auth/forgot-password` (rate-limited, enumeration-safe). Admin: `POST /api/admin/users/:id/reset-password`.
+
+Both use `requestPasswordReset()` in `src/lib/auth/requestPasswordReset.ts`:
+
+1. **Resend configured** (Admin → API Keys): `auth.admin.generateLink({ type: 'recovery' })` → branded HTML via `sendPasswordResetEmail()` with impressum footer from `site_settings`.
+2. **Resend not configured or send fails**: falls back to `auth.resetPasswordForEmail()` (Supabase built-in template).
+
+Recovery landing page unchanged: `/login?type=recovery`.
+
 ## Admin users & feature flags
 
 Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Two flag systems: `site_settings.feature_toggles` (global) + `portal_feature_flags` (per-module).
@@ -64,6 +75,7 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Two flag systems:
 | Route | Limit |
 |-------|-------|
 | `/api/contact` | 5 / 10 min |
+| `/api/auth/forgot-password` | 3 / 10 min |
 | `/api/newsletter` | 3 / 10 min |
 | `/api/journalist-applications` | 3 / 30 min |
 | `/api/page-events` | 120 / 10 min |
