@@ -34,6 +34,8 @@ export const POST = withErrorHandler(async (): Promise<NextResponse> => {
 
   if (error) throw new ApiError(500, error.message)
 
+  const startedAt = Date.now()
+
   const result = await syncListenerMetricsForArtists(
     serviceSupabase,
     (artists ?? []).map((a) => ({
@@ -47,6 +49,58 @@ export const POST = withErrorHandler(async (): Promise<NextResponse> => {
       soundchartsApiKey: soundchartsApiKey ?? undefined,
     },
   )
+
+  const durationMs = Date.now() - startedAt
+
+  if (lastfmApiKey) {
+    const lastfmErrors = result.errors
+      .filter((e) => e.source === 'lastfm')
+      .map((e) => `${e.artistId}: ${e.message}`)
+    const lastfmStatus =
+      lastfmErrors.length === 0 ? 'success' : result.lastfmRows > 0 ? 'partial' : 'error'
+
+    await serviceSupabase.from('sync_logs').insert({
+      artist_id: null,
+      status: lastfmStatus,
+      message: lastfmErrors[0] ?? null,
+      releases_synced: result.lastfmRows,
+      errors: lastfmErrors,
+      api_source: 'lastfm',
+      rate_limited: false,
+      duration_ms: durationMs,
+      metadata: {
+        artists_processed: result.artistsProcessed,
+        source: 'lastfm',
+      },
+    })
+  }
+
+  if (soundchartsApiKey) {
+    const soundchartsErrors = result.errors
+      .filter((e) => e.source === 'soundcharts')
+      .map((e) => `${e.artistId}: ${e.message}`)
+    const soundchartsStatus =
+      soundchartsErrors.length === 0
+        ? 'success'
+        : result.soundchartsRows > 0
+          ? 'partial'
+          : 'error'
+
+    await serviceSupabase.from('sync_logs').insert({
+      artist_id: null,
+      status: soundchartsStatus,
+      message: soundchartsErrors[0] ?? null,
+      releases_synced: result.soundchartsRows,
+      errors: soundchartsErrors,
+      api_source: 'soundcharts',
+      rate_limited: false,
+      duration_ms: durationMs,
+      metadata: {
+        artists_processed: result.artistsProcessed,
+        source: 'soundcharts',
+      },
+    })
+  }
 
   return NextResponse.json(result)
 })

@@ -159,25 +159,40 @@ export async function getKnownApiConfiguration(
     discogsToken,
     songkickApiKey,
     bandsintownApiKey,
+    lastfmApiKey,
+    soundchartsApiKey,
     youtubeApiKey,
     youtubeChannelId,
+    artistsWithBandsintownKey,
   ] = await Promise.all([
     getApiCredential(db, 'spotify_client_id'),
     getApiCredential(db, 'spotify_client_secret'),
     getApiCredential(db, 'discogs_token'),
     getApiCredential(db, 'songkick_api_key'),
     getApiCredential(db, 'bandsintown_api_key'),
+    getApiCredential(db, 'lastfm_api_key'),
+    getApiCredential(db, 'soundcharts_api_key'),
     getApiCredential(db, 'youtube_api_key'),
     getApiCredential(db, 'youtube_channel_id'),
+    db
+      .from('artists')
+      .select('id', { count: 'exact', head: true })
+      .not('bandsintown_api_key', 'is', null)
+      .then(({ count }) => count ?? 0),
   ])
+
+  const hasBandsintown =
+    Boolean(bandsintownApiKey) || (typeof artistsWithBandsintownKey === 'number' && artistsWithBandsintownKey > 0)
 
   return {
     itunes: true,
     spotify: Boolean(spotifyClientId && spotifyClientSecret),
     discogs: Boolean(discogsToken),
     songkick: Boolean(songkickApiKey),
-    bandsintown: Boolean(bandsintownApiKey),
+    bandsintown: hasBandsintown,
     odesli: true,
+    lastfm: Boolean(lastfmApiKey),
+    soundcharts: Boolean(soundchartsApiKey),
     youtube: Boolean(youtubeApiKey && youtubeChannelId),
   }
 }

@@ -91,6 +91,38 @@ describe('fetchSpotifyArtistReleases', () => {
     expect(releases[0].releaseDate).toBe('2019-01-01')
   })
 
+  it('extracts artist ID from intl-de Spotify URLs', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      const hostname = new URL(url).hostname
+      if (hostname === 'accounts.spotify.com') {
+        return { ok: true, json: async () => TOKEN_RESPONSE } as Response
+      }
+      expect(url).toContain('/artists/1Cs0zKBU1kc0i8ypK3B9ai/albums')
+      expect(url).not.toContain('%2C')
+      return { ok: true, json: async () => ALBUM_RESPONSE } as Response
+    })
+
+    await fetchSpotifyArtistReleases(
+      'https://open.spotify.com/intl-de/artist/1Cs0zKBU1kc0i8ypK3B9ai',
+      'client-id',
+      'client-secret',
+      mockFetch,
+    )
+  })
+
+  it('throws HttpError for invalid Spotify artist identifiers', async () => {
+    const mockFetch = makeFetch(TOKEN_RESPONSE, ALBUM_RESPONSE)
+    await expect(
+      fetchSpotifyArtistReleases('https://open.spotify.com/album/not-an-artist', 'id', 'secret', mockFetch),
+    ).rejects.toThrow('Invalid Spotify artist ID')
+  })
+
+  it('returns empty array when Spotify response has no items', async () => {
+    const mockFetch = makeFetch(TOKEN_RESPONSE, {})
+    const releases = await fetchSpotifyArtistReleases('artist123', 'id', 'secret', mockFetch)
+    expect(releases).toEqual([])
+  })
+
   it('throws HttpError when the Spotify API returns a non-ok status', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('accounts.spotify.com')) {

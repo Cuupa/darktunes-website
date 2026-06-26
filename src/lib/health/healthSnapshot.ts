@@ -48,6 +48,8 @@ export function getKnownApisFallback(): Record<string, boolean> {
     songkick: false,
     bandsintown: false,
     odesli: true,
+    lastfm: false,
+    soundcharts: false,
     youtube: false,
   }
 }

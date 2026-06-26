@@ -12,9 +12,25 @@ export const API_SOURCE_ORDER = [
   'songkick',
   'bandsintown',
   'odesli',
+  'lastfm',
+  'soundcharts',
   'youtube',
   'all',
 ] as const
+
+/** How to configure each integration (stored in Admin → API Keys unless noted). */
+export const API_CONFIG_HINTS: Record<string, string> = {
+  itunes: 'No API key required — uses the public Apple Music lookup API.',
+  spotify: 'Add Spotify Client ID and Client Secret in Admin → API Keys.',
+  discogs: 'Add a Discogs personal access token in Admin → API Keys.',
+  songkick: 'Add a Songkick API key in Admin → API Keys.',
+  bandsintown:
+    'Per-artist API keys on artist profiles, or a global fallback key in Admin → API Keys.',
+  odesli: 'No API key required — free song.link smart-link resolution.',
+  lastfm: 'Add a Last.fm API key in Admin → API Keys. Artists need a Last.fm name.',
+  soundcharts: 'Optional — add a Soundcharts API key in Admin → API Keys.',
+  youtube: 'Add YouTube API key and Channel ID in Admin → API Keys.',
+}
 
 /** Sync crons run daily; flag as stale after 36 hours without a successful run. */
 export const STALE_SYNC_MS = 36 * 60 * 60 * 1000
@@ -86,7 +102,8 @@ function formatSyncMetrics(
   const parts: string[] = []
 
   if (snapshot.releasesSynced > 0) {
-    const unit = api === 'youtube' ? 'video' : 'release'
+    const unit =
+      api === 'youtube' ? 'video' : api === 'lastfm' || api === 'soundcharts' ? 'metric row' : 'release'
     parts.push(
       `${snapshot.releasesSynced} ${unit}${snapshot.releasesSynced === 1 ? '' : 's'}`,
     )
@@ -124,7 +141,9 @@ export function deriveApiHealth(
     return {
       operationalState: 'unconfigured',
       statusLabel: 'Not configured',
-      statusDetail: 'Required environment variables are missing on this deployment.',
+      statusDetail:
+        API_CONFIG_HINTS[api] ??
+        'Add the required credentials in Admin → API Keys.',
     }
   }
 

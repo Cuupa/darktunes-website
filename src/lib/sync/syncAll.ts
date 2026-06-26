@@ -26,7 +26,7 @@ import { fetchSpotifyArtistReleases } from './spotifyApi'
 import { fetchDiscogsArtistReleases } from './discogsApi'
 import { fetchSongkickArtistCalendar } from './songkickApi'
 import { fetchBandsintownArtistEvents } from './bandsintownApi'
-import { resolveOdesliSmartLink } from './odesliApi'
+import { isSkippableOdesliError, pickOdesliMusicUrl, resolveOdesliSmartLink } from './odesliApi'
 import { deduplicateReleases } from './deduplication'
 import { syncArtist } from './syncArtist'
 import type { SyncDeps } from './syncArtist'
@@ -183,14 +183,18 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
           try {
             // Resolve Odesli smart link for Spotify releases
             let smartUrl: string | null = null
+            let platformLinks: Record<string, string> | null = null
             let appleMusicUrl: string | null = null
-            if (release.spotifyUrl) {
+            const odesliSourceUrl = release.spotifyUrl
+              ? pickOdesliMusicUrl(release.spotifyUrl, null)
+              : null
+            if (odesliSourceUrl) {
               const odesli = await withExponentialBackoff(() =>
-                resolveOdesliSmartLink(release.spotifyUrl!, fetchFn),
+                resolveOdesliSmartLink(odesliSourceUrl, fetchFn),
               ).catch(() => null)
               if (odesli) {
                 smartUrl = odesli.smartUrl
-                // Save Apple Music URL if Odesli returns it
+                platformLinks = odesli.platforms
                 appleMusicUrl = odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
               }
             }
@@ -227,6 +231,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
                   catalog_number: release.catalogNumber,
                   popularity: release.popularity,
                   smart_url: smartUrl,
+                  platform_links: platformLinks,
                   featured: preservedFeatured,
                 },
                 { onConflict: 'spotify_id' },
@@ -261,7 +266,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       } catch (e) {
         const msg = String(e)
         if (msg.includes('429')) spotifyResult.rateLimited = true
-        if (msg.includes('Invalid limit')) spotifyResult.rateLimited = true
 
         spotifyResult.errors.push(`Spotify sync for ${artist.name}: ${msg}`)
       }
@@ -527,7 +531,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
 
       for (const release of releasesWithoutSmartUrl ?? []) {
-        const musicUrl = release.spotify_url ?? release.apple_music_url
+        const musicUrl = pickOdesliMusicUrl(release.spotify_url, release.apple_music_url)
         if (!musicUrl) continue
 
         odesliResult.artistsProcessed++ // counts releases attempted (field reused for parity)
@@ -551,6 +555,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               .from('releases')
               .update({
                 smart_url: odesli.smartUrl,
+                platform_links: odesli.platforms,
                 ...(appleMusicUrl && !release.apple_music_url
                   ? { apple_music_url: appleMusicUrl }
                   : {}),
@@ -565,8 +570,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               odesliResult.releasesUpserted++
             }
           } else if (odesliErr) {
-            // Only push an error if there was an actual failure (not just "not found")
-            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+            if (!isSkippableOdesliError(odesliErr)) {
               odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${odesliErr}`)
             }
             if (odesliErr.includes('429')) odesliResult.rateLimited = true
@@ -582,9 +586,8 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     results.push(odesliResult)
   }
 
-  // 7. Odesli platform links for artists — finds all artists that have a
-  // Spotify URL or Apple Music URL but no platform_links yet, and resolves
-  // each one through Odesli to populate per-platform streaming URLs.
+  // 7. Odesli platform links for artists — uses each artist's latest
+  // resolvable release URL as proxy (artist profile URLs are not supported).
   // Results are merged into the existing odesliResult (same api_source).
   if (!onlyApi || onlyApi === 'odesli') {
     // Find the existing odesliResult from step 6, or create a fresh one when
@@ -592,11 +595,37 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     const existingOdesli = results.find((r) => r.api === 'odesli')
 
     try {
+      // Odesli cannot resolve artist profile URLs — use each artist's latest release as proxy.
+      let releaseProxyQuery = db
+        .from('releases')
+        .select('artist_id, spotify_url, apple_music_url, release_date')
+        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+        .order('release_date', { ascending: false })
+
+      if (onlyArtistId) {
+        releaseProxyQuery = releaseProxyQuery.eq('artist_id', onlyArtistId)
+      }
+
+      const { data: proxyReleaseRows, error: proxyErr } = await releaseProxyQuery
+
+      if (proxyErr) {
+        existingOdesli?.errors.push(`Odesli release proxy query failed: ${proxyErr.message}`)
+      }
+
+      const releaseProxyByArtist = new Map<string, string>()
+      for (const row of proxyReleaseRows ?? []) {
+        if (!row.artist_id || releaseProxyByArtist.has(row.artist_id)) continue
+        const proxyUrl = pickOdesliMusicUrl(row.spotify_url, row.apple_music_url)
+        if (proxyUrl) releaseProxyByArtist.set(row.artist_id, proxyUrl)
+      }
+
+      const proxyArtistIds = [...releaseProxyByArtist.keys()]
+      if (proxyArtistIds.length > 0) {
       let artistsQuery = db
         .from('artists')
-        .select('id, spotify_url, apple_music_url')
+        .select('id')
         .is('platform_links', null)
-        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+        .in('id', proxyArtistIds)
 
       if (onlyArtistId) {
         artistsQuery = artistsQuery.eq('id', onlyArtistId)
@@ -609,7 +638,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       }
 
       for (const artist of artistsWithoutPlatformLinks ?? []) {
-        const musicUrl = artist.spotify_url ?? artist.apple_music_url
+        const musicUrl = releaseProxyByArtist.get(artist.id)
         if (!musicUrl) continue
 
         if (existingOdesli) existingOdesli.artistsProcessed++
@@ -639,8 +668,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               if (existingOdesli) existingOdesli.releasesUpserted++ // counts artist updates (field reused for parity)
             }
           } else if (odesliErr) {
-            // 404/no-match responses are expected for some artists — skip silently
-            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+            if (!isSkippableOdesliError(odesliErr)) {
               existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
             }
             if (odesliErr.includes('429') && existingOdesli) existingOdesli.rateLimited = true
@@ -648,6 +676,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         } catch (e) {
           existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${String(e)}`)
         }
+      }
       }
     } catch (e) {
       existingOdesli?.errors.push(`Odesli artist batch query failed: ${String(e)}`)

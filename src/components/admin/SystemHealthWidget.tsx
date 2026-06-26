@@ -29,10 +29,13 @@ import {
   Bell,
   ChartLine,
   Clock,
+  Headphones,
+  Waveform,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
+  API_CONFIG_HINTS,
   formatDurationMs,
   sortApiSources,
   type ApiOperationalState,
@@ -63,8 +66,12 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
   bandsintown: { label: 'Bandsintown', icon: <Ticket size={16} weight="bold" aria-hidden="true" /> },
   youtube: { label: 'YouTube', icon: <YoutubeLogo size={16} weight="bold" aria-hidden="true" /> },
   odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" aria-hidden="true" /> },
+  lastfm: { label: 'Last.fm', icon: <Headphones size={16} weight="bold" aria-hidden="true" /> },
+  soundcharts: { label: 'Soundcharts', icon: <Waveform size={16} weight="bold" aria-hidden="true" /> },
   all: { label: 'Full pipeline', icon: <ArrowsClockwise size={16} weight="bold" aria-hidden="true" /> },
 }
+
+const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts'])
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
   return (
@@ -238,18 +245,35 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const handleSyncApi = async (api: string) => {
     setSyncingApi(api)
     try {
-      const res = await fetch('/api/sync-api', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${bearerToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ apiSource: api }),
-      })
-      const data = (await res.json()) as { error?: string }
+      const res = LISTENER_SYNC_APIS.has(api)
+        ? await fetch('/api/admin/analytics/sync-listeners', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${bearerToken}` },
+          })
+        : await fetch('/api/sync-api', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${bearerToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ apiSource: api }),
+          })
+
+      const data = (await res.json()) as {
+        error?: string
+        lastfmRows?: number
+        soundchartsRows?: number
+      }
       if (!res.ok) throw new Error(data.error ?? `Sync failed (${res.status})`)
 
-      toast.success(`${getApiMeta(api).label} sync completed.`)
+      if (LISTENER_SYNC_APIS.has(api)) {
+        const rows = api === 'soundcharts' ? data.soundchartsRows : data.lastfmRows
+        toast.success(
+          `${getApiMeta(api).label} sync completed (${rows ?? 0} metric row${rows === 1 ? '' : 's'}).`,
+        )
+      } else {
+        toast.success(`${getApiMeta(api).label} sync completed.`)
+      }
       await fetchHealth()
     } catch (err) {
       toast.error(`${getApiMeta(api).label} sync failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -636,13 +660,22 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                     </p>
                   )}
                   {!status.configured && (
-                    <p>Missing server env vars for this integration.</p>
+                    <p>{API_CONFIG_HINTS[api] ?? 'Configure in Admin → API Keys.'}</p>
                   )}
-                  {api === 'discogs' && status.operationalState === 'idle' && (
+                  {api === 'discogs' && status.configured && status.operationalState === 'idle' && (
                     <p>Also runs inside Spotify sync when artists have a Discogs ID.</p>
                   )}
-                  {api === 'odesli' && status.operationalState === 'idle' && (
-                    <p>Resolves smart links after Spotify releases sync.</p>
+                  {api === 'bandsintown' && status.configured && (
+                    <p>Keys are per artist on the profile; global key is an optional fallback.</p>
+                  )}
+                  {api === 'odesli' && status.configured && status.operationalState === 'idle' && (
+                    <p>Resolves smart links from release album/track URLs.</p>
+                  )}
+                  {api === 'lastfm' && status.configured && (
+                    <p>Syncs monthly listener trends for portal artists.</p>
+                  )}
+                  {api === 'soundcharts' && status.configured && (
+                    <p>Optional paid listener analytics — requires Soundcharts UUID per artist.</p>
                   )}
                 </div>
 
@@ -653,7 +686,11 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                     {status.releasesSynced !== null && status.releasesSynced > 0 && (
                       <li>
                         {status.releasesSynced}{' '}
-                        {api === 'youtube' ? 'video' : 'release'}
+                        {api === 'youtube'
+                          ? 'video'
+                          : api === 'lastfm' || api === 'soundcharts'
+                            ? 'metric row'
+                            : 'release'}
                         {status.releasesSynced === 1 ? '' : 's'} on last run
                       </li>
                     )}

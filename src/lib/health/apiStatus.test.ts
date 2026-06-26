@@ -33,10 +33,16 @@ describe('formatDurationMs', () => {
 })
 
 describe('deriveApiHealth', () => {
-  it('reports unconfigured APIs', () => {
+  it('reports unconfigured APIs with API Keys hint', () => {
     const result = deriveApiHealth('spotify', false, null, NOW)
     expect(result.operationalState).toBe('unconfigured')
     expect(result.statusLabel).toBe('Not configured')
+    expect(result.statusDetail).toContain('Admin → API Keys')
+  })
+
+  it('describes per-artist Bandsintown configuration', () => {
+    const result = deriveApiHealth('bandsintown', false, null, NOW)
+    expect(result.statusDetail).toContain('Per-artist')
   })
 
   it('reports idle when configured but never synced', () => {
@@ -132,8 +138,9 @@ describe('parseSyncLogSnapshot', () => {
 
 describe('sortApiSources', () => {
   it('orders known APIs before unknown sources', () => {
-    expect(sortApiSources(['youtube', 'itunes', 'custom'])).toEqual([
+    expect(sortApiSources(['youtube', 'lastfm', 'itunes', 'custom'])).toEqual([
       'itunes',
+      'lastfm',
       'youtube',
       'custom',
     ])
