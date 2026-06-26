@@ -161,9 +161,10 @@ export function ReleasesManager() {
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
   const { news, updateNewsPost } = useNews()
   const [featuredBumpConfirm, setFeaturedBumpConfirm] = useState<{
-    release: Release
     bumpTarget: HeroFeaturedItem
     message: string
+    release?: Release
+    pendingSave?: ReleaseFormData
   } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRelease, setEditingRelease] = useState<Release | null>(null)
@@ -206,47 +207,71 @@ export function ReleasesManager() {
     setDialogOpen(true)
   }
 
+  const persistReleaseForm = async (data: ReleaseFormData, bumpTarget?: HeroFeaturedItem) => {
+    if (bumpTarget) {
+      await bumpHeroItem(bumpTarget)
+    }
+
+    if (editingRelease) {
+      await updateRelease(editingRelease.id, formDataToInsert(data))
+      await supabase
+        .from('release_artists' as const)
+        .delete()
+        .eq('release_id', editingRelease.id)
+      if ((data.artistIds ?? []).length > 0) {
+        const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+          release_id: editingRelease.id,
+          artist_id: artistId,
+          sort_order: i,
+        }))
+        await supabase.from('release_artists' as const).insert(inserts)
+      }
+      toast.success(`Updated "${data.title}"`)
+      return
+    }
+
+    await createRelease(formDataToInsert(data))
+    if ((data.artistIds ?? []).length > 0) {
+      const { data: row } = await supabase
+        .from('releases')
+        .select('id')
+        .eq('title', data.title)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (row) {
+        const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+          release_id: row.id,
+          artist_id: artistId,
+          sort_order: i,
+        }))
+        await supabase.from('release_artists' as const).insert(inserts)
+      }
+    }
+    toast.success(`Created "${data.title}"`)
+  }
+
   const handleSave = async (data: ReleaseFormData) => {
+    const enablingFeatured = data.featured && (!editingRelease || !editingRelease.featured)
+    if (enablingFeatured) {
+      const preview = previewFeaturedBump(releases, news, {
+        id: editingRelease?.id ?? 'new-release',
+        kind: 'release',
+      })
+      if (preview.needsConfirm && preview.bumpTarget) {
+        setFeaturedBumpConfirm({
+          bumpTarget: preview.bumpTarget,
+          message: preview.message,
+          release: editingRelease ?? undefined,
+          pendingSave: data,
+        })
+        return
+      }
+    }
+
     setIsMutating(true)
     try {
-      if (editingRelease) {
-        await updateRelease(editingRelease.id, formDataToInsert(data))
-        // Update junction table: replace all entries for this release
-        await supabase
-          .from('release_artists' as const)
-          .delete()
-          .eq('release_id', editingRelease.id)
-        if ((data.artistIds ?? []).length > 0) {
-          const inserts = (data.artistIds ?? []).map((artistId, i) => ({
-            release_id: editingRelease.id,
-            artist_id: artistId,
-            sort_order: i,
-          }))
-          await supabase.from('release_artists' as const).insert(inserts)
-        }
-        toast.success(`Updated "${data.title}"`)
-      } else {
-        await createRelease(formDataToInsert(data))
-        // Save junction table entries for newly created release
-        if ((data.artistIds ?? []).length > 0) {
-          const { data: row } = await supabase
-            .from('releases')
-            .select('id')
-            .eq('title', data.title)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-          if (row) {
-            const inserts = (data.artistIds ?? []).map((artistId, i) => ({
-              release_id: row.id,
-              artist_id: artistId,
-              sort_order: i,
-            }))
-            await supabase.from('release_artists' as const).insert(inserts)
-          }
-        }
-        toast.success(`Created "${data.title}"`)
-      }
+      await persistReleaseForm(data)
       setDialogOpen(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
@@ -425,9 +450,9 @@ export function ReleasesManager() {
     const preview = previewFeaturedBump(releases, news, { id: release.id, kind: 'release' })
     if (preview.needsConfirm && preview.bumpTarget) {
       setFeaturedBumpConfirm({
-        release,
         bumpTarget: preview.bumpTarget,
         message: preview.message,
+        release,
       })
       return
     }
@@ -832,14 +857,24 @@ export function ReleasesManager() {
             <AlertDialogAction
               onClick={() => {
                 if (!featuredBumpConfirm) return
-                void applyFeaturedToggle(
-                  featuredBumpConfirm.release,
-                  featuredBumpConfirm.bumpTarget,
-                )
-                  .catch((err) => {
-                    toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
-                  })
-                  .finally(() => setFeaturedBumpConfirm(null))
+                const confirm = featuredBumpConfirm
+                setFeaturedBumpConfirm(null)
+
+                if (confirm.pendingSave) {
+                  setIsMutating(true)
+                  void persistReleaseForm(confirm.pendingSave, confirm.bumpTarget)
+                    .then(() => setDialogOpen(false))
+                    .catch((err) => {
+                      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
+                    })
+                    .finally(() => setIsMutating(false))
+                  return
+                }
+
+                if (!confirm.release) return
+                void applyFeaturedToggle(confirm.release, confirm.bumpTarget).catch((err) => {
+                  toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
+                })
               }}
             >
               OK

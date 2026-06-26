@@ -29,6 +29,7 @@ export function sanitizeReleaseWrite<T extends ReleaseInsert | ReleaseUpdate>(da
 export function sanitizeNewsWrite<T extends NewsInsert | NewsUpdate>(data: T): T {
   const next = { ...data }
   if (typeof next.title === 'string') next.title = stripEmojis(next.title)
+  if (typeof next.slug === 'string') next.slug = stripEmojis(next.slug)
   if (typeof next.excerpt === 'string') next.excerpt = cleanText(next.excerpt) ?? null
   if (typeof next.content === 'string') next.content = cleanHtml(next.content) ?? ''
   return next

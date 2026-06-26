@@ -59,18 +59,22 @@ export async function persistEmojiCleanup(db: DbClient): Promise<number> {
 
   const { data: newsPosts, error: newsError } = await db
     .from('news_posts')
-    .select('id, title, excerpt, content')
+    .select('id, title, slug, excerpt, content')
   if (newsError) throw new Error(newsError.message)
 
   for (const row of newsPosts ?? []) {
     const patch: {
       title?: string
+      slug?: string
       excerpt?: string | null
       content?: string
     } = {}
 
     const title = cleanOptionalText(row.title)
     if (title !== row.title && typeof title === 'string') patch.title = title
+
+    const slug = cleanOptionalText(row.slug)
+    if (slug !== row.slug && typeof slug === 'string') patch.slug = slug
 
     const excerpt = cleanOptionalText(row.excerpt)
     if (excerpt !== row.excerpt) patch.excerpt = excerpt ?? null

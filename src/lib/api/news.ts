@@ -25,7 +25,7 @@ export function rowToNewsPost(row: NewsRow): NewsPost {
   return {
     id: row.id,
     title: stripEmojis(row.title),
-    slug: row.slug,
+    slug: stripEmojis(row.slug),
     excerpt: row.excerpt ? stripEmojis(row.excerpt) : '',
     content: stripEmojisFromHtml(row.content),
     imageUrl: row.image_url ?? undefined,

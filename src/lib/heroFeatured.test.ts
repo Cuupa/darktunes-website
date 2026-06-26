@@ -32,6 +32,21 @@ describe('collectHeroCandidates', () => {
     expect(collectHeroCandidates(releases, news).map((item) => item.id)).toEqual(['n1', 'r1'])
   })
 
+  it('excludes scheduled posts with a future publish date', () => {
+    const news = [
+      {
+        ...baseNews,
+        id: 'future',
+        title: 'Future',
+        featured: true,
+        status: 'scheduled',
+        publishedAt: '2099-01-01T00:00:00.000Z',
+      },
+    ] as NewsPost[]
+
+    expect(collectHeroCandidates([], news)).toEqual([])
+  })
+
   it('excludes expired featured items', () => {
     const releases = [
       {
@@ -88,6 +103,36 @@ describe('computeHeroFeaturedEnforcement', () => {
 
     expect(capacityUpdates).toHaveLength(2)
     expect(capacityUpdates.map((u) => u.id).sort()).toEqual(['r0', 'r1'])
+  })
+
+  it('removes no-duration items ranked below the top 10 even when duration items fill the list', () => {
+    const releases = [
+      ...Array.from({ length: 10 }, (_, index) => ({
+        ...baseRelease,
+        id: `timed-${index}`,
+        title: `Timed ${index}`,
+        featured: true,
+        featuredUntil: '2099-01-01T00:00:00.000Z',
+        releaseDate: `2024-${String(index + 1).padStart(2, '0')}-01`,
+      })),
+      {
+        ...baseRelease,
+        id: 'old',
+        title: 'Old',
+        featured: true,
+        releaseDate: '2020-01-01',
+      },
+    ] as Release[]
+
+    const updates = computeHeroFeaturedEnforcement(releases, [])
+    expect(updates).toEqual([
+      {
+        id: 'old',
+        kind: 'release',
+        featured: false,
+        featured_removed_reason: 'capacity',
+      },
+    ])
   })
 
   it('marks expired duration items separately', () => {

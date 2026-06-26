@@ -39,6 +39,7 @@ export async function enforceHeroFeaturedLimits(db: DbClient): Promise<number> {
       .update({
         featured: false,
         featured_removed_reason: update.featured_removed_reason,
+        featured_until: null,
         updated_at: now,
       })
       .eq('id', update.id)

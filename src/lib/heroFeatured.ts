@@ -27,6 +27,7 @@ export function isReleaseHeroEligible(release: Release, now = Date.now()): boole
 export function isNewsHeroEligible(post: NewsPost, now = Date.now()): boolean {
   if (!post.featured) return false
   if (post.status !== 'published' && post.status !== 'scheduled') return false
+  if (new Date(post.publishedAt).getTime() > now) return false
   if (post.featuredUntil && new Date(post.featuredUntil).getTime() <= now) return false
   return true
 }
@@ -138,17 +139,22 @@ export function computeHeroFeaturedEnforcement(
   const activeReleases = releases.filter((r) => !expiredKeys.has(`release:${r.id}`))
   const activeNews = news.filter((n) => !expiredKeys.has(`news:${n.id}`))
   const candidates = collectHeroCandidates(activeReleases, activeNews, now)
+  const updatedKeys = new Set(updates.map((update) => `${update.kind}:${update.id}`))
 
-  const noDuration = candidates.filter((item) => !item.featuredUntil)
-  if (noDuration.length > MAX_HERO_FEATURES) {
-    for (const item of noDuration.slice(MAX_HERO_FEATURES)) {
-      updates.push({
-        id: item.id,
-        kind: item.kind,
-        featured: false,
-        featured_removed_reason: 'capacity',
-      })
-    }
+  for (let index = MAX_HERO_FEATURES; index < candidates.length; index++) {
+    const item = candidates[index]
+    if (item.featuredUntil) continue
+
+    const key = `${item.kind}:${item.id}`
+    if (updatedKeys.has(key)) continue
+
+    updatedKeys.add(key)
+    updates.push({
+      id: item.id,
+      kind: item.kind,
+      featured: false,
+      featured_removed_reason: 'capacity',
+    })
   }
 
   return updates

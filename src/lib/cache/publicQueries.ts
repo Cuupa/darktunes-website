@@ -13,14 +13,11 @@
  */
 
 import { unstable_cache } from 'next/cache'
-import { revalidateTag } from 'next/cache'
 import { cache } from 'react'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicReleases } from '@/lib/api/releases'
-import { getPublicNewsPosts, publishScheduledNewsPosts } from '@/lib/api/news'
-import { persistEmojiCleanup } from '@/lib/emojiCleanup'
-import { enforceHeroFeaturedLimits } from '@/lib/heroFeaturedEnforcement'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getPublicNewsPosts } from '@/lib/api/news'
+import { runPublicContentMaintenance } from '@/lib/publicContentMaintenance'
 import { getPublicVideos } from '@/lib/api/videos'
 import { getPublicConcerts } from '@/lib/api/concerts'
 import { getPublicArtists } from '@/lib/api/artists'
@@ -32,20 +29,7 @@ const TTL = 60 // seconds
 /** All public releases, cache-keyed to the `releases` tag. */
 export const getCachedPublicReleases = cache(unstable_cache(
   async (): Promise<Release[]> => {
-    try {
-      const serviceDb = await createServiceRoleSupabaseClient()
-      const featuredChanged = await enforceHeroFeaturedLimits(serviceDb)
-      const emojiChanged = await persistEmojiCleanup(serviceDb)
-      if (featuredChanged > 0) revalidateTag('releases')
-      if (emojiChanged > 0) {
-        revalidateTag('releases')
-        revalidateTag('news')
-        revalidateTag('artists')
-        revalidateTag('site-settings')
-      }
-    } catch (err) {
-      console.error('[getCachedPublicReleases] Maintenance failed:', err)
-    }
+    await runPublicContentMaintenance()
     return getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[])
   },
   ['public-releases'],
@@ -55,23 +39,7 @@ export const getCachedPublicReleases = cache(unstable_cache(
 /** All public news posts, cache-keyed to the `news` tag. */
 export const getCachedPublicNews = cache(unstable_cache(
   async (): Promise<NewsPost[]> => {
-    try {
-      const serviceDb = await createServiceRoleSupabaseClient()
-      const publishedCount = await publishScheduledNewsPosts(serviceDb)
-      const featuredChanged = await enforceHeroFeaturedLimits(serviceDb)
-      const emojiChanged = await persistEmojiCleanup(serviceDb)
-      if (publishedCount > 0 || featuredChanged > 0 || emojiChanged > 0) {
-        revalidateTag('news')
-      }
-      if (featuredChanged > 0) revalidateTag('releases')
-      if (emojiChanged > 0) {
-        revalidateTag('releases')
-        revalidateTag('artists')
-        revalidateTag('site-settings')
-      }
-    } catch (err) {
-      console.error('[getCachedPublicNews] Maintenance failed:', err)
-    }
+    await runPublicContentMaintenance()
     return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[])
   },
   ['public-news'],
