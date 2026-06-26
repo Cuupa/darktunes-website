@@ -4,12 +4,10 @@ import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Calendar,
   ArrowLeft,
-  LinkSimple,
   Globe,
   SpotifyLogo,
   InstagramLogo,
@@ -20,7 +18,8 @@ import {
   MusicNote,
 } from '@phosphor-icons/react'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
-import { ODESLI_PLATFORM_CONFIG, ODESLI_PLATFORM_ORDER } from '@/lib/platforms/odesliPlatformConfig'
+import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
+import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { ShareButton } from '@/components/ShareButton'
 import { trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
@@ -40,14 +39,8 @@ interface ReleaseDetailContentProps {
  * the thumbnail seamlessly morphs into the large header image when the
  * user navigates from the grid to this detail page.
  *
- * Odesli smart link: if `release.smartUrl` is populated (resolved by the
- * syncAll pipeline via the Odesli API), a "Listen Everywhere" button is
- * shown that deep-links to song.link — a universal streaming hub that
- * redirects the visitor to their preferred platform.
- *
- * Per-platform links: if `release.platformLinks` is populated, individual
- * platform buttons are rendered for all available services (Deezer, Tidal,
- * Amazon Music, etc.) rather than only Spotify and Apple Music.
+ * Per-platform streaming buttons: Odesli-resolved `platformLinks` merged
+ * with individually stored URLs (Spotify, Apple Music, Tidal, Amazon, etc.).
  */
 export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentProps) {
   const t = useTranslations('releaseDetail')
@@ -60,30 +53,13 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
     day: 'numeric',
   })
 
-  /**
-   * Resolve all platform URLs to display.
-   * Priority order:
-   *   1. Odesli-resolved `platformLinks` (most complete – includes all streaming services)
-   *   2. Fallback to the individually stored spotify_url / apple_music_url / youtube_url fields
-   */
-  const platformEntries: Array<{ key: string; url: string }> = (() => {
-    if (release.platformLinks && Object.keys(release.platformLinks).length > 0) {
-      // Sort by PLATFORM_ORDER, then append any unknown keys alphabetically
-      const known = ODESLI_PLATFORM_ORDER.filter((k) => release.platformLinks![k])
-      const unknown = Object.keys(release.platformLinks)
-        .filter((k) => !ODESLI_PLATFORM_ORDER.includes(k))
-        .sort()
-      return [...known, ...unknown].map((k) => ({ key: k, url: release.platformLinks![k] }))
-    }
-    // Fallback: use the individual URL fields
-    const fallback: Array<{ key: string; url: string }> = []
-    if (release.spotifyUrl)    fallback.push({ key: 'spotify',    url: release.spotifyUrl })
-    if (release.appleMusicUrl) fallback.push({ key: 'appleMusic', url: release.appleMusicUrl })
-    if (release.youtubeUrl)    fallback.push({ key: 'youtube',    url: release.youtubeUrl })
-    if (release.bandcampUrl)   fallback.push({ key: 'bandcamp',   url: release.bandcampUrl })
-    if (release.smartlinkUrl)  fallback.push({ key: 'smartlink',  url: release.smartlinkUrl })
-    return fallback
-  })()
+  const platformEntries = buildPlatformLinkEntries({
+    platformLinks: release.platformLinks,
+    spotifyUrl: release.spotifyUrl,
+    appleMusicUrl: release.appleMusicUrl,
+    youtubeUrl: release.youtubeUrl,
+    bandcampUrl: release.bandcampUrl,
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -163,57 +139,38 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
                 {formattedDate}
               </p>
 
-              {/* Streaming links */}
-              <div className="space-y-3 pt-2">
-                {/* Odesli smart link — universal hub shown first */}
-                {release.smartUrl && (
-                  <div>
-                    <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+              {/* Streaming links — one button per platform */}
+              {platformEntries.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {platformEntries.map(({ key, url }) => {
+                    const cfg = ODESLI_PLATFORM_CONFIG[key]
+                    const Icon = cfg?.icon ?? Globe
+                    const label = cfg?.label ?? key
+                    const bg = cfg?.bg ?? undefined
+                    const textColor = cfg?.textColor ?? 'text-white'
+                    return (
                       <a
-                        href={release.smartUrl}
+                        key={key}
+                        href={url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        aria-label={`Listen on ${label}`}
                         onClick={() => {
                           const artistId = artist?.id ?? release.artistId
                           if (artistId) {
                             trackSmartLinkClick(artistId, `/releases/${release.id}`)
                           }
                         }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 hover:scale-105 ${textColor}`}
+                        style={bg ? { backgroundColor: bg } : undefined}
                       >
-                        <LinkSimple size={18} weight="bold" className="mr-2" aria-hidden="true" />
-                        {t('listenEverywhere')}
+                        <Icon size={14} weight="fill" aria-hidden="true" />
+                        {label}
                       </a>
-                    </Button>
-                  </div>
-                )}
-
-                {/* Per-platform buttons */}
-                {platformEntries.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {platformEntries.map(({ key, url }) => {
-                      const cfg = ODESLI_PLATFORM_CONFIG[key]
-                      const Icon = cfg?.icon ?? Globe
-                      const label = cfg?.label ?? key
-                      const bg = cfg?.bg ?? undefined
-                      const textColor = cfg?.textColor ?? 'text-white'
-                      return (
-                        <a
-                          key={key}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Listen on ${label}`}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 hover:scale-105 ${textColor}`}
-                          style={bg ? { backgroundColor: bg } : undefined}
-                        >
-                          <Icon size={14} weight="fill" aria-hidden="true" />
-                          {label}
-                        </a>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* Share button */}
               <div className="pt-1">

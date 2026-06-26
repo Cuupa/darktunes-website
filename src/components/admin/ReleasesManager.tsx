@@ -238,7 +238,7 @@ export function ReleasesManager() {
   const handleSync = async () => {
     try {
       const result = await syncAllReleases()
-      if (!result?.results) {
+      if (!Array.isArray(result?.results)) {
         toast.info(
           'Sync jobs wurden eingereiht. Verarbeitung läuft im Hintergrund (alle 5 Minuten via Cron).',
         )

@@ -31,6 +31,7 @@ export interface PlatformConfig {
 export const ODESLI_PLATFORM_CONFIG: Record<string, PlatformConfig> = {
   spotify:      { label: 'Spotify',       bg: '#1DB954', textColor: 'text-black',  icon: SpotifyLogo },
   appleMusic:   { label: 'Apple Music',   bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo   },
+  itunes:       { label: 'iTunes',        bg: '#FA2D48', textColor: 'text-white',  icon: AppleLogo   },
   youtube:      { label: 'YouTube',       bg: '#FF0000', textColor: 'text-white',  icon: YoutubeLogo },
   youtubeMusic: { label: 'YT Music',      bg: '#FF0033', textColor: 'text-white',  icon: MusicNote   },
   deezer:       { label: 'Deezer',        bg: '#A238FF', textColor: 'text-white',  icon: MusicNote   },
@@ -42,7 +43,6 @@ export const ODESLI_PLATFORM_CONFIG: Record<string, PlatformConfig> = {
   napster:      { label: 'Napster',       bg: '#0D3661', textColor: 'text-white',  icon: MusicNote   },
   audiomack:    { label: 'Audiomack',     bg: '#FFA200', textColor: 'text-black',  icon: MusicNote   },
   anghami:      { label: 'Anghami',       bg: '#5A0FC8', textColor: 'text-white',  icon: MusicNote   },
-  smartlink:    { label: 'Listen Everywhere', bg: '#6366F1', textColor: 'text-white', icon: Globe   },
 }
 
 /**
@@ -50,7 +50,7 @@ export const ODESLI_PLATFORM_CONFIG: Record<string, PlatformConfig> = {
  * Platforms in `platformLinks` but NOT in this list are appended at the end.
  */
 export const ODESLI_PLATFORM_ORDER: string[] = [
-  'spotify', 'appleMusic', 'youtube', 'youtubeMusic',
+  'spotify', 'appleMusic', 'itunes', 'youtube', 'youtubeMusic',
   'deezer', 'tidal', 'amazonMusic', 'soundcloud',
   'bandcamp', 'pandora', 'napster', 'audiomack', 'anghami',
 ]
