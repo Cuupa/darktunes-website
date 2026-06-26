@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getNewsPosts,
   getPublicNewsPostBySlug,
+  publishScheduledNewsPosts,
   createNewsPost,
   updateNewsPost,
   deleteNewsPost,
@@ -123,6 +124,26 @@ describe('updateNewsPost', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
     await expect(updateNewsPost(db, 'news-001', { title: 'X' })).rejects.toThrow('Update failed')
+  })
+})
+
+describe('publishScheduledNewsPosts', () => {
+  it('returns the number of promoted posts', async () => {
+    const db = makeMockDb([{ id: 'news-001' }, { id: 'news-002' }])
+    const count = await publishScheduledNewsPosts(db)
+    expect(count).toBe(2)
+    expect(db.from).toHaveBeenCalledWith('news_posts')
+  })
+
+  it('returns zero when nothing is due', async () => {
+    const db = makeMockDb([])
+    const count = await publishScheduledNewsPosts(db)
+    expect(count).toBe(0)
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
+    await expect(publishScheduledNewsPosts(db)).rejects.toThrow('Update failed')
   })
 })
 

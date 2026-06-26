@@ -3314,8 +3314,9 @@ CREATE POLICY "media_files: admin delete"                ON public.media_files F
   public.get_my_role() = 'admin'
 );
 
--- Scheduled news: lazy publishing via published_at <= NOW() in public queries + RLS.
--- No pg_cron job required. Unschedule legacy job if it was created manually:
+-- Scheduled news: promoted to published on public cache refresh (see publishScheduledNewsPosts).
+-- Query-time visibility also allows status=scheduled when published_at <= NOW().
+-- Unschedule legacy pg_cron job if it was created manually:
 --   SELECT cron.unschedule('publish-scheduled-news');
 
 -- =============================================================================
