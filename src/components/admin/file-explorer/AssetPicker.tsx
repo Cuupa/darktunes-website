@@ -232,7 +232,7 @@ export function AssetPicker({ open, onClose, onSelect, mimeTypeFilter, artistId 
         <div className="flex gap-3 overflow-hidden" style={{ height: '32rem' }}>
           {/* ── Folder sidebar ──────────────────────────────────────────── */}
           {folders.length > 0 && (
-            <div className="w-44 shrink-0 overflow-y-auto rounded-md border border-border bg-card/40 p-2 text-xs">
+            <div className="w-44 shrink-0 overflow-y-auto overscroll-contain rounded-md border border-border bg-card/40 p-2 text-xs" data-lenis-prevent>
               <p className="mb-1.5 px-1 font-semibold text-muted-foreground uppercase tracking-wide" style={{ fontSize: '0.65rem' }}>Folders</p>
               <ul className="space-y-0.5">
                 <li>
