@@ -197,7 +197,7 @@ serve(async (req: Request) => {
             : `${siteUrl}/api/sync`
       } else {
         targetUrl = `${siteUrl}/api/sync-api`
-        requestBody = {apiSource: syncType}
+        requestBody = { apiSource: syncType }
       }
 
       response = await fetch(targetUrl, {

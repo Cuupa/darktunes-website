@@ -14,11 +14,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { RATE_LIMIT_JOB_COOLDOWN_MS } from '@/lib/sync/retryPolicy'
 
 type DbClient = SupabaseClient<Database>
 type SyncQueueRow = Database['public']['Tables']['sync_queue']['Row']
 
-export type SyncJobType = 'full' | 'spotify' | 'discogs' | 'youtube'
+export type SyncJobType = 'full' | 'spotify' | 'discogs' | 'youtube' | 'odesli'
 export type SyncJobStatus = 'pending' | 'running' | 'done' | 'failed'
 
 export interface SyncJob {
@@ -38,6 +39,24 @@ export interface SyncJob {
 export const MAX_ATTEMPTS = 3
 /** Visibility timeout — running jobs past this are reset to pending. */
 export const LOCK_DURATION_MS = 10 * 60 * 1000
+
+const ARTIST_SCOPED_JOB_TYPES: SyncJobType[] = ['full', 'spotify', 'discogs', 'youtube']
+
+/** Job types that block enqueueing the same artist for `jobType`. */
+export function conflictingArtistJobTypes(jobType: SyncJobType): SyncJobType[] {
+  switch (jobType) {
+    case 'full':
+      return ARTIST_SCOPED_JOB_TYPES
+    case 'spotify':
+      return ['full', 'spotify']
+    case 'discogs':
+      return ['full', 'discogs']
+    case 'youtube':
+      return ['full', 'youtube']
+    default:
+      return [jobType]
+  }
+}
 
 function rowToSyncJob(row: SyncQueueRow): SyncJob {
   return {
@@ -118,6 +137,7 @@ export async function enqueueArtistSyncJobs(
     .select('artist_id')
     .in('artist_id', artistIds)
     .in('status', ['pending', 'running'])
+    .in('job_type', conflictingArtistJobTypes(jobType))
 
   const alreadyQueued = new Set((existing ?? []).map((r) => r.artist_id))
   const toEnqueue = artistIds.filter((id) => !alreadyQueued.has(id))
@@ -134,6 +154,80 @@ export async function enqueueArtistSyncJobs(
   if (error) throw new Error(`Failed to enqueue sync jobs: ${error.message}`)
 
   return toEnqueue.length
+}
+
+/**
+ * Enqueues a global Odesli batch job when none is already pending or running.
+ */
+export async function enqueueOdesliSyncJob(
+  db: DbClient,
+  cooldownMs = 0,
+): Promise<number> {
+  const { data: existing } = await db
+    .from('sync_queue')
+    .select('id')
+    .eq('job_type', 'odesli')
+    .is('artist_id', null)
+    .in('status', ['pending', 'running'])
+    .limit(1)
+
+  if (existing && existing.length > 0) return 0
+
+  const scheduledAt = new Date(Date.now() + cooldownMs).toISOString()
+  const { error } = await db.from('sync_queue').insert({
+    artist_id: null,
+    job_type: 'odesli',
+    status: 'pending',
+    scheduled_at: scheduledAt,
+  })
+
+  if (error) throw new Error(`Failed to enqueue Odesli sync job: ${error.message}`)
+  return 1
+}
+
+/**
+ * Enqueues Spotify sync jobs for artists with a spotify_id.
+ */
+export async function enqueueSpotifySyncJobs(db: DbClient): Promise<number> {
+  const { data: artists, error } = await db
+    .from('artists')
+    .select('id')
+    .not('spotify_id', 'is', null)
+
+  if (error) throw new Error(`Failed to load artists for Spotify queue: ${error.message}`)
+  const artistIds = (artists ?? []).map((a) => a.id)
+  return enqueueArtistSyncJobs(db, artistIds, 'spotify')
+}
+
+/**
+ * Re-schedules a completed job when more work remains (e.g. Odesli batch).
+ */
+export async function rescheduleSyncJob(
+  db: DbClient,
+  jobId: string,
+  cooldownMs: number,
+  options?: { undoAttemptIncrement?: boolean; currentAttemptCount?: number },
+): Promise<void> {
+  const scheduledAt = new Date(Date.now() + cooldownMs).toISOString()
+  const attemptCount =
+    options?.undoAttemptIncrement && options.currentAttemptCount !== undefined
+      ? Math.max(0, options.currentAttemptCount - 1)
+      : undefined
+
+  const { error } = await db
+    .from('sync_queue')
+    .update({
+      status: 'pending',
+      scheduled_at: scheduledAt,
+      finished_at: null,
+      locked_until: null,
+      started_at: null,
+      error_message: null,
+      ...(attemptCount !== undefined ? { attempt_count: attemptCount } : {}),
+    })
+    .eq('id', jobId)
+
+  if (error) throw new Error(`Failed to reschedule sync job: ${error.message}`)
 }
 
 /**
@@ -212,21 +306,33 @@ export async function markSyncJobFailed(
   jobId: string,
   errorMessage: string,
   currentAttemptCount: number,
+  options?: { rateLimited?: boolean },
 ): Promise<void> {
-  const willRetry = currentAttemptCount < MAX_ATTEMPTS
+  const rateLimited = options?.rateLimited ?? false
+  const willRetry = rateLimited || currentAttemptCount < MAX_ATTEMPTS
 
-  // Exponential backoff: 2^attempt minutes (2, 4, 8 minutes)
-  const backoffMinutes = Math.pow(2, currentAttemptCount)
-  const scheduledAt = new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString()
+  const delayMs = rateLimited
+    ? RATE_LIMIT_JOB_COOLDOWN_MS
+    : Math.pow(2, currentAttemptCount) * 60 * 1000
+  const scheduledAt = new Date(Date.now() + delayMs).toISOString()
+  const attemptCount = rateLimited
+    ? Math.max(0, currentAttemptCount - 1)
+    : undefined
 
   const { error } = await db
     .from('sync_queue')
     .update({
       status: willRetry ? 'pending' : 'failed',
       finished_at: willRetry ? null : new Date().toISOString(),
-      error_message: errorMessage,
+      error_message: rateLimited ? 'Rate limited — rescheduled' : errorMessage,
       locked_until: null,
-      ...(willRetry ? { scheduled_at: scheduledAt, started_at: null } : {}),
+      ...(willRetry
+        ? {
+            scheduled_at: scheduledAt,
+            started_at: null,
+            ...(attemptCount !== undefined ? { attempt_count: attemptCount } : {}),
+          }
+        : {}),
     })
     .eq('id', jobId)
 

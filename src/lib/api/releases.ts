@@ -4,6 +4,12 @@ import type { Release } from '@/types'
 import { parseJunctionRows } from '@/lib/types/jsonColumns'
 import { stripEmojis } from '@/lib/stripEmojis'
 import { sanitizeReleaseWrite } from '@/lib/sanitizeTextContent'
+import {
+  findCrossSourceMergeTarget,
+  registerSyncedRelease,
+  type CrossSourceReleaseRow,
+  type ExternalReleaseSource,
+} from '@/lib/sync/deduplication'
 
 type DbClient = SupabaseClient<Database>
 type ReleaseRow = Database['public']['Tables']['releases']['Row']
@@ -301,22 +307,63 @@ export async function getAllVisibleReleasesForCalendar(db: DbClient): Promise<Re
   return attachReleaseArtists(db, releases)
 }
 
+const SYNC_WRITABLE_KEYS = [
+  'title',
+  'artist_id',
+  'release_date',
+  'cover_art',
+  'type',
+  'spotify_url',
+  'spotify_id',
+  'apple_music_url',
+  'itunes_id',
+  'discogs_id',
+  'isrc',
+  'barcode',
+  'catalog_number',
+  'popularity',
+  'smart_url',
+  'platform_links',
+] as const satisfies readonly (keyof ReleaseInsert)[]
+
+function pickSyncWritableFields(data: ReleaseInsert): ReleaseUpdate {
+  const patch: ReleaseUpdate = {}
+  for (const key of SYNC_WRITABLE_KEYS) {
+    if (key in data && data[key] !== undefined) {
+      ;(patch as Record<string, unknown>)[key] = data[key]
+    }
+  }
+  return patch
+}
+
+async function preserveFeaturedByColumn(
+  db: DbClient,
+  column: 'itunes_id' | 'spotify_id' | 'discogs_id',
+  value: string | null | undefined,
+  fallback: boolean,
+): Promise<boolean> {
+  if (!value) return fallback
+
+  const { data: existing, error } = await db
+    .from('releases')
+    .select('id, featured')
+    .eq(column, value)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return existing?.featured ?? fallback
+}
+
 export async function upsertReleaseByItunesId(
   db: DbClient,
   releaseData: ReleaseInsert,
 ): Promise<Release> {
-  let featured = releaseData.featured ?? false
-
-  if (releaseData.itunes_id) {
-    const { data: existing, error: existingErr } = await db
-      .from('releases')
-      .select('id, featured')
-      .eq('itunes_id', releaseData.itunes_id)
-      .maybeSingle()
-
-    if (existingErr) throw new Error(existingErr.message)
-    featured = existing?.featured ?? featured
-  }
+  const featured = await preserveFeaturedByColumn(
+    db,
+    'itunes_id',
+    releaseData.itunes_id,
+    releaseData.featured ?? false,
+  )
 
   const { data, error } = await db
     .from('releases')
@@ -326,4 +373,225 @@ export async function upsertReleaseByItunesId(
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from upsertReleaseByItunesId')
   return rowToRelease(data)
+}
+
+export async function upsertReleaseBySpotifyId(
+  db: DbClient,
+  releaseData: ReleaseInsert,
+): Promise<Release> {
+  if (!releaseData.spotify_id) {
+    throw new Error('upsertReleaseBySpotifyId requires spotify_id')
+  }
+
+  const featured = await preserveFeaturedByColumn(
+    db,
+    'spotify_id',
+    releaseData.spotify_id,
+    releaseData.featured ?? false,
+  )
+
+  const { data, error } = await db
+    .from('releases')
+    .upsert(sanitizeReleaseWrite({ ...releaseData, featured }), { onConflict: 'spotify_id' })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('No data returned from upsertReleaseBySpotifyId')
+  return rowToRelease(data)
+}
+
+export async function upsertReleaseByDiscogsId(
+  db: DbClient,
+  releaseData: ReleaseInsert,
+): Promise<Release> {
+  if (!releaseData.discogs_id) {
+    throw new Error('upsertReleaseByDiscogsId requires discogs_id')
+  }
+
+  const featured = await preserveFeaturedByColumn(
+    db,
+    'discogs_id',
+    releaseData.discogs_id,
+    releaseData.featured ?? false,
+  )
+
+  const { data, error } = await db
+    .from('releases')
+    .upsert(sanitizeReleaseWrite({ ...releaseData, featured }), { onConflict: 'discogs_id' })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('No data returned from upsertReleaseByDiscogsId')
+  return rowToRelease(data)
+}
+
+export interface SyncReleaseResult {
+  release: Release
+  merged: boolean
+}
+
+function releaseRowFromInsert(
+  release: Release,
+  sanitized: ReleaseInsert,
+): Parameters<typeof registerSyncedRelease>[1] {
+  return {
+    id: release.id,
+    title: release.title,
+    release_date: release.releaseDate,
+    spotify_id: sanitized.spotify_id ?? release.spotifyId ?? null,
+    itunes_id: sanitized.itunes_id ?? release.itunesId ?? null,
+    discogs_id: sanitized.discogs_id ?? release.discogsId ?? null,
+    isrc: sanitized.isrc ?? release.isrc ?? null,
+    barcode: sanitized.barcode ?? release.barcode ?? null,
+  }
+}
+
+function finishSyncRelease(
+  existingReleases: CrossSourceReleaseRow[],
+  release: Release,
+  sanitized: ReleaseInsert,
+  merged: boolean,
+): SyncReleaseResult {
+  registerSyncedRelease(existingReleases, releaseRowFromInsert(release, sanitized), merged)
+  return { release, merged }
+}
+
+/**
+ * Upserts or merges a release from an external API source.
+ * Manual rows are enriched in-place; featured and visibility flags are preserved.
+ */
+export async function syncReleaseFromExternalSource(
+  db: DbClient,
+  source: ExternalReleaseSource,
+  releaseData: ReleaseInsert,
+  existingReleases: CrossSourceReleaseRow[],
+): Promise<SyncReleaseResult> {
+  const sanitized = sanitizeReleaseWrite(releaseData)
+
+  if (source === 'itunes') {
+    const mergeTarget = findCrossSourceMergeTarget(
+      existingReleases,
+      {
+        title: sanitized.title,
+        releaseDate: sanitized.release_date,
+        isrc: sanitized.isrc,
+        barcode: sanitized.barcode,
+      },
+      'itunes',
+    )
+
+    if (mergeTarget) {
+      const patch = pickSyncWritableFields(sanitized)
+      const { data, error } = await db
+        .from('releases')
+        .update(patch)
+        .eq('id', mergeTarget.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('No data returned from iTunes merge update')
+
+      return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+    }
+
+    if (sanitized.itunes_id) {
+      const release = await upsertReleaseByItunesId(db, sanitized)
+      return finishSyncRelease(existingReleases, release, sanitized, false)
+    }
+
+    throw new Error('iTunes sync requires itunes_id when no merge target exists')
+  }
+
+  if (source === 'spotify' && sanitized.spotify_id) {
+    const mergeTarget = findCrossSourceMergeTarget(
+      existingReleases,
+      {
+        title: sanitized.title,
+        releaseDate: sanitized.release_date,
+        isrc: sanitized.isrc,
+        barcode: sanitized.barcode,
+      },
+      'spotify',
+    )
+
+    if (mergeTarget && mergeTarget.id) {
+      const patch = pickSyncWritableFields(sanitized)
+      const { data, error } = await db
+        .from('releases')
+        .update(patch)
+        .eq('id', mergeTarget.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('No data returned from Spotify merge update')
+
+      return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+    }
+
+    const release = await upsertReleaseBySpotifyId(db, sanitized)
+    return finishSyncRelease(existingReleases, release, sanitized, false)
+  }
+
+  if (source === 'discogs' && sanitized.discogs_id) {
+    const mergeTarget = findCrossSourceMergeTarget(
+      existingReleases,
+      {
+        title: sanitized.title,
+        releaseDate: sanitized.release_date,
+        isrc: sanitized.isrc,
+        barcode: sanitized.barcode,
+      },
+      'discogs',
+    )
+
+    if (mergeTarget && mergeTarget.id) {
+      const patch = pickSyncWritableFields(sanitized)
+      const { data, error } = await db
+        .from('releases')
+        .update(patch)
+        .eq('id', mergeTarget.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('No data returned from Discogs merge update')
+
+      return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+    }
+
+    const release = await upsertReleaseByDiscogsId(db, sanitized)
+    return finishSyncRelease(existingReleases, release, sanitized, false)
+  }
+
+  const mergeTarget = findCrossSourceMergeTarget(
+    existingReleases,
+    {
+      title: sanitized.title,
+      releaseDate: sanitized.release_date,
+      isrc: sanitized.isrc,
+      barcode: sanitized.barcode,
+    },
+    source,
+  )
+
+  if (mergeTarget) {
+    const patch = pickSyncWritableFields(sanitized)
+    const { data, error } = await db
+      .from('releases')
+      .update(patch)
+      .eq('id', mergeTarget.id)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error('No data returned from cross-source merge update')
+    return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+  }
+
+  const { data, error } = await db.from('releases').insert(sanitized).select().single()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('No data returned from release insert')
+  return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, false)
 }

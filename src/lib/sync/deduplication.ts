@@ -73,6 +73,61 @@ export interface CrossSourceReleaseRow {
   release_date: string
   spotify_id: string | null
   itunes_id: string | null
+  discogs_id?: string | null
+  isrc?: string | null
+  barcode?: string | null
+}
+
+export type ExternalReleaseSource = 'itunes' | 'spotify' | 'discogs'
+
+export interface IncomingReleaseMatchFields {
+  title: string
+  releaseDate: string
+  isrc?: string | null
+  barcode?: string | null
+}
+
+/** Keeps the per-artist in-memory release list current within a single sync run. */
+export function registerSyncedRelease(
+  existingReleases: CrossSourceReleaseRow[],
+  row: {
+    id: string
+    title: string
+    release_date: string
+    spotify_id?: string | null
+    itunes_id?: string | null
+    discogs_id?: string | null
+    isrc?: string | null
+    barcode?: string | null
+  },
+  merged: boolean,
+): void {
+  if (merged) {
+    const target = existingReleases.find((r) => r.id === row.id)
+    if (!target) return
+    if (row.spotify_id) target.spotify_id = row.spotify_id
+    if (row.itunes_id) target.itunes_id = row.itunes_id
+    if (row.discogs_id) target.discogs_id = row.discogs_id
+    if (row.isrc) target.isrc = row.isrc
+    if (row.barcode) target.barcode = row.barcode
+    target.title = row.title
+    target.release_date = row.release_date
+    return
+  }
+
+  const duplicate = existingReleases.some((r) => r.id === row.id)
+  if (duplicate) return
+
+  existingReleases.push({
+    id: row.id,
+    title: row.title,
+    release_date: row.release_date,
+    spotify_id: row.spotify_id ?? null,
+    itunes_id: row.itunes_id ?? null,
+    discogs_id: row.discogs_id ?? null,
+    isrc: row.isrc ?? null,
+    barcode: row.barcode ?? null,
+  })
 }
 
 /** Normalise a title for fuzzy comparison: lowercase, strip punctuation */
@@ -181,20 +236,36 @@ export function deduplicateReleases(
   return merged
 }
 
+function normalizeBarcode(value: string | null | undefined): string | null {
+  if (!value) return null
+  const digits = value.replace(/\D/g, '')
+  return digits.length > 0 ? digits : null
+}
+
 /**
- * Finds an existing Spotify-sourced release row that likely represents the same
- * album as an incoming iTunes release (title + approximate year match).
+ * Finds an existing release row that likely represents the same album as an
+ * incoming sync item (ISRC/barcode, then title + approximate year).
+ * Includes manual entries without external IDs.
  */
 export function findCrossSourceMergeTarget(
   existingReleases: CrossSourceReleaseRow[],
-  incomingTitle: string,
-  incomingDate: string,
+  incoming: IncomingReleaseMatchFields,
+  source: ExternalReleaseSource,
 ): CrossSourceReleaseRow | null {
-  const incomingYear = extractYear(incomingDate)
-  const incomingNorm = normTitle(incomingTitle)
+  const incomingYear = extractYear(incoming.releaseDate)
+  const incomingNorm = normTitle(incoming.title)
+  const incomingIsrc = incoming.isrc?.trim() || null
+  const incomingBarcode = normalizeBarcode(incoming.barcode)
 
   for (const row of existingReleases) {
-    if (!row.spotify_id || row.itunes_id) continue
+    if (source === 'itunes' && row.itunes_id) continue
+    if (source === 'spotify' && row.spotify_id) continue
+    if (source === 'discogs' && row.discogs_id) continue
+
+    if (incomingIsrc && row.isrc && incomingIsrc === row.isrc.trim()) return row
+
+    const rowBarcode = normalizeBarcode(row.barcode)
+    if (incomingBarcode && rowBarcode && incomingBarcode === rowBarcode) return row
 
     const rowYear = extractYear(row.release_date)
     const titleMatch = normTitle(row.title) === incomingNorm
@@ -208,3 +279,5 @@ export function findCrossSourceMergeTarget(
 
   return null
 }
+
+

@@ -8,6 +8,7 @@ import {
   markSyncJobFailed,
   markSyncJobDone,
   countStuckSyncJobs,
+  conflictingArtistJobTypes,
   MAX_ATTEMPTS,
 } from './syncQueue'
 
@@ -74,6 +75,17 @@ describe('requeueFailedSyncJobs', () => {
   })
 })
 
+describe('conflictingArtistJobTypes', () => {
+  it('treats full jobs as blocking any artist-scoped sync', () => {
+    expect(conflictingArtistJobTypes('full')).toEqual(['full', 'spotify', 'discogs', 'youtube'])
+  })
+
+  it('allows spotify enqueue when only discogs is pending', () => {
+    expect(conflictingArtistJobTypes('spotify')).toEqual(['full', 'spotify'])
+    expect(conflictingArtistJobTypes('spotify')).not.toContain('discogs')
+  })
+})
+
 describe('enqueueArtistSyncJobs', () => {
   it('skips artists that already have pending or running jobs', async () => {
     const db = makeSequentialMockDb([
@@ -115,6 +127,12 @@ describe('markSyncJobFailed', () => {
   it('marks permanently failed when max attempts reached', async () => {
     const db = makeSequentialMockDb([{ data: null }])
     await markSyncJobFailed(db, 'job-1', 'fatal', MAX_ATTEMPTS)
+    expect(db.from).toHaveBeenCalledWith('sync_queue')
+  })
+
+  it('re-queues rate-limited jobs without exhausting max attempts', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await markSyncJobFailed(db, 'job-1', '429', MAX_ATTEMPTS, { rateLimited: true })
     expect(db.from).toHaveBeenCalledWith('sync_queue')
   })
 })

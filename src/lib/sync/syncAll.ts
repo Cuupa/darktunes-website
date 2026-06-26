@@ -21,15 +21,19 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { withExponentialBackoff } from '@/lib/rateLimiter'
+import { syncReleaseFromExternalSource } from '@/lib/api/releases'
 import { fetchSpotifyArtistReleases } from './spotifyApi'
 import { fetchDiscogsArtistReleases } from './discogsApi'
 import { fetchSongkickArtistCalendar } from './songkickApi'
 import { fetchBandsintownArtistEvents } from './bandsintownApi'
-import { isSkippableOdesliError, pickOdesliMusicUrl, resolveOdesliSmartLink } from './odesliApi'
-import { deduplicateReleases } from './deduplication'
+import { isSkippableOdesliError, pickOdesliMusicUrl } from './odesliApi'
+import { resolveOdesliSmartLinkThrottled } from './odesliThrottle'
+import { deduplicateReleases, type CrossSourceReleaseRow } from './deduplication'
+import { isRateLimitedSyncError, withApiRetry } from './retryPolicy'
 import { syncArtist } from './syncArtist'
 import type { SyncDeps } from './syncArtist'
+
+export const ODESLI_BATCH_SIZE = 40
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +58,8 @@ export interface SyncAllDeps extends SyncDeps {
    * Used by the queue executor so each job processes exactly one artist.
    */
   onlyArtistId?: string
+  /** Max releases to resolve per Odesli batch (queue executor). */
+  odesliBatchLimit?: number
 }
 
 export interface ApiSyncResult {
@@ -62,6 +68,8 @@ export interface ApiSyncResult {
   releasesUpserted: number
   concertsUpserted: number
   rateLimited: boolean
+  /** True when more Odesli work remains after a batch (re-queue). */
+  hasMoreWork?: boolean
   errors: string[]
 }
 
@@ -78,8 +86,42 @@ export interface SyncAllResult {
  * Runs a full synchronisation across all artists and all configured APIs.
  * Returns a consolidated result — never throws.
  */
+async function loadArtistExistingReleases(
+  db: SupabaseClient<Database>,
+  artistId: string,
+): Promise<CrossSourceReleaseRow[]> {
+  const { data, error } = await db
+    .from('releases')
+    .select('id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode')
+    .eq('artist_id', artistId)
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    release_date: row.release_date,
+    spotify_id: row.spotify_id,
+    itunes_id: row.itunes_id,
+    discogs_id: row.discogs_id,
+    isrc: row.isrc,
+    barcode: row.barcode,
+  }))
+}
+
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
-  const { db, fetch: fetchFn, uploadToR2, spotify, discogsToken, songkickApiKey, bandsintownApiKey, onlyApi, onlyArtistId } = deps
+  const {
+    db,
+    fetch: fetchFn,
+    uploadToR2,
+    spotify,
+    discogsToken,
+    songkickApiKey,
+    bandsintownApiKey,
+    onlyApi,
+    onlyArtistId,
+    odesliBatchLimit = ODESLI_BATCH_SIZE,
+  } = deps
   const results: ApiSyncResult[] = []
 
   // 1. Fetch artists — either all or just the one targeted by the queue job
@@ -158,18 +200,19 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       spotifyResult.artistsProcessed++
 
       try {
-        const spotifyReleases = await withExponentialBackoff(() =>
+        const existingReleases = await loadArtistExistingReleases(db, artist.id)
+
+        const spotifyReleases = await withApiRetry('spotify', () =>
           fetchSpotifyArtistReleases(
             artist.spotify_id!,
             spotify.clientId,
             spotify.clientSecret,
             fetchFn,
-          ), 5, 1000,
+          ),
         )
 
-        // Fetch Discogs releases for deduplication (if token available)
         const discogsReleases = discogsToken && artist.discogs_id
-          ? await withExponentialBackoff(() =>
+          ? await withApiRetry('discogs', () =>
               fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, fetchFn),
             ).catch((e) => {
               spotifyResult.errors.push(`Discogs fetch for ${artist.name}: ${String(e)}`)
@@ -177,71 +220,32 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             })
           : []
 
-        const merged = deduplicateReleases(spotifyReleases, discogsReleases)
+        const merged = deduplicateReleases(spotifyReleases, discogsReleases).filter(
+          (release) => release.spotifyId,
+        )
 
         for (const release of merged) {
           try {
-            // Resolve Odesli smart link for Spotify releases
-            let smartUrl: string | null = null
-            let platformLinks: Record<string, string> | null = null
-            let appleMusicUrl: string | null = null
-            const odesliSourceUrl = release.spotifyUrl
-              ? pickOdesliMusicUrl(release.spotifyUrl, null)
-              : null
-            if (odesliSourceUrl) {
-              const odesli = await withExponentialBackoff(() =>
-                resolveOdesliSmartLink(odesliSourceUrl, fetchFn),
-              ).catch(() => null)
-              if (odesli) {
-                smartUrl = odesli.smartUrl
-                platformLinks = odesli.platforms
-                appleMusicUrl = odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
-              }
-            }
-
-            let preservedFeatured = false
-            if (release.spotifyId) {
-              const { data: existingRelease, error: existingReleaseErr } = await db
-                .from('releases')
-                .select('id, featured')
-                .eq('spotify_id', release.spotifyId)
-                .maybeSingle()
-
-              if (existingReleaseErr) {
-                throw new Error(existingReleaseErr.message)
-              }
-              preservedFeatured = existingRelease?.featured ?? false
-            }
-
-            const { data: upsertedRelease, error: upsertErr } = await db
-              .from('releases')
-              .upsert(
-                {
-                  title: release.title,
-                  artist_id: artist.id,
-                  release_date: release.releaseDate,
-                  cover_art: release.coverUrl,
-                  type: release.type,
-                  spotify_url: release.spotifyUrl,
-                  spotify_id: release.spotifyId,
-                  apple_music_url: appleMusicUrl,
-                  discogs_id: release.discogsId,
-                  isrc: release.isrc,
-                  barcode: release.barcode,
-                  catalog_number: release.catalogNumber,
-                  popularity: release.popularity,
-                  smart_url: smartUrl,
-                  platform_links: platformLinks,
-                  featured: preservedFeatured,
-                },
-                { onConflict: 'spotify_id' },
-              )
-              .select()
-              .single()
-
-            if (upsertErr || !upsertedRelease) {
-              throw new Error(upsertErr?.message ?? 'No data returned from Spotify upsert')
-            }
+            const { release: upsertedRelease } = await syncReleaseFromExternalSource(
+              db,
+              'spotify',
+              {
+                title: release.title,
+                artist_id: artist.id,
+                release_date: release.releaseDate,
+                cover_art: release.coverUrl,
+                type: release.type,
+                spotify_url: release.spotifyUrl,
+                spotify_id: release.spotifyId,
+                discogs_id: release.discogsId,
+                isrc: release.isrc,
+                barcode: release.barcode,
+                catalog_number: release.catalogNumber,
+                popularity: release.popularity,
+                featured: false,
+              },
+              existingReleases,
+            )
 
             if (
               release.coverUrl &&
@@ -265,8 +269,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         }
       } catch (e) {
         const msg = String(e)
-        if (msg.includes('429')) spotifyResult.rateLimited = true
-
+        if (isRateLimitedSyncError(e)) spotifyResult.rateLimited = true
         spotifyResult.errors.push(`Spotify sync for ${artist.name}: ${msg}`)
       }
     }
@@ -297,43 +300,38 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       discogsResult.artistsProcessed++
 
       try {
-        const discogsReleases = await withExponentialBackoff(() =>
+        const existingReleases = await loadArtistExistingReleases(db, artist.id)
+
+        const discogsReleases = await withApiRetry('discogs', () =>
           fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, fetchFn),
         )
 
         for (const release of discogsReleases) {
           try {
-            // Skip if this release already exists with a Spotify ID
-            // (it will have been handled more completely by the Spotify block)
             const { data: existing } = await db
               .from('releases')
               .select('id, spotify_id')
               .eq('discogs_id', release.discogsId)
               .maybeSingle()
 
-            if (existing?.spotify_id) continue // Already handled by Spotify sync
+            if (existing?.spotify_id) continue
 
-            const { data: upsertedRelease, error: upsertErr } = await db
-              .from('releases')
-              .upsert(
-                {
-                  title: release.title,
-                  artist_id: artist.id,
-                  release_date: release.releaseDate ?? new Date().toISOString().slice(0, 10),
-                  cover_art: release.coverUrl,
-                  type: release.format === 'vinyl' || release.format === 'cd' ? 'album' : 'single',
-                  discogs_id: release.discogsId,
-                  barcode: release.barcode,
-                  catalog_number: release.catalogNumber,
-                },
-                { onConflict: 'discogs_id' },
-              )
-              .select()
-              .single()
-
-            if (upsertErr || !upsertedRelease) {
-              throw new Error(upsertErr?.message ?? 'No data returned from Discogs upsert')
-            }
+            const { release: upsertedRelease } = await syncReleaseFromExternalSource(
+              db,
+              'discogs',
+              {
+                title: release.title,
+                artist_id: artist.id,
+                release_date: release.releaseDate ?? new Date().toISOString().slice(0, 10),
+                cover_art: release.coverUrl,
+                type: release.format === 'vinyl' || release.format === 'cd' ? 'album' : 'single',
+                discogs_id: release.discogsId,
+                barcode: release.barcode,
+                catalog_number: release.catalogNumber,
+                featured: false,
+              },
+              existingReleases,
+            )
 
             if (
               release.coverUrl &&
@@ -357,7 +355,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         }
       } catch (e) {
         const msg = String(e)
-        if (msg.includes('429')) discogsResult.rateLimited = true
+        if (isRateLimitedSyncError(e)) discogsResult.rateLimited = true
         discogsResult.errors.push(`Discogs sync for ${artist.name}: ${msg}`)
       }
     }
@@ -387,7 +385,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       songkickResult.artistsProcessed++
 
       try {
-        const concerts = await withExponentialBackoff(() =>
+        const concerts = await withApiRetry('songkick', () =>
           fetchSongkickArtistCalendar(artist.songkick_id!, songkickApiKey, fetchFn),
         )
 
@@ -416,7 +414,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         }
       } catch (e) {
         const msg = String(e)
-        if (msg.includes('429')) songkickResult.rateLimited = true
+        if (isRateLimitedSyncError(e)) songkickResult.rateLimited = true
         songkickResult.errors.push(`Songkick sync for ${artist.name}: ${msg}`)
       }
     }
@@ -453,7 +451,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       bandsintownResult.artistsProcessed++
 
       try {
-        const concerts = await withExponentialBackoff(() =>
+        const concerts = await withApiRetry('bandsintown', () =>
           fetchBandsintownArtistEvents(artist.bandsintown_id!, effectiveKey, fetchFn),
         )
 
@@ -482,7 +480,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         }
       } catch (e) {
         const msg = String(e)
-        if (msg.includes('429')) bandsintownResult.rateLimited = true
+        if (isRateLimitedSyncError(e)) bandsintownResult.rateLimited = true
         bandsintownResult.errors.push(`Bandsintown sync for ${artist.name}: ${msg}`)
       }
     }
@@ -513,12 +511,13 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     }
 
     try {
-      // PostgREST "not null" filter: column.not.is.null is valid PostgREST syntax
       let releasesQuery = db
         .from('releases')
         .select('id, spotify_url, apple_music_url, artist_id')
         .is('smart_url', null)
         .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+        .order('id', { ascending: true })
+        .limit(odesliBatchLimit)
 
       if (onlyArtistId) {
         releasesQuery = releasesQuery.eq('artist_id', onlyArtistId)
@@ -530,54 +529,52 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         odesliResult.errors.push(`Odesli batch query failed: ${batchErr.message}`)
       }
 
-      for (const release of releasesWithoutSmartUrl ?? []) {
+      const batch = releasesWithoutSmartUrl ?? []
+
+      for (const release of batch) {
         const musicUrl = pickOdesliMusicUrl(release.spotify_url, release.apple_music_url)
         if (!musicUrl) continue
 
-        odesliResult.artistsProcessed++ // counts releases attempted (field reused for parity)
+        odesliResult.artistsProcessed++
 
         try {
-          let odesliErr: string | null = null
-          let odesli: Awaited<ReturnType<typeof resolveOdesliSmartLink>> | null = null
-          try {
-            odesli = await withExponentialBackoff(() =>
-              resolveOdesliSmartLink(musicUrl, fetchFn),
+          const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
+          const appleMusicUrl =
+            odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
+
+          const { error: updateErr } = await db
+            .from('releases')
+            .update({
+              smart_url: odesli.smartUrl,
+              platform_links: odesli.platforms,
+              ...(appleMusicUrl && !release.apple_music_url
+                ? { apple_music_url: appleMusicUrl }
+                : {}),
+            })
+            .eq('id', release.id)
+
+          if (updateErr) {
+            odesliResult.errors.push(
+              `Odesli DB update for release ${release.id}: ${updateErr.message}`,
             )
-          } catch (e) {
-            odesliErr = String(e)
-          }
-
-          if (odesli) {
-            const appleMusicUrl =
-              odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
-
-            const { error: updateErr } = await db
-              .from('releases')
-              .update({
-                smart_url: odesli.smartUrl,
-                platform_links: odesli.platforms,
-                ...(appleMusicUrl && !release.apple_music_url
-                  ? { apple_music_url: appleMusicUrl }
-                  : {}),
-              })
-              .eq('id', release.id)
-
-            if (updateErr) {
-              odesliResult.errors.push(
-                `Odesli DB update for release ${release.id}: ${updateErr.message}`,
-              )
-            } else {
-              odesliResult.releasesUpserted++
-            }
-          } else if (odesliErr) {
-            if (!isSkippableOdesliError(odesliErr)) {
-              odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${odesliErr}`)
-            }
-            if (odesliErr.includes('429')) odesliResult.rateLimited = true
+          } else {
+            odesliResult.releasesUpserted++
           }
         } catch (e) {
-          odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${String(e)}`)
+          if (isRateLimitedSyncError(e)) {
+            odesliResult.rateLimited = true
+            odesliResult.hasMoreWork = true
+            break
+          }
+          const odesliErr = String(e)
+          if (!isSkippableOdesliError(odesliErr)) {
+            odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${odesliErr}`)
+          }
         }
+      }
+
+      if (!odesliResult.rateLimited && batch.length >= odesliBatchLimit) {
+        odesliResult.hasMoreWork = true
       }
     } catch (e) {
       odesliResult.errors.push(`Odesli batch query failed: ${String(e)}`)
@@ -594,6 +591,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     // the caller used onlyApi='odesli' (step 6 already ran and pushed it).
     const existingOdesli = results.find((r) => r.api === 'odesli')
 
+    if (!existingOdesli?.rateLimited) {
     try {
       // Odesli cannot resolve artist profile URLs — use each artist's latest release as proxy.
       let releaseProxyQuery = db
@@ -644,17 +642,9 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         if (existingOdesli) existingOdesli.artistsProcessed++
 
         try {
-          let odesliErr: string | null = null
-          let odesli: Awaited<ReturnType<typeof resolveOdesliSmartLink>> | null = null
-          try {
-            odesli = await withExponentialBackoff(() =>
-              resolveOdesliSmartLink(musicUrl, fetchFn),
-            )
-          } catch (e) {
-            odesliErr = String(e)
-          }
+          const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
 
-          if (odesli && Object.keys(odesli.platforms).length > 0) {
+          if (Object.keys(odesli.platforms).length > 0) {
             const { error: updateErr } = await db
               .from('artists')
               .update({ platform_links: odesli.platforms })
@@ -664,22 +654,28 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               existingOdesli?.errors.push(
                 `Odesli DB update for artist ${artist.id}: ${updateErr.message}`,
               )
-            } else {
-              if (existingOdesli) existingOdesli.releasesUpserted++ // counts artist updates (field reused for parity)
+            } else if (existingOdesli) {
+              existingOdesli.releasesUpserted++
             }
-          } else if (odesliErr) {
-            if (!isSkippableOdesliError(odesliErr)) {
-              existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
-            }
-            if (odesliErr.includes('429') && existingOdesli) existingOdesli.rateLimited = true
           }
         } catch (e) {
-          existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${String(e)}`)
+          if (isRateLimitedSyncError(e)) {
+            if (existingOdesli) {
+              existingOdesli.rateLimited = true
+              existingOdesli.hasMoreWork = true
+            }
+            break
+          }
+          const odesliErr = String(e)
+          if (!isSkippableOdesliError(odesliErr)) {
+            existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
+          }
         }
       }
       }
     } catch (e) {
       existingOdesli?.errors.push(`Odesli artist batch query failed: ${String(e)}`)
+    }
     }
 
     // Write one combined sync_log for releases + artist platform links
@@ -720,8 +716,19 @@ export async function syncSingleArtist(
   deps: SyncAllDeps,
 ): Promise<SyncAllResult> {
   const onlyApi =
-    jobType === 'spotify' ? 'spotify' : jobType === 'discogs' ? 'discogs' : undefined
+    jobType === 'spotify'
+      ? 'spotify'
+      : jobType === 'discogs'
+        ? 'discogs'
+        : jobType === 'odesli'
+          ? 'odesli'
+          : undefined
   return syncAll({ ...deps, onlyArtistId: artistId, onlyApi })
+}
+
+/** Runs a single Odesli batch (global queue job). */
+export async function syncOdesliBatch(deps: SyncAllDeps): Promise<SyncAllResult> {
+  return syncAll({ ...deps, onlyApi: 'odesli', onlyArtistId: undefined })
 }
 
 // ---------------------------------------------------------------------------

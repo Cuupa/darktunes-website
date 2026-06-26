@@ -8,15 +8,17 @@ Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verify
 
 ## Rate limiting
 
-External API calls: `withExponentialBackoff()` + `HttpError` from `src/lib/rateLimiter.ts`.
+External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPolicy.ts`. Base `HttpError` in `src/lib/rateLimiter.ts`. Odesli uses `resolveOdesliSmartLinkThrottled()` (~8 req/s).
 
 ## Sync service
 
 Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll` never throw — errors in `SyncResult.errors`. Each run → `sync_logs`.
 
-**Cron (`vercel.json`):** `/api/sync` (enqueue + */5 execute), `/api/sync-youtube` (06:00 UTC). Auth: `CRON_SECRET` + `timingSafeEqual`. Edge alternative: `supabase/functions/trigger-sync`.
+**Scheduling (no Vercel Cron):** Supabase Cron → `supabase/functions/trigger-sync` → Next.js routes. Auth: `CRON_SECRET` Bearer. Typical schedules: `all` daily 03:00 UTC, `process-queue` every 5 min, `youtube` daily 06:00 UTC.
 
-**Queue:** `sync_queue` DAL in `syncQueue.ts` — enqueue, claim, done/failed, recover stuck, requeue.
+**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube`, `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (50s budget). Odesli batches (`ODESLI_BATCH_SIZE`) reschedule on rate limit (15 min cooldown).
+
+**Release writes:** `syncReleaseFromExternalSource()` in `releases.ts` — cross-source merge before insert; `upsertReleaseBySpotifyId` / `upsertReleaseByDiscogsId` require full UNIQUE constraints on `spotify_id` / `discogs_id` in `reset.sql`.
 
 ## API credentials
 
