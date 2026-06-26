@@ -15,6 +15,25 @@ export function useNews() {
   const [error, setError] = useState<Error | null>(null)
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
+  const revalidateContentCache = async (tags: string[], entityTags?: string[]): Promise<void> => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      void fetch('/api/revalidate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ tags, entityTags }),
+      })
+    } catch {
+      // Non-critical
+    }
+  }
+
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) {
       setIsLoading(false)
@@ -43,6 +62,7 @@ export function useNews() {
       changes: data,
     })
     await load()
+    void revalidateContentCache(['news'])
   }
 
   const updateNewsPost = async (id: string, data: NewsUpdate): Promise<void> => {
@@ -62,6 +82,10 @@ export function useNews() {
       changes: payload,
     })
     await load()
+    void revalidateContentCache(
+      ['news'],
+      updated.slug ? [`news-${updated.slug}`] : undefined,
+    )
   }
 
   const deleteNewsPost = async (id: string): Promise<void> => {
@@ -74,6 +98,10 @@ export function useNews() {
       entityName: target?.title,
     })
     await load()
+    void revalidateContentCache(
+      ['news'],
+      target?.slug ? [`news-${target.slug}`] : undefined,
+    )
   }
 
   useEffect(() => {

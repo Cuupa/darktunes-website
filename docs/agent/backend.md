@@ -51,6 +51,10 @@ Release/video submit → `editor_notifications` + `sendSubmissionNotificationEma
 
 Health (`buildHealthSnapshot`), sync logs, app errors, maintenance routes. Cron heartbeats + optional alert webhook.
 
+## Scheduled news publishing
+
+No Vercel Cron. Due posts (`status = scheduled`, `published_at <= now`) are promoted to `published` when `getCachedPublicNews()` revalidates (public homepage, `/news`, etc.). Admin saves trigger `revalidateTag('news')` via `useNews`.
+
 ## Newsletter DOI
 
 `subscribeToNewsletter` Server Action → pending row → Edge Function email → `GET /api/newsletter/verify`.

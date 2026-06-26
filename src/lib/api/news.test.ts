@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getNewsPosts,
   getPublicNewsPostBySlug,
+  publishScheduledNewsPosts,
   createNewsPost,
   updateNewsPost,
   deleteNewsPost,
@@ -62,6 +63,7 @@ const mockNewsRow: NewsRow = {
   hero_secondary_btn_href: null,
   hero_secondary_btn_action: null,
   hero_bg_url: null,
+  published_at_timezone: 'Europe/Berlin',
 }
 
 describe('getNewsPosts', () => {
@@ -77,6 +79,7 @@ describe('getNewsPosts', () => {
     expect(result).toHaveLength(1)
     expect(result[0].title).toBe('BLACKBOOK Returns')
     expect(result[0].slug).toBe('blackbook-returns')
+    expect(result[0].publishedAtTimezone).toBe('Europe/Berlin')
   })
 
   it('throws on database error', async () => {
@@ -123,6 +126,26 @@ describe('updateNewsPost', () => {
   it('throws on database error', async () => {
     const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
     await expect(updateNewsPost(db, 'news-001', { title: 'X' })).rejects.toThrow('Update failed')
+  })
+})
+
+describe('publishScheduledNewsPosts', () => {
+  it('returns the number of promoted posts', async () => {
+    const db = makeMockDb([{ id: 'news-001' }, { id: 'news-002' }])
+    const count = await publishScheduledNewsPosts(db)
+    expect(count).toBe(2)
+    expect(db.from).toHaveBeenCalledWith('news_posts')
+  })
+
+  it('returns zero when nothing is due', async () => {
+    const db = makeMockDb([])
+    const count = await publishScheduledNewsPosts(db)
+    expect(count).toBe(0)
+  })
+
+  it('throws on database error', async () => {
+    const db = makeMockDb(null, { message: 'Update failed', code: 'PGRST001' })
+    await expect(publishScheduledNewsPosts(db)).rejects.toThrow('Update failed')
   })
 })
 

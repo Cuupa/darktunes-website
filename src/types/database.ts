@@ -1856,6 +1856,7 @@ export interface Database {
           hero_secondary_btn_label: string | null
           hero_secondary_btn_action: string | null
           hero_secondary_btn_href: string | null
+          published_at_timezone: string | null
         }
         Insert: {
           id?: string
@@ -1868,6 +1869,7 @@ export interface Database {
           is_press_only?: boolean
           status?: string
           published_at?: string
+          published_at_timezone?: string | null
           created_at?: string
           updated_at?: string
           artist_id?: string | null
@@ -1894,6 +1896,7 @@ export interface Database {
           is_press_only?: boolean
           status?: string
           published_at?: string
+          published_at_timezone?: string | null
           created_at?: string
           updated_at?: string
           artist_id?: string | null

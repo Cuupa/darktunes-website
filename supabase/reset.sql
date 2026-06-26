@@ -815,6 +815,7 @@ ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_href   T
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS published_at_timezone TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);
@@ -3314,8 +3315,9 @@ CREATE POLICY "media_files: admin delete"                ON public.media_files F
   public.get_my_role() = 'admin'
 );
 
--- Scheduled news: lazy publishing via published_at <= NOW() in public queries + RLS.
--- No pg_cron job required. Unschedule legacy job if it was created manually:
+-- Scheduled news: promoted to published on public cache refresh (see publishScheduledNewsPosts).
+-- Query-time visibility also allows status=scheduled when published_at <= NOW().
+-- Unschedule legacy pg_cron job if it was created manually:
 --   SELECT cron.unschedule('publish-scheduled-news');
 
 -- =============================================================================

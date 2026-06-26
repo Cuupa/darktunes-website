@@ -28,6 +28,7 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     content: row.content,
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
+    publishedAtTimezone: row.published_at_timezone ?? undefined,
     featured: row.featured ?? false,
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
@@ -95,6 +96,23 @@ export async function getNewsPosts(db: DbClient): Promise<NewsPost[]> {
 /**
  * Public-facing: returns published posts and scheduled posts once their publish time is reached.
  */
+/**
+ * Promote due scheduled posts to published (replaces legacy pg_cron job).
+ * Returns the number of rows updated.
+ */
+export async function publishScheduledNewsPosts(db: DbClient): Promise<number> {
+  const now = new Date().toISOString()
+  const { data, error } = await db
+    .from('news_posts')
+    .update({ status: 'published', updated_at: now })
+    .eq('status', 'scheduled')
+    .lte('published_at', now)
+    .select('id')
+
+  if (error) throw new Error(error.message)
+  return data?.length ?? 0
+}
+
 export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
   const now = new Date().toISOString()
   const { data, error } = await db

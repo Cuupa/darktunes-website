@@ -50,6 +50,7 @@ const mockRow: NewsRow = {
   hero_secondary_btn_action: null,
   hero_secondary_btn_href: null,
   hero_bg_url: null,
+  published_at_timezone: null,
 }
 
 describe('pressReleases DAL', () => {
