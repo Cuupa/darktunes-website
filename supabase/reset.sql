@@ -747,6 +747,8 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  T
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS guest_artists             TEXT;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS featured_until            TIMESTAMPTZ;
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS featured_removed_reason   TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS bandcamp_url             TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smartlink_url            TEXT;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
@@ -799,6 +801,8 @@ CREATE TABLE IF NOT EXISTS public.news_posts (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS featured       BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS featured_until  TIMESTAMPTZ;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS featured_removed_reason TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS is_press_only BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS status        TEXT    NOT NULL DEFAULT 'published';
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS artist_id     UUID    REFERENCES public.artists (id) ON DELETE SET NULL;

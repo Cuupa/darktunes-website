@@ -1631,6 +1631,8 @@ export interface Database {
           bandcamp_url: string | null
           smartlink_url: string | null
           featured: boolean
+          featured_until: string | null
+          featured_removed_reason: string | null
           itunes_id: string | null
           spotify_id: string | null
           discogs_id: string | null
@@ -1668,6 +1670,8 @@ export interface Database {
           bandcamp_url?: string | null
           smartlink_url?: string | null
           featured?: boolean
+          featured_until?: string | null
+          featured_removed_reason?: string | null
           itunes_id?: string | null
           spotify_id?: string | null
           discogs_id?: string | null
@@ -1705,6 +1709,8 @@ export interface Database {
           bandcamp_url?: string | null
           smartlink_url?: string | null
           featured?: boolean
+          featured_until?: string | null
+          featured_removed_reason?: string | null
           itunes_id?: string | null
           spotify_id?: string | null
           discogs_id?: string | null
@@ -1839,6 +1845,8 @@ export interface Database {
           content: string
           image_url: string | null
          featured: boolean
+         featured_until: string | null
+         featured_removed_reason: string | null
          is_press_only: boolean
           status: string
           published_at: string
@@ -1866,6 +1874,8 @@ export interface Database {
           content: string
           image_url?: string | null
           featured?: boolean
+          featured_until?: string | null
+          featured_removed_reason?: string | null
           is_press_only?: boolean
           status?: string
           published_at?: string
@@ -1893,6 +1903,8 @@ export interface Database {
           content?: string
           image_url?: string | null
           featured?: boolean
+          featured_until?: string | null
+          featured_removed_reason?: string | null
           is_press_only?: boolean
           status?: string
           published_at?: string

@@ -2,13 +2,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { NewsPost } from '@/types'
 import { parseJunctionRows } from '@/lib/types/jsonColumns'
+import { stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
+import { sanitizeNewsWrite } from '@/lib/sanitizeTextContent'
 
 type DbClient = SupabaseClient<Database>
 type NewsRow = Database['public']['Tables']['news_posts']['Row']
 export type NewsInsert = Database['public']['Tables']['news_posts']['Insert']
 export type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
 
-function rowToNewsPost(row: NewsRow): NewsPost {
+export function rowToNewsPost(row: NewsRow): NewsPost {
   const r = row as NewsRow & {
     embargo_until?: string | null
     media_contact?: string | null
@@ -22,14 +24,16 @@ function rowToNewsPost(row: NewsRow): NewsPost {
     : 'published'
   return {
     id: row.id,
-    title: row.title,
+    title: stripEmojis(row.title),
     slug: row.slug,
-    excerpt: row.excerpt ?? '',
-    content: row.content,
+    excerpt: row.excerpt ? stripEmojis(row.excerpt) : '',
+    content: stripEmojisFromHtml(row.content),
     imageUrl: row.image_url ?? undefined,
     publishedAt: row.published_at,
     publishedAtTimezone: row.published_at_timezone ?? undefined,
     featured: row.featured ?? false,
+    featuredUntil: row.featured_until ?? undefined,
+    featuredRemovedReason: (row.featured_removed_reason as NewsPost['featuredRemovedReason']) ?? undefined,
     isPressOnly: row.is_press_only,
     artistId: row.artist_id ?? null,
     status,
@@ -246,7 +250,7 @@ export async function getNewsPostById(db: DbClient, id: string): Promise<NewsPos
 }
 
 export async function createNewsPost(db: DbClient, newsData: NewsInsert): Promise<NewsPost> {
-  const { data, error } = await db.from('news_posts').insert(newsData).select().single()
+  const { data, error } = await db.from('news_posts').insert(sanitizeNewsWrite(newsData)).select().single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createNewsPost')
   return rowToNewsPost(data)
@@ -259,7 +263,7 @@ export async function updateNewsPost(
 ): Promise<NewsPost> {
   const { data, error } = await db
     .from('news_posts')
-    .update(newsData)
+    .update(sanitizeNewsWrite(newsData))
     .eq('id', id)
     .select()
     .single()

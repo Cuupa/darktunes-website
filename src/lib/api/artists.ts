@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
+import { sanitizeArtistWrite } from '@/lib/sanitizeTextContent'
 import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
@@ -88,7 +89,7 @@ export async function getArtistBySlug(db: DbClient, slug: string): Promise<Artis
 }
 
 export async function createArtist(db: DbClient, artistData: ArtistInsert): Promise<Artist> {
-  const { data, error } = await db.from('artists').insert(artistData).select().single()
+  const { data, error } = await db.from('artists').insert(sanitizeArtistWrite(artistData)).select().single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createArtist')
   return rowToArtist(data)
@@ -101,7 +102,7 @@ export async function updateArtist(
 ): Promise<Artist> {
   const { data, error } = await db
     .from('artists')
-    .update(artistData)
+    .update(sanitizeArtistWrite(artistData))
     .eq('id', id)
     .select()
     .single()

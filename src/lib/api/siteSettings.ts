@@ -4,6 +4,8 @@ import type { Database } from '@/types/database'
 import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig, CustomSocialLink } from '@/types'
 import { parseThemeConfig, themeConfigFromFlatFields } from '@/config/themeConfig'
 import type { ThemeConfig } from '@/config/themeConfig'
+import { sanitizeSiteSettingsWrite } from '@/lib/sanitizeTextContent'
+import { stripEmojis } from '@/lib/stripEmojis'
 
 type DbClient = SupabaseClient<Database>
 
@@ -162,7 +164,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
 
   return {
     labelName: map['label_name'] ?? SITE_SETTINGS_DEFAULTS.labelName,
-    labelTagline: map['label_tagline'] ?? SITE_SETTINGS_DEFAULTS.labelTagline,
+    labelTagline: stripEmojis(map['label_tagline'] ?? SITE_SETTINGS_DEFAULTS.labelTagline),
     contactEmail: map['contact_email'] ?? SITE_SETTINGS_DEFAULTS.contactEmail,
     privacyPolicyUrl: map['privacy_policy_url'] ?? SITE_SETTINGS_DEFAULTS.privacyPolicyUrl,
     termsUrl: map['terms_url'] ?? SITE_SETTINGS_DEFAULTS.termsUrl,
@@ -206,9 +208,9 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     featureToggles,
     logoUrl: map['logo_url'] ?? '',
     faviconUrl: map['favicon_url'] ?? '',
-    aboutHeadline: map['about_headline'] ?? '',
-    aboutSubheading: map['about_subheading'] ?? '',
-    aboutBody: map['about_body'] ?? '',
+    aboutHeadline: stripEmojis(map['about_headline'] ?? ''),
+    aboutSubheading: stripEmojis(map['about_subheading'] ?? ''),
+    aboutBody: stripEmojis(map['about_body'] ?? ''),
     newsletterHeading: map['newsletter_heading'] ?? '',
     newsletterDescription: map['newsletter_description'] ?? '',
     spotifySectionHeading: map['spotify_section_heading'] ?? '',
@@ -309,9 +311,10 @@ export async function upsertSiteSetting(
   key: string,
   value: string,
 ): Promise<void> {
+  const sanitized = sanitizeSiteSettingsWrite({ [key]: value })[key] ?? value
   const { error } = await db
     .from('site_settings')
-    .upsert({ key, value }, { onConflict: 'key' })
+    .upsert({ key, value: sanitized }, { onConflict: 'key' })
   if (error) throw new Error(error.message)
 }
 
@@ -323,7 +326,8 @@ export async function upsertSiteSettings(
   db: DbClient,
   settings: Partial<Record<string, string>>,
 ): Promise<void> {
-  const rows = Object.entries(settings).map(([key, value]) => ({ key, value: value ?? '' }))
+  const sanitized = sanitizeSiteSettingsWrite(settings)
+  const rows = Object.entries(sanitized).map(([key, value]) => ({ key, value: value ?? '' }))
   if (rows.length === 0) return
   const { error } = await db.from('site_settings').upsert(rows, { onConflict: 'key' })
   if (error) throw new Error(error.message)

@@ -4,6 +4,10 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star, Copy } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
+import { useReleases } from '@/hooks/useReleases'
+import { previewFeaturedBump, type HeroFeaturedItem } from '@/lib/heroFeatured'
+import { buildHeroBumpUpdate, buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { FeaturedRemovedBadge } from '@/components/admin/FeaturedRemovedBadge'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { formatZonedDateTime } from '@/lib/datetime/zonedDateTime'
@@ -53,6 +57,12 @@ export function NewsManager() {
   const router = useRouter()
   const cms = useCmsPaths()
   const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
+  const { releases, updateRelease } = useReleases()
+  const [featuredBumpConfirm, setFeaturedBumpConfirm] = useState<{
+    post: NewsPost
+    bumpTarget: HeroFeaturedItem
+    message: string
+  } | null>(null)
   const { settings } = useSiteSettings()
   const operatorTimezone = resolveOperatorTimezone(settings)
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null)
@@ -97,9 +107,55 @@ export function NewsManager() {
     }
   }
 
+  const bumpHeroItem = async (bumpTarget: HeroFeaturedItem) => {
+    if (bumpTarget.kind === 'release') {
+      await updateRelease(bumpTarget.id, buildHeroBumpUpdate())
+      return
+    }
+    await updateNewsPost(bumpTarget.id, buildHeroBumpUpdate())
+  }
+
+  const applyFeaturedToggle = async (post: NewsPost, bumpTarget?: HeroFeaturedItem) => {
+    if (bumpTarget) {
+      await bumpHeroItem(bumpTarget)
+    }
+
+    await updateNewsPost(
+      post.id,
+      buildHeroFeatureUpdate({
+        featured: true,
+        featuredUntil: post.featuredUntil ?? null,
+      }),
+    )
+    toast.success(`"${post.title}" featured`)
+  }
+
   const handleToggleFeatured = async (post: NewsPost) => {
+    if (post.featured) {
+      try {
+        await updateNewsPost(
+          post.id,
+          buildHeroFeatureUpdate({ featured: false, featuredUntil: null }),
+        )
+        toast.success(`"${post.title}" unfeatured`)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Update failed')
+      }
+      return
+    }
+
+    const preview = previewFeaturedBump(releases, news, { id: post.id, kind: 'news' })
+    if (preview.needsConfirm && preview.bumpTarget) {
+      setFeaturedBumpConfirm({
+        post,
+        bumpTarget: preview.bumpTarget,
+        message: preview.message,
+      })
+      return
+    }
+
     try {
-      await updateNewsPost(post.id, { featured: !post.featured })
+      await applyFeaturedToggle(post)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Update failed')
     }
@@ -269,12 +325,17 @@ export function NewsManager() {
                   </TableCell>
                   <TableCell>{post.isPressOnly ? 'Press' : 'Public'}</TableCell>
                   <TableCell>
-                    <Switch
-                      checked={post.featured}
-                      onCheckedChange={() => void handleToggleFeatured(post)}
-                      aria-label={`Toggle featured for "${post.title}"`}
-                      title="Show in hero carousel"
-                    />
+                    <div className="flex flex-col items-start gap-1">
+                      <Switch
+                        checked={post.featured}
+                        onCheckedChange={() => void handleToggleFeatured(post)}
+                        aria-label={`Toggle featured for "${post.title}"`}
+                        title="Show in hero carousel"
+                      />
+                      {!post.featured && (
+                        <FeaturedRemovedBadge reason={post.featuredRemovedReason} />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -331,6 +392,38 @@ export function NewsManager() {
         </TableBody>
       </Table>
       </div>
+
+      <AlertDialog
+        open={!!featuredBumpConfirm}
+        onOpenChange={(open) => !open && setFeaturedBumpConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hero carousel is full</AlertDialogTitle>
+            <AlertDialogDescription>
+              {featuredBumpConfirm?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!featuredBumpConfirm) return
+                void applyFeaturedToggle(
+                  featuredBumpConfirm.post,
+                  featuredBumpConfirm.bumpTarget,
+                )
+                  .catch((err) => {
+                    toast.error(err instanceof Error ? err.message : 'Update failed')
+                  })
+                  .finally(() => setFeaturedBumpConfirm(null))
+              }}
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

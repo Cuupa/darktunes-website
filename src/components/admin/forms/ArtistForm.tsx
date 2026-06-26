@@ -4,6 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { AdminPanelProps } from '@/lib/component-contracts'
+import { stripEmojisOnPaste } from '@/lib/stripEmojisPaste'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -562,7 +563,12 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   <p className="text-xs text-muted-foreground">Band name can only be changed by an admin.</p>
                 </>
               ) : (
-                <Input id="name" {...register('name', { required: true })} disabled={isLoading} />
+                <Input
+                  id="name"
+                  {...register('name', { required: true })}
+                  onPaste={stripEmojisOnPaste}
+                  disabled={isLoading}
+                />
               )}
             </div>
             <div className="space-y-1">
@@ -931,6 +937,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
               <Textarea
                 id="notes"
                 {...register('notes')}
+                onPaste={stripEmojisOnPaste}
                 rows={3}
                 disabled={isLoading}
                 placeholder="Internal notes — not visible to the artist."

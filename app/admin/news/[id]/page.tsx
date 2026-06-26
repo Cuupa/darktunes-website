@@ -16,6 +16,8 @@ import { utcIsoToZonedLocal } from '@/lib/datetime/zonedDateTime'
 import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
 import { resolveOperatorTimezone } from '@/lib/operator/defaultTimezone'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { featuredDurationFromUntil, featuredUntilFromDuration } from '@/lib/featuredDurationForm'
 import type { NewsPost, SiteSettings } from '@/types'
 
 function newsPostToFormData(
@@ -38,6 +40,15 @@ function newsPostToFormData(
     publishedAt: localDt,
     publishedAtTimezone: post.publishedAtTimezone ?? operatorTimezone,
     featured: post.featured ?? false,
+    ...(() => {
+      const duration = featuredDurationFromUntil(post.featuredUntil)
+      return {
+        featuredDurationEnabled: duration.durationEnabled,
+        featuredDurationMode: duration.durationMode,
+        featuredDurationDays: duration.durationDays,
+        featuredUntilLocal: duration.untilLocal,
+      }
+    })(),
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
     artistId: post.artistId ?? '',
@@ -83,7 +94,15 @@ export default function NewsEditPage() {
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
         ...publishedAtFields,
-        featured: data.featured,
+        ...buildHeroFeatureUpdate({
+          featured: data.featured,
+          featuredUntil: featuredUntilFromDuration(data.featured, {
+            durationEnabled: data.featuredDurationEnabled,
+            durationMode: data.featuredDurationMode,
+            durationDays: data.featuredDurationDays,
+            untilLocal: data.featuredUntilLocal,
+          }),
+        }),
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,

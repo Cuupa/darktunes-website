@@ -33,6 +33,8 @@ const mockRow: NewsRow = {
   content: 'Body',
   image_url: null,
   featured: false,
+  featured_until: null,
+  featured_removed_reason: null,
   is_press_only: true,
   status: 'published',
   published_at: '2024-06-01T00:00:00Z',

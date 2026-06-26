@@ -26,6 +26,8 @@ import {
   getScheduleTimezoneOptions,
   resolveOperatorTimezone,
 } from '@/lib/operator/defaultTimezone'
+import { FeaturedDurationFields } from './FeaturedDurationFields'
+import { stripEmojisOnPaste } from '@/lib/stripEmojisPaste'
 
 export interface NewsFormData {
   title: string
@@ -37,6 +39,10 @@ export interface NewsFormData {
   publishedAt: string
   publishedAtTimezone: string
   featured: boolean
+  featuredDurationEnabled: boolean
+  featuredDurationMode: 'days' | 'datetime'
+  featuredDurationDays: number
+  featuredUntilLocal: string
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
   artistId: string
@@ -121,7 +127,12 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-1">
         <Label htmlFor="title">Title *</Label>
-        <Input id="title" {...register('title', { required: true })} disabled={isLoading} />
+        <Input
+          id="title"
+          {...register('title', { required: true })}
+          onPaste={stripEmojisOnPaste}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-1">
@@ -131,7 +142,13 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
 
       <div className="space-y-1">
         <Label htmlFor="excerpt">Excerpt (shown in listings)</Label>
-        <Textarea id="excerpt" {...register('excerpt')} rows={2} disabled={isLoading} />
+        <Textarea
+          id="excerpt"
+          {...register('excerpt')}
+          onPaste={stripEmojisOnPaste}
+          rows={2}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-1">
@@ -320,6 +337,23 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
         />
         <Label htmlFor="featured">Featured (show in hero carousel)</Label>
       </div>
+
+      <FeaturedDurationFields
+        featured={featured}
+        value={{
+          durationEnabled: watch('featuredDurationEnabled'),
+          durationMode: watch('featuredDurationMode'),
+          durationDays: watch('featuredDurationDays'),
+          untilLocal: watch('featuredUntilLocal'),
+        }}
+        onChange={(next) => {
+          setValue('featuredDurationEnabled', next.durationEnabled)
+          setValue('featuredDurationMode', next.durationMode)
+          setValue('featuredDurationDays', next.durationDays)
+          setValue('featuredUntilLocal', next.untilLocal)
+        }}
+        disabled={isLoading}
+      />
 
       {isPressOnly && (
         <div className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 md:grid-cols-2">

@@ -13,6 +13,8 @@ import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { featuredUntilFromDuration } from '@/lib/featuredDurationForm'
 
 const EMPTY_FORM: NewsFormData = {
   title: '',
@@ -24,6 +26,10 @@ const EMPTY_FORM: NewsFormData = {
   publishedAt: '',
   publishedAtTimezone: '',
   featured: false,
+  featuredDurationEnabled: false,
+  featuredDurationMode: 'days',
+  featuredDurationDays: 14,
+  featuredUntilLocal: '',
   isPressOnly: false,
   status: 'draft',
   artistId: '',
@@ -58,7 +64,15 @@ export default function NewsNewPage() {
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
         ...publishedAtFields,
-        featured: data.featured,
+        ...buildHeroFeatureUpdate({
+          featured: data.featured,
+          featuredUntil: featuredUntilFromDuration(data.featured, {
+            durationEnabled: data.featuredDurationEnabled,
+            durationMode: data.featuredDurationMode,
+            durationDays: data.featuredDurationDays,
+            untilLocal: data.featuredUntilLocal,
+          }),
+        }),
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,

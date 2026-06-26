@@ -18,6 +18,7 @@
  */
 
 import DOMPurify from 'dompurify'
+import { stripEmojisFromHtml } from '@/lib/stripEmojis'
 
 type SanitizeOptions = Parameters<typeof DOMPurify.sanitize>[1]
 
@@ -103,7 +104,7 @@ export function sanitizeHtml(html: string, options?: SanitizeOptions): string {
   if (!html) return ''
 
   if (typeof window === 'undefined') {
-    return serverSanitize(html)
+    return stripEmojisFromHtml(serverSanitize(html))
   }
 
   const addAttr = Array.isArray(options?.ADD_ATTR) ? options.ADD_ATTR : []
@@ -127,5 +128,6 @@ export function sanitizeHtml(html: string, options?: SanitizeOptions): string {
   }
 
   const clean = DOMPurify.sanitize(html, mergedOptions)
-  return wantsIframe ? stripDisallowedIframes(clean) : clean
+  const iframeSafe = wantsIframe ? stripDisallowedIframes(clean) : clean
+  return stripEmojisFromHtml(iframeSafe)
 }
