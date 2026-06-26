@@ -22,6 +22,7 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
+    not: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
@@ -61,6 +62,17 @@ function mockSupabaseClientOnline(): void {
             gte: vi.fn().mockReturnThis(),
             order: vi.fn().mockReturnThis(),
             limit: vi.fn().mockReturnThis(),
+          }
+        }
+        if (table === 'artists') {
+          const countResult = { count: 0, error: null }
+          const countPromise = Promise.resolve(countResult)
+          return {
+            select: vi.fn().mockReturnThis(),
+            not: vi.fn().mockReturnThis(),
+            then: countPromise.then.bind(countPromise),
+            catch: countPromise.catch.bind(countPromise),
+            finally: countPromise.finally.bind(countPromise),
           }
         }
         return makeThenableBuilder(null)

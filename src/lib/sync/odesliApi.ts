@@ -13,6 +13,7 @@
  */
 
 import { HttpError } from '@/lib/rateLimiter'
+import { parseSpotifyUrl } from '@/lib/parsers/platformUrlParser'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,45 @@ export interface OdesliSmartLink {
   platforms: Record<string, string>
 }
 
+const ODESLI_RESOLVABLE_SPOTIFY_TYPES = new Set(['album', 'track'])
+
+/**
+ * Returns true when the URL points at an album or track Odesli can resolve.
+ * Artist/profile URLs return 405 UNSUPPORTED_URL from the Odesli API.
+ */
+export function isOdesliResolvableUrl(musicUrl: string): boolean {
+  const trimmed = musicUrl.trim()
+  if (!trimmed) return false
+
+  const spotify = parseSpotifyUrl(trimmed)
+  if (spotify) return ODESLI_RESOLVABLE_SPOTIFY_TYPES.has(spotify.type)
+
+  try {
+    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+    if (url.hostname.includes('apple.com')) {
+      const parts = url.pathname.split('/').filter(Boolean)
+      const typeIndex = parts.findIndex((p) => p === 'album' || p === 'song')
+      return typeIndex !== -1 && Boolean(parts[typeIndex + 1])
+    }
+  } catch {
+    return false
+  }
+
+  return false
+}
+
+/** Expected Odesli failures that should not count as sync errors. */
+export function isSkippableOdesliError(err: string): boolean {
+  return (
+    err.includes('404') ||
+    err.includes('No match') ||
+    err.includes('405') ||
+    err.includes('UNSUPPORTED_URL') ||
+    err.includes('422') ||
+    err.includes('URL type not supported by Odesli')
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -56,13 +96,17 @@ export interface OdesliSmartLink {
  * Resolves a music URL through Odesli and returns the universal smart link
  * plus per-platform URLs.
  *
- * @param musicUrl  - Any music streaming URL (Spotify, Apple Music, etc.)
+ * @param musicUrl  - Album or track URL (Spotify, Apple Music, etc.)
  * @param fetchFn   - Injectable fetch (real in prod, mocked in tests)
  */
 export async function resolveOdesliSmartLink(
   musicUrl: string,
   fetchFn: typeof fetch,
 ): Promise<OdesliSmartLink> {
+  if (!isOdesliResolvableUrl(musicUrl)) {
+    throw new HttpError(422, 'URL type not supported by Odesli')
+  }
+
   const url = new URL('https://api.song.link/v1-alpha.1/links')
   url.searchParams.set('url', musicUrl)
 
@@ -83,9 +127,13 @@ export async function resolveOdesliSmartLink(
     throw new HttpError(response.status, `Odesli returned non-JSON response: ${text.slice(0, 200)}`)
   }
 
+  if (!data.pageUrl) {
+    throw new HttpError(response.status, 'Odesli response missing pageUrl')
+  }
+
   const platforms: Record<string, string> = {}
-  for (const [platform, entity] of Object.entries(data.linksByPlatform)) {
-    platforms[platform] = entity.url
+  for (const [platform, entity] of Object.entries(data.linksByPlatform ?? {})) {
+    if (entity?.url) platforms[platform] = entity.url
   }
 
   return {

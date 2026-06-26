@@ -28,7 +28,12 @@ function makeBuilder(result: QueryResult) {
     update: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockImplementation(() => createThenable(result)),
+    maybeSingle: vi.fn().mockImplementation(() => createThenable(result)),
     ...createThenable(result),
   }
 }
@@ -245,6 +250,65 @@ describe('syncSingleArtist', () => {
 
     const result = await syncSingleArtist(mockArtist.id, 'spotify', deps)
     expect(result.results.find((r) => r.api === 'itunes')).toBeUndefined()
+  })
+
+  it('uses latest release URL as Odesli proxy for artist platform_links', async () => {
+    const artistWithSpotify = {
+      ...mockArtist,
+      id: 'artist-odesli',
+      spotify_url: 'https://open.spotify.com/artist/artist123',
+      apple_music_url: null,
+    }
+
+    const odesliFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            pageUrl: 'https://song.link/s/proxy',
+            linksByPlatform: { spotify: { url: 'https://open.spotify.com/album/album1' } },
+          }),
+        ),
+    })
+
+    const db = makeMockDb((table) => {
+      if (table === 'artists') {
+        return { data: [artistWithSpotify], error: null }
+      }
+      if (table === 'releases') {
+        return {
+          data: [
+            {
+              id: 'release-1',
+              artist_id: 'artist-odesli',
+              spotify_url: 'https://open.spotify.com/album/album1',
+              apple_music_url: null,
+              release_date: '2024-01-01',
+            },
+          ],
+          error: null,
+        }
+      }
+      if (table === 'sync_logs') return { data: null, error: null }
+      return { data: [], error: null }
+    })
+
+    const deps: SyncAllDeps = {
+      db,
+      fetch: odesliFetch as typeof fetch,
+      uploadToR2: vi.fn(),
+      onlyApi: 'odesli',
+    }
+
+    const result = await syncAll(deps)
+    const odesliResult = result.results.find((r) => r.api === 'odesli')
+    expect(odesliResult).toBeDefined()
+
+    const calledUrls = odesliFetch.mock.calls.map((call) => String(call[0]))
+    expect(calledUrls.some((u) => u.includes('album1'))).toBe(true)
+    expect(calledUrls.some((u) => u.includes('artist123'))).toBe(false)
+    expect(odesliResult?.errors.filter((e) => e.includes('UNSUPPORTED_URL'))).toHaveLength(0)
   })
 
   it('maps discogs jobType to onlyApi=discogs, skipping iTunes', async () => {

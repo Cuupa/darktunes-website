@@ -169,7 +169,7 @@ export function buildHealthAlerts(
       id: 'apis-unconfigured',
       severity: 'info',
       title: 'Optional integrations not configured',
-      message: `${kpis.unconfiguredApis} API${kpis.unconfiguredApis === 1 ? '' : 's'} missing env vars — sync for those sources is disabled.`,
+      message: `${kpis.unconfiguredApis} integration${kpis.unconfiguredApis === 1 ? '' : 's'} not configured in Admin → API Keys — sync for those sources is disabled.`,
       source: 'system',
     })
   }
@@ -337,5 +337,7 @@ export function computeKpiSummary(apis: Record<string, ApiHealthStatus>): Health
 function formatApiName(api: string): string {
   if (api === 'itunes') return 'iTunes'
   if (api === 'odesli') return 'Odesli'
+  if (api === 'lastfm') return 'Last.fm'
+  if (api === 'soundcharts') return 'Soundcharts'
   return api.charAt(0).toUpperCase() + api.slice(1)
 }

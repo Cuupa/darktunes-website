@@ -26,7 +26,7 @@ import { fetchSpotifyArtistReleases } from './spotifyApi'
 import { fetchDiscogsArtistReleases } from './discogsApi'
 import { fetchSongkickArtistCalendar } from './songkickApi'
 import { fetchBandsintownArtistEvents } from './bandsintownApi'
-import { resolveOdesliSmartLink } from './odesliApi'
+import { isOdesliResolvableUrl, isSkippableOdesliError, resolveOdesliSmartLink } from './odesliApi'
 import { deduplicateReleases } from './deduplication'
 import { syncArtist } from './syncArtist'
 import type { SyncDeps } from './syncArtist'
@@ -184,7 +184,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             // Resolve Odesli smart link for Spotify releases
             let smartUrl: string | null = null
             let appleMusicUrl: string | null = null
-            if (release.spotifyUrl) {
+            if (release.spotifyUrl && isOdesliResolvableUrl(release.spotifyUrl)) {
               const odesli = await withExponentialBackoff(() =>
                 resolveOdesliSmartLink(release.spotifyUrl!, fetchFn),
               ).catch(() => null)
@@ -261,7 +261,6 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
       } catch (e) {
         const msg = String(e)
         if (msg.includes('429')) spotifyResult.rateLimited = true
-        if (msg.includes('Invalid limit')) spotifyResult.rateLimited = true
 
         spotifyResult.errors.push(`Spotify sync for ${artist.name}: ${msg}`)
       }
@@ -528,7 +527,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
       for (const release of releasesWithoutSmartUrl ?? []) {
         const musicUrl = release.spotify_url ?? release.apple_music_url
-        if (!musicUrl) continue
+        if (!musicUrl || !isOdesliResolvableUrl(musicUrl)) continue
 
         odesliResult.artistsProcessed++ // counts releases attempted (field reused for parity)
 
@@ -565,8 +564,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               odesliResult.releasesUpserted++
             }
           } else if (odesliErr) {
-            // Only push an error if there was an actual failure (not just "not found")
-            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+            if (!isSkippableOdesliError(odesliErr)) {
               odesliResult.errors.push(`Odesli resolve for release ${release.id}: ${odesliErr}`)
             }
             if (odesliErr.includes('429')) odesliResult.rateLimited = true
@@ -608,8 +606,29 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         existingOdesli?.errors.push(`Odesli artist batch query failed: ${batchErr.message}`)
       }
 
+      // Odesli cannot resolve artist profile URLs — use each artist's latest release as proxy.
+      let releaseProxyQuery = db
+        .from('releases')
+        .select('artist_id, spotify_url, apple_music_url, release_date')
+        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+        .order('release_date', { ascending: false })
+
+      if (onlyArtistId) {
+        releaseProxyQuery = releaseProxyQuery.eq('artist_id', onlyArtistId)
+      }
+
+      const { data: proxyReleaseRows } = await releaseProxyQuery
+      const releaseProxyByArtist = new Map<string, string>()
+      for (const row of proxyReleaseRows ?? []) {
+        if (!row.artist_id || releaseProxyByArtist.has(row.artist_id)) continue
+        const proxyUrl = row.spotify_url ?? row.apple_music_url
+        if (proxyUrl && isOdesliResolvableUrl(proxyUrl)) {
+          releaseProxyByArtist.set(row.artist_id, proxyUrl)
+        }
+      }
+
       for (const artist of artistsWithoutPlatformLinks ?? []) {
-        const musicUrl = artist.spotify_url ?? artist.apple_music_url
+        const musicUrl = releaseProxyByArtist.get(artist.id)
         if (!musicUrl) continue
 
         if (existingOdesli) existingOdesli.artistsProcessed++
@@ -639,8 +658,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               if (existingOdesli) existingOdesli.releasesUpserted++ // counts artist updates (field reused for parity)
             }
           } else if (odesliErr) {
-            // 404/no-match responses are expected for some artists — skip silently
-            if (!odesliErr.includes('404') && !odesliErr.includes('No match')) {
+            if (!isSkippableOdesliError(odesliErr)) {
               existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
             }
             if (odesliErr.includes('429') && existingOdesli) existingOdesli.rateLimited = true
