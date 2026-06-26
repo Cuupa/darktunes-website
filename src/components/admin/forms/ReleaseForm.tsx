@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AssetPicker } from '@/components/admin/file-explorer/AssetPicker'
 import { ImageUploadButton } from './ImageUploadButton'
 import { FeaturedDurationFields } from './FeaturedDurationFields'
 import { stripEmojisOnPaste } from '@/lib/stripEmojisPaste'
@@ -59,6 +60,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   })
 
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
+  const [heroPickerOpen, setHeroPickerOpen] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -77,6 +79,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   const type = watch('type')
   const heroPrimaryBtnAction = watch('heroPrimaryBtnAction')
   const heroSecondaryBtnAction = watch('heroSecondaryBtnAction')
+  const artistIds = watch('artistIds') ?? []
 
   return (
     <form onSubmit={handleSubmit(onChange)} className="space-y-4">
@@ -184,7 +187,20 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
             label="Upload"
             onUploaded={(url) => setValue('heroBgUrl', url, { shouldDirty: true })}
           />
+          <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={isLoading} onClick={() => setHeroPickerOpen(true)}>
+            Library
+          </Button>
         </div>
+        <AssetPicker
+          open={heroPickerOpen}
+          onClose={() => setHeroPickerOpen(false)}
+          onSelect={(asset) => {
+            setValue('heroBgUrl', asset.publicUrl, { shouldDirty: true })
+            setHeroPickerOpen(false)
+          }}
+          mimeTypeFilter="image/"
+          artistId={artistIds[0]}
+        />
       </div>
 
       <div className="space-y-1">
