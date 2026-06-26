@@ -1,18 +1,17 @@
 import type { NewsPost, Release, SiteSettings } from '@/types'
+import { collectHeroCandidates, MAX_HERO_FEATURES } from '@/lib/heroFeatured'
 
 export function selectHeroItems(
   releases: Release[],
   news: NewsPost[],
   _siteSettings?: Pick<SiteSettings, 'heroContentType' | 'heroFeaturedId'>,
 ): (Release | NewsPost)[] {
-  const featuredReleases = releases.filter((r) => r.featured && r.isVisible && !r.isPromo)
-  const featuredNews = news.filter((n) => n.featured && (n.status === 'published' || n.status === 'scheduled'))
+  const byId = new Map<string, Release | NewsPost>()
+  for (const release of releases) byId.set(release.id, release)
+  for (const post of news) byId.set(post.id, post)
 
-  const allFeatured = [...featuredReleases, ...featuredNews].sort((a, b) => {
-    const dateA = 'releaseDate' in a ? a.releaseDate : a.publishedAt
-    const dateB = 'releaseDate' in b ? b.releaseDate : b.publishedAt
-    return new Date(dateB).getTime() - new Date(dateA).getTime()
-  })
-
-  return allFeatured
+  return collectHeroCandidates(releases, news)
+    .slice(0, MAX_HERO_FEATURES)
+    .map((item) => byId.get(item.id))
+    .filter((item): item is Release | NewsPost => item != null)
 }

@@ -9,15 +9,16 @@
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
 import { toSlug } from '@/lib/slugify'
+import { stripEmojis } from '@/lib/stripEmojis'
 
 type ArtistRow = Database['public']['Tables']['artists']['Row']
 
 export function rowToArtist(row: ArtistRow): Artist {
   return {
     id: row.id,
-    name: row.name,
+    name: stripEmojis(row.name),
     slug: (row.slug ?? '').trim() || toSlug(row.name),
-    bio: row.bio ?? '',
+    bio: row.bio ? stripEmojis(row.bio) : '',
     genres: row.genres,
     imageUrl: row.image_url ?? '',
     spotifyUrl: row.spotify_url ?? undefined,
@@ -32,13 +33,13 @@ export function rowToArtist(row: ArtistRow): Artist {
     shopUrl: row.shop_url ?? undefined,
     soundcloudUrl: row.soundcloud_url ?? undefined,
     featured: row.featured,
-    country: row.country ?? undefined,
+    country: row.country ? stripEmojis(row.country) : undefined,
     foundedYear: row.founding_year ?? undefined,
-    hometown: row.hometown ?? undefined,
+    hometown: row.hometown ? stripEmojis(row.hometown) : undefined,
     email: row.email ?? undefined,
     vatNumber: row.vat_number ?? undefined,
     isEuNonGerman: row.is_eu_non_german,
-    notes: row.notes ?? undefined,
+    notes: row.notes ? stripEmojis(row.notes) : undefined,
     spotifyId: row.spotify_id ?? undefined,
     discogsId: row.discogs_id ?? undefined,
     songkickId: row.songkick_id ?? undefined,

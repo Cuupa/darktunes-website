@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ImageUploadButton } from './ImageUploadButton'
+import { FeaturedDurationFields } from './FeaturedDurationFields'
+import { stripEmojisOnPaste } from '@/lib/stripEmojisPaste'
 
 export interface ReleaseFormData {
   title: string
@@ -33,6 +35,10 @@ export interface ReleaseFormData {
   bandcampUrl: string
   smartlinkUrl: string
   featured: boolean
+  featuredDurationEnabled: boolean
+  featuredDurationMode: 'days' | 'datetime'
+  featuredDurationDays: number
+  featuredUntilLocal: string
   isVisible: boolean
   isPromo: boolean
   promoText: string
@@ -77,7 +83,12 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="title">Title *</Label>
-          <Input id="title" {...register('title', { required: true })} disabled={isLoading} />
+          <Input
+            id="title"
+            {...register('title', { required: true })}
+            onPaste={stripEmojisOnPaste}
+            disabled={isLoading}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="guestArtists">
@@ -87,6 +98,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
           <Input
             id="guestArtists"
             {...register('guestArtists')}
+            onPaste={stripEmojisOnPaste}
             disabled={isLoading}
             placeholder="e.g. feat. John Doe, Remix by XYZ"
           />
@@ -177,7 +189,14 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
 
       <div className="space-y-1">
         <Label htmlFor="promoText">Promo Text (optional, shown in Hero section)</Label>
-        <Textarea id="promoText" {...register('promoText')} rows={2} disabled={isLoading} placeholder="Short teaser text for the hero section…" />
+        <Textarea
+          id="promoText"
+          {...register('promoText')}
+          onPaste={stripEmojisOnPaste}
+          rows={2}
+          disabled={isLoading}
+          placeholder="Short teaser text for the hero section…"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -236,6 +255,23 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
           <Label htmlFor="isPromo">Promo Release</Label>
         </div>
       </div>
+
+      <FeaturedDurationFields
+        featured={featured}
+        value={{
+          durationEnabled: watch('featuredDurationEnabled'),
+          durationMode: watch('featuredDurationMode'),
+          durationDays: watch('featuredDurationDays'),
+          untilLocal: watch('featuredUntilLocal'),
+        }}
+        onChange={(next) => {
+          setValue('featuredDurationEnabled', next.durationEnabled)
+          setValue('featuredDurationMode', next.durationMode)
+          setValue('featuredDurationDays', next.durationDays)
+          setValue('featuredUntilLocal', next.untilLocal)
+        }}
+        disabled={isLoading}
+      />
 
       {/* ── Hero Buttons ── */}
       <div className="space-y-4 rounded-lg border border-border p-4">

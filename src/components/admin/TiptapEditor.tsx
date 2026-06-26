@@ -35,6 +35,7 @@ import { ImageBubbleMenu } from '@/components/admin/tiptap/ImageBubbleMenu'
 import { LinkPopover } from '@/components/admin/tiptap/LinkPopover'
 import { YouTubeEmbedExtension } from '@/components/admin/tiptap/YouTubeEmbedExtension'
 import { VideoInsertDialog } from '@/components/admin/tiptap/VideoInsertDialog'
+import { containsEmojis, stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
 
 interface TiptapEditorProps {
   value: string
@@ -80,9 +81,27 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
         class: 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto p-4 focus:outline-none',
         ...(placeholder ? { 'data-placeholder': placeholder } : {}),
       },
+      handlePaste: (_view, event) => {
+        const pastedText = event.clipboardData?.getData('text/plain') ?? ''
+        const pastedHtml = event.clipboardData?.getData('text/html') ?? ''
+        if (!containsEmojis(pastedText) && !containsEmojis(pastedHtml)) {
+          return false
+        }
+
+        event.preventDefault()
+        const cleaned = pastedHtml
+          ? stripEmojisFromHtml(pastedHtml)
+          : stripEmojis(pastedText)
+        _view.dispatch(_view.state.tr.insertText(cleaned))
+        return true
+      },
     },
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML()
+      let html = editor.getHTML()
+      if (containsEmojis(html)) {
+        html = stripEmojisFromHtml(html)
+        editor.commands.setContent(html, { emitUpdate: false })
+      }
       onChange(html)
       onChangeWithText?.(html, editor.getText())
     },

@@ -13,6 +13,10 @@ import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { featuredUntilFromDuration } from '@/lib/featuredDurationForm'
+import { HeroFeaturedBumpDialog } from '@/components/admin/HeroFeaturedBumpDialog'
+import { useHeroFeaturedBump } from '@/hooks/useHeroFeaturedBump'
 
 const EMPTY_FORM: NewsFormData = {
   title: '',
@@ -24,6 +28,10 @@ const EMPTY_FORM: NewsFormData = {
   publishedAt: '',
   publishedAtTimezone: '',
   featured: false,
+  featuredDurationEnabled: false,
+  featuredDurationMode: 'days',
+  featuredDurationDays: 14,
+  featuredUntilLocal: '',
   isPressOnly: false,
   status: 'draft',
   artistId: '',
@@ -44,9 +52,11 @@ export default function NewsNewPage() {
   const cms = useCmsPaths()
   const { createNewsPost } = useNews()
   const { settings } = useSiteSettings()
+  const { pendingAction, runWithOptionalBump, confirmPendingAction, cancelPendingAction } =
+    useHeroFeaturedBump()
   const [isSaving, setIsSaving] = useState(false)
 
-  const handleSave = async (data: NewsFormData) => {
+  const persistNewsPost = async (data: NewsFormData) => {
     setIsSaving(true)
     try {
       const publishedAtFields = buildPublishedAtFields(data, settings)
@@ -58,7 +68,15 @@ export default function NewsNewPage() {
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
         ...publishedAtFields,
-        featured: data.featured,
+        ...buildHeroFeatureUpdate({
+          featured: data.featured,
+          featuredUntil: featuredUntilFromDuration(data.featured, {
+            durationEnabled: data.featuredDurationEnabled,
+            durationMode: data.featuredDurationMode,
+            durationDays: data.featuredDurationDays,
+            untilLocal: data.featuredUntilLocal,
+          }),
+        }),
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,
@@ -92,9 +110,23 @@ export default function NewsNewPage() {
       }
       toast.success(`Created "${data.title}"`)
       router.push(cms.newsList)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create news post')
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleSave = async (data: NewsFormData) => {
+    await runWithOptionalBump({
+      activatingFeatured: data.featured,
+      wasFeatured: false,
+      itemId: 'new-news-post',
+      kind: 'news',
+      action: async () => {
+        await persistNewsPost(data)
+      },
+    })
   }
 
   return (
@@ -109,6 +141,17 @@ export default function NewsNewPage() {
           </Button>
           <h1 className="text-2xl font-bold">New News Post</h1>
         </div>
+
+        <HeroFeaturedBumpDialog
+          open={!!pendingAction}
+          message={pendingAction?.message}
+          onConfirm={() => {
+            void confirmPendingAction().catch((err) => {
+              toast.error(err instanceof Error ? err.message : 'Failed to create news post')
+            })
+          }}
+          onCancel={cancelPendingAction}
+        />
 
         <Card>
           <CardHeader>

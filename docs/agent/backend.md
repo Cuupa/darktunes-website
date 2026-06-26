@@ -55,6 +55,14 @@ Health (`buildHealthSnapshot`), sync logs, app errors, maintenance routes. Cron 
 
 No Vercel Cron. Due posts (`status = scheduled`, `published_at <= now`) are promoted to `published` when `getCachedPublicNews()` revalidates (public homepage, `/news`, etc.). Admin saves trigger `revalidateTag('news')` via `useNews`.
 
+## Emoji-free public text (a11y)
+
+User-facing text is stripped of emoji characters via `src/lib/stripEmojis.ts` on read (DAL mappers), write (DAL sanitizers), HTML display (`sanitizeHtml`), admin paste (TipTap + plain inputs), and a one-time `persistEmojiCleanup()` pass during public cache revalidation. Theme preset emoji pickers in admin are excluded.
+
+## Hero featured limits
+
+Releases and news posts support `featured_until` and `featured_removed_reason`. The hero carousel shows at most 10 eligible featured items (`src/lib/heroFeatured.ts`). `enforceHeroFeaturedLimits()` runs during public cache revalidation; enabling an 11th feature in admin prompts a confirmation modal and bumps the oldest active hero item.
+
 ## Newsletter DOI
 
 `subscribeToNewsletter` Server Action → pending row → Edge Function email → `GET /api/newsletter/verify`.

@@ -52,6 +52,8 @@ const mockReleaseRow: ReleaseRow = {
   apple_music_url: null,
   youtube_url: null,
   featured: true,
+  featured_until: null,
+  featured_removed_reason: null,
   itunes_id: '123456789',
   spotify_id: null,
   discogs_id: null,

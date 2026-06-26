@@ -16,6 +16,10 @@ import { utcIsoToZonedLocal } from '@/lib/datetime/zonedDateTime'
 import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
 import { resolveOperatorTimezone } from '@/lib/operator/defaultTimezone'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { featuredDurationFromUntil, featuredUntilFromDuration } from '@/lib/featuredDurationForm'
+import { HeroFeaturedBumpDialog } from '@/components/admin/HeroFeaturedBumpDialog'
+import { useHeroFeaturedBump } from '@/hooks/useHeroFeaturedBump'
 import type { NewsPost, SiteSettings } from '@/types'
 
 function newsPostToFormData(
@@ -38,6 +42,15 @@ function newsPostToFormData(
     publishedAt: localDt,
     publishedAtTimezone: post.publishedAtTimezone ?? operatorTimezone,
     featured: post.featured ?? false,
+    ...(() => {
+      const duration = featuredDurationFromUntil(post.featuredUntil)
+      return {
+        featuredDurationEnabled: duration.durationEnabled,
+        featuredDurationMode: duration.durationMode,
+        featuredDurationDays: duration.durationDays,
+        featuredUntilLocal: duration.untilLocal,
+      }
+    })(),
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
     artistId: post.artistId ?? '',
@@ -62,6 +75,8 @@ export default function NewsEditPage() {
 
   const { news, isLoading, updateNewsPost } = useNews()
   const { settings } = useSiteSettings()
+  const { pendingAction, runWithOptionalBump, confirmPendingAction, cancelPendingAction } =
+    useHeroFeaturedBump()
   const [isSaving, setIsSaving] = useState(false)
 
   const post = useMemo(() => news.find((n) => n.id === postId), [news, postId])
@@ -70,7 +85,7 @@ export default function NewsEditPage() {
     [post, settings],
   )
 
-  const handleSave = async (data: NewsFormData) => {
+  const persistNewsPost = async (data: NewsFormData) => {
     if (!post) return
     setIsSaving(true)
     try {
@@ -83,7 +98,15 @@ export default function NewsEditPage() {
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
         ...publishedAtFields,
-        featured: data.featured,
+        ...buildHeroFeatureUpdate({
+          featured: data.featured,
+          featuredUntil: featuredUntilFromDuration(data.featured, {
+            durationEnabled: data.featuredDurationEnabled,
+            durationMode: data.featuredDurationMode,
+            durationDays: data.featuredDurationDays,
+            untilLocal: data.featuredUntilLocal,
+          }),
+        }),
         is_press_only: data.isPressOnly,
         status: data.status,
         artist_id: data.artistId || null,
@@ -124,6 +147,19 @@ export default function NewsEditPage() {
     }
   }
 
+  const handleSave = async (data: NewsFormData) => {
+    if (!post) return
+    await runWithOptionalBump({
+      activatingFeatured: data.featured,
+      wasFeatured: post.featured,
+      itemId: post.id,
+      kind: 'news',
+      action: async () => {
+        await persistNewsPost(data)
+      },
+    })
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -159,6 +195,17 @@ export default function NewsEditPage() {
             </CardContent>
           </Card>
         )}
+
+        <HeroFeaturedBumpDialog
+          open={!!pendingAction}
+          message={pendingAction?.message}
+          onConfirm={() => {
+            void confirmPendingAction().catch((err) => {
+              toast.error(err instanceof Error ? err.message : 'Failed to save news post')
+            })
+          }}
+          onCancel={cancelPendingAction}
+        />
 
         {!isLoading && !post && (
           <Card>

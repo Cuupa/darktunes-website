@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Release } from '@/types'
 import { parseJunctionRows } from '@/lib/types/jsonColumns'
+import { stripEmojis } from '@/lib/stripEmojis'
+import { sanitizeReleaseWrite } from '@/lib/sanitizeTextContent'
 
 type DbClient = SupabaseClient<Database>
 type ReleaseRow = Database['public']['Tables']['releases']['Row']
@@ -15,10 +17,10 @@ export type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
  */
 const RELEASE_ARTISTS_BATCH_SIZE = 50
 
-function rowToRelease(row: ReleaseRow): Release {
+export function rowToRelease(row: ReleaseRow): Release {
   return {
     id: row.id,
-    title: row.title,
+    title: stripEmojis(row.title),
     artistId: row.artist_id ?? '',
     artistName: '',
     releaseDate: row.release_date,
@@ -30,6 +32,8 @@ function rowToRelease(row: ReleaseRow): Release {
     bandcampUrl: row.bandcamp_url ?? undefined,
     smartlinkUrl: row.smartlink_url ?? undefined,
     featured: row.featured,
+    featuredUntil: row.featured_until ?? undefined,
+    featuredRemovedReason: (row.featured_removed_reason as Release['featuredRemovedReason']) ?? undefined,
     itunesId: row.itunes_id ?? undefined,
     spotifyId: row.spotify_id ?? undefined,
     discogsId: row.discogs_id ?? undefined,
@@ -42,7 +46,7 @@ function rowToRelease(row: ReleaseRow): Release {
     popularity: row.popularity ?? undefined,
     isVisible: row.is_visible,
     isPromo: row.is_promo,
-    promoText: row.promo_text ?? undefined,
+    promoText: row.promo_text ? stripEmojis(row.promo_text) : undefined,
     heroBgUrl: row.hero_bg_url ?? undefined,
     heroPrimaryBtn: (row.hero_primary_btn_action || row.hero_primary_btn_label || row.hero_primary_btn_href)
       ? {
@@ -58,7 +62,7 @@ function rowToRelease(row: ReleaseRow): Release {
           href: row.hero_secondary_btn_href ?? undefined,
         }
       : undefined,
-    guestArtists: row.guest_artists ?? undefined,
+    guestArtists: row.guest_artists ? stripEmojis(row.guest_artists) : undefined,
   }
 }
 
@@ -239,7 +243,7 @@ export async function getReleaseById(db: DbClient, id: string): Promise<Release 
 }
 
 export async function createRelease(db: DbClient, releaseData: ReleaseInsert): Promise<Release> {
-  const { data, error } = await db.from('releases').insert(releaseData).select().single()
+  const { data, error } = await db.from('releases').insert(sanitizeReleaseWrite(releaseData)).select().single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createRelease')
   return rowToRelease(data)
@@ -252,7 +256,7 @@ export async function updateRelease(
 ): Promise<Release> {
   const { data, error } = await db
     .from('releases')
-    .update(releaseData)
+    .update(sanitizeReleaseWrite(releaseData))
     .eq('id', id)
     .select()
     .single()
@@ -316,7 +320,7 @@ export async function upsertReleaseByItunesId(
 
   const { data, error } = await db
     .from('releases')
-    .upsert({ ...releaseData, featured }, { onConflict: 'itunes_id' })
+    .upsert(sanitizeReleaseWrite({ ...releaseData, featured }), { onConflict: 'itunes_id' })
     .select()
     .single()
   if (error) throw new Error(error.message)

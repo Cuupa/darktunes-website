@@ -45,6 +45,21 @@ describe('selectHeroItems', () => {
     expect(items).toEqual([])
   })
 
+  it('caps hero items at 10', () => {
+    const releases = Array.from({ length: 8 }, (_, index) => ({
+      ...releaseA,
+      id: `rel-${index}`,
+      releaseDate: `2024-0${index + 1}-01`,
+    })) as Release[]
+    const news = Array.from({ length: 5 }, (_, index) => ({
+      ...newsA,
+      id: `news-${index}`,
+      publishedAt: `2024-1${index}-01`,
+    })) as NewsPost[]
+
+    expect(selectHeroItems(releases, news)).toHaveLength(10)
+  })
+
   it('accepts optional siteSettings parameter for backward compatibility', () => {
     const items = selectHeroItems(
       [releaseA],

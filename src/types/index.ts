@@ -96,6 +96,10 @@ export interface Release {
   bandcampUrl?: string
   smartlinkUrl?: string
   featured: boolean
+  /** Optional hero feature expiry. When passed, featured is turned off automatically. */
+  featuredUntil?: string | null
+  /** Why the item was auto-removed from the hero carousel. */
+  featuredRemovedReason?: 'expired' | 'capacity' | null
   itunesId?: string
   spotifyId?: string
   discogsId?: string
@@ -142,6 +146,10 @@ export interface NewsPost {
   imageUrl?: string
   slug: string
   featured: boolean
+  /** Optional hero feature expiry. When passed, featured is turned off automatically. */
+  featuredUntil?: string | null
+  /** Why the post was auto-removed from the hero carousel. */
+  featuredRemovedReason?: 'expired' | 'capacity' | null
   isPressOnly: boolean
   /**
    * Optional artist association. When set, this news post is shown only on that

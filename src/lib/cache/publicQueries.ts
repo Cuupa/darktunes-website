@@ -13,12 +13,11 @@
  */
 
 import { unstable_cache } from 'next/cache'
-import { revalidateTag } from 'next/cache'
 import { cache } from 'react'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicReleases } from '@/lib/api/releases'
-import { getPublicNewsPosts, publishScheduledNewsPosts } from '@/lib/api/news'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getPublicNewsPosts } from '@/lib/api/news'
+import { runPublicContentMaintenance } from '@/lib/publicContentMaintenance'
 import { getPublicVideos } from '@/lib/api/videos'
 import { getPublicConcerts } from '@/lib/api/concerts'
 import { getPublicArtists } from '@/lib/api/artists'
@@ -29,8 +28,10 @@ const TTL = 60 // seconds
 
 /** All public releases, cache-keyed to the `releases` tag. */
 export const getCachedPublicReleases = cache(unstable_cache(
-  async (): Promise<Release[]> =>
-    getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[]),
+  async (): Promise<Release[]> => {
+    await runPublicContentMaintenance()
+    return getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[])
+  },
   ['public-releases'],
   { revalidate: TTL, tags: ['releases'] },
 ))
@@ -38,15 +39,7 @@ export const getCachedPublicReleases = cache(unstable_cache(
 /** All public news posts, cache-keyed to the `news` tag. */
 export const getCachedPublicNews = cache(unstable_cache(
   async (): Promise<NewsPost[]> => {
-    try {
-      const serviceDb = await createServiceRoleSupabaseClient()
-      const publishedCount = await publishScheduledNewsPosts(serviceDb)
-      if (publishedCount > 0) {
-        revalidateTag('news')
-      }
-    } catch (err) {
-      console.error('[getCachedPublicNews] Failed to publish scheduled posts:', err)
-    }
+    await runPublicContentMaintenance()
     return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[])
   },
   ['public-news'],

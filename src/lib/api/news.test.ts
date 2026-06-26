@@ -46,6 +46,8 @@ const mockNewsRow: NewsRow = {
   content: 'Full content here...',
   image_url: 'https://example.com/news.jpg',
   featured: false,
+  featured_until: null,
+  featured_removed_reason: null,
   is_press_only: false,
   status: 'published',
   published_at: '2024-04-24T00:00:00Z',

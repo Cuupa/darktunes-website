@@ -4,6 +4,11 @@ import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, CheckSquare } from '@phosphor-icons/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useReleases } from '@/hooks/useReleases'
+import { useNews } from '@/hooks/useNews'
+import { previewFeaturedBump, type HeroFeaturedItem } from '@/lib/heroFeatured'
+import { buildHeroBumpUpdate, buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { featuredDurationFromUntil, featuredUntilFromDuration } from '@/lib/featuredDurationForm'
+import { FeaturedRemovedBadge } from '@/components/admin/FeaturedRemovedBadge'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
 import { getOrCreateReleaseChecklist, toggleChecklistItem, type ReleaseChecklist } from '@/lib/api/releaseChecklists'
@@ -61,6 +66,10 @@ const EMPTY_FORM: ReleaseFormData = {
   bandcampUrl: '',
   smartlinkUrl: '',
   featured: false,
+  featuredDurationEnabled: false,
+  featuredDurationMode: 'days',
+  featuredDurationDays: 14,
+  featuredUntilLocal: '',
   isVisible: true,
   isPromo: false,
   promoText: '',
@@ -87,6 +96,15 @@ function releaseToFormData(release: Release): ReleaseFormData {
     bandcampUrl: release.bandcampUrl ?? '',
     smartlinkUrl: release.smartlinkUrl ?? '',
     featured: release.featured,
+    ...(() => {
+      const duration = featuredDurationFromUntil(release.featuredUntil)
+      return {
+        featuredDurationEnabled: duration.durationEnabled,
+        featuredDurationMode: duration.durationMode,
+        featuredDurationDays: duration.durationDays,
+        featuredUntilLocal: duration.untilLocal,
+      }
+    })(),
     isVisible: release.isVisible,
     isPromo: release.isPromo,
     promoText: release.promoText ?? '',
@@ -101,6 +119,16 @@ function releaseToFormData(release: Release): ReleaseFormData {
 }
 
 function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
+  const featuredFields = buildHeroFeatureUpdate({
+    featured: data.featured,
+    featuredUntil: featuredUntilFromDuration(data.featured, {
+      durationEnabled: data.featuredDurationEnabled,
+      durationMode: data.featuredDurationMode,
+      durationDays: data.featuredDurationDays,
+      untilLocal: data.featuredUntilLocal,
+    }),
+  })
+
   return {
     title: data.title,
     artist_id: (data.artistIds?.[0]) ?? null,
@@ -113,7 +141,7 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
     youtube_url: data.youtubeUrl || null,
     bandcamp_url: data.bandcampUrl || null,
     smartlink_url: data.smartlinkUrl || null,
-    featured: data.featured,
+    ...featuredFields,
     is_visible: data.isVisible,
     is_promo: data.isPromo,
     promo_text: data.promoText || null,
@@ -131,6 +159,13 @@ export function ReleasesManager() {
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
+  const { news, updateNewsPost } = useNews()
+  const [featuredBumpConfirm, setFeaturedBumpConfirm] = useState<{
+    bumpTarget: HeroFeaturedItem
+    message: string
+    release?: Release
+    pendingSave?: ReleaseFormData
+  } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRelease, setEditingRelease] = useState<Release | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Release | null>(null)
@@ -172,47 +207,71 @@ export function ReleasesManager() {
     setDialogOpen(true)
   }
 
+  const persistReleaseForm = async (data: ReleaseFormData, bumpTarget?: HeroFeaturedItem) => {
+    if (bumpTarget) {
+      await bumpHeroItem(bumpTarget)
+    }
+
+    if (editingRelease) {
+      await updateRelease(editingRelease.id, formDataToInsert(data))
+      await supabase
+        .from('release_artists' as const)
+        .delete()
+        .eq('release_id', editingRelease.id)
+      if ((data.artistIds ?? []).length > 0) {
+        const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+          release_id: editingRelease.id,
+          artist_id: artistId,
+          sort_order: i,
+        }))
+        await supabase.from('release_artists' as const).insert(inserts)
+      }
+      toast.success(`Updated "${data.title}"`)
+      return
+    }
+
+    await createRelease(formDataToInsert(data))
+    if ((data.artistIds ?? []).length > 0) {
+      const { data: row } = await supabase
+        .from('releases')
+        .select('id')
+        .eq('title', data.title)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (row) {
+        const inserts = (data.artistIds ?? []).map((artistId, i) => ({
+          release_id: row.id,
+          artist_id: artistId,
+          sort_order: i,
+        }))
+        await supabase.from('release_artists' as const).insert(inserts)
+      }
+    }
+    toast.success(`Created "${data.title}"`)
+  }
+
   const handleSave = async (data: ReleaseFormData) => {
+    const enablingFeatured = data.featured && (!editingRelease || !editingRelease.featured)
+    if (enablingFeatured) {
+      const preview = previewFeaturedBump(releases, news, {
+        id: editingRelease?.id ?? 'new-release',
+        kind: 'release',
+      })
+      if (preview.needsConfirm && preview.bumpTarget) {
+        setFeaturedBumpConfirm({
+          bumpTarget: preview.bumpTarget,
+          message: preview.message,
+          release: editingRelease ?? undefined,
+          pendingSave: data,
+        })
+        return
+      }
+    }
+
     setIsMutating(true)
     try {
-      if (editingRelease) {
-        await updateRelease(editingRelease.id, formDataToInsert(data))
-        // Update junction table: replace all entries for this release
-        await supabase
-          .from('release_artists' as const)
-          .delete()
-          .eq('release_id', editingRelease.id)
-        if ((data.artistIds ?? []).length > 0) {
-          const inserts = (data.artistIds ?? []).map((artistId, i) => ({
-            release_id: editingRelease.id,
-            artist_id: artistId,
-            sort_order: i,
-          }))
-          await supabase.from('release_artists' as const).insert(inserts)
-        }
-        toast.success(`Updated "${data.title}"`)
-      } else {
-        await createRelease(formDataToInsert(data))
-        // Save junction table entries for newly created release
-        if ((data.artistIds ?? []).length > 0) {
-          const { data: row } = await supabase
-            .from('releases')
-            .select('id')
-            .eq('title', data.title)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-          if (row) {
-            const inserts = (data.artistIds ?? []).map((artistId, i) => ({
-              release_id: row.id,
-              artist_id: artistId,
-              sort_order: i,
-            }))
-            await supabase.from('release_artists' as const).insert(inserts)
-          }
-        }
-        toast.success(`Created "${data.title}"`)
-      }
+      await persistReleaseForm(data)
       setDialogOpen(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
@@ -351,10 +410,55 @@ export function ReleasesManager() {
     }
   }
 
+  const bumpHeroItem = async (bumpTarget: HeroFeaturedItem) => {
+    if (bumpTarget.kind === 'release') {
+      await updateRelease(bumpTarget.id, buildHeroBumpUpdate())
+      return
+    }
+    await updateNewsPost(bumpTarget.id, buildHeroBumpUpdate())
+  }
+
+  const applyFeaturedToggle = async (release: Release, bumpTarget?: HeroFeaturedItem) => {
+    if (bumpTarget) {
+      await bumpHeroItem(bumpTarget)
+    }
+
+    await updateRelease(
+      release.id,
+      buildHeroFeatureUpdate({
+        featured: true,
+        featuredUntil: release.featuredUntil ?? null,
+      }),
+    )
+    toast.success(`"${release.title}" featured`)
+  }
+
   const handleToggleFeatured = async (release: Release) => {
+    if (release.featured) {
+      try {
+        await updateRelease(
+          release.id,
+          buildHeroFeatureUpdate({ featured: false, featuredUntil: null }),
+        )
+        toast.success(`"${release.title}" unfeatured`)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
+      }
+      return
+    }
+
+    const preview = previewFeaturedBump(releases, news, { id: release.id, kind: 'release' })
+    if (preview.needsConfirm && preview.bumpTarget) {
+      setFeaturedBumpConfirm({
+        bumpTarget: preview.bumpTarget,
+        message: preview.message,
+        release,
+      })
+      return
+    }
+
     try {
-      await updateRelease(release.id, { featured: !release.featured })
-      toast.success(`"${release.title}" ${!release.featured ? 'featured' : 'unfeatured'}`)
+      await applyFeaturedToggle(release)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     }
@@ -515,11 +619,16 @@ export function ReleasesManager() {
       header: 'Featured',
       enableSorting: false,
       cell: ({ row }) => (
-        <Switch
-          checked={row.original.featured}
-          onCheckedChange={() => void handleToggleFeatured(row.original)}
-          aria-label={`Toggle featured for ${row.original.title}`}
-        />
+        <div className="flex flex-col items-start gap-1">
+          <Switch
+            checked={row.original.featured}
+            onCheckedChange={() => void handleToggleFeatured(row.original)}
+            aria-label={`Toggle featured for ${row.original.title}`}
+          />
+          {!row.original.featured && (
+            <FeaturedRemovedBadge reason={row.original.featuredRemovedReason} />
+          )}
+        </div>
       ),
     },
     {
@@ -727,6 +836,48 @@ export function ReleasesManager() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!featuredBumpConfirm}
+        onOpenChange={(open) => !open && setFeaturedBumpConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hero carousel is full</AlertDialogTitle>
+            <AlertDialogDescription>
+              {featuredBumpConfirm?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!featuredBumpConfirm) return
+                const confirm = featuredBumpConfirm
+                setFeaturedBumpConfirm(null)
+
+                if (confirm.pendingSave) {
+                  setIsMutating(true)
+                  void persistReleaseForm(confirm.pendingSave, confirm.bumpTarget)
+                    .then(() => setDialogOpen(false))
+                    .catch((err) => {
+                      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
+                    })
+                    .finally(() => setIsMutating(false))
+                  return
+                }
+
+                if (!confirm.release) return
+                void applyFeaturedToggle(confirm.release, confirm.bumpTarget).catch((err) => {
+                  toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
+                })
+              }}
+            >
+              OK
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
