@@ -815,6 +815,7 @@ ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_primary_btn_href   T
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_label  TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_action TEXT;
 ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS hero_secondary_btn_href   TEXT;
+ALTER TABLE public.news_posts ADD COLUMN IF NOT EXISTS published_at_timezone TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_news_posts_slug         ON public.news_posts (slug);
 CREATE INDEX IF NOT EXISTS idx_news_posts_published_at ON public.news_posts (published_at DESC);

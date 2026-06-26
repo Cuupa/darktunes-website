@@ -5,6 +5,9 @@ import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star, Copy } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { formatZonedDateTime } from '@/lib/datetime/zonedDateTime'
+import { resolveOperatorTimezone } from '@/lib/operator/defaultTimezone'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -50,6 +53,8 @@ export function NewsManager() {
   const router = useRouter()
   const cms = useCmsPaths()
   const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
+  const { settings } = useSiteSettings()
+  const operatorTimezone = resolveOperatorTimezone(settings)
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null)
   const [isMutating, setIsMutating] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -103,7 +108,10 @@ export function NewsManager() {
   const handleTogglePublished = async (post: NewsPost, checked: boolean) => {
     setTogglingId(post.id)
     try {
-      await updateNewsPost(post.id, { status: checked ? 'published' : 'draft' })
+      await updateNewsPost(post.id, {
+        status: checked ? 'published' : 'draft',
+        ...(checked ? { published_at_timezone: null } : {}),
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Update failed')
     } finally {
@@ -204,7 +212,7 @@ export function NewsManager() {
           <TableRow>
             <TableHead>Title</TableHead>
             <TableHead>Bands</TableHead>
-            <TableHead>Date</TableHead>
+            <TableHead>Date &amp; Time</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Audience</TableHead>
             <TableHead title="Show in hero carousel">Featured</TableHead>
@@ -246,7 +254,14 @@ export function NewsManager() {
                       }
                     </div>
                   </TableCell>
-                  <TableCell>{post.publishedAt.split('T')[0]}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    <time dateTime={post.publishedAt}>
+                      {formatZonedDateTime(
+                        post.publishedAt,
+                        post.publishedAtTimezone ?? operatorTimezone,
+                      )}
+                    </time>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`gap-1 ${badge.className}`}>
                       {badge.label}

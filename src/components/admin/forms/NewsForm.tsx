@@ -20,6 +20,12 @@ import { ImageUploadButton } from './ImageUploadButton'
 import { AssetPicker } from '@/components/admin/file-explorer/AssetPicker'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import { toSlug } from '@/lib/slugify'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { utcIsoToZonedLocal } from '@/lib/datetime/zonedDateTime'
+import {
+  getScheduleTimezoneOptions,
+  resolveOperatorTimezone,
+} from '@/lib/operator/defaultTimezone'
 
 export interface NewsFormData {
   title: string
@@ -29,7 +35,7 @@ export interface NewsFormData {
   imageUrl: string
   heroBgUrl: string
   publishedAt: string
-  scheduledAt: string
+  publishedAtTimezone: string
   featured: boolean
   isPressOnly: boolean
   status: 'draft' | 'published' | 'scheduled' | 'archived'
@@ -50,6 +56,10 @@ export interface NewsFormData {
 type Props = AdminPanelProps<NewsFormData>
 
 export function NewsForm({ value, onChange, isLoading }: Props) {
+  const { settings } = useSiteSettings()
+  const operatorTimezone = resolveOperatorTimezone(settings)
+  const timezoneOptions = getScheduleTimezoneOptions(operatorTimezone)
+
   const { register, handleSubmit, watch, setValue, reset, control } = useForm<NewsFormData>({
     defaultValues: value,
   })
@@ -73,6 +83,20 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
   const title = watch('title')
   const slugValue = watch('slug')
   const status = watch('status')
+  const publishedAt = watch('publishedAt')
+  const publishedAtTimezone = watch('publishedAtTimezone')
+
+  useEffect(() => {
+    if (!publishedAtTimezone) {
+      setValue('publishedAtTimezone', operatorTimezone)
+    }
+  }, [operatorTimezone, publishedAtTimezone, setValue])
+
+  useEffect(() => {
+    if (!publishedAt) {
+      setValue('publishedAt', utcIsoToZonedLocal(new Date().toISOString(), operatorTimezone))
+    }
+  }, [operatorTimezone, publishedAt, setValue])
 
   // Track whether the slug was auto-generated so we stop overwriting manual edits
   const lastAutoSlug = useRef(toSlug(title))
@@ -163,7 +187,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
       </div>
 
       {/* Status + scheduling */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${status === 'scheduled' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
         <div className="space-y-1">
           <Label htmlFor="status">Status</Label>
           <Controller
@@ -172,7 +196,13 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
             render={({ field }) => (
               <Select
                 value={field.value}
-                onValueChange={(val) => field.onChange(val as NewsFormData['status'])}
+                onValueChange={(val) => {
+                  const nextStatus = val as NewsFormData['status']
+                  field.onChange(nextStatus)
+                  if (nextStatus === 'scheduled' && !publishedAtTimezone) {
+                    setValue('publishedAtTimezone', operatorTimezone)
+                  }
+                }}
                 disabled={isLoading}
               >
                 <SelectTrigger id="status">
@@ -200,10 +230,40 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           />
           {status === 'scheduled' && (
             <p className="text-xs text-muted-foreground">
-              Post will go live automatically at this time.
+              Post will go live automatically at this time in the selected timezone.
             </p>
           )}
         </div>
+        {status === 'scheduled' && (
+          <div className="space-y-1">
+            <Label htmlFor="publishedAtTimezone">Timezone</Label>
+            <Controller
+              name="publishedAtTimezone"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || operatorTimezone}
+                  onValueChange={field.onChange}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="publishedAtTimezone">
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timezoneOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <p className="text-xs text-muted-foreground">
+              Defaults to the operator headquarters ({operatorTimezone}).
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">

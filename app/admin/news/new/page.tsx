@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 const EMPTY_FORM: NewsFormData = {
@@ -19,8 +21,8 @@ const EMPTY_FORM: NewsFormData = {
   content: '',
   imageUrl: '',
   heroBgUrl: '',
-  publishedAt: new Date().toISOString().slice(0, 16),
-  scheduledAt: '',
+  publishedAt: '',
+  publishedAtTimezone: '',
   featured: false,
   isPressOnly: false,
   status: 'draft',
@@ -41,11 +43,13 @@ export default function NewsNewPage() {
   const router = useRouter()
   const cms = useCmsPaths()
   const { createNewsPost } = useNews()
+  const { settings } = useSiteSettings()
   const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = async (data: NewsFormData) => {
     setIsSaving(true)
     try {
+      const publishedAtFields = buildPublishedAtFields(data, settings)
       await createNewsPost({
         title: data.title,
         slug: data.slug,
@@ -53,7 +57,7 @@ export default function NewsNewPage() {
         content: data.content,
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
-        published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : new Date().toISOString(),
+        ...publishedAtFields,
         featured: data.featured,
         is_press_only: data.isPressOnly,
         status: data.status,

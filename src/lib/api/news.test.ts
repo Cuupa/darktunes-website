@@ -63,6 +63,7 @@ const mockNewsRow: NewsRow = {
   hero_secondary_btn_href: null,
   hero_secondary_btn_action: null,
   hero_bg_url: null,
+  published_at_timezone: 'Europe/Berlin',
 }
 
 describe('getNewsPosts', () => {
@@ -78,6 +79,7 @@ describe('getNewsPosts', () => {
     expect(result).toHaveLength(1)
     expect(result[0].title).toBe('BLACKBOOK Returns')
     expect(result[0].slug).toBe('blackbook-returns')
+    expect(result[0].publishedAtTimezone).toBe('Europe/Berlin')
   })
 
   it('throws on database error', async () => {

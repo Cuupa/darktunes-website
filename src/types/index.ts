@@ -137,6 +137,8 @@ export interface NewsPost {
   excerpt: string
   content: string
   publishedAt: string
+  /** IANA timezone used when scheduling (e.g. Europe/Berlin). */
+  publishedAtTimezone?: string
   imageUrl?: string
   slug: string
   featured: boolean

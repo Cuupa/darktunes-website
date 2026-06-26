@@ -11,14 +11,22 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { NewsForm, type NewsFormData } from '@/components/admin/forms/NewsForm'
 import { useNews } from '@/hooks/useNews'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
+import { useSiteSettings } from '@/hooks/useSiteSettings'
+import { utcIsoToZonedLocal } from '@/lib/datetime/zonedDateTime'
+import { buildPublishedAtFields } from '@/lib/news/publishedAtFields'
+import { resolveOperatorTimezone } from '@/lib/operator/defaultTimezone'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { NewsPost } from '@/types'
+import type { NewsPost, SiteSettings } from '@/types'
 
-function newsPostToFormData(post: NewsPost): NewsFormData {
-  // Normalize publishedAt to datetime-local format (YYYY-MM-DDTHH:mm)
-  const dt = post.publishedAt ? new Date(post.publishedAt) : new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const localDt = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+function newsPostToFormData(
+  post: NewsPost,
+  settings?: Pick<SiteSettings, 'impressumAddress' | 'impressumVatId'> | null,
+): NewsFormData {
+  const operatorTimezone = resolveOperatorTimezone(settings)
+  const displayTimezone = post.publishedAtTimezone ?? operatorTimezone
+  const localDt = post.publishedAt
+    ? utcIsoToZonedLocal(post.publishedAt, displayTimezone)
+    : utcIsoToZonedLocal(new Date().toISOString(), operatorTimezone)
 
   return {
     title: post.title,
@@ -28,7 +36,7 @@ function newsPostToFormData(post: NewsPost): NewsFormData {
     imageUrl: post.imageUrl ?? '',
     heroBgUrl: post.heroBgUrl ?? '',
     publishedAt: localDt,
-    scheduledAt: '',
+    publishedAtTimezone: post.publishedAtTimezone ?? operatorTimezone,
     featured: post.featured ?? false,
     isPressOnly: post.isPressOnly ?? false,
     status: post.status,
@@ -53,15 +61,20 @@ export default function NewsEditPage() {
   const postId = params['id'] as string
 
   const { news, isLoading, updateNewsPost } = useNews()
+  const { settings } = useSiteSettings()
   const [isSaving, setIsSaving] = useState(false)
 
   const post = useMemo(() => news.find((n) => n.id === postId), [news, postId])
-  const formValue = useMemo(() => (post ? newsPostToFormData(post) : null), [post])
+  const formValue = useMemo(
+    () => (post ? newsPostToFormData(post, settings) : null),
+    [post, settings],
+  )
 
   const handleSave = async (data: NewsFormData) => {
     if (!post) return
     setIsSaving(true)
     try {
+      const publishedAtFields = buildPublishedAtFields(data, settings)
       await updateNewsPost(post.id, {
         title: data.title,
         slug: data.slug,
@@ -69,7 +82,7 @@ export default function NewsEditPage() {
         content: data.content,
         image_url: data.imageUrl || null,
         hero_bg_url: data.heroBgUrl || null,
-        published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : new Date().toISOString(),
+        ...publishedAtFields,
         featured: data.featured,
         is_press_only: data.isPressOnly,
         status: data.status,
