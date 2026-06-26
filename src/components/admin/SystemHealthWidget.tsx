@@ -266,7 +266,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       }
       if (!res.ok) throw new Error(data.error ?? `Sync failed (${res.status})`)
 
-      if (LISTENER_SYNC_APIS.has(api) && typeof data.lastfmRows === 'number') {
+      if (LISTENER_SYNC_APIS.has(api)) {
         const rows = api === 'soundcharts' ? data.soundchartsRows : data.lastfmRows
         toast.success(
           `${getApiMeta(api).label} sync completed (${rows ?? 0} metric row${rows === 1 ? '' : 's'}).`,

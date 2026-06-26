@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   isOdesliResolvableUrl,
   isSkippableOdesliError,
+  pickOdesliMusicUrl,
   resolveOdesliSmartLink,
 } from './odesliApi'
 
@@ -40,6 +41,35 @@ describe('isOdesliResolvableUrl', () => {
 
   it('rejects Apple Music artist URLs', () => {
     expect(isOdesliResolvableUrl('https://music.apple.com/de/artist/name/123')).toBe(false)
+  })
+})
+
+describe('pickOdesliMusicUrl', () => {
+  it('prefers resolvable Spotify album URL over artist profile URL', () => {
+    expect(
+      pickOdesliMusicUrl(
+        'https://open.spotify.com/artist/bad',
+        'https://open.spotify.com/album/good',
+      ),
+    ).toBe('https://open.spotify.com/album/good')
+  })
+
+  it('falls back to Apple Music album when Spotify URL is an artist profile', () => {
+    expect(
+      pickOdesliMusicUrl(
+        'https://open.spotify.com/artist/bad',
+        'https://music.apple.com/de/album/name/123',
+      ),
+    ).toBe('https://music.apple.com/de/album/name/123')
+  })
+
+  it('returns null when neither URL is resolvable', () => {
+    expect(
+      pickOdesliMusicUrl(
+        'https://open.spotify.com/artist/bad',
+        'https://music.apple.com/de/artist/name/123',
+      ),
+    ).toBeNull()
   })
 })
 

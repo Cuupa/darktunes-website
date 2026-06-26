@@ -28,6 +28,7 @@ function makeBuilder(result: QueryResult) {
     update: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
@@ -256,7 +257,7 @@ describe('syncSingleArtist', () => {
     const artistWithSpotify = {
       ...mockArtist,
       id: 'artist-odesli',
-      spotify_url: 'https://open.spotify.com/artist/artist123',
+      spotify_url: null,
       apple_music_url: null,
     }
 

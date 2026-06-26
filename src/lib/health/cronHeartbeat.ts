@@ -122,7 +122,7 @@ function deriveDailyCron(
       ...base,
       operationalState: 'unconfigured',
       statusLabel: 'Not scheduled',
-      statusDetail: `Required env vars for ${label} are missing on this deployment.`,
+      statusDetail: `Required credentials for ${label} are missing — check Admin → API Keys and deployment secrets.`,
     }
   }
 

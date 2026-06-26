@@ -76,6 +76,19 @@ export function isOdesliResolvableUrl(musicUrl: string): boolean {
   return false
 }
 
+/**
+ * Picks the first Odesli-resolvable URL from Spotify and Apple Music candidates.
+ * Prefers Spotify when both are valid album/track links.
+ */
+export function pickOdesliMusicUrl(
+  spotifyUrl: string | null | undefined,
+  appleMusicUrl: string | null | undefined,
+): string | null {
+  if (spotifyUrl && isOdesliResolvableUrl(spotifyUrl)) return spotifyUrl
+  if (appleMusicUrl && isOdesliResolvableUrl(appleMusicUrl)) return appleMusicUrl
+  return null
+}
+
 /** Expected Odesli failures that should not count as sync errors. */
 export function isSkippableOdesliError(err: string): boolean {
   return (
