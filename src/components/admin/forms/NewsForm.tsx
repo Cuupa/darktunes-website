@@ -73,6 +73,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
   const [htmlContent, setHtmlContent] = useState(value?.content ?? '')
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [heroPickerOpen, setHeroPickerOpen] = useState(false)
 
   useEffect(() => {
     reset(value)
@@ -313,9 +314,22 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           <Input id="heroBgUrl" {...register('heroBgUrl')} disabled={isLoading} placeholder="Leave empty to use cover image" className="flex-1" />
           <ImageUploadButton
             label="Upload"
-            onUploaded={(url) => setValue('heroBgUrl', url)}
+            onUploaded={(url) => setValue('heroBgUrl', url, { shouldDirty: true })}
           />
+          <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={isLoading} onClick={() => setHeroPickerOpen(true)}>
+            Library
+          </Button>
         </div>
+        <AssetPicker
+          open={heroPickerOpen}
+          onClose={() => setHeroPickerOpen(false)}
+          onSelect={(asset) => {
+            setValue('heroBgUrl', asset.publicUrl, { shouldDirty: true })
+            setHeroPickerOpen(false)
+          }}
+          mimeTypeFilter="image/"
+          artistId={(watch('artistIds') ?? [])[0]}
+        />
       </div>
 
       <div className="flex items-center gap-2">
