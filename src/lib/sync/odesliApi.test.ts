@@ -77,6 +77,16 @@ describe('isSkippableOdesliError', () => {
   it('treats unsupported URL responses as skippable', () => {
     expect(isSkippableOdesliError('Odesli API failed: 405 — UNSUPPORTED_URL')).toBe(true)
     expect(isSkippableOdesliError('URL type not supported by Odesli')).toBe(true)
+    expect(
+      isSkippableOdesliError(
+        'Odesli API failed: 400 — {"statusCode":400,"code":"could_not_fetch_entity_data"}',
+      ),
+    ).toBe(true)
+    expect(
+      isSkippableOdesliError(
+        'HttpError: Odesli returned non-JSON response: An error occurred. Please try again later.',
+      ),
+    ).toBe(true)
     expect(isSkippableOdesliError('Odesli API failed: 500')).toBe(false)
   })
 })

@@ -91,13 +91,16 @@ describe('fetchSpotifyArtistReleases', () => {
     expect(releases[0].releaseDate).toBe('2019-01-01')
   })
 
-  it('extracts artist ID from intl-de Spotify URLs', async () => {
+  it('uses API-compliant limit, market, and unencoded include_groups', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
       const hostname = new URL(url).hostname
       if (hostname === 'accounts.spotify.com') {
         return { ok: true, json: async () => TOKEN_RESPONSE } as Response
       }
       expect(url).toContain('/artists/1Cs0zKBU1kc0i8ypK3B9ai/albums')
+      expect(url).toContain('limit=10')
+      expect(url).toContain('market=DE')
+      expect(url).not.toContain('limit=20')
       expect(url).not.toContain('%2C')
       return { ok: true, json: async () => ALBUM_RESPONSE } as Response
     })
@@ -121,6 +124,38 @@ describe('fetchSpotifyArtistReleases', () => {
     const mockFetch = makeFetch(TOKEN_RESPONSE, {})
     const releases = await fetchSpotifyArtistReleases('artist123', 'id', 'secret', mockFetch)
     expect(releases).toEqual([])
+  })
+
+  it('paginates when Spotify returns a next page link', async () => {
+    let albumsCall = 0
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
+        return { ok: true, json: async () => TOKEN_RESPONSE } as Response
+      }
+      albumsCall++
+      if (albumsCall === 1) {
+        expect(url).toContain('offset=0')
+        return {
+          ok: true,
+          json: async () => ({
+            items: ALBUM_RESPONSE.items.slice(0, 1),
+            next: 'https://api.spotify.com/v1/artists/a/albums?offset=10',
+          }),
+        } as Response
+      }
+      expect(url).toContain('offset=10')
+      return {
+        ok: true,
+        json: async () => ({
+          items: ALBUM_RESPONSE.items.slice(1),
+          next: null,
+        }),
+      } as Response
+    })
+
+    const releases = await fetchSpotifyArtistReleases('artist123', 'id', 'secret', mockFetch)
+    expect(releases).toHaveLength(2)
+    expect(albumsCall).toBe(2)
   })
 
   it('throws HttpError when the Spotify API returns a non-ok status', async () => {

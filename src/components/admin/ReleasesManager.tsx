@@ -238,7 +238,7 @@ export function ReleasesManager() {
   const handleSync = async () => {
     try {
       const result = await syncAllReleases()
-      if (!result) {
+      if (!result?.results) {
         toast.info(
           'Sync jobs wurden eingereiht. Verarbeitung läuft im Hintergrund (alle 5 Minuten via Cron).',
         )
@@ -312,12 +312,21 @@ export function ReleasesManager() {
         body: JSON.stringify({ releaseId: release.id }),
       })
 
+      const rawText = await res.text()
+      if (!rawText.trim()) {
+        throw new Error(res.ok ? tErrors('SERVER_ERROR') : `Request failed (${res.status})`)
+      }
+      let body: ApiErrorResponse & { smartUrl?: string }
+      try {
+        body = JSON.parse(rawText) as ApiErrorResponse & { smartUrl?: string }
+      } catch {
+        throw new Error(rawText.trim().slice(0, 200) || tErrors('SERVER_ERROR'))
+      }
       if (!res.ok) {
-        const body = (await res.json()) as ApiErrorResponse
         throw new Error(getErrorMessage(body, tErrors))
       }
-
-      const { smartUrl } = (await res.json()) as { smartUrl: string }
+      const smartUrl = body.smartUrl
+      if (!smartUrl) throw new Error(tErrors('SERVER_ERROR'))
       toast.success(
         `Smart link resolved for "${release.title}": ${smartUrl.slice(0, 50)}…`,
       )

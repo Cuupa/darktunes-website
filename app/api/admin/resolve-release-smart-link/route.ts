@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
-import { resolveOdesliSmartLink } from '@/lib/sync/odesliApi'
+import { pickOdesliMusicUrl, resolveOdesliSmartLink } from '@/lib/sync/odesliApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 
@@ -68,10 +68,12 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     throw new ApiError(404, 'Release not found')
   }
 
-  // Prefer Spotify URL; fall back to Apple Music
-  const musicUrl = releaseRow.spotify_url ?? releaseRow.apple_music_url
+  const musicUrl = pickOdesliMusicUrl(releaseRow.spotify_url, releaseRow.apple_music_url)
   if (!musicUrl) {
-    throw new ApiError(422, 'Release has no Spotify or Apple Music URL to resolve')
+    throw new ApiError(
+      422,
+      'Release has no Odesli-resolvable album or track URL (Spotify/Apple Music)',
+    )
   }
 
   // 4. Resolve smart link via Odesli

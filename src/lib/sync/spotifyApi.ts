@@ -105,6 +105,23 @@ async function getSpotifyAccessToken(
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Spotify Web API max page size for artist albums (reduced to 10 in Feb 2026). */
+const SPOTIFY_ALBUMS_PAGE_LIMIT = 10
+
+/** Default market for catalog lookups (darkTunes is DE-based; required without user token). */
+const SPOTIFY_DEFAULT_MARKET = 'DE'
+
+function buildArtistAlbumsUrl(artistId: string, offset: number): string {
+  // Manual query string — include_groups commas must not be percent-encoded.
+  return (
+    `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums` +
+    `?limit=${SPOTIFY_ALBUMS_PAGE_LIMIT}` +
+    `&offset=${offset}` +
+    `&market=${SPOTIFY_DEFAULT_MARKET}` +
+    `&include_groups=album,single,compilation`
+  )
+}
+
 /**
  * Fetches all albums for a given Spotify artist ID.
  * Returns simplified release objects with cover art and popularity.
@@ -121,24 +138,32 @@ export async function fetchSpotifyArtistReleases(
     throw new HttpError(400, `Invalid Spotify artist ID: ${spotifyArtistId.slice(0, 80)}`)
   }
 
-  const url = `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}/albums?limit=20&include_groups=album,single,compilation`
+  const albums: SpotifyAlbum[] = []
+  let offset = 0
 
-  const response = await fetchFn(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  while (true) {
+    const response = await fetchFn(buildArtistAlbumsUrl(artistId, offset), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-  if (!response.ok) {
-    let detail = ''
-    try {
-      const errBody = (await response.json()) as { error?: { message?: string } }
-      if (errBody?.error?.message) detail = ': ' + errBody.error.message
-    } catch { /* ignore parse errors */ }
-    throw new HttpError(response.status, 'Spotify albums fetch failed: ' + String(response.status) + detail)
+    if (!response.ok) {
+      let detail = ''
+      try {
+        const errBody = (await response.json()) as { error?: { message?: string } }
+        if (errBody?.error?.message) detail = ': ' + errBody.error.message
+      } catch { /* ignore parse errors */ }
+      throw new HttpError(response.status, 'Spotify albums fetch failed: ' + String(response.status) + detail)
+    }
+
+    const data = (await response.json()) as { items?: SpotifyAlbum[]; next?: string | null }
+    const page = data.items ?? []
+    albums.push(...page)
+
+    if (!data.next || page.length === 0) break
+    offset += SPOTIFY_ALBUMS_PAGE_LIMIT
   }
 
-  const data = (await response.json()) as { items?: SpotifyAlbum[] }
-
-  return (data.items ?? []).map((album) => ({
+  return albums.map((album) => ({
     spotifyId: album.id,
     title: album.name,
     type: deriveReleaseType(album.total_tracks, album.album_type),
