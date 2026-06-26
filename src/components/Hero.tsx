@@ -162,13 +162,13 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
       
       <div className="container mx-auto px-4 lg:px-16 z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <ScrollReveal delay={0.2} className="space-y-8">
+          <ScrollReveal delay={0.2} className="min-w-0 space-y-8">
             <Badge className="bg-secondary/90 text-secondary-foreground uppercase tracking-wider font-bold text-sm px-4 py-2 backdrop-blur-sm">
               {itemIsRelease ? siteSettings.heroBadge : (siteSettings.heroNewsBadge || '📰 News')}
             </Badge>
             
             <div className="space-y-4">
-              <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight">
+              <h1 className="max-w-full text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight break-words text-balance">
                 {heroTitle}
               </h1>
               {heroSubtitle && (
