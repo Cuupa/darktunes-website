@@ -11,8 +11,10 @@ import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getAllVisibleReleasesForCalendar } from '@/lib/api/releases'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseCalendarClient } from './_components/ReleaseCalendarClient'
+import { getTranslations } from 'next-intl/server'
 
 function CalendarSkeleton() {
 
@@ -44,6 +46,7 @@ async function CalendarContent({
   searchParams: Promise<{ artistId?: string }>
 }) {
 
+  const t = await getTranslations('portal')
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -51,6 +54,16 @@ async function CalendarContent({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
+
+  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
+  if (flags['artist.calendar'] === false) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">{t('calendar_heading')}</h1>
+        <p className="text-muted-foreground">{t('calendar_disabled')}</p>
+      </div>
+    )
+  }
 
   const [releases, artist] = await Promise.all([
     getAllVisibleReleasesForCalendar(supabase).catch(() => []),

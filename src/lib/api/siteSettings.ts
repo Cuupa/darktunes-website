@@ -1,19 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import type { Database } from '@/types/database'
-import type { SiteSettings, SpotifyPlaylistEntry, FeatureToggles, HomepageSection, ContactTopicConfig, CustomSocialLink } from '@/types'
+import type { SiteSettings, SpotifyPlaylistEntry, HomepageSection, ContactTopicConfig, CustomSocialLink } from '@/types'
 import { parseThemeConfig, themeConfigFromFlatFields } from '@/config/themeConfig'
 import type { ThemeConfig } from '@/config/themeConfig'
 import { sanitizeSiteSettingsWrite } from '@/lib/sanitizeTextContent'
 import { stripEmojis } from '@/lib/stripEmojis'
+import { DEFAULT_FEATURE_TOGGLES, parseFeatureTogglesJson } from '@/lib/featureToggles'
 
 type DbClient = SupabaseClient<Database>
-
-/** Default feature toggle values — all features enabled by default. */
-const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
-  promoPool: true,
-  editorTools: true,
-}
 
 /** Default values used when a key is missing from the database. */
 export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
@@ -134,19 +129,7 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     spotifyPlaylists = []
   }
 
-  let featureToggles: FeatureToggles = { ...DEFAULT_FEATURE_TOGGLES }
-  try {
-    const parsed = JSON.parse(map['feature_toggles'] ?? '{}') as unknown
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const candidate = parsed as Record<string, unknown>
-      featureToggles = {
-        promoPool: typeof candidate['promoPool'] === 'boolean' ? candidate['promoPool'] : DEFAULT_FEATURE_TOGGLES.promoPool,
-        editorTools: typeof candidate['editorTools'] === 'boolean' ? candidate['editorTools'] : DEFAULT_FEATURE_TOGGLES.editorTools,
-      }
-    }
-  } catch {
-    featureToggles = { ...DEFAULT_FEATURE_TOGGLES }
-  }
+  const featureToggles = parseFeatureTogglesJson(map['feature_toggles'])
 
   let contactTopics: ContactTopicConfig[] = []
   try {

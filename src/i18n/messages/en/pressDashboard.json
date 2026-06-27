@@ -28,6 +28,7 @@
   "navToggle": "Toggle press navigation",
   "logout": "Logout",
   "accreditationDisabled": "Accreditation requests are currently disabled.",
+  "contactDisabled": "The press inquiry form is currently disabled.",
   "accreditationForm": {
     "eventName": "Event name",
     "eventDate": "Event date",

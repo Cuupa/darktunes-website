@@ -28,6 +28,7 @@
   "navToggle": "Press-Navigation ein-/ausblenden",
   "logout": "Abmelden",
   "accreditationDisabled": "Akkreditierungsanfragen sind derzeit deaktiviert.",
+  "contactDisabled": "Das Presse-Anfrageformular ist derzeit deaktiviert.",
   "accreditationForm": {
     "eventName": "Eventname",
     "eventDate": "Eventdatum",

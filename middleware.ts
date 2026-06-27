@@ -19,6 +19,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isEditorAllowedAdminPath } from '@/lib/editor/editorAdminPaths'
+import { DEFAULT_FEATURE_TOGGLES, getFeatureToggles } from '@/lib/featureToggles'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
 import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 
@@ -183,6 +184,16 @@ export async function middleware(request: NextRequest) {
       loginUrl.pathname = '/login'
       loginUrl.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(loginUrl)
+    }
+
+    if (isEditorRoute && profile?.role === 'editor') {
+      const toggles = await getFeatureToggles(supabase).catch(() => DEFAULT_FEATURE_TOGGLES)
+      if (!toggles.editorTools) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.searchParams.set('error', 'unauthorized')
+        return NextResponse.redirect(loginUrl)
+      }
     }
 
     if (isAdminRoute && profile?.role === 'editor' && !isEditorAllowedAdminPath(pathname)) {
