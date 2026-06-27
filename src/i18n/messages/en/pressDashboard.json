@@ -28,6 +28,8 @@
   "navToggle": "Toggle press navigation",
   "logout": "Logout",
   "accreditationDisabled": "Accreditation requests are currently disabled.",
+  "contactDisabled": "The press inquiry form is currently disabled.",
+  "promoPoolDisabled": "The Promo Pool is currently unavailable.",
   "accreditationForm": {
     "eventName": "Event name",
     "eventDate": "Event date",

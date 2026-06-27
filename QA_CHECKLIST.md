@@ -87,6 +87,7 @@
 - [ ] PortalAccessGate shown for unlinked users (role=user)
 - [ ] Profile edit saves bio, photo uploads to R2
 - [ ] Feature-flagged modules hidden when flag is disabled
+- [ ] `/portal/calendar` blocked when `artist.calendar` is disabled (direct URL shows disabled message)
 - [ ] `/portal/analytics` tabs load (streaming, website, merch) when `artist.analytics` is enabled
 - [ ] Overview intelligence panel shows insights with working deep links
 
@@ -100,6 +101,10 @@
 - [ ] /press/login accessible, /press/dashboard/* redirects to login when unauthenticated
 - [ ] Role=journalist can access dashboard, role=user cannot
 - [ ] Promo track stream URL expires after 5 minutes
+- [ ] Global `promoPool` off hides `/promo-pool` and `/press/dashboard/promo-pool`
+- [ ] `press.applications` off blocks `/press/apply` and journalist application API
+- [ ] `press.contact` off blocks press inquiry form and `/press/dashboard/contact`
+- [ ] `/admin/features` shows Global site toggles + Portal module flags sections
 
 ## Schema Parity
 - [ ] Every column in supabase/reset.sql exists in src/types/database.ts

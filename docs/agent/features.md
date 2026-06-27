@@ -64,7 +64,36 @@ API surface: document, versions, fonts, share, templates, press export. DAL: `ep
 
 ## Journalist dashboard (`/press/dashboard/*`)
 
-Role `journalist` or `admin`. Feature flags: `journalist.*`. Promo pool dual-gate (middleware + layout).
+Role `journalist` or `admin`. Feature flags: `journalist.*` and `press.*`. Promo pool dual-gate (middleware + layout).
+
+## Feature flags (admin `/admin/features`)
+
+Two independent systems — do not conflate with **Settings → Roles** (`role_permissions`), which gates CRUD inside modules.
+
+| System | Storage | Scope | Helpers |
+|--------|---------|-------|---------|
+| **Global toggles** | `site_settings.key = 'feature_toggles'` (JSON) | Whole roles / site areas | `src/lib/featureToggles.ts` — `getFeatureToggles()`, `parseFeatureTogglesJson()` |
+| **Portal module flags** | `portal_feature_flags` table | Per sidebar module for `artist` / `journalist` | `getFeatureFlagsForRole()` in `src/lib/api/featureFlags.ts`; UI meta in `src/lib/portalFeatureFlagMeta.ts` |
+
+**Global toggles**
+
+| Key | Effect |
+|-----|--------|
+| `promoPool` | `/promo-pool`, `/press/dashboard/promo-pool`, journalist promo nav; SSOT via `isPromoPoolEnabled()` in `src/lib/pressAccess.ts` |
+| `editorTools` | `/editor/*` and editor CMS paths; enforced in `middleware.ts` |
+
+**Portal flags (seed in `supabase/reset.sql`)**
+
+- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`
+- **Journalist:** `journalist.accreditation`, `press.applications`, `press.zip_download`, `press.audio_preview`, `press.contact`
+
+**Press helpers** (`src/lib/pressAccess.ts`): `isPressApplicationsEnabled()`, `isPressZipDownloadEnabled()`, `isPressAudioPreviewEnabled()` — each reads `portal_feature_flags` for role `journalist`.
+
+**Deprecated:** `press.promo_tracks` — replaced by global `promoPool`; hidden in admin UI (`DEPRECATED_PORTAL_FEATURE_FLAGS`), not seeded.
+
+**Route-guard pattern:** RSC page (or server action) loads flags/toggles via DAL, returns disabled message or `notFound()`; nav hides links when flag is off. Examples: `app/portal/calendar/page.tsx` (`artist.calendar`), `app/press/apply/page.tsx` (`press.applications`), `app/press/dashboard/promo-pool/page.tsx` (global `promoPool`).
+
+Admin UI: `AdminFeaturesWrapper` — section 1 `FeatureTogglesManager` (global, saved with site settings), section 2 `FeatureFlagsManager` (portal rows, immediate PATCH).
 
 ## Press ecosystem
 

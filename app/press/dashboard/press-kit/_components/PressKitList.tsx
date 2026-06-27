@@ -15,6 +15,7 @@ import { getPressKitUrls } from '../_actions/downloadZip'
 
 interface PressKitListProps {
   assets: PressAsset[]
+  zipDownloadEnabled?: boolean
 }
 
 const IMAGE_CATEGORIES = new Set(['photo', 'logo', 'social', 'promo', 'live', 'stage', 'artwork'])
@@ -23,7 +24,7 @@ function assetTitle(asset: PressAsset): string {
   return asset.pressCaption ?? asset.originalFilename
 }
 
-export function PressKitList({ assets }: PressKitListProps) {
+export function PressKitList({ assets, zipDownloadEnabled = true }: PressKitListProps) {
   const t = useTranslations('pressKit')
   const [activeTab, setActiveTab] = useState<'all' | 'photo' | 'logo' | 'social' | 'document'>('all')
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -79,10 +80,12 @@ export function PressKitList({ assets }: PressKitListProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold">{t('heading')}</h1>
-        <Button onClick={() => void downloadZip()} disabled={preparingZip || filtered.length === 0} className="gap-2">
-          <FileArrowDown size={16} weight="bold" aria-hidden="true" />
-          {preparingZip ? t('preparingZip') : t('downloadZipAll')}
-        </Button>
+        {zipDownloadEnabled && (
+          <Button onClick={() => void downloadZip()} disabled={preparingZip || filtered.length === 0} className="gap-2">
+            <FileArrowDown size={16} weight="bold" aria-hidden="true" />
+            {preparingZip ? t('preparingZip') : t('downloadZipAll')}
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>

@@ -22,6 +22,7 @@ import type { PromoTrack } from '@/lib/api/promoTracks'
 
 interface PromoTrackPlayerProps {
   track: PromoTrack
+  audioPreviewEnabled?: boolean
 }
 
 function formatDuration(seconds: number): string {
@@ -30,7 +31,7 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
+export function PromoTrackPlayer({ track, audioPreviewEnabled = true }: PromoTrackPlayerProps) {
   const t = useTranslations('promoPool')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -98,16 +99,18 @@ export function PromoTrackPlayer({ track }: PromoTrackPlayerProps) {
             <p className="text-sm text-muted-foreground">{track.artistName}</p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void togglePlay()}
-              disabled={loadingPreview}
-              aria-label={isPlaying ? `${t('player.pause')} ${track.title}` : `${t('player.preview')} ${track.title}`}
-            >
-              {isPlaying ? <Pause size={14} weight="bold" aria-hidden="true" /> : <Play size={14} weight="bold" aria-hidden="true" />}
-              {loadingPreview ? t('loading') : isPlaying ? t('player.pause') : t('player.preview')}
-            </Button>
+            {audioPreviewEnabled && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void togglePlay()}
+                disabled={loadingPreview}
+                aria-label={isPlaying ? `${t('player.pause')} ${track.title}` : `${t('player.preview')} ${track.title}`}
+              >
+                {isPlaying ? <Pause size={14} weight="bold" aria-hidden="true" /> : <Play size={14} weight="bold" aria-hidden="true" />}
+                {loadingPreview ? t('loading') : isPlaying ? t('player.pause') : t('player.preview')}
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={handleDownload}

@@ -864,6 +864,7 @@
   "nav_group_account": "Account",
   "calendar": "Calendar",
   "calendar_heading": "Release Calendar",
+  "calendar_disabled": "The Release Calendar is currently unavailable. Please contact the label for more information.",
   "calendar_filter_all": "All Releases",
   "calendar_filter_mine": "My Releases",
   "calendar_today": "Today",

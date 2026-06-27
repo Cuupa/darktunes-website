@@ -16,6 +16,7 @@
     "message": "Thank you! We'll review your application and get back to you by email.",
     "login": "Already approved? Sign in"
   },
+  "applicationsDisabled": "Press applications are currently not being accepted. Please check back later or contact the label.",
   "errors": {
     "emailInUse": "An account with this email already exists. Please sign in.",
     "generic": "Submission failed. Please try again."

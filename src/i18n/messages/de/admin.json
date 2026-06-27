@@ -427,5 +427,53 @@
     "trendsChartTitle": "Umsatz & Auszahlung im Zeitverlauf",
     "trendsOnePeriodHint": "1 Periode gespeichert. Mindestens eine weitere speichern, um ein Trend-Chart zu sehen.",
     "trendsSaveFailed": "Perioden-Zusammenfassung konnte nicht gespeichert werden"
+  },
+  "features": {
+    "globalSectionTitle": "Globale Site-Schalter",
+    "globalSectionDescription": "Grobe Schalter in den Site-Einstellungen. Promo Pool und Editor Tools betreffen ganze Rollen, nicht einzelne Portal-Module.",
+    "portalSectionTitle": "Portal-Modul-Flags",
+    "portalSectionDescription": "Feingranulare Schalter pro Artist- oder Journalisten-Modul. Werden sofort beim Umschalten gespeichert.",
+    "globalHint": "Deaktivierte Schalter blenden Routen und Navigation für die betroffene Rolle aus. Globale Schalter werden mit den übrigen Site-Einstellungen gespeichert.",
+    "portalHint": "Modul-Flags verstecken Sidebar-Links und blockieren direkte URL-Zugriffe. Änderungen gelten ab dem nächsten Seitenaufruf.",
+    "disabledBadge": "Deaktiviert",
+    "noFlags": "Keine Feature-Flags gefunden.",
+    "updatedToast": "{label} aktualisiert",
+    "toggleAria": "{label} umschalten",
+    "groups": {
+      "artist": "Artist-Portal-Module",
+      "journalist": "Presse- / Journalisten-Module"
+    },
+    "globalToggles": {
+      "promoPool": {
+        "label": "Promo Pool",
+        "description": "Gibt verifizierten Journalisten Zugang zu unveröffentlichter Musik unter /promo-pool und /press/dashboard/promo-pool.",
+        "role": "journalist"
+      },
+      "editorTools": {
+        "label": "Editor Tools",
+        "description": "Editoren können das eingeschränkte CMS unter /editor und erlaubte Admin-Pfade nutzen.",
+        "role": "editor"
+      }
+    },
+    "flagDescriptions": {
+      "artist": {
+        "analytics": "Enterprise-Analytics mit Streaming-, Merch- und Engagement-Tabs.",
+        "statements": "Statement-of-Sales-PDFs und verknüpfter Rechnungsworkflow.",
+        "marketing": "Label-Marketing-Timeline und Smart Links.",
+        "invoices": "Artist-Rechnungen und PDF-Erstellung.",
+        "documents": "Privater Dokumententresor für Verträge und Rider.",
+        "calendar": "Label-weiter Releasekalender mit persönlichem Filter.",
+        "epk_builder": "Canvas-EPK-Builder und Share-Links."
+      },
+      "journalist": {
+        "accreditation": "Akkreditierungsanfragen im Press-Dashboard."
+      },
+      "press": {
+        "applications": "Öffentliches Formular /press/apply und Journalisten-Bewerbungs-API.",
+        "zip_download": "Bulk-ZIP-Download auf der Press-Kit-Seite.",
+        "audio_preview": "Promo-Track-Vorschau im Browser (Stream-Buttons).",
+        "contact": "Presse-Anfrageformular im Journalisten-Dashboard."
+      }
+    }
   }
 }

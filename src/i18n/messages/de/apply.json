@@ -16,6 +16,7 @@
     "message": "Vielen Dank! Wir prüfen deine Bewerbung und melden uns per E-Mail bei dir.",
     "login": "Bereits freigeschaltet? Jetzt anmelden"
   },
+  "applicationsDisabled": "Pressebewerbungen werden derzeit nicht angenommen. Bitte versuche es später erneut oder kontaktiere das Label.",
   "errors": {
     "emailInUse": "Für diese E-Mail existiert bereits ein Konto. Bitte melde dich an.",
     "generic": "Senden fehlgeschlagen. Bitte versuche es erneut."

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { getDownloadHistory } from '@/lib/api/journalistDownloads'
 import { getInterviewRequestsByJournalistId } from '@/lib/api/interviewRequests'
 import { JournalistDashboardClient } from './_components/JournalistDashboardClient'
@@ -14,8 +15,9 @@ export default async function PressDashboardPage() {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
-  const [downloads, interviewRequests, accreditationRows] = await Promise.all([
+  const [flags, promoPoolEnabled, downloads, interviewRequests, accreditationRows] = await Promise.all([
+    getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>)),
+    isPromoPoolEnabled(supabase),
     getDownloadHistory(supabase, user.id).catch(() => []),
     getInterviewRequestsByJournalistId(supabase, user.id).catch(() => []),
     supabase
@@ -40,7 +42,7 @@ export default async function PressDashboardPage() {
 
   const cardHrefs = [
     { href: '/press/dashboard/profile', enabled: true },
-    { href: '/press/dashboard/promo-pool', enabled: true },
+    { href: '/press/dashboard/promo-pool', enabled: promoPoolEnabled },
     { href: '/press/dashboard/press-kit', enabled: true },
     { href: '/press/dashboard/press-releases', enabled: true },
     { href: '/press/dashboard/accreditation', enabled: flags['journalist.accreditation'] ?? true },

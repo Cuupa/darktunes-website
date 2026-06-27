@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 async function sendPressApplicationNotification(data: {
@@ -48,6 +49,9 @@ export async function submitPressApplication(data: {
 }): Promise<{ status: 'pending' | 'error'; message?: string }> {
   try {
     const supabase = await createServerSupabaseClient()
+    const applicationsEnabled = await isPressApplicationsEnabled(supabase)
+    if (!applicationsEnabled) return { status: 'error', message: 'disabled' }
+
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,

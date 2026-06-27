@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { getTranslations } from 'next-intl/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { PressNav } from './_components/PressNav'
 
 export const metadata: Metadata = {
@@ -20,11 +21,14 @@ export default async function PressDashboardLayout({ children }: { children: Rea
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
+  const [flags, promoPoolEnabled] = await Promise.all([
+    getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>)),
+    isPromoPoolEnabled(supabase),
+  ])
   const links = [
     { href: '/press/dashboard', label: t('overview'), enabled: true },
     { href: '/press/dashboard/profile', label: t('profile'), enabled: true },
-    { href: '/press/dashboard/promo-pool', label: t('promoPool'), enabled: true },
+    { href: '/press/dashboard/promo-pool', label: t('promoPool'), enabled: promoPoolEnabled },
     { href: '/press/dashboard/press-kit', label: t('pressKit'), enabled: true },
     { href: '/press/dashboard/press-releases', label: t('pressReleases'), enabled: true },
     { href: '/press/dashboard/interviews', label: t('interviews'), enabled: true },

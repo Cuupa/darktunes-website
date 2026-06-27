@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { logServerActionError } from '@/lib/logServerActionError'
 
 function escapeHtml(value: string): string {
@@ -24,6 +25,9 @@ export async function sendPressInquiry(data: {
     } = await supabase.auth.getUser()
     if (!user) return { success: false }
     userId = user.id
+
+    const flags = await getFeatureFlagsForRole(supabase, 'journalist').catch(() => ({} as Record<string, boolean>))
+    if (flags['press.contact'] === false) return { success: false }
 
     const { error } = await supabase.from('app_logs').insert({
       source: 'press_inquiry',

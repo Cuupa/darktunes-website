@@ -18,6 +18,7 @@ import { useTranslations } from 'next-intl'
 
 interface Props {
   tracks: PromoTrack[]
+  audioPreviewEnabled?: boolean
 }
 
 function formatDuration(seconds: number): string {
@@ -31,7 +32,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function TrackCard({ track }: { track: PromoTrack }) {
+function TrackCard({ track, audioPreviewEnabled = true }: { track: PromoTrack; audioPreviewEnabled?: boolean }) {
   const t = useTranslations('promoPool')
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -71,7 +72,7 @@ function TrackCard({ track }: { track: PromoTrack }) {
           </div>
         </div>
 
-        {!streamUrl && (
+        {audioPreviewEnabled && !streamUrl && (
           <Button
             variant="outline"
             size="sm"
@@ -110,7 +111,7 @@ function TrackCard({ track }: { track: PromoTrack }) {
   )
 }
 
-export function PromoPoolClient({ tracks }: Props) {
+export function PromoPoolClient({ tracks, audioPreviewEnabled = true }: Props) {
   const t = useTranslations('promoPool')
 
   return (
@@ -127,7 +128,7 @@ export function PromoPoolClient({ tracks }: Props) {
         ) : (
           <div className="space-y-3">
             {tracks.map((track) => (
-              <TrackCard key={track.id} track={track} />
+              <TrackCard key={track.id} track={track} audioPreviewEnabled={audioPreviewEnabled} />
             ))}
           </div>
         )}

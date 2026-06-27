@@ -9,11 +9,15 @@ export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getPromoTracks } from '@/lib/api/promoTracks'
+import { isPressAudioPreviewEnabled } from '@/lib/pressAccess'
 import { PromoPoolClient } from './_components/PromoPoolClient'
 
 export default async function PromoPoolPage() {
   const supabase = await createServerSupabaseClient()
-  const tracks = await getPromoTracks(supabase).catch(() => [])
+  const [tracks, audioPreviewEnabled] = await Promise.all([
+    getPromoTracks(supabase).catch(() => []),
+    isPressAudioPreviewEnabled(supabase),
+  ])
 
-  return <PromoPoolClient tracks={tracks} />
+  return <PromoPoolClient tracks={tracks} audioPreviewEnabled={audioPreviewEnabled} />
 }

@@ -427,5 +427,53 @@
     "trendsChartTitle": "Revenue & Payout Over Time",
     "trendsOnePeriodHint": "1 period saved. Save at least one more to see a trend chart.",
     "trendsSaveFailed": "Failed to save period summary"
+  },
+  "features": {
+    "globalSectionTitle": "Global site toggles",
+    "globalSectionDescription": "Coarse switches stored in site settings. Promo Pool and Editor Tools affect entire roles, not individual portal modules.",
+    "portalSectionTitle": "Portal module flags",
+    "portalSectionDescription": "Fine-grained switches per artist or journalist module. Saved immediately when toggled.",
+    "globalHint": "Disabling a toggle hides routes and navigation for the affected role. Global toggles are saved with your other site settings.",
+    "portalHint": "Module flags hide sidebar links and block direct URL access. Changes apply on the next page load.",
+    "disabledBadge": "Disabled",
+    "noFlags": "No feature flags found.",
+    "updatedToast": "Updated {label}",
+    "toggleAria": "Toggle {label}",
+    "groups": {
+      "artist": "Artist portal modules",
+      "journalist": "Press / journalist modules"
+    },
+    "globalToggles": {
+      "promoPool": {
+        "label": "Promo Pool",
+        "description": "Gives verified journalists access to unreleased music at /promo-pool and /press/dashboard/promo-pool.",
+        "role": "journalist"
+      },
+      "editorTools": {
+        "label": "Editor Tools",
+        "description": "Editors can access the restricted CMS at /editor and allowed admin paths.",
+        "role": "editor"
+      }
+    },
+    "flagDescriptions": {
+      "artist": {
+        "analytics": "Enterprise analytics dashboard with streaming, merch, and engagement tabs.",
+        "statements": "Statement of Sales PDFs and linked invoice workflow.",
+        "marketing": "Label marketing timeline and smart links.",
+        "invoices": "Artist-submitted invoices and PDF generation.",
+        "documents": "Private document vault for contracts and riders.",
+        "calendar": "Label-wide release calendar with personal filter.",
+        "epk_builder": "Canvas-based EPK builder and share links."
+      },
+      "journalist": {
+        "accreditation": "Event accreditation requests in the press dashboard."
+      },
+      "press": {
+        "applications": "Public /press/apply form and journalist application API.",
+        "zip_download": "Bulk ZIP download on the press kit page.",
+        "audio_preview": "In-browser promo track preview (stream buttons).",
+        "contact": "Press inquiry form in the journalist dashboard."
+      }
+    }
   }
 }
