@@ -764,11 +764,14 @@ CREATE INDEX IF NOT EXISTS idx_releases_visible      ON public.releases (is_visi
 -- Full UNIQUE constraints (required for PostgREST upsert — partial indexes are unsupported).
 -- Before applying on a live DB, dedupe: SELECT spotify_id, COUNT(*) FROM releases
 -- WHERE spotify_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_spotify_id_key;
 DROP INDEX IF EXISTS releases_spotify_id_key;
 DO $$ BEGIN
   ALTER TABLE public.releases ADD CONSTRAINT releases_spotify_id_key UNIQUE (spotify_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_discogs_id_key;
+DROP INDEX IF EXISTS releases_discogs_id_key;
 DO $$ BEGIN
   ALTER TABLE public.releases ADD CONSTRAINT releases_discogs_id_key UNIQUE (discogs_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
