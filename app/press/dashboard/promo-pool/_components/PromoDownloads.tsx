@@ -12,9 +12,10 @@ import type { PromoTrack } from '@/lib/api/promoTracks'
 interface PromoDownloadsProps {
   releases: Release[]
   promoTracks: PromoTrack[]
+  audioPreviewEnabled?: boolean
 }
 
-export function PromoDownloads({ releases, promoTracks }: PromoDownloadsProps) {
+export function PromoDownloads({ releases, promoTracks, audioPreviewEnabled = true }: PromoDownloadsProps) {
   const t = useTranslations('promoPool')
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
@@ -55,7 +56,9 @@ export function PromoDownloads({ releases, promoTracks }: PromoDownloadsProps) {
 
       <section className="space-y-3" aria-labelledby="promo-tracks-heading">
         <h2 id="promo-tracks-heading" className="text-xl font-semibold">{t('tracksHeading')}</h2>
-        {promoTracks.map((track) => <PromoTrackPlayer key={track.id} track={track} />)}
+        {promoTracks.map((track) => (
+          <PromoTrackPlayer key={track.id} track={track} audioPreviewEnabled={audioPreviewEnabled} />
+        ))}
         {promoTracks.length === 0 && <p className="text-sm text-muted-foreground">{t('noTracks')}</p>}
       </section>
     </div>

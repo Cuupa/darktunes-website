@@ -29,6 +29,7 @@
   "logout": "Abmelden",
   "accreditationDisabled": "Akkreditierungsanfragen sind derzeit deaktiviert.",
   "contactDisabled": "Das Presse-Anfrageformular ist derzeit deaktiviert.",
+  "promoPoolDisabled": "Der Promo Pool ist derzeit nicht verfügbar.",
   "accreditationForm": {
     "eventName": "Eventname",
     "eventDate": "Eventdatum",

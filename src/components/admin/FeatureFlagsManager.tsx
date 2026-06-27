@@ -9,6 +9,7 @@ import { getFeatureFlags } from '@/lib/api/featureFlags'
 import { useTranslations } from 'next-intl'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
+import { DEPRECATED_PORTAL_FEATURE_FLAGS } from '@/lib/pressAccess'
 import type { PortalFeatureFlag } from '@/types'
 
 export function FeatureFlagsManager() {
@@ -19,7 +20,7 @@ export function FeatureFlagsManager() {
 
   useEffect(() => {
     void getFeatureFlags(supabase)
-      .then(setFlags)
+      .then((rows) => setFlags(rows.filter((flag) => !DEPRECATED_PORTAL_FEATURE_FLAGS.has(flag.id))))
       .catch(() => toast.error(tErrors('SERVER_ERROR')))
   }, [supabase, tErrors])
 

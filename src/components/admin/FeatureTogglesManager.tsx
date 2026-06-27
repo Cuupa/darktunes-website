@@ -102,7 +102,7 @@ export function FeatureTogglesManager({ value, onChange, isLoading = false }: Fe
             id="toggle-promo-pool"
             icon={<MusicNote size={18} aria-hidden="true" />}
             label="Promo Pool"
-            description="Gives verified journalists access to unreleased music and press kits at /promo-pool."
+            description="Gives verified journalists access to unreleased music at /promo-pool and /press/dashboard/promo-pool."
             affectedRole="journalist"
             checked={value.promoPool}
             onCheckedChange={(checked) => handleChange('promoPool', checked)}

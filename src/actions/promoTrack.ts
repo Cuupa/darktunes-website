@@ -14,6 +14,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { isPressAudioPreviewEnabled, isPromoPoolEnabled } from '@/lib/pressAccess'
 import { createR2Client } from '@/lib/r2Utils'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
@@ -36,6 +37,14 @@ export async function getPromoTrackStreamUrl(r2Key: string): Promise<{ url: stri
     .single()
 
   if (!profile || !(['journalist', 'admin'] as string[]).includes(profile.role)) {
+    throw new Error('Forbidden')
+  }
+
+  const [promoPoolEnabled, audioPreviewEnabled] = await Promise.all([
+    isPromoPoolEnabled(supabase),
+    isPressAudioPreviewEnabled(supabase),
+  ])
+  if (!promoPoolEnabled || !audioPreviewEnabled) {
     throw new Error('Forbidden')
   }
 

@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedDownloadUrl } from '@/lib/portal/presignedUrl'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { isPressZipDownloadEnabled } from '@/lib/pressAccess'
 import { logDownload } from '@/lib/api/journalistDownloads'
 
 export async function getPressKitUrls(r2Keys: string[]): Promise<{ urls: Array<{ key: string; url: string }>; error?: string }> {
@@ -16,6 +17,9 @@ export async function getPressKitUrls(r2Keys: string[]): Promise<{ urls: Array<{
 
     const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
     if (!profile || !['journalist', 'admin'].includes(profile.role)) return { urls: [], error: 'Unauthorized' }
+
+    const zipDownloadEnabled = await isPressZipDownloadEnabled(supabase)
+    if (!zipDownloadEnabled) return { urls: [], error: 'ZIP download is currently disabled' }
 
     const { serverEnv } = await import('@/lib/env.server')
     const s3 = createR2Client(

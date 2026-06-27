@@ -13,6 +13,7 @@ import {
   getJournalistApplications,
   createJournalistApplication,
 } from '@/lib/api/journalistApplications'
+import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { z } from 'zod'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 
@@ -47,13 +48,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = await req.json()
   const { email, name, outlet, message } = ApplySchema.parse(body)
 
+  const db = await createServiceRoleSupabaseClient()
+  const applicationsEnabled = await isPressApplicationsEnabled(db)
+  if (!applicationsEnabled) {
+    throw new ApiError(403, 'Press applications are currently disabled', 'FEATURE_DISABLED')
+  }
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Use service-role so the insert can bypass the user_id RLS check when unauthenticated
-  const db = await createServiceRoleSupabaseClient()
   const application = await createJournalistApplication(db, {
     email,
     name,

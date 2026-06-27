@@ -15,7 +15,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { getJournalistApplicationByUserId } from '@/lib/api/journalistApplications'
 import { PromoPoolAccessGate } from './_components/PromoPoolAccessGate'
 
@@ -33,9 +33,7 @@ export default async function PromoPoolLayout({ children }: { children: ReactNod
   // Middleware handles the unauthenticated case; user is always defined here.
   if (!user) return null
 
-  // Check feature toggle — if promo pool is disabled, show "unavailable" message
-  const siteSettings = await getSiteSettings(supabase).catch(() => null)
-  const promoPoolEnabled = siteSettings?.featureToggles?.promoPool ?? true
+  const promoPoolEnabled = await isPromoPoolEnabled(supabase)
 
   if (!promoPoolEnabled) {
     return (

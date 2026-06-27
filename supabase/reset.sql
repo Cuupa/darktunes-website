@@ -3197,7 +3197,6 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('press.applications',  'Press Portal Applications',          TRUE, 'journalist'),
-  ('press.promo_tracks',  'Press Promo Pool Access',            TRUE, 'journalist'),
   ('press.zip_download',  'Press Kit ZIP Download',             TRUE, 'journalist'),
   ('press.audio_preview', 'Promo Track In-Browser Preview',     TRUE, 'journalist'),
   ('press.contact',       'Press Inquiry Form',                 TRUE, 'journalist')
