@@ -18,6 +18,7 @@ import {
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Concert, Tour, TourStop } from '@/types'
+import { TourPlannerTabs } from './TourPlannerPanels'
 
 interface TourPlannerShellProps {
   artistId: string
@@ -253,28 +254,22 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
                 {t('tour_planner_add_stop')}
               </Button>
 
-              {stops.length === 0 ? (
+              {stops.length === 0 && (
                 <p className="text-sm text-muted-foreground">{t('tour_planner_no_stops')}</p>
-              ) : (
-                <ul className="divide-y divide-border rounded-md border border-border">
-                  {stops.map((stop) => (
-                    <li key={stop.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                      <div>
-                        <p className="font-medium">{stop.venueName ?? t('tour_planner_unnamed_stop')}</p>
-                        <p className="text-muted-foreground">
-                          {stop.stopDate}
-                          {stop.venueCity ? ` · ${stop.venueCity}` : ''}
-                        </p>
-                      </div>
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">{stop.showStatus}</span>
-                    </li>
-                  ))}
-                </ul>
               )}
             </>
           )}
         </div>
       </section>
+
+      {activeTour && (
+        <TourPlannerTabs
+          artistId={artistId}
+          activeTour={activeTour}
+          stops={stops}
+          onStopsChange={() => queryClient.invalidateQueries({ queryKey: stopsQueryKey })}
+        />
+      )}
 
       {activeTour && importableConcerts.length > 0 && (
         <section className="space-y-3 rounded-lg border border-border p-4">

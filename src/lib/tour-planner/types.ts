@@ -157,6 +157,12 @@ export interface Coordinates {
   lon: number
 }
 
+export interface GeocodingResult {
+  coords?: Coordinates
+  error?: string
+  displayName?: string
+}
+
 export interface RouteSegment {
   from: string
   to: string
