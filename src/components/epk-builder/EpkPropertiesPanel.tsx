@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Crop } from '@phosphor-icons/react'
+import { Crop, Image as ImageIcon } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -23,15 +23,24 @@ import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { EPK_GOOGLE_FONTS } from '@/lib/epk/googleFonts'
 import { EpkImageCropDialog } from './EpkImageCropDialog'
 
-export function EpkPropertiesPanel() {
+export type EpkAssetPickerMode = 'insert' | 'replace'
+
+interface EpkPropertiesPanelProps {
+  onOpenAssetPicker?: (mode: EpkAssetPickerMode) => void
+}
+
+export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProps = {}) {
   const t = useTranslations('portal')
   const document = useEpkEditorStore((s) => s.document)
-  const selectedIds = useEpkEditorStore((s) => s.selectedIds)
   const updateElement = useEpkEditorStore((s) => s.updateElement)
   const addDocumentFont = useEpkEditorStore((s) => s.addDocumentFont)
   const [cropOpen, setCropOpen] = useState(false)
 
-  const element = document.elements.find((el) => el.id === selectedIds[0])
+  const element = useEpkEditorStore((s) =>
+    s.selectedIds[0]
+      ? s.document.elements.find((el) => el.id === s.selectedIds[0])
+      : undefined,
+  )
 
   if (!element) {
     return (
@@ -215,50 +224,67 @@ export function EpkPropertiesPanel() {
           </div>
         )}
 
-        {(element.type === 'image' || element.type === 'logo') && element.src && (
+        {(element.type === 'image' || element.type === 'logo') && (
           <>
-            <div className="space-y-2">
-              <Label htmlFor="epk-prop-image-fit">{t('epk_editor_image_fit')}</Label>
-              <Select
-                value={element.style.objectFit ?? 'contain'}
-                onValueChange={(v) => patchStyle('objectFit', v)}
+            {onOpenAssetPicker ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full min-h-[44px]"
+                onClick={() => onOpenAssetPicker('replace')}
               >
-                <SelectTrigger id="epk-prop-image-fit">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contain">{t('epk_editor_image_fit_contain')}</SelectItem>
-                  <SelectItem value="cover">{t('epk_editor_image_fit_cover')}</SelectItem>
-                  <SelectItem value="fill">{t('epk_editor_image_fit_fill')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="epk-prop-image-src">{t('epk_editor_image_source')}</Label>
-              <Input
-                id="epk-prop-image-src"
-                type="url"
-                readOnly
-                value={element.src}
-                className="text-xs"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full min-h-[44px]"
-              onClick={() => setCropOpen(true)}
-            >
-              <Crop className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t('epk_editor_crop_open')}
-            </Button>
-            <EpkImageCropDialog
-              open={cropOpen}
-              src={element.src}
-              crop={element.crop}
-              onClose={() => setCropOpen(false)}
-              onApply={(crop) => updateElement(element.id, { crop })}
-            />
+                <ImageIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('epk_assets_replace')}
+              </Button>
+            ) : null}
+            {element.src ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="epk-prop-image-fit">{t('epk_editor_image_fit')}</Label>
+                  <Select
+                    value={element.style.objectFit ?? 'contain'}
+                    onValueChange={(v) => patchStyle('objectFit', v)}
+                  >
+                    <SelectTrigger id="epk-prop-image-fit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contain">{t('epk_editor_image_fit_contain')}</SelectItem>
+                      <SelectItem value="cover">{t('epk_editor_image_fit_cover')}</SelectItem>
+                      <SelectItem value="fill">{t('epk_editor_image_fit_fill')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="epk-prop-image-src">{t('epk_editor_image_source')}</Label>
+                  <Input
+                    id="epk-prop-image-src"
+                    type="url"
+                    readOnly
+                    value={element.src}
+                    className="text-xs"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full min-h-[44px]"
+                  onClick={() => setCropOpen(true)}
+                >
+                  <Crop className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t('epk_editor_crop_open')}
+                </Button>
+                <EpkImageCropDialog
+                  open={cropOpen}
+                  src={element.src}
+                  crop={element.crop}
+                  onClose={() => setCropOpen(false)}
+                  onApply={(crop) => updateElement(element.id, { crop })}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('epk_assets_no_image')}</p>
+            )}
           </>
         )}
       </div>

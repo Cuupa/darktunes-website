@@ -156,6 +156,10 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
               if (typeof next.x === 'number') next.x = snapValue(next.x, state.gridSize, true)
               if (typeof next.y === 'number') next.y = snapValue(next.y, state.gridSize, true)
             }
+            if (next.style) {
+              el.style = { ...el.style, ...next.style }
+              delete next.style
+            }
             Object.assign(el, next)
             state.isDirty = true
           }),

@@ -25,9 +25,11 @@ import {
   Plus,
   GridFour,
   Magnet,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +39,7 @@ import {
 import { useEpkEditorStore, useEpkEditorStoreApi, useEpkEditorTemporal } from '@/lib/epk/editor/EpkEditorProvider'
 import { PROFILE_PRESETS, type ProfilePresetId } from '@/lib/epk/editor/profilePresets'
 import { EpkColorThemePicker } from './EpkColorThemePicker'
+import { EpkHelpDialog } from './EpkHelpDialog'
 
 interface EpkToolbarProps {
   onSave: () => void
@@ -46,6 +49,7 @@ interface EpkToolbarProps {
   onOpenShareLinks: () => void
   onOpenAnalytics: () => void
   onOpenTemplates: () => void
+  onOpenCommandPalette: () => void
   onInsertPreset: (presetId: ProfilePresetId) => void
   isSaving: boolean
 }
@@ -58,6 +62,7 @@ export function EpkToolbar({
   onOpenShareLinks,
   onOpenAnalytics,
   onOpenTemplates,
+  onOpenCommandPalette,
   onInsertPreset,
   isSaving,
 }: EpkToolbarProps) {
@@ -111,33 +116,63 @@ export function EpkToolbar({
   }
 
   return (
+    <TooltipProvider>
     <div
       className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2"
       role="toolbar"
       aria-label={t('epk_editor_toolbar_label')}
     >
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="min-h-[44px] min-w-[44px]"
-        disabled={!canUndo}
-        aria-label={t('epk_editor_undo')}
-        onClick={() => store.temporal.getState().undo()}
-      >
-        <ArrowCounterClockwise size={18} aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="min-h-[44px] min-w-[44px]"
-        disabled={!canRedo}
-        aria-label={t('epk_editor_redo')}
-        onClick={() => store.temporal.getState().redo()}
-      >
-        <ArrowClockwise size={18} aria-hidden="true" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[44px] min-w-[44px]"
+            aria-label={t('epk_cmd_title')}
+            onClick={onOpenCommandPalette}
+          >
+            <MagnifyingGlass size={18} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('epk_cmd_tooltip')}</TooltipContent>
+      </Tooltip>
+      <EpkHelpDialog />
+
+      <Separator orientation="vertical" className="h-8 hidden sm:block" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[44px] min-w-[44px]"
+            disabled={!canUndo}
+            aria-label={t('epk_editor_undo')}
+            onClick={() => store.temporal.getState().undo()}
+          >
+            <ArrowCounterClockwise size={18} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('epk_editor_undo')}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[44px] min-w-[44px]"
+            disabled={!canRedo}
+            aria-label={t('epk_editor_redo')}
+            onClick={() => store.temporal.getState().redo()}
+          >
+            <ArrowClockwise size={18} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('epk_editor_redo')}</TooltipContent>
+      </Tooltip>
 
       <Separator orientation="vertical" className="h-8 hidden sm:block" />
 
@@ -329,16 +364,21 @@ export function EpkToolbar({
       </Button>
       <EpkColorThemePicker />
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="min-h-[44px] min-w-[44px]"
-        aria-label={t('epk_templates_title')}
-        onClick={onOpenTemplates}
-      >
-        <Layout size={18} aria-hidden="true" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[44px] min-w-[44px]"
+            aria-label={t('epk_templates_title')}
+            onClick={onOpenTemplates}
+          >
+            <Layout size={18} aria-hidden="true" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('epk_templates_title')}</TooltipContent>
+      </Tooltip>
 
       <Button
         type="button"
@@ -352,5 +392,6 @@ export function EpkToolbar({
         {isSaving ? t('epk_editor_saving') : t('epk_editor_save')}
       </Button>
     </div>
+    </TooltipProvider>
   )
 }

@@ -8,4 +8,5 @@
 import 'konva/lib/shapes/Rect'
 import 'konva/lib/shapes/Text'
 import 'konva/lib/shapes/Image'
+import 'konva/lib/shapes/Line'
 import 'konva/lib/shapes/Transformer'

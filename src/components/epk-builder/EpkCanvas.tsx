@@ -21,11 +21,15 @@ import type Konva from 'konva'
 import { useReducedMotion } from 'framer-motion'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { getTopLevelPageElements } from '@/lib/epk/elements/groupUtils'
+import { EPK_FONTS_LOADED_EVENT } from './EpkFontLoader'
+import { EpkCanvasContextMenu, type EpkContextMenuAnchor } from './EpkContextMenu'
 import { EpkCanvasElementNode } from './EpkCanvasElementNode'
 import { EpkGroupNode } from './EpkGroupNode'
 import { EpkTextEditor } from './EpkTextEditor'
 
 interface EpkCanvasProps {
+  onOpenAssetPicker?: () => void
+  onReplaceImage?: () => void
   onEditText?: (id: string) => void
 }
 
@@ -64,7 +68,7 @@ function GridLines({
   return <>{lines}</>
 }
 
-export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
+export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: EpkCanvasProps = {}) {
   const document = useEpkEditorStore((s) => s.document)
   const activePageId = useEpkEditorStore((s) => s.activePageId)
   const zoom = useEpkEditorStore((s) => s.zoom)
@@ -79,8 +83,10 @@ export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
 
   const prefersReducedMotion = useReducedMotion()
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map())
+  const stageRef = useRef<Konva.Stage>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<EpkContextMenuAnchor | null>(null)
 
   const page = document.pages.find((p) => p.id === activePageId) ?? document.pages[0]
 
@@ -105,6 +111,12 @@ export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
     tr.getLayer()?.batchDraw()
   }, [selectedIds, elements])
 
+  useEffect(() => {
+    const redraw = () => stageRef.current?.batchDraw()
+    window.addEventListener(EPK_FONTS_LOADED_EVENT, redraw)
+    return () => window.removeEventListener(EPK_FONTS_LOADED_EVENT, redraw)
+  }, [])
+
   const handleSelect = useCallback(
     (id: string, additive: boolean) => {
       if (additive) {
@@ -117,6 +129,30 @@ export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
       }
     },
     [selectElements, selectedIds],
+  )
+
+  const resolveElementId = useCallback(
+    (node: Konva.Node): string | null => {
+      const stage = node.getStage()
+      let current: Konva.Node | null = node
+      while (current && current !== stage) {
+        const id = current.id()
+        if (id && document.elements.some((el) => el.id === id)) return id
+        current = current.getParent()
+      }
+      return null
+    },
+    [document.elements],
+  )
+
+  const handleStageContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault()
+      const elementId = resolveElementId(e.target)
+      if (elementId) handleSelect(elementId, false)
+      setContextMenu({ x: e.evt.clientX, y: e.evt.clientY })
+    },
+    [handleSelect, resolveElementId],
   )
 
   const selectedImageElement =
@@ -156,20 +192,20 @@ export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
         style={{ width: stageWidth, height: stageHeight }}
       >
         <Stage
+          ref={stageRef}
           width={stageWidth}
           height={stageHeight}
           scaleX={zoom}
           scaleY={zoom}
+          onContextMenu={handleStageContextMenu}
           onMouseDown={(e) => {
-            if (e.target === e.target.getStage()) {
+            if (e.target === e.target.getStage() && !editingTextId) {
               clearSelection()
-              setEditingTextId(null)
             }
           }}
           onTouchStart={(e) => {
-            if (e.target === e.target.getStage()) {
+            if (e.target === e.target.getStage() && !editingTextId) {
               clearSelection()
-              setEditingTextId(null)
             }
           }}
         >
@@ -252,6 +288,18 @@ export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
           />
         )}
       </div>
+      {contextMenu && (onOpenAssetPicker || onReplaceImage) ? (
+        <EpkCanvasContextMenu
+          anchor={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onOpenAssetPicker={onOpenAssetPicker ?? (() => {})}
+          onReplaceImage={onReplaceImage}
+          onEditText={(id) => {
+            setEditingTextId(id)
+            onEditText?.(id)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

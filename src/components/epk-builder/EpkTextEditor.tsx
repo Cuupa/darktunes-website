@@ -6,8 +6,9 @@
  * HTML textarea overlay for inline text editing on the Konva canvas.
  */
 
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
+import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
 
 interface EpkTextEditorProps {
   element: EpkElement
@@ -18,6 +19,14 @@ interface EpkTextEditorProps {
 
 export function EpkTextEditor({ element, zoom, onChange, onClose }: EpkTextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [value, setValue] = useState(element.content ?? '')
+  const valueRef = useRef(value)
+
+  useEffect(() => {
+    const next = element.content ?? ''
+    setValue(next)
+    valueRef.current = next
+  }, [element.id, element.content])
 
   useEffect(() => {
     textareaRef.current?.focus()
@@ -26,11 +35,28 @@ export function EpkTextEditor({ element, zoom, onChange, onClose }: EpkTextEdito
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onChange(valueRef.current)
+        onClose()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [onChange, onClose])
+
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
+  useEffect(() => {
+    return () => {
+      onChangeRef.current(valueRef.current)
+    }
+  }, [])
+
+  const commit = () => {
+    onChange(valueRef.current)
+    onClose()
+  }
 
   const style: CSSProperties = {
     position: 'absolute',
@@ -39,7 +65,7 @@ export function EpkTextEditor({ element, zoom, onChange, onClose }: EpkTextEdito
     width: element.width * zoom,
     minHeight: element.height * zoom,
     fontSize: (element.style.fontSize ?? 14) * zoom,
-    fontFamily: element.style.fontFamily ?? 'Helvetica, Arial, sans-serif',
+    fontFamily: formatKonvaFontFamily(element.style.fontFamily),
     color: element.style.fill ?? '#ffffff',
     textAlign: element.style.textAlign ?? 'left',
     lineHeight: element.style.lineHeight ?? 1.4,
@@ -56,11 +82,20 @@ export function EpkTextEditor({ element, zoom, onChange, onClose }: EpkTextEdito
     <textarea
       ref={textareaRef}
       aria-label="Edit text element"
-      defaultValue={element.content ?? ''}
+      value={value}
       style={style}
-      onBlur={(e) => {
+      onMouseDown={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        valueRef.current = e.target.value
+        setValue(e.target.value)
         onChange(e.target.value)
-        onClose()
+      }}
+      onBlur={() => commit()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          commit()
+        }
       }}
     />
   )
