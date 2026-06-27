@@ -4,8 +4,15 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, DotsSixVertical, Trash } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, DotsSixVertical, DotsThree, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -24,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
+import { downloadDaySheetPdf } from '@/lib/tour-planner/pdf'
 import {
   useTourPlannerContacts,
   useTourPlannerTasks,
@@ -39,8 +47,8 @@ import {
 } from './TourPlannerProductionForms'
 import type { Concert, Tour, TourStop } from '@/types'
 import {
+  buildTourPlannerPdfLabels,
   CrewPanel,
-  DaySheetPdfButton,
   geocodeStopHotel,
   geocodeStopVenue,
   GuestListForm,
@@ -279,6 +287,28 @@ function StopCard({
       .catch(() => toast.error(t('tour_planner_error')))
   }
 
+  const geocodeVenue = async () => {
+    const c = await geocodeStopVenue(artistId, stop)
+    if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
+    patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true })
+      .then(() => toast.success(t('tour_planner_geocode_ok')))
+      .catch(() => toast.error(t('tour_planner_error')))
+  }
+
+  const geocodeHotel = async () => {
+    const c = await geocodeStopHotel(artistId, stop)
+    if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
+    patchStop({ hotelLat: c.lat, hotelLng: c.lng, hotelValidated: true })
+      .then(() => toast.success(t('tour_planner_geocode_ok')))
+      .catch(() => toast.error(t('tour_planner_error')))
+  }
+
+  const exportDaySheetPdf = () => {
+    downloadDaySheetPdf(stop, stop.daySchedule ?? {}, buildTourPlannerPdfLabels(t))
+  }
+
+  const openDialog = (key: NonNullable<typeof open>) => setOpen(key)
+
   return (
     <li
       draggable
@@ -320,7 +350,7 @@ function StopCard({
           />
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Dialog open={open === 'day'} onOpenChange={(v) => setOpen(v ? 'day' : null)}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">{t('tour_planner_day_sheet')}</Button>
@@ -345,89 +375,106 @@ function StopCard({
             />
           </DialogContent>
         </Dialog>
-        <Dialog open={open === 'guest'} onOpenChange={(v) => setOpen(v ? 'guest' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_guest_list')}</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{t('tour_planner_guest_list')}</DialogTitle></DialogHeader>
-            <GuestListForm list={stop.guestList} onSave={(guestList) => patchStop({ guestList }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'venue'} onOpenChange={(v) => setOpen(v ? 'venue' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_venue_contacts')}</Button></DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{t('tour_planner_venue_contacts')}</DialogTitle></DialogHeader>
-            <VenueContactForm info={stop.venueContactInfo} onSave={(venueContactInfo) => patchStop({ venueContactInfo }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'loadin'} onOpenChange={(v) => setOpen(v ? 'loadin' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_loadin')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_loadin')}</DialogTitle></DialogHeader>
-            <LoadInForm details={stop.venueDetails} onSave={(venueDetails) => patchStop({ venueDetails }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'perdiems'} onOpenChange={(v) => setOpen(v ? 'perdiems' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_per_diems')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_per_diems')}</DialogTitle></DialogHeader>
-            <PerDiemsForm items={stop.perDiems} onSave={(perDiems) => patchStop({ perDiems }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'rooming'} onOpenChange={(v) => setOpen(v ? 'rooming' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_rooming')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_rooming')}</DialogTitle></DialogHeader>
-            <RoomingForm items={stop.rooming} onSave={(rooming) => patchStop({ rooming }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'manifest'} onOpenChange={(v) => setOpen(v ? 'manifest' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_manifest')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_manifest')}</DialogTitle></DialogHeader>
-            <TravelManifestForm items={stop.travelManifest} onSave={(travelManifest) => patchStop({ travelManifest }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'hotel'} onOpenChange={(v) => setOpen(v ? 'hotel' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_hotel_name')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_hotel_name')}</DialogTitle></DialogHeader>
-            <HotelForm
-              stop={stop}
-              onSave={(fields) => patchStop(fields).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))}
-            />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'settlement'} onOpenChange={(v) => setOpen(v ? 'settlement' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_settlement')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_settlement')}</DialogTitle></DialogHeader>
-            <SettlementForm
-              stop={stop}
-              settlement={stop.settlement}
-              deal={stop.deal}
-              onSave={(settlement) => patchStop({ settlement }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))}
-            />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={open === 'merch'} onOpenChange={(v) => setOpen(v ? 'merch' : null)}>
-          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_merch_settlement')}</Button></DialogTrigger>
-          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_merch_settlement')}</DialogTitle></DialogHeader>
-            <MerchSettlementForm artistId={artistId} stop={stop} onSaved={() => { setOpen(null); toast.success(t('tour_planner_saved')) }} />
-          </DialogContent>
-        </Dialog>
-        <Button variant="outline" size="sm" onClick={async () => {
-          const c = await geocodeStopVenue(artistId, stop)
-          if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
-          patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true }).then(() => toast.success(t('tour_planner_geocode_ok'))).catch(() => toast.error(t('tour_planner_error')))
-        }}>{t('tour_planner_geocode_venue')}</Button>
-        <Button variant="outline" size="sm" onClick={async () => {
-          const c = await geocodeStopHotel(artistId, stop)
-          if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
-          patchStop({ hotelLat: c.lat, hotelLng: c.lng, hotelValidated: true }).then(() => toast.success(t('tour_planner_geocode_ok'))).catch(() => toast.error(t('tour_planner_error')))
-        }}>{t('tour_planner_geocode_hotel')}</Button>
         <Button variant="outline" size="sm" onClick={publishOrSync}>
           {stop.concertId ? t('tour_planner_sync_event') : t('tour_planner_publish_event')}
         </Button>
-        <DaySheetPdfButton stop={stop} />
-        <Button variant="ghost" size="sm" onClick={() => deleteStop().catch(() => toast.error(t('tour_planner_error')))} aria-label={t('tour_planner_delete_stop')}>
-          <Trash size={16} aria-hidden />
-          {t('tour_planner_delete_stop')}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" aria-label={t('tour_planner_more_actions')}>
+              <DotsThree size={16} aria-hidden />
+              {t('tour_planner_more_actions')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem onSelect={() => openDialog('guest')}>{t('tour_planner_guest_list')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('venue')}>{t('tour_planner_venue_contacts')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('loadin')}>{t('tour_planner_loadin')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openDialog('perdiems')}>{t('tour_planner_per_diems')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('rooming')}>{t('tour_planner_rooming')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('manifest')}>{t('tour_planner_manifest')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('hotel')}>{t('tour_planner_hotel_name')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openDialog('settlement')}>{t('tour_planner_settlement')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDialog('merch')}>{t('tour_planner_merch_settlement')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void geocodeVenue()}>{t('tour_planner_geocode_venue')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void geocodeHotel()}>{t('tour_planner_geocode_hotel')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={exportDaySheetPdf}>{t('tour_planner_pdf')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => deleteStop().catch(() => toast.error(t('tour_planner_error')))}
+            >
+              <Trash size={14} className="mr-2" aria-hidden />
+              {t('tour_planner_delete_stop')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <Dialog open={open === 'guest'} onOpenChange={(v) => setOpen(v ? 'guest' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_guest_list')}</DialogTitle></DialogHeader>
+          <GuestListForm list={stop.guestList} onSave={(guestList) => patchStop({ guestList }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'venue'} onOpenChange={(v) => setOpen(v ? 'venue' : null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{t('tour_planner_venue_contacts')}</DialogTitle></DialogHeader>
+          <VenueContactForm info={stop.venueContactInfo} onSave={(venueContactInfo) => patchStop({ venueContactInfo }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'loadin'} onOpenChange={(v) => setOpen(v ? 'loadin' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_loadin')}</DialogTitle></DialogHeader>
+          <LoadInForm details={stop.venueDetails} onSave={(venueDetails) => patchStop({ venueDetails }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'perdiems'} onOpenChange={(v) => setOpen(v ? 'perdiems' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_per_diems')}</DialogTitle></DialogHeader>
+          <PerDiemsForm items={stop.perDiems} onSave={(perDiems) => patchStop({ perDiems }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'rooming'} onOpenChange={(v) => setOpen(v ? 'rooming' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_rooming')}</DialogTitle></DialogHeader>
+          <RoomingForm items={stop.rooming} onSave={(rooming) => patchStop({ rooming }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'manifest'} onOpenChange={(v) => setOpen(v ? 'manifest' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_manifest')}</DialogTitle></DialogHeader>
+          <TravelManifestForm items={stop.travelManifest} onSave={(travelManifest) => patchStop({ travelManifest }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'hotel'} onOpenChange={(v) => setOpen(v ? 'hotel' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_hotel_name')}</DialogTitle></DialogHeader>
+          <HotelForm
+            stop={stop}
+            onSave={(fields) => patchStop(fields).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'settlement'} onOpenChange={(v) => setOpen(v ? 'settlement' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_settlement')}</DialogTitle></DialogHeader>
+          <SettlementForm
+            stop={stop}
+            settlement={stop.settlement}
+            deal={stop.deal}
+            onSave={(settlement) => patchStop({ settlement }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === 'merch'} onOpenChange={(v) => setOpen(v ? 'merch' : null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('tour_planner_merch_settlement')}</DialogTitle></DialogHeader>
+          <MerchSettlementForm artistId={artistId} stop={stop} onSaved={() => { setOpen(null); toast.success(t('tour_planner_saved')) }} />
+        </DialogContent>
+      </Dialog>
     </li>
   )
 }

@@ -540,6 +540,7 @@
   "tour_planner_tech_download": "Download document",
   "tour_planner_drag_handle": "Drag to reorder stop",
   "tour_planner_reordered": "Stop order updated.",
+  "tour_planner_more_actions": "More",
   "tour_planner_import_csv_heading": "Import stops from CSV",
   "tour_planner_import_csv_desc": "Upload a CSV with venue and hotel columns to bulk-add stops.",
   "tour_planner_import_none": "All portal events are already linked to stops on this tour.",

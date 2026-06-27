@@ -540,6 +540,7 @@
   "tour_planner_tech_download": "Dokument herunterladen",
   "tour_planner_drag_handle": "Stop per Drag & Drop sortieren",
   "tour_planner_reordered": "Reihenfolge aktualisiert.",
+  "tour_planner_more_actions": "Mehr",
   "tour_planner_import_csv_heading": "Stops aus CSV importieren",
   "tour_planner_import_csv_desc": "CSV mit Venue- und Hotel-Spalten hochladen, um Stops in Bulk hinzuzufügen.",
   "tour_planner_import_none": "Alle Portal-Events sind bereits mit Stops auf dieser Tour verknüpft.",
