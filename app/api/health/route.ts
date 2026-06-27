@@ -1,10 +1,10 @@
 /**
  * app/api/health/route.ts — System health check
  *
- * GET /api/health          — Full dashboard snapshot (60s server cache)
- * GET /api/health?mode=lite — Database liveness only
- * GET /api/health?fresh=1  — Bypass cache (manual admin refresh)
- * HEAD /api/health         — Liveness probe only (no JSON body)
+ * GET /api/health              — Database liveness only (default)
+ * GET /api/health?mode=full    — Full dashboard snapshot (60s server cache)
+ * GET /api/health?mode=full&fresh=1 — Bypass cache (manual admin refresh)
+ * HEAD /api/health             — Liveness probe only (no JSON body)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,11 +19,9 @@ export type { HealthResponse } from '@/lib/health/types'
 
 const HEALTH_CACHE_CONTROL = 'private, max-age=60'
 
-function isLiteHealthRequest(req: NextRequest): boolean {
+function isFullHealthRequest(req: NextRequest): boolean {
   const url = new URL(req.url)
-  if (url.searchParams.get('mode') === 'lite') return true
-  const accept = req.headers.get('accept') ?? ''
-  return accept.includes('application/health+json')
+  return url.searchParams.get('mode') === 'full'
 }
 
 function databaseHttpStatus(databaseStatus: string): number {
@@ -33,7 +31,7 @@ function databaseHttpStatus(databaseStatus: string): number {
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const db = createHealthDbClient()
 
-  if (isLiteHealthRequest(req)) {
+  if (!isFullHealthRequest(req)) {
     const liveness = await buildHealthLivenessResponse(db)
     return NextResponse.json(liveness satisfies HealthLivenessResponse, {
       status: databaseHttpStatus(liveness.database.status),

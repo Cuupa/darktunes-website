@@ -10,7 +10,8 @@ vi.mock('@/lib/health/cachedHealthSnapshot', () => ({
 }))
 
 const ORIGINAL_ENV = { ...process.env }
-const MOCK_REQUEST = new NextRequest('http://localhost/api/health')
+const MOCK_LITE_REQUEST = new NextRequest('http://localhost/api/health')
+const MOCK_FULL_REQUEST = new NextRequest('http://localhost/api/health?mode=full')
 
 const SAMPLE_LOG_ROW = {
   api_source: 'itunes',
@@ -119,14 +120,36 @@ describe('app/api/health/route', () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     const { GET, HEAD } = await loadHealthRoute()
-    const getResponse = await GET(MOCK_REQUEST)
-    const headResponse = await HEAD(MOCK_REQUEST)
+    const getResponse = await GET(MOCK_LITE_REQUEST)
+    const headResponse = await HEAD(MOCK_LITE_REQUEST)
 
     expect(headResponse.status).toBe(getResponse.status)
     expect(await headResponse.text()).toBe('')
   })
 
-  it('HEAD returns 200 when GET is healthy', async () => {
+  it('GET defaults to lite liveness without full snapshot fields', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+
+    mockSupabaseClientOnline()
+
+    const { GET } = await loadHealthRoute()
+    const response = await GET(MOCK_LITE_REQUEST)
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      status: string
+      database: { status: string }
+      checkedAt: string
+      healthScore?: number
+    }
+    expect(body.status).toBe('ok')
+    expect(body.database.status).toBe('online')
+    expect(body.checkedAt).toBeTruthy()
+    expect(body.healthScore).toBeUndefined()
+  })
+
+  it('HEAD returns 200 when GET full snapshot is healthy', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
     process.env.API_CREDENTIALS_ENCRYPTION_KEY =
@@ -135,8 +158,8 @@ describe('app/api/health/route', () => {
     mockSupabaseClientOnline()
 
     const { GET, HEAD } = await loadHealthRoute()
-    const getResponse = await GET(MOCK_REQUEST)
-    const headResponse = await HEAD(MOCK_REQUEST)
+    const getResponse = await GET(MOCK_FULL_REQUEST)
+    const headResponse = await HEAD(MOCK_LITE_REQUEST)
 
     expect(getResponse.status).toBe(200)
     expect(headResponse.status).toBe(200)
@@ -168,7 +191,7 @@ describe('app/api/health/route', () => {
     mockSupabaseClientOnline()
 
     const { GET } = await loadHealthRoute()
-    const response = await GET(MOCK_REQUEST)
+    const response = await GET(MOCK_FULL_REQUEST)
 
     expect(response.status).toBe(200)
     const body = (await response.json()) as {
@@ -179,28 +202,6 @@ describe('app/api/health/route', () => {
     expect(body.database.status).toBe('online')
     expect(body.status).not.toBe('unhealthy')
     expect(body.apis.spotify?.operationalState).toBe('unconfigured')
-  })
-
-  it('GET ?mode=lite returns liveness payload without full snapshot fields', async () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
-
-    mockSupabaseClientOnline()
-
-    const { GET } = await loadHealthRoute()
-    const response = await GET(new NextRequest('http://localhost/api/health?mode=lite'))
-
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as {
-      status: string
-      database: { status: string }
-      checkedAt: string
-      healthScore?: number
-    }
-    expect(body.status).toBe('ok')
-    expect(body.database.status).toBe('online')
-    expect(body.checkedAt).toBeTruthy()
-    expect(body.healthScore).toBeUndefined()
   })
 
   it('OPTIONS responds with CORS preflight headers', async () => {

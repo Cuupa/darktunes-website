@@ -51,7 +51,7 @@ Release/video submit → `editor_notifications` + `sendSubmissionNotificationEma
 
 ## Admin system (`/admin/system`)
 
-Health (`buildHealthSnapshot`), sync logs, app errors, maintenance routes. Cron heartbeats + optional alert webhook.
+Health: `GET /api/health` defaults to **lite** (DB liveness); full dashboard snapshot only via `?mode=full` (admin widget uses this). `buildHealthSnapshot` powers full mode + `/api/health/alert`. Sync logs, app errors, maintenance routes. Cron heartbeats + optional alert webhook.
 
 ## Scheduled news publishing
 

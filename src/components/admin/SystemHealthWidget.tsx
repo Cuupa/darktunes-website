@@ -168,7 +168,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const fetchHealth = useCallback(async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setRefreshing(true)
     try {
-      const url = showRefreshSpinner ? '/api/health?fresh=1' : '/api/health'
+      const url = showRefreshSpinner
+        ? '/api/health?mode=full&fresh=1'
+        : '/api/health?mode=full'
       const res = await fetch(url)
       if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
       const data = (await parseAdminFetchJson(res)) as unknown as HealthResponse
