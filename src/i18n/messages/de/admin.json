@@ -463,7 +463,8 @@
         "invoices": "Artist-Rechnungen und PDF-Erstellung.",
         "documents": "Privater Dokumententresor für Verträge und Rider.",
         "calendar": "Label-weiter Releasekalender mit persönlichem Filter.",
-        "epk_builder": "Canvas-EPK-Builder und Share-Links."
+        "epk_builder": "Canvas-EPK-Builder und Share-Links.",
+        "tour_planner": "TRACK-Tourplaner — Multi-Tour-Production, Day Sheets, Finance und Routing."
       },
       "journalist": {
         "accreditation": "Akkreditierungsanfragen im Press-Dashboard."

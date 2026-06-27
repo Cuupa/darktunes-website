@@ -463,7 +463,8 @@
         "invoices": "Artist-submitted invoices and PDF generation.",
         "documents": "Private document vault for contracts and riders.",
         "calendar": "Label-wide release calendar with personal filter.",
-        "epk_builder": "Canvas-based EPK builder and share links."
+        "epk_builder": "Canvas-based EPK builder and share links.",
+        "tour_planner": "TRACK tour planner — multi-tour production, day sheets, finance, and routing."
       },
       "journalist": {
         "accreditation": "Event accreditation requests in the press dashboard."

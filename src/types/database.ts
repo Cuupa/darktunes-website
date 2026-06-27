@@ -1836,6 +1836,417 @@ export interface Database {
         }
         Relationships: []
       }
+      tours: {
+        Row: {
+          id: string
+          artist_id: string
+          name: string
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          archived: boolean
+          sort_order: number
+          settings: Json
+          route_cache: Json | null
+          budget: Json | null
+          tech_documents: Json
+          currency: string
+          total_budget: number | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          name: string
+          description?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          archived?: boolean
+          sort_order?: number
+          settings?: Json
+          route_cache?: Json | null
+          budget?: Json | null
+          tech_documents?: Json
+          currency?: string
+          total_budget?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          name?: string
+          description?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          archived?: boolean
+          sort_order?: number
+          settings?: Json
+          route_cache?: Json | null
+          budget?: Json | null
+          tech_documents?: Json
+          currency?: string
+          total_budget?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_stops: {
+        Row: {
+          id: string
+          tour_id: string
+          artist_id: string
+          concert_id: string | null
+          sort_order: number
+          stop_date: string
+          is_travel_day: boolean
+          venue_name: string | null
+          venue_address: string | null
+          venue_city: string | null
+          venue_country: string | null
+          venue_lat: number | null
+          venue_lng: number | null
+          venue_validated: boolean
+          hotel_name: string | null
+          hotel_address: string | null
+          hotel_city: string | null
+          hotel_country: string | null
+          hotel_lat: number | null
+          hotel_lng: number | null
+          hotel_validated: boolean
+          arrival_time: string | null
+          show_status: string
+          day_schedule: Json | null
+          deal: Json | null
+          settlement: Json | null
+          per_diems: Json
+          rooming: Json
+          travel_manifest: Json
+          venue_details: Json | null
+          venue_contact_info: Json | null
+          guest_list: Json
+          guest_list_limit: number | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tour_id: string
+          artist_id: string
+          concert_id?: string | null
+          sort_order?: number
+          stop_date: string
+          is_travel_day?: boolean
+          venue_name?: string | null
+          venue_address?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          venue_lat?: number | null
+          venue_lng?: number | null
+          venue_validated?: boolean
+          hotel_name?: string | null
+          hotel_address?: string | null
+          hotel_city?: string | null
+          hotel_country?: string | null
+          hotel_lat?: number | null
+          hotel_lng?: number | null
+          hotel_validated?: boolean
+          arrival_time?: string | null
+          show_status?: string
+          day_schedule?: Json | null
+          deal?: Json | null
+          settlement?: Json | null
+          per_diems?: Json
+          rooming?: Json
+          travel_manifest?: Json
+          venue_details?: Json | null
+          venue_contact_info?: Json | null
+          guest_list?: Json
+          guest_list_limit?: number | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tour_id?: string
+          artist_id?: string
+          concert_id?: string | null
+          sort_order?: number
+          stop_date?: string
+          is_travel_day?: boolean
+          venue_name?: string | null
+          venue_address?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          venue_lat?: number | null
+          venue_lng?: number | null
+          venue_validated?: boolean
+          hotel_name?: string | null
+          hotel_address?: string | null
+          hotel_city?: string | null
+          hotel_country?: string | null
+          hotel_lat?: number | null
+          hotel_lng?: number | null
+          hotel_validated?: boolean
+          arrival_time?: string | null
+          show_status?: string
+          day_schedule?: Json | null
+          deal?: Json | null
+          settlement?: Json | null
+          per_diems?: Json
+          rooming?: Json
+          travel_manifest?: Json
+          venue_details?: Json | null
+          venue_contact_info?: Json | null
+          guest_list?: Json
+          guest_list_limit?: number | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_contacts: {
+        Row: {
+          id: string
+          artist_id: string
+          contact_type: string
+          name: string
+          company: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          city: string | null
+          country: string | null
+          last_contact_date: string | null
+          notes: string | null
+          previous_deals: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          contact_type?: string
+          name: string
+          company?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          last_contact_date?: string | null
+          notes?: string | null
+          previous_deals?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          contact_type?: string
+          name?: string
+          company?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          last_contact_date?: string | null
+          notes?: string | null
+          previous_deals?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_tasks: {
+        Row: {
+          id: string
+          artist_id: string
+          tour_id: string | null
+          stop_id: string | null
+          title: string
+          description: string | null
+          due_date: string
+          priority: string
+          completed: boolean
+          assigned_to: string | null
+          task_type: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          tour_id?: string | null
+          stop_id?: string | null
+          title: string
+          description?: string | null
+          due_date: string
+          priority?: string
+          completed?: boolean
+          assigned_to?: string | null
+          task_type?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          tour_id?: string | null
+          stop_id?: string | null
+          title?: string
+          description?: string | null
+          due_date?: string
+          priority?: string
+          completed?: boolean
+          assigned_to?: string | null
+          task_type?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_crew_members: {
+        Row: {
+          id: string
+          tour_id: string
+          artist_id: string
+          name: string
+          role: string
+          email: string | null
+          phone: string | null
+          passport_number: string | null
+          passport_expiry: string | null
+          passport_issue_place: string | null
+          date_of_birth: string | null
+          nationality: string | null
+          visa_info: string | null
+          room_assignment: string | null
+          bus_assignment: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tour_id: string
+          artist_id: string
+          name: string
+          role?: string
+          email?: string | null
+          phone?: string | null
+          passport_number?: string | null
+          passport_expiry?: string | null
+          passport_issue_place?: string | null
+          date_of_birth?: string | null
+          nationality?: string | null
+          visa_info?: string | null
+          room_assignment?: string | null
+          bus_assignment?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tour_id?: string
+          artist_id?: string
+          name?: string
+          role?: string
+          email?: string | null
+          phone?: string | null
+          passport_number?: string | null
+          passport_expiry?: string | null
+          passport_issue_place?: string | null
+          date_of_birth?: string | null
+          nationality?: string | null
+          visa_info?: string | null
+          room_assignment?: string | null
+          bus_assignment?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_merch_items: {
+        Row: {
+          id: string
+          artist_id: string
+          sku: string
+          name: string
+          category: string
+          variants: Json
+          base_price: number
+          currency: string
+          box: string | null
+          photo_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          sku: string
+          name: string
+          category?: string
+          variants?: Json
+          base_price?: number
+          currency?: string
+          box?: string | null
+          photo_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          sku?: string
+          name?: string
+          category?: string
+          variants?: Json
+          base_price?: number
+          currency?: string
+          box?: string | null
+          photo_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_merch_settlements: {
+        Row: {
+          id: string
+          stop_id: string
+          artist_id: string
+          settlement: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          stop_id: string
+          artist_id: string
+          settlement?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          stop_id?: string
+          artist_id?: string
+          settlement?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       news_posts: {
         Row: {
           id: string

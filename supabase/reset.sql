@@ -1164,6 +1164,318 @@ CREATE TABLE IF NOT EXISTS public.concert_artists (
 CREATE INDEX IF NOT EXISTS idx_concert_artists_concert ON public.concert_artists (concert_id);
 CREATE INDEX IF NOT EXISTS idx_concert_artists_artist  ON public.concert_artists (artist_id);
 
+-- ---------------------------------------------------------------------------
+-- TRACK Tour Planner — tours, stops, contacts, tasks, crew, merch
+-- Parallel to concerts (public events); optional link via tour_stops.concert_id
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.tours (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id       UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  name            TEXT        NOT NULL,
+  description     TEXT,
+  start_date      DATE,
+  end_date        DATE,
+  archived        BOOLEAN     NOT NULL DEFAULT FALSE,
+  sort_order      INT         NOT NULL DEFAULT 0,
+  settings        JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  route_cache     JSONB,
+  budget          JSONB,
+  tech_documents  JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  currency        TEXT        NOT NULL DEFAULT 'EUR',
+  total_budget    NUMERIC,
+  created_by      UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tours_artist_id ON public.tours (artist_id);
+CREATE INDEX IF NOT EXISTS idx_tours_archived  ON public.tours (artist_id, archived);
+
+CREATE TABLE IF NOT EXISTS public.tour_stops (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tour_id             UUID        NOT NULL REFERENCES public.tours (id) ON DELETE CASCADE,
+  artist_id           UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  concert_id          UUID        REFERENCES public.concerts (id) ON DELETE SET NULL,
+  sort_order          INT         NOT NULL DEFAULT 0,
+  stop_date           DATE        NOT NULL,
+  is_travel_day       BOOLEAN     NOT NULL DEFAULT FALSE,
+  venue_name          TEXT,
+  venue_address       TEXT,
+  venue_city          TEXT,
+  venue_country       TEXT,
+  venue_lat           FLOAT8,
+  venue_lng           FLOAT8,
+  venue_validated     BOOLEAN     NOT NULL DEFAULT FALSE,
+  hotel_name          TEXT,
+  hotel_address       TEXT,
+  hotel_city          TEXT,
+  hotel_country       TEXT,
+  hotel_lat           FLOAT8,
+  hotel_lng           FLOAT8,
+  hotel_validated     BOOLEAN     NOT NULL DEFAULT FALSE,
+  arrival_time        TEXT,
+  show_status         TEXT        NOT NULL DEFAULT 'option',
+  day_schedule        JSONB,
+  deal                JSONB,
+  settlement          JSONB,
+  per_diems           JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  rooming             JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  travel_manifest     JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  venue_details       JSONB,
+  venue_contact_info  JSONB,
+  guest_list          JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  guest_list_limit    INT,
+  notes               TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_stops_tour_id    ON public.tour_stops (tour_id);
+CREATE INDEX IF NOT EXISTS idx_tour_stops_artist_id  ON public.tour_stops (artist_id);
+CREATE INDEX IF NOT EXISTS idx_tour_stops_concert_id ON public.tour_stops (concert_id);
+CREATE INDEX IF NOT EXISTS idx_tour_stops_stop_date  ON public.tour_stops (stop_date);
+
+CREATE TABLE IF NOT EXISTS public.tour_contacts (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id         UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  contact_type      TEXT        NOT NULL DEFAULT 'promoter',
+  name              TEXT        NOT NULL,
+  company           TEXT,
+  email             TEXT,
+  phone             TEXT,
+  address           TEXT,
+  city              TEXT,
+  country           TEXT,
+  last_contact_date DATE,
+  notes             TEXT,
+  previous_deals    JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_contacts_artist_id ON public.tour_contacts (artist_id);
+
+CREATE TABLE IF NOT EXISTS public.tour_tasks (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id     UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  tour_id       UUID        REFERENCES public.tours (id) ON DELETE CASCADE,
+  stop_id       UUID        REFERENCES public.tour_stops (id) ON DELETE CASCADE,
+  title         TEXT        NOT NULL,
+  description   TEXT,
+  due_date      DATE        NOT NULL,
+  priority      TEXT        NOT NULL DEFAULT 'medium',
+  completed     BOOLEAN     NOT NULL DEFAULT FALSE,
+  assigned_to   TEXT,
+  task_type     TEXT        NOT NULL DEFAULT 'other',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_tasks_artist_id ON public.tour_tasks (artist_id);
+CREATE INDEX IF NOT EXISTS idx_tour_tasks_tour_id   ON public.tour_tasks (tour_id);
+CREATE INDEX IF NOT EXISTS idx_tour_tasks_stop_id   ON public.tour_tasks (stop_id);
+
+CREATE TABLE IF NOT EXISTS public.tour_crew_members (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tour_id             UUID        NOT NULL REFERENCES public.tours (id) ON DELETE CASCADE,
+  artist_id           UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  name                TEXT        NOT NULL,
+  role                TEXT        NOT NULL DEFAULT '',
+  email               TEXT,
+  phone               TEXT,
+  passport_number     TEXT,
+  passport_expiry     DATE,
+  passport_issue_place TEXT,
+  date_of_birth       DATE,
+  nationality         TEXT,
+  visa_info           TEXT,
+  room_assignment     TEXT,
+  bus_assignment      TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_crew_tour_id   ON public.tour_crew_members (tour_id);
+CREATE INDEX IF NOT EXISTS idx_tour_crew_artist_id ON public.tour_crew_members (artist_id);
+
+CREATE TABLE IF NOT EXISTS public.tour_merch_items (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  sku         TEXT        NOT NULL,
+  name        TEXT        NOT NULL,
+  category    TEXT        NOT NULL DEFAULT 'soft',
+  variants    JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  base_price  NUMERIC     NOT NULL DEFAULT 0,
+  currency    TEXT        NOT NULL DEFAULT 'EUR',
+  box         TEXT,
+  photo_url   TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, sku)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_merch_items_artist_id ON public.tour_merch_items (artist_id);
+
+CREATE TABLE IF NOT EXISTS public.tour_merch_settlements (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  stop_id      UUID        NOT NULL REFERENCES public.tour_stops (id) ON DELETE CASCADE,
+  artist_id    UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  settlement   JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (stop_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_merch_settlements_stop_id ON public.tour_merch_settlements (stop_id);
+
+DROP TRIGGER IF EXISTS trg_tours_updated_at ON public.tours;
+CREATE TRIGGER trg_tours_updated_at
+  BEFORE UPDATE ON public.tours
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_stops_updated_at ON public.tour_stops;
+CREATE TRIGGER trg_tour_stops_updated_at
+  BEFORE UPDATE ON public.tour_stops
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_contacts_updated_at ON public.tour_contacts;
+CREATE TRIGGER trg_tour_contacts_updated_at
+  BEFORE UPDATE ON public.tour_contacts
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_tasks_updated_at ON public.tour_tasks;
+CREATE TRIGGER trg_tour_tasks_updated_at
+  BEFORE UPDATE ON public.tour_tasks
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_crew_members_updated_at ON public.tour_crew_members;
+CREATE TRIGGER trg_tour_crew_members_updated_at
+  BEFORE UPDATE ON public.tour_crew_members
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_merch_items_updated_at ON public.tour_merch_items;
+CREATE TRIGGER trg_tour_merch_items_updated_at
+  BEFORE UPDATE ON public.tour_merch_items
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_merch_settlements_updated_at ON public.tour_merch_settlements;
+CREATE TRIGGER trg_tour_merch_settlements_updated_at
+  BEFORE UPDATE ON public.tour_merch_settlements
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.tours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_stops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_crew_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_merch_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_merch_settlements ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tours: artist manage" ON public.tours;
+CREATE POLICY "tours: artist manage" ON public.tours
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tours: admin all" ON public.tours;
+CREATE POLICY "tours: admin all" ON public.tours
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_stops: artist manage" ON public.tour_stops;
+CREATE POLICY "tour_stops: artist manage" ON public.tour_stops
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_stops: admin all" ON public.tour_stops;
+CREATE POLICY "tour_stops: admin all" ON public.tour_stops
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_contacts: artist manage" ON public.tour_contacts;
+CREATE POLICY "tour_contacts: artist manage" ON public.tour_contacts
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_contacts: admin all" ON public.tour_contacts;
+CREATE POLICY "tour_contacts: admin all" ON public.tour_contacts
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_tasks: artist manage" ON public.tour_tasks;
+CREATE POLICY "tour_tasks: artist manage" ON public.tour_tasks
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_tasks: admin all" ON public.tour_tasks;
+CREATE POLICY "tour_tasks: admin all" ON public.tour_tasks
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_crew: artist manage" ON public.tour_crew_members;
+CREATE POLICY "tour_crew: artist manage" ON public.tour_crew_members
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_crew: admin all" ON public.tour_crew_members;
+CREATE POLICY "tour_crew: admin all" ON public.tour_crew_members
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_merch_items: artist manage" ON public.tour_merch_items;
+CREATE POLICY "tour_merch_items: artist manage" ON public.tour_merch_items
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_merch_items: admin all" ON public.tour_merch_items;
+CREATE POLICY "tour_merch_items: admin all" ON public.tour_merch_items
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_merch_settlements: artist manage" ON public.tour_merch_settlements;
+CREATE POLICY "tour_merch_settlements: artist manage" ON public.tour_merch_settlements
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "tour_merch_settlements: admin all" ON public.tour_merch_settlements;
+CREATE POLICY "tour_merch_settlements: admin all" ON public.tour_merch_settlements
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
 ALTER TABLE public.concert_artists ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "concert_artists: public read" ON public.concert_artists;
@@ -2075,6 +2387,13 @@ ALTER TABLE public.artist_territory_metrics     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_listener_metrics      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statement_line_items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_impact                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tours                          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_stops                     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_contacts                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_tasks                     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_crew_members              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_merch_items               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_merch_settlements         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promo_impact                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.page_events                    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.merch_orders                   ENABLE ROW LEVEL SECURITY;
@@ -3192,6 +3511,7 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
   ('artist.calendar', 'Artist Release Calendar', TRUE, 'artist'),
   ('artist.epk_builder', 'EPK Canvas Builder', TRUE, 'artist'),
+  ('artist.tour_planner', 'Tour Planner (TRACK)', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;
 

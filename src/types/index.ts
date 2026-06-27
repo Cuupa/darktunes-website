@@ -715,6 +715,143 @@ export interface Concert {
   featuredArtists?: { id: string; name: string; slug: string }[]
 }
 
+export interface Tour {
+  id: string
+  artistId: string
+  name: string
+  description: string | null
+  startDate: string | null
+  endDate: string | null
+  archived: boolean
+  sortOrder: number
+  settings: import('@/lib/tour-planner/types').TourPlannerSettings
+  routeCache: import('@/lib/tour-planner/types').RouteResult | null
+  budget: unknown
+  techDocuments: import('@/lib/tour-planner/types').TechDocument[]
+  currency: string
+  totalBudget: number | null
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourStop {
+  id: string
+  tourId: string
+  artistId: string
+  concertId: string | null
+  sortOrder: number
+  stopDate: string
+  isTravelDay: boolean
+  venueName: string | null
+  venueAddress: string | null
+  venueCity: string | null
+  venueCountry: string | null
+  venueLat: number | null
+  venueLng: number | null
+  venueValidated: boolean
+  hotelName: string | null
+  hotelAddress: string | null
+  hotelCity: string | null
+  hotelCountry: string | null
+  hotelLat: number | null
+  hotelLng: number | null
+  hotelValidated: boolean
+  arrivalTime: string | null
+  showStatus: import('@/lib/tour-planner/types').ShowStatus
+  daySchedule: import('@/lib/tour-planner/types').DaySchedule | null
+  deal: import('@/lib/tour-planner/types').DealStructure | null
+  settlement: import('@/lib/tour-planner/types').Settlement | null
+  perDiems: import('@/lib/tour-planner/types').PerDiem[]
+  rooming: import('@/lib/tour-planner/types').RoomingAssignment[]
+  travelManifest: import('@/lib/tour-planner/types').TravelManifest[]
+  venueDetails: import('@/lib/tour-planner/types').VenueDetails | null
+  venueContactInfo: import('@/lib/tour-planner/types').VenueContactInfo | null
+  guestList: import('@/lib/tour-planner/types').GuestListEntry[]
+  guestListLimit: number | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourContact {
+  id: string
+  artistId: string
+  contactType: string
+  name: string
+  company: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  country: string | null
+  lastContactDate: string | null
+  notes: string | null
+  previousDeals: import('@/lib/tour-planner/types').ContactDealHistory[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourTask {
+  id: string
+  artistId: string
+  tourId: string | null
+  stopId: string | null
+  title: string
+  description: string | null
+  dueDate: string
+  priority: 'low' | 'medium' | 'high'
+  completed: boolean
+  assignedTo: string | null
+  taskType: 'follow-up' | 'contract' | 'payment' | 'logistics' | 'other'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourCrewMember {
+  id: string
+  tourId: string
+  artistId: string
+  name: string
+  role: string
+  email: string | null
+  phone: string | null
+  passportNumber: string | null
+  passportExpiry: string | null
+  passportIssuePlace: string | null
+  dateOfBirth: string | null
+  nationality: string | null
+  visaInfo: string | null
+  roomAssignment: string | null
+  busAssignment: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourMerchItem {
+  id: string
+  artistId: string
+  sku: string
+  name: string
+  category: 'soft' | 'hard'
+  variants: import('@/lib/tour-planner/types').MerchVariant[]
+  basePrice: number
+  currency: string
+  box: string | null
+  photoUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TourMerchSettlementRecord {
+  id: string
+  stopId: string
+  artistId: string
+  settlement: import('@/lib/tour-planner/types').MerchSettlement
+  createdAt: string
+  updatedAt: string
+}
+
 export interface NewsletterSubscriber {
   id: string
   email: string

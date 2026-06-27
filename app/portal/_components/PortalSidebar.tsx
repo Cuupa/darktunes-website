@@ -15,6 +15,7 @@ import {
   List,
   CalendarDots,
   MapPin,
+  MapTrifold,
   MegaphoneSimple,
   MusicNotes,
   Question,
@@ -80,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_live',
     items: [
       { href: '/portal/events', label: 'tour', icon: MapPin },
+      { href: '/portal/tour-planner', label: 'tour_planner_nav', icon: MapTrifold, flag: 'artist.tour_planner' },
       { href: '/portal/marketing', label: 'marketing', icon: MegaphoneSimple, flag: 'artist.marketing' },
     ],
   },
