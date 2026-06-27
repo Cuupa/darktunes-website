@@ -3,7 +3,7 @@
 /**
  * src/components/epk-builder/EpkCanvas.tsx
  *
- * Interactive Konva canvas with selection, drag, resize, and rotate.
+ * Interactive Konva canvas with selection, drag, resize, rotate, and snap guides.
  */
 
 import '@/lib/epk/konvaShapes'
@@ -16,16 +16,19 @@ import {
   type ReactNode,
   type WheelEvent,
 } from 'react'
-import { Stage, Layer, Rect, Line, Transformer } from 'react-konva'
+import { Stage, Layer, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useReducedMotion } from 'framer-motion'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { getTopLevelPageElements } from '@/lib/epk/elements/groupUtils'
+import { computeSnapPosition, type EpkSnapGuides } from '@/lib/epk/editor/snapGuides'
 import { EPK_FONTS_LOADED_EVENT } from './EpkFontLoader'
 import { EpkCanvasContextMenu, type EpkContextMenuAnchor } from './EpkContextMenu'
 import { EpkCanvasElementNode } from './EpkCanvasElementNode'
 import { EpkGroupNode } from './EpkGroupNode'
 import { EpkTextEditor } from './EpkTextEditor'
+import { EpkImageCropDialog } from './EpkImageCropDialog'
+import { EpkPageBackgroundLayer } from './EpkPageBackgroundLayer'
 
 interface EpkCanvasProps {
   onOpenAssetPicker?: () => void
@@ -68,6 +71,41 @@ function GridLines({
   return <>{lines}</>
 }
 
+function SnapGuideLines({
+  guides,
+  width,
+  height,
+}: {
+  guides: EpkSnapGuides
+  width: number
+  height: number
+}) {
+  return (
+    <>
+      {guides.vertical.map((x) => (
+        <Line
+          key={`guide-v-${x}`}
+          points={[x, 0, x, height]}
+          stroke="#493687"
+          strokeWidth={1}
+          dash={[4, 4]}
+          listening={false}
+        />
+      ))}
+      {guides.horizontal.map((y) => (
+        <Line
+          key={`guide-h-${y}`}
+          points={[0, y, width, y]}
+          stroke="#493687"
+          strokeWidth={1}
+          dash={[4, 4]}
+          listening={false}
+        />
+      ))}
+    </>
+  )
+}
+
 export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: EpkCanvasProps = {}) {
   const document = useEpkEditorStore((s) => s.document)
   const activePageId = useEpkEditorStore((s) => s.activePageId)
@@ -80,13 +118,17 @@ export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: Epk
   const setZoom = useEpkEditorStore((s) => s.setZoom)
   const showGrid = useEpkEditorStore((s) => s.showGrid)
   const gridSize = useEpkEditorStore((s) => s.gridSize)
+  const snapEnabled = useEpkEditorStore((s) => s.snapEnabled)
 
   const prefersReducedMotion = useReducedMotion()
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map())
   const stageRef = useRef<Konva.Stage>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<EpkContextMenuAnchor | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [activeGuides, setActiveGuides] = useState<EpkSnapGuides>({ vertical: [], horizontal: [] })
 
   const page = document.pages.find((p) => p.id === activePageId) ?? document.pages[0]
 
@@ -173,6 +215,33 @@ export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: Epk
     [setZoom, zoom],
   )
 
+  const snapDragMove = useCallback(
+    (id: string, x: number, y: number, width: number, height: number) => {
+      if (!page) return { x, y }
+      const others = document.elements
+        .filter((el) => el.pageId === page.id && el.id !== id && el.visible && el.type !== 'group')
+        .map((el) => ({ x: el.x, y: el.y, width: el.width, height: el.height }))
+
+      const result = computeSnapPosition(
+        { x, y, width, height },
+        {
+          snapEnabled,
+          gridSize,
+          pageWidth: page.width,
+          pageHeight: page.height,
+          others,
+        },
+      )
+      setActiveGuides(result.guides)
+      return { x: result.x, y: result.y }
+    },
+    [document.elements, gridSize, page, snapEnabled],
+  )
+
+  const clearGuides = useCallback(() => {
+    setActiveGuides({ vertical: [], horizontal: [] })
+  }, [])
+
   if (!page) return null
 
   const stageWidth = page.width * zoom
@@ -183,121 +252,136 @@ export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: Epk
 
   return (
     <div
-      className="relative overflow-auto rounded-lg border border-border bg-muted/30 p-4"
+      ref={containerRef}
+      className="flex h-full flex-col overflow-hidden"
       data-lenis-prevent
       onWheel={handleWheel}
     >
-      <div
-        className="relative mx-auto shadow-lg"
-        style={{ width: stageWidth, height: stageHeight }}
-      >
-        <Stage
-          ref={stageRef}
-          width={stageWidth}
-          height={stageHeight}
-          scaleX={zoom}
-          scaleY={zoom}
-          onContextMenu={handleStageContextMenu}
-          onMouseDown={(e) => {
-            if (e.target === e.target.getStage() && !editingTextId) {
-              clearSelection()
-            }
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.target.getStage() && !editingTextId) {
-              clearSelection()
-            }
-          }}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4 md:p-6">
+        <div
+          className="relative shrink-0 shadow-xl ring-1 ring-border/50"
+          style={{ width: stageWidth, height: stageHeight }}
         >
-          <Layer>
-            {page.background.type === 'color' && (
-              <Rect
-                x={0}
-                y={0}
+          <Stage
+            ref={stageRef}
+            width={stageWidth}
+            height={stageHeight}
+            scaleX={zoom}
+            scaleY={zoom}
+            onContextMenu={handleStageContextMenu}
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage() && !editingTextId) {
+                clearSelection()
+                clearGuides()
+              }
+            }}
+            onTouchStart={(e) => {
+              if (e.target === e.target.getStage() && !editingTextId) {
+                clearSelection()
+                clearGuides()
+              }
+            }}
+          >
+            <Layer>
+            <EpkPageBackgroundLayer page={page} />
+              {showGrid ? (
+                <GridLines width={page.width} height={page.height} gridSize={gridSize} />
+              ) : null}
+              {elements.map((element) =>
+                element.type === 'group' ? (
+                  <EpkGroupNode
+                    key={element.id}
+                    document={document}
+                    element={element}
+                    listening
+                    isSelected={selectedIds.includes(element.id)}
+                    onSelect={handleSelect}
+                    onChange={updateElement}
+                    onGroupDrag={moveGroupByDelta}
+                    onDoubleClickText={(id) => {
+                      setEditingTextId(id)
+                      onEditText?.(id)
+                    }}
+                    registerRef={registerRef}
+                    onSnapDragMove={snapDragMove}
+                    onDragEnd={clearGuides}
+                  />
+                ) : (
+                  <EpkCanvasElementNode
+                    key={element.id}
+                    element={element}
+                    listening
+                    isSelected={selectedIds.includes(element.id)}
+                    onSelect={handleSelect}
+                    onChange={updateElement}
+                    onDoubleClickText={(id) => {
+                      setEditingTextId(id)
+                      onEditText?.(id)
+                    }}
+                    registerRef={registerRef}
+                    onSnapDragMove={snapDragMove}
+                    onDragEnd={clearGuides}
+                  />
+                ),
+              )}
+              <SnapGuideLines
+                guides={activeGuides}
                 width={page.width}
                 height={page.height}
-                fill={page.background.color ?? '#101010'}
-                listening={false}
               />
-            )}
-            {showGrid ? (
-              <GridLines width={page.width} height={page.height} gridSize={gridSize} />
-            ) : null}
-            {elements.map((element) =>
-              element.type === 'group' ? (
-                <EpkGroupNode
-                  key={element.id}
-                  document={document}
-                  element={element}
-                  listening
-                  isSelected={selectedIds.includes(element.id)}
-                  onSelect={handleSelect}
-                  onChange={updateElement}
-                  onGroupDrag={moveGroupByDelta}
-                  onDoubleClickText={(id) => {
-                    setEditingTextId(id)
-                    onEditText?.(id)
-                  }}
-                  registerRef={registerRef}
-                />
-              ) : (
-                <EpkCanvasElementNode
-                  key={element.id}
-                  element={element}
-                  listening
-                  isSelected={selectedIds.includes(element.id)}
-                  onSelect={handleSelect}
-                  onChange={updateElement}
-                  onDoubleClickText={(id) => {
-                    setEditingTextId(id)
-                    onEditText?.(id)
-                  }}
-                  registerRef={registerRef}
-                />
-              ),
-            )}
-            <Transformer
-              ref={transformerRef}
-              rotateEnabled
-              keepRatio={Boolean(selectedImageElement)}
-              enabledAnchors={[
-                'top-left',
-                'top-right',
-                'bottom-left',
-                'bottom-right',
-                'middle-left',
-                'middle-right',
-                'top-center',
-                'bottom-center',
-              ]}
-              boundBoxFunc={(oldBox, newBox) => {
-                if (newBox.width < 8 || newBox.height < 8) return oldBox
-                return newBox
-              }}
-              animationDuration={prefersReducedMotion ? 0 : undefined}
-            />
-          </Layer>
-        </Stage>
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled
+                keepRatio={Boolean(selectedImageElement)}
+                enabledAnchors={[
+                  'top-left',
+                  'top-right',
+                  'bottom-left',
+                  'bottom-right',
+                  'middle-left',
+                  'middle-right',
+                  'top-center',
+                  'bottom-center',
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 8 || newBox.height < 8) return oldBox
+                  return newBox
+                }}
+                animationDuration={prefersReducedMotion ? 0 : undefined}
+              />
+            </Layer>
+          </Stage>
 
-        {editingElement?.type === 'text' && (
-          <EpkTextEditor
-            element={editingElement}
-            zoom={zoom}
-            onChange={(content) => updateElement(editingElement.id, { content })}
-            onClose={() => setEditingTextId(null)}
-          />
-        )}
+          {editingElement?.type === 'text' && (
+            <EpkTextEditor
+              element={editingElement}
+              zoom={zoom}
+              onChange={(content) => updateElement(editingElement.id, { content })}
+              onClose={() => setEditingTextId(null)}
+            />
+          )}
+        </div>
       </div>
-      {contextMenu && (onOpenAssetPicker || onReplaceImage) ? (
+      {contextMenu ? (
         <EpkCanvasContextMenu
           anchor={contextMenu}
           onClose={() => setContextMenu(null)}
           onOpenAssetPicker={onOpenAssetPicker ?? (() => {})}
           onReplaceImage={onReplaceImage}
+          onCropImage={() => setCropOpen(true)}
           onEditText={(id) => {
             setEditingTextId(id)
             onEditText?.(id)
           }}
+        />
+      ) : null}
+      {selectedImageElement?.src ? (
+        <EpkImageCropDialog
+          open={cropOpen}
+          src={selectedImageElement.src}
+          crop={selectedImageElement.crop}
+          onClose={() => setCropOpen(false)}
+          onApply={(crop) => updateElement(selectedImageElement.id, { crop })}
         />
       ) : null}
     </div>

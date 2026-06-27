@@ -14,6 +14,8 @@ import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
 import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
 import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
+import { parseGradientFromStyle } from '@/lib/epk/gradients'
+import { getKonvaRectFillProps } from '@/lib/epk/konvaFill'
 
 function useHtmlImage(src: string | undefined): HTMLImageElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null)
@@ -43,6 +45,14 @@ export interface EpkCanvasElementNodeProps {
   onChange?: (id: string, patch: Partial<EpkElement>) => void
   onDoubleClickText?: (id: string) => void
   registerRef?: (id: string, node: Konva.Node | null) => void
+  onSnapDragMove?: (
+    id: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => { x: number; y: number }
+  onDragEnd?: () => void
 }
 
 export function EpkCanvasElementNode({
@@ -55,6 +65,8 @@ export function EpkCanvasElementNode({
   onChange,
   onDoubleClickText,
   registerRef,
+  onSnapDragMove,
+  onDragEnd: onDragEndCallback,
 }: EpkCanvasElementNodeProps) {
   const image = useHtmlImage(element.type === 'image' || element.type === 'logo' ? element.src : undefined)
 
@@ -86,12 +98,26 @@ export function EpkCanvasElementNode({
           onSelect?.(element.id, false)
         }
       : undefined,
+    onDragMove: interactive && onSnapDragMove
+      ? (e: Konva.KonvaEventObject<DragEvent>) => {
+          const node = e.target
+          const snapped = onSnapDragMove(
+            element.id,
+            node.x() + offsetX,
+            node.y() + offsetY,
+            element.width,
+            element.height,
+          )
+          node.position({ x: snapped.x - offsetX, y: snapped.y - offsetY })
+        }
+      : undefined,
     onDragEnd: interactive
       ? (e: Konva.KonvaEventObject<DragEvent>) => {
           onChange?.(element.id, {
             x: e.target.x() + offsetX,
             y: e.target.y() + offsetY,
           })
+          onDragEndCallback?.()
         }
       : undefined,
     onTransformEnd: interactive
@@ -117,16 +143,24 @@ export function EpkCanvasElementNode({
   }
 
   switch (element.type) {
-    case 'shape':
+    case 'shape': {
+      const gradient = parseGradientFromStyle(element.style)
+      const fillProps = getKonvaRectFillProps(
+        element.width,
+        element.height,
+        element.style.fill ?? '#292929',
+        gradient,
+      )
       return (
         <Rect
           {...commonProps}
-          fill={element.style.fill ?? '#292929'}
+          {...fillProps}
           stroke={isSelected ? '#493687' : element.style.stroke}
           strokeWidth={isSelected ? 2 : (element.style.strokeWidth ?? 0)}
           cornerRadius={element.style.cornerRadius}
         />
       )
+    }
     case 'text':
       return (
         <Text
@@ -152,6 +186,8 @@ export function EpkCanvasElementNode({
     case 'logo': {
       if (!image) return null
       const layout = getEpkImageLayout(element, image.naturalWidth, image.naturalHeight)
+      const flipX = Boolean(element.flipX)
+      const flipY = Boolean(element.flipY)
       return (
         <Group
           id={element.id}
@@ -160,6 +196,10 @@ export function EpkCanvasElementNode({
           width={element.width}
           height={element.height}
           rotation={element.rotation}
+          scaleX={flipX ? -1 : 1}
+          scaleY={flipY ? -1 : 1}
+          offsetX={flipX ? element.width : 0}
+          offsetY={flipY ? element.height : 0}
           opacity={element.style.opacity ?? 1}
           listening={interactive}
           draggable={interactive && !element.locked}

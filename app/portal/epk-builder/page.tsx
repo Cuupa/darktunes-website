@@ -13,6 +13,8 @@ import {
 } from '@/lib/api/artistProfiles'
 import { ensureMigratedEpkDocument } from '@/lib/api/epkDocument'
 import { getArtistAssets } from '@/lib/api/artistAssets'
+import { getAssetsByArtist } from '@/lib/api/assets'
+import { buildEpkPickerAssets } from '@/lib/epk/pickerAssets'
 import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
@@ -62,12 +64,20 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     )
   }
 
-  const [profile, siteSettings, assets, fontRecords] = await Promise.all([
+  const [profile, siteSettings, assets, labelAssets, fontRecords] = await Promise.all([
     getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
     getCachedSiteSettings().catch(() => null),
     getArtistAssets(supabase, artist.id).catch(() => []),
+    getAssetsByArtist(supabase, artist.id).catch(() => []),
     listEpkFonts(supabase, artist.id).catch(() => []),
   ])
+
+  const pickerAssets = buildEpkPickerAssets({
+    artist,
+    artistProfile: profile,
+    artistAssets: assets,
+    labelAssets,
+  })
 
   const { serverEnv } = await import('@/lib/env.server')
   const initialFonts = fontRecords.map((font) => ({
@@ -97,6 +107,7 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
       initialDocument={state.document}
       documentVersion={state.documentVersion}
       initialAssets={assets}
+      pickerAssets={pickerAssets}
       initialFonts={initialFonts}
     />
   )

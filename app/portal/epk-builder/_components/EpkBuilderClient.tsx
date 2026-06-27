@@ -20,6 +20,7 @@ import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
 import type { EpkFontAsset } from '@/components/epk-builder/EpkFontManager'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist, ArtistAsset } from '@/types'
+import type { EpkPickerAsset } from '@/lib/epk/pickerAssets'
 import { toast } from 'sonner'
 
 const EpkBuilderShell = dynamic(
@@ -40,6 +41,7 @@ interface EpkBuilderClientProps {
   initialDocument: EpkDocumentV2
   documentVersion: number
   initialAssets: ArtistAsset[]
+  pickerAssets: EpkPickerAsset[]
   initialFonts: EpkFontAsset[]
 }
 
@@ -50,6 +52,7 @@ function EpkBuilderWorkspace({
   artistProfile,
   documentVersion: initialVersion,
   initialAssets,
+  pickerAssets,
   initialFonts,
 }: Omit<EpkBuilderClientProps, 'initialDocument'>) {
   const t = useTranslations('portal')
@@ -137,18 +140,17 @@ function EpkBuilderWorkspace({
   }, [artistId, artistName, document, isDirty, saveNow, t])
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
+        <div className="min-w-0">
+          <Button variant="ghost" size="sm" asChild className="-ml-2 h-8 px-2">
             <Link href={`/portal/profile?artistId=${artistId}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+              <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden="true" />
               {t('epk_builder_back_profile')}
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight">{t('epk_builder_title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t('epk_editor_description')}</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{t('epk_builder_title')}</h1>
+          <p className="text-xs text-muted-foreground">
             {t('epk_builder_version_label').replace('{version}', String(documentVersion))}
             {isDirty ? ` · ${t('epk_editor_unsaved')}` : ''}
           </p>
@@ -168,6 +170,7 @@ function EpkBuilderWorkspace({
         artist={artist}
         artistProfile={artistProfile}
         initialAssets={initialAssets}
+        pickerAssets={pickerAssets}
         initialFonts={initialFonts}
         onSave={() => void handleSave()}
         onSaveSnapshot={() => void handleSaveSnapshot()}
@@ -186,6 +189,7 @@ export function EpkBuilderClient({
   initialDocument,
   documentVersion,
   initialAssets,
+  pickerAssets,
   initialFonts,
 }: EpkBuilderClientProps) {
   const hydratedDocument = hydrateDocumentFonts(initialDocument, initialFonts)
@@ -199,6 +203,7 @@ export function EpkBuilderClient({
         artistProfile={artistProfile}
         documentVersion={documentVersion}
         initialAssets={initialAssets}
+        pickerAssets={pickerAssets}
         initialFonts={initialFonts}
       />
     </EpkEditorProvider>

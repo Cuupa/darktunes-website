@@ -14,6 +14,8 @@ import {
 } from '@/lib/api/artistProfiles'
 import { ensureMigratedEpkDocument } from '@/lib/api/epkDocument'
 import { generateEpkPdfBytes } from '@/lib/epk/export/generateEpkPdfBytes'
+import { ensureDocumentFontsForExport } from '@/lib/epk/editor/ensureDocumentFontsForExport'
+import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
 import { epkDocumentV2Schema } from '@/lib/epk/schema/documentV2'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
@@ -63,8 +65,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (profile?.riderTechnicalUrl) riderAttachments.push(profile.riderTechnicalUrl)
   if (profile?.riderHospitalityUrl) riderAttachments.push(profile.riderHospitalityUrl)
 
+  const { serverEnv } = await import('@/lib/env.server')
+  const fontRecords = await listEpkFonts(supabase, artist.id).catch(() => [])
+  const hydratedDocument = ensureDocumentFontsForExport(document, fontRecords.map((font) => ({
+    id: font.id,
+    name: font.name,
+    r2Key: font.r2Key,
+    publicUrl: buildEpkFontPublicUrl(font.r2Key, serverEnv.CLOUDFLARE_R2_PUBLIC_URL),
+  })))
+
   const pdfBytes = await generateEpkPdfBytes({
-    document,
+    document: hydratedDocument,
     attachmentUrls: riderAttachments,
   })
 

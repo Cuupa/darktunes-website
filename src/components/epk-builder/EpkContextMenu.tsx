@@ -6,6 +6,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import {
@@ -13,9 +16,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useEpkEditorStore, useEpkEditorStoreApi } from '@/lib/epk/editor/EpkEditorProvider'
+import { EPK_GRADIENT_PRESETS } from '@/lib/epk/gradients'
 
 export interface EpkContextMenuAnchor {
   x: number
@@ -29,12 +36,14 @@ interface EpkContextMenuProps {
   onOpenAssetPicker: () => void
   onReplaceImage?: () => void
   onEditText?: (id: string) => void
+  onCropImage?: () => void
 }
 
 function useContextMenuActions(
   onOpenAssetPicker: () => void,
   onReplaceImage: (() => void) | undefined,
   onEditText?: (id: string) => void,
+  onCropImage?: () => void,
 ) {
   const t = useTranslations('portal')
   const store = useEpkEditorStoreApi()
@@ -51,6 +60,9 @@ function useContextMenuActions(
   const setSnapEnabled = useEpkEditorStore((s) => s.setSnapEnabled)
   const setShowGrid = useEpkEditorStore((s) => s.setShowGrid)
   const addElement = useEpkEditorStore((s) => s.addElement)
+  const alignSelected = useEpkEditorStore((s) => s.alignSelected)
+  const applyGradientToSelected = useEpkEditorStore((s) => s.applyGradientToSelected)
+  const toggleSelectedFlip = useEpkEditorStore((s) => s.toggleSelectedFlip)
 
   const primaryId = selectedIds[0]
   const primary = primaryId ? document.elements.find((el) => el.id === primaryId) : undefined
@@ -72,6 +84,34 @@ function useContextMenuActions(
         (primary?.type === 'image' || primary?.type === 'logo') && onReplaceImage
           ? { label: t('epk_assets_replace'), action: close(onReplaceImage) }
           : null,
+      cropImage:
+        (primary?.type === 'image' || primary?.type === 'logo') && primary.src && onCropImage
+          ? { label: t('epk_editor_crop_open'), action: close(onCropImage) }
+          : null,
+      flipH:
+        primary?.type === 'image' || primary?.type === 'logo'
+          ? { label: t('epk_flip_horizontal'), action: close(() => toggleSelectedFlip('x')) }
+          : null,
+      flipV:
+        primary?.type === 'image' || primary?.type === 'logo'
+          ? { label: t('epk_flip_vertical'), action: close(() => toggleSelectedFlip('y')) }
+          : null,
+      alignCenterH: primary
+        ? { label: t('epk_align_center_h'), action: close(() => alignSelected('center-h')) }
+        : null,
+      alignCenterV: primary
+        ? { label: t('epk_align_center_v'), action: close(() => alignSelected('center-v')) }
+        : null,
+      alignCenter: primary
+        ? { label: t('epk_align_center'), action: close(() => alignSelected('center')) }
+        : null,
+      gradientPresets:
+        primary?.type === 'shape'
+          ? EPK_GRADIENT_PRESETS.map((preset) => ({
+              label: preset.name,
+              action: close(() => applyGradientToSelected(preset.gradient)),
+            }))
+          : [],
       duplicate: { label: t('epk_ctx_duplicate'), action: close(() => duplicateSelected()) },
       delete: { label: t('epk_ctx_delete'), action: close(() => deleteSelected()) },
       bringFront: primary
@@ -115,17 +155,25 @@ function EpkMenuItems({
   onOpenAssetPicker,
   onReplaceImage,
   onEditText,
+  onCropImage,
   onClose,
   MenuItem,
   MenuSeparator,
+  MenuSub,
+  MenuSubTrigger,
+  MenuSubContent,
 }: EpkContextMenuProps & {
   MenuItem: typeof ContextMenuItem | typeof DropdownMenuItem
   MenuSeparator: typeof ContextMenuSeparator | typeof DropdownMenuSeparator
+  MenuSub: typeof ContextMenuSub | typeof DropdownMenuSub
+  MenuSubTrigger: typeof ContextMenuSubTrigger | typeof DropdownMenuSubTrigger
+  MenuSubContent: typeof ContextMenuSubContent | typeof DropdownMenuSubContent
 }) {
-  const { primary, selectedIds, items } = useContextMenuActions(
+  const { t, primary, selectedIds, items } = useContextMenuActions(
     onOpenAssetPicker,
     onReplaceImage,
     onEditText,
+    onCropImage,
   )
 
   const wrap = (action: () => void) => () => {
@@ -143,6 +191,38 @@ function EpkMenuItems({
           {items.replaceImage ? (
             <MenuItem onSelect={wrap(items.replaceImage.action)}>{items.replaceImage.label}</MenuItem>
           ) : null}
+          {items.cropImage ? (
+            <MenuItem onSelect={wrap(items.cropImage.action)}>{items.cropImage.label}</MenuItem>
+          ) : null}
+          {items.flipH ? (
+            <MenuItem onSelect={wrap(items.flipH.action)}>{items.flipH.label}</MenuItem>
+          ) : null}
+          {items.flipV ? (
+            <MenuItem onSelect={wrap(items.flipV.action)}>{items.flipV.label}</MenuItem>
+          ) : null}
+          <MenuSeparator />
+          {items.alignCenterH ? (
+            <MenuItem onSelect={wrap(items.alignCenterH.action)}>{items.alignCenterH.label}</MenuItem>
+          ) : null}
+          {items.alignCenterV ? (
+            <MenuItem onSelect={wrap(items.alignCenterV.action)}>{items.alignCenterV.label}</MenuItem>
+          ) : null}
+          {items.alignCenter ? (
+            <MenuItem onSelect={wrap(items.alignCenter.action)}>{items.alignCenter.label}</MenuItem>
+          ) : null}
+          {items.gradientPresets.length > 0 ? (
+            <MenuSub>
+              <MenuSubTrigger>{t('epk_fill_gradient')}</MenuSubTrigger>
+              <MenuSubContent>
+                {items.gradientPresets.map((preset) => (
+                  <MenuItem key={preset.label} onSelect={wrap(preset.action)}>
+                    {preset.label}
+                  </MenuItem>
+                ))}
+              </MenuSubContent>
+            </MenuSub>
+          ) : null}
+          <MenuSeparator />
           <MenuItem onSelect={wrap(items.duplicate.action)}>{items.duplicate.label}</MenuItem>
           <MenuItem onSelect={wrap(items.delete.action)}>{items.delete.label}</MenuItem>
           <MenuSeparator />
@@ -186,6 +266,7 @@ export function EpkContextMenu({
   onOpenAssetPicker,
   onReplaceImage,
   onEditText,
+  onCropImage,
 }: EpkContextMenuProps) {
   return (
     <ContextMenu>
@@ -195,8 +276,12 @@ export function EpkContextMenu({
           onOpenAssetPicker={onOpenAssetPicker}
           onReplaceImage={onReplaceImage}
           onEditText={onEditText}
+          onCropImage={onCropImage}
           MenuItem={ContextMenuItem}
           MenuSeparator={ContextMenuSeparator}
+          MenuSub={ContextMenuSub}
+          MenuSubTrigger={ContextMenuSubTrigger}
+          MenuSubContent={ContextMenuSubContent}
         />
       </ContextMenuContent>
     </ContextMenu>
@@ -210,6 +295,7 @@ export function EpkCanvasContextMenu({
   onOpenAssetPicker,
   onReplaceImage,
   onEditText,
+  onCropImage,
 }: Omit<EpkContextMenuProps, 'children'> & { anchor: EpkContextMenuAnchor }) {
   return (
     <DropdownMenu open onOpenChange={(open) => { if (!open) onClose?.() }}>
@@ -225,9 +311,13 @@ export function EpkCanvasContextMenu({
           onOpenAssetPicker={onOpenAssetPicker}
           onReplaceImage={onReplaceImage}
           onEditText={onEditText}
+          onCropImage={onCropImage}
           onClose={onClose}
           MenuItem={DropdownMenuItem}
           MenuSeparator={DropdownMenuSeparator}
+          MenuSub={DropdownMenuSub}
+          MenuSubTrigger={DropdownMenuSubTrigger}
+          MenuSubContent={DropdownMenuSubContent}
         />
       </DropdownMenuContent>
     </DropdownMenu>

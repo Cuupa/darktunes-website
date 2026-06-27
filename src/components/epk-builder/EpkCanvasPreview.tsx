@@ -8,11 +8,12 @@
 
 import '@/lib/epk/konvaShapes'
 import { useMemo } from 'react'
-import { Stage, Layer, Rect } from 'react-konva'
+import { Stage, Layer } from 'react-konva'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { getTopLevelPageElements } from '@/lib/epk/elements/groupUtils'
 import { EpkCanvasElementNode } from './EpkCanvasElementNode'
 import { EpkGroupNode } from './EpkGroupNode'
+import { EpkPageBackgroundLayer } from './EpkPageBackgroundLayer'
 
 interface EpkCanvasPreviewProps {
   document: EpkDocumentV2
@@ -47,16 +48,7 @@ export function EpkCanvasPreview({ document, scale = 0.55, className }: EpkCanva
         listening={false}
       >
         <Layer listening={false}>
-          {page.background.type === 'color' && (
-            <Rect
-              x={0}
-              y={0}
-              width={page.width}
-              height={page.height}
-              fill={page.background.color ?? '#101010'}
-              listening={false}
-            />
-          )}
+          <EpkPageBackgroundLayer page={page} />
           {elements.map((element) =>
             element.type === 'group' ? (
               <EpkGroupNode key={element.id} document={document} element={element} listening={false} />

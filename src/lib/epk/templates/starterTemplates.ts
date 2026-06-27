@@ -4,6 +4,8 @@ import { createEpkElementId, createEpkPageId } from '@/lib/epk/schema/elementIds
 import { getPageDimensions } from '@/lib/epk/schema/pageDimensions'
 import { applyPaletteToDocument } from './applyPalette'
 import { DEFAULT_EPK_PALETTE_ID } from './colorPalettes'
+import { EPK_GRADIENT_PRESETS } from '@/lib/epk/gradients'
+import type { EpkPageBackground } from '@/lib/epk/schema/documentV2'
 
 export type EpkTemplateCategory = 'one-page' | 'multi-page' | 'social'
 
@@ -19,11 +21,21 @@ export interface EpkBuiltinTemplate extends EpkTemplate {
   meta: EpkBuiltinTemplateMeta
 }
 
+function gradientBackground(presetId: string): EpkPageBackground {
+  const preset = EPK_GRADIENT_PRESETS.find((p) => p.id === presetId) ?? EPK_GRADIENT_PRESETS[0]!
+  return {
+    type: 'gradient',
+    gradientStops: preset.gradient.stops,
+    gradientAngle: preset.gradient.angle,
+  }
+}
+
 function buildDocument(
   name: string,
   format: EpkPageFormat,
   orientation: EpkOrientation,
-  pageDefs: Array<{ name: string; elements: Omit<EpkElement, 'pageId'>[] }>,
+  pageDefs: Array<{ name: string; background?: EpkPageBackground; elements: Omit<EpkElement, 'pageId'>[] }>,
+  defaultBackground: EpkPageBackground = { type: 'color', color: '#101010' },
 ): EpkDocumentV2 {
   const dims = getPageDimensions(format, orientation)
   const pages = pageDefs.map((def, index) => ({
@@ -31,7 +43,7 @@ function buildDocument(
     name: def.name,
     width: dims.width,
     height: dims.height,
-    background: { type: 'color' as const, color: '#101010' },
+    background: def.background ?? defaultBackground,
   }))
 
   const elements: EpkElement[] = []
@@ -508,6 +520,298 @@ function landscapeWideBrief(): EpkDocumentV2 {
   }])
 }
 
+function neonGradientPortrait(): EpkDocumentV2 {
+  return buildDocument(
+    'Neon Gradient',
+    'a4',
+    'portrait',
+    [{
+      name: 'Page 1',
+      background: gradientBackground('neon-pulse'),
+      elements: [
+        shapeEl({
+          x: W - 280, y: -80, width: 360, height: 360, zIndex: 1, role: 'accent-block',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#49368788' },
+              { offset: 1, color: '#7e1e3744' },
+            ],
+            gradientAngle: 45,
+            cornerRadius: 180,
+            opacity: 0.9,
+          },
+        }),
+        imageEl({
+          x: margin, y: 72, width: 320, height: 400, zIndex: 2, role: 'artist-photo',
+          src: undefined,
+          style: { opacity: 1, objectFit: 'cover', cornerRadius: 12 },
+        }),
+        textEl({
+          x: 400, y: 96, width: 346, height: 120, zIndex: 3, role: 'artist-name',
+          content: 'Artist\nName',
+          style: {
+            fill: '#ffffff',
+            fontSize: 48,
+            fontWeight: 700,
+            fontFamily: 'Oswald, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.05,
+          },
+        }),
+        textEl({
+          x: 400, y: 240, width: 346, height: 48, zIndex: 4, role: 'genres',
+          content: 'Electronic · Darkwave · Industrial',
+          style: {
+            fill: '#b8a8e8',
+            fontSize: 13,
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.4,
+          },
+        }),
+        shapeEl({
+          x: 400, y: 310, width: 120, height: 4, zIndex: 5, role: 'accent-line',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#493687' },
+              { offset: 1, color: '#ffffff' },
+            ],
+            gradientAngle: 90,
+          },
+        }),
+        textEl({
+          x: margin, y: 520, width: contentW, height: 280, zIndex: 6, role: 'bio',
+          content: 'Modern press-ready biography with bold typography and gradient accents.',
+          style: {
+            fill: '#d8d8d8',
+            fontSize: 14,
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.55,
+          },
+        }),
+        textEl({
+          x: margin, y: 840, width: contentW, height: 80, zIndex: 7, role: 'contacts',
+          content: 'Booking: …  ·  Press: …',
+          style: {
+            fill: '#ffffff',
+            fontSize: 12,
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.6,
+          },
+        }),
+      ],
+    }],
+    gradientBackground('neon-pulse'),
+  )
+}
+
+function sunsetEditorial(): EpkDocumentV2 {
+  return buildDocument(
+    'Sunset Editorial',
+    'a4',
+    'portrait',
+    [{
+      name: 'Page 1',
+      background: gradientBackground('sunset-glow'),
+      elements: [
+        shapeEl({
+          x: 0, y: 0, width: W, height: 280, zIndex: 1, role: 'header-band',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#7e1e37cc' },
+              { offset: 1, color: '#49368700' },
+            ],
+            gradientAngle: 180,
+          },
+        }),
+        textEl({
+          x: margin, y: 72, width: contentW, height: 100, zIndex: 2, role: 'artist-name',
+          content: 'ARTIST NAME',
+          style: {
+            fill: '#ffffff',
+            fontSize: 56,
+            fontWeight: 700,
+            fontFamily: 'Playfair Display, Georgia, serif',
+            textAlign: 'center',
+            lineHeight: 1.05,
+          },
+        }),
+        textEl({
+          x: margin, y: 190, width: contentW, height: 40, zIndex: 3, role: 'quote',
+          content: '"A quote that captures your artistic vision."',
+          style: {
+            fill: '#b8a8e8',
+            fontSize: 16,
+            fontStyle: 'italic',
+            fontFamily: 'Playfair Display, Georgia, serif',
+            textAlign: 'center',
+            lineHeight: 1.5,
+          },
+        }),
+        imageEl({
+          x: margin, y: 280, width: contentW, height: 360, zIndex: 4, role: 'artist-photo',
+          src: undefined,
+          style: { opacity: 1, objectFit: 'cover', cornerRadius: 8 },
+        }),
+        textEl({
+          x: margin, y: 680, width: contentW, height: 320, zIndex: 5, role: 'bio',
+          content: 'Editorial long-form bio with warm sunset gradients and serif headlines.',
+          style: {
+            fill: '#f0f0f0',
+            fontSize: 13,
+            fontFamily: 'Merriweather, Georgia, serif',
+            textAlign: 'left',
+            lineHeight: 1.6,
+          },
+        }),
+      ],
+    }],
+    gradientBackground('sunset-glow'),
+  )
+}
+
+function midnightGlassLandscape(): EpkDocumentV2 {
+  const dims = getPageDimensions('a4', 'landscape')
+  const lw = dims.width
+  const lh = dims.height
+  return buildDocument(
+    'Midnight Glass',
+    'a4',
+    'landscape',
+    [{
+      name: 'Page 1',
+      background: gradientBackground('midnight-blue'),
+      elements: [
+        shapeEl({
+          x: Math.round(lw * 0.42), y: 40, width: Math.round(lw * 0.52), height: lh - 80, zIndex: 1,
+          role: 'accent-block',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#ffffff18' },
+              { offset: 1, color: '#49368733' },
+            ],
+            gradientAngle: 135,
+            cornerRadius: 24,
+          },
+        }),
+        imageEl({
+          x: 48, y: 48, width: Math.round(lw * 0.36), height: lh - 96, zIndex: 2, role: 'artist-photo',
+          src: undefined,
+          style: { opacity: 1, objectFit: 'cover', cornerRadius: 16 },
+        }),
+        textEl({
+          x: Math.round(lw * 0.46), y: 80, width: Math.round(lw * 0.48), height: 80, zIndex: 3, role: 'artist-name',
+          content: 'Artist Name',
+          style: {
+            fill: '#ffffff',
+            fontSize: 44,
+            fontWeight: 700,
+            fontFamily: 'Space Grotesk, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.1,
+          },
+        }),
+        textEl({
+          x: Math.round(lw * 0.46), y: 180, width: Math.round(lw * 0.48), height: 200, zIndex: 4, role: 'bio',
+          content: 'Glassmorphism panel with gradient backdrop — ideal for festival submissions.',
+          style: {
+            fill: '#d8d8d8',
+            fontSize: 13,
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.5,
+          },
+        }),
+        textEl({
+          x: Math.round(lw * 0.46), y: 400, width: Math.round(lw * 0.48), height: 100, zIndex: 5, role: 'links',
+          content: 'Spotify · Instagram · Website',
+          style: {
+            fill: '#b8a8e8',
+            fontSize: 12,
+            fontFamily: 'Inter, Helvetica, Arial, sans-serif',
+            textAlign: 'left',
+            lineHeight: 1.6,
+          },
+        }),
+      ],
+    }],
+    gradientBackground('midnight-blue'),
+  )
+}
+
+function purpleDuskCover(): EpkDocumentV2 {
+  return buildDocument(
+    'Purple Dusk Cover',
+    'a4',
+    'portrait',
+    [{
+      name: 'Cover',
+      background: gradientBackground('purple-dusk'),
+      elements: [
+        shapeEl({
+          x: -60, y: H - 320, width: 400, height: 400, zIndex: 1, role: 'accent-block',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#49368766' },
+              { offset: 1, color: '#7e1e3700' },
+            ],
+            gradientAngle: 45,
+            cornerRadius: 200,
+          },
+        }),
+        imageEl({
+          x: margin, y: 120, width: contentW, height: 520, zIndex: 2, role: 'artist-photo',
+          src: undefined,
+          style: { opacity: 1, objectFit: 'cover', cornerRadius: 16 },
+        }),
+        textEl({
+          x: margin, y: 680, width: contentW, height: 100, zIndex: 3, role: 'artist-name',
+          content: 'ARTIST NAME',
+          style: {
+            fill: '#ffffff',
+            fontSize: 52,
+            fontWeight: 700,
+            fontFamily: 'Montserrat, Helvetica, Arial, sans-serif',
+            textAlign: 'center',
+            lineHeight: 1.05,
+          },
+        }),
+        textEl({
+          x: margin, y: 800, width: contentW, height: 48, zIndex: 4, role: 'genres',
+          content: 'Electronic Press Kit 2026',
+          style: {
+            fill: '#b8a8e8',
+            fontSize: 14,
+            fontFamily: 'Montserrat, Helvetica, Arial, sans-serif',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          },
+        }),
+        shapeEl({
+          x: 297, y: 870, width: 200, height: 4, zIndex: 5, role: 'accent-line',
+          style: {
+            fillType: 'gradient',
+            gradientStops: [
+              { offset: 0, color: '#493687' },
+              { offset: 0.5, color: '#ffffff' },
+              { offset: 1, color: '#7e1e37' },
+            ],
+            gradientAngle: 0,
+          },
+        }),
+      ],
+    }],
+    gradientBackground('purple-dusk'),
+  )
+}
+
 const BUILTIN_DEFS: Array<{
   id: string
   name: string
@@ -587,6 +891,38 @@ const BUILTIN_DEFS: Array<{
     sortOrder: 8,
     meta: { category: 'multi-page', pageFormat: 'a4', orientation: 'portrait', pageCount: 3, defaultPaletteId: DEFAULT_EPK_PALETTE_ID },
     build: threePagePressPack,
+  },
+  {
+    id: 'builtin-neon-gradient',
+    name: 'Neon Gradient',
+    description: 'Portrait A4 — bold gradients, photo column, modern sans typography.',
+    sortOrder: 9,
+    meta: { category: 'one-page', pageFormat: 'a4', orientation: 'portrait', pageCount: 1, defaultPaletteId: DEFAULT_EPK_PALETTE_ID },
+    build: neonGradientPortrait,
+  },
+  {
+    id: 'builtin-sunset-editorial',
+    name: 'Sunset Editorial',
+    description: 'Portrait A4 — warm gradient, serif headlines, full-bleed photo.',
+    sortOrder: 10,
+    meta: { category: 'one-page', pageFormat: 'a4', orientation: 'portrait', pageCount: 1, defaultPaletteId: DEFAULT_EPK_PALETTE_ID },
+    build: sunsetEditorial,
+  },
+  {
+    id: 'builtin-midnight-glass',
+    name: 'Midnight Glass',
+    description: 'Landscape A4 — glass panel layout with deep gradient backdrop.',
+    sortOrder: 11,
+    meta: { category: 'one-page', pageFormat: 'a4', orientation: 'landscape', pageCount: 1, defaultPaletteId: DEFAULT_EPK_PALETTE_ID },
+    build: midnightGlassLandscape,
+  },
+  {
+    id: 'builtin-purple-dusk',
+    name: 'Purple Dusk Cover',
+    description: 'Portrait A4 — hero photo cover with multi-stop gradient accents.',
+    sortOrder: 12,
+    meta: { category: 'one-page', pageFormat: 'a4', orientation: 'portrait', pageCount: 1, defaultPaletteId: DEFAULT_EPK_PALETTE_ID },
+    build: purpleDuskCover,
   },
 ]
 

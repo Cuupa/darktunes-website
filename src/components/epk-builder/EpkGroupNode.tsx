@@ -22,6 +22,14 @@ interface EpkGroupNodeProps {
   onGroupDrag?: (groupId: string, dx: number, dy: number) => void
   onDoubleClickText?: (id: string) => void
   registerRef?: (id: string, node: Konva.Node | null) => void
+  onSnapDragMove?: (
+    id: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => { x: number; y: number }
+  onDragEnd?: () => void
 }
 
 export function EpkGroupNode({
@@ -34,6 +42,8 @@ export function EpkGroupNode({
   onGroupDrag,
   onDoubleClickText,
   registerRef,
+  onSnapDragMove,
+  onDragEnd: onDragEndCallback,
 }: EpkGroupNodeProps) {
   const children = getGroupChildren(document, element)
   const interactive = listening && Boolean(onSelect && onChange)
@@ -63,6 +73,21 @@ export function EpkGroupNode({
             }
           : undefined
       }
+      onDragMove={
+        interactive && onSnapDragMove
+          ? (e) => {
+              const node = e.target
+              const snapped = onSnapDragMove(
+                element.id,
+                node.x(),
+                node.y(),
+                element.width,
+                element.height,
+              )
+              node.position({ x: snapped.x, y: snapped.y })
+            }
+          : undefined
+      }
       onDragEnd={
         interactive
           ? (e) => {
@@ -73,6 +98,7 @@ export function EpkGroupNode({
                 onGroupDrag?.(element.id, dx, dy)
                 node.position({ x: element.x, y: element.y })
               }
+              onDragEndCallback?.()
             }
           : undefined
       }
@@ -102,6 +128,8 @@ export function EpkGroupNode({
           onChange={onChange}
           onDoubleClickText={onDoubleClickText}
           registerRef={registerRef}
+          onSnapDragMove={onSnapDragMove}
+          onDragEnd={onDragEndCallback}
         />
       ))}
     </Group>
