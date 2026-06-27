@@ -25,6 +25,15 @@ import {
 import { tourPlannerFetch } from '@/lib/tour-planner/clientApi'
 import type { DaySchedule, DealStructure, ShowStatus } from '@/lib/tour-planner/types'
 import type { Tour, TourContact, TourStop, TourTask } from '@/types'
+import {
+  CrewPanel,
+  DaySheetPdfButton,
+  GuestListForm,
+  ImportPanel,
+  MapRoutePanel,
+  MerchPanel,
+  VenueContactForm,
+} from './TourPlannerExtras'
 
 const DAY_FIELDS: (keyof DaySchedule)[] = [
   'getIn', 'soundcheck', 'doors', 'stageTime', 'curfew', 'dinnerTime', 'lobbyCall', 'hotelDeparture',
@@ -50,18 +59,30 @@ export function TourPlannerTabs({
         <TabsTrigger value="route">{t('tour_planner_tab_route')}</TabsTrigger>
         <TabsTrigger value="tasks">{t('tour_planner_tab_tasks')}</TabsTrigger>
         <TabsTrigger value="contacts">{t('tour_planner_tab_contacts')}</TabsTrigger>
+        <TabsTrigger value="crew">{t('tour_planner_tab_crew')}</TabsTrigger>
+        <TabsTrigger value="merch">{t('tour_planner_tab_merch')}</TabsTrigger>
+        <TabsTrigger value="import">{t('tour_planner_tab_import')}</TabsTrigger>
       </TabsList>
       <TabsContent value="stops" className="mt-4">
         <StopsPanel artistId={artistId} stops={stops} onUpdated={onStopsChange} />
       </TabsContent>
       <TabsContent value="route" className="mt-4">
-        <RoutePanel artistId={artistId} activeTour={activeTour} />
+        <MapRoutePanel artistId={artistId} activeTour={activeTour} stops={stops} />
       </TabsContent>
       <TabsContent value="tasks" className="mt-4">
         <TasksPanel artistId={artistId} tourId={activeTour?.id ?? null} />
       </TabsContent>
       <TabsContent value="contacts" className="mt-4">
         <ContactsPanel artistId={artistId} />
+      </TabsContent>
+      <TabsContent value="crew" className="mt-4">
+        <CrewPanel artistId={artistId} tourId={activeTour?.id ?? null} />
+      </TabsContent>
+      <TabsContent value="merch" className="mt-4">
+        <MerchPanel artistId={artistId} />
+      </TabsContent>
+      <TabsContent value="import" className="mt-4">
+        <ImportPanel artistId={artistId} tourId={activeTour?.id ?? null} onImported={onStopsChange} />
       </TabsContent>
     </Tabs>
   )
@@ -90,7 +111,7 @@ function StopsPanel({
 
 function StopCard({ artistId, stop, onUpdated }: { artistId: string; stop: TourStop; onUpdated: () => void }) {
   const t = useTranslations('portal')
-  const [open, setOpen] = useState<'day' | 'finance' | null>(null)
+  const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | null>(null)
 
   const patchStop = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/stops/${stop.id}`, {
@@ -135,6 +156,21 @@ function StopCard({ artistId, stop, onUpdated }: { artistId: string; stop: TourS
             />
           </DialogContent>
         </Dialog>
+        <Dialog open={open === 'guest'} onOpenChange={(v) => setOpen(v ? 'guest' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_guest_list')}</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{t('tour_planner_guest_list')}</DialogTitle></DialogHeader>
+            <GuestListForm list={stop.guestList} onSave={(guestList) => patchStop({ guestList }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={open === 'venue'} onOpenChange={(v) => setOpen(v ? 'venue' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_venue_contacts')}</Button></DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>{t('tour_planner_venue_contacts')}</DialogTitle></DialogHeader>
+            <VenueContactForm info={stop.venueContactInfo} onSave={(venueContactInfo) => patchStop({ venueContactInfo }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <DaySheetPdfButton stop={stop} />
       </div>
     </li>
   )
@@ -193,34 +229,6 @@ function FinanceForm({ deal, onSave }: { deal: DealStructure | null; onSave: (d:
         <Input type="number" value={draft.guarantee ?? 0} onChange={(e) => setDraft({ ...draft, guarantee: Number(e.target.value) })} />
       </div>
       <Button onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
-    </div>
-  )
-}
-
-function RoutePanel({ artistId, activeTour }: { artistId: string; activeTour: Tour | null }) {
-  const t = useTranslations('portal')
-  const qc = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!activeTour) throw new Error('no tour')
-      const res = await tourPlannerFetch(artistId, '/route', { method: 'POST', body: JSON.stringify({ tourId: activeTour.id }) })
-      if (!res.ok) throw new Error('route failed')
-      return res.json() as Promise<{ route: Tour['routeCache'] }>
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tour-planner', 'tours', artistId] }); toast.success(t('tour_planner_route_done')) },
-    onError: () => toast.error(t('tour_planner_error')),
-  })
-
-  const route = activeTour?.routeCache
-  return (
-    <div className="space-y-3">
-      <Button disabled={!activeTour || mutation.isPending} onClick={() => mutation.mutate()}>{t('tour_planner_calc_route')}</Button>
-      {route?.error && <p className="text-sm text-destructive">{route.error}</p>}
-      {route && !route.error && (
-        <p className="text-sm text-muted-foreground">
-          {t('tour_planner_route_summary', { km: Math.round(route.totalDistance / 1000), min: Math.round(route.totalDuration / 60) })}
-        </p>
-      )}
     </div>
   )
 }

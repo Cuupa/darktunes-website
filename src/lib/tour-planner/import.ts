@@ -59,8 +59,7 @@ function combineAddressParts(street?: string, plzOrt?: string): { address: strin
   return { address, city, postalCode }
 }
 
-export async function parseCSVFile(file: File): Promise<TourStop[]> {
-  const text = await file.text()
+export function parseCSVText(text: string): TourStop[] {
   const lines = text.split('\n').filter(line => line.trim())
   
   if (lines.length < 2) {
@@ -147,6 +146,10 @@ export async function parseCSVFile(file: File): Promise<TourStop[]> {
   }
 
   return stops
+}
+
+export async function parseCSVFile(file: File): Promise<TourStop[]> {
+  return parseCSVText(await file.text())
 }
 
 export async function parseExcelFile(file: File): Promise<TourStop[]> {
