@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -11,7 +11,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { tourPlannerFetch } from '@/lib/tour-planner/clientApi'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import { downloadDaySheetPdf } from '@/lib/tour-planner/pdf'
-import type { GuestListEntry, VenueContactInfo } from '@/lib/tour-planner/types'
+import type {
+  GuestListEntry,
+  Settlement,
+  TourPlannerSettings,
+  VenueContactInfo,
+  VenueDetails,
+} from '@/lib/tour-planner/types'
 import type { Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
 
@@ -181,6 +187,84 @@ export function VenueContactForm({ info, onSave }: { info: VenueContactInfo | nu
       <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
     </div>
   )
+}
+
+export function LoadInForm({ details, onSave }: { details: VenueDetails | null; onSave: (v: VenueDetails) => void }) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState<VenueDetails>(details ?? {})
+  const fields: (keyof VenueDetails)[] = ['loadingDock', 'powerSupply', 'paSpecs', 'capacity', 'loadInNotes', 'parkingSpaces']
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {fields.map((f) => (
+        <div key={f} className="space-y-1">
+          <Label>{String(f)}</Label>
+          <Input value={String(draft[f] ?? '')} onChange={(e) => setDraft({ ...draft, [f]: f === 'capacity' || f === 'parkingSpaces' ? Number(e.target.value) : e.target.value })} />
+        </div>
+      ))}
+      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" checked={draft.truckAccess ?? false} onChange={(e) => setDraft({ ...draft, truckAccess: e.target.checked })} />
+        truckAccess
+      </label>
+      <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
+    </div>
+  )
+}
+
+export function SettlementForm({ settlement, onSave }: { settlement: Settlement | null; onSave: (s: Settlement) => void }) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState<Settlement>(settlement ?? {
+    ticketsSold: 0, ticketPrice: 0, grossRevenue: 0, venueCosts: 0, netRevenue: 0, artistPayment: 0,
+  })
+  const num = (k: keyof Settlement, v: string) => setDraft({ ...draft, [k]: Number(v) })
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {(['ticketsSold', 'ticketPrice', 'grossRevenue', 'venueCosts', 'netRevenue', 'artistPayment'] as const).map((k) => (
+        <div key={k} className="space-y-1">
+          <Label>{k}</Label>
+          <Input type="number" value={draft[k]} onChange={(e) => num(k, e.target.value)} />
+        </div>
+      ))}
+      <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
+    </div>
+  )
+}
+
+export function SettingsPanel({ artistId, tour, onSaved }: { artistId: string; tour: Tour | null; onSaved: () => void }) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState<TourPlannerSettings | null>(tour?.settings ?? null)
+  useEffect(() => { if (tour) setDraft(tour.settings) }, [tour])
+  if (!tour || !draft) return null
+  const save = async () => {
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, { method: 'PATCH', body: JSON.stringify({ settings: draft }) })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    onSaved(); toast.success(t('tour_planner_saved'))
+  }
+  return (
+    <div className="grid gap-3 max-w-md">
+      <div className="space-y-1">
+        <Label>{t('tour_planner_vehicle')}</Label>
+        <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={draft.vehicleType} onChange={(e) => setDraft({ ...draft, vehicleType: e.target.value as TourPlannerSettings['vehicleType'] })}>
+          <option value="car">car</option><option value="bus">bus</option><option value="truck">truck</option>
+        </select>
+      </div>
+      <div className="space-y-1">
+        <Label>{t('tour_planner_api_provider')}</Label>
+        <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={draft.apiProvider} onChange={(e) => setDraft({ ...draft, apiProvider: e.target.value as TourPlannerSettings['apiProvider'] })}>
+          <option value="nominatim">Nominatim</option><option value="google">Google</option>
+        </select>
+      </div>
+      <Button onClick={save}>{t('tour_planner_save')}</Button>
+    </div>
+  )
+}
+
+export async function geocodeStopVenue(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
+  const q = [stop.venueAddress, stop.venueCity, stop.venueCountry].filter(Boolean).join(', ')
+  if (!q) return null
+  const res = await tourPlannerFetch(artistId, '/geocode', { method: 'POST', body: JSON.stringify({ query: q }) })
+  if (!res.ok) return null
+  const json = (await res.json()) as { coords?: { lat: number; lon: number } }
+  return json.coords ? { lat: json.coords.lat, lng: json.coords.lon } : null
 }
 
 export function DaySheetPdfButton({ stop }: { stop: TourStop }) {

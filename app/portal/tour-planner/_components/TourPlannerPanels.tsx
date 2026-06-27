@@ -28,10 +28,14 @@ import type { Tour, TourContact, TourStop, TourTask } from '@/types'
 import {
   CrewPanel,
   DaySheetPdfButton,
+  geocodeStopVenue,
   GuestListForm,
   ImportPanel,
+  LoadInForm,
   MapRoutePanel,
   MerchPanel,
+  SettingsPanel,
+  SettlementForm,
   VenueContactForm,
 } from './TourPlannerExtras'
 
@@ -44,11 +48,13 @@ export function TourPlannerTabs({
   activeTour,
   stops,
   onStopsChange,
+  onTourChange,
 }: {
   artistId: string
   activeTour: Tour | null
   stops: TourStop[]
   onStopsChange: () => void
+  onTourChange: () => void
 }) {
   const t = useTranslations('portal')
 
@@ -62,6 +68,7 @@ export function TourPlannerTabs({
         <TabsTrigger value="crew">{t('tour_planner_tab_crew')}</TabsTrigger>
         <TabsTrigger value="merch">{t('tour_planner_tab_merch')}</TabsTrigger>
         <TabsTrigger value="import">{t('tour_planner_tab_import')}</TabsTrigger>
+        <TabsTrigger value="settings">{t('tour_planner_tab_settings')}</TabsTrigger>
       </TabsList>
       <TabsContent value="stops" className="mt-4">
         <StopsPanel artistId={artistId} stops={stops} onUpdated={onStopsChange} />
@@ -83,6 +90,9 @@ export function TourPlannerTabs({
       </TabsContent>
       <TabsContent value="import" className="mt-4">
         <ImportPanel artistId={artistId} tourId={activeTour?.id ?? null} onImported={onStopsChange} />
+      </TabsContent>
+      <TabsContent value="settings" className="mt-4">
+        <SettingsPanel artistId={artistId} tour={activeTour} onSaved={onTourChange} />
       </TabsContent>
     </Tabs>
   )
@@ -111,7 +121,7 @@ function StopsPanel({
 
 function StopCard({ artistId, stop, onUpdated }: { artistId: string; stop: TourStop; onUpdated: () => void }) {
   const t = useTranslations('portal')
-  const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | null>(null)
+  const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | 'loadin' | 'settlement' | null>(null)
 
   const patchStop = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/stops/${stop.id}`, {
@@ -170,6 +180,26 @@ function StopCard({ artistId, stop, onUpdated }: { artistId: string; stop: TourS
             <VenueContactForm info={stop.venueContactInfo} onSave={(venueContactInfo) => patchStop({ venueContactInfo }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
           </DialogContent>
         </Dialog>
+        <Dialog open={open === 'loadin'} onOpenChange={(v) => setOpen(v ? 'loadin' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_loadin')}</Button></DialogTrigger>
+          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_loadin')}</DialogTitle></DialogHeader>
+            <LoadInForm details={stop.venueDetails} onSave={(venueDetails) => patchStop({ venueDetails }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={open === 'settlement'} onOpenChange={(v) => setOpen(v ? 'settlement' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_settlement')}</Button></DialogTrigger>
+          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_settlement')}</DialogTitle></DialogHeader>
+            <SettlementForm settlement={stop.settlement} onSave={(settlement) => patchStop({ settlement }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <Button variant="outline" size="sm" onClick={async () => {
+          const c = await geocodeStopVenue(artistId, stop)
+          if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
+          patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true }).then(() => toast.success(t('tour_planner_geocode_ok'))).catch(() => toast.error(t('tour_planner_error')))
+        }}>{t('tour_planner_geocode')}</Button>
+        <Button variant="outline" size="sm" onClick={() => patchStop({ publishConcert: true }).then(() => toast.success(t('tour_planner_published'))).catch(() => toast.error(t('tour_planner_error')))}>
+          {stop.concertId ? t('tour_planner_sync_event') : t('tour_planner_publish_event')}
+        </Button>
         <DaySheetPdfButton stop={stop} />
       </div>
     </li>
@@ -266,8 +296,14 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
       </div>
       <ul className="divide-y divide-border rounded-md border">
         {tasks.map((task) => (
-          <li key={task.id} className="p-3 text-sm flex justify-between">
-            <span>{task.title}</span>
+          <li key={task.id} className="p-3 text-sm flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={task.completed} onChange={async () => {
+                await tourPlannerFetch(artistId, `/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify({ completed: !task.completed }) })
+                qc.invalidateQueries({ queryKey: ['tour-planner', 'tasks', artistId] })
+              }} />
+              <span className={task.completed ? 'line-through text-muted-foreground' : ''}>{task.title}</span>
+            </label>
             <span className="text-muted-foreground">{task.dueDate}</span>
           </li>
         ))}

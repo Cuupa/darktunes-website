@@ -268,6 +268,7 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
           activeTour={activeTour}
           stops={stops}
           onStopsChange={() => queryClient.invalidateQueries({ queryKey: stopsQueryKey })}
+          onTourChange={() => queryClient.invalidateQueries({ queryKey: toursQueryKey })}
         />
       )}
 
