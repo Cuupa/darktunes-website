@@ -46,7 +46,9 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 | `merch/[id]` | PATCH/DELETE |
 | `route`, `geocode`, `import` | POST |
 
-**Stop production UI:** per-diems, rooming, travel manifest, full finance deal fields, hotel geocode, merch count-in/out/sold per variant with comps.
+**Stop production UI:** per-diems, rooming, travel manifest, full finance deal fields, hotel geocode, merch count-in/out/sold per variant with comps, drag-reorder stops.
+
+**Tour settings UI:** route settings (vehicle, planning mode, geocoding provider, fuel/tolls), budget JSONB line items + total, tech document PDF upload (`/api/portal/tour-planner/tech-documents/upload`).
 
 ## Settlement & Abrechnungszentrale
 

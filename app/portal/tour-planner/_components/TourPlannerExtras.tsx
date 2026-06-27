@@ -20,19 +20,31 @@ import {
   downloadSettlementPdf,
   type TourPlannerPdfLabels,
 } from '@/lib/tour-planner/pdf'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type {
   DealStructure,
   GuestListEntry,
   MerchComp,
   MerchSettlement,
   MerchVariant,
+  PlanningMode,
   Settlement,
+  TourBudget,
   TourPlannerSettings,
+  VehicleType,
   VenueContactInfo,
   VenueDetails,
 } from '@/lib/tour-planner/types'
+import { EMPTY_TOUR_BUDGET } from '@/lib/tour-planner/types'
 import type { Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
+import { BudgetForm, TechDocumentsForm } from './TourPlannerProductionForms'
 
 type PortalTranslator = ReturnType<typeof useTranslations<'portal'>>
 
@@ -317,10 +329,15 @@ export function MerchPanel({ artistId }: { artistId: string }) {
         <Input placeholder={t('tour_planner_merch_sku')} value={sku} onChange={(e) => setSku(e.target.value)} />
         <Input placeholder={t('tour_planner_merch_name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input type="number" placeholder={t('tour_planner_merch_price')} value={basePrice} onChange={(e) => setBasePrice(Number(e.target.value))} aria-label={t('tour_planner_merch_price')} />
-        <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value as 'soft' | 'hard')} aria-label={t('tour_planner_merch_category')}>
-          <option value="soft">{t('tour_planner_merch_soft')}</option>
-          <option value="hard">{t('tour_planner_merch_hard')}</option>
-        </select>
+        <Select value={category} onValueChange={(v) => setCategory(v as 'soft' | 'hard')}>
+          <SelectTrigger className="w-[140px]" aria-label={t('tour_planner_merch_category')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="soft">{t('tour_planner_merch_soft')}</SelectItem>
+            <SelectItem value="hard">{t('tour_planner_merch_hard')}</SelectItem>
+          </SelectContent>
+        </Select>
         <Input placeholder={t('tour_planner_variant')} value={variantValue} onChange={(e) => setVariantValue(e.target.value)} />
         <Button disabled={!sku || !name} onClick={() => create.mutate()}>{t('tour_planner_add_merch')}</Button>
       </div>
@@ -386,6 +403,9 @@ export function MerchSettlementForm({
   const pdfLabels = buildTourPlannerPdfLabels(t)
   const [draft, setDraft] = useState<MerchSettlement>(emptyMerchSettlement(stop))
   const [loading, setLoading] = useState(true)
+  const [compVariant, setCompVariant] = useState('')
+  const [compQty, setCompQty] = useState(1)
+  const [compReason, setCompReason] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -444,11 +464,15 @@ export function MerchSettlementForm({
     setDraft(next)
   }
 
-  const addComp = (variantId: string, quantity: number, reason: string) => {
-    if (!variantId || !quantity) return
-    const comp: MerchComp = { itemVariantId: variantId, quantity, reason, recipientName: '' }
+  const addComp = () => {
+    if (!compVariant || !compQty) return
+    const comp: MerchComp = { itemVariantId: compVariant, quantity: compQty, reason: compReason, recipientName: '' }
     setDraft({ ...draft, comps: [...draft.comps, comp] })
+    setCompReason('')
+    setCompQty(1)
   }
+
+  const variantLabel = (key: string) => variantRows.find((row) => row.key === key)?.label ?? key
 
   const num = (key: 'hallFee' | 'netRevenue' | 'taxRate', value: string) => {
     setDraft({ ...draft, [key]: Number(value) })
@@ -496,23 +520,26 @@ export function MerchSettlementForm({
       </div>
       {variantRows.length > 0 && (
         <div className="sm:col-span-2 flex flex-wrap gap-2 items-end">
-          <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" id="comp-variant" aria-label={t('tour_planner_comp_variant')}>
-            {variantRows.map((row) => <option key={row.key} value={row.key}>{row.label}</option>)}
-          </select>
-          <Input type="number" min={1} defaultValue={1} id="comp-qty" aria-label={t('tour_planner_comp_qty')} className="w-24" />
-          <Input placeholder={t('tour_planner_comp_reason')} id="comp-reason" className="flex-1 min-w-[120px]" />
-          <Button variant="outline" onClick={() => {
-            const variant = (document.getElementById('comp-variant') as HTMLSelectElement).value
-            const qty = Number((document.getElementById('comp-qty') as HTMLInputElement).value)
-            const reason = (document.getElementById('comp-reason') as HTMLInputElement).value
-            addComp(variant, qty, reason)
-          }}>{t('tour_planner_add_comp')}</Button>
+          <Select
+            value={compVariant || variantRows[0]?.key}
+            onValueChange={setCompVariant}
+          >
+            <SelectTrigger className="min-w-[160px]" aria-label={t('tour_planner_comp_variant')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {variantRows.map((row) => <SelectItem key={row.key} value={row.key}>{row.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input type="number" min={1} value={compQty} onChange={(e) => setCompQty(Number(e.target.value))} aria-label={t('tour_planner_comp_qty')} className="w-24" />
+          <Input placeholder={t('tour_planner_comp_reason')} value={compReason} onChange={(e) => setCompReason(e.target.value)} className="flex-1 min-w-[120px]" />
+          <Button variant="outline" onClick={addComp}>{t('tour_planner_add_comp')}</Button>
         </div>
       )}
       {draft.comps.length > 0 && (
         <ul className="sm:col-span-2 text-sm space-y-1">
           {draft.comps.map((c, i) => (
-            <li key={`${c.itemVariantId}-${i}`}>{c.quantity}× {c.itemVariantId} — {c.reason}</li>
+            <li key={`${c.itemVariantId}-${i}`}>{c.quantity}× {variantLabel(c.itemVariantId)}{c.reason ? ` — ${c.reason}` : ''}</li>
           ))}
         </ul>
       )}
@@ -582,7 +609,19 @@ export function HotelForm({
   )
 }
 
-export function ImportPanel({ artistId, tourId, onImported }: { artistId: string; tourId: string | null; onImported: () => void }) {
+export function ImportPanel({
+  artistId,
+  tourId,
+  concerts,
+  stops,
+  onImported,
+}: {
+  artistId: string
+  tourId: string | null
+  concerts: import('@/types').Concert[]
+  stops: TourStop[]
+  onImported: () => void
+}) {
   const t = useTranslations('portal')
   const ref = useRef<HTMLInputElement>(null)
   const importCsv = useMutation({
@@ -598,16 +637,76 @@ export function ImportPanel({ artistId, tourId, onImported }: { artistId: string
     },
     onError: () => toast.error(t('tour_planner_error')),
   })
-  if (!tourId) return null
+
+  const importConcert = useMutation({
+    mutationFn: async (concertId: string) => {
+      if (!tourId) throw new Error('no tour')
+      const res = await tourPlannerFetch(artistId, '/stops/import-concert', {
+        method: 'POST',
+        body: JSON.stringify({ tourId, concertId }),
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(err?.error ?? 'Import failed')
+      }
+      return wasQueuedOffline(res)
+    },
+    onSuccess: (offline) => {
+      onImported()
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_import_success'))
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  if (!tourId) return <p className="text-sm text-muted-foreground">{t('tour_planner_select_tour_first')}</p>
+
+  const importableConcerts = concerts.filter(
+    (concert) => !stops.some((stop) => stop.concertId === concert.id),
+  )
+
   return (
-    <div className="space-y-2">
-      <input ref={ref} type="file" accept=".csv,.txt" className="hidden" onChange={async (e) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        importCsv.mutate(await file.text())
-        e.target.value = ''
-      }} />
-      <Button variant="outline" onClick={() => ref.current?.click()} disabled={importCsv.isPending}>{t('tour_planner_import_csv')}</Button>
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="font-semibold">{t('tour_planner_import_csv_heading')}</h3>
+        <p className="text-sm text-muted-foreground">{t('tour_planner_import_csv_desc')}</p>
+        <input ref={ref} type="file" accept=".csv,.txt" className="hidden" onChange={async (e) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          importCsv.mutate(await file.text())
+          e.target.value = ''
+        }} />
+        <Button variant="outline" onClick={() => ref.current?.click()} disabled={importCsv.isPending}>{t('tour_planner_import_csv')}</Button>
+      </section>
+
+      <section className="space-y-3 border-t border-border pt-6">
+        <h3 className="font-semibold">{t('tour_planner_import_heading')}</h3>
+        <p className="text-sm text-muted-foreground">{t('tour_planner_import_desc')}</p>
+        {importableConcerts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('tour_planner_import_none')}</p>
+        ) : (
+          <ul className="space-y-2">
+            {importableConcerts.map((concert) => (
+              <li key={concert.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                <div>
+                  <p className="font-medium">{concert.eventName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {concert.concertDate}
+                    {concert.venueCity ? ` · ${concert.venueCity}` : ''}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importConcert.mutate(concert.id)}
+                  disabled={importConcert.isPending}
+                >
+                  {t('tour_planner_import_button')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }
@@ -768,23 +867,32 @@ export function SettingsPanel({
   const [draft, setDraft] = useState<TourPlannerSettings | null>(tour?.settings ?? null)
   const [totalBudget, setTotalBudget] = useState<number | null>(tour?.totalBudget ?? null)
   const [currency, setCurrency] = useState(tour?.currency ?? 'EUR')
+  const [budget, setBudget] = useState<TourBudget | null>(tour?.budget ?? null)
+  const [techDocuments, setTechDocuments] = useState(tour?.techDocuments ?? [])
   useEffect(() => {
     if (tour) {
       setDraft(tour.settings)
       setTotalBudget(tour.totalBudget)
       setCurrency(tour.currency)
+      setBudget(tour.budget ?? EMPTY_TOUR_BUDGET)
+      setTechDocuments(tour.techDocuments)
     }
   }, [tour])
   if (!tour || !draft) return null
 
-  const saveSettings = async () => {
+  const patchTour = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ settings: draft, totalBudget, currency }),
+      body: JSON.stringify(body),
     })
-    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    if (!res.ok) { toast.error(t('tour_planner_error')); return false }
     onSaved()
     toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_saved'))
+    return true
+  }
+
+  const saveSettings = async () => {
+    await patchTour({ settings: draft, totalBudget, currency })
   }
 
   const toggleArchive = async () => {
@@ -815,43 +923,110 @@ export function SettingsPanel({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 max-w-md">
-        <div className="space-y-1">
-          <Label htmlFor="vehicle-type">{t('tour_planner_vehicle')}</Label>
-          <select
-            id="vehicle-type"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={draft.vehicleType}
-            onChange={(e) => setDraft({ ...draft, vehicleType: e.target.value as TourPlannerSettings['vehicleType'] })}
-          >
-            <option value="car">{t('tour_planner_vehicle_car')}</option>
-            <option value="bus">{t('tour_planner_vehicle_bus')}</option>
-            <option value="truck">{t('tour_planner_vehicle_truck')}</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="tour-budget">{t('tour_planner_total_budget')}</Label>
-          <Input id="tour-budget" type="number" value={totalBudget ?? ''} onChange={(e) => setTotalBudget(e.target.value ? Number(e.target.value) : null)} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="tour-currency">{t('tour_planner_currency')}</Label>
-          <Input id="tour-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="api-provider">{t('tour_planner_api_provider')}</Label>
-          <select
-            id="api-provider"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={draft.apiProvider}
-            onChange={(e) => setDraft({ ...draft, apiProvider: e.target.value as TourPlannerSettings['apiProvider'] })}
-          >
-            <option value="nominatim">Nominatim</option>
-            <option value="google">Google</option>
-          </select>
+    <div className="space-y-8">
+      <section className="space-y-4 rounded-lg border border-border p-4">
+        <h3 className="font-semibold">{t('tour_planner_settings_route')}</h3>
+        <div className="grid gap-3 sm:grid-cols-2 max-w-2xl">
+          <div className="space-y-1">
+            <Label>{t('tour_planner_vehicle')}</Label>
+            <Select value={draft.vehicleType} onValueChange={(v) => setDraft({ ...draft, vehicleType: v as VehicleType })}>
+              <SelectTrigger aria-label={t('tour_planner_vehicle')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="car">{t('tour_planner_vehicle_car')}</SelectItem>
+                <SelectItem value="bus">{t('tour_planner_vehicle_bus')}</SelectItem>
+                <SelectItem value="truck">{t('tour_planner_vehicle_truck')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>{t('tour_planner_planning_mode')}</Label>
+            <Select value={draft.planningMode} onValueChange={(v) => setDraft({ ...draft, planningMode: v as PlanningMode })}>
+              <SelectTrigger aria-label={t('tour_planner_planning_mode')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fastest">{t('tour_planner_planning_fastest')}</SelectItem>
+                <SelectItem value="avoid-rush-hour">{t('tour_planner_planning_avoid_rush')}</SelectItem>
+                <SelectItem value="balanced">{t('tour_planner_planning_balanced')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>{t('tour_planner_api_provider')}</Label>
+            <Select value={draft.apiProvider} onValueChange={(v) => setDraft({ ...draft, apiProvider: v as TourPlannerSettings['apiProvider'] })}>
+              <SelectTrigger aria-label={t('tour_planner_api_provider')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nominatim">Nominatim</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {draft.apiProvider === 'google' && (
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="google-api-key">{t('tour_planner_google_api_key')}</Label>
+              <Input
+                id="google-api-key"
+                type="password"
+                value={draft.googleApiKey ?? ''}
+                onChange={(e) => setDraft({ ...draft, googleApiKey: e.target.value || undefined })}
+                autoComplete="off"
+              />
+            </div>
+          )}
+          <div className="space-y-1">
+            <Label htmlFor="fuel-cost">{t('tour_planner_fuel_cost')}</Label>
+            <Input
+              id="fuel-cost"
+              type="number"
+              step="0.01"
+              value={draft.fuelCostPerKm ?? ''}
+              onChange={(e) => setDraft({ ...draft, fuelCostPerKm: e.target.value ? Number(e.target.value) : undefined })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="toll-costs">{t('tour_planner_toll_costs')}</Label>
+            <Input
+              id="toll-costs"
+              type="number"
+              value={draft.tollCosts ?? ''}
+              onChange={(e) => setDraft({ ...draft, tollCosts: e.target.value ? Number(e.target.value) : undefined })}
+            />
+          </div>
         </div>
         <Button onClick={() => void saveSettings()}>{t('tour_planner_save')}</Button>
-      </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-border p-4">
+        <h3 className="font-semibold">{t('tour_planner_settings_budget')}</h3>
+        <BudgetForm
+          budget={budget}
+          currency={currency}
+          totalBudget={totalBudget}
+          onSave={(data) => {
+            setBudget(data.budget)
+            setTotalBudget(data.totalBudget)
+            setCurrency(data.currency)
+            void patchTour({ budget: data.budget, totalBudget: data.totalBudget, currency: data.currency })
+          }}
+        />
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-border p-4">
+        <h3 className="font-semibold">{t('tour_planner_settings_tech_docs')}</h3>
+        <TechDocumentsForm
+          artistId={artistId}
+          tourId={tour.id}
+          documents={techDocuments}
+          onSave={(docs) => {
+            setTechDocuments(docs)
+            void patchTour({ techDocuments: docs })
+          }}
+        />
+      </section>
 
       <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         <Button variant="outline" onClick={() => void toggleArchive()}>

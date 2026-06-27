@@ -3,7 +3,8 @@ import type { Database, Json } from '@/types/database'
 import type { Tour } from '@/types'
 import type { TourPlannerSettings } from '@/lib/tour-planner/types'
 import { DEFAULT_TOUR_PLANNER_SETTINGS } from '@/lib/tour-planner/types'
-import type { RouteResult, TechDocument } from '@/lib/tour-planner/types'
+import type { RouteResult, TechDocument, TourBudget } from '@/lib/tour-planner/types'
+import { EMPTY_TOUR_BUDGET } from '@/lib/tour-planner/types'
 
 type DbClient = SupabaseClient<Database>
 type TourRow = Database['public']['Tables']['tours']['Row']
@@ -15,6 +16,13 @@ function parseSettings(raw: Json): TourPlannerSettings {
     return DEFAULT_TOUR_PLANNER_SETTINGS
   }
   return { ...DEFAULT_TOUR_PLANNER_SETTINGS, ...(raw as unknown as TourPlannerSettings) }
+}
+
+function parseBudget(raw: Json | null): TourBudget | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const candidate = raw as unknown as TourBudget
+  if (!Array.isArray(candidate.lines)) return EMPTY_TOUR_BUDGET
+  return candidate
 }
 
 function rowToTour(row: TourRow): Tour {
@@ -29,7 +37,7 @@ function rowToTour(row: TourRow): Tour {
     sortOrder: row.sort_order,
     settings: parseSettings(row.settings),
     routeCache: (row.route_cache as RouteResult | null) ?? null,
-    budget: row.budget,
+    budget: parseBudget(row.budget),
     techDocuments: (row.tech_documents as unknown as TechDocument[]) ?? [],
     currency: row.currency,
     totalBudget: row.total_budget !== null ? Number(row.total_budget) : null,

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Trash } from '@phosphor-icons/react'
+import { toast } from 'sonner'
+import { DownloadSimple, Trash, UploadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,16 +15,61 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { tourPlannerToken } from '@/lib/tour-planner/clientApi'
 import type {
   Currency,
   DealStructure,
   PerDiem,
   RoomingAssignment,
+  TechDocument,
+  TourBudget,
+  TourBudgetCategory,
+  TourBudgetLine,
   TravelManifest,
 } from '@/lib/tour-planner/types'
+import { EMPTY_TOUR_BUDGET } from '@/lib/tour-planner/types'
 import type { TourContact } from '@/types'
 
 const CURRENCIES = ['EUR', 'GBP', 'USD', 'CHF'] as const satisfies readonly Currency[]
+
+const TECH_DOC_TYPES = [
+  'tech-rider',
+  'stage-plot',
+  'input-list',
+  'catering-rider',
+  'other',
+] as const satisfies readonly TechDocument['type'][]
+
+const BUDGET_CATEGORIES = [
+  'transport',
+  'accommodation',
+  'crew',
+  'production',
+  'marketing',
+  'merch',
+  'other',
+] as const satisfies readonly TourBudgetCategory[]
+
+type TechDocType = (typeof TECH_DOC_TYPES)[number]
+type BudgetCategory = (typeof BUDGET_CATEGORIES)[number]
+
+const TECH_DOC_I18N: Record<TechDocType, 'tour_planner_tech_rider' | 'tour_planner_tech_stage_plot' | 'tour_planner_tech_input_list' | 'tour_planner_tech_catering' | 'tour_planner_tech_other'> = {
+  'tech-rider': 'tour_planner_tech_rider',
+  'stage-plot': 'tour_planner_tech_stage_plot',
+  'input-list': 'tour_planner_tech_input_list',
+  'catering-rider': 'tour_planner_tech_catering',
+  other: 'tour_planner_tech_other',
+}
+
+const BUDGET_CATEGORY_I18N: Record<BudgetCategory, 'tour_planner_budget_transport' | 'tour_planner_budget_accommodation' | 'tour_planner_budget_crew' | 'tour_planner_budget_production' | 'tour_planner_budget_marketing' | 'tour_planner_budget_merch' | 'tour_planner_budget_other'> = {
+  transport: 'tour_planner_budget_transport',
+  accommodation: 'tour_planner_budget_accommodation',
+  crew: 'tour_planner_budget_crew',
+  production: 'tour_planner_budget_production',
+  marketing: 'tour_planner_budget_marketing',
+  merch: 'tour_planner_budget_merch',
+  other: 'tour_planner_budget_other',
+}
 
 export function FinanceForm({ deal, onSave }: { deal: DealStructure | null; onSave: (d: DealStructure) => void }) {
   const t = useTranslations('portal')
@@ -305,6 +351,257 @@ export function ContactForm({
       })}>
         {t('tour_planner_save')}
       </Button>
+    </div>
+  )
+}
+
+export function TechDocumentsForm({
+  artistId,
+  tourId,
+  documents,
+  onSave,
+}: {
+  artistId: string
+  tourId: string
+  documents: TechDocument[]
+  onSave: (docs: TechDocument[]) => void
+}) {
+  const t = useTranslations('portal')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [list, setList] = useState<TechDocument[]>(documents)
+  const [name, setName] = useState('')
+  const [docType, setDocType] = useState<TechDocType>('tech-rider')
+  const [uploading, setUploading] = useState(false)
+
+  const uploadFile = async (file: File) => {
+    if (!name.trim()) {
+      toast.error(t('tour_planner_tech_name_required'))
+      return
+    }
+    setUploading(true)
+    try {
+      const token = await tourPlannerToken()
+      const form = new FormData()
+      form.append('file', file)
+      form.append('tourId', tourId)
+      const res = await fetch(
+        `/api/portal/tour-planner/tech-documents/upload?artistId=${encodeURIComponent(artistId)}`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        },
+      )
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(err?.error ?? t('tour_planner_error'))
+      }
+      const json = (await res.json()) as { url: string }
+      const doc: TechDocument = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        type: docType,
+        url: json.url,
+        uploadedAt: new Date().toISOString(),
+      }
+      setList((prev) => [...prev, doc])
+      setName('')
+      if (fileRef.current) fileRef.current.value = ''
+      toast.success(t('tour_planner_tech_uploaded'))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('tour_planner_error'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const removeDoc = (id: string) => setList((prev) => prev.filter((d) => d.id !== id))
+
+  return (
+    <div className="space-y-4">
+      <ul className="divide-y divide-border rounded-md border">
+        {list.length === 0 ? (
+          <li className="p-4 text-sm text-muted-foreground">{t('tour_planner_tech_empty')}</li>
+        ) : list.map((doc) => (
+          <li key={doc.id} className="flex items-center justify-between gap-2 p-3 text-sm">
+            <div className="min-w-0">
+              <p className="font-medium truncate">{doc.name}</p>
+              <p className="text-muted-foreground">{t(TECH_DOC_I18N[doc.type])}</p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {doc.url && (
+                <Button variant="ghost" size="sm" asChild>
+                  <a href={doc.url} target="_blank" rel="noopener noreferrer" aria-label={t('tour_planner_tech_download')}>
+                    <DownloadSimple size={14} aria-hidden />
+                  </a>
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" aria-label={t('tour_planner_remove')} onClick={() => removeDoc(doc.id)}>
+                <Trash size={14} aria-hidden />
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="tech-doc-name">{t('tour_planner_tech_name')}</Label>
+          <Input id="tech-doc-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tour_planner_tech_name_placeholder')} />
+        </div>
+        <div className="space-y-1">
+          <Label>{t('tour_planner_tech_type')}</Label>
+          <Select value={docType} onValueChange={(v) => setDocType(v as TechDocType)}>
+            <SelectTrigger aria-label={t('tour_planner_tech_type')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TECH_DOC_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>{t(TECH_DOC_I18N[type])}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void uploadFile(file)
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={uploading || !name.trim()} onClick={() => fileRef.current?.click()}>
+          <UploadSimple size={16} aria-hidden />
+          {uploading ? t('tour_planner_tech_uploading') : t('tour_planner_tech_upload')}
+        </Button>
+        <Button onClick={() => onSave(list)}>{t('tour_planner_save')}</Button>
+      </div>
+    </div>
+  )
+}
+
+export function BudgetForm({
+  budget,
+  currency,
+  totalBudget,
+  onSave,
+}: {
+  budget: TourBudget | null
+  currency: string
+  totalBudget: number | null
+  onSave: (data: { budget: TourBudget; totalBudget: number | null; currency: string }) => void
+}) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState<TourBudget>(budget ?? EMPTY_TOUR_BUDGET)
+  const [total, setTotal] = useState<number | null>(totalBudget)
+  const [curr, setCurr] = useState(currency)
+  const [label, setLabel] = useState('')
+  const [category, setCategory] = useState<BudgetCategory>('transport')
+  const [planned, setPlanned] = useState(0)
+
+  const plannedSum = draft.lines.reduce((sum, line) => sum + line.planned, 0)
+  const actualSum = draft.lines.reduce((sum, line) => sum + (line.actual ?? 0), 0)
+
+  const addLine = () => {
+    if (!label.trim()) return
+    const line: TourBudgetLine = {
+      id: crypto.randomUUID(),
+      category,
+      label: label.trim(),
+      planned,
+    }
+    setDraft({ ...draft, lines: [...draft.lines, line] })
+    setLabel('')
+    setPlanned(0)
+  }
+
+  const removeLine = (id: string) => {
+    setDraft({ ...draft, lines: draft.lines.filter((line) => line.id !== id) })
+  }
+
+  const updateActual = (id: string, actual: number) => {
+    setDraft({
+      ...draft,
+      lines: draft.lines.map((line) => (line.id === id ? { ...line, actual } : line)),
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 max-w-md">
+        <div className="space-y-1">
+          <Label htmlFor="budget-total">{t('tour_planner_total_budget')}</Label>
+          <Input
+            id="budget-total"
+            type="number"
+            value={total ?? ''}
+            onChange={(e) => setTotal(e.target.value ? Number(e.target.value) : null)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="budget-currency">{t('tour_planner_currency')}</Label>
+          <Select value={curr} onValueChange={setCurr}>
+            <SelectTrigger id="budget-currency" aria-label={t('tour_planner_currency')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {draft.lines.length > 0 && (
+        <div className="rounded-md border divide-y divide-border">
+          {draft.lines.map((line) => (
+            <div key={line.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto_auto_auto] items-end text-sm">
+              <div>
+                <p className="font-medium">{line.label}</p>
+                <p className="text-muted-foreground">{t(BUDGET_CATEGORY_I18N[line.category])} · {line.planned} {curr}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t('tour_planner_budget_actual')}</Label>
+                <Input
+                  type="number"
+                  className="w-28"
+                  value={line.actual ?? ''}
+                  onChange={(e) => updateActual(line.id, Number(e.target.value))}
+                />
+              </div>
+              <Button variant="ghost" size="sm" aria-label={t('tour_planner_remove')} onClick={() => removeLine(line.id)}>
+                <Trash size={14} aria-hidden />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-4 items-end">
+        <Input placeholder={t('tour_planner_budget_label')} value={label} onChange={(e) => setLabel(e.target.value)} className="sm:col-span-2" />
+        <Select value={category} onValueChange={(v) => setCategory(v as BudgetCategory)}>
+          <SelectTrigger aria-label={t('tour_planner_budget_category')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BUDGET_CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>{t(BUDGET_CATEGORY_I18N[cat])}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input type="number" placeholder={t('tour_planner_amount')} value={planned} onChange={(e) => setPlanned(Number(e.target.value))} aria-label={t('tour_planner_amount')} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={addLine} disabled={!label.trim()}>{t('tour_planner_add')}</Button>
+        <Button onClick={() => onSave({ budget: draft, totalBudget: total, currency: curr })}>{t('tour_planner_save')}</Button>
+      </div>
+      {draft.lines.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {t('tour_planner_budget_summary', { planned: plannedSum, actual: actualSum, currency: curr })}
+        </p>
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, Trash } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, DotsSixVertical, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,7 +37,7 @@ import {
   RoomingForm,
   TravelManifestForm,
 } from './TourPlannerProductionForms'
-import type { Tour, TourStop } from '@/types'
+import type { Concert, Tour, TourStop } from '@/types'
 import {
   CrewPanel,
   DaySheetPdfButton,
@@ -84,6 +84,7 @@ export function TourPlannerTabs({
   artistId,
   activeTour,
   stops,
+  concerts,
   onStopsChange,
   onTourChange,
   onTourDeleted,
@@ -91,6 +92,7 @@ export function TourPlannerTabs({
   artistId: string
   activeTour: Tour | null
   stops: TourStop[]
+  concerts: Concert[]
   onStopsChange: () => void
   onTourChange: () => void
   onTourDeleted: () => void
@@ -128,7 +130,13 @@ export function TourPlannerTabs({
         <MerchPanel artistId={artistId} />
       </TabsContent>
       <TabsContent value="import" className="mt-4">
-        <ImportPanel artistId={artistId} tourId={activeTour?.id ?? null} onImported={onStopsChange} />
+        <ImportPanel
+          artistId={artistId}
+          tourId={activeTour?.id ?? null}
+          concerts={concerts}
+          stops={stops}
+          onImported={onStopsChange}
+        />
       </TabsContent>
       <TabsContent value="settings" className="mt-4">
         <SettingsPanel
@@ -154,6 +162,7 @@ function StopsPanel({
   onUpdated: () => void
 }) {
   const t = useTranslations('portal')
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   if (!stops.length) return <p className="text-sm text-muted-foreground">{t('tour_planner_no_stops')}</p>
 
   const reorder = async (orderedStopIds: string[]) => {
@@ -167,12 +176,29 @@ function StopsPanel({
     if (wasQueuedOffline(res)) toast.success(t('tour_planner_saved_offline'))
   }
 
+  const applyOrder = (next: TourStop[]) => {
+    reorder(next.map((stop) => stop.id)).catch(() => toast.error(t('tour_planner_error')))
+  }
+
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction
     if (target < 0 || target >= stops.length) return
     const next = [...stops]
     ;[next[index], next[target]] = [next[target], next[index]]
-    reorder(next.map((stop) => stop.id)).catch(() => toast.error(t('tour_planner_error')))
+    applyOrder(next)
+  }
+
+  const handleDrop = (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null)
+      return
+    }
+    const next = [...stops]
+    const [dragged] = next.splice(draggedIndex, 1)
+    next.splice(dropIndex, 0, dragged)
+    setDraggedIndex(null)
+    applyOrder(next)
+    toast.success(t('tour_planner_reordered'))
   }
 
   return (
@@ -184,6 +210,11 @@ function StopsPanel({
           stop={stop}
           index={index}
           total={stops.length}
+          isDragging={draggedIndex === index}
+          onDragStart={() => setDraggedIndex(index)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => handleDrop(index)}
+          onDragEnd={() => setDraggedIndex(null)}
           onMoveUp={() => move(index, -1)}
           onMoveDown={() => move(index, 1)}
           onUpdated={onUpdated}
@@ -198,6 +229,11 @@ function StopCard({
   stop,
   index,
   total,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
   onMoveUp,
   onMoveDown,
   onUpdated,
@@ -206,6 +242,11 @@ function StopCard({
   stop: TourStop
   index: number
   total: number
+  isDragging: boolean
+  onDragStart: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: () => void
+  onDragEnd: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   onUpdated: () => void
@@ -239,15 +280,32 @@ function StopCard({
   }
 
   return (
-    <li className="rounded-lg border border-border p-4 space-y-3">
+    <li
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={(e) => { e.preventDefault(); onDrop() }}
+      onDragEnd={onDragEnd}
+      className={`rounded-lg border border-border p-4 space-y-3 ${isDragging ? 'opacity-60' : ''}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="flex items-start gap-2 min-w-0">
+          <button
+            type="button"
+            className="mt-0.5 cursor-grab text-muted-foreground active:cursor-grabbing"
+            aria-label={t('tour_planner_drag_handle')}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <DotsSixVertical size={18} aria-hidden />
+          </button>
+          <div>
           <p className="font-medium">{stop.venueName ?? t('tour_planner_unnamed_stop')}</p>
           <p className="text-sm text-muted-foreground">
             {stop.stopDate}
             {stop.isTravelDay ? ` · ${t('tour_planner_travel_day_label')}` : ''}
             {stop.venueCity ? ` · ${stop.venueCity}` : ''}
           </p>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={onMoveUp} disabled={index === 0} aria-label={t('tour_planner_move_up')}>

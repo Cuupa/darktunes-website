@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { MapTrifold, Plus, ArrowSquareOut } from '@phosphor-icons/react'
+import { MapTrifold, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -106,26 +106,6 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
     onError: () => toast.error(t('tour_planner_error')),
   })
 
-  const importConcertMutation = useMutation({
-    mutationFn: async (concertId: string) => {
-      if (!activeTourId) throw new Error('No active tour')
-      const res = await tourPlannerFetch(artistId, '/stops/import-concert', {
-        method: 'POST',
-        body: JSON.stringify({ tourId: activeTourId, concertId }),
-      })
-      if (!res.ok) {
-        const err = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(err?.error ?? 'Import failed')
-      }
-      return wasQueuedOffline(res)
-    },
-    onSuccess: (offline) => {
-      invalidateStops()
-      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_import_success'))
-    },
-    onError: (error: Error) => toast.error(error.message),
-  })
-
   const activeTour = tours.find((tour) => tour.id === activeTourId) ?? null
 
   const handleCreateTour = useCallback(() => {
@@ -139,10 +119,6 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
     setActiveTourId(null)
     toast.success(t('tour_planner_tour_deleted'))
   }, [invalidateTours, t])
-
-  const importableConcerts = concerts.filter(
-    (concert) => !stops.some((stop) => stop.concertId === concert.id),
-  )
 
   return (
     <div className="space-y-8">
@@ -244,39 +220,11 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
           artistId={artistId}
           activeTour={activeTour}
           stops={stops}
+          concerts={concerts}
           onStopsChange={invalidateStops}
           onTourChange={invalidateTours}
           onTourDeleted={handleTourDeleted}
         />
-      )}
-
-      {activeTour && importableConcerts.length > 0 && (
-        <section className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="font-semibold">{t('tour_planner_import_heading')}</h2>
-          <p className="text-sm text-muted-foreground">{t('tour_planner_import_desc')}</p>
-          <ul className="space-y-2">
-            {importableConcerts.map((concert) => (
-              <li key={concert.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-                <div>
-                  <p className="font-medium">{concert.eventName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {concert.concertDate}
-                    {concert.venueCity ? ` · ${concert.venueCity}` : ''}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => importConcertMutation.mutate(concert.id)}
-                  disabled={importConcertMutation.isPending}
-                >
-                  <ArrowSquareOut size={14} aria-hidden />
-                  {t('tour_planner_import_button')}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
     </div>
   )

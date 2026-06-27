@@ -70,7 +70,7 @@ function mapTour(row: Record<string, unknown>): Tour {
     sortOrder: Number(row.sort_order),
     settings: row.settings as Tour['settings'],
     routeCache: (row.route_cache as Tour['routeCache']) ?? null,
-    budget: row.budget,
+    budget: (row.budget as Tour['budget']) ?? null,
     techDocuments: (row.tech_documents as Tour['techDocuments']) ?? [],
     currency: row.currency as string,
     totalBudget: row.total_budget != null ? Number(row.total_budget) : null,

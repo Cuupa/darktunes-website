@@ -141,6 +141,31 @@ export interface TechDocument {
   uploadedAt: string
 }
 
+export type TourBudgetCategory =
+  | 'transport'
+  | 'accommodation'
+  | 'crew'
+  | 'production'
+  | 'marketing'
+  | 'merch'
+  | 'other'
+
+export interface TourBudgetLine {
+  id: string
+  category: TourBudgetCategory
+  label: string
+  planned: number
+  actual?: number
+  notes?: string
+}
+
+export interface TourBudget {
+  lines: TourBudgetLine[]
+  notes?: string
+}
+
+export const EMPTY_TOUR_BUDGET: TourBudget = { lines: [] }
+
 export interface GuestListEntry {
   id: string
   name: string

@@ -726,7 +726,7 @@ export interface Tour {
   sortOrder: number
   settings: import('@/lib/tour-planner/types').TourPlannerSettings
   routeCache: import('@/lib/tour-planner/types').RouteResult | null
-  budget: unknown
+  budget: import('@/lib/tour-planner/types').TourBudget | null
   techDocuments: import('@/lib/tour-planner/types').TechDocument[]
   currency: string
   totalBudget: number | null
