@@ -2,23 +2,38 @@ import { test, expect } from '@playwright/test'
 import { getTestUser, loginAsAdmin } from '../helpers/auth'
 import { getVisibleArtists, isSupabaseE2EConfigured } from '../helpers/supabase'
 
-const ADMIN_TABS = [
+/** Tabs on `/admin` (AdminDashboard TAB_DEFS). */
+const ADMIN_DASHBOARD_TABS = [
   'Artists',
   'Releases',
   'News',
   'Videos',
+  'Events',
+  'Genres',
   'Assets',
-  'Settings',
-  'Health',
-  'Users',
-  'Features',
-  'Feature Flags',
-  'Messages',
   'Accreditations',
   'Press Portal',
-  'Logs',
-  'Roles & Permissions',
   'Statements',
+  'Release Submissions',
+  'Video Submissions',
+  'Promo Log',
+  'Submission Form',
+  'Maintenance',
+]
+
+/** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. */
+const ADMIN_SIDEBAR_LINKS = [
+  'Dashboard',
+  'Accounting',
+  'Label Intelligence',
+  'Messages',
+  'Users',
+  'Feature Flags',
+  'Colors',
+  'Settings',
+  'API Keys',
+  'Support',
+  'System',
 ]
 
 test.describe('Feature completeness', () => {
@@ -58,9 +73,38 @@ test.describe('Feature completeness', () => {
 
     await loginAsAdmin(page)
 
-    for (const tabLabel of ADMIN_TABS) {
+    for (const tabLabel of ADMIN_DASHBOARD_TABS) {
       await expect(page.getByRole('tab', { name: tabLabel })).toBeVisible()
     }
+  })
+
+  test('admin sidebar links are visible for admin role', async ({ page }) => {
+    if (!getTestUser('admin')) {
+      test.skip(true, 'Missing E2E admin credentials')
+      return
+    }
+
+    await loginAsAdmin(page)
+
+    const nav = page.getByRole('navigation', { name: 'Admin sections' })
+    for (const linkLabel of ADMIN_SIDEBAR_LINKS) {
+      await expect(nav.getByRole('link', { name: linkLabel })).toBeVisible()
+    }
+  })
+
+  test('admin features page shows global and portal sections', async ({ page }) => {
+    if (!getTestUser('admin')) {
+      test.skip(true, 'Missing E2E admin credentials')
+      return
+    }
+
+    await loginAsAdmin(page)
+    await page.goto('/admin/features', { waitUntil: 'domcontentloaded' })
+
+    await expect(page.getByRole('heading', { name: 'Global site toggles' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Portal module flags' })).toBeVisible()
+    await expect(page.getByText('Promo Pool').first()).toBeVisible()
+    await expect(page.getByText('Editor Tools').first()).toBeVisible()
   })
 
   test('newsletter section embeds the Shopify signup iframe', async ({ page }) => {

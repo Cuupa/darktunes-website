@@ -82,7 +82,7 @@ Recovery landing page unchanged: `/login?type=recovery`.
 
 ## Admin users & feature flags
 
-Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Two flag systems: `site_settings.feature_toggles` (global) + `portal_feature_flags` (per-module).
+Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `site_settings.feature_toggles` (global `promoPool`, `editorTools`) + `portal_feature_flags` (per-module). See [features.md](features.md#feature-flags-admin-adminfeatures).
 
 ## Public rate limits (`ipRateLimit.ts`)
 
