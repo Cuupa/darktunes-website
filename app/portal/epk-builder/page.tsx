@@ -92,6 +92,8 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     <EpkBuilderClient
       artistId={artist.id}
       artistName={artist.name}
+      artist={artist}
+      artistProfile={profile}
       initialDocument={state.document}
       documentVersion={state.documentVersion}
       initialAssets={assets}

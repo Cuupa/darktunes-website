@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { EpkGoogleFontPicker } from './EpkGoogleFontPicker'
 
 export interface EpkFontAsset {
   id: string
@@ -139,7 +140,8 @@ export function EpkFontManager({ artistId, initialFonts }: EpkFontManagerProps) 
         </Button>
       </div>
 
-      <div className="p-4 max-h-[min(200px,30vh)] overflow-y-auto">
+      <div className="space-y-4 p-4 max-h-[min(280px,40vh)] overflow-y-auto">
+        <EpkGoogleFontPicker />
         {fonts.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('epk_fonts_empty')}</p>
         ) : (

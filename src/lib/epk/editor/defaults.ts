@@ -76,6 +76,7 @@ export function createDefaultElement(
       src: overrides?.src,
       style: {
         opacity: 1,
+        objectFit: 'contain',
       },
       ...overrides,
     }

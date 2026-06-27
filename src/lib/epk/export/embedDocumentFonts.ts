@@ -10,6 +10,8 @@ import { StandardFonts } from 'pdf-lib'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { buildEpkFontPublicUrl } from '@/lib/api/epkFonts'
 import { fetchRemoteBytes } from './fetchRemoteBytes'
+import { fetchGoogleFontBytes } from './fetchGoogleFontBytes'
+import { isGoogleFontFamily } from '@/lib/epk/googleFonts'
 
 export interface PdfFontSet {
   regular: PDFFont
@@ -32,12 +34,17 @@ export async function embedDocumentFonts(
   ])
 
   for (const font of document.fonts) {
-    const url =
-      font.src ??
-      (font.r2Key && r2PublicUrl ? buildEpkFontPublicUrl(font.r2Key, r2PublicUrl) : undefined)
-    if (!url) continue
+    let bytes: Uint8Array | null = null
 
-    const bytes = await fetchRemoteBytes(url, r2PublicUrl)
+    if (isGoogleFontFamily(font.family)) {
+      bytes = await fetchGoogleFontBytes(font.family, 400)
+    } else {
+      const url =
+        font.src ??
+        (font.r2Key && r2PublicUrl ? buildEpkFontPublicUrl(font.r2Key, r2PublicUrl) : undefined)
+      if (url) bytes = await fetchRemoteBytes(url, r2PublicUrl)
+    }
+
     if (!bytes) continue
 
     try {
@@ -45,6 +52,19 @@ export async function embedDocumentFonts(
       byFamily.set(font.family, embedded)
     } catch {
       // Skip unsupported or corrupt font files.
+    }
+  }
+
+  for (const element of document.elements) {
+    if (element.type !== 'text' || !element.style.fontFamily) continue
+    const family = element.style.fontFamily
+    if (byFamily.has(family) || !isGoogleFontFamily(family)) continue
+    const bytes = await fetchGoogleFontBytes(family, 400)
+    if (!bytes) continue
+    try {
+      byFamily.set(family, await pdfDoc.embedFont(bytes))
+    } catch {
+      // fallback to Helvetica via resolvePdfFont
     }
   }
 

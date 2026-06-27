@@ -95,31 +95,6 @@ export function usePortalProfileForm({
   })
   const [riderUploading, setRiderUploading] = useState<RiderType | null>(null)
 
-  // EPK customisation settings (theme, section order, password, gallery, custom colors)
-  const [epkSettings, setEpkSettings] = useState<{
-    epkTheme: string
-    epkSectionsOrder: string[]
-    epkSectionsHidden: string[]
-    epkPasswordSections: string[]
-    epkPasswordRaw?: string | null
-    epkCustomThemeTokens: Record<string, string>
-    epkLayout: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
-    epkOrientation: 'portrait' | 'landscape'
-    epkBgImageUrl?: string
-    epkBgOpacity: number
-  }>({
-    epkTheme: initialProfile?.epkTheme ?? 'default',
-    epkSectionsOrder: initialProfile?.epkSectionsOrder?.length ? initialProfile.epkSectionsOrder : ['header','quote','bio','gallery','info','contacts','riders','links'],
-    epkSectionsHidden: initialProfile?.epkSectionsHidden ?? [],
-    epkPasswordSections: initialProfile?.epkPasswordSections ?? [],
-    epkPasswordRaw: undefined,
-    epkCustomThemeTokens: initialProfile?.epkCustomThemeTokens ?? {},
-    epkLayout: initialProfile?.epkLayout ?? 'classic',
-    epkOrientation: initialProfile?.epkOrientation ?? 'portrait',
-    epkBgImageUrl: initialProfile?.epkBgImageUrl,
-    epkBgOpacity: initialProfile?.epkBgOpacity ?? 20,
-  })
-
   // Gallery photos (managed separately from the main form)
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>(initialProfile?.epkGalleryPhotos ?? [])
   const [galleryUploading, setGalleryUploading] = useState(false)
@@ -249,50 +224,7 @@ export function usePortalProfileForm({
   }
 
   // -------------------------------------------------------------------------
-  // EPK settings change handler (called from EPKPreview child)
-  // -------------------------------------------------------------------------
-
-  const handleEpkSettingsChange = (updates: Partial<{
-    epkTheme: string
-    epkSectionsOrder: string[]
-    epkSectionsHidden: string[]
-    epkPasswordSections: string[]
-    epkPasswordHash: string | undefined
-    epkCustomThemeTokens: Record<string, string>
-    epkLayout: 'classic' | 'magazine' | 'minimal' | 'full-bleed'
-    epkOrientation: 'portrait' | 'landscape'
-    epkBgImageUrl: string | undefined
-    epkBgOpacity: number
-  }>) => {
-    setEpkSettings((prev) => {
-      // Extract raw password from the __plain__ sentinel
-      let epkPasswordRaw = prev.epkPasswordRaw
-      if (updates.epkPasswordHash !== undefined) {
-        const raw = updates.epkPasswordHash
-        if (raw === undefined) {
-          epkPasswordRaw = null // signal: clear password
-        } else if (typeof raw === 'string' && raw.startsWith('__plain__')) {
-          epkPasswordRaw = raw.slice('__plain__'.length) || null
-        }
-      }
-      return {
-        ...prev,
-        ...(updates.epkTheme !== undefined ? { epkTheme: updates.epkTheme } : {}),
-        ...(updates.epkSectionsOrder !== undefined ? { epkSectionsOrder: updates.epkSectionsOrder } : {}),
-        ...(updates.epkSectionsHidden !== undefined ? { epkSectionsHidden: updates.epkSectionsHidden } : {}),
-        ...(updates.epkPasswordSections !== undefined ? { epkPasswordSections: updates.epkPasswordSections } : {}),
-        ...(updates.epkCustomThemeTokens !== undefined ? { epkCustomThemeTokens: updates.epkCustomThemeTokens } : {}),
-        ...(updates.epkLayout !== undefined ? { epkLayout: updates.epkLayout } : {}),
-        ...(updates.epkOrientation !== undefined ? { epkOrientation: updates.epkOrientation } : {}),
-        ...('epkBgImageUrl' in updates ? { epkBgImageUrl: updates.epkBgImageUrl } : {}),
-        ...(updates.epkBgOpacity !== undefined ? { epkBgOpacity: updates.epkBgOpacity } : {}),
-        epkPasswordRaw,
-      }
-    })
-  }
-
-  // -------------------------------------------------------------------------
-  // Form submission (includes rider URLs + EPK settings)
+  // Form submission (includes rider URLs + gallery photos)
   // -------------------------------------------------------------------------
 
   const onSubmit = async (values: ProfileFormValues) => {
@@ -338,19 +270,7 @@ export function usePortalProfileForm({
           rider_stage_plot_url: riderUrls.stage_plot ?? null,
           rider_technical_url: riderUrls.technical ?? null,
           rider_hospitality_url: riderUrls.hospitality ?? null,
-          epk_theme: epkSettings.epkTheme,
-          epk_sections_order: epkSettings.epkSectionsOrder,
-          epk_sections_hidden: epkSettings.epkSectionsHidden,
-          epk_password_sections: epkSettings.epkPasswordSections,
           epk_gallery_photos: galleryPhotos,
-          epk_custom_theme_tokens: Object.keys(epkSettings.epkCustomThemeTokens).length > 0
-            ? epkSettings.epkCustomThemeTokens
-            : null,
-          epk_layout: epkSettings.epkLayout,
-          epk_orientation: epkSettings.epkOrientation,
-          epk_bg_image_url: epkSettings.epkBgImageUrl ?? null,
-          epk_bg_opacity: epkSettings.epkBgOpacity,
-          ...(epkSettings.epkPasswordRaw !== undefined ? { epk_password_raw: epkSettings.epkPasswordRaw } : {}),
         },
         session.access_token,
       )
@@ -375,7 +295,6 @@ export function usePortalProfileForm({
     watched,
     riderUrls,
     riderUploading,
-    epkSettings,
     galleryPhotos,
     galleryUploading,
     handlePhotoChange,
@@ -383,7 +302,6 @@ export function usePortalProfileForm({
     handleRiderDelete,
     handleGalleryUpload,
     handleGalleryRemove,
-    handleEpkSettingsChange,
     onSubmit: form.handleSubmit(onSubmit),
   }
 }

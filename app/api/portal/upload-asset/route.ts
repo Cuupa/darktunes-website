@@ -125,9 +125,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   let asset
   let mainAssetId: string | null = null
+  const serviceRole = await createServiceRoleSupabaseClient()
   try {
-    // Insert into main assets table so admin file explorer can see portal uploads
-    const mainAsset = await createAssetRecord(supabase, {
+    // Portal artists cannot insert into `assets` under RLS — use service role.
+    const mainAsset = await createAssetRecord(serviceRole, {
       filename: file.name,
       original_filename: file.name,
       mime_type: file.type || 'application/octet-stream',
@@ -162,7 +163,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (pressSuggested && mainAssetId) {
-    const serviceRole = await createServiceRoleSupabaseClient()
     const { data: recipientProfiles } = await serviceRole
       .from('users')
       .select('id')

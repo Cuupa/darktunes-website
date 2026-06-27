@@ -1,12 +1,8 @@
 'use client'
 
-/**
- * src/components/epk-builder/EpkBuilderShell.tsx
- *
- * Full editor layout: toolbar, canvas, pages, layers, properties, and Phase 3 panels.
- */
-
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useEpkEditorStore, useEpkEditorStoreApi } from '@/lib/epk/editor/EpkEditorProvider'
 import { EpkToolbar } from './EpkToolbar'
 import { EpkCanvas } from './EpkCanvas'
@@ -18,13 +14,26 @@ import { EpkVersionHistoryPanel } from './EpkVersionHistoryPanel'
 import { EpkShareLinkPanel } from './EpkShareLinkPanel'
 import { EpkDownloadStatsPanel } from './EpkDownloadStatsPanel'
 import { EpkTemplatePicker } from './EpkTemplatePicker'
+import { EpkContextMenu } from './EpkContextMenu'
 import type { EpkTemplate } from '@/lib/api/epkTemplates'
 import { EpkFontLoader } from './EpkFontLoader'
 import { EpkFontManager, type EpkFontAsset } from './EpkFontManager'
-import type { ArtistAsset } from '@/types'
+import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
+import { getProportionalElementSize } from '@/lib/epk/imageFit'
+import {
+  buildProfilePresetElement,
+  type ProfilePresetId,
+} from '@/lib/epk/editor/profilePresets'
+import type { ArtistProfile } from '@/lib/api/artistProfiles'
+import type { Artist, ArtistAsset } from '@/types'
+import { cn } from '@/lib/utils'
+
+type MobilePanel = 'canvas' | 'layers' | 'properties'
 
 interface EpkBuilderShellProps {
   artistId: string
+  artist: Artist
+  artistProfile: ArtistProfile | null
   initialAssets: ArtistAsset[]
   initialFonts: EpkFontAsset[]
   onSave: () => void
@@ -35,6 +44,8 @@ interface EpkBuilderShellProps {
 
 export function EpkBuilderShell({
   artistId,
+  artist,
+  artistProfile,
   initialAssets,
   initialFonts,
   onSave,
@@ -42,24 +53,60 @@ export function EpkBuilderShell({
   onVersionRestored,
   isSaving,
 }: EpkBuilderShellProps) {
+  const t = useTranslations('portal')
   const store = useEpkEditorStoreApi()
   const setDocument = useEpkEditorStore((s) => s.setDocument)
   const applyDocument = useEpkEditorStore((s) => s.applyDocument)
   const addElement = useEpkEditorStore((s) => s.addElement)
+  const addPresetElement = useEpkEditorStore((s) => s.addPresetElement)
   const deleteSelected = useEpkEditorStore((s) => s.deleteSelected)
+  const duplicateSelected = useEpkEditorStore((s) => s.duplicateSelected)
+  const nudgeSelected = useEpkEditorStore((s) => s.nudgeSelected)
   const selectedIds = useEpkEditorStore((s) => s.selectedIds)
+  const activePageId = useEpkEditorStore((s) => s.activePageId)
+  const document = useEpkEditorStore((s) => s.document)
 
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [shareLinksOpen, setShareLinksOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('canvas')
+
+  const insertImage = (url: string) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const size = getProportionalElementSize(img.naturalWidth, img.naturalHeight)
+      addElement('image', { src: url, width: size.width, height: size.height })
+    }
+    img.onerror = () => addElement('image', { src: url })
+    img.src = resolveEpkCanvasImageSrc(url)
+  }
+
+  const handleInsertPreset = (presetId: ProfilePresetId) => {
+    if (!artistProfile) {
+      toast.error(t('epk_preset_no_profile'))
+      return
+    }
+    const element = buildProfilePresetElement(
+      presetId,
+      activePageId,
+      document,
+      artistProfile,
+      artist,
+    )
+    if (!element) {
+      toast.error(t('epk_preset_empty'))
+      return
+    }
+    addPresetElement(element)
+    toast.success(t('epk_preset_inserted'))
+  }
 
   const handleApplyTemplate = (template: EpkTemplate) => {
-    const document = structuredClone(template.document)
-    // Template custom fonts live in admin storage — artists use their own font library.
-    document.fonts = []
-    applyDocument(document)
+    const next = structuredClone(template.document)
+    applyDocument(next)
     store.temporal.getState().clear()
   }
 
@@ -77,14 +124,41 @@ export function EpkBuilderShell({
       } else if (meta && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault()
         store.temporal.getState().redo()
+      } else if (meta && e.key === 'd') {
+        e.preventDefault()
+        duplicateSelected()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
         e.preventDefault()
         deleteSelected()
+      } else if (selectedIds.length > 0) {
+        const step = e.shiftKey ? 16 : 1
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          nudgeSelected(-step, 0)
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          nudgeSelected(step, 0)
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          nudgeSelected(0, -step)
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          nudgeSelected(0, step)
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [deleteSelected, selectedIds.length, store])
+  }, [deleteSelected, duplicateSelected, nudgeSelected, selectedIds.length, store])
+
+  const sidePanels = (
+    <div className="space-y-4">
+      <EpkPagesPanel />
+      <EpkLayersPanel />
+      <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
+      <EpkPropertiesPanel />
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -97,15 +171,57 @@ export function EpkBuilderShell({
         onOpenShareLinks={() => setShareLinksOpen(true)}
         onOpenAnalytics={() => setAnalyticsOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}
+        onInsertPreset={handleInsertPreset}
         isSaving={isSaving}
       />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
-        <EpkCanvas />
-        <div className="space-y-4">
-          <EpkPagesPanel />
-          <EpkLayersPanel />
-          <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
-          <EpkPropertiesPanel />
+
+      <nav
+        className="flex gap-1 rounded-lg border border-border bg-card p-1 lg:hidden"
+        aria-label={t('epk_mobile_nav_label')}
+      >
+        {(['canvas', 'layers', 'properties'] as const).map((panel) => (
+          <button
+            key={panel}
+            type="button"
+            className={cn(
+              'min-h-[44px] flex-1 rounded-md px-3 text-sm font-medium transition-colors',
+              mobilePanel === panel
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted',
+            )}
+            onClick={() => setMobilePanel(panel)}
+          >
+            {panel === 'canvas'
+              ? t('epk_mobile_canvas')
+              : panel === 'layers'
+                ? t('epk_editor_layers_title')
+                : t('epk_editor_properties_title')}
+          </button>
+        ))}
+      </nav>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className={cn(mobilePanel !== 'canvas' && 'hidden lg:block')}>
+          <EpkContextMenu onOpenAssetPicker={() => setAssetPickerOpen(true)}>
+            <EpkCanvas />
+          </EpkContextMenu>
+        </div>
+        <div className={cn('space-y-4', mobilePanel === 'canvas' && 'hidden lg:block')}>
+          {mobilePanel === 'properties' || mobilePanel === 'layers' ? (
+            mobilePanel === 'layers' ? (
+              <>
+                <EpkPagesPanel />
+                <EpkLayersPanel />
+              </>
+            ) : (
+              <>
+                <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
+                <EpkPropertiesPanel />
+              </>
+            )
+          ) : (
+            sidePanels
+          )}
         </div>
       </div>
 
@@ -114,7 +230,7 @@ export function EpkBuilderShell({
         open={assetPickerOpen}
         onClose={() => setAssetPickerOpen(false)}
         initialAssets={initialAssets}
-        onSelect={(url) => addElement('image', { src: url })}
+        onSelect={insertImage}
       />
 
       <EpkVersionHistoryPanel

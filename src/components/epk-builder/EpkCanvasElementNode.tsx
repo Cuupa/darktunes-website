@@ -8,9 +8,10 @@
 
 import '@/lib/epk/konvaShapes'
 import { useEffect, useState } from 'react'
-import { Rect, Text, Image as KonvaImage } from 'react-konva'
+import { Group, Rect, Text, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
+import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
 
 function useHtmlImage(src: string | undefined): HTMLImageElement | null {
@@ -97,13 +98,16 @@ export function EpkCanvasElementNode({
           const node = e.target
           const scaleX = node.scaleX()
           const scaleY = node.scaleY()
+          const isImage = element.type === 'image' || element.type === 'logo'
+          const uniformScale = isImage ? Math.max(scaleX, scaleY) : scaleX
+          const uniformScaleY = isImage ? uniformScale : scaleY
           node.scaleX(1)
           node.scaleY(1)
           onChange?.(element.id, {
             x: node.x() + offsetX,
             y: node.y() + offsetY,
-            width: Math.max(8, node.width() * scaleX),
-            height: Math.max(8, node.height() * scaleY),
+            width: Math.max(8, node.width() * uniformScale),
+            height: Math.max(8, node.height() * uniformScaleY),
             rotation: node.rotation(),
           })
         }
@@ -142,16 +146,45 @@ export function EpkCanvasElementNode({
         />
       )
     case 'image':
-    case 'logo':
+    case 'logo': {
       if (!image) return null
+      const layout = getEpkImageLayout(element, image.naturalWidth, image.naturalHeight)
       return (
-        <KonvaImage
-          {...commonProps}
-          image={image}
-          stroke={isSelected ? '#493687' : undefined}
-          strokeWidth={isSelected ? 2 : 0}
-        />
+        <Group
+          id={element.id}
+          x={x}
+          y={y}
+          width={element.width}
+          height={element.height}
+          rotation={element.rotation}
+          opacity={element.style.opacity ?? 1}
+          listening={interactive}
+          draggable={interactive && !element.locked}
+          onClick={commonProps.onClick}
+          onTap={commonProps.onTap}
+          onDragEnd={commonProps.onDragEnd}
+          onTransformEnd={commonProps.onTransformEnd}
+          ref={registerRef ? (node: Konva.Node | null) => registerRef(element.id, node) : undefined}
+        >
+          <Rect
+            width={element.width}
+            height={element.height}
+            fill="transparent"
+            stroke={isSelected ? '#493687' : undefined}
+            strokeWidth={isSelected ? 2 : 0}
+          />
+          <KonvaImage
+            x={layout.offsetX}
+            y={layout.offsetY}
+            width={layout.drawWidth}
+            height={layout.drawHeight}
+            image={image}
+            crop={layout.crop}
+            listening={false}
+          />
+        </Group>
       )
+    }
     default:
       return null
   }

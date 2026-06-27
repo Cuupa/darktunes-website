@@ -18,7 +18,8 @@ import { useEpkAutosave } from '@/hooks/useEpkAutosave'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
 import type { EpkFontAsset } from '@/components/epk-builder/EpkFontManager'
-import type { ArtistAsset } from '@/types'
+import type { ArtistProfile } from '@/lib/api/artistProfiles'
+import type { Artist, ArtistAsset } from '@/types'
 import { toast } from 'sonner'
 
 const EpkBuilderShell = dynamic(
@@ -34,14 +35,19 @@ const EpkBuilderShell = dynamic(
 interface EpkBuilderClientProps {
   artistId: string
   artistName: string
+  artist: Artist
+  artistProfile: ArtistProfile | null
   initialDocument: EpkDocumentV2
   documentVersion: number
   initialAssets: ArtistAsset[]
   initialFonts: EpkFontAsset[]
 }
 
-function EpkBuilderWorkspace({ artistId,
+function EpkBuilderWorkspace({
+  artistId,
   artistName,
+  artist,
+  artistProfile,
   documentVersion: initialVersion,
   initialAssets,
   initialFonts,
@@ -159,6 +165,8 @@ function EpkBuilderWorkspace({ artistId,
 
       <EpkBuilderShell
         artistId={artistId}
+        artist={artist}
+        artistProfile={artistProfile}
         initialAssets={initialAssets}
         initialFonts={initialFonts}
         onSave={() => void handleSave()}
@@ -170,8 +178,11 @@ function EpkBuilderWorkspace({ artistId,
   )
 }
 
-export function EpkBuilderClient({ artistId,
+export function EpkBuilderClient({
+  artistId,
   artistName,
+  artist,
+  artistProfile,
   initialDocument,
   documentVersion,
   initialAssets,
@@ -184,6 +195,8 @@ export function EpkBuilderClient({ artistId,
       <EpkBuilderWorkspace
         artistId={artistId}
         artistName={artistName}
+        artist={artist}
+        artistProfile={artistProfile}
         documentVersion={documentVersion}
         initialAssets={initialAssets}
         initialFonts={initialFonts}
