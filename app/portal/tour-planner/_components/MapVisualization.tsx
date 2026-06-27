@@ -5,13 +5,23 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react'
 
+export interface MapLegendLabels {
+  title: string
+  reset: string
+  start: string
+  hotel: string
+  venue: string
+  travel: string
+}
+
 interface MapVisualizationProps {
   stops: TrackStop[]
   route: RouteResult | null
+  labels: MapLegendLabels
   onMapImageReady?: (imageData: string) => void
 }
 
-export function MapVisualization({ stops, route, onMapImageReady }: MapVisualizationProps) {
+export function MapVisualization({ stops, route, labels, onMapImageReady }: MapVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -204,7 +214,7 @@ export function MapVisualization({ stops, route, onMapImageReady }: MapVisualiza
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Route Map</h3>
+        <h3 className="text-lg font-semibold">{labels.title}</h3>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={handleZoomIn}>
             <MagnifyingGlassPlus size={16} />
@@ -213,7 +223,7 @@ export function MapVisualization({ stops, route, onMapImageReady }: MapVisualiza
             <MagnifyingGlassMinus size={16} />
           </Button>
           <Button size="sm" variant="outline" onClick={handleReset}>
-            Reset
+            {labels.reset}
           </Button>
         </div>
       </div>
@@ -232,19 +242,19 @@ export function MapVisualization({ stops, route, onMapImageReady }: MapVisualiza
       <div className="flex gap-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'oklch(0.55 0.15 150)' }} />
-          <span>Start</span>
+          <span>{labels.start}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'oklch(0.65 0.15 195)' }} />
-          <span>Hotel</span>
+          <span>{labels.hotel}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'oklch(0.60 0.20 330)' }} />
-          <span>Venue</span>
+          <span>{labels.venue}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'oklch(0.50 0.05 240)' }} />
-          <span>Travel</span>
+          <span>{labels.travel}</span>
         </div>
       </div>
     </Card>

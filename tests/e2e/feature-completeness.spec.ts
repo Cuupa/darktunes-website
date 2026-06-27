@@ -24,6 +24,7 @@ const ADMIN_DASHBOARD_TABS = [
 /** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. */
 const ADMIN_SIDEBAR_LINKS = [
   'Dashboard',
+  'Tour Planner',
   'Accounting',
   'Label Intelligence',
   'Messages',

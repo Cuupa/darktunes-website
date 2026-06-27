@@ -1,52 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { deleteTourContact, updateTourContact } from '@/lib/api/tourContacts'
+import { deleteTourCrewMember, updateTourCrewMember } from '@/lib/api/tourCrew'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
-  contactType: z.string().optional(),
-  company: z.string().nullable().optional(),
+  role: z.string().optional(),
   email: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
 })
 
-function contactId(pathname: string): string {
+function crewId(pathname: string): string {
   const id = pathname.split('/').pop()
-  if (!id) throw new ApiError(400, 'Missing contact id')
+  if (!id) throw new ApiError(400, 'Missing crew id')
   return id
 }
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
-  const id = contactId(req.nextUrl.pathname)
+  const id = crewId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
-  const { data, error } = await supabase.from('tour_contacts').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Contact not found')
+  const { data, error } = await supabase.from('tour_crew_members').select('artist_id').eq('id', id).single()
+  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Crew member not found')
 
-  const contact = await updateTourContact(supabase, id, {
+  const member = await updateTourCrewMember(supabase, id, {
     name: body.name,
-    contact_type: body.contactType,
-    company: body.company,
+    role: body.role,
     email: body.email,
     phone: body.phone,
-    notes: body.notes,
   })
-  return NextResponse.json({ contact })
+  return NextResponse.json({ member })
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
-  const id = contactId(req.nextUrl.pathname)
+  const id = crewId(req.nextUrl.pathname)
 
-  const { data, error } = await supabase.from('tour_contacts').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Contact not found')
+  const { data, error } = await supabase.from('tour_crew_members').select('artist_id').eq('id', id).single()
+  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Crew member not found')
 
-  await deleteTourContact(supabase, id)
+  await deleteTourCrewMember(supabase, id)
   return NextResponse.json({ ok: true })
 })

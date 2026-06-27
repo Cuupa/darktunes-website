@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,8 +14,14 @@ import { downloadFile, exportToCSV, exportToText } from '@/lib/tour-planner/expo
 import { useTourPlannerCrew, useTourPlannerMerch } from '@/lib/tour-planner/hooks'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
-import { downloadDaySheetPdf } from '@/lib/tour-planner/pdf'
+import {
+  downloadDaySheetPdf,
+  downloadMerchSettlementPdf,
+  downloadSettlementPdf,
+  type TourPlannerPdfLabels,
+} from '@/lib/tour-planner/pdf'
 import type {
+  DealStructure,
   GuestListEntry,
   MerchSettlement,
   Settlement,
@@ -24,6 +31,37 @@ import type {
 } from '@/lib/tour-planner/types'
 import type { Tour, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
+
+type PortalTranslator = ReturnType<typeof useTranslations<'portal'>>
+
+export function buildTourPlannerPdfLabels(t: PortalTranslator): TourPlannerPdfLabels {
+  return {
+    daySheet: t('tour_planner_day_sheet'),
+    schedule: t('tour_planner_pdf_schedule'),
+    venue: t('tour_planner_stop_venue'),
+    date: t('tour_planner_stop_date'),
+    show: t('tour_planner_unnamed_stop'),
+    tbd: t('tour_planner_pdf_tbd'),
+    getIn: t('tour_planner_day_getIn'),
+    soundcheck: t('tour_planner_day_soundcheck'),
+    doors: t('tour_planner_day_doors'),
+    stageTime: t('tour_planner_day_stageTime'),
+    curfew: t('tour_planner_day_curfew'),
+    settlement: t('tour_planner_settlement'),
+    ticketsSold: t('tour_planner_settlement_ticketsSold'),
+    ticketPrice: t('tour_planner_settlement_ticketPrice'),
+    grossRevenue: t('tour_planner_settlement_grossRevenue'),
+    venueCosts: t('tour_planner_settlement_venueCosts'),
+    netRevenue: t('tour_planner_settlement_netRevenue'),
+    artistPayment: t('tour_planner_settlement_artistPayment'),
+    notes: t('tour_planner_notes'),
+    merchSettlement: t('tour_planner_merch_settlement'),
+    hallFee: t('tour_planner_merch_hall_fee'),
+    itemsSold: t('tour_planner_merch_items_sold'),
+    signedAt: t('tour_planner_pdf_signed_at'),
+    signature: t('tour_planner_pdf_signature'),
+  }
+}
 
 export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: string; activeTour: Tour | null; stops: TourStop[] }) {
   const t = useTranslations('portal')
@@ -101,7 +139,20 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
           {t('tour_planner_route_summary', { km: Math.round(route.totalDistance / 1000), min: Math.round(route.totalDuration / 60) })}
         </p>
       )}
-      {trackStops.length > 0 && <MapVisualization stops={trackStops} route={route ?? null} />}
+      {trackStops.length > 0 && (
+        <MapVisualization
+          stops={trackStops}
+          route={route ?? null}
+          labels={{
+            title: t('tour_planner_map_title'),
+            reset: t('tour_planner_map_reset'),
+            start: t('tour_planner_map_start'),
+            hotel: t('tour_planner_hotel_name'),
+            venue: t('tour_planner_stop_venue'),
+            travel: t('tour_planner_map_travel'),
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -134,7 +185,24 @@ export function CrewPanel({ artistId, tourId }: { artistId: string; tourId: stri
         <Button disabled={!name} onClick={() => create.mutate()}>{t('tour_planner_add_crew')}</Button>
       </div>
       <ul className="divide-y divide-border rounded-md border">
-        {crew.map((m) => <li key={m.id} className="p-3 text-sm">{m.name} · {m.role}</li>)}
+        {crew.map((m) => (
+          <li key={m.id} className="p-3 text-sm flex items-center justify-between gap-2">
+            <span>{m.name} · {m.role}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('tour_planner_delete_crew')}
+              onClick={async () => {
+                const res = await tourPlannerFetch(artistId, `/crew/${m.id}`, { method: 'DELETE' })
+                if (!res.ok) { toast.error(t('tour_planner_error')); return }
+                void qc.invalidateQueries({ queryKey: tourPlannerKeys.crew(artistId, tourId) })
+                toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_crew_deleted'))
+              }}
+            >
+              <Trash size={14} aria-hidden />
+            </Button>
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -173,17 +241,8 @@ export function MerchPanel({ artistId }: { artistId: string }) {
   )
 }
 
-export function MerchSettlementForm({
-  artistId,
-  stop,
-  onSaved,
-}: {
-  artistId: string
-  stop: TourStop
-  onSaved: () => void
-}) {
-  const t = useTranslations('portal')
-  const [draft, setDraft] = useState<MerchSettlement>({
+function emptyMerchSettlement(stop: TourStop): MerchSettlement {
+  return {
     showId: stop.id,
     date: stop.stopDate,
     countIn: {},
@@ -198,7 +257,39 @@ export function MerchSettlementForm({
     netRevenue: 0,
     taxRate: 0,
     notes: '',
-  })
+  }
+}
+
+export function MerchSettlementForm({
+  artistId,
+  stop,
+  onSaved,
+}: {
+  artistId: string
+  stop: TourStop
+  onSaved: () => void
+}) {
+  const t = useTranslations('portal')
+  const pdfLabels = buildTourPlannerPdfLabels(t)
+  const [draft, setDraft] = useState<MerchSettlement>(emptyMerchSettlement(stop))
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await tourPlannerFetch(artistId, `/merch/settlement?stopId=${stop.id}`)
+        if (!res.ok) return
+        const json = (await res.json()) as { record: { settlement: MerchSettlement } | null }
+        if (!cancelled && json.record?.settlement) setDraft(json.record.settlement)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [artistId, stop.id])
 
   const save = async () => {
     const res = await tourPlannerFetch(artistId, '/merch/settlement', {
@@ -235,7 +326,68 @@ export function MerchSettlementForm({
         <Label>{t('tour_planner_notes')}</Label>
         <Textarea value={draft.notes ?? ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
       </div>
-      <Button className="sm:col-span-2" onClick={() => void save()}>{t('tour_planner_save')}</Button>
+      <div className="sm:col-span-2 flex flex-wrap gap-2">
+        <Button onClick={() => void save()} disabled={loading}>{t('tour_planner_save')}</Button>
+        <Button
+          variant="outline"
+          disabled={loading}
+          onClick={() => downloadMerchSettlementPdf(stop, draft, pdfLabels)}
+        >
+          {t('tour_planner_pdf')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export function HotelForm({
+  stop,
+  onSave,
+}: {
+  stop: TourStop
+  onSave: (fields: Pick<TourStop, 'hotelName' | 'hotelAddress' | 'hotelCity' | 'hotelCountry' | 'isTravelDay'>) => void
+}) {
+  const t = useTranslations('portal')
+  const [hotelName, setHotelName] = useState(stop.hotelName ?? '')
+  const [hotelAddress, setHotelAddress] = useState(stop.hotelAddress ?? '')
+  const [hotelCity, setHotelCity] = useState(stop.hotelCity ?? '')
+  const [hotelCountry, setHotelCountry] = useState(stop.hotelCountry ?? '')
+  const [isTravelDay, setIsTravelDay] = useState(stop.isTravelDay)
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" checked={isTravelDay} onChange={(e) => setIsTravelDay(e.target.checked)} />
+        {t('tour_planner_travel_day_label')}
+      </label>
+      <div className="space-y-1">
+        <Label htmlFor="hotel-name">{t('tour_planner_hotel_name')}</Label>
+        <Input id="hotel-name" value={hotelName} onChange={(e) => setHotelName(e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="hotel-city">{t('tour_planner_hotel_city')}</Label>
+        <Input id="hotel-city" value={hotelCity} onChange={(e) => setHotelCity(e.target.value)} />
+      </div>
+      <div className="space-y-1 sm:col-span-2">
+        <Label htmlFor="hotel-address">{t('tour_planner_hotel_address')}</Label>
+        <Input id="hotel-address" value={hotelAddress} onChange={(e) => setHotelAddress(e.target.value)} />
+      </div>
+      <div className="space-y-1 sm:col-span-2">
+        <Label htmlFor="hotel-country">{t('tour_planner_hotel_country')}</Label>
+        <Input id="hotel-country" value={hotelCountry} onChange={(e) => setHotelCountry(e.target.value)} />
+      </div>
+      <Button
+        className="sm:col-span-2"
+        onClick={() => onSave({
+          hotelName: hotelName || null,
+          hotelAddress: hotelAddress || null,
+          hotelCity: hotelCity || null,
+          hotelCountry: hotelCountry || null,
+          isTravelDay,
+        })}
+      >
+        {t('tour_planner_save')}
+      </Button>
     </div>
   )
 }
@@ -375,8 +527,19 @@ export function LoadInForm({ details, onSave }: { details: VenueDetails | null; 
   )
 }
 
-export function SettlementForm({ settlement, onSave }: { settlement: Settlement | null; onSave: (s: Settlement) => void }) {
+export function SettlementForm({
+  stop,
+  settlement,
+  deal,
+  onSave,
+}: {
+  stop: TourStop
+  settlement: Settlement | null
+  deal: DealStructure | null
+  onSave: (s: Settlement) => void
+}) {
   const t = useTranslations('portal')
+  const pdfLabels = buildTourPlannerPdfLabels(t)
   const [draft, setDraft] = useState<Settlement>(settlement ?? {
     ticketsSold: 0, ticketPrice: 0, grossRevenue: 0, venueCosts: 0, netRevenue: 0, artistPayment: 0,
   })
@@ -389,7 +552,12 @@ export function SettlementForm({ settlement, onSave }: { settlement: Settlement 
           <Input id={field} type="number" value={draft[field]} onChange={(e) => num(field, e.target.value)} />
         </div>
       ))}
-      <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
+      <div className="sm:col-span-2 flex flex-wrap gap-2">
+        <Button onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
+        <Button variant="outline" onClick={() => downloadSettlementPdf(stop, draft, deal, pdfLabels)}>
+          {t('tour_planner_pdf')}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -498,8 +666,13 @@ export async function geocodeStopVenue(artistId: string, stop: TourStop): Promis
 
 export function DaySheetPdfButton({ stop }: { stop: TourStop }) {
   const t = useTranslations('portal')
+  const pdfLabels = buildTourPlannerPdfLabels(t)
   return (
-    <Button variant="ghost" size="sm" onClick={() => downloadDaySheetPdf(stop, stop.daySchedule ?? {})}>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => downloadDaySheetPdf(stop, stop.daySchedule ?? {}, pdfLabels)}
+    >
       {t('tour_planner_pdf')}
     </Button>
   )

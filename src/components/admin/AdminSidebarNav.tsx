@@ -26,6 +26,7 @@ import {
   Newspaper,
   FilmStrip,
   CalendarBlank,
+  MapTrifold,
   UploadSimple,
   VideoCamera,
   IdentificationCard,
@@ -88,6 +89,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'News',     href: '/admin/news',     editorHref: getCmsTabPath('editor', 'news'),     icon: Newspaper,     adminOnly: false },
       { label: 'Videos',   href: '/admin/videos',   editorHref: getCmsTabPath('editor', 'videos'),   icon: FilmStrip,     adminOnly: false },
       { label: 'Events',   href: '/admin/events',   editorHref: getCmsTabPath('editor', 'events'),   icon: CalendarBlank, adminOnly: false },
+      { label: 'Tour Planner', href: '/admin/tour-planner', icon: MapTrifold, adminOnly: true },
     ],
   },
   {

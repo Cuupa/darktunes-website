@@ -54,6 +54,19 @@ export async function getTourMerchItemsByArtistId(db: DbClient, artistId: string
   return (data ?? []).map(rowToMerchItem)
 }
 
+export async function getTourMerchSettlementByStopId(
+  db: DbClient,
+  stopId: string,
+): Promise<TourMerchSettlementRecord | null> {
+  const { data, error } = await db
+    .from('tour_merch_settlements')
+    .select('*')
+    .eq('stop_id', stopId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? rowToMerchSettlement(data) : null
+}
+
 export async function upsertTourMerchSettlement(
   db: DbClient,
   stopId: string,
