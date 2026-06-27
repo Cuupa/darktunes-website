@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getPasswordRecoveryRedirectUrl, resolveRedirectPath } from './resolveRedirectPath'
+import {
+  buildPasswordRecoveryVerifyUrl,
+  getPasswordRecoveryClientLandingUrl,
+  getPasswordRecoveryRedirectUrl,
+  resolveRedirectPath,
+} from './resolveRedirectPath'
 
 describe('resolveRedirectPath', () => {
   it('routes admin and editor to /admin', () => {
@@ -26,6 +31,22 @@ describe('getPasswordRecoveryRedirectUrl', () => {
   it('builds recovery URL without trailing slash', () => {
     expect(getPasswordRecoveryRedirectUrl('https://darktunes.com/')).toBe(
       'https://darktunes.com/auth/callback?recovery=1',
+    )
+  })
+})
+
+describe('buildPasswordRecoveryVerifyUrl', () => {
+  it('builds a server-verifiable callback URL from hashed_token', () => {
+    expect(buildPasswordRecoveryVerifyUrl('https://darktunes.com/', 'abc123hash')).toBe(
+      'https://darktunes.com/auth/callback?recovery=1&token_hash=abc123hash&type=recovery',
+    )
+  })
+})
+
+describe('getPasswordRecoveryClientLandingUrl', () => {
+  it('points Supabase fallback emails at the client hash handler', () => {
+    expect(getPasswordRecoveryClientLandingUrl('https://darktunes.com/')).toBe(
+      'https://darktunes.com/login?type=recovery',
     )
   })
 })

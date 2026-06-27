@@ -62,7 +62,7 @@ describe('requestPasswordReset', () => {
 
     expect(result).toEqual({ sent: true, channel: 'supabase_fallback' })
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
-      redirectTo: 'https://darktunes.com/auth/callback?recovery=1',
+      redirectTo: 'https://darktunes.com/login?type=recovery',
     })
     expect(mockGenerateLink).not.toHaveBeenCalled()
   })
@@ -80,7 +80,12 @@ describe('requestPasswordReset', () => {
 
   it('sends branded Resend email when API key is configured', async () => {
     mockGenerateLink.mockResolvedValue({
-      data: { properties: { action_link: 'https://darktunes.com/login?type=recovery&code=xyz' } },
+      data: {
+        properties: {
+          action_link: 'https://project.supabase.co/auth/v1/verify?token=xyz',
+          hashed_token: 'hashed-recovery-token',
+        },
+      },
       error: null,
     })
 
@@ -95,7 +100,8 @@ describe('requestPasswordReset', () => {
     expect(mockSendPasswordResetEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         recipientEmail: 'user@example.com',
-        resetUrl: 'https://darktunes.com/login?type=recovery&code=xyz',
+        resetUrl:
+          'https://darktunes.com/auth/callback?recovery=1&token_hash=hashed-recovery-token&type=recovery',
       }),
     )
     expect(mockResetPasswordForEmail).not.toHaveBeenCalled()
@@ -115,7 +121,7 @@ describe('requestPasswordReset', () => {
 
   it('falls back to Supabase when Resend send fails', async () => {
     mockGenerateLink.mockResolvedValue({
-      data: { properties: { action_link: 'https://darktunes.com/login?type=recovery&code=xyz' } },
+      data: { properties: { hashed_token: 'hashed-recovery-token' } },
       error: null,
     })
     mockSendPasswordResetEmail.mockResolvedValue({ success: false, error: 'Resend down' })
@@ -125,7 +131,7 @@ describe('requestPasswordReset', () => {
 
     expect(result).toEqual({ sent: true, channel: 'supabase_fallback' })
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
-      redirectTo: 'https://darktunes.com/auth/callback?recovery=1',
+      redirectTo: 'https://darktunes.com/login?type=recovery',
     })
   })
 })

@@ -42,6 +42,7 @@ export function CentralLoginForm() {
   const errorParam = searchParams.get('error')
   const isRecoveryUrl = searchParams.get('type') === 'recovery'
   const recoveryCode = searchParams.get('code')
+  const recoveryTokenHash = searchParams.get('token_hash')
   const recoveryExchanged = searchParams.get('exchanged') === '1'
 
   useEffect(() => {
@@ -53,9 +54,19 @@ export function CentralLoginForm() {
   useEffect(() => {
     if (view !== 'recovery') return
 
-    // Legacy emails pointed at /login?type=recovery&code=… — exchange server-side.
+    // Legacy / Supabase-fallback links may land on /login with code or token_hash — exchange server-side.
     if (recoveryCode) {
       const params = new URLSearchParams({ recovery: '1', code: recoveryCode })
+      window.location.replace(`/auth/callback?${params}`)
+      return
+    }
+
+    if (recoveryTokenHash) {
+      const params = new URLSearchParams({
+        recovery: '1',
+        token_hash: recoveryTokenHash,
+        type: 'recovery',
+      })
       window.location.replace(`/auth/callback?${params}`)
       return
     }
@@ -114,7 +125,7 @@ export function CentralLoginForm() {
       }
 
       if (serverExchangeSucceeded) {
-        for (let attempt = 0; attempt < 8; attempt += 1) {
+        for (let attempt = 0; attempt < 24; attempt += 1) {
           if (cancelled) return
           const { data: { session } } = await supabase.auth.getSession()
           if (
@@ -124,6 +135,19 @@ export function CentralLoginForm() {
             markReady()
             return
           }
+
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const { data: { session: refreshed } } = await supabase.auth.getSession()
+            if (
+              refreshed &&
+              canUseRecoverySession(refreshed.access_token, { serverExchangeSucceeded: true })
+            ) {
+              markReady()
+              return
+            }
+          }
+
           await new Promise((resolve) => window.setTimeout(resolve, 250))
         }
         fail()
@@ -141,7 +165,7 @@ export function CentralLoginForm() {
       if (hashFallbackTimer !== undefined) window.clearTimeout(hashFallbackTimer)
       subscription.unsubscribe()
     }
-  }, [view, recoveryCode, recoveryExchanged, errorParam, t])
+  }, [view, recoveryCode, recoveryTokenHash, recoveryExchanged, errorParam, t])
 
   const redirectAfterAuth = async () => {
     const supabase = createBrowserSupabaseClient()

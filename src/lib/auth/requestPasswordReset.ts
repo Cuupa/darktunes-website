@@ -5,7 +5,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getSiteSettings } from '@/lib/api/siteSettings'
-import { getPasswordRecoveryRedirectUrl } from '@/lib/auth/resolveRedirectPath'
+import {
+  buildPasswordRecoveryVerifyUrl,
+  getPasswordRecoveryClientLandingUrl,
+  getPasswordRecoveryRedirectUrl,
+} from '@/lib/auth/resolveRedirectPath'
 import { sendPasswordResetEmail } from '@/lib/email/sendPasswordResetEmail'
 import type { Database } from '@/types/database'
 
@@ -32,7 +36,7 @@ async function sendViaSupabaseFallback(
   email: string,
   siteUrl: string,
 ): Promise<RequestPasswordResetResult> {
-  const redirectTo = getPasswordRecoveryRedirectUrl(siteUrl)
+  const redirectTo = getPasswordRecoveryClientLandingUrl(siteUrl)
   const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo })
 
   if (error) {
@@ -66,16 +70,18 @@ export async function requestPasswordReset(
     options: { redirectTo },
   })
 
-  if (error || !data.properties?.action_link) {
-    console.warn('[requestPasswordReset] generateLink failed:', error?.message ?? 'no action_link')
+  const hashedToken = data?.properties?.hashed_token
+  if (error || !hashedToken) {
+    console.warn('[requestPasswordReset] generateLink failed:', error?.message ?? 'no hashed_token')
     return { sent: false, silent: true, channel: 'resend' }
   }
 
   const settings = await getSiteSettings(adminClient)
+  const resetUrl = buildPasswordRecoveryVerifyUrl(siteUrl, hashedToken)
 
   const sendResult = await sendPasswordResetEmail({
     recipientEmail: normalizedEmail,
-    resetUrl: data.properties.action_link,
+    resetUrl,
     settings,
     resendApiKey: deps.resendApiKey,
     resendFromEmail: deps.resendFromEmail,
