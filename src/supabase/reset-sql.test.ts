@@ -322,6 +322,9 @@ describe('supabase/reset.sql — static analysis', () => {
     expect(sql).toMatch(
       /ALTER TABLE public\.releases DROP CONSTRAINT IF EXISTS releases_discogs_id_key/,
     )
+    expect(sql).toMatch(
+      /DROP INDEX IF EXISTS public\.releases_spotify_id_key[\s\S]*WHEN dependent_objects_still_exist THEN NULL/,
+    )
   })
 
   it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {
