@@ -50,3 +50,15 @@ export function isRecoverySessionEvent(
   }
   return false
 }
+
+/**
+ * Whether the session may be used to set a new password.
+ * After /auth/callback sets exchanged=1 the server already validated the recovery link.
+ */
+export function canUseRecoverySession(
+  accessToken: string | undefined,
+  options: { serverExchangeSucceeded: boolean },
+): boolean {
+  if (options.serverExchangeSucceeded) return Boolean(accessToken)
+  return sessionHasRecoveryAmr(accessToken)
+}

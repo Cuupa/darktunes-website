@@ -16,7 +16,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { isRecoverySessionEvent, sessionHasRecoveryAmr } from '@/lib/auth/recoverySession'
+import {
+  canUseRecoverySession,
+  isRecoverySessionEvent,
+} from '@/lib/auth/recoverySession'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
@@ -78,11 +81,9 @@ export function CentralLoginForm() {
       accessToken: string | undefined,
     ) => {
       if (!isRecoverySessionEvent(event, { serverExchangeSucceeded })) return
-      if (event === 'PASSWORD_RECOVERY' || sessionHasRecoveryAmr(accessToken)) {
+      if (canUseRecoverySession(accessToken, { serverExchangeSucceeded })) {
         markReady()
-        return
       }
-      fail()
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -113,16 +114,26 @@ export function CentralLoginForm() {
       }
 
       if (serverExchangeSucceeded) {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session && sessionHasRecoveryAmr(session.access_token)) {
-          markReady()
-          return
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          if (cancelled) return
+          const { data: { session } } = await supabase.auth.getSession()
+          if (
+            session &&
+            canUseRecoverySession(session.access_token, { serverExchangeSucceeded: true })
+          ) {
+            markReady()
+            return
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 250))
         }
         fail()
         return
       }
 
-      fail()
+      // Hash-based recovery: PASSWORD_RECOVERY event or timeout handles the rest.
+      if (!hasHashTokens) {
+        fail()
+      }
     })()
 
     return () => {
@@ -214,7 +225,12 @@ export function CentralLoginForm() {
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (!session || !sessionHasRecoveryAmr(session.access_token)) {
+      if (
+        !session ||
+        !canUseRecoverySession(session.access_token, {
+          serverExchangeSucceeded: recoveryExchanged,
+        })
+      ) {
         setRecoveryError(t('login_recovery_error'))
         toast.error(t('login_recovery_error'))
         return

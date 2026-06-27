@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { UserRole } from '@/types/users'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
 function recoveryLoginUrl(origin: string, params?: Record<string, string>): string {
@@ -11,12 +12,7 @@ function recoveryLoginUrl(origin: string, params?: Record<string, string>): stri
   return `${origin}/login?${search}`
 }
 
-async function exchangeRecoveryCode(
-  request: NextRequest,
-  code: string,
-  origin: string,
-): Promise<NextResponse> {
-  const destination = recoveryLoginUrl(origin, { exchanged: '1' })
+function createRecoveryCookieClient(request: NextRequest, destination: string) {
   let response = NextResponse.redirect(destination)
 
   const supabase = createServerClient<Database>(
@@ -38,26 +34,75 @@ async function exchangeRecoveryCode(
     },
   )
 
-  // Drop any active session so the emailed account receives the recovery session.
+  return { supabase, getResponse: () => response }
+}
+
+function recoveryFailureResponse(
+  origin: string,
+  sessionResponse: NextResponse,
+): NextResponse {
+  const failureResponse = NextResponse.redirect(recoveryLoginUrl(origin, { error: 'auth_failed' }))
+  for (const cookie of sessionResponse.cookies.getAll()) {
+    failureResponse.cookies.set(cookie.name, cookie.value)
+  }
+  return failureResponse
+}
+
+async function establishRecoverySession(
+  request: NextRequest,
+  origin: string,
+  authenticate: (
+    supabase: SupabaseClient<Database>,
+  ) => Promise<{ error: { message: string } | null }>,
+): Promise<NextResponse> {
+  const destination = recoveryLoginUrl(origin, { exchanged: '1' })
+  const { supabase, getResponse } = createRecoveryCookieClient(request, destination)
+
   await supabase.auth.signOut()
 
-  const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
+  const { error } = await authenticate(supabase)
 
-  if (sessionError) {
-    const failureResponse = NextResponse.redirect(recoveryLoginUrl(origin, { error: 'auth_failed' }))
-    for (const cookie of response.cookies.getAll()) {
-      failureResponse.cookies.set(cookie.name, cookie.value)
-    }
-    return failureResponse
+  if (error) {
+    return recoveryFailureResponse(origin, getResponse())
   }
 
-  return response
+  return getResponse()
+}
+
+async function exchangeRecoveryCode(
+  request: NextRequest,
+  code: string,
+  origin: string,
+): Promise<NextResponse> {
+  return establishRecoverySession(request, origin, async (supabase) => {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    return { error }
+  })
+}
+
+async function verifyRecoveryTokenHash(
+  request: NextRequest,
+  tokenHash: string,
+  origin: string,
+): Promise<NextResponse> {
+  return establishRecoverySession(request, origin, async (supabase) => {
+    const { error } = await supabase.auth.verifyOtp({
+      type: 'recovery',
+      token_hash: tokenHash,
+    })
+    return { error }
+  })
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const isRecovery = searchParams.get('recovery') === '1'
+  const tokenHash = searchParams.get('token_hash')
+  const isRecovery = searchParams.get('recovery') === '1' || searchParams.get('type') === 'recovery'
+
+  if (isRecovery && tokenHash) {
+    return verifyRecoveryTokenHash(request, tokenHash, origin)
+  }
 
   if (!code) {
     const missingTarget = isRecovery
@@ -77,9 +122,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth_failed`)
   }
 
-  // Fetch the user's role from the profiles table to decide where to redirect.
-  // This runs server-side after the session cookie is set, so the user is
-  // already authenticated at this point.
   const {
     data: { user },
   } = await supabase.auth.getUser()

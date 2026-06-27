@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isRecoverySessionEvent, sessionHasRecoveryAmr } from './recoverySession'
+import {
+  canUseRecoverySession,
+  isRecoverySessionEvent,
+  sessionHasRecoveryAmr,
+} from './recoverySession'
 
 function makeJwt(payload: object): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
@@ -44,5 +48,25 @@ describe('sessionHasRecoveryAmr', () => {
   it('returns false for missing or malformed tokens', () => {
     expect(sessionHasRecoveryAmr(undefined)).toBe(false)
     expect(sessionHasRecoveryAmr('not-a-jwt')).toBe(false)
+  })
+})
+
+describe('canUseRecoverySession', () => {
+  const recoveryToken = makeJwt({ amr: [{ method: 'recovery', timestamp: 1_640_991_600 }] })
+  const passwordToken = makeJwt({ amr: [{ method: 'password', timestamp: 1_640_991_600 }] })
+
+  it('trusts any session after the server callback set exchanged=1', () => {
+    expect(
+      canUseRecoverySession(passwordToken, { serverExchangeSucceeded: true }),
+    ).toBe(true)
+  })
+
+  it('requires recovery amr for hash-based recovery without server exchange', () => {
+    expect(
+      canUseRecoverySession(recoveryToken, { serverExchangeSucceeded: false }),
+    ).toBe(true)
+    expect(
+      canUseRecoverySession(passwordToken, { serverExchangeSucceeded: false }),
+    ).toBe(false)
   })
 })
