@@ -89,7 +89,6 @@ export function EpkTemplatePicker({ open, onClose, onApply }: EpkTemplatePickerP
     onApply({ ...template, document })
     setConfirmId(null)
     onClose()
-    toast.success(t('epk_templates_apply_success'))
   }
 
   const categoryButtons: Array<{ id: FilterCategory; label: string }> = [

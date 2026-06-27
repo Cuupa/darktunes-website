@@ -23,6 +23,7 @@ interface EpkAssetPickerProps {
   onClose: () => void
   initialAssets: ArtistAsset[]
   onSelect: (url: string) => void
+  mode?: 'insert' | 'replace'
 }
 
 type PickerTab = 'uploads' | 'library'
@@ -87,6 +88,7 @@ export function EpkAssetPicker({
   onClose,
   initialAssets,
   onSelect,
+  mode = 'insert',
 }: EpkAssetPickerProps) {
   const t = useTranslations('portal')
   const [tab, setTab] = useState<PickerTab>('uploads')
@@ -110,7 +112,7 @@ export function EpkAssetPicker({
       try {
         const supabase = createBrowserSupabaseClient()
         const { data, error } = await supabase
-          .from('assets')
+          .from('artist_assets')
           .select('id, artist_id, filename, original_filename, mime_type, size_bytes, r2_key, public_url, created_at')
           .eq('artist_id', artistId)
           .order('created_at', { ascending: false })
@@ -206,8 +208,12 @@ export function EpkAssetPicker({
         aria-describedby="epk-asset-picker-desc"
       >
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle id="epk-asset-picker-title">{t('epk_assets_title')}</DialogTitle>
-          <DialogDescription id="epk-asset-picker-desc">{t('epk_assets_desc')}</DialogDescription>
+          <DialogTitle id="epk-asset-picker-title">
+            {mode === 'replace' ? t('epk_assets_replace_title') : t('epk_assets_title')}
+          </DialogTitle>
+          <DialogDescription id="epk-asset-picker-desc">
+            {mode === 'replace' ? t('epk_assets_replace_desc') : t('epk_assets_desc')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] p-6 space-y-4" data-lenis-prevent>

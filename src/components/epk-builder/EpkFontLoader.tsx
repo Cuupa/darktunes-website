@@ -9,6 +9,9 @@
 import { useEffect, useMemo } from 'react'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { buildGoogleFontsCssUrl, isGoogleFontFamily } from '@/lib/epk/googleFonts'
+import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
+
+export const EPK_FONTS_LOADED_EVENT = 'epk-fonts-loaded'
 
 const STYLE_ID = 'epk-custom-font-faces'
 const GOOGLE_LINK_ID = 'epk-google-fonts'
@@ -63,6 +66,29 @@ export function EpkFontLoader() {
 
     styleEl.textContent = css
   }, [fonts])
+
+  useEffect(() => {
+    const families = new Set<string>()
+    for (const font of fonts) {
+      if (font.family) families.add(font.family)
+    }
+    for (const el of elements) {
+      if (el.style?.fontFamily) families.add(el.style.fontFamily.split(',')[0].trim())
+    }
+    if (families.size === 0) return
+
+    let cancelled = false
+    void Promise.all(
+      [...families].map((family) =>
+        document.fonts.load(`16px ${formatKonvaFontFamily(family)}`).catch(() => undefined),
+      ),
+    ).then(() => {
+      if (!cancelled) window.dispatchEvent(new CustomEvent(EPK_FONTS_LOADED_EVENT))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [elements, fonts, googleFamilies])
 
   useEffect(() => () => {
     document.getElementById(STYLE_ID)?.remove()

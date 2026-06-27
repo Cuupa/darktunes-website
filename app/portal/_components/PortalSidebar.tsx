@@ -59,6 +59,19 @@ type NavGroup = {
   items: NavItem[]
 }
 
+/** Longest-prefix wins so sibling routes (e.g. profile vs epk-builder) highlight exactly one item. */
+function resolveActiveNavHref(pathname: string, hrefs: string[]): string | null {
+  const sorted = [...hrefs].sort((a, b) => b.length - a.length)
+  for (const href of sorted) {
+    if (href === '/portal') {
+      if (pathname === '/portal') return href
+      continue
+    }
+    if (pathname === href || pathname.startsWith(`${href}/`)) return href
+  }
+  return null
+}
+
 const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'nav_group_dashboard',
@@ -149,6 +162,11 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
     [featureFlags],
   )
 
+  const activeNavHref = useMemo(() => {
+    const hrefs = navGroups.flatMap((group) => group.items.map((item) => item.href))
+    return resolveActiveNavHref(pathname, hrefs)
+  }, [navGroups, pathname])
+
   const handleSignOut = async () => {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
@@ -183,7 +201,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
           </p>
           <div className="space-y-0.5">
             {items.map(({ href, label, icon: Icon }) => {
-              const isActive = href === '/portal' ? pathname === '/portal' : pathname.startsWith(href)
+              const isActive = activeNavHref === href
               const navAllowed = canNavigateTo(href)
               return (
                 <Link

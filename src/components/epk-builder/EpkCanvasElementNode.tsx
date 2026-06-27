@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { Group, Rect, Text, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
+import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
 import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
 
@@ -129,10 +130,11 @@ export function EpkCanvasElementNode({
     case 'text':
       return (
         <Text
+          key={`${element.id}:${element.content ?? ''}`}
           {...commonProps}
           text={element.content ?? ''}
           fontSize={element.style.fontSize ?? 14}
-          fontFamily={element.style.fontFamily ?? 'Helvetica, Arial, sans-serif'}
+          fontFamily={formatKonvaFontFamily(element.style.fontFamily)}
           fontStyle={
             element.style.fontWeight === 700 || element.style.fontWeight === 'bold'
               ? 'bold'
@@ -141,6 +143,7 @@ export function EpkCanvasElementNode({
           fill={element.style.fill ?? '#ffffff'}
           align={element.style.textAlign ?? 'left'}
           lineHeight={element.style.lineHeight}
+          wrap="word"
           onDblClick={interactive ? () => onDoubleClickText?.(element.id) : undefined}
           onDblTap={interactive ? () => onDoubleClickText?.(element.id) : undefined}
         />
