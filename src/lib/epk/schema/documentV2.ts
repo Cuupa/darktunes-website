@@ -43,6 +43,7 @@ export const epkElementStyleSchema = z.object({
   lineHeight: z.number().positive().optional(),
   letterSpacing: z.number().optional(),
   cornerRadius: z.number().min(0).optional(),
+  objectFit: z.enum(['contain', 'cover', 'fill']).optional(),
   shadowColor: z.string().optional(),
   shadowBlur: z.number().min(0).optional(),
   shadowOffsetX: z.number().optional(),
@@ -71,6 +72,15 @@ export const epkPageSchema = z.object({
 
 export type EpkPage = z.infer<typeof epkPageSchema>
 
+export const epkImageCropSchema = z.object({
+  x: z.number().min(0),
+  y: z.number().min(0),
+  width: z.number().positive(),
+  height: z.number().positive(),
+})
+
+export type EpkImageCrop = z.infer<typeof epkImageCropSchema>
+
 export const epkElementSchema = z.object({
   id: z.string().min(1),
   pageId: z.string().min(1),
@@ -87,6 +97,7 @@ export const epkElementSchema = z.object({
   style: epkElementStyleSchema.default({}),
   content: z.string().optional(),
   src: z.string().optional(),
+  crop: epkImageCropSchema.optional(),
   children: z.array(z.string()).optional(),
 })
 
@@ -106,6 +117,8 @@ export const epkDocumentMetadataSchema = z.object({
   author: z.string().optional(),
   subject: z.string().optional(),
   keywords: z.array(z.string()).optional(),
+  /** Built-in color palette id — used by applyPaletteToDocument(). */
+  themePaletteId: z.string().optional(),
 })
 
 export type EpkDocumentMetadata = z.infer<typeof epkDocumentMetadataSchema>

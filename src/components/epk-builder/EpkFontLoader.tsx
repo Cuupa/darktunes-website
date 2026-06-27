@@ -6,13 +6,44 @@
  * Injects @font-face rules for custom EPK document fonts (canvas preview).
  */
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
+import { buildGoogleFontsCssUrl, isGoogleFontFamily } from '@/lib/epk/googleFonts'
 
 const STYLE_ID = 'epk-custom-font-faces'
+const GOOGLE_LINK_ID = 'epk-google-fonts'
 
 export function EpkFontLoader() {
   const fonts = useEpkEditorStore((s) => s.document.fonts)
+  const elements = useEpkEditorStore((s) => s.document.elements)
+
+  const googleFamilies = useMemo(() => {
+    const families = new Set<string>()
+    for (const font of fonts) {
+      if (isGoogleFontFamily(font.family)) families.add(font.family)
+    }
+    for (const el of elements) {
+      const family = el.style?.fontFamily
+      if (family && isGoogleFontFamily(family)) families.add(family)
+    }
+    return [...families]
+  }, [elements, fonts])
+
+  useEffect(() => {
+    const href = buildGoogleFontsCssUrl(googleFamilies)
+    let link = document.getElementById(GOOGLE_LINK_ID) as HTMLLinkElement | null
+    if (!href) {
+      link?.remove()
+      return
+    }
+    if (!link) {
+      link = document.createElement('link')
+      link.id = GOOGLE_LINK_ID
+      link.rel = 'stylesheet'
+      document.head.appendChild(link)
+    }
+    link.href = href
+  }, [googleFamilies])
 
   useEffect(() => {
     let styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null

@@ -19,6 +19,8 @@ import { embedPdfMetadata } from './embedMetadata'
 import { parseColorToRgb } from './colorUtils'
 import { embedDocumentFonts, resolvePdfFont, type PdfFontSet } from './embedDocumentFonts'
 import { flattenGroupElements } from '@/lib/epk/elements/groupUtils'
+import { getEpkImageLayout } from '@/lib/epk/imageFit'
+import { layoutWrappedText, type TextAlign } from '@/lib/epk/textLayout'
 
 const DEFAULT_TEXT: RGB = rgb(1, 1, 1)
 const DEFAULT_SHAPE: RGB = rgb(0.16, 0.16, 0.16)
@@ -70,21 +72,31 @@ async function drawElement(
       const font = resolvePdfFont(fonts, element.style)
       const fontSize = scale(element.style.fontSize ?? 14, scaleFactor)
       const fill = parseColorToRgb(element.style.fill, DEFAULT_TEXT)
-      const lines = element.content.split('\n')
-      let lineY = pdfY + height - fontSize
+      const padding = scale(4, scaleFactor)
+      const textAlign = (element.style.textAlign ?? 'left') as TextAlign
+      const wrapped = layoutWrappedText({
+        text: element.content,
+        font,
+        fontSize,
+        boxX: x,
+        boxY: pdfY,
+        boxWidth: width,
+        boxHeight: height,
+        padding,
+        lineHeight: element.style.lineHeight ?? 1.4,
+        textAlign,
+      })
 
-      for (const line of lines) {
-        if (lineY < pdfY) break
-        page.drawText(line, {
-          x: x + scale(4, scaleFactor),
-          y: lineY,
+      for (const line of wrapped) {
+        page.drawText(line.text, {
+          x: line.x,
+          y: line.y,
           size: fontSize,
           font,
           color: fill,
           opacity,
-          maxWidth: width - scale(8, scaleFactor),
+          ...(line.align !== 'left' ? { align: line.align } : {}),
         })
-        lineY -= fontSize * (element.style.lineHeight ?? 1.4)
       }
       break
     }
@@ -92,15 +104,20 @@ async function drawElement(
     case 'image':
     case 'logo': {
       if (!element.src) break
-      const imageData = await fetchAndCompressImage(element.src)
+      const imageData = await fetchAndCompressImage(element.src, 1200, element.crop)
       if (!imageData) break
 
+      const layout = getEpkImageLayout(
+        { ...element, crop: undefined },
+        imageData.width,
+        imageData.height,
+      )
       const embedded = await pdfDoc.embedJpg(imageData.bytes)
       page.drawImage(embedded, {
-        x,
-        y: pdfY,
-        width,
-        height,
+        x: x + scale(layout.offsetX, scaleFactor),
+        y: pdfY + scale(layout.offsetY, scaleFactor),
+        width: scale(layout.drawWidth, scaleFactor),
+        height: scale(layout.drawHeight, scaleFactor),
         opacity,
       })
       break

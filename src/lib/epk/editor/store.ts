@@ -10,7 +10,8 @@ import { temporal } from 'zundo'
 import type { EpkDocumentV2, EpkElement, EpkFont } from '@/lib/epk/schema/documentV2'
 import { createEpkElementId, createEpkPageId } from '@/lib/epk/schema/elementIds'
 import { getPageDimensions } from '@/lib/epk/schema/pageDimensions'
-import { createDefaultElement } from './defaults'
+import { createDefaultElement, getNextZIndex } from './defaults'
+import { snapValue } from '@/lib/epk/textLayout'
 import { createGroupFromElements, getGroupChildren } from '@/lib/epk/elements/groupUtils'
 
 export interface EpkEditorState {
@@ -19,6 +20,9 @@ export interface EpkEditorState {
   zoom: number
   activePageId: string
   isDirty: boolean
+  snapEnabled: boolean
+  showGrid: boolean
+  gridSize: number
 }
 
 export interface EpkEditorActions {
@@ -28,7 +32,13 @@ export interface EpkEditorActions {
   selectElements: (ids: string[]) => void
   clearSelection: () => void
   setZoom: (zoom: number) => void
+  setSnapEnabled: (enabled: boolean) => void
+  setShowGrid: (show: boolean) => void
+  setGridSize: (size: number) => void
   setActivePageId: (pageId: string) => void
+  duplicateSelected: () => void
+  nudgeSelected: (dx: number, dy: number) => void
+  addPresetElement: (element: EpkElement) => void
   updateElement: (id: string, patch: Partial<EpkElement>) => void
   addElement: (type: EpkElement['type'], overrides?: Partial<EpkElement>) => string
   deleteSelected: () => void
@@ -71,9 +81,12 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
       immer((set, get) => ({
         document: initialDocument,
         selectedIds: [],
-        zoom: 0.55,
+        zoom: 0.75,
         activePageId,
         isDirty: false,
+        snapEnabled: true,
+        showGrid: true,
+        gridSize: 16,
 
         setDocument: (document) =>
           set((state) => {
@@ -109,7 +122,22 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
 
         setZoom: (zoom) =>
           set((state) => {
-            state.zoom = Math.min(1.5, Math.max(0.25, zoom))
+            state.zoom = Math.min(3, Math.max(0.1, zoom))
+          }),
+
+        setSnapEnabled: (enabled) =>
+          set((state) => {
+            state.snapEnabled = enabled
+          }),
+
+        setShowGrid: (show) =>
+          set((state) => {
+            state.showGrid = show
+          }),
+
+        setGridSize: (size) =>
+          set((state) => {
+            state.gridSize = Math.max(4, Math.min(64, size))
           }),
 
         setActivePageId: (pageId) =>
@@ -122,7 +150,53 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
           set((state) => {
             const index = state.document.elements.findIndex((el) => el.id === id)
             if (index === -1) return
-            Object.assign(state.document.elements[index], patch)
+            const el = state.document.elements[index]
+            const next = { ...patch }
+            if (state.snapEnabled) {
+              if (typeof next.x === 'number') next.x = snapValue(next.x, state.gridSize, true)
+              if (typeof next.y === 'number') next.y = snapValue(next.y, state.gridSize, true)
+            }
+            Object.assign(el, next)
+            state.isDirty = true
+          }),
+
+        duplicateSelected: () =>
+          set((state) => {
+            if (state.selectedIds.length === 0) return
+            const newIds: string[] = []
+            for (const id of state.selectedIds) {
+              const source = state.document.elements.find((el) => el.id === id)
+              if (!source || source.type === 'group') continue
+              const clone: EpkElement = {
+                ...source,
+                id: createEpkElementId(source.type),
+                x: source.x + 16,
+                y: source.y + 16,
+                zIndex: getNextZIndex(state.document, state.activePageId),
+              }
+              state.document.elements.push(clone)
+              newIds.push(clone.id)
+            }
+            if (newIds.length > 0) state.selectedIds = newIds
+            state.isDirty = true
+          }),
+
+        nudgeSelected: (dx, dy) =>
+          set((state) => {
+            if (state.selectedIds.length === 0) return
+            for (const id of state.selectedIds) {
+              const el = state.document.elements.find((e) => e.id === id)
+              if (!el || el.locked) continue
+              el.x = snapValue(el.x + dx, state.gridSize, state.snapEnabled)
+              el.y = snapValue(el.y + dy, state.gridSize, state.snapEnabled)
+            }
+            state.isDirty = true
+          }),
+
+        addPresetElement: (element) =>
+          set((state) => {
+            state.document.elements.push(element)
+            state.selectedIds = [element.id]
             state.isDirty = true
           }),
 

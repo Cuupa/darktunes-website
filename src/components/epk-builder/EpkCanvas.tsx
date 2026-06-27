@@ -7,8 +7,16 @@
  */
 
 import '@/lib/epk/konvaShapes'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Stage, Layer, Rect, Transformer } from 'react-konva'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type WheelEvent,
+} from 'react'
+import { Stage, Layer, Rect, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useReducedMotion } from 'framer-motion'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
@@ -17,7 +25,46 @@ import { EpkCanvasElementNode } from './EpkCanvasElementNode'
 import { EpkGroupNode } from './EpkGroupNode'
 import { EpkTextEditor } from './EpkTextEditor'
 
-export function EpkCanvas() {
+interface EpkCanvasProps {
+  onEditText?: (id: string) => void
+}
+
+function GridLines({
+  width,
+  height,
+  gridSize,
+}: {
+  width: number
+  height: number
+  gridSize: number
+}) {
+  const lines: ReactNode[] = []
+  for (let x = 0; x <= width; x += gridSize) {
+    lines.push(
+      <Line
+        key={`v-${x}`}
+        points={[x, 0, x, height]}
+        stroke="#ffffff14"
+        strokeWidth={1}
+        listening={false}
+      />,
+    )
+  }
+  for (let y = 0; y <= height; y += gridSize) {
+    lines.push(
+      <Line
+        key={`h-${y}`}
+        points={[0, y, width, y]}
+        stroke="#ffffff14"
+        strokeWidth={1}
+        listening={false}
+      />,
+    )
+  }
+  return <>{lines}</>
+}
+
+export function EpkCanvas({ onEditText }: EpkCanvasProps = {}) {
   const document = useEpkEditorStore((s) => s.document)
   const activePageId = useEpkEditorStore((s) => s.activePageId)
   const zoom = useEpkEditorStore((s) => s.zoom)
@@ -26,6 +73,9 @@ export function EpkCanvas() {
   const clearSelection = useEpkEditorStore((s) => s.clearSelection)
   const updateElement = useEpkEditorStore((s) => s.updateElement)
   const moveGroupByDelta = useEpkEditorStore((s) => s.moveGroupByDelta)
+  const setZoom = useEpkEditorStore((s) => s.setZoom)
+  const showGrid = useEpkEditorStore((s) => s.showGrid)
+  const gridSize = useEpkEditorStore((s) => s.gridSize)
 
   const prefersReducedMotion = useReducedMotion()
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map())
@@ -69,6 +119,24 @@ export function EpkCanvas() {
     [selectElements, selectedIds],
   )
 
+  const selectedImageElement =
+    selectedIds.length === 1
+      ? document.elements.find(
+          (el) =>
+            el.id === selectedIds[0] && (el.type === 'image' || el.type === 'logo'),
+        )
+      : undefined
+
+  const handleWheel = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      if (!event.ctrlKey && !event.metaKey) return
+      event.preventDefault()
+      const delta = event.deltaY > 0 ? -0.08 : 0.08
+      setZoom(zoom + delta)
+    },
+    [setZoom, zoom],
+  )
+
   if (!page) return null
 
   const stageWidth = page.width * zoom
@@ -81,6 +149,7 @@ export function EpkCanvas() {
     <div
       className="relative overflow-auto rounded-lg border border-border bg-muted/30 p-4"
       data-lenis-prevent
+      onWheel={handleWheel}
     >
       <div
         className="relative mx-auto shadow-lg"
@@ -115,6 +184,9 @@ export function EpkCanvas() {
                 listening={false}
               />
             )}
+            {showGrid ? (
+              <GridLines width={page.width} height={page.height} gridSize={gridSize} />
+            ) : null}
             {elements.map((element) =>
               element.type === 'group' ? (
                 <EpkGroupNode
@@ -126,7 +198,10 @@ export function EpkCanvas() {
                   onSelect={handleSelect}
                   onChange={updateElement}
                   onGroupDrag={moveGroupByDelta}
-                  onDoubleClickText={setEditingTextId}
+                  onDoubleClickText={(id) => {
+                    setEditingTextId(id)
+                    onEditText?.(id)
+                  }}
                   registerRef={registerRef}
                 />
               ) : (
@@ -137,7 +212,10 @@ export function EpkCanvas() {
                   isSelected={selectedIds.includes(element.id)}
                   onSelect={handleSelect}
                   onChange={updateElement}
-                  onDoubleClickText={setEditingTextId}
+                  onDoubleClickText={(id) => {
+                    setEditingTextId(id)
+                    onEditText?.(id)
+                  }}
                   registerRef={registerRef}
                 />
               ),
@@ -145,6 +223,7 @@ export function EpkCanvas() {
             <Transformer
               ref={transformerRef}
               rotateEnabled
+              keepRatio={Boolean(selectedImageElement)}
               enabledAnchors={[
                 'top-left',
                 'top-right',

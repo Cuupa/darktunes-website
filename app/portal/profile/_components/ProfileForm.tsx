@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl'
  *  1. Bio & Press  — photo, rich-text bios, genres, press quote
  *  2. Artist Info  — founding year, hometown, booking/press contacts
  *  3. Links        — all social / streaming links
- *  4. EPK Preview  — live preview of the press kit
+ *  4. Riders       — stage plot, technical, hospitality PDFs
  */
 
 import * as React from 'react'
@@ -34,22 +34,17 @@ import {
   TextAlignLeft,
   LinkSimple,
   Info,
-  Newspaper,
-  FilePdf,
+  FileText,
   Trash,
 } from '@phosphor-icons/react'
 import { TiptapEditor } from '@/components/admin/TiptapEditor'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist } from '@/types'
-import { EPKPreview } from './EPKPreview'
-import type { EPKData } from './EPKPreview'
 import { usePortalProfileForm } from '@/hooks/usePortalProfileForm'
 import { PORTAL_PHOTO_MAX_BYTES } from '@/hooks/usePortalProfileForm'
 import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
 import type { Genre } from '@/lib/api/genres'
 import { formatFileSize } from '@/lib/imageResizer'
-import { toast } from 'sonner'
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -61,17 +56,13 @@ interface ProfileFormProps {
   initialProfile: ArtistProfile | null
   /** Full artist row — used to pre-fill fields when no EPK profile exists yet. */
   artist?: Artist | null
-  /** Label name from site settings — shown in EPK footer. */
-  labelName?: string | null
-  /** Label logo URL from site settings — shown in EPK footer. */
-  labelLogoUrl?: string | null
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormProps) {
+export function ProfileForm({ artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormProps) {
   const t = useTranslations('portal')
 
   if (!artistId) {
@@ -84,18 +75,16 @@ export function ProfileForm({ artistId, artistName, artistSlug, initialProfile, 
     )
   }
 
-  return <ProfileFormInner artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} labelName={labelName} labelLogoUrl={labelLogoUrl} />
+  return <ProfileFormInner artistId={artistId} artistName={artistName} artistSlug={artistSlug} initialProfile={initialProfile} artist={artist} />
 }
 
 interface ProfileFormInnerProps extends Omit<ProfileFormProps, 'artistId'> {
   artistId: string
 }
 
-function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, artist, labelName, labelLogoUrl }: ProfileFormInnerProps) {
+function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, artist }: ProfileFormInnerProps) {
   const t = useTranslations('portal')
 
-  const [pdfDownloading, setPdfDownloading] = React.useState(false)
-  const epkDocumentRef = React.useRef<HTMLElement>(null)
   const [genreCatalogue, setGenreCatalogue] = React.useState<Genre[]>([])
   const {
     form,
@@ -103,10 +92,8 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
     uploadProgress,
     isUploading,
     fileInputRef,
-    watched,
     riderUrls,
     riderUploading,
-    epkSettings,
     galleryPhotos,
     galleryUploading,
     handlePhotoChange,
@@ -114,7 +101,6 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
     handleRiderDelete,
     handleGalleryUpload,
     handleGalleryRemove,
-    handleEpkSettingsChange,
     onSubmit,
   } = usePortalProfileForm({ artistId, initialProfile, artist })
 
@@ -128,43 +114,6 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
       .then((data) => setGenreCatalogue(data))
       .catch(() => setGenreCatalogue([]))
   }, [])
-
-  // ---------------------------------------------------------------------------
-  // Build live EPK data from form watch
-  // ---------------------------------------------------------------------------
-
-  const epkData: EPKData = {
-    artistName: artistName ?? 'Artist',
-    photoUrl,
-    bioShort: watched.bio_short,
-    bioMedium: watched.bio_medium,
-    bioLong: watched.bio_long,
-    pressQuote: watched.press_quote,
-    genres: watched.genres,
-    foundingYear: watched.founding_year ? parseInt(watched.founding_year, 10) : undefined,
-    hometown: watched.hometown,
-    bookingContact: watched.booking_contact,
-    pressContact: watched.press_contact,
-    websiteUrl: watched.website_url,
-    instagramUrl: watched.instagram_url,
-    youtubeUrl: watched.youtube_url,
-    bandcampUrl: watched.bandcamp_url,
-    spotifyUrl: watched.spotify_url,
-    appleMusicUrl: watched.apple_music_url,
-    tiktokUrl: watched.tiktok_url,
-    facebookUrl: watched.facebook_url,
-    soundcloudUrl: watched.soundcloud_url,
-    riderStagePlotUrl: riderUrls.stage_plot,
-    riderTechnicalUrl: riderUrls.technical,
-    riderHospitalityUrl: riderUrls.hospitality,
-    photoGallery: galleryPhotos,
-    labelName: labelName ?? undefined,
-    labelLogoUrl: labelLogoUrl ?? undefined,
-    epkLayout: epkSettings.epkLayout,
-    epkOrientation: epkSettings.epkOrientation,
-    epkBgImageUrl: epkSettings.epkBgImageUrl,
-    epkBgOpacity: epkSettings.epkBgOpacity,
-  }
 
   // ---------------------------------------------------------------------------
   // URL fields config
@@ -198,34 +147,12 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
           )}
         </div>
         <div className="no-print flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={pdfDownloading}
-            aria-busy={pdfDownloading}
-            onClick={async () => {
-              setPdfDownloading(true)
-              try {
-                const { buildEpkPdfMessages, generateEpkPdf } = await import('./epkPdf')
-                await generateEpkPdf(epkData, buildEpkPdfMessages(t), epkDocumentRef.current)
-              } catch (err) {
-                const message = err instanceof Error ? err.message : t('profile_epk_error_print_failed')
-                toast.error(message || t('profile_epk_error_print_failed'))
-              } finally {
-                setPdfDownloading(false)
-              }
-            }}
-          >
-            <FilePdf size={16} aria-hidden="true" className="mr-1.5" />
-            {pdfDownloading ? t('profile_epk_downloading') : t('profile_download_epk')}
+          <Button asChild className="min-h-[44px] gap-1.5">
+            <Link href={`/portal/epk-builder?artistId=${artistId}`}>
+              <FileText size={16} aria-hidden="true" />
+              {t('epk_builder_nav')}
+            </Link>
           </Button>
-          <Link
-            href={`/portal/epk-builder?artistId=${artistId}`}
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
-          >
-            <FilePdf size={15} aria-hidden="true" />
-            {t('epk_builder_nav')}
-          </Link>
           {artistSlug && (
             <Link
               href={`/artists/${artistSlug}`}
@@ -257,12 +184,8 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
               {t('profile_tab_links')}
             </TabsTrigger>
             <TabsTrigger value="riders" className="gap-1.5">
-              <FilePdf size={14} aria-hidden="true" />
+              <FileText size={14} aria-hidden="true" />
               {t('profile_tab_riders')}
-            </TabsTrigger>
-            <TabsTrigger value="epk" className="gap-1.5">
-              <Newspaper size={14} aria-hidden="true" />
-              {t('profile_tab_epk')}
             </TabsTrigger>
           </TabsList>
 
@@ -620,7 +543,7 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
                         htmlFor={`rider-${type}`}
                         className="cursor-pointer inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
                       >
-                        <FilePdf size={14} aria-hidden="true" />
+                        <FileText size={14} aria-hidden="true" />
                         {riderUploading === type ? t('profile_rider_uploading') : t('profile_rider_upload')}
                       </label>
                       <input
@@ -650,25 +573,6 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
             </Card>
           </TabsContent>
 
-          {/* ── Tab 5: EPK Preview ───────────────────────────────────────── */}
-          <TabsContent value="epk" className="mt-0" forceMount>
-            <EPKPreview
-              data={epkData}
-              artistSlug={artistSlug}
-              epkTheme={epkSettings.epkTheme}
-              epkSectionsOrder={epkSettings.epkSectionsOrder}
-              epkSectionsHidden={epkSettings.epkSectionsHidden}
-              epkPasswordHash={epkSettings.epkPasswordRaw ? `__plain__${epkSettings.epkPasswordRaw}` : undefined}
-              epkPasswordSections={epkSettings.epkPasswordSections}
-              epkCustomThemeTokens={epkSettings.epkCustomThemeTokens}
-              epkLayout={epkSettings.epkLayout}
-              epkOrientation={epkSettings.epkOrientation}
-              epkBgImageUrl={epkSettings.epkBgImageUrl}
-              epkBgOpacity={epkSettings.epkBgOpacity}
-              documentRef={epkDocumentRef}
-              onSettingsChange={handleEpkSettingsChange}
-            />
-          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end pt-2 border-t border-border">

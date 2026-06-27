@@ -22,10 +22,21 @@ import {
   Link as LinkIcon,
   ChartBar,
   Layout,
+  Plus,
+  GridFour,
+  Magnet,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useEpkEditorStore, useEpkEditorStoreApi, useEpkEditorTemporal } from '@/lib/epk/editor/EpkEditorProvider'
+import { PROFILE_PRESETS, type ProfilePresetId } from '@/lib/epk/editor/profilePresets'
+import { EpkColorThemePicker } from './EpkColorThemePicker'
 
 interface EpkToolbarProps {
   onSave: () => void
@@ -35,6 +46,7 @@ interface EpkToolbarProps {
   onOpenShareLinks: () => void
   onOpenAnalytics: () => void
   onOpenTemplates: () => void
+  onInsertPreset: (presetId: ProfilePresetId) => void
   isSaving: boolean
 }
 
@@ -46,6 +58,7 @@ export function EpkToolbar({
   onOpenShareLinks,
   onOpenAnalytics,
   onOpenTemplates,
+  onInsertPreset,
   isSaving,
 }: EpkToolbarProps) {
   const t = useTranslations('portal')
@@ -54,16 +67,48 @@ export function EpkToolbar({
   const deleteSelected = useEpkEditorStore((s) => s.deleteSelected)
   const groupSelected = useEpkEditorStore((s) => s.groupSelected)
   const ungroupSelected = useEpkEditorStore((s) => s.ungroupSelected)
+  const document = useEpkEditorStore((s) => s.document)
+  const activePageId = useEpkEditorStore((s) => s.activePageId)
   const setZoom = useEpkEditorStore((s) => s.setZoom)
   const zoom = useEpkEditorStore((s) => s.zoom)
   const selectedIds = useEpkEditorStore((s) => s.selectedIds)
   const isDirty = useEpkEditorStore((s) => s.isDirty)
+  const snapEnabled = useEpkEditorStore((s) => s.snapEnabled)
+  const showGrid = useEpkEditorStore((s) => s.showGrid)
+  const setSnapEnabled = useEpkEditorStore((s) => s.setSnapEnabled)
+  const setShowGrid = useEpkEditorStore((s) => s.setShowGrid)
 
   const pastStates = useEpkEditorTemporal((s) => s.pastStates)
   const futureStates = useEpkEditorTemporal((s) => s.futureStates)
 
   const canUndo = pastStates.length > 0
   const canRedo = futureStates.length > 0
+
+  const presetLabel = (id: ProfilePresetId): string => {
+    switch (id) {
+      case 'bio-short':
+        return t('epk_preset_bio_short')
+      case 'bio-long':
+        return t('epk_preset_bio_long')
+      case 'social-links':
+        return t('epk_preset_social')
+      case 'contacts':
+        return t('epk_preset_contacts')
+      case 'press-quote':
+        return t('epk_preset_quote')
+      case 'artist-info':
+        return t('epk_preset_info')
+      default:
+        return id
+    }
+  }
+
+  const fitPageZoom = () => {
+    const page = document.pages.find((p) => p.id === activePageId) ?? document.pages[0]
+    if (!page) return
+    const availableWidth = Math.min(window.innerWidth - 340, 1400)
+    setZoom(Math.min(2.5, Math.max(0.1, availableWidth / page.width)))
+  }
 
   return (
     <div
@@ -124,8 +169,27 @@ export function EpkToolbar({
         onClick={onOpenAssetPicker}
       >
         <ImageIcon size={18} className="mr-2" aria-hidden="true" />
-        {t('epk_editor_add_image')}
+        <span className="hidden sm:inline">{t('epk_editor_add_image')}</span>
       </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" size="sm" className="min-h-[44px]">
+            <Plus size={18} className="mr-2" aria-hidden="true" />
+            <span className="hidden sm:inline">{t('epk_preset_menu')}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          {PROFILE_PRESETS.map((preset) => (
+            <DropdownMenuItem
+              key={preset.id}
+              onSelect={() => onInsertPreset(preset.id)}
+            >
+              {presetLabel(preset.id)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Button
         type="button"
@@ -165,6 +229,29 @@ export function EpkToolbar({
 
       <Button
         type="button"
+        variant={snapEnabled ? 'secondary' : 'outline'}
+        size="sm"
+        className="min-h-[44px] min-w-[44px]"
+        aria-label={snapEnabled ? t('epk_ctx_snap_off') : t('epk_ctx_snap_on')}
+        aria-pressed={snapEnabled}
+        onClick={() => setSnapEnabled(!snapEnabled)}
+      >
+        <Magnet size={18} aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant={showGrid ? 'secondary' : 'outline'}
+        size="sm"
+        className="min-h-[44px] min-w-[44px]"
+        aria-label={showGrid ? t('epk_ctx_grid_off') : t('epk_ctx_grid_on')}
+        aria-pressed={showGrid}
+        onClick={() => setShowGrid(!showGrid)}
+      >
+        <GridFour size={18} aria-hidden="true" />
+      </Button>
+
+      <Button
+        type="button"
         variant="outline"
         size="sm"
         className="min-h-[44px] min-w-[44px]"
@@ -185,6 +272,15 @@ export function EpkToolbar({
         onClick={() => setZoom(zoom + 0.1)}
       >
         <MagnifyingGlassPlus size={18} aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="min-h-[44px]"
+        onClick={fitPageZoom}
+      >
+        {t('epk_editor_zoom_fit')}
       </Button>
 
       <div className="flex-1" />
@@ -231,6 +327,8 @@ export function EpkToolbar({
       >
         <ChartBar size={18} aria-hidden="true" />
       </Button>
+      <EpkColorThemePicker />
+
       <Button
         type="button"
         variant="outline"

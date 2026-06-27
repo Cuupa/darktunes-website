@@ -33,21 +33,10 @@ export type ArtistProfilePayload = Pick<
   | 'rider_stage_plot_url'
   | 'rider_technical_url'
   | 'rider_hospitality_url'
-  | 'epk_theme'
-  | 'epk_layout'
-  | 'epk_orientation'
-  | 'epk_bg_image_url'
-  | 'epk_bg_opacity'
-  | 'epk_sections_order'
-  | 'epk_sections_hidden'
-  | 'epk_password_sections'
   | 'epk_gallery_photos'
 > & {
   // artist_id is required (not optional like in Insert)
   artist_id: string
-  // Raw plaintext password (server will hash it). Null = clear, undefined = unchanged.
-  epk_password_raw?: string | null
-  epk_custom_theme_tokens?: Record<string, string> | null
   // bio, genres, founding_year, hometown, and image_url are stored in the artists table (single source of truth).
   // Included here so the route can write them to artists in a single request.
   bio?: string | null

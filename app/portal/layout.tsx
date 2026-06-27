@@ -198,7 +198,11 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           userId={user?.id ?? null}
           featureFlags={featureFlags}
         />
-        <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">
+        <main
+          className={`flex-1 p-4 sm:p-6 md:p-8 w-full border-t md:border-t-0 border-primary/10 ${
+            currentPath.includes('/portal/epk-builder') ? 'max-w-none' : 'max-w-5xl mx-auto'
+          }`}
+        >
           <PortalOfflineProvider>
             <PortalQueryProvider>
               <PortalOfflineBanner />
