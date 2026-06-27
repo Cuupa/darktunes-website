@@ -1,4 +1,6 @@
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { enqueueMutation } from '@/lib/tour-planner/offline/syncQueue'
+import { getTourPlannerDb } from '@/lib/tour-planner/offline/database'
 
 export async function tourPlannerToken(): Promise<string> {
   const { data } = await createBrowserSupabaseClient().auth.getSession()
@@ -7,7 +9,7 @@ export async function tourPlannerToken(): Promise<string> {
   return token
 }
 
-export async function tourPlannerFetch(
+export async function tourPlannerFetchDirect(
   artistId: string,
   path: string,
   init?: RequestInit,
@@ -23,4 +25,44 @@ export async function tourPlannerFetch(
       ...init?.headers,
     },
   })
+}
+
+async function markSynced(): Promise<void> {
+  await getTourPlannerDb().meta.put({ key: 'lastSyncedAt', value: new Date().toISOString() })
+}
+
+export async function tourPlannerFetch(
+  artistId: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const isMutation = method !== 'GET' && method !== 'HEAD'
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine && isMutation) {
+    const body = typeof init?.body === 'string' ? init.body : init?.body ? JSON.stringify(init.body) : null
+    await enqueueMutation(artistId, path, method, body)
+    return new Response(JSON.stringify({ ok: true, offline: true }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  try {
+    const res = await tourPlannerFetchDirect(artistId, path, init)
+    if (res.ok && typeof navigator !== 'undefined' && navigator.onLine) {
+      await markSynced()
+    }
+    return res
+  } catch (error) {
+    if (isMutation && typeof navigator !== 'undefined' && !navigator.onLine) {
+      const body = typeof init?.body === 'string' ? init.body : null
+      await enqueueMutation(artistId, path, method, body)
+      return new Response(JSON.stringify({ ok: true, offline: true }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    throw error
+  }
 }

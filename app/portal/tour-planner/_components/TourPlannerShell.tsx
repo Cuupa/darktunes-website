@@ -19,6 +19,7 @@ import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { Concert, Tour, TourStop } from '@/types'
 import { TourPlannerTabs } from './TourPlannerPanels'
+import { TourPlannerOfflineBanner } from './TourPlannerOfflineBanner'
 
 interface TourPlannerShellProps {
   artistId: string
@@ -171,6 +172,8 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
 
   return (
     <div className="space-y-8">
+      <TourPlannerOfflineBanner />
+
       <header className="space-y-2">
         <div className="flex items-center gap-3">
           <MapTrifold size={28} className="text-primary" aria-hidden />
