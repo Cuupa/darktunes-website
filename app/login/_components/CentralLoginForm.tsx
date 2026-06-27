@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { isRecoverySessionEvent } from '@/lib/auth/recoverySession'
+import { isRecoverySessionEvent, sessionHasRecoveryAmr } from '@/lib/auth/recoverySession'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
@@ -39,6 +39,7 @@ export function CentralLoginForm() {
   const errorParam = searchParams.get('error')
   const isRecoveryUrl = searchParams.get('type') === 'recovery'
   const recoveryCode = searchParams.get('code')
+  const recoveryExchanged = searchParams.get('exchanged') === '1'
 
   useEffect(() => {
     if (isRecoveryUrl) {
@@ -59,7 +60,7 @@ export function CentralLoginForm() {
     const supabase = createBrowserSupabaseClient()
     let cancelled = false
     let hashFallbackTimer: number | undefined
-    const trustInitialSession = true
+    const serverExchangeSucceeded = recoveryExchanged
 
     const markReady = () => {
       if (cancelled) return
@@ -72,49 +73,56 @@ export function CentralLoginForm() {
       setRecoveryError(t('login_recovery_error'))
     }
 
+    const acceptRecoverySession = (
+      event: string,
+      accessToken: string | undefined,
+    ) => {
+      if (!isRecoverySessionEvent(event, { serverExchangeSucceeded })) return
+      if (event === 'PASSWORD_RECOVERY' || sessionHasRecoveryAmr(accessToken)) {
+        markReady()
+        return
+      }
+      fail()
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || cancelled) return
-      if (isRecoverySessionEvent(event, { codeExchangeSucceeded: false, trustInitialSession })) {
-        markReady()
-      }
+      acceptRecoverySession(event, session.access_token)
     })
 
     void (async () => {
       setSessionReady(false)
       setRecoveryError(null)
 
+      if (errorParam === 'auth_failed' || errorParam === 'missing_code') {
+        fail()
+        return
+      }
+
       const hasHashTokens =
         window.location.hash.includes('access_token') ||
         window.location.hash.includes('type=recovery')
 
       if (hasHashTokens) {
-        // Let Supabase parse the hash — do not sign out first.
+        // Let Supabase parse the hash — only PASSWORD_RECOVERY unlocks the form.
         hashFallbackTimer = window.setTimeout(() => {
           if (cancelled) return
-          void supabase.auth.getSession().then(({ data: { session } }) => {
-            if (cancelled) return
-            if (session) markReady()
-            else fail()
-          })
-        }, 2000)
+          fail()
+        }, 5000)
         return
       }
 
-      // Session already established by /auth/callback server exchange.
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        markReady()
+      if (serverExchangeSucceeded) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session && sessionHasRecoveryAmr(session.access_token)) {
+          markReady()
+          return
+        }
+        fail()
         return
       }
 
-      hashFallbackTimer = window.setTimeout(() => {
-        if (cancelled) return
-        void supabase.auth.getSession().then(({ data: { session: retrySession } }) => {
-          if (cancelled) return
-          if (retrySession) markReady()
-          else fail()
-        })
-      }, 2000)
+      fail()
     })()
 
     return () => {
@@ -122,7 +130,7 @@ export function CentralLoginForm() {
       if (hashFallbackTimer !== undefined) window.clearTimeout(hashFallbackTimer)
       subscription.unsubscribe()
     }
-  }, [view, recoveryCode, t])
+  }, [view, recoveryCode, recoveryExchanged, errorParam, t])
 
   const redirectAfterAuth = async () => {
     const supabase = createBrowserSupabaseClient()
@@ -202,6 +210,16 @@ export function CentralLoginForm() {
     setIsLoading(true)
     try {
       const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session || !sessionHasRecoveryAmr(session.access_token)) {
+        setRecoveryError(t('login_recovery_error'))
+        toast.error(t('login_recovery_error'))
+        return
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPassword })
 
       if (error) {
