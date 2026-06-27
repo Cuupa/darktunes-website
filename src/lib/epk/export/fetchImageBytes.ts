@@ -16,11 +16,28 @@ export interface CompressedImage {
   mime: 'image/jpeg' | 'image/png'
 }
 
+export interface FetchImageOptions {
+  crop?: EpkImageCrop
+  flipX?: boolean
+  flipY?: boolean
+}
+
+function isCropRect(value: EpkImageCrop | FetchImageOptions): value is EpkImageCrop {
+  return 'x' in value && 'y' in value && 'width' in value && 'height' in value
+}
+
 export async function fetchAndCompressImage(
   url: string,
   maxWidth = 1200,
-  crop?: EpkImageCrop,
+  options?: EpkImageCrop | FetchImageOptions,
 ): Promise<CompressedImage | null> {
+  const crop = options
+    ? isCropRect(options)
+      ? options
+      : options.crop
+    : undefined
+  const flipX = options && !isCropRect(options) ? Boolean(options.flipX) : false
+  const flipY = options && !isCropRect(options) ? Boolean(options.flipY) : false
   const r2PublicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
   if (!url || !isAllowedEpkImageUrl(url, r2PublicUrl)) return null
 
@@ -38,6 +55,8 @@ export async function fetchAndCompressImage(
         height: Math.max(1, Math.round(crop.height)),
       })
     }
+    if (flipX) pipeline = pipeline.flop()
+    if (flipY) pipeline = pipeline.flip()
     const processed = await pipeline
       .resize({ width: maxWidth, withoutEnlargement: true })
       .jpeg({ quality: 82, mozjpeg: true })

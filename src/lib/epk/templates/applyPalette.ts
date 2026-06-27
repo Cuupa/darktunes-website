@@ -63,6 +63,12 @@ export function applyPaletteToDocument(
   for (const page of next.pages) {
     if (page.background.type === 'color') {
       page.background.color = palette.colors.background
+    } else if (page.background.type === 'gradient' && page.background.gradientStops?.length) {
+      page.background.gradientStops = [
+        { offset: 0, color: palette.colors.background },
+        { offset: 0.55, color: palette.colors.surface },
+        { offset: 1, color: palette.colors.accent },
+      ]
     }
   }
 
@@ -70,7 +76,26 @@ export function applyPaletteToDocument(
     const color = colorForElement(el, palette)
     if (!color) return el
 
-    if (el.type === 'text' || el.type === 'shape') {
+    if (el.type === 'text') {
+      return {
+        ...el,
+        style: { ...el.style, fill: color },
+      }
+    }
+
+    if (el.type === 'shape') {
+      if (el.style.fillType === 'gradient' && el.style.gradientStops?.length) {
+        return {
+          ...el,
+          style: {
+            ...el.style,
+            gradientStops: [
+              { offset: 0, color: palette.colors.accent },
+              { offset: 1, color: palette.colors.surface },
+            ],
+          },
+        }
+      }
       return {
         ...el,
         style: { ...el.style, fill: color },

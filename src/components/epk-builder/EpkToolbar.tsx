@@ -111,8 +111,12 @@ export function EpkToolbar({
   const fitPageZoom = () => {
     const page = document.pages.find((p) => p.id === activePageId) ?? document.pages[0]
     if (!page) return
-    const availableWidth = Math.min(window.innerWidth - 340, 1400)
-    setZoom(Math.min(2.5, Math.max(0.1, availableWidth / page.width)))
+    const sidebarWidth = window.innerWidth >= 1280 ? 560 : window.innerWidth >= 1024 ? 520 : 0
+    const availableWidth = Math.max(320, window.innerWidth - sidebarWidth - 80)
+    const availableHeight = Math.max(320, window.innerHeight - 200)
+    const fitByWidth = availableWidth / page.width
+    const fitByHeight = availableHeight / page.height
+    setZoom(Math.min(2.5, Math.max(0.1, Math.min(fitByWidth, fitByHeight))))
   }
 
   return (

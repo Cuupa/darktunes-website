@@ -21,6 +21,8 @@ import { embedDocumentFonts, resolvePdfFont, type PdfFontSet } from './embedDocu
 import { flattenGroupElements } from '@/lib/epk/elements/groupUtils'
 import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import { layoutWrappedText, type TextAlign } from '@/lib/epk/textLayout'
+import { parseGradientFromBackground, parseGradientFromStyle } from '@/lib/epk/gradients'
+import { renderGradientToJpeg } from './renderGradientToJpeg'
 
 const DEFAULT_TEXT: RGB = rgb(1, 1, 1)
 const DEFAULT_SHAPE: RGB = rgb(0.16, 0.16, 0.16)
@@ -49,6 +51,21 @@ async function drawElement(
 
   switch (element.type) {
     case 'shape': {
+      const gradient = parseGradientFromStyle(element.style)
+      if (gradient) {
+        const raster = await renderGradientToJpeg(element.width, element.height, gradient)
+        if (raster) {
+          const embedded = await pdfDoc.embedJpg(raster.bytes)
+          page.drawImage(embedded, {
+            x,
+            y: pdfY,
+            width,
+            height,
+            opacity,
+          })
+          break
+        }
+      }
       const fill = parseColorToRgb(element.style.fill, DEFAULT_SHAPE)
       page.drawRectangle({
         x,
@@ -104,7 +121,11 @@ async function drawElement(
     case 'image':
     case 'logo': {
       if (!element.src) break
-      const imageData = await fetchAndCompressImage(element.src, 1200, element.crop)
+      const imageData = await fetchAndCompressImage(element.src, 1200, {
+        crop: element.crop,
+        flipX: element.flipX,
+        flipY: element.flipY,
+      })
       if (!imageData) break
 
       const layout = getEpkImageLayout(
@@ -151,7 +172,21 @@ export async function renderDocumentToPdf(
     pdfPages.push(page)
 
     // Page background
-    if (pageMeta.background.type === 'color' && pageMeta.background.color) {
+    if (pageMeta.background.type === 'gradient') {
+      const gradient = parseGradientFromBackground(pageMeta.background)
+      if (gradient) {
+        const raster = await renderGradientToJpeg(pageMeta.width, pageMeta.height, gradient)
+        if (raster) {
+          const embedded = await pdfDoc.embedJpg(raster.bytes)
+          page.drawImage(embedded, {
+            x: 0,
+            y: 0,
+            width: pdfDims.width,
+            height: pdfDims.height,
+          })
+        }
+      }
+    } else if (pageMeta.background.type === 'color' && pageMeta.background.color) {
       const bg = parseColorToRgb(pageMeta.background.color, DEFAULT_SHAPE)
       page.drawRectangle({
         x: 0,

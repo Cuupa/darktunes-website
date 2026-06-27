@@ -27,6 +27,7 @@ import {
 } from '@/lib/epk/editor/profilePresets'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist, ArtistAsset } from '@/types'
+import type { EpkPickerAsset } from '@/lib/epk/pickerAssets'
 import type { EpkAssetPickerMode } from './EpkPropertiesPanel'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +38,7 @@ interface EpkBuilderShellProps {
   artist: Artist
   artistProfile: ArtistProfile | null
   initialAssets: ArtistAsset[]
+  pickerAssets: EpkPickerAsset[]
   initialFonts: EpkFontAsset[]
   onSave: () => void
   onSaveSnapshot: () => void
@@ -49,6 +51,7 @@ export function EpkBuilderShell({
   artist,
   artistProfile,
   initialAssets,
+  pickerAssets,
   initialFonts,
   onSave,
   onSaveSnapshot,
@@ -179,17 +182,8 @@ export function EpkBuilderShell({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deleteSelected, duplicateSelected, nudgeSelected, selectedIds.length, store])
 
-  const sidePanels = (
-    <div className="space-y-4">
-      <EpkPagesPanel />
-      <EpkLayersPanel />
-      <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
-      <EpkPropertiesPanel onOpenAssetPicker={openAssetPicker} />
-    </div>
-  )
-
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] min-h-[560px] flex-col md:h-[calc(100dvh-0px)]">
       <EpkFontLoader />
       <EpkCommandPalette
         onOpenAssetPicker={() => openAssetPicker('insert')}
@@ -199,23 +193,26 @@ export function EpkBuilderShell({
         onInsertPreset={handleInsertPreset}
         onSave={onSave}
       />
-      <EpkToolbar
-        onSave={onSave}
-        onSaveSnapshot={onSaveSnapshot}
-        onOpenAssetPicker={() => openAssetPicker('insert')}
-        onOpenVersionHistory={() => setVersionHistoryOpen(true)}
-        onOpenShareLinks={() => setShareLinksOpen(true)}
-        onOpenAnalytics={() => setAnalyticsOpen(true)}
-        onOpenTemplates={() => setTemplatesOpen(true)}
-        onOpenCommandPalette={() => {
-          window.dispatchEvent(new CustomEvent(EPK_OPEN_COMMAND_PALETTE_EVENT))
-        }}
-        onInsertPreset={handleInsertPreset}
-        isSaving={isSaving}
-      />
+
+      <div className="shrink-0 border-b border-border bg-card px-3 py-2 md:px-4">
+        <EpkToolbar
+          onSave={onSave}
+          onSaveSnapshot={onSaveSnapshot}
+          onOpenAssetPicker={() => openAssetPicker('insert')}
+          onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+          onOpenShareLinks={() => setShareLinksOpen(true)}
+          onOpenAnalytics={() => setAnalyticsOpen(true)}
+          onOpenTemplates={() => setTemplatesOpen(true)}
+          onOpenCommandPalette={() => {
+            window.dispatchEvent(new CustomEvent(EPK_OPEN_COMMAND_PALETTE_EVENT))
+          }}
+          onInsertPreset={handleInsertPreset}
+          isSaving={isSaving}
+        />
+      </div>
 
       <nav
-        className="flex gap-1 rounded-lg border border-border bg-card p-1 lg:hidden"
+        className="flex shrink-0 gap-1 border-b border-border bg-card p-2 lg:hidden"
         aria-label={t('epk_mobile_nav_label')}
       >
         {(['canvas', 'layers', 'properties'] as const).map((panel) => (
@@ -239,37 +236,51 @@ export function EpkBuilderShell({
         ))}
       </nav>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className={cn(mobilePanel !== 'canvas' && 'hidden lg:block')}>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <aside
+          className={cn(
+            'hidden w-56 shrink-0 flex-col border-r border-border bg-card lg:flex xl:w-60',
+            mobilePanel === 'layers' && 'flex w-full lg:w-56',
+            mobilePanel !== 'layers' && 'max-lg:hidden',
+          )}
+        >
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3" data-lenis-prevent>
+            <EpkPagesPanel />
+            <EpkLayersPanel />
+          </div>
+        </aside>
+
+        <main
+          className={cn(
+            'min-w-0 flex-1 overflow-hidden bg-muted/20',
+            mobilePanel !== 'canvas' && 'max-lg:hidden',
+          )}
+        >
           <EpkCanvas
             onOpenAssetPicker={() => openAssetPicker('insert')}
             onReplaceImage={() => openAssetPicker('replace')}
           />
-        </div>
-        <div className={cn('space-y-4', mobilePanel === 'canvas' && 'hidden lg:block')}>
-          {mobilePanel === 'properties' || mobilePanel === 'layers' ? (
-            mobilePanel === 'layers' ? (
-              <>
-                <EpkPagesPanel />
-                <EpkLayersPanel />
-              </>
-            ) : (
-              <>
-                <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
-                <EpkPropertiesPanel onOpenAssetPicker={openAssetPicker} />
-              </>
-            )
-          ) : (
-            sidePanels
+        </main>
+
+        <aside
+          className={cn(
+            'hidden w-72 shrink-0 flex-col border-l border-border bg-card xl:w-80',
+            mobilePanel === 'properties' && 'flex w-full lg:w-72',
+            mobilePanel !== 'properties' && 'max-lg:hidden',
           )}
-        </div>
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3" data-lenis-prevent>
+            <EpkPropertiesPanel onOpenAssetPicker={openAssetPicker} />
+            <EpkFontManager artistId={artistId} initialFonts={initialFonts} />
+          </div>
+        </aside>
       </div>
 
       <EpkAssetPicker
         artistId={artistId}
         open={assetPickerOpen}
         onClose={() => setAssetPickerOpen(false)}
-        initialAssets={initialAssets}
+        pickerAssets={pickerAssets}
         onSelect={handleAssetSelect}
         mode={assetPickerMode}
       />

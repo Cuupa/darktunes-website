@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Crop, Image as ImageIcon } from '@phosphor-icons/react'
+import { Crop, Image as ImageIcon, ArrowsHorizontal, ArrowsVertical } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -21,7 +21,10 @@ import {
 } from '@/components/ui/select'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { EPK_GOOGLE_FONTS } from '@/lib/epk/googleFonts'
+import { DEFAULT_GRADIENT_ANGLE, EPK_GRADIENT_PRESETS } from '@/lib/epk/gradients'
 import { EpkImageCropDialog } from './EpkImageCropDialog'
+import { EpkGradientPicker } from './EpkGradientPicker'
+import { EpkPageBackgroundPanel } from './EpkPageBackgroundPanel'
 
 export type EpkAssetPickerMode = 'insert' | 'replace'
 
@@ -34,6 +37,8 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
   const document = useEpkEditorStore((s) => s.document)
   const updateElement = useEpkEditorStore((s) => s.updateElement)
   const addDocumentFont = useEpkEditorStore((s) => s.addDocumentFont)
+  const alignSelected = useEpkEditorStore((s) => s.alignSelected)
+  const toggleSelectedFlip = useEpkEditorStore((s) => s.toggleSelectedFlip)
   const [cropOpen, setCropOpen] = useState(false)
 
   const element = useEpkEditorStore((s) =>
@@ -43,11 +48,7 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
   )
 
   if (!element) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-sm text-muted-foreground">{t('epk_editor_no_selection')}</p>
-      </div>
-    )
+    return <EpkPageBackgroundPanel />
   }
 
   const patchStyle = (key: string, value: string | number) => {
@@ -56,13 +57,45 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
     })
   }
 
+  const fillType = element.style.fillType ?? 'solid'
+
   return (
     <div className="rounded-lg border border-border bg-card" data-lenis-prevent>
       <div className="border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">{t('epk_editor_properties_title')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5 capitalize">{element.type}</p>
       </div>
-      <div className="space-y-4 p-4 max-h-[min(360px,50vh)] overflow-y-auto">
+      <div className="space-y-4 p-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[36px]"
+            onClick={() => alignSelected('center-h')}
+          >
+            {t('epk_align_center_h')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[36px]"
+            onClick={() => alignSelected('center-v')}
+          >
+            {t('epk_align_center_v')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-[36px]"
+            onClick={() => alignSelected('center')}
+          >
+            {t('epk_align_center')}
+          </Button>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="epk-prop-x">X</Label>
@@ -213,15 +246,81 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
         )}
 
         {element.type === 'shape' && (
-          <div className="space-y-2">
-            <Label htmlFor="epk-prop-fill">{t('epk_editor_fill_color')}</Label>
-            <Input
-              id="epk-prop-fill"
-              type="text"
-              value={element.style.fill ?? '#493687'}
-              onChange={(e) => patchStyle('fill', e.target.value)}
-            />
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="epk-prop-fill-type">{t('epk_fill_type')}</Label>
+              <Select
+                value={fillType}
+                onValueChange={(v: 'solid' | 'gradient') => {
+                  if (v === 'gradient') {
+                    const preset = EPK_GRADIENT_PRESETS[0]?.gradient
+                    updateElement(element.id, {
+                      style: {
+                        ...element.style,
+                        fillType: 'gradient',
+                        gradientStops: preset?.stops ?? [
+                          { offset: 0, color: '#493687' },
+                          { offset: 1, color: '#7e1e37' },
+                        ],
+                        gradientAngle: preset?.angle ?? DEFAULT_GRADIENT_ANGLE,
+                      },
+                    })
+                  } else {
+                    updateElement(element.id, {
+                      style: { ...element.style, fillType: 'solid' },
+                    })
+                  }
+                }}
+              >
+                <SelectTrigger id="epk-prop-fill-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="solid">{t('epk_fill_solid')}</SelectItem>
+                  <SelectItem value="gradient">{t('epk_fill_gradient')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {fillType === 'gradient' && element.style.gradientStops ? (
+              <EpkGradientPicker
+                compact
+                gradient={{
+                  angle: element.style.gradientAngle ?? DEFAULT_GRADIENT_ANGLE,
+                  stops: element.style.gradientStops,
+                }}
+                onChange={(gradient) =>
+                  updateElement(element.id, {
+                    style: {
+                      ...element.style,
+                      fillType: 'gradient',
+                      gradientStops: gradient.stops,
+                      gradientAngle: gradient.angle,
+                    },
+                  })
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="epk-prop-fill">{t('epk_editor_fill_color')}</Label>
+                <Input
+                  id="epk-prop-fill"
+                  type="text"
+                  value={element.style.fill ?? '#493687'}
+                  onChange={(e) => patchStyle('fill', e.target.value)}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="epk-prop-corner-radius">{t('epk_corner_radius')}</Label>
+              <Input
+                id="epk-prop-corner-radius"
+                type="number"
+                min={0}
+                value={element.style.cornerRadius ?? 0}
+                onChange={(e) => patchStyle('cornerRadius', Number(e.target.value))}
+              />
+            </div>
+          </>
         )}
 
         {(element.type === 'image' || element.type === 'logo') && (
@@ -239,6 +338,28 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
             ) : null}
             {element.src ? (
               <>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => toggleSelectedFlip('x')}
+                  >
+                    <ArrowsHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {t('epk_flip_horizontal')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => toggleSelectedFlip('y')}
+                  >
+                    <ArrowsVertical className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {t('epk_flip_vertical')}
+                  </Button>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="epk-prop-image-fit">{t('epk_editor_image_fit')}</Label>
                   <Select
@@ -254,16 +375,6 @@ export function EpkPropertiesPanel({ onOpenAssetPicker }: EpkPropertiesPanelProp
                       <SelectItem value="fill">{t('epk_editor_image_fit_fill')}</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="epk-prop-image-src">{t('epk_editor_image_source')}</Label>
-                  <Input
-                    id="epk-prop-image-src"
-                    type="url"
-                    readOnly
-                    value={element.src}
-                    className="text-xs"
-                  />
                 </div>
                 <Button
                   type="button"

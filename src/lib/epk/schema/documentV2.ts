@@ -30,8 +30,21 @@ export type EpkEditorMode = z.infer<typeof epkEditorModeSchema>
 // Nested objects
 // ---------------------------------------------------------------------------
 
+export const epkGradientStopSchema = z.object({
+  offset: z.number().min(0).max(1),
+  color: z.string(),
+})
+
+export type EpkGradientStop = z.infer<typeof epkGradientStopSchema>
+
+export const epkFillTypeSchema = z.enum(['solid', 'gradient'])
+export type EpkFillType = z.infer<typeof epkFillTypeSchema>
+
 export const epkElementStyleSchema = z.object({
   fill: z.string().optional(),
+  fillType: epkFillTypeSchema.optional(),
+  gradientStops: z.array(epkGradientStopSchema).optional(),
+  gradientAngle: z.number().optional(),
   stroke: z.string().optional(),
   strokeWidth: z.number().optional(),
   opacity: z.number().min(0).max(1).optional(),
@@ -57,7 +70,8 @@ export const epkPageBackgroundSchema = z.object({
   color: z.string().optional(),
   src: z.string().url().optional(),
   opacity: z.number().min(0).max(1).optional(),
-  gradientStops: z.array(z.object({ offset: z.number(), color: z.string() })).optional(),
+  gradientStops: z.array(epkGradientStopSchema).optional(),
+  gradientAngle: z.number().optional(),
 })
 
 export type EpkPageBackground = z.infer<typeof epkPageBackgroundSchema>
@@ -98,6 +112,8 @@ export const epkElementSchema = z.object({
   content: z.string().optional(),
   src: z.string().optional(),
   crop: epkImageCropSchema.optional(),
+  flipX: z.boolean().optional(),
+  flipY: z.boolean().optional(),
   children: z.array(z.string()).optional(),
 })
 

@@ -41,14 +41,15 @@ async function uploadAssetToR2(
   const ext = extFromMimeType(contentType)
   const key = `artist-assets/${artistId}/${randomUUID()}.${ext}`
 
-  // Stream file directly to R2 — avoids loading an extra copy into Node.js memory
+  const buffer = Buffer.from(await file.arrayBuffer())
+
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      Body: file.stream(),
+      Body: buffer,
       ContentType: contentType,
-      ContentLength: file.size,
+      ContentLength: buffer.length,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )

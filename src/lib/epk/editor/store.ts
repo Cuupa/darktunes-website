@@ -7,7 +7,8 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { temporal } from 'zundo'
-import type { EpkDocumentV2, EpkElement, EpkFont } from '@/lib/epk/schema/documentV2'
+import type { EpkDocumentV2, EpkElement, EpkFont, EpkPageBackground } from '@/lib/epk/schema/documentV2'
+import type { EpkGradient } from '@/lib/epk/gradients'
 import { createEpkElementId, createEpkPageId } from '@/lib/epk/schema/elementIds'
 import { getPageDimensions } from '@/lib/epk/schema/pageDimensions'
 import { createDefaultElement, getNextZIndex } from './defaults'
@@ -54,6 +55,10 @@ export interface EpkEditorActions {
   groupSelected: () => void
   ungroupSelected: () => void
   moveGroupByDelta: (groupId: string, dx: number, dy: number) => void
+  updatePageBackground: (pageId: string, background: EpkPageBackground) => void
+  alignSelected: (mode: 'center' | 'center-h' | 'center-v') => void
+  applyGradientToSelected: (gradient: EpkGradient) => void
+  toggleSelectedFlip: (axis: 'x' | 'y') => void
 }
 
 export type EpkEditorStore = EpkEditorState & EpkEditorActions
@@ -426,6 +431,57 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
               child.y += dy
             }
 
+            state.isDirty = true
+          }),
+
+        updatePageBackground: (pageId, background) =>
+          set((state) => {
+            const page = state.document.pages.find((p) => p.id === pageId)
+            if (!page) return
+            page.background = background
+            state.isDirty = true
+          }),
+
+        alignSelected: (mode) =>
+          set((state) => {
+            const page = state.document.pages.find((p) => p.id === state.activePageId)
+            if (!page || state.selectedIds.length === 0) return
+            for (const id of state.selectedIds) {
+              const el = state.document.elements.find((e) => e.id === id)
+              if (!el || el.locked) continue
+              if (mode === 'center' || mode === 'center-h') {
+                el.x = snapValue((page.width - el.width) / 2, state.gridSize, state.snapEnabled)
+              }
+              if (mode === 'center' || mode === 'center-v') {
+                el.y = snapValue((page.height - el.height) / 2, state.gridSize, state.snapEnabled)
+              }
+            }
+            state.isDirty = true
+          }),
+
+        applyGradientToSelected: (gradient) =>
+          set((state) => {
+            if (state.selectedIds.length === 0) return
+            for (const id of state.selectedIds) {
+              const el = state.document.elements.find((e) => e.id === id)
+              if (!el || el.type !== 'shape') continue
+              el.style = {
+                ...el.style,
+                fillType: 'gradient',
+                gradientStops: gradient.stops,
+                gradientAngle: gradient.angle,
+              }
+            }
+            state.isDirty = true
+          }),
+
+        toggleSelectedFlip: (axis) =>
+          set((state) => {
+            if (state.selectedIds.length !== 1) return
+            const el = state.document.elements.find((e) => e.id === state.selectedIds[0])
+            if (!el || (el.type !== 'image' && el.type !== 'logo')) return
+            if (axis === 'x') el.flipX = !el.flipX
+            else el.flipY = !el.flipY
             state.isDirty = true
           }),
       })),
