@@ -39,6 +39,7 @@ import { portalKey } from '@/i18n/portalKey'
 import { toast } from 'sonner'
 import type { Artist } from '@/types'
 import { useUnreadMessages } from './PortalNotificationProvider'
+import { usePortalOffline } from './PortalOfflineProvider'
 
 interface PortalSidebarProps {
   artists: Artist[]
@@ -123,6 +124,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unreadCount } = useUnreadMessages()
+  const { offline, canNavigateTo } = usePortalOffline()
 
   // Derive active artist directly from URL — no stale local state
   const activeArtistId = searchParams.get('artistId')
@@ -157,8 +159,19 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
 
   /** Switch active artist — URL is the single source of truth */
   const handleArtistSwitch = (artist: Artist) => {
+    if (offline) {
+      toast.info(t('portal_offline_action_unavailable'))
+      return
+    }
     router.push(`${pathname}?artistId=${artist.id}`)
     router.refresh()
+  }
+
+  const handleNavClick = (href: string, onNavigate?: () => void) => (event: React.MouseEvent) => {
+    if (canNavigateTo(href)) return
+    event.preventDefault()
+    toast.info(t('portal_offline_nav_blocked'))
+    onNavigate?.()
   }
 
   const renderNav = (onNavigate?: () => void) => (
@@ -171,16 +184,23 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
           <div className="space-y-0.5">
             {items.map(({ href, label, icon: Icon }) => {
               const isActive = href === '/portal' ? pathname === '/portal' : pathname.startsWith(href)
+              const navAllowed = canNavigateTo(href)
               return (
                 <Link
                   key={href}
                   href={navHref(href)}
-                  onClick={onNavigate}
+                  onClick={(event) => {
+                    handleNavClick(href, onNavigate)(event)
+                    if (navAllowed) onNavigate?.()
+                  }}
+                  aria-disabled={!navAllowed}
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
                       ? 'portal-nav-active bg-primary/20 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                      : navAllowed
+                        ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        : 'text-muted-foreground/50 cursor-not-allowed',
                   )}
                 >
                   <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />

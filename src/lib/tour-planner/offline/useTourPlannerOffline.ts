@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useOnlineStatus } from '@/lib/offline/useOnlineStatus'
 import { useQueryClient } from '@tanstack/react-query'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import { flushSyncQueue, getLastSyncedAt, getPendingMutationCount } from '@/lib/tour-planner/offline/syncQueue'
 
 export function useTourPlannerOffline() {
   const queryClient = useQueryClient()
-  const [online, setOnline] = useState(true)
+  const { online } = useOnlineStatus()
   const [pending, setPending] = useState(0)
   const [lastSynced, setLastSynced] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -36,22 +37,13 @@ export function useTourPlannerOffline() {
   const syncNow = useCallback(() => syncNowRef.current(), [])
 
   useEffect(() => {
-    setOnline(navigator.onLine)
     void refresh()
-
-    const onOnline = () => {
-      setOnline(true)
-      void syncNowRef.current()
-    }
-    const onOffline = () => setOnline(false)
-
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
   }, [refresh])
+
+  useEffect(() => {
+    if (!online) return
+    void syncNowRef.current()
+  }, [online])
 
   return { online, pending, lastSynced, syncing, syncNow, refresh }
 }

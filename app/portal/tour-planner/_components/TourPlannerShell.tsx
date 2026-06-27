@@ -19,6 +19,8 @@ import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import { parseTourPlannerJson, tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
 import { useTourPlannerStops, useTourPlannerTours } from '@/lib/tour-planner/hooks'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
+import { appendStopToCache, appendTourToCache } from '@/lib/tour-planner/offline/cacheUpdates'
+import { DEFAULT_TOUR_PLANNER_SETTINGS } from '@/lib/tour-planner/types'
 import type { Concert, Tour } from '@/types'
 import { TourPlannerTabs } from './TourPlannerPanels'
 import { TourPlannerOfflineBanner } from './TourPlannerOfflineBanner'
@@ -73,9 +75,33 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
       const json = offline ? null : await parseTourPlannerJson<{ tour: Tour }>(res)
       return { tour: json?.tour ?? null, offline }
     },
-    onSuccess: ({ tour, offline }) => {
-      invalidateTours()
-      if (tour) setActiveTourId(tour.id)
+    onSuccess: ({ tour, offline }, name) => {
+      if (offline && !tour) {
+        const optimistic: Tour = {
+          id: `offline-${crypto.randomUUID()}`,
+          artistId,
+          name,
+          description: null,
+          startDate: null,
+          endDate: null,
+          archived: false,
+          sortOrder: tours.length,
+          settings: DEFAULT_TOUR_PLANNER_SETTINGS,
+          routeCache: null,
+          budget: null,
+          techDocuments: [],
+          currency: 'EUR',
+          totalBudget: null,
+          createdBy: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        appendTourToCache(queryClient, artistId, optimistic)
+        setActiveTourId(optimistic.id)
+      } else {
+        invalidateTours()
+        if (tour) setActiveTourId(tour.id)
+      }
       setNewTourName('')
       toastSaved(offline)
     },
@@ -98,7 +124,48 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
       return wasQueuedOffline(res)
     },
     onSuccess: (offline) => {
-      invalidateStops()
+      if (offline && activeTourId) {
+        appendStopToCache(queryClient, artistId, activeTourId, {
+          id: `offline-${crypto.randomUUID()}`,
+          tourId: activeTourId,
+          artistId,
+          concertId: null,
+          stopDate: newStopDate,
+          isTravelDay: false,
+          sortOrder: stops.length,
+          venueName: newStopVenue || null,
+          venueAddress: null,
+          venueCity: null,
+          venueCountry: null,
+          venueLat: null,
+          venueLng: null,
+          venueValidated: false,
+          hotelName: null,
+          hotelAddress: null,
+          hotelCity: null,
+          hotelCountry: null,
+          hotelLat: null,
+          hotelLng: null,
+          hotelValidated: false,
+          arrivalTime: null,
+          showStatus: 'option',
+          daySchedule: null,
+          deal: null,
+          settlement: null,
+          perDiems: [],
+          rooming: [],
+          travelManifest: [],
+          venueDetails: null,
+          venueContactInfo: null,
+          guestList: [],
+          guestListLimit: null,
+          notes: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      } else {
+        invalidateStops()
+      }
       setNewStopDate('')
       setNewStopVenue('')
       toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_stop_created'))

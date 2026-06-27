@@ -49,13 +49,13 @@ export async function flushSyncQueue(): Promise<{ flushed: number; failed: numbe
       })
       if (!res.ok) {
         failed += 1
-        break
+        continue
       }
       await database.syncQueue.delete(item.id)
       flushed += 1
     } catch {
       failed += 1
-      break
+      continue
     }
   }
 

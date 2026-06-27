@@ -27,6 +27,8 @@ import { shouldRedirectToOnboarding } from '@/lib/portal/onboardingGate'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalQueryProvider } from './_components/PortalQueryProvider'
+import { PortalOfflineProvider } from './_components/PortalOfflineProvider'
+import { PortalOfflineBanner } from './_components/PortalOfflineBanner'
 import { PortalAccessGate } from './_components/PortalAccessGate'
 import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
@@ -197,7 +199,12 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           featureFlags={featureFlags}
         />
         <main className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full border-t md:border-t-0 border-primary/10">
-          <PortalQueryProvider>{children}</PortalQueryProvider>
+          <PortalOfflineProvider>
+            <PortalQueryProvider>
+              <PortalOfflineBanner />
+              {children}
+            </PortalQueryProvider>
+          </PortalOfflineProvider>
         </main>
       </PortalNotificationProvider>
     </div>

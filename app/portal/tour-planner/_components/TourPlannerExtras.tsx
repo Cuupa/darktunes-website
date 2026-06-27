@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
+import { useOnlineStatus } from '@/lib/offline/useOnlineStatus'
 import { downloadFile, exportToCSV, exportToText } from '@/lib/tour-planner/export'
 import { useTourPlannerCrew, useTourPlannerMerch } from '@/lib/tour-planner/hooks'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
@@ -76,9 +77,15 @@ export function buildTourPlannerPdfLabels(t: PortalTranslator): TourPlannerPdfLa
   }
 }
 
+export type GeocodeResult =
+  | { status: 'ok'; lat: number; lng: number }
+  | { status: 'queued' }
+  | { status: 'fail' }
+
 export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: string; activeTour: Tour | null; stops: TourStop[] }) {
   const t = useTranslations('portal')
   const qc = useQueryClient()
+  const { offline } = useOnlineStatus()
   const mutation = useMutation({
     mutationFn: async () => {
       if (!activeTour) throw new Error('no tour')
@@ -138,7 +145,16 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button disabled={!activeTour || mutation.isPending} onClick={() => mutation.mutate()}>{t('tour_planner_calc_route')}</Button>
+        <Button
+          disabled={!activeTour || mutation.isPending || offline}
+          title={offline ? t('tour_planner_offline_unavailable') : undefined}
+          onClick={() => mutation.mutate()}
+        >
+          {t('tour_planner_calc_route')}
+        </Button>
+        {offline && (
+          <p className="w-full text-sm text-muted-foreground">{t('tour_planner_route_offline_hint')}</p>
+        )}
         {trackStops.length > 0 && (
           <>
             <Button variant="outline" onClick={exportCsv}>{t('tour_planner_export_csv')}</Button>
@@ -416,6 +432,7 @@ export function MerchSettlementForm({
   onSaved: () => void
 }) {
   const t = useTranslations('portal')
+  const { offline } = useOnlineStatus()
   const pdfLabels = buildTourPlannerPdfLabels(t)
   const [draft, setDraft] = useState<MerchSettlement>(emptyMerchSettlement(stop))
   const [loading, setLoading] = useState(true)
@@ -424,6 +441,10 @@ export function MerchSettlementForm({
   const [compReason, setCompReason] = useState('')
 
   useEffect(() => {
+    if (offline) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     const load = async () => {
       setLoading(true)
@@ -438,7 +459,7 @@ export function MerchSettlementForm({
     }
     void load()
     return () => { cancelled = true }
-  }, [artistId, stop.id])
+  }, [artistId, stop.id, offline])
 
   const save = async () => {
     const res = await tourPlannerFetch(artistId, '/merch/settlement', {
@@ -1080,23 +1101,26 @@ async function geocodeQuery(
   artistId: string,
   query: string,
   tourId: string,
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<GeocodeResult> {
   const res = await tourPlannerFetch(artistId, '/geocode', {
     method: 'POST',
     body: JSON.stringify({ query, tourId }),
   })
-  if (!res.ok) return null
+  if (wasQueuedOffline(res)) return { status: 'queued' }
+  if (!res.ok) return { status: 'fail' }
   const json = (await res.json()) as { coords?: { lat: number; lon: number } }
-  return json.coords ? { lat: json.coords.lat, lng: json.coords.lon } : null
+  return json.coords
+    ? { status: 'ok', lat: json.coords.lat, lng: json.coords.lon }
+    : { status: 'fail' }
 }
 
 export async function geocodeStopVenue(
   artistId: string,
   tourId: string,
   stop: TourStop,
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<GeocodeResult> {
   const q = [stop.venueAddress, stop.venueCity, stop.venueCountry].filter(Boolean).join(', ')
-  if (!q) return null
+  if (!q) return { status: 'fail' }
   return geocodeQuery(artistId, q, tourId)
 }
 
@@ -1104,8 +1128,8 @@ export async function geocodeStopHotel(
   artistId: string,
   tourId: string,
   stop: TourStop,
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<GeocodeResult> {
   const q = [stop.hotelAddress, stop.hotelCity, stop.hotelCountry].filter(Boolean).join(', ')
-  if (!q) return null
+  if (!q) return { status: 'fail' }
   return geocodeQuery(artistId, q, tourId)
 }

@@ -5,9 +5,18 @@ import { parseTourPlannerJson, tourPlannerFetch } from '@/lib/tour-planner/clien
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import type { Tour, TourCrewMember, TourContact, TourMerchItem, TourStop, TourTask } from '@/types'
 
+const offlineQueryOptions = {
+  networkMode: 'offlineFirst' as const,
+  retry: (failureCount: number) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return false
+    return failureCount < 1
+  },
+}
+
 export function useTourPlannerTours(artistId: string, initialTours: Tour[]) {
   return useQuery({
     queryKey: tourPlannerKeys.tours(artistId),
+    ...offlineQueryOptions,
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, '/tours')
       const json = await parseTourPlannerJson<{ tours: Tour[] }>(res)
@@ -20,6 +29,7 @@ export function useTourPlannerTours(artistId: string, initialTours: Tour[]) {
 export function useTourPlannerStops(artistId: string, tourId: string | null) {
   return useQuery({
     queryKey: tourPlannerKeys.stops(artistId, tourId),
+    ...offlineQueryOptions,
     enabled: Boolean(tourId),
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, `/stops?tourId=${tourId}`)
@@ -32,6 +42,7 @@ export function useTourPlannerStops(artistId: string, tourId: string | null) {
 export function useTourPlannerTasks(artistId: string, tourId: string | null) {
   return useQuery({
     queryKey: tourPlannerKeys.tasks(artistId, tourId),
+    ...offlineQueryOptions,
     enabled: Boolean(tourId),
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, `/tasks?tourId=${tourId}`)
@@ -44,6 +55,7 @@ export function useTourPlannerTasks(artistId: string, tourId: string | null) {
 export function useTourPlannerContacts(artistId: string) {
   return useQuery({
     queryKey: tourPlannerKeys.contacts(artistId),
+    ...offlineQueryOptions,
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, '/contacts')
       const json = await parseTourPlannerJson<{ contacts: TourContact[] }>(res)
@@ -55,6 +67,7 @@ export function useTourPlannerContacts(artistId: string) {
 export function useTourPlannerCrew(artistId: string, tourId: string | null) {
   return useQuery({
     queryKey: tourPlannerKeys.crew(artistId, tourId),
+    ...offlineQueryOptions,
     enabled: Boolean(tourId),
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, `/crew?tourId=${tourId}`)
@@ -67,6 +80,7 @@ export function useTourPlannerCrew(artistId: string, tourId: string | null) {
 export function useTourPlannerMerch(artistId: string) {
   return useQuery({
     queryKey: tourPlannerKeys.merch(artistId),
+    ...offlineQueryOptions,
     queryFn: async () => {
       const res = await tourPlannerFetch(artistId, '/merch')
       const json = await parseTourPlannerJson<{ items: TourMerchItem[] }>(res)

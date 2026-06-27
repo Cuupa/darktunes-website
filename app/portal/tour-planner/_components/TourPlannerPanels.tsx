@@ -37,6 +37,12 @@ import {
   useTourPlannerTasks,
 } from '@/lib/tour-planner/hooks'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
+import {
+  patchStopInCache,
+  removeStopFromCache,
+  setStopsOrderInCache,
+} from '@/lib/tour-planner/offline/cacheUpdates'
+import { useOnlineStatus } from '@/lib/offline/useOnlineStatus'
 import type { DaySchedule, ShowStatus } from '@/lib/tour-planner/types'
 import {
   ContactForm,
@@ -170,22 +176,29 @@ function StopsPanel({
   onUpdated: () => void
 }) {
   const t = useTranslations('portal')
+  const queryClient = useQueryClient()
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   if (!stops.length) return <p className="text-sm text-muted-foreground">{t('tour_planner_no_stops')}</p>
 
-  const reorder = async (orderedStopIds: string[]) => {
+  const reorder = async (next: TourStop[]) => {
     if (!tourId) return
+    const orderedStopIds = next.map((stop) => stop.id)
     const res = await tourPlannerFetch(artistId, '/stops', {
       method: 'POST',
       body: JSON.stringify({ tourId, orderedStopIds }),
     })
     if (!res.ok) throw new Error('reorder failed')
+    const offline = wasQueuedOffline(res)
+    if (offline) {
+      setStopsOrderInCache(queryClient, artistId, tourId, next)
+      toast.success(t('tour_planner_saved_offline'))
+      return
+    }
     onUpdated()
-    if (wasQueuedOffline(res)) toast.success(t('tour_planner_saved_offline'))
   }
 
   const applyOrder = (next: TourStop[]) => {
-    reorder(next.map((stop) => stop.id)).catch(() => toast.error(t('tour_planner_error')))
+    reorder(next).catch(() => toast.error(t('tour_planner_error')))
   }
 
   const move = (index: number, direction: -1 | 1) => {
@@ -263,6 +276,8 @@ function StopCard({
   onUpdated: () => void
 }) {
   const t = useTranslations('portal')
+  const queryClient = useQueryClient()
+  const { offline } = useOnlineStatus()
   const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | 'loadin' | 'settlement' | 'merch' | 'hotel' | 'perdiems' | 'rooming' | 'manifest' | null>(null)
 
   const patchStop = async (body: Record<string, unknown>) => {
@@ -271,16 +286,27 @@ function StopCard({
       body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error('patch failed')
+    const queued = wasQueuedOffline(res)
+    if (queued) {
+      patchStopInCache(queryClient, artistId, tourId, stop.id, body)
+      toast.success(t('tour_planner_saved_offline'))
+      return
+    }
     onUpdated()
-    if (wasQueuedOffline(res)) toast.success(t('tour_planner_saved_offline'))
   }
 
   const deleteStop = async () => {
     if (!window.confirm(t('tour_planner_delete_stop_confirm'))) return
     const res = await tourPlannerFetch(artistId, `/stops/${stop.id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('delete failed')
+    const queued = wasQueuedOffline(res)
+    if (queued) {
+      removeStopFromCache(queryClient, artistId, tourId, stop.id)
+      toast.success(t('tour_planner_saved_offline'))
+      return
+    }
     onUpdated()
-    toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_stop_deleted'))
+    toast.success(t('tour_planner_stop_deleted'))
   }
 
   const publishOrSync = () => {
@@ -292,19 +318,33 @@ function StopCard({
   }
 
   const geocodeVenue = async () => {
-    if (!tourId) return
-    const c = await geocodeStopVenue(artistId, tourId, stop)
-    if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
-    patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true })
+    if (!tourId || offline) return
+    const result = await geocodeStopVenue(artistId, tourId, stop)
+    if (result.status === 'queued') {
+      toast.info(t('tour_planner_geocode_queued'))
+      return
+    }
+    if (result.status !== 'ok') {
+      toast.error(t('tour_planner_geocode_fail'))
+      return
+    }
+    patchStop({ venueLat: result.lat, venueLng: result.lng, venueValidated: true })
       .then(() => toast.success(t('tour_planner_geocode_ok')))
       .catch(() => toast.error(t('tour_planner_error')))
   }
 
   const geocodeHotel = async () => {
-    if (!tourId) return
-    const c = await geocodeStopHotel(artistId, tourId, stop)
-    if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
-    patchStop({ hotelLat: c.lat, hotelLng: c.lng, hotelValidated: true })
+    if (!tourId || offline) return
+    const result = await geocodeStopHotel(artistId, tourId, stop)
+    if (result.status === 'queued') {
+      toast.info(t('tour_planner_geocode_queued'))
+      return
+    }
+    if (result.status !== 'ok') {
+      toast.error(t('tour_planner_geocode_fail'))
+      return
+    }
+    patchStop({ hotelLat: result.lat, hotelLng: result.lng, hotelValidated: true })
       .then(() => toast.success(t('tour_planner_geocode_ok')))
       .catch(() => toast.error(t('tour_planner_error')))
   }
@@ -404,8 +444,12 @@ function StopCard({
             <DropdownMenuItem onSelect={() => openDialog('settlement')}>{t('tour_planner_settlement')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => openDialog('merch')}>{t('tour_planner_merch_settlement')}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void geocodeVenue()}>{t('tour_planner_geocode_venue')}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => void geocodeHotel()}>{t('tour_planner_geocode_hotel')}</DropdownMenuItem>
+            <DropdownMenuItem disabled={offline} onSelect={() => void geocodeVenue()}>
+              {t('tour_planner_geocode_venue')}{offline ? ` (${t('tour_planner_offline_unavailable')})` : ''}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={offline} onSelect={() => void geocodeHotel()}>
+              {t('tour_planner_geocode_hotel')}{offline ? ` (${t('tour_planner_offline_unavailable')})` : ''}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={exportDaySheetPdf}>{t('tour_planner_pdf')}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

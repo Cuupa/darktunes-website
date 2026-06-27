@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { tourPlannerToken } from '@/lib/tour-planner/clientApi'
+import { useOnlineStatus } from '@/lib/offline/useOnlineStatus'
 import type {
   Currency,
   DealStructure,
@@ -367,6 +368,7 @@ export function TechDocumentsForm({
   onSave: (docs: TechDocument[]) => void
 }) {
   const t = useTranslations('portal')
+  const { offline } = useOnlineStatus()
   const fileRef = useRef<HTMLInputElement>(null)
   const [list, setList] = useState<TechDocument[]>(documents)
   const [name, setName] = useState('')
@@ -374,6 +376,10 @@ export function TechDocumentsForm({
   const [uploading, setUploading] = useState(false)
 
   const uploadFile = async (file: File) => {
+    if (offline) {
+      toast.info(t('tour_planner_upload_offline'))
+      return
+    }
     if (!name.trim()) {
       toast.error(t('tour_planner_tech_name_required'))
       return
@@ -473,10 +479,18 @@ export function TechDocumentsForm({
         }}
       />
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={uploading || !name.trim()} onClick={() => fileRef.current?.click()}>
+        <Button
+          variant="outline"
+          disabled={uploading || !name.trim() || offline}
+          title={offline ? t('tour_planner_offline_unavailable') : undefined}
+          onClick={() => fileRef.current?.click()}
+        >
           <UploadSimple size={16} aria-hidden />
           {uploading ? t('tour_planner_tech_uploading') : t('tour_planner_tech_upload')}
         </Button>
+        {offline && (
+          <p className="w-full text-sm text-muted-foreground">{t('tour_planner_upload_offline')}</p>
+        )}
         <Button onClick={() => onSave(list)}>{t('tour_planner_save')}</Button>
       </div>
     </div>
