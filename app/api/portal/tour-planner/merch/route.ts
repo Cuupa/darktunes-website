@@ -5,12 +5,20 @@ import { withErrorHandler } from '@/lib/errors'
 import { createTourMerchItem, getTourMerchItemsByArtistId } from '@/lib/api/tourMerch'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 
+const variantSchema = z.object({
+  id: z.string(),
+  type: z.enum(['size', 'color', 'format']),
+  value: z.string(),
+  stock: z.number(),
+})
+
 const createSchema = z.object({
   sku: z.string().min(1),
   name: z.string().min(1),
   category: z.enum(['soft', 'hard']).default('soft'),
   basePrice: z.number().default(0),
   currency: z.string().default('EUR'),
+  variants: z.array(variantSchema).optional(),
 })
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -31,7 +39,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     category: body.category,
     base_price: body.basePrice,
     currency: body.currency,
-    variants: [] as Json,
+    variants: (body.variants ?? []) as Json,
   })
   return NextResponse.json({ item }, { status: 201 })
 })

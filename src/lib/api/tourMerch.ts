@@ -36,12 +36,25 @@ function rowToMerchSettlement(
 }
 
 export type TourMerchItemInsert = Database['public']['Tables']['tour_merch_items']['Insert']
+export type TourMerchItemUpdate = Database['public']['Tables']['tour_merch_items']['Update']
 
 export async function createTourMerchItem(db: DbClient, data: TourMerchItemInsert): Promise<TourMerchItem> {
   const { data: row, error } = await db.from('tour_merch_items').insert(data).select('*').single()
   if (error) throw new Error(error.message)
   if (!row) throw new Error('No data returned from createTourMerchItem')
   return rowToMerchItem(row)
+}
+
+export async function updateTourMerchItem(db: DbClient, id: string, data: TourMerchItemUpdate): Promise<TourMerchItem> {
+  const { data: row, error } = await db.from('tour_merch_items').update(data).eq('id', id).select('*').single()
+  if (error) throw new Error(error.message)
+  if (!row) throw new Error('No data returned from updateTourMerchItem')
+  return rowToMerchItem(row)
+}
+
+export async function deleteTourMerchItem(db: DbClient, id: string): Promise<void> {
+  const { error } = await db.from('tour_merch_items').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function getTourMerchItemsByArtistId(db: DbClient, artistId: string): Promise<TourMerchItem[]> {

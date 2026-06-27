@@ -23,13 +23,15 @@ import {
 import type {
   DealStructure,
   GuestListEntry,
+  MerchComp,
   MerchSettlement,
+  MerchVariant,
   Settlement,
   TourPlannerSettings,
   VenueContactInfo,
   VenueDetails,
 } from '@/lib/tour-planner/types'
-import type { Tour, TourStop } from '@/types'
+import type { Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
 
 type PortalTranslator = ReturnType<typeof useTranslations<'portal'>>
@@ -157,50 +159,99 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
   )
 }
 
+function CrewMemberForm({
+  member,
+  onSave,
+}: {
+  member: Partial<TourCrewMember> & { name: string; role: string }
+  onSave: (body: Record<string, unknown>) => void
+}) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState({
+    name: member.name,
+    role: member.role,
+    email: member.email ?? '',
+    phone: member.phone ?? '',
+    passportNumber: member.passportNumber ?? '',
+    passportExpiry: member.passportExpiry ?? '',
+    nationality: member.nationality ?? '',
+    visaInfo: member.visaInfo ?? '',
+    roomAssignment: member.roomAssignment ?? '',
+    busAssignment: member.busAssignment ?? '',
+  })
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 text-sm">
+      <Input placeholder={t('tour_planner_crew_name')} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      <Input placeholder={t('tour_planner_crew_role')} value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
+      <Input placeholder={t('tour_planner_contact_email')} value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+      <Input placeholder={t('tour_planner_contact_phone')} value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+      <Input placeholder={t('tour_planner_passport_number')} value={draft.passportNumber} onChange={(e) => setDraft({ ...draft, passportNumber: e.target.value })} />
+      <Input type="date" value={draft.passportExpiry} onChange={(e) => setDraft({ ...draft, passportExpiry: e.target.value })} aria-label={t('tour_planner_passport_expiry')} />
+      <Input placeholder={t('tour_planner_nationality')} value={draft.nationality} onChange={(e) => setDraft({ ...draft, nationality: e.target.value })} />
+      <Input placeholder={t('tour_planner_visa_info')} value={draft.visaInfo} onChange={(e) => setDraft({ ...draft, visaInfo: e.target.value })} />
+      <Input placeholder={t('tour_planner_room_assignment')} value={draft.roomAssignment} onChange={(e) => setDraft({ ...draft, roomAssignment: e.target.value })} />
+      <Input placeholder={t('tour_planner_bus_assignment')} value={draft.busAssignment} onChange={(e) => setDraft({ ...draft, busAssignment: e.target.value })} />
+      <Button className="sm:col-span-2" onClick={() => onSave({
+        name: draft.name,
+        role: draft.role,
+        email: draft.email || null,
+        phone: draft.phone || null,
+        passportNumber: draft.passportNumber || null,
+        passportExpiry: draft.passportExpiry || null,
+        nationality: draft.nationality || null,
+        visaInfo: draft.visaInfo || null,
+        roomAssignment: draft.roomAssignment || null,
+        busAssignment: draft.busAssignment || null,
+      })}>{t('tour_planner_save')}</Button>
+    </div>
+  )
+}
+
 export function CrewPanel({ artistId, tourId }: { artistId: string; tourId: string | null }) {
   const t = useTranslations('portal')
   const qc = useQueryClient()
-  const [name, setName] = useState('')
-  const [role, setRole] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
   const { data: crew = [] } = useTourPlannerCrew(artistId, tourId)
-  const create = useMutation({
-    mutationFn: async () => {
-      const res = await tourPlannerFetch(artistId, '/crew', { method: 'POST', body: JSON.stringify({ tourId, name, role }) })
-      if (!res.ok) throw new Error('crew create')
-      return wasQueuedOffline(res)
-    },
-    onSuccess: (offline) => {
-      void qc.invalidateQueries({ queryKey: tourPlannerKeys.crew(artistId, tourId) })
-      setName('')
-      setRole('')
-      if (offline) toast.success(t('tour_planner_saved_offline'))
-    },
-  })
   if (!tourId) return null
+
+  const saveMember = async (memberId: string | null, body: Record<string, unknown>) => {
+    const res = await tourPlannerFetch(artistId, memberId ? `/crew/${memberId}` : '/crew', {
+      method: memberId ? 'PATCH' : 'POST',
+      body: JSON.stringify(memberId ? body : { ...body, tourId }),
+    })
+    if (!res.ok) throw new Error('crew save')
+    void qc.invalidateQueries({ queryKey: tourPlannerKeys.crew(artistId, tourId) })
+    setEditing(null)
+    setCreating(false)
+    toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_saved'))
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Input placeholder={t('tour_planner_crew_name')} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input placeholder={t('tour_planner_crew_role')} value={role} onChange={(e) => setRole(e.target.value)} />
-        <Button disabled={!name} onClick={() => create.mutate()}>{t('tour_planner_add_crew')}</Button>
-      </div>
+      <Button variant="outline" onClick={() => setCreating((v) => !v)}>{t('tour_planner_add_crew')}</Button>
+      {creating && (
+        <CrewMemberForm member={{ name: '', role: '' }} onSave={(body) => saveMember(null, body).catch(() => toast.error(t('tour_planner_error')))} />
+      )}
       <ul className="divide-y divide-border rounded-md border">
         {crew.map((m) => (
-          <li key={m.id} className="p-3 text-sm flex items-center justify-between gap-2">
-            <span>{m.name} · {m.role}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t('tour_planner_delete_crew')}
-              onClick={async () => {
+          <li key={m.id} className="p-3 text-sm space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="text-left hover:underline" onClick={() => setEditing(editing === m.id ? null : m.id)}>
+                {m.name} · {m.role}{m.nationality ? ` · ${m.nationality}` : ''}
+              </button>
+              <Button variant="ghost" size="sm" aria-label={t('tour_planner_delete_crew')} onClick={async () => {
                 const res = await tourPlannerFetch(artistId, `/crew/${m.id}`, { method: 'DELETE' })
                 if (!res.ok) { toast.error(t('tour_planner_error')); return }
                 void qc.invalidateQueries({ queryKey: tourPlannerKeys.crew(artistId, tourId) })
                 toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_crew_deleted'))
-              }}
-            >
-              <Trash size={14} aria-hidden />
-            </Button>
+              }}>
+                <Trash size={14} aria-hidden />
+              </Button>
+            </div>
+            {editing === m.id && (
+              <CrewMemberForm member={m} onSave={(body) => saveMember(m.id, body).catch(() => toast.error(t('tour_planner_error')))} />
+            )}
           </li>
         ))}
       </ul>
@@ -213,29 +264,91 @@ export function MerchPanel({ artistId }: { artistId: string }) {
   const qc = useQueryClient()
   const [sku, setSku] = useState('')
   const [name, setName] = useState('')
+  const [basePrice, setBasePrice] = useState(0)
+  const [category, setCategory] = useState<'soft' | 'hard'>('soft')
+  const [variantValue, setVariantValue] = useState('')
   const { data: items = [] } = useTourPlannerMerch(artistId)
+
+  const invalidate = () => void qc.invalidateQueries({ queryKey: tourPlannerKeys.merch(artistId) })
+
   const create = useMutation({
     mutationFn: async () => {
-      const res = await tourPlannerFetch(artistId, '/merch', { method: 'POST', body: JSON.stringify({ sku, name }) })
+      const variants: MerchVariant[] = variantValue
+        ? [{ id: crypto.randomUUID(), type: 'size', value: variantValue, stock: 0 }]
+        : []
+      const res = await tourPlannerFetch(artistId, '/merch', {
+        method: 'POST',
+        body: JSON.stringify({ sku, name, basePrice, category, variants }),
+      })
       if (!res.ok) throw new Error('merch create')
       return wasQueuedOffline(res)
     },
     onSuccess: (offline) => {
-      void qc.invalidateQueries({ queryKey: tourPlannerKeys.merch(artistId) })
+      invalidate()
       setSku('')
       setName('')
+      setBasePrice(0)
+      setVariantValue('')
       if (offline) toast.success(t('tour_planner_saved_offline'))
     },
   })
+
+  const addVariant = async (item: TourMerchItem, value: string) => {
+    if (!value) return
+    const variants = [...item.variants, { id: crypto.randomUUID(), type: 'size' as const, value, stock: 0 }]
+    const res = await tourPlannerFetch(artistId, `/merch/${item.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ variants }),
+    })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    invalidate()
+  }
+
+  const deleteItem = async (itemId: string) => {
+    const res = await tourPlannerFetch(artistId, `/merch/${itemId}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    invalidate()
+    toast.success(t('tour_planner_merch_deleted'))
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <Input placeholder={t('tour_planner_merch_sku')} value={sku} onChange={(e) => setSku(e.target.value)} />
         <Input placeholder={t('tour_planner_merch_name')} value={name} onChange={(e) => setName(e.target.value)} />
+        <Input type="number" placeholder={t('tour_planner_merch_price')} value={basePrice} onChange={(e) => setBasePrice(Number(e.target.value))} aria-label={t('tour_planner_merch_price')} />
+        <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value as 'soft' | 'hard')} aria-label={t('tour_planner_merch_category')}>
+          <option value="soft">{t('tour_planner_merch_soft')}</option>
+          <option value="hard">{t('tour_planner_merch_hard')}</option>
+        </select>
+        <Input placeholder={t('tour_planner_variant')} value={variantValue} onChange={(e) => setVariantValue(e.target.value)} />
         <Button disabled={!sku || !name} onClick={() => create.mutate()}>{t('tour_planner_add_merch')}</Button>
       </div>
       <ul className="divide-y divide-border rounded-md border">
-        {items.map((i) => <li key={i.id} className="p-3 text-sm">{i.sku} — {i.name}</li>)}
+        {items.map((item) => (
+          <li key={item.id} className="p-3 text-sm space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span>{item.sku} — {item.name} · {item.basePrice} {item.currency} ({item.category})</span>
+              <Button variant="ghost" size="sm" aria-label={t('tour_planner_delete_merch')} onClick={() => deleteItem(item.id)}>
+                <Trash size={14} aria-hidden />
+              </Button>
+            </div>
+            {item.variants.length > 0 && (
+              <p className="text-muted-foreground">{t('tour_planner_variants')}: {item.variants.map((v) => v.value).join(', ')}</p>
+            )}
+            <div className="flex gap-2">
+              <Input placeholder={t('tour_planner_variant')} id={`variant-${item.id}`} onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  addVariant(item, (e.target as HTMLInputElement).value).then(() => { (e.target as HTMLInputElement).value = '' })
+                }
+              }} />
+              <Button variant="outline" size="sm" onClick={(e) => {
+                const input = (e.currentTarget.previousElementSibling as HTMLInputElement | null)
+                if (input) addVariant(item, input.value).then(() => { input.value = '' })
+              }}>{t('tour_planner_add_variant')}</Button>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -304,15 +417,70 @@ export function MerchSettlementForm({
     onSaved()
   }
 
-  const num = (key: 'grossRevenue' | 'hallFee' | 'netRevenue', value: string) => {
+  const { data: merchItems = [] } = useTourPlannerMerch(artistId)
+
+  const variantRows = merchItems.flatMap((item) => {
+    if (item.variants.length === 0) {
+      return [{ key: item.id, label: item.name, price: item.basePrice }]
+    }
+    return item.variants.map((v) => ({
+      key: v.id,
+      label: `${item.name} (${v.value})`,
+      price: item.basePrice,
+    }))
+  })
+
+  const setQty = (field: 'countIn' | 'countOut' | 'sold', key: string, value: number) => {
+    const next = { ...draft, [field]: { ...draft[field], [key]: value } }
+    if (field === 'sold') {
+      const gross = variantRows.reduce((sum, row) => sum + (next.sold[row.key] ?? 0) * row.price, 0)
+      next.grossRevenue = gross
+      const hallPct = merchItems.some((i) => i.category === 'hard')
+        ? next.hallFeePercentageHard
+        : next.hallFeePercentageSoft
+      next.hallFee = gross * (hallPct / 100)
+      next.netRevenue = gross - next.hallFee
+    }
+    setDraft(next)
+  }
+
+  const addComp = (variantId: string, quantity: number, reason: string) => {
+    if (!variantId || !quantity) return
+    const comp: MerchComp = { itemVariantId: variantId, quantity, reason, recipientName: '' }
+    setDraft({ ...draft, comps: [...draft.comps, comp] })
+  }
+
+  const num = (key: 'hallFee' | 'netRevenue' | 'taxRate', value: string) => {
     setDraft({ ...draft, [key]: Number(value) })
   }
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
+      {variantRows.length > 0 && (
+        <div className="sm:col-span-2 space-y-2">
+          <p className="text-sm font-medium">{t('tour_planner_merch_inventory')}</p>
+          {variantRows.map((row) => (
+            <div key={row.key} className="grid gap-2 sm:grid-cols-4 items-end border-b border-border pb-2">
+              <span className="text-sm sm:col-span-1">{row.label}</span>
+              <div className="space-y-1">
+                <Label>{t('tour_planner_count_in')}</Label>
+                <Input type="number" value={draft.countIn[row.key] ?? 0} onChange={(e) => setQty('countIn', row.key, Number(e.target.value))} />
+              </div>
+              <div className="space-y-1">
+                <Label>{t('tour_planner_count_out')}</Label>
+                <Input type="number" value={draft.countOut[row.key] ?? 0} onChange={(e) => setQty('countOut', row.key, Number(e.target.value))} />
+              </div>
+              <div className="space-y-1">
+                <Label>{t('tour_planner_sold')}</Label>
+                <Input type="number" value={draft.sold[row.key] ?? 0} onChange={(e) => setQty('sold', row.key, Number(e.target.value))} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="space-y-1">
         <Label>{t('tour_planner_merch_gross')}</Label>
-        <Input type="number" value={draft.grossRevenue} onChange={(e) => num('grossRevenue', e.target.value)} />
+        <Input type="number" value={draft.grossRevenue} readOnly />
       </div>
       <div className="space-y-1">
         <Label>{t('tour_planner_merch_hall_fee')}</Label>
@@ -322,17 +490,39 @@ export function MerchSettlementForm({
         <Label>{t('tour_planner_merch_net')}</Label>
         <Input type="number" value={draft.netRevenue} onChange={(e) => num('netRevenue', e.target.value)} />
       </div>
+      <div className="space-y-1">
+        <Label>{t('tour_planner_tax_rate')}</Label>
+        <Input type="number" value={draft.taxRate} onChange={(e) => num('taxRate', e.target.value)} />
+      </div>
+      {variantRows.length > 0 && (
+        <div className="sm:col-span-2 flex flex-wrap gap-2 items-end">
+          <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" id="comp-variant" aria-label={t('tour_planner_comp_variant')}>
+            {variantRows.map((row) => <option key={row.key} value={row.key}>{row.label}</option>)}
+          </select>
+          <Input type="number" min={1} defaultValue={1} id="comp-qty" aria-label={t('tour_planner_comp_qty')} className="w-24" />
+          <Input placeholder={t('tour_planner_comp_reason')} id="comp-reason" className="flex-1 min-w-[120px]" />
+          <Button variant="outline" onClick={() => {
+            const variant = (document.getElementById('comp-variant') as HTMLSelectElement).value
+            const qty = Number((document.getElementById('comp-qty') as HTMLInputElement).value)
+            const reason = (document.getElementById('comp-reason') as HTMLInputElement).value
+            addComp(variant, qty, reason)
+          }}>{t('tour_planner_add_comp')}</Button>
+        </div>
+      )}
+      {draft.comps.length > 0 && (
+        <ul className="sm:col-span-2 text-sm space-y-1">
+          {draft.comps.map((c, i) => (
+            <li key={`${c.itemVariantId}-${i}`}>{c.quantity}× {c.itemVariantId} — {c.reason}</li>
+          ))}
+        </ul>
+      )}
       <div className="space-y-1 sm:col-span-2">
         <Label>{t('tour_planner_notes')}</Label>
         <Textarea value={draft.notes ?? ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
       </div>
       <div className="sm:col-span-2 flex flex-wrap gap-2">
         <Button onClick={() => void save()} disabled={loading}>{t('tour_planner_save')}</Button>
-        <Button
-          variant="outline"
-          disabled={loading}
-          onClick={() => downloadMerchSettlementPdf(stop, draft, pdfLabels)}
-        >
+        <Button variant="outline" disabled={loading} onClick={() => downloadMerchSettlementPdf(stop, draft, pdfLabels)}>
           {t('tour_planner_pdf')}
         </Button>
       </div>
@@ -576,11 +766,22 @@ export function SettingsPanel({
   const t = useTranslations('portal')
   const qc = useQueryClient()
   const [draft, setDraft] = useState<TourPlannerSettings | null>(tour?.settings ?? null)
-  useEffect(() => { if (tour) setDraft(tour.settings) }, [tour])
+  const [totalBudget, setTotalBudget] = useState<number | null>(tour?.totalBudget ?? null)
+  const [currency, setCurrency] = useState(tour?.currency ?? 'EUR')
+  useEffect(() => {
+    if (tour) {
+      setDraft(tour.settings)
+      setTotalBudget(tour.totalBudget)
+      setCurrency(tour.currency)
+    }
+  }, [tour])
   if (!tour || !draft) return null
 
   const saveSettings = async () => {
-    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, { method: 'PATCH', body: JSON.stringify({ settings: draft }) })
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ settings: draft, totalBudget, currency }),
+    })
     if (!res.ok) { toast.error(t('tour_planner_error')); return }
     onSaved()
     toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_saved'))
@@ -630,6 +831,14 @@ export function SettingsPanel({
           </select>
         </div>
         <div className="space-y-1">
+          <Label htmlFor="tour-budget">{t('tour_planner_total_budget')}</Label>
+          <Input id="tour-budget" type="number" value={totalBudget ?? ''} onChange={(e) => setTotalBudget(e.target.value ? Number(e.target.value) : null)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="tour-currency">{t('tour_planner_currency')}</Label>
+          <Input id="tour-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+        </div>
+        <div className="space-y-1">
           <Label htmlFor="api-provider">{t('tour_planner_api_provider')}</Label>
           <select
             id="api-provider"
@@ -655,13 +864,23 @@ export function SettingsPanel({
   )
 }
 
-export async function geocodeStopVenue(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
-  const q = [stop.venueAddress, stop.venueCity, stop.venueCountry].filter(Boolean).join(', ')
-  if (!q) return null
-  const res = await tourPlannerFetch(artistId, '/geocode', { method: 'POST', body: JSON.stringify({ query: q }) })
+async function geocodeQuery(artistId: string, query: string): Promise<{ lat: number; lng: number } | null> {
+  const res = await tourPlannerFetch(artistId, '/geocode', { method: 'POST', body: JSON.stringify({ query }) })
   if (!res.ok) return null
   const json = (await res.json()) as { coords?: { lat: number; lon: number } }
   return json.coords ? { lat: json.coords.lat, lng: json.coords.lon } : null
+}
+
+export async function geocodeStopVenue(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
+  const q = [stop.venueAddress, stop.venueCity, stop.venueCountry].filter(Boolean).join(', ')
+  if (!q) return null
+  return geocodeQuery(artistId, q)
+}
+
+export async function geocodeStopHotel(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
+  const q = [stop.hotelAddress, stop.hotelCity, stop.hotelCountry].filter(Boolean).join(', ')
+  if (!q) return null
+  return geocodeQuery(artistId, q)
 }
 
 export function DaySheetPdfButton({ stop }: { stop: TourStop }) {

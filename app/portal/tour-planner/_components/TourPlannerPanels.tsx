@@ -29,11 +29,19 @@ import {
   useTourPlannerTasks,
 } from '@/lib/tour-planner/hooks'
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
-import type { DaySchedule, DealStructure, ShowStatus } from '@/lib/tour-planner/types'
+import type { DaySchedule, ShowStatus } from '@/lib/tour-planner/types'
+import {
+  ContactForm,
+  FinanceForm,
+  PerDiemsForm,
+  RoomingForm,
+  TravelManifestForm,
+} from './TourPlannerProductionForms'
 import type { Tour, TourStop } from '@/types'
 import {
   CrewPanel,
   DaySheetPdfButton,
+  geocodeStopHotel,
   geocodeStopVenue,
   GuestListForm,
   HotelForm,
@@ -203,7 +211,7 @@ function StopCard({
   onUpdated: () => void
 }) {
   const t = useTranslations('portal')
-  const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | 'loadin' | 'settlement' | 'merch' | 'hotel' | null>(null)
+  const [open, setOpen] = useState<'day' | 'finance' | 'guest' | 'venue' | 'loadin' | 'settlement' | 'merch' | 'hotel' | 'perdiems' | 'rooming' | 'manifest' | null>(null)
 
   const patchStop = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/stops/${stop.id}`, {
@@ -299,6 +307,24 @@ function StopCard({
             <LoadInForm details={stop.venueDetails} onSave={(venueDetails) => patchStop({ venueDetails }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
           </DialogContent>
         </Dialog>
+        <Dialog open={open === 'perdiems'} onOpenChange={(v) => setOpen(v ? 'perdiems' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_per_diems')}</Button></DialogTrigger>
+          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_per_diems')}</DialogTitle></DialogHeader>
+            <PerDiemsForm items={stop.perDiems} onSave={(perDiems) => patchStop({ perDiems }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={open === 'rooming'} onOpenChange={(v) => setOpen(v ? 'rooming' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_rooming')}</Button></DialogTrigger>
+          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_rooming')}</DialogTitle></DialogHeader>
+            <RoomingForm items={stop.rooming} onSave={(rooming) => patchStop({ rooming }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
+        <Dialog open={open === 'manifest'} onOpenChange={(v) => setOpen(v ? 'manifest' : null)}>
+          <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_manifest')}</Button></DialogTrigger>
+          <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_manifest')}</DialogTitle></DialogHeader>
+            <TravelManifestForm items={stop.travelManifest} onSave={(travelManifest) => patchStop({ travelManifest }).then(() => { setOpen(null); toast.success(t('tour_planner_saved')) }).catch(() => toast.error(t('tour_planner_error')))} />
+          </DialogContent>
+        </Dialog>
         <Dialog open={open === 'hotel'} onOpenChange={(v) => setOpen(v ? 'hotel' : null)}>
           <DialogTrigger asChild><Button variant="outline" size="sm">{t('tour_planner_hotel_name')}</Button></DialogTrigger>
           <DialogContent><DialogHeader><DialogTitle>{t('tour_planner_hotel_name')}</DialogTitle></DialogHeader>
@@ -329,7 +355,12 @@ function StopCard({
           const c = await geocodeStopVenue(artistId, stop)
           if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
           patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true }).then(() => toast.success(t('tour_planner_geocode_ok'))).catch(() => toast.error(t('tour_planner_error')))
-        }}>{t('tour_planner_geocode')}</Button>
+        }}>{t('tour_planner_geocode_venue')}</Button>
+        <Button variant="outline" size="sm" onClick={async () => {
+          const c = await geocodeStopHotel(artistId, stop)
+          if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
+          patchStop({ hotelLat: c.lat, hotelLng: c.lng, hotelValidated: true }).then(() => toast.success(t('tour_planner_geocode_ok'))).catch(() => toast.error(t('tour_planner_error')))
+        }}>{t('tour_planner_geocode_hotel')}</Button>
         <Button variant="outline" size="sm" onClick={publishOrSync}>
           {stop.concertId ? t('tour_planner_sync_event') : t('tour_planner_publish_event')}
         </Button>
@@ -371,32 +402,6 @@ function DaySheetForm({ schedule, onSave }: { schedule: DaySchedule; onSave: (s:
         </div>
       ))}
       <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
-    </div>
-  )
-}
-
-function FinanceForm({ deal, onSave }: { deal: DealStructure | null; onSave: (d: DealStructure) => void }) {
-  const t = useTranslations('portal')
-  const [draft, setDraft] = useState<DealStructure>(deal ?? { type: 'guarantee', currency: 'EUR', guarantee: 0 })
-  return (
-    <div className="grid gap-3">
-      <div className="space-y-1">
-        <Label>{t('tour_planner_deal_type')}</Label>
-        <Select value={draft.type} onValueChange={(type) => setDraft({ ...draft, type: type as DealStructure['type'] })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="guarantee">{t('tour_planner_deal_guarantee')}</SelectItem>
-            <SelectItem value="door-split">{t('tour_planner_deal_door_split')}</SelectItem>
-            <SelectItem value="versus">{t('tour_planner_deal_versus')}</SelectItem>
-            <SelectItem value="bonus">{t('tour_planner_deal_bonus')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label>{t('tour_planner_guarantee')}</Label>
-        <Input type="number" value={draft.guarantee ?? 0} onChange={(e) => setDraft({ ...draft, guarantee: Number(e.target.value) })} />
-      </div>
-      <Button onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
     </div>
   )
 }
@@ -474,20 +479,21 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
 function ContactsPanel({ artistId }: { artistId: string }) {
   const t = useTranslations('portal')
   const qc = useQueryClient()
-  const [name, setName] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
   const { data: contacts = [] } = useTourPlannerContacts(artistId)
-  const create = useMutation({
-    mutationFn: async () => {
-      const res = await tourPlannerFetch(artistId, '/contacts', { method: 'POST', body: JSON.stringify({ name }) })
-      if (!res.ok) throw new Error('create contact')
-      return wasQueuedOffline(res)
-    },
-    onSuccess: (offline) => {
-      void qc.invalidateQueries({ queryKey: tourPlannerKeys.contacts(artistId) })
-      setName('')
-      if (offline) toast.success(t('tour_planner_saved_offline'))
-    },
-  })
+
+  const saveContact = async (contactId: string | null, body: Record<string, unknown>) => {
+    const res = await tourPlannerFetch(artistId, contactId ? `/contacts/${contactId}` : '/contacts', {
+      method: contactId ? 'PATCH' : 'POST',
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error('contact save')
+    void qc.invalidateQueries({ queryKey: tourPlannerKeys.contacts(artistId) })
+    setEditing(null)
+    setCreating(false)
+    toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_saved'))
+  }
 
   const deleteContact = async (contactId: string) => {
     const res = await tourPlannerFetch(artistId, `/contacts/${contactId}`, { method: 'DELETE' })
@@ -498,17 +504,24 @@ function ContactsPanel({ artistId }: { artistId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Input placeholder={t('tour_planner_contact_name')} value={name} onChange={(e) => setName(e.target.value)} />
-        <Button disabled={!name} onClick={() => create.mutate()}>{t('tour_planner_add_contact')}</Button>
-      </div>
+      <Button variant="outline" onClick={() => setCreating((v) => !v)}>{t('tour_planner_add_contact')}</Button>
+      {creating && (
+        <ContactForm contact={{ name: '' }} onSave={(body) => saveContact(null, body).catch(() => toast.error(t('tour_planner_error')))} />
+      )}
       <ul className="divide-y divide-border rounded-md border">
         {contacts.map((c) => (
-          <li key={c.id} className="p-3 text-sm flex items-center justify-between gap-2">
-            <span>{c.name}{c.company ? ` · ${c.company}` : ''}</span>
-            <Button variant="ghost" size="sm" onClick={() => deleteContact(c.id).catch(() => toast.error(t('tour_planner_error')))} aria-label={t('tour_planner_delete_contact')}>
-              <Trash size={14} aria-hidden />
-            </Button>
+          <li key={c.id} className="p-3 text-sm space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="text-left hover:underline" onClick={() => setEditing(editing === c.id ? null : c.id)}>
+                {c.name}{c.company ? ` · ${c.company}` : ''}{c.email ? ` · ${c.email}` : ''}
+              </button>
+              <Button variant="ghost" size="sm" onClick={() => deleteContact(c.id).catch(() => toast.error(t('tour_planner_error')))} aria-label={t('tour_planner_delete_contact')}>
+                <Trash size={14} aria-hidden />
+              </Button>
+            </div>
+            {editing === c.id && (
+              <ContactForm contact={c} onSave={(body) => saveContact(c.id, body).catch(() => toast.error(t('tour_planner_error')))} />
+            )}
           </li>
         ))}
       </ul>

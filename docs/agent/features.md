@@ -43,7 +43,10 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 | `contacts`, `contacts/[id]` | GET/POST, PATCH/DELETE |
 | `crew`, `crew/[id]` | GET/POST, PATCH/DELETE |
 | `merch`, `merch/settlement` | GET/POST |
+| `merch/[id]` | PATCH/DELETE |
 | `route`, `geocode`, `import` | POST |
+
+**Stop production UI:** per-diems, rooming, travel manifest, full finance deal fields, hotel geocode, merch count-in/out/sold per variant with comps.
 
 ## Settlement & Abrechnungszentrale
 

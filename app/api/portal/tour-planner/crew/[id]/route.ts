@@ -9,6 +9,12 @@ const patchSchema = z.object({
   role: z.string().optional(),
   email: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  passportNumber: z.string().nullable().optional(),
+  passportExpiry: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
+  visaInfo: z.string().nullable().optional(),
+  roomAssignment: z.string().nullable().optional(),
+  busAssignment: z.string().nullable().optional(),
 })
 
 function crewId(pathname: string): string {
@@ -31,6 +37,12 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
     role: body.role,
     email: body.email,
     phone: body.phone,
+    passport_number: body.passportNumber,
+    passport_expiry: body.passportExpiry,
+    nationality: body.nationality,
+    visa_info: body.visaInfo,
+    room_assignment: body.roomAssignment,
+    bus_assignment: body.busAssignment,
   })
   return NextResponse.json({ member })
 })

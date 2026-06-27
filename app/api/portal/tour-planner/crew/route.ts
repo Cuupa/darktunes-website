@@ -11,6 +11,12 @@ const createSchema = z.object({
   role: z.string().default(''),
   email: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  passportNumber: z.string().nullable().optional(),
+  passportExpiry: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
+  visaInfo: z.string().nullable().optional(),
+  roomAssignment: z.string().nullable().optional(),
+  busAssignment: z.string().nullable().optional(),
 })
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -37,6 +43,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     role: body.role,
     email: body.email ?? null,
     phone: body.phone ?? null,
+    passport_number: body.passportNumber ?? null,
+    passport_expiry: body.passportExpiry ?? null,
+    nationality: body.nationality ?? null,
+    visa_info: body.visaInfo ?? null,
+    room_assignment: body.roomAssignment ?? null,
+    bus_assignment: body.busAssignment ?? null,
   })
   return NextResponse.json({ member }, { status: 201 })
 })
