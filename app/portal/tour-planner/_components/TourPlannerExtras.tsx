@@ -2,23 +2,27 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { tourPlannerFetch } from '@/lib/tour-planner/clientApi'
+import { tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
+import { downloadFile, exportToCSV, exportToText } from '@/lib/tour-planner/export'
+import { useTourPlannerCrew, useTourPlannerMerch } from '@/lib/tour-planner/hooks'
+import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import { downloadDaySheetPdf } from '@/lib/tour-planner/pdf'
 import type {
   GuestListEntry,
+  MerchSettlement,
   Settlement,
   TourPlannerSettings,
   VenueContactInfo,
   VenueDetails,
 } from '@/lib/tour-planner/types'
-import type { Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
+import type { Tour, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
 
 export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: string; activeTour: Tour | null; stops: TourStop[] }) {
@@ -29,15 +33,68 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
       if (!activeTour) throw new Error('no tour')
       const res = await tourPlannerFetch(artistId, '/route', { method: 'POST', body: JSON.stringify({ tourId: activeTour.id }) })
       if (!res.ok) throw new Error('route failed')
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tour-planner', 'tours', artistId] }); toast.success(t('tour_planner_route_done')) },
+    onSuccess: (offline) => {
+      void qc.invalidateQueries({ queryKey: tourPlannerKeys.tours(artistId) })
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_route_done'))
+    },
     onError: () => toast.error(t('tour_planner_error')),
   })
   const route = activeTour?.routeCache
   const trackStops = stops.map(dbStopToTrack)
+
+  const exportLabels = {
+    appTitle: t('tour_planner_heading'),
+    tourStops: t('tour_planner_stops_heading'),
+    venueName: t('tour_planner_stop_venue'),
+    venueAddress: t('tour_planner_venue_address'),
+    venueCity: t('tour_planner_venue_city'),
+    venueCountry: t('tour_planner_venue_country'),
+    hotelName: t('tour_planner_hotel_name'),
+    hotelAddress: t('tour_planner_hotel_address'),
+    hotelCity: t('tour_planner_hotel_city'),
+    hotelCountry: t('tour_planner_hotel_country'),
+    routeResults: t('tour_planner_route_results'),
+    from: t('tour_planner_route_from'),
+    to: t('tour_planner_route_to'),
+    distance: t('tour_planner_route_distance'),
+    duration: t('tour_planner_route_duration'),
+    totalDistance: t('tour_planner_route_total_distance'),
+    totalDuration: t('tour_planner_route_total_duration'),
+    hours: t('tour_planner_hours'),
+    minutes: t('tour_planner_minutes'),
+    segmentStart: t('tour_planner_segment_start'),
+    segmentToVenue: t('tour_planner_segment_to_venue'),
+    segmentToHotel: t('tour_planner_segment_to_hotel'),
+    segmentToNextHotel: t('tour_planner_segment_to_next_hotel'),
+    date: t('tour_planner_stop_date'),
+    type: t('tour_planner_route_type'),
+  }
+
+  const exportCsv = () => {
+    const csv = exportToCSV(trackStops, route ?? null, exportLabels)
+    downloadFile(csv, `${activeTour?.name ?? 'tour'}-stops.csv`, 'text/csv')
+    toast.success(t('tour_planner_export_done'))
+  }
+
+  const exportText = () => {
+    const text = exportToText(trackStops, route ?? null, exportLabels)
+    downloadFile(text, `${activeTour?.name ?? 'tour'}-stops.txt`, 'text/plain')
+    toast.success(t('tour_planner_export_done'))
+  }
+
   return (
     <div className="space-y-4">
-      <Button disabled={!activeTour || mutation.isPending} onClick={() => mutation.mutate()}>{t('tour_planner_calc_route')}</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={!activeTour || mutation.isPending} onClick={() => mutation.mutate()}>{t('tour_planner_calc_route')}</Button>
+        {trackStops.length > 0 && (
+          <>
+            <Button variant="outline" onClick={exportCsv}>{t('tour_planner_export_csv')}</Button>
+            <Button variant="outline" onClick={exportText}>{t('tour_planner_export_text')}</Button>
+          </>
+        )}
+      </div>
       {route?.error && <p className="text-sm text-destructive">{route.error}</p>}
       {route && !route.error && (
         <p className="text-sm text-muted-foreground">
@@ -54,21 +111,19 @@ export function CrewPanel({ artistId, tourId }: { artistId: string; tourId: stri
   const qc = useQueryClient()
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
-  const { data: crew = [] } = useQuery({
-    queryKey: ['tour-planner', 'crew', artistId, tourId],
-    enabled: Boolean(tourId),
-    queryFn: async () => {
-      const res = await tourPlannerFetch(artistId, `/crew?tourId=${tourId}`)
-      if (!res.ok) throw new Error('crew')
-      return ((await res.json()) as { crew: TourCrewMember[] }).crew
-    },
-  })
+  const { data: crew = [] } = useTourPlannerCrew(artistId, tourId)
   const create = useMutation({
     mutationFn: async () => {
       const res = await tourPlannerFetch(artistId, '/crew', { method: 'POST', body: JSON.stringify({ tourId, name, role }) })
       if (!res.ok) throw new Error('crew create')
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tour-planner', 'crew', artistId, tourId] }); setName(''); setRole('') },
+    onSuccess: (offline) => {
+      void qc.invalidateQueries({ queryKey: tourPlannerKeys.crew(artistId, tourId) })
+      setName('')
+      setRole('')
+      if (offline) toast.success(t('tour_planner_saved_offline'))
+    },
   })
   if (!tourId) return null
   return (
@@ -90,31 +145,97 @@ export function MerchPanel({ artistId }: { artistId: string }) {
   const qc = useQueryClient()
   const [sku, setSku] = useState('')
   const [name, setName] = useState('')
-  const { data: items = [] } = useQuery({
-    queryKey: ['tour-planner', 'merch', artistId],
-    queryFn: async () => {
-      const res = await tourPlannerFetch(artistId, '/merch')
-      if (!res.ok) throw new Error('merch')
-      return ((await res.json()) as { items: TourMerchItem[] }).items
-    },
-  })
+  const { data: items = [] } = useTourPlannerMerch(artistId)
   const create = useMutation({
     mutationFn: async () => {
       const res = await tourPlannerFetch(artistId, '/merch', { method: 'POST', body: JSON.stringify({ sku, name }) })
       if (!res.ok) throw new Error('merch create')
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tour-planner', 'merch', artistId] }); setSku(''); setName('') },
+    onSuccess: (offline) => {
+      void qc.invalidateQueries({ queryKey: tourPlannerKeys.merch(artistId) })
+      setSku('')
+      setName('')
+      if (offline) toast.success(t('tour_planner_saved_offline'))
+    },
   })
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <Input placeholder="SKU" value={sku} onChange={(e) => setSku(e.target.value)} />
+        <Input placeholder={t('tour_planner_merch_sku')} value={sku} onChange={(e) => setSku(e.target.value)} />
         <Input placeholder={t('tour_planner_merch_name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Button disabled={!sku || !name} onClick={() => create.mutate()}>{t('tour_planner_add_merch')}</Button>
       </div>
       <ul className="divide-y divide-border rounded-md border">
         {items.map((i) => <li key={i.id} className="p-3 text-sm">{i.sku} — {i.name}</li>)}
       </ul>
+    </div>
+  )
+}
+
+export function MerchSettlementForm({
+  artistId,
+  stop,
+  onSaved,
+}: {
+  artistId: string
+  stop: TourStop
+  onSaved: () => void
+}) {
+  const t = useTranslations('portal')
+  const [draft, setDraft] = useState<MerchSettlement>({
+    showId: stop.id,
+    date: stop.stopDate,
+    countIn: {},
+    adds: {},
+    comps: [],
+    countOut: {},
+    sold: {},
+    grossRevenue: 0,
+    hallFee: 0,
+    hallFeePercentageSoft: 15,
+    hallFeePercentageHard: 25,
+    netRevenue: 0,
+    taxRate: 0,
+    notes: '',
+  })
+
+  const save = async () => {
+    const res = await tourPlannerFetch(artistId, '/merch/settlement', {
+      method: 'POST',
+      body: JSON.stringify({ stopId: stop.id, settlement: draft }),
+    })
+    if (!res.ok) {
+      toast.error(t('tour_planner_error'))
+      return
+    }
+    if (wasQueuedOffline(res)) toast.success(t('tour_planner_saved_offline'))
+    onSaved()
+  }
+
+  const num = (key: 'grossRevenue' | 'hallFee' | 'netRevenue', value: string) => {
+    setDraft({ ...draft, [key]: Number(value) })
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1">
+        <Label>{t('tour_planner_merch_gross')}</Label>
+        <Input type="number" value={draft.grossRevenue} onChange={(e) => num('grossRevenue', e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <Label>{t('tour_planner_merch_hall_fee')}</Label>
+        <Input type="number" value={draft.hallFee} onChange={(e) => num('hallFee', e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <Label>{t('tour_planner_merch_net')}</Label>
+        <Input type="number" value={draft.netRevenue} onChange={(e) => num('netRevenue', e.target.value)} />
+      </div>
+      <div className="space-y-1 sm:col-span-2">
+        <Label>{t('tour_planner_notes')}</Label>
+        <Textarea value={draft.notes ?? ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+      </div>
+      <Button className="sm:col-span-2" onClick={() => void save()}>{t('tour_planner_save')}</Button>
     </div>
   )
 }
@@ -127,9 +248,12 @@ export function ImportPanel({ artistId, tourId, onImported }: { artistId: string
       if (!tourId) throw new Error('no tour')
       const res = await tourPlannerFetch(artistId, '/import', { method: 'POST', body: JSON.stringify({ tourId, csv }) })
       if (!res.ok) throw new Error('import')
-      return res.json()
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => { onImported(); toast.success(t('tour_planner_import_csv_done')) },
+    onSuccess: (offline) => {
+      onImported()
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_import_csv_done'))
+    },
     onError: () => toast.error(t('tour_planner_error')),
   })
   if (!tourId) return null
@@ -160,7 +284,7 @@ export function GuestListForm({ list, onSave }: { list: GuestListEntry[]; onSave
     <div className="space-y-3">
       <div className="flex gap-2">
         <Input placeholder={t('tour_planner_guest_name')} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input type="number" min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} aria-label="Guests" />
+        <Input type="number" min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} aria-label={t('tour_planner_guest_count')} />
         <Button onClick={add}>{t('tour_planner_add_guest')}</Button>
       </div>
       <ul className="text-sm space-y-1">{list.map((g) => <li key={g.id}>{g.name} ({g.numberOfGuests})</li>)}</ul>
@@ -168,16 +292,51 @@ export function GuestListForm({ list, onSave }: { list: GuestListEntry[]; onSave
   )
 }
 
+const VENUE_CONTACT_FIELDS = [
+  'promoterName', 'promoterEmail', 'promoterPhone', 'venueContactName', 'technicalContactName',
+] as const satisfies readonly (keyof VenueContactInfo)[]
+
+const LOADIN_FIELDS = [
+  'loadingDock', 'powerSupply', 'paSpecs', 'capacity', 'loadInNotes', 'parkingSpaces',
+] as const satisfies readonly (keyof VenueDetails)[]
+
+const SETTLEMENT_FIELDS = ['ticketsSold', 'ticketPrice', 'grossRevenue', 'venueCosts', 'netRevenue', 'artistPayment'] as const
+
+const VENUE_CONTACT_I18N: Record<(typeof VENUE_CONTACT_FIELDS)[number], 'tour_planner_venue_promoterName' | 'tour_planner_venue_promoterEmail' | 'tour_planner_venue_promoterPhone' | 'tour_planner_venue_venueContactName' | 'tour_planner_venue_technicalContactName'> = {
+  promoterName: 'tour_planner_venue_promoterName',
+  promoterEmail: 'tour_planner_venue_promoterEmail',
+  promoterPhone: 'tour_planner_venue_promoterPhone',
+  venueContactName: 'tour_planner_venue_venueContactName',
+  technicalContactName: 'tour_planner_venue_technicalContactName',
+}
+
+const LOADIN_I18N: Record<(typeof LOADIN_FIELDS)[number], 'tour_planner_loadin_loadingDock' | 'tour_planner_loadin_powerSupply' | 'tour_planner_loadin_paSpecs' | 'tour_planner_loadin_capacity' | 'tour_planner_loadin_loadInNotes' | 'tour_planner_loadin_parkingSpaces'> = {
+  loadingDock: 'tour_planner_loadin_loadingDock',
+  powerSupply: 'tour_planner_loadin_powerSupply',
+  paSpecs: 'tour_planner_loadin_paSpecs',
+  capacity: 'tour_planner_loadin_capacity',
+  loadInNotes: 'tour_planner_loadin_loadInNotes',
+  parkingSpaces: 'tour_planner_loadin_parkingSpaces',
+}
+
+const SETTLEMENT_I18N: Record<(typeof SETTLEMENT_FIELDS)[number], 'tour_planner_settlement_ticketsSold' | 'tour_planner_settlement_ticketPrice' | 'tour_planner_settlement_grossRevenue' | 'tour_planner_settlement_venueCosts' | 'tour_planner_settlement_netRevenue' | 'tour_planner_settlement_artistPayment'> = {
+  ticketsSold: 'tour_planner_settlement_ticketsSold',
+  ticketPrice: 'tour_planner_settlement_ticketPrice',
+  grossRevenue: 'tour_planner_settlement_grossRevenue',
+  venueCosts: 'tour_planner_settlement_venueCosts',
+  netRevenue: 'tour_planner_settlement_netRevenue',
+  artistPayment: 'tour_planner_settlement_artistPayment',
+}
+
 export function VenueContactForm({ info, onSave }: { info: VenueContactInfo | null; onSave: (v: VenueContactInfo) => void }) {
   const t = useTranslations('portal')
   const [draft, setDraft] = useState<VenueContactInfo>(info ?? {})
-  const fields: (keyof VenueContactInfo)[] = ['promoterName', 'promoterEmail', 'promoterPhone', 'venueContactName', 'technicalContactName']
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {fields.map((f) => (
-        <div key={f} className="space-y-1">
-          <Label>{f}</Label>
-          <Input value={draft[f] ?? ''} onChange={(e) => setDraft({ ...draft, [f]: e.target.value })} />
+      {VENUE_CONTACT_FIELDS.map((field) => (
+        <div key={field} className="space-y-1">
+          <Label htmlFor={field}>{t(VENUE_CONTACT_I18N[field])}</Label>
+          <Input id={field} value={draft[field] ?? ''} onChange={(e) => setDraft({ ...draft, [field]: e.target.value })} />
         </div>
       ))}
       <div className="sm:col-span-2 space-y-1">
@@ -192,18 +351,24 @@ export function VenueContactForm({ info, onSave }: { info: VenueContactInfo | nu
 export function LoadInForm({ details, onSave }: { details: VenueDetails | null; onSave: (v: VenueDetails) => void }) {
   const t = useTranslations('portal')
   const [draft, setDraft] = useState<VenueDetails>(details ?? {})
-  const fields: (keyof VenueDetails)[] = ['loadingDock', 'powerSupply', 'paSpecs', 'capacity', 'loadInNotes', 'parkingSpaces']
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {fields.map((f) => (
-        <div key={f} className="space-y-1">
-          <Label>{String(f)}</Label>
-          <Input value={String(draft[f] ?? '')} onChange={(e) => setDraft({ ...draft, [f]: f === 'capacity' || f === 'parkingSpaces' ? Number(e.target.value) : e.target.value })} />
+      {LOADIN_FIELDS.map((field) => (
+        <div key={field} className="space-y-1">
+          <Label htmlFor={String(field)}>{t(LOADIN_I18N[field])}</Label>
+          <Input
+            id={String(field)}
+            value={String(draft[field] ?? '')}
+            onChange={(e) => setDraft({
+              ...draft,
+              [field]: field === 'capacity' || field === 'parkingSpaces' ? Number(e.target.value) : e.target.value,
+            })}
+          />
         </div>
       ))}
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
         <input type="checkbox" checked={draft.truckAccess ?? false} onChange={(e) => setDraft({ ...draft, truckAccess: e.target.checked })} />
-        truckAccess
+        {t('tour_planner_loadin_truck_access')}
       </label>
       <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
     </div>
@@ -218,10 +383,10 @@ export function SettlementForm({ settlement, onSave }: { settlement: Settlement 
   const num = (k: keyof Settlement, v: string) => setDraft({ ...draft, [k]: Number(v) })
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {(['ticketsSold', 'ticketPrice', 'grossRevenue', 'venueCosts', 'netRevenue', 'artistPayment'] as const).map((k) => (
-        <div key={k} className="space-y-1">
-          <Label>{k}</Label>
-          <Input type="number" value={draft[k]} onChange={(e) => num(k, e.target.value)} />
+      {SETTLEMENT_FIELDS.map((field) => (
+        <div key={field} className="space-y-1">
+          <Label htmlFor={field}>{t(SETTLEMENT_I18N[field])}</Label>
+          <Input id={field} type="number" value={draft[field]} onChange={(e) => num(field, e.target.value)} />
         </div>
       ))}
       <Button className="sm:col-span-2" onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
@@ -229,31 +394,95 @@ export function SettlementForm({ settlement, onSave }: { settlement: Settlement 
   )
 }
 
-export function SettingsPanel({ artistId, tour, onSaved }: { artistId: string; tour: Tour | null; onSaved: () => void }) {
+export function SettingsPanel({
+  artistId,
+  tour,
+  onSaved,
+  onDeleted,
+}: {
+  artistId: string
+  tour: Tour | null
+  onSaved: () => void
+  onDeleted: () => void
+}) {
   const t = useTranslations('portal')
+  const qc = useQueryClient()
   const [draft, setDraft] = useState<TourPlannerSettings | null>(tour?.settings ?? null)
   useEffect(() => { if (tour) setDraft(tour.settings) }, [tour])
   if (!tour || !draft) return null
-  const save = async () => {
+
+  const saveSettings = async () => {
     const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, { method: 'PATCH', body: JSON.stringify({ settings: draft }) })
     if (!res.ok) { toast.error(t('tour_planner_error')); return }
-    onSaved(); toast.success(t('tour_planner_saved'))
+    onSaved()
+    toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_saved'))
   }
+
+  const toggleArchive = async () => {
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived: !tour.archived }),
+    })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    onSaved()
+    toast.success(tour.archived ? t('tour_planner_tour_restored') : t('tour_planner_tour_archived'))
+  }
+
+  const duplicateTour = async () => {
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ duplicate: true }),
+    })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    void qc.invalidateQueries({ queryKey: tourPlannerKeys.tours(artistId) })
+    toast.success(t('tour_planner_tour_duplicated'))
+  }
+
+  const deleteTour = async () => {
+    if (!window.confirm(t('tour_planner_delete_confirm'))) return
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    onDeleted()
+  }
+
   return (
-    <div className="grid gap-3 max-w-md">
-      <div className="space-y-1">
-        <Label>{t('tour_planner_vehicle')}</Label>
-        <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={draft.vehicleType} onChange={(e) => setDraft({ ...draft, vehicleType: e.target.value as TourPlannerSettings['vehicleType'] })}>
-          <option value="car">car</option><option value="bus">bus</option><option value="truck">truck</option>
-        </select>
+    <div className="space-y-6">
+      <div className="grid gap-3 max-w-md">
+        <div className="space-y-1">
+          <Label htmlFor="vehicle-type">{t('tour_planner_vehicle')}</Label>
+          <select
+            id="vehicle-type"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={draft.vehicleType}
+            onChange={(e) => setDraft({ ...draft, vehicleType: e.target.value as TourPlannerSettings['vehicleType'] })}
+          >
+            <option value="car">{t('tour_planner_vehicle_car')}</option>
+            <option value="bus">{t('tour_planner_vehicle_bus')}</option>
+            <option value="truck">{t('tour_planner_vehicle_truck')}</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="api-provider">{t('tour_planner_api_provider')}</Label>
+          <select
+            id="api-provider"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={draft.apiProvider}
+            onChange={(e) => setDraft({ ...draft, apiProvider: e.target.value as TourPlannerSettings['apiProvider'] })}
+          >
+            <option value="nominatim">Nominatim</option>
+            <option value="google">Google</option>
+          </select>
+        </div>
+        <Button onClick={() => void saveSettings()}>{t('tour_planner_save')}</Button>
       </div>
-      <div className="space-y-1">
-        <Label>{t('tour_planner_api_provider')}</Label>
-        <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={draft.apiProvider} onChange={(e) => setDraft({ ...draft, apiProvider: e.target.value as TourPlannerSettings['apiProvider'] })}>
-          <option value="nominatim">Nominatim</option><option value="google">Google</option>
-        </select>
+
+      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <Button variant="outline" onClick={() => void toggleArchive()}>
+          {tour.archived ? t('tour_planner_unarchive_tour') : t('tour_planner_archive_tour')}
+        </Button>
+        <Button variant="outline" onClick={() => void duplicateTour()}>{t('tour_planner_duplicate_tour')}</Button>
+        <Button variant="destructive" onClick={() => void deleteTour()}>{t('tour_planner_delete_tour')}</Button>
       </div>
-      <Button onClick={save}>{t('tour_planner_save')}</Button>
     </div>
   )
 }

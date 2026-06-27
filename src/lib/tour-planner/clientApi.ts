@@ -31,6 +31,15 @@ async function markSynced(): Promise<void> {
   await getTourPlannerDb().meta.put({ key: 'lastSyncedAt', value: new Date().toISOString() })
 }
 
+export function wasQueuedOffline(res: Response): boolean {
+  return res.status === 202
+}
+
+export async function parseTourPlannerJson<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(`Tour planner request failed (${res.status})`)
+  return res.json() as Promise<T>
+}
+
 export async function tourPlannerFetch(
   artistId: string,
   path: string,

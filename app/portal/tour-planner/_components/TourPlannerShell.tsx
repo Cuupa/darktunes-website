@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { MapTrifold, Plus, ArrowSquareOut } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -16,8 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { Concert, Tour, TourStop } from '@/types'
+import { parseTourPlannerJson, tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
+import { useTourPlannerStops, useTourPlannerTours } from '@/lib/tour-planner/hooks'
+import { tourPlannerKeys } from '@/lib/tour-planner/keys'
+import type { Concert, Tour } from '@/types'
 import { TourPlannerTabs } from './TourPlannerPanels'
 import { TourPlannerOfflineBanner } from './TourPlannerOfflineBanner'
 
@@ -28,14 +30,6 @@ interface TourPlannerShellProps {
   concerts: Concert[]
 }
 
-async function getAccessToken(): Promise<string> {
-  const supabase = createBrowserSupabaseClient()
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) throw new Error('Not authenticated')
-  return token
-}
-
 export function TourPlannerShell({ artistId, artistName, initialTours, concerts }: TourPlannerShellProps) {
   const t = useTranslations('portal')
   const queryClient = useQueryClient()
@@ -44,61 +38,46 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
   const [newStopDate, setNewStopDate] = useState('')
   const [newStopVenue, setNewStopVenue] = useState('')
 
-  const toursQueryKey = useMemo(() => ['tour-planner', 'tours', artistId] as const, [artistId])
-  const stopsQueryKey = useMemo(
-    () => ['tour-planner', 'stops', artistId, activeTourId] as const,
-    [artistId, activeTourId],
+  const { data: tours = initialTours } = useTourPlannerTours(artistId, initialTours)
+  const { data: stops = [] } = useTourPlannerStops(artistId, activeTourId)
+
+  useEffect(() => {
+    if (activeTourId && !tours.some((tour) => tour.id === activeTourId)) {
+      setActiveTourId(tours[0]?.id ?? null)
+    }
+  }, [activeTourId, tours])
+
+  const invalidateTours = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: tourPlannerKeys.tours(artistId) })
+  }, [artistId, queryClient])
+
+  const invalidateStops = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: tourPlannerKeys.stops(artistId, activeTourId) })
+  }, [activeTourId, artistId, queryClient])
+
+  const toastSaved = useCallback(
+    (offline: boolean) => {
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_tour_created'))
+    },
+    [t],
   )
-
-  const { data: tours = initialTours } = useQuery({
-    queryKey: toursQueryKey,
-    queryFn: async () => {
-      const token = await getAccessToken()
-      const res = await fetch(`/api/portal/tour-planner/tours?artistId=${artistId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error('Failed to load tours')
-      const json = (await res.json()) as { tours: Tour[] }
-      return json.tours
-    },
-    initialData: initialTours,
-  })
-
-  const { data: stops = [] } = useQuery({
-    queryKey: stopsQueryKey,
-    enabled: Boolean(activeTourId),
-    queryFn: async () => {
-      const token = await getAccessToken()
-      const res = await fetch(
-        `/api/portal/tour-planner/stops?artistId=${artistId}&tourId=${activeTourId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-      if (!res.ok) throw new Error('Failed to load stops')
-      const json = (await res.json()) as { stops: TourStop[] }
-      return json.stops
-    },
-  })
 
   const createTourMutation = useMutation({
     mutationFn: async (name: string) => {
-      const token = await getAccessToken()
-      const res = await fetch(`/api/portal/tour-planner/tours?artistId=${artistId}`, {
+      const res = await tourPlannerFetch(artistId, '/tours', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ name }),
       })
       if (!res.ok) throw new Error('Failed to create tour')
-      const json = (await res.json()) as { tour: Tour }
-      return json.tour
+      const offline = wasQueuedOffline(res)
+      const json = offline ? null : await parseTourPlannerJson<{ tour: Tour }>(res)
+      return { tour: json?.tour ?? null, offline }
     },
-    onSuccess: (tour) => {
-      queryClient.invalidateQueries({ queryKey: toursQueryKey })
-      setActiveTourId(tour.id)
+    onSuccess: ({ tour, offline }) => {
+      invalidateTours()
+      if (tour) setActiveTourId(tour.id)
       setNewTourName('')
-      toast.success(t('tour_planner_tour_created'))
+      toastSaved(offline)
     },
     onError: () => toast.error(t('tour_planner_error')),
   })
@@ -106,13 +85,8 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
   const createStopMutation = useMutation({
     mutationFn: async () => {
       if (!activeTourId) throw new Error('No active tour')
-      const token = await getAccessToken()
-      const res = await fetch(`/api/portal/tour-planner/stops?artistId=${artistId}`, {
+      const res = await tourPlannerFetch(artistId, '/stops', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           tourId: activeTourId,
           stopDate: newStopDate,
@@ -121,14 +95,13 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
         }),
       })
       if (!res.ok) throw new Error('Failed to create stop')
-      const json = (await res.json()) as { stop: TourStop }
-      return json.stop
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: stopsQueryKey })
+    onSuccess: (offline) => {
+      invalidateStops()
       setNewStopDate('')
       setNewStopVenue('')
-      toast.success(t('tour_planner_stop_created'))
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_stop_created'))
     },
     onError: () => toast.error(t('tour_planner_error')),
   })
@@ -136,24 +109,19 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
   const importConcertMutation = useMutation({
     mutationFn: async (concertId: string) => {
       if (!activeTourId) throw new Error('No active tour')
-      const token = await getAccessToken()
-      const res = await fetch(`/api/portal/tour-planner/stops/import-concert?artistId=${artistId}`, {
+      const res = await tourPlannerFetch(artistId, '/stops/import-concert', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ tourId: activeTourId, concertId }),
       })
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null
         throw new Error(err?.error ?? 'Import failed')
       }
-      return res.json()
+      return wasQueuedOffline(res)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: stopsQueryKey })
-      toast.success(t('tour_planner_import_success'))
+    onSuccess: (offline) => {
+      invalidateStops()
+      toast.success(offline ? t('tour_planner_saved_offline') : t('tour_planner_import_success'))
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -165,6 +133,12 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
     if (!name) return
     createTourMutation.mutate(name)
   }, [createTourMutation, newTourName])
+
+  const handleTourDeleted = useCallback(() => {
+    invalidateTours()
+    setActiveTourId(null)
+    toast.success(t('tour_planner_tour_deleted'))
+  }, [invalidateTours, t])
 
   const importableConcerts = concerts.filter(
     (concert) => !stops.some((stop) => stop.concertId === concert.id),
@@ -215,7 +189,7 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
               <SelectContent>
                 {tours.map((tour) => (
                   <SelectItem key={tour.id} value={tour.id}>
-                    {tour.name}
+                    {tour.archived ? `${tour.name} (${t('tour_planner_archived_label')})` : tour.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -270,8 +244,9 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
           artistId={artistId}
           activeTour={activeTour}
           stops={stops}
-          onStopsChange={() => queryClient.invalidateQueries({ queryKey: stopsQueryKey })}
-          onTourChange={() => queryClient.invalidateQueries({ queryKey: toursQueryKey })}
+          onStopsChange={invalidateStops}
+          onTourChange={invalidateTours}
+          onTourDeleted={handleTourDeleted}
         />
       )}
 

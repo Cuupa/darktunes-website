@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import { flushSyncQueue, getLastSyncedAt, getPendingMutationCount } from '@/lib/tour-planner/offline/syncQueue'
 
 export function useTourPlannerOffline() {
@@ -16,19 +17,23 @@ export function useTourPlannerOffline() {
     setLastSynced(await getLastSyncedAt())
   }, [])
 
-  const syncNow = useCallback(async () => {
+  const syncNowRef = useRef<() => Promise<void>>(async () => {})
+
+  syncNowRef.current = async () => {
     if (!navigator.onLine) return
     setSyncing(true)
     try {
       const result = await flushSyncQueue()
       if (result.flushed > 0) {
-        await queryClient.invalidateQueries({ queryKey: ['tour-planner'] })
+        await queryClient.invalidateQueries({ queryKey: tourPlannerKeys.all })
       }
     } finally {
       await refresh()
       setSyncing(false)
     }
-  }, [queryClient, refresh])
+  }
+
+  const syncNow = useCallback(() => syncNowRef.current(), [])
 
   useEffect(() => {
     setOnline(navigator.onLine)
@@ -36,7 +41,7 @@ export function useTourPlannerOffline() {
 
     const onOnline = () => {
       setOnline(true)
-      void syncNow()
+      void syncNowRef.current()
     }
     const onOffline = () => setOnline(false)
 
@@ -46,7 +51,7 @@ export function useTourPlannerOffline() {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
     }
-  }, [refresh, syncNow])
+  }, [refresh])
 
   return { online, pending, lastSynced, syncing, syncNow, refresh }
 }
