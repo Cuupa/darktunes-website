@@ -28,3 +28,12 @@ export async function authenticateTourPlannerRequest(
 export function resolveGoogleMapsApiKey(settings?: TourPlannerSettings): string | undefined {
   return settings?.googleApiKey ?? process.env.GOOGLE_MAPS_API_KEY
 }
+
+export {
+  assertTourAccess,
+  assertTourOwner,
+  assertValidPerformingArtists,
+  getTourAccess,
+  getTourRosterArtistIds,
+} from '@/lib/api/tourAccess'
+export type { TourAccess, TourAccessRole } from '@/lib/api/tourAccess'

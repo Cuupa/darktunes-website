@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { deleteTourTask, updateTourTask } from '@/lib/api/tourTasks'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { deleteTourTask, getTourTaskById, updateTourTask } from '@/lib/api/tourTasks'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const schema = z.object({ completed: z.boolean() })
 
@@ -12,13 +12,31 @@ function taskId(pathname: string): string {
   return id
 }
 
+async function assertTaskAccess(
+  supabase: Awaited<ReturnType<typeof authenticateTourPlannerRequest>>['supabase'],
+  artistId: string,
+  id: string,
+) {
+  const task = await getTourTaskById(supabase, id)
+  if (!task) throw new ApiError(404, 'Task not found')
+
+  if (task.tourId) {
+    await assertTourAccess(supabase, task.tourId, artistId)
+  } else if (task.artistId !== artistId) {
+    throw new ApiError(404, 'Task not found')
+  }
+
+  return task
+}
+
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
-  const { data, error } = await supabase.from('tour_tasks').select('artist_id').eq('id', taskId(req.nextUrl.pathname)).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Task not found')
-  const task = await updateTourTask(supabase, taskId(req.nextUrl.pathname), { completed: body.completed })
+  const id = taskId(req.nextUrl.pathname)
+  await assertTaskAccess(supabase, artist.id, id)
+
+  const task = await updateTourTask(supabase, id, { completed: body.completed })
   return NextResponse.json({ task })
 })
 
@@ -26,9 +44,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = taskId(req.nextUrl.pathname)
-
-  const { data, error } = await supabase.from('tour_tasks').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Task not found')
+  await assertTaskAccess(supabase, artist.id, id)
 
   await deleteTourTask(supabase, id)
   return NextResponse.json({ ok: true })

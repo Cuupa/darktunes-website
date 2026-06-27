@@ -715,6 +715,12 @@ export interface Concert {
   featuredArtists?: { id: string; name: string; slug: string }[]
 }
 
+export interface TourCollaboratorSummary {
+  artistId: string
+  artistName: string
+  artistSlug: string | null
+}
+
 export interface Tour {
   id: string
   artistId: string
@@ -733,6 +739,10 @@ export interface Tour {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Present when loaded for portal: owner or collaborator */
+  accessRole?: 'owner' | 'collaborator'
+  collaborators?: TourCollaboratorSummary[]
+  ownerArtistName?: string | null
 }
 
 export interface TourStop {
@@ -770,6 +780,10 @@ export interface TourStop {
   guestList: import('@/lib/tour-planner/types').GuestListEntry[]
   guestListLimit: number | null
   notes: string | null
+  externalGuestNotes: string | null
+  performingArtistIds: string[]
+  privateDataVersion: number | null
+  privateDataUpdatedAt: string | null
   createdAt: string
   updatedAt: string
 }

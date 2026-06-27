@@ -1932,6 +1932,7 @@ export interface Database {
           guest_list: Json
           guest_list_limit: number | null
           notes: string | null
+          external_guest_notes: string | null
           created_at: string
           updated_at: string
         }
@@ -1970,6 +1971,7 @@ export interface Database {
           guest_list?: Json
           guest_list_limit?: number | null
           notes?: string | null
+          external_guest_notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -2008,6 +2010,7 @@ export interface Database {
           guest_list?: Json
           guest_list_limit?: number | null
           notes?: string | null
+          external_guest_notes?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -2242,6 +2245,111 @@ export interface Database {
           stop_id?: string
           artist_id?: string
           settlement?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_collaborators: {
+        Row: {
+          tour_id: string
+          artist_id: string
+          invited_by: string | null
+          created_at: string
+        }
+        Insert: {
+          tour_id: string
+          artist_id: string
+          invited_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          tour_id?: string
+          artist_id?: string
+          invited_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tour_stop_performing_artists: {
+        Row: {
+          stop_id: string
+          artist_id: string
+          created_at: string
+        }
+        Insert: {
+          stop_id: string
+          artist_id: string
+          created_at?: string
+        }
+        Update: {
+          stop_id?: string
+          artist_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tour_stop_artist_private: {
+        Row: {
+          stop_id: string
+          artist_id: string
+          deal: Json | null
+          settlement: Json | null
+          private_notes: string | null
+          version: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          stop_id: string
+          artist_id: string
+          deal?: Json | null
+          settlement?: Json | null
+          private_notes?: string | null
+          version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          stop_id?: string
+          artist_id?: string
+          deal?: Json | null
+          settlement?: Json | null
+          private_notes?: string | null
+          version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tour_artist_finance: {
+        Row: {
+          tour_id: string
+          artist_id: string
+          budget: Json | null
+          total_budget: number | null
+          currency: string
+          version: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          tour_id: string
+          artist_id: string
+          budget?: Json | null
+          total_budget?: number | null
+          currency?: string
+          version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tour_id?: string
+          artist_id?: string
+          budget?: Json | null
+          total_budget?: number | null
+          currency?: string
+          version?: number
           created_at?: string
           updated_at?: string
         }

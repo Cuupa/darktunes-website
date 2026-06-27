@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Concert, TourStop } from '@/types'
 import type { ShowStatus } from '@/lib/tour-planner/types'
-import { createConcert, updateConcert } from '@/lib/api/concerts'
+import { createConcert, updateConcert, setConcertArtists } from '@/lib/api/concerts'
 import { createTourStop, updateTourStop } from '@/lib/api/tourStops'
 
 type DbClient = SupabaseClient<Database>
@@ -59,11 +59,19 @@ export async function importConcertToTourStop(
   return createTourStop(db, concertToStopFields(concert, tourId, artistId, sortOrder))
 }
 
+function resolveConcertArtistIds(stop: TourStop, performingArtistIds?: string[]): string[] {
+  if (performingArtistIds && performingArtistIds.length > 0) {
+    return [...new Set(performingArtistIds)]
+  }
+  return [stop.artistId]
+}
+
 export async function publishTourStopAsConcert(
   db: DbClient,
   stop: TourStop,
   userId: string,
   eventName?: string,
+  performingArtistIds?: string[],
 ): Promise<Concert> {
   const payload = {
     artist_id: stop.artistId,
@@ -80,18 +88,25 @@ export async function publishTourStopAsConcert(
     source: 'artist',
   }
 
+  let concert: Concert
   if (stop.concertId) {
-    return updateConcert(db, stop.concertId, payload)
+    concert = await updateConcert(db, stop.concertId, payload)
+  } else {
+    concert = await createConcert(db, payload)
+    await updateTourStop(db, stop.id, { concert_id: concert.id })
   }
 
-  const concert = await createConcert(db, payload)
-  await updateTourStop(db, stop.id, { concert_id: concert.id })
+  await setConcertArtists(db, concert.id, resolveConcertArtistIds(stop, performingArtistIds))
   return concert
 }
 
-export async function syncLinkedConcertFromStop(db: DbClient, stop: TourStop): Promise<Concert | null> {
+export async function syncLinkedConcertFromStop(
+  db: DbClient,
+  stop: TourStop,
+  performingArtistIds?: string[],
+): Promise<Concert | null> {
   if (!stop.concertId) return null
-  return updateConcert(db, stop.concertId, {
+  const concert = await updateConcert(db, stop.concertId, {
     concert_date: stop.stopDate,
     venue_name: stop.venueName,
     venue_address: stop.venueAddress,
@@ -101,6 +116,8 @@ export async function syncLinkedConcertFromStop(db: DbClient, stop: TourStop): P
     venue_lng: stop.venueLng,
     status: showStatusToConcertStatus(stop.showStatus),
   })
+  await setConcertArtists(db, concert.id, resolveConcertArtistIds(stop, performingArtistIds))
+  return concert
 }
 
 export async function syncLinkedStopFromConcert(db: DbClient, concert: Concert, stop: TourStop): Promise<TourStop> {

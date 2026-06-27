@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
-import { getTourById } from '@/lib/api/tours'
 import { getTourStopsByTourId } from '@/lib/api/tourStops'
+import { enrichTourStopForViewer } from '@/lib/api/tourStopView'
 import { importConcertToTourStop } from '@/lib/api/tourConcertBridge'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const schema = z.object({
   tourId: z.string().uuid(),
@@ -17,8 +17,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
 
-  const tour = await getTourById(supabase, body.tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, body.tourId, artist.id)
 
   const concerts = await getConcertsByArtistId(supabase, artist.id)
   const concert = concerts.find((c) => c.id === body.concertId)
@@ -36,5 +35,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     existingStops.length,
   )
 
-  return NextResponse.json({ stop }, { status: 201 })
+  const enriched = await enrichTourStopForViewer(supabase, stop, artist.id)
+  return NextResponse.json({ stop: enriched }, { status: 201 })
 })

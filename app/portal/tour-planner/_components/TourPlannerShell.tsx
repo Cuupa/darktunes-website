@@ -160,6 +160,10 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
           guestList: [],
           guestListLimit: null,
           notes: null,
+          externalGuestNotes: null,
+          performingArtistIds: [],
+          privateDataVersion: null,
+          privateDataUpdatedAt: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -230,11 +234,22 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
                 <SelectValue placeholder={t('tour_planner_select_tour')} />
               </SelectTrigger>
               <SelectContent>
-                {tours.map((tour) => (
-                  <SelectItem key={tour.id} value={tour.id}>
-                    {tour.archived ? `${tour.name} (${t('tour_planner_archived_label')})` : tour.name}
-                  </SelectItem>
-                ))}
+                {tours.map((tour) => {
+                  const coTour = (tour.collaborators?.length ?? 0) > 0 || tour.accessRole === 'collaborator'
+                  const label = [
+                    tour.name,
+                    tour.archived ? `(${t('tour_planner_archived_label')})` : null,
+                    coTour ? `· ${t('tour_planner_co_tour_badge')}` : null,
+                    tour.accessRole === 'collaborator' && tour.ownerArtistName
+                      ? `(${tour.ownerArtistName})`
+                      : null,
+                  ].filter(Boolean).join(' ')
+                  return (
+                    <SelectItem key={tour.id} value={tour.id}>
+                      {label}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           )}
@@ -285,6 +300,7 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
       {activeTour && (
         <TourPlannerTabs
           artistId={artistId}
+          artistName={artistName}
           activeTour={activeTour}
           stops={stops}
           concerts={concerts}

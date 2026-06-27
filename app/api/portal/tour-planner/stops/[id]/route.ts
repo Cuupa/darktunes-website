@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { deleteTourStop, getTourStopById, updateTourStop } from '@/lib/api/tourStops'
+import { deleteTourStop, getTourStopById, updateTourStopIfUnchanged } from '@/lib/api/tourStops'
+import { upsertStopPrivateData } from '@/lib/api/tourStopPrivate'
+import { setPerformingArtistsForStop } from '@/lib/api/tourStopPerformingArtists'
+import { enrichTourStopForViewer } from '@/lib/api/tourStopView'
 import { publishTourStopAsConcert, syncLinkedConcertFromStop } from '@/lib/api/tourConcertBridge'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import {
+  authenticateTourPlannerRequest,
+  assertTourAccess,
+  assertValidPerformingArtists,
+} from '@/lib/portal/tourPlannerAuth'
 import { showStatusSchema } from '@/lib/tour-planner/validation'
 
 const updateSchema = z.object({
@@ -37,6 +44,10 @@ const updateSchema = z.object({
   guestList: z.array(z.record(z.string(), z.unknown())).optional(),
   guestListLimit: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
+  externalGuestNotes: z.string().nullable().optional(),
+  performingArtistIds: z.array(z.string().uuid()).optional(),
+  expectedUpdatedAt: z.string().optional(),
+  expectedPrivateUpdatedAt: z.string().nullable().optional(),
   publishConcert: z.boolean().optional(),
   eventName: z.string().optional(),
   syncConcert: z.boolean().optional(),
@@ -55,50 +66,111 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const body = updateSchema.parse(await req.json())
 
   const existing = await getTourStopById(supabase, id)
-  if (!existing || existing.artistId !== artist.id) {
-    throw new ApiError(404, 'Tour stop not found')
+  if (!existing) throw new ApiError(404, 'Tour stop not found')
+  await assertTourAccess(supabase, existing.tourId, artist.id)
+
+  const hasSharedPatch =
+    body.stopDate !== undefined
+    || body.isTravelDay !== undefined
+    || body.venueName !== undefined
+    || body.venueAddress !== undefined
+    || body.venueCity !== undefined
+    || body.venueCountry !== undefined
+    || body.venueLat !== undefined
+    || body.venueLng !== undefined
+    || body.venueValidated !== undefined
+    || body.hotelName !== undefined
+    || body.hotelAddress !== undefined
+    || body.hotelCity !== undefined
+    || body.hotelCountry !== undefined
+    || body.hotelLat !== undefined
+    || body.hotelLng !== undefined
+    || body.hotelValidated !== undefined
+    || body.arrivalTime !== undefined
+    || body.showStatus !== undefined
+    || body.daySchedule !== undefined
+    || body.perDiems !== undefined
+    || body.rooming !== undefined
+    || body.travelManifest !== undefined
+    || body.venueDetails !== undefined
+    || body.venueContactInfo !== undefined
+    || body.guestList !== undefined
+    || body.guestListLimit !== undefined
+    || body.externalGuestNotes !== undefined
+
+  let stop = existing
+  if (hasSharedPatch) {
+    stop = await updateTourStopIfUnchanged(
+      supabase,
+      id,
+      {
+        stop_date: body.stopDate,
+        is_travel_day: body.isTravelDay,
+        venue_name: body.venueName,
+        venue_address: body.venueAddress,
+        venue_city: body.venueCity,
+        venue_country: body.venueCountry,
+        venue_lat: body.venueLat,
+        venue_lng: body.venueLng,
+        venue_validated: body.venueValidated,
+        hotel_name: body.hotelName,
+        hotel_address: body.hotelAddress,
+        hotel_city: body.hotelCity,
+        hotel_country: body.hotelCountry,
+        hotel_lat: body.hotelLat,
+        hotel_lng: body.hotelLng,
+        hotel_validated: body.hotelValidated,
+        arrival_time: body.arrivalTime,
+        show_status: body.showStatus,
+        day_schedule: body.daySchedule as Json | null | undefined,
+        per_diems: body.perDiems as Json | undefined,
+        rooming: body.rooming as Json | undefined,
+        travel_manifest: body.travelManifest as Json | undefined,
+        venue_details: body.venueDetails as Json | null | undefined,
+        venue_contact_info: body.venueContactInfo as Json | null | undefined,
+        guest_list: body.guestList as Json | undefined,
+        guest_list_limit: body.guestListLimit,
+        external_guest_notes: body.externalGuestNotes,
+      },
+      body.expectedUpdatedAt,
+    )
   }
 
-  const stop = await updateTourStop(supabase, id, {
-    stop_date: body.stopDate,
-    is_travel_day: body.isTravelDay,
-    venue_name: body.venueName,
-    venue_address: body.venueAddress,
-    venue_city: body.venueCity,
-    venue_country: body.venueCountry,
-    venue_lat: body.venueLat,
-    venue_lng: body.venueLng,
-    venue_validated: body.venueValidated,
-    hotel_name: body.hotelName,
-    hotel_address: body.hotelAddress,
-    hotel_city: body.hotelCity,
-    hotel_country: body.hotelCountry,
-    hotel_lat: body.hotelLat,
-    hotel_lng: body.hotelLng,
-    hotel_validated: body.hotelValidated,
-    arrival_time: body.arrivalTime,
-    show_status: body.showStatus,
-    day_schedule: body.daySchedule as Json | null | undefined,
-    deal: body.deal as Json | null | undefined,
-    settlement: body.settlement as Json | null | undefined,
-    per_diems: body.perDiems as Json | undefined,
-    rooming: body.rooming as Json | undefined,
-    travel_manifest: body.travelManifest as Json | undefined,
-    venue_details: body.venueDetails as Json | null | undefined,
-    venue_contact_info: body.venueContactInfo as Json | null | undefined,
-    guest_list: body.guestList as Json | undefined,
-    guest_list_limit: body.guestListLimit,
-    notes: body.notes,
-  })
+  if (body.deal !== undefined || body.settlement !== undefined || body.notes !== undefined) {
+    await upsertStopPrivateData(
+      supabase,
+      id,
+      artist.id,
+      {
+        deal: body.deal as import('@/lib/tour-planner/types').DealStructure | null | undefined,
+        settlement: body.settlement as import('@/lib/tour-planner/types').Settlement | null | undefined,
+        privateNotes: body.notes,
+      },
+      body.expectedPrivateUpdatedAt ?? undefined,
+    )
+  }
+
+  if (body.performingArtistIds !== undefined) {
+    await assertValidPerformingArtists(supabase, existing.tourId, body.performingArtistIds)
+    await setPerformingArtistsForStop(supabase, id, body.performingArtistIds)
+  }
+
+  const enriched = await enrichTourStopForViewer(supabase, stop, artist.id)
 
   let concert = null
   if (body.publishConcert) {
-    concert = await publishTourStopAsConcert(supabase, stop, user.id, body.eventName)
-  } else if (body.syncConcert && stop.concertId) {
-    concert = await syncLinkedConcertFromStop(supabase, stop)
+    concert = await publishTourStopAsConcert(
+      supabase,
+      enriched,
+      user.id,
+      body.eventName,
+      enriched.performingArtistIds,
+    )
+  } else if (body.syncConcert && enriched.concertId) {
+    concert = await syncLinkedConcertFromStop(supabase, enriched, enriched.performingArtistIds)
   }
 
-  return NextResponse.json({ stop, concert })
+  return NextResponse.json({ stop: enriched, concert })
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
@@ -107,9 +179,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
 
   const existing = await getTourStopById(supabase, id)
-  if (!existing || existing.artistId !== artist.id) {
-    throw new ApiError(404, 'Tour stop not found')
-  }
+  if (!existing) throw new ApiError(404, 'Tour stop not found')
+  await assertTourAccess(supabase, existing.tourId, artist.id)
 
   await deleteTourStop(supabase, id)
   return NextResponse.json({ ok: true })

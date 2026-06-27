@@ -1226,9 +1226,12 @@ CREATE TABLE IF NOT EXISTS public.tour_stops (
   guest_list          JSONB       NOT NULL DEFAULT '[]'::jsonb,
   guest_list_limit    INT,
   notes               TEXT,
+  external_guest_notes TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.tour_stops ADD COLUMN IF NOT EXISTS external_guest_notes TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_tour_stops_tour_id    ON public.tour_stops (tour_id);
 CREATE INDEX IF NOT EXISTS idx_tour_stops_artist_id  ON public.tour_stops (artist_id);
@@ -1323,10 +1326,86 @@ CREATE TABLE IF NOT EXISTS public.tour_merch_settlements (
   settlement   JSONB       NOT NULL DEFAULT '{}'::jsonb,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (stop_id)
+  UNIQUE (stop_id, artist_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tour_merch_settlements_stop_id ON public.tour_merch_settlements (stop_id);
+CREATE INDEX IF NOT EXISTS idx_tour_merch_settlements_artist_id ON public.tour_merch_settlements (artist_id);
+
+-- Co-tour collaborators (any roster artist may be invited to co-manage)
+CREATE TABLE IF NOT EXISTS public.tour_collaborators (
+  tour_id     UUID        NOT NULL REFERENCES public.tours (id) ON DELETE CASCADE,
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  invited_by  UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tour_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_collaborators_artist_id ON public.tour_collaborators (artist_id);
+
+-- Per-stop co-headline roster artists (subset of tour collaborators)
+CREATE TABLE IF NOT EXISTS public.tour_stop_performing_artists (
+  stop_id     UUID        NOT NULL REFERENCES public.tour_stops (id) ON DELETE CASCADE,
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (stop_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_stop_performing_artists_stop_id ON public.tour_stop_performing_artists (stop_id);
+
+-- Private per-artist stop data (deal, settlement — never shared with collaborators)
+CREATE TABLE IF NOT EXISTS public.tour_stop_artist_private (
+  stop_id        UUID        NOT NULL REFERENCES public.tour_stops (id) ON DELETE CASCADE,
+  artist_id      UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  deal           JSONB,
+  settlement     JSONB,
+  private_notes  TEXT,
+  version        INT         NOT NULL DEFAULT 1,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (stop_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_stop_artist_private_artist_id ON public.tour_stop_artist_private (artist_id);
+
+-- Private per-artist tour budget
+CREATE TABLE IF NOT EXISTS public.tour_artist_finance (
+  tour_id        UUID        NOT NULL REFERENCES public.tours (id) ON DELETE CASCADE,
+  artist_id      UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  budget         JSONB,
+  total_budget   NUMERIC,
+  currency       TEXT        NOT NULL DEFAULT 'EUR',
+  version        INT         NOT NULL DEFAULT 1,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tour_id, artist_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_artist_finance_artist_id ON public.tour_artist_finance (artist_id);
+
+-- Backfill private stop data from legacy columns
+INSERT INTO public.tour_stop_artist_private (stop_id, artist_id, deal, settlement, private_notes)
+SELECT s.id, s.artist_id, s.deal, s.settlement, s.notes
+FROM public.tour_stops s
+WHERE (s.deal IS NOT NULL OR s.settlement IS NOT NULL OR s.notes IS NOT NULL)
+ON CONFLICT (stop_id, artist_id) DO NOTHING;
+
+-- Backfill tour finance for tour owners
+INSERT INTO public.tour_artist_finance (tour_id, artist_id, budget, total_budget, currency)
+SELECT t.id, t.artist_id, t.budget, t.total_budget, t.currency
+FROM public.tours t
+WHERE t.budget IS NOT NULL OR t.total_budget IS NOT NULL
+ON CONFLICT (tour_id, artist_id) DO NOTHING;
+
+DROP TRIGGER IF EXISTS trg_tour_stop_artist_private_updated_at ON public.tour_stop_artist_private;
+CREATE TRIGGER trg_tour_stop_artist_private_updated_at
+  BEFORE UPDATE ON public.tour_stop_artist_private
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tour_artist_finance_updated_at ON public.tour_artist_finance;
+CREATE TRIGGER trg_tour_artist_finance_updated_at
+  BEFORE UPDATE ON public.tour_artist_finance
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS trg_tours_updated_at ON public.tours;
 CREATE TRIGGER trg_tours_updated_at
@@ -1370,14 +1449,58 @@ ALTER TABLE public.tour_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_crew_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_merch_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_merch_settlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_collaborators ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_stop_performing_artists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_stop_artist_private ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_artist_finance ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.user_can_access_tour(p_tour_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tours t
+    WHERE t.id = p_tour_id
+      AND (
+        t.artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+        OR EXISTS (
+          SELECT 1
+          FROM public.tour_collaborators tc
+          WHERE tc.tour_id = p_tour_id
+            AND tc.artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+        )
+      )
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.user_owns_tour(p_tour_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tours t
+    WHERE t.id = p_tour_id
+      AND t.artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+  );
+$$;
 
 DROP POLICY IF EXISTS "tours: artist manage" ON public.tours;
 CREATE POLICY "tours: artist manage" ON public.tours
   FOR ALL USING (
     artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    OR public.user_can_access_tour(id)
   )
   WITH CHECK (
     artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    OR public.user_can_access_tour(id)
   );
 
 DROP POLICY IF EXISTS "tours: admin all" ON public.tours;
@@ -1388,12 +1511,8 @@ CREATE POLICY "tours: admin all" ON public.tours
 
 DROP POLICY IF EXISTS "tour_stops: artist manage" ON public.tour_stops;
 CREATE POLICY "tour_stops: artist manage" ON public.tour_stops
-  FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
-  );
+  FOR ALL USING (public.user_can_access_tour(tour_id))
+  WITH CHECK (public.user_can_access_tour(tour_id));
 
 DROP POLICY IF EXISTS "tour_stops: admin all" ON public.tour_stops;
 CREATE POLICY "tour_stops: admin all" ON public.tour_stops
@@ -1420,9 +1539,11 @@ DROP POLICY IF EXISTS "tour_tasks: artist manage" ON public.tour_tasks;
 CREATE POLICY "tour_tasks: artist manage" ON public.tour_tasks
   FOR ALL USING (
     artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    OR (tour_id IS NOT NULL AND public.user_can_access_tour(tour_id))
   )
   WITH CHECK (
     artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    OR (tour_id IS NOT NULL AND public.user_can_access_tour(tour_id))
   );
 
 DROP POLICY IF EXISTS "tour_tasks: admin all" ON public.tour_tasks;
@@ -1433,12 +1554,8 @@ CREATE POLICY "tour_tasks: admin all" ON public.tour_tasks
 
 DROP POLICY IF EXISTS "tour_crew: artist manage" ON public.tour_crew_members;
 CREATE POLICY "tour_crew: artist manage" ON public.tour_crew_members
-  FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
-  );
+  FOR ALL USING (public.user_can_access_tour(tour_id))
+  WITH CHECK (public.user_can_access_tour(tour_id));
 
 DROP POLICY IF EXISTS "tour_crew: admin all" ON public.tour_crew_members;
 CREATE POLICY "tour_crew: admin all" ON public.tour_crew_members
@@ -1472,6 +1589,85 @@ CREATE POLICY "tour_merch_settlements: artist manage" ON public.tour_merch_settl
 
 DROP POLICY IF EXISTS "tour_merch_settlements: admin all" ON public.tour_merch_settlements;
 CREATE POLICY "tour_merch_settlements: admin all" ON public.tour_merch_settlements
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_collaborators: read" ON public.tour_collaborators;
+CREATE POLICY "tour_collaborators: read" ON public.tour_collaborators
+  FOR SELECT USING (public.user_can_access_tour(tour_id));
+
+DROP POLICY IF EXISTS "tour_collaborators: owner manage" ON public.tour_collaborators;
+CREATE POLICY "tour_collaborators: owner manage" ON public.tour_collaborators
+  FOR INSERT WITH CHECK (public.user_owns_tour(tour_id));
+
+DROP POLICY IF EXISTS "tour_collaborators: owner delete" ON public.tour_collaborators;
+CREATE POLICY "tour_collaborators: owner delete" ON public.tour_collaborators
+  FOR DELETE USING (public.user_owns_tour(tour_id));
+
+DROP POLICY IF EXISTS "tour_stop_performing_artists: tour access" ON public.tour_stop_performing_artists;
+CREATE POLICY "tour_stop_performing_artists: tour access" ON public.tour_stop_performing_artists
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.tour_stops ts
+      WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.tour_stops ts
+      WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "tour_stop_artist_private: own artist" ON public.tour_stop_artist_private;
+CREATE POLICY "tour_stop_artist_private: own artist" ON public.tour_stop_artist_private
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.tour_stops ts
+      WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
+    )
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.tour_stops ts
+      WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "tour_artist_finance: own artist" ON public.tour_artist_finance;
+CREATE POLICY "tour_artist_finance: own artist" ON public.tour_artist_finance
+  FOR ALL USING (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    AND public.user_can_access_tour(tour_id)
+  )
+  WITH CHECK (
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    AND public.user_can_access_tour(tour_id)
+  );
+
+DROP POLICY IF EXISTS "tour_collaborators: admin all" ON public.tour_collaborators;
+CREATE POLICY "tour_collaborators: admin all" ON public.tour_collaborators
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_stop_performing_artists: admin all" ON public.tour_stop_performing_artists;
+CREATE POLICY "tour_stop_performing_artists: admin all" ON public.tour_stop_performing_artists
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_stop_artist_private: admin all" ON public.tour_stop_artist_private;
+CREATE POLICY "tour_stop_artist_private: admin all" ON public.tour_stop_artist_private
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+  );
+
+DROP POLICY IF EXISTS "tour_artist_finance: admin all" ON public.tour_artist_finance;
+CREATE POLICY "tour_artist_finance: admin all" ON public.tour_artist_finance
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
   );

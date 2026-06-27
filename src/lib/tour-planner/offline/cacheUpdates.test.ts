@@ -39,6 +39,10 @@ const stop: TourStop = {
   guestList: [],
   guestListLimit: null,
   notes: null,
+  externalGuestNotes: null,
+  performingArtistIds: [],
+  privateDataVersion: null,
+  privateDataUpdatedAt: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',
 }

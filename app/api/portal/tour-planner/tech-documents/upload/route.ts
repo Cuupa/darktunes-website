@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { getTourById } from '@/lib/api/tours'
 import { createR2Client } from '@/lib/r2Utils'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -52,8 +51,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!isPdf) throw new ApiError(415, 'Only PDF files are allowed')
 
-  const tour = await getTourById(supabase, tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, tourId, artist.id)
 
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(

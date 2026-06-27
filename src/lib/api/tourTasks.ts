@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { TourTask } from '@/types'
+import { getCollaboratorTourIds } from '@/lib/api/tourCollaborators'
 
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['tour_tasks']['Row']
@@ -25,22 +26,56 @@ function rowToTask(row: Row): TourTask {
   }
 }
 
+export async function getTourTasksForTour(db: DbClient, tourId: string): Promise<TourTask[]> {
+  const { data, error } = await db
+    .from('tour_tasks')
+    .select('*')
+    .eq('tour_id', tourId)
+    .order('due_date', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToTask)
+}
+
 export async function getTourTasksByArtistId(
   db: DbClient,
   artistId: string,
   tourId?: string | null,
 ): Promise<TourTask[]> {
-  let query = db
-    .from('tour_tasks')
-    .select('*')
-    .eq('artist_id', artistId)
-    .order('due_date', { ascending: true })
-
   if (tourId) {
-    query = query.eq('tour_id', tourId)
+    return getTourTasksForTour(db, tourId)
   }
 
-  const { data, error } = await query
+  const collaboratorTourIds = await getCollaboratorTourIds(db, artistId)
+  const { data: ownedTours, error: ownedError } = await db
+    .from('tours')
+    .select('id')
+    .eq('artist_id', artistId)
+  if (ownedError) throw new Error(ownedError.message)
+
+  const accessibleTourIds = [
+    ...new Set([
+      ...collaboratorTourIds,
+      ...(ownedTours ?? []).map((row) => row.id),
+    ]),
+  ]
+
+  if (accessibleTourIds.length === 0) {
+    const { data, error } = await db
+      .from('tour_tasks')
+      .select('*')
+      .eq('artist_id', artistId)
+      .order('due_date', { ascending: true })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(rowToTask)
+  }
+
+  const { data, error } = await db
+    .from('tour_tasks')
+    .select('*')
+    .or(`artist_id.eq.${artistId},tour_id.in.(${accessibleTourIds.join(',')})`)
+    .order('due_date', { ascending: true })
+
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToTask)
 }
@@ -62,4 +97,10 @@ export async function updateTourTask(db: DbClient, id: string, data: TourTaskUpd
 export async function deleteTourTask(db: DbClient, id: string): Promise<void> {
   const { error } = await db.from('tour_tasks').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export async function getTourTaskById(db: DbClient, taskId: string): Promise<TourTask | null> {
+  const { data, error } = await db.from('tour_tasks').select('*').eq('id', taskId).maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? rowToTask(data) : null
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { getTourById } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
 import { geocodeAddress } from '@/lib/tour-planner/geocoding'
 
 const schema = z.object({
@@ -19,8 +19,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   let apiKey: string | undefined
 
   if (body.tourId) {
+    await assertTourAccess(supabase, body.tourId, artist.id)
     const tour = await getTourById(supabase, body.tourId)
-    if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+    if (!tour) throw new ApiError(404, 'Tour not found')
     provider = tour.settings.apiProvider
     apiKey = resolveGoogleMapsApiKey(tour.settings)
   }

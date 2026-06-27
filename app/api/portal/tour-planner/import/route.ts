@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withErrorHandler, ApiError } from '@/lib/errors'
+import { withErrorHandler } from '@/lib/errors'
 import { createTourStop, getTourStopsByTourId } from '@/lib/api/tourStops'
-import { getTourById } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { enrichTourStopsForViewer } from '@/lib/api/tourStopView'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 import { parseCSVText } from '@/lib/tour-planner/import'
 
 const schema = z.object({
@@ -15,8 +15,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
-  const tour = await getTourById(supabase, body.tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, body.tourId, artist.id)
 
   const parsed = parseCSVText(body.csv)
   const existing = await getTourStopsByTourId(supabase, body.tourId)
@@ -41,5 +40,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const stops = await getTourStopsByTourId(supabase, body.tourId)
-  return NextResponse.json({ imported: parsed.length, stops })
+  const enriched = await enrichTourStopsForViewer(supabase, stops, artist.id)
+  return NextResponse.json({ imported: parsed.length, stops: enriched })
 })

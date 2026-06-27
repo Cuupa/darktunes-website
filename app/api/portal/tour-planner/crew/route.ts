@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createTourCrewMember, getTourCrewByTourId } from '@/lib/api/tourCrew'
-import { getTourById } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const createSchema = z.object({
   tourId: z.string().uuid(),
@@ -24,8 +23,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const tourId = req.nextUrl.searchParams.get('tourId')
   if (!tourId) throw new ApiError(400, 'tourId required')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
-  const tour = await getTourById(supabase, tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, tourId, artist.id)
   const crew = await getTourCrewByTourId(supabase, tourId)
   return NextResponse.json({ crew })
 })
@@ -34,8 +32,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
-  const tour = await getTourById(supabase, body.tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, body.tourId, artist.id)
   const member = await createTourCrewMember(supabase, {
     tour_id: body.tourId,
     artist_id: artist.id,

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { TourStop } from '@/types'
+import { ApiError } from '@/lib/errors'
 import type {
   DaySchedule,
   DealStructure,
@@ -55,6 +56,10 @@ function rowToTourStop(row: TourStopRow): TourStop {
     guestList: (row.guest_list as unknown as GuestListEntry[]) ?? [],
     guestListLimit: row.guest_list_limit,
     notes: row.notes,
+    externalGuestNotes: row.external_guest_notes ?? null,
+    performingArtistIds: [],
+    privateDataVersion: null,
+    privateDataUpdatedAt: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -89,6 +94,25 @@ export async function updateTourStop(db: DbClient, id: string, data: TourStopUpd
   const { data: row, error } = await db.from('tour_stops').update(data).eq('id', id).select('*').single()
   if (error) throw new Error(error.message)
   if (!row) throw new Error('No data returned from updateTourStop')
+  return rowToTourStop(row)
+}
+
+export async function updateTourStopIfUnchanged(
+  db: DbClient,
+  id: string,
+  data: TourStopUpdate,
+  expectedUpdatedAt?: string,
+): Promise<TourStop> {
+  let query = db.from('tour_stops').update(data).eq('id', id)
+  if (expectedUpdatedAt) {
+    query = query.eq('updated_at', expectedUpdatedAt)
+  }
+  const { data: row, error } = await query.select('*').maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!row) {
+    if (expectedUpdatedAt) throw new ApiError(409, 'Tour stop was modified by another user')
+    throw new Error('No data returned from updateTourStopIfUnchanged')
+  }
   return rowToTourStop(row)
 }
 

@@ -62,6 +62,10 @@ function mapStop(row: Record<string, unknown>): TourStop {
     guestList: (row.guest_list as TourStop['guestList']) ?? [],
     guestListLimit: row.guest_list_limit != null ? Number(row.guest_list_limit) : null,
     notes: (row.notes as string | null) ?? null,
+    externalGuestNotes: (row.external_guest_notes as string | null) ?? null,
+    performingArtistIds: [],
+    privateDataVersion: null,
+    privateDataUpdatedAt: null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }

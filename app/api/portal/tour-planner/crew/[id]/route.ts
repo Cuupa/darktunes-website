@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTourCrewMember, updateTourCrewMember } from '@/lib/api/tourCrew'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -29,8 +29,9 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = crewId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
-  const { data, error } = await supabase.from('tour_crew_members').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Crew member not found')
+  const { data, error } = await supabase.from('tour_crew_members').select('tour_id').eq('id', id).single()
+  if (error || !data) throw new ApiError(404, 'Crew member not found')
+  await assertTourAccess(supabase, data.tour_id, artist.id)
 
   const member = await updateTourCrewMember(supabase, id, {
     name: body.name,
@@ -52,8 +53,9 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = crewId(req.nextUrl.pathname)
 
-  const { data, error } = await supabase.from('tour_crew_members').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Crew member not found')
+  const { data, error } = await supabase.from('tour_crew_members').select('tour_id').eq('id', id).single()
+  if (error || !data) throw new ApiError(404, 'Crew member not found')
+  await assertTourAccess(supabase, data.tour_id, artist.id)
 
   await deleteTourCrewMember(supabase, id)
   return NextResponse.json({ ok: true })

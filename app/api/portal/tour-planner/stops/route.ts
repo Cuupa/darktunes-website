@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createTourStop, getTourStopsByTourId, reorderTourStops } from '@/lib/api/tourStops'
-import { getTourById } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { enrichTourStopsForViewer } from '@/lib/api/tourStopView'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 import { showStatusSchema } from '@/lib/tour-planner/validation'
 
 const createSchema = z.object({
@@ -31,11 +31,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   if (!tourId) throw new ApiError(400, 'tourId is required')
 
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
-  const tour = await getTourById(supabase, tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, tourId, artist.id)
 
   const stops = await getTourStopsByTourId(supabase, tourId)
-  return NextResponse.json({ stops })
+  const enriched = await enrichTourStopsForViewer(supabase, stops, artist.id)
+  return NextResponse.json({ stops: enriched })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -45,8 +45,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (raw.orderedStopIds) {
     const body = reorderSchema.parse(raw)
-    const tour = await getTourById(supabase, body.tourId)
-    if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+    await assertTourAccess(supabase, body.tourId, artist.id)
     const existing = await getTourStopsByTourId(supabase, body.tourId)
     const existingIds = new Set(existing.map((stop) => stop.id))
     if (
@@ -56,12 +55,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       throw new ApiError(400, 'Invalid stop order')
     }
     const stops = await reorderTourStops(supabase, body.tourId, body.orderedStopIds)
-    return NextResponse.json({ stops })
+    const enriched = await enrichTourStopsForViewer(supabase, stops, artist.id)
+    return NextResponse.json({ stops: enriched })
   }
 
   const body = createSchema.parse(raw)
-  const tour = await getTourById(supabase, body.tourId)
-  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+  await assertTourAccess(supabase, body.tourId, artist.id)
 
   const stop = await createTourStop(supabase, {
     tour_id: body.tourId,
@@ -78,5 +77,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     sort_order: body.sortOrder ?? 0,
   })
 
-  return NextResponse.json({ stop }, { status: 201 })
+  const [enriched] = await enrichTourStopsForViewer(supabase, [stop], artist.id)
+  return NextResponse.json({ stop: enriched }, { status: 201 })
 })

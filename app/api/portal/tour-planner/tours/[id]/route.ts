@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { deleteTour, duplicateTour, getTourById, updateTour } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { deleteTour, duplicateTour, getTourById, getToursByArtistId, updateTour } from '@/lib/api/tours'
+import { upsertTourArtistFinance } from '@/lib/api/tourArtistFinance'
+import type { TourBudget } from '@/lib/tour-planner/types'
+import {
+  authenticateTourPlannerRequest,
+  assertTourAccess,
+  assertTourOwner,
+} from '@/lib/portal/tourPlannerAuth'
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -17,6 +23,7 @@ const updateSchema = z.object({
   techDocuments: z.array(z.record(z.string(), z.unknown())).optional(),
   currency: z.string().optional(),
   totalBudget: z.number().nullable().optional(),
+  expectedFinanceUpdatedAt: z.string().nullable().optional(),
   duplicate: z.boolean().optional(),
 })
 
@@ -33,13 +40,32 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const body = updateSchema.parse(await req.json())
 
   const existing = await getTourById(supabase, id)
-  if (!existing || existing.artistId !== artist.id) {
-    throw new ApiError(404, 'Tour not found')
-  }
+  if (!existing) throw new ApiError(404, 'Tour not found')
 
   if (body.duplicate) {
+    await assertTourOwner(supabase, id, artist.id)
     const copy = await duplicateTour(supabase, id, user.id)
     return NextResponse.json({ tour: copy })
+  }
+
+  await assertTourAccess(supabase, id, artist.id)
+
+  if (
+    body.budget !== undefined
+    || body.totalBudget !== undefined
+    || body.currency !== undefined
+  ) {
+    await upsertTourArtistFinance(
+      supabase,
+      id,
+      artist.id,
+      {
+        budget: body.budget as TourBudget | null | undefined,
+        totalBudget: body.totalBudget,
+        currency: body.currency,
+      },
+      body.expectedFinanceUpdatedAt ?? undefined,
+    )
   }
 
   const tour = await updateTour(supabase, id, {
@@ -50,13 +76,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
     archived: body.archived,
     settings: body.settings as Json | undefined,
     route_cache: body.routeCache as Json | null | undefined,
-    budget: body.budget as Json | null | undefined,
     tech_documents: body.techDocuments as Json | undefined,
-    currency: body.currency,
-    total_budget: body.totalBudget,
   })
 
-  return NextResponse.json({ tour })
+  const enriched = (await getToursByArtistId(supabase, artist.id, true)).find((t) => t.id === tour.id)
+  return NextResponse.json({ tour: enriched ?? tour })
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
@@ -64,11 +88,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
 
-  const existing = await getTourById(supabase, id)
-  if (!existing || existing.artistId !== artist.id) {
-    throw new ApiError(404, 'Tour not found')
-  }
-
+  await assertTourOwner(supabase, id, artist.id)
   await deleteTour(supabase, id)
   return NextResponse.json({ ok: true })
 })

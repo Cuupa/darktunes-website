@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { getTourStopsByTourId } from '@/lib/api/tourStops'
 import { getTourById, updateTour } from '@/lib/api/tours'
-import { authenticateTourPlannerRequest, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import { calculateTourRoute } from '@/lib/tour-planner/routing'
 import type { Json } from '@/types/database'
@@ -17,8 +17,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const { tourId } = schema.parse(await req.json())
 
+  await assertTourAccess(supabase, tourId, artist.id)
   const tour = await getTourById(supabase, tourId)
-  if (!tour || tour.artistId !== artist.id) {
+  if (!tour) {
     return NextResponse.json({ error: 'Tour not found' }, { status: 404 })
   }
 

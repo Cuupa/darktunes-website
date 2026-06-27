@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { getTourStopById } from '@/lib/api/tourStops'
 import { getTourMerchSettlementByStopId, upsertTourMerchSettlement } from '@/lib/api/tourMerch'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 import type { MerchSettlement } from '@/lib/tour-planner/types'
 
 const postSchema = z.object({
@@ -18,9 +18,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const stop = await getTourStopById(supabase, stopId)
-  if (!stop || stop.artistId !== artist.id) throw new ApiError(404, 'Stop not found')
+  if (!stop) throw new ApiError(404, 'Stop not found')
+  await assertTourAccess(supabase, stop.tourId, artist.id)
 
-  const record = await getTourMerchSettlementByStopId(supabase, stopId)
+  const record = await getTourMerchSettlementByStopId(supabase, stopId, artist.id)
   return NextResponse.json({ record })
 })
 
@@ -29,7 +30,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = postSchema.parse(await req.json())
   const stop = await getTourStopById(supabase, body.stopId)
-  if (!stop || stop.artistId !== artist.id) throw new ApiError(404, 'Stop not found')
+  if (!stop) throw new ApiError(404, 'Stop not found')
+  await assertTourAccess(supabase, stop.tourId, artist.id)
   const record = await upsertTourMerchSettlement(
     supabase,
     body.stopId,

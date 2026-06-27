@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { createTourTask, getTourTasksByArtistId } from '@/lib/api/tourTasks'
-import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -17,6 +17,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const tourId = req.nextUrl.searchParams.get('tourId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
+
+  if (tourId) {
+    await assertTourAccess(supabase, tourId, artist.id)
+  }
+
   const tasks = await getTourTasksByArtistId(supabase, artist.id, tourId)
   return NextResponse.json({ tasks })
 })
@@ -25,6 +30,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
+
+  if (body.tourId) {
+    await assertTourAccess(supabase, body.tourId, artist.id)
+  }
+
   const task = await createTourTask(supabase, {
     artist_id: artist.id,
     title: body.title,

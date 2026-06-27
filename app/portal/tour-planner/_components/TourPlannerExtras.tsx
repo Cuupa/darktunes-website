@@ -909,6 +909,179 @@ export function SettlementForm({
   )
 }
 
+export function CoHeadlineForm({
+  rosterArtists,
+  performingArtistIds,
+  externalGuestNotes,
+  onSave,
+}: {
+  rosterArtists: { artistId: string; artistName: string }[]
+  performingArtistIds: string[]
+  externalGuestNotes: string | null
+  onSave: (data: { performingArtistIds?: string[]; externalGuestNotes?: string | null }) => void
+}) {
+  const t = useTranslations('portal')
+  const [selected, setSelected] = useState<string[]>(performingArtistIds)
+  const [guestNotes, setGuestNotes] = useState(externalGuestNotes ?? '')
+
+  useEffect(() => {
+    setSelected(performingArtistIds)
+    setGuestNotes(externalGuestNotes ?? '')
+  }, [performingArtistIds, externalGuestNotes])
+
+  const toggleArtist = (id: string) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-dashed border-border p-3">
+      {rosterArtists.length > 1 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">{t('tour_planner_co_headline')}</p>
+          <ul className="flex flex-wrap gap-2" role="list">
+            {rosterArtists.map((artist) => {
+              const checked = selected.includes(artist.artistId)
+              return (
+                <li key={artist.artistId}>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-border"
+                      checked={checked}
+                      onChange={() => toggleArtist(artist.artistId)}
+                    />
+                    {artist.artistName}
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+      <div className="space-y-1">
+        <Label htmlFor="external-guest-notes">{t('tour_planner_external_guests')}</Label>
+        <Textarea
+          id="external-guest-notes"
+          value={guestNotes}
+          onChange={(e) => setGuestNotes(e.target.value)}
+          placeholder={t('tour_planner_external_guests_placeholder')}
+          rows={2}
+        />
+        <p className="text-xs text-muted-foreground">{t('tour_planner_external_guests_hint')}</p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => onSave({
+          ...(rosterArtists.length > 1 ? { performingArtistIds: selected } : {}),
+          externalGuestNotes: guestNotes.trim() || null,
+        })}
+      >
+        {t('tour_planner_save_lineup')}
+      </Button>
+    </div>
+  )
+}
+
+function CollaboratorsSection({
+  artistId,
+  tour,
+  onUpdated,
+}: {
+  artistId: string
+  tour: Tour
+  onUpdated: () => void
+}) {
+  const t = useTranslations('portal')
+  const { offline } = useOnlineStatus()
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ id: string; name: string; slug: string | null }[]>([])
+  const [searching, setSearching] = useState(false)
+
+  const search = async () => {
+    if (query.trim().length < 2 || offline) return
+    setSearching(true)
+    try {
+      const res = await tourPlannerFetch(artistId, `/artists/search?q=${encodeURIComponent(query.trim())}`)
+      if (!res.ok) throw new Error('search failed')
+      const json = await res.json() as { artists: { id: string; name: string; slug: string | null }[] }
+      setResults(json.artists)
+    } catch {
+      toast.error(t('tour_planner_error'))
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const addCollaborator = async (collaboratorArtistId: string) => {
+    const res = await tourPlannerFetch(artistId, `/tours/${tour.id}/collaborators`, {
+      method: 'POST',
+      body: JSON.stringify({ collaboratorArtistId }),
+    })
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    setQuery('')
+    setResults([])
+    onUpdated()
+    toast.success(t('tour_planner_collaborator_added'))
+  }
+
+  const removeCollaborator = async (collaboratorArtistId: string) => {
+    const res = await tourPlannerFetch(
+      artistId,
+      `/tours/${tour.id}/collaborators?collaboratorArtistId=${encodeURIComponent(collaboratorArtistId)}`,
+      { method: 'DELETE' },
+    )
+    if (!res.ok) { toast.error(t('tour_planner_error')); return }
+    onUpdated()
+    toast.success(t('tour_planner_collaborator_removed'))
+  }
+
+  return (
+    <section className="space-y-4 rounded-lg border border-border p-4">
+      <h3 className="font-semibold">{t('tour_planner_collaborators')}</h3>
+      <p className="text-sm text-muted-foreground">{t('tour_planner_collaborators_desc')}</p>
+      {(tour.collaborators ?? []).length > 0 ? (
+        <ul className="space-y-2" role="list">
+          {(tour.collaborators ?? []).map((c) => (
+            <li key={c.artistId} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+              <span>{c.artistName}</span>
+              <Button variant="ghost" size="sm" onClick={() => void removeCollaborator(c.artistId)}>
+                <Trash size={14} aria-hidden />
+                {t('tour_planner_remove_collaborator')}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">{t('tour_planner_no_collaborators')}</p>
+      )}
+      <div className="flex flex-wrap gap-2 max-w-xl">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('tour_planner_search_roster')}
+          aria-label={t('tour_planner_search_roster')}
+          disabled={offline}
+        />
+        <Button variant="outline" onClick={() => void search()} disabled={offline || searching || query.trim().length < 2}>
+          {t('tour_planner_search')}
+        </Button>
+      </div>
+      {results.length > 0 && (
+        <ul className="space-y-1 max-w-xl" role="list">
+          {results.map((a) => (
+            <li key={a.id}>
+              <Button variant="ghost" className="w-full justify-start" onClick={() => void addCollaborator(a.id)}>
+                {a.name}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 export function SettingsPanel({
   artistId,
   tour,
@@ -937,6 +1110,7 @@ export function SettingsPanel({
     }
   }, [tour])
   if (!tour || !draft) return null
+  const isOwner = tour.accessRole !== 'collaborator'
 
   const patchTour = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/tours/${tour.id}`, {
@@ -982,6 +1156,12 @@ export function SettingsPanel({
 
   return (
     <div className="space-y-8">
+      {isOwner && <CollaboratorsSection artistId={artistId} tour={tour} onUpdated={onSaved} />}
+      {!isOwner && tour.ownerArtistName && (
+        <p className="text-sm text-muted-foreground rounded-lg border border-border p-4">
+          {t('tour_planner_collaborator_view', { owner: tour.ownerArtistName })}
+        </p>
+      )}
       <section className="space-y-4 rounded-lg border border-border p-4">
         <h3 className="font-semibold">{t('tour_planner_settings_route')}</h3>
         <div className="grid gap-3 sm:grid-cols-2 max-w-2xl">
@@ -1086,13 +1266,15 @@ export function SettingsPanel({
         />
       </section>
 
-      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-        <Button variant="outline" onClick={() => void toggleArchive()}>
-          {tour.archived ? t('tour_planner_unarchive_tour') : t('tour_planner_archive_tour')}
-        </Button>
-        <Button variant="outline" onClick={() => void duplicateTour()}>{t('tour_planner_duplicate_tour')}</Button>
-        <Button variant="destructive" onClick={() => void deleteTour()}>{t('tour_planner_delete_tour')}</Button>
-      </div>
+      {isOwner && (
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          <Button variant="outline" onClick={() => void toggleArchive()}>
+            {tour.archived ? t('tour_planner_unarchive_tour') : t('tour_planner_archive_tour')}
+          </Button>
+          <Button variant="outline" onClick={() => void duplicateTour()}>{t('tour_planner_duplicate_tour')}</Button>
+          <Button variant="destructive" onClick={() => void deleteTour()}>{t('tour_planner_delete_tour')}</Button>
+        </div>
+      )}
     </div>
   )
 }

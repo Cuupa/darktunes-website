@@ -54,6 +54,7 @@ import {
 import type { Concert, Tour, TourStop } from '@/types'
 import {
   buildTourPlannerPdfLabels,
+  CoHeadlineForm,
   CrewPanel,
   geocodeStopHotel,
   geocodeStopVenue,
@@ -96,6 +97,7 @@ const DAY_FIELD_I18N: Record<(typeof DAY_FIELDS)[number], 'tour_planner_day_getI
 
 export function TourPlannerTabs({
   artistId,
+  artistName,
   activeTour,
   stops,
   concerts,
@@ -104,6 +106,7 @@ export function TourPlannerTabs({
   onTourDeleted,
 }: {
   artistId: string
+  artistName: string
   activeTour: Tour | null
   stops: TourStop[]
   concerts: Concert[]
@@ -126,7 +129,14 @@ export function TourPlannerTabs({
         <TabsTrigger value="settings">{t('tour_planner_tab_settings')}</TabsTrigger>
       </TabsList>
       <TabsContent value="stops" className="mt-4">
-        <StopsPanel artistId={artistId} tourId={activeTour?.id ?? null} stops={stops} onUpdated={onStopsChange} />
+        <StopsPanel
+          artistId={artistId}
+          artistName={artistName}
+          tour={activeTour}
+          tourId={activeTour?.id ?? null}
+          stops={stops}
+          onUpdated={onStopsChange}
+        />
       </TabsContent>
       <TabsContent value="route" className="mt-4">
         <MapRoutePanel artistId={artistId} activeTour={activeTour} stops={stops} />
@@ -164,13 +174,33 @@ export function TourPlannerTabs({
   )
 }
 
+function buildRosterArtists(tour: Tour | null, artistId: string, artistName: string) {
+  if (!tour) return []
+  const roster: { artistId: string; artistName: string }[] = []
+  const ownerName = tour.accessRole === 'owner' ? artistName : (tour.ownerArtistName ?? 'Owner')
+  roster.push({ artistId: tour.artistId, artistName: ownerName })
+  for (const c of tour.collaborators ?? []) {
+    if (!roster.some((r) => r.artistId === c.artistId)) {
+      roster.push({ artistId: c.artistId, artistName: c.artistName })
+    }
+  }
+  if (!roster.some((r) => r.artistId === artistId) && tour.accessRole === 'collaborator') {
+    roster.push({ artistId, artistName })
+  }
+  return roster
+}
+
 function StopsPanel({
   artistId,
+  artistName,
+  tour,
   tourId,
   stops,
   onUpdated,
 }: {
   artistId: string
+  artistName: string
+  tour: Tour | null
   tourId: string | null
   stops: TourStop[]
   onUpdated: () => void
@@ -178,6 +208,7 @@ function StopsPanel({
   const t = useTranslations('portal')
   const queryClient = useQueryClient()
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const rosterArtists = buildRosterArtists(tour, artistId, artistName)
   if (!stops.length) return <p className="text-sm text-muted-foreground">{t('tour_planner_no_stops')}</p>
 
   const reorder = async (next: TourStop[]) => {
@@ -229,6 +260,7 @@ function StopsPanel({
           key={stop.id}
           artistId={artistId}
           tourId={tourId}
+          rosterArtists={rosterArtists}
           stop={stop}
           index={index}
           total={stops.length}
@@ -249,6 +281,7 @@ function StopsPanel({
 function StopCard({
   artistId,
   tourId,
+  rosterArtists,
   stop,
   index,
   total,
@@ -263,6 +296,7 @@ function StopCard({
 }: {
   artistId: string
   tourId: string | null
+  rosterArtists: { artistId: string; artistName: string }[]
   stop: TourStop
   index: number
   total: number
@@ -283,7 +317,11 @@ function StopCard({
   const patchStop = async (body: Record<string, unknown>) => {
     const res = await tourPlannerFetch(artistId, `/stops/${stop.id}`, {
       method: 'PATCH',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ...body,
+        expectedUpdatedAt: stop.updatedAt,
+        expectedPrivateUpdatedAt: stop.privateDataUpdatedAt,
+      }),
     })
     if (!res.ok) throw new Error('patch failed')
     const queued = wasQueuedOffline(res)
@@ -396,6 +434,12 @@ function StopCard({
           />
         </div>
       </div>
+      <CoHeadlineForm
+        rosterArtists={rosterArtists}
+        performingArtistIds={stop.performingArtistIds}
+        externalGuestNotes={stop.externalGuestNotes}
+        onSave={(data) => patchStop(data).then(() => toast.success(t('tour_planner_saved'))).catch(() => toast.error(t('tour_planner_error')))}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Dialog open={open === 'day'} onOpenChange={(v) => setOpen(v ? 'day' : null)}>
           <DialogTrigger asChild>

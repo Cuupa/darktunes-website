@@ -70,12 +70,13 @@ export async function getTourMerchItemsByArtistId(db: DbClient, artistId: string
 export async function getTourMerchSettlementByStopId(
   db: DbClient,
   stopId: string,
+  artistId?: string,
 ): Promise<TourMerchSettlementRecord | null> {
-  const { data, error } = await db
-    .from('tour_merch_settlements')
-    .select('*')
-    .eq('stop_id', stopId)
-    .maybeSingle()
+  let query = db.from('tour_merch_settlements').select('*').eq('stop_id', stopId)
+  if (artistId) {
+    query = query.eq('artist_id', artistId)
+  }
+  const { data, error } = await query.maybeSingle()
   if (error) throw new Error(error.message)
   return data ? rowToMerchSettlement(data) : null
 }
@@ -90,7 +91,7 @@ export async function upsertTourMerchSettlement(
     .from('tour_merch_settlements')
     .upsert(
       { stop_id: stopId, artist_id: artistId, settlement: settlement as unknown as Database['public']['Tables']['tour_merch_settlements']['Insert']['settlement'] },
-      { onConflict: 'stop_id' },
+      { onConflict: 'stop_id,artist_id' },
     )
     .select('*')
     .single()

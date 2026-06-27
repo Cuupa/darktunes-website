@@ -5,6 +5,11 @@ import type { TourPlannerSettings } from '@/lib/tour-planner/types'
 import { DEFAULT_TOUR_PLANNER_SETTINGS } from '@/lib/tour-planner/types'
 import type { RouteResult, TechDocument, TourBudget } from '@/lib/tour-planner/types'
 import { EMPTY_TOUR_BUDGET } from '@/lib/tour-planner/types'
+import { getCollaboratorTourIds, getTourCollaborators } from '@/lib/api/tourCollaborators'
+import { getTourArtistFinance, upsertTourArtistFinance } from '@/lib/api/tourArtistFinance'
+import { getPerformingArtistIdsByStopIds } from '@/lib/api/tourStopPerformingArtists'
+import { getStopPrivateData } from '@/lib/api/tourStopPrivate'
+import type { TourAccessRole } from '@/lib/api/tourAccess'
 
 type DbClient = SupabaseClient<Database>
 type TourRow = Database['public']['Tables']['tours']['Row']
@@ -47,21 +52,81 @@ function rowToTour(row: TourRow): Tour {
   }
 }
 
+async function enrichTourForViewer(
+  db: DbClient,
+  tour: Tour,
+  viewingArtistId: string,
+  accessRole: TourAccessRole,
+): Promise<Tour> {
+  const collaborators = await getTourCollaborators(db, tour.id)
+  let ownerArtistName: string | null = null
+  if (accessRole === 'collaborator') {
+    const { data } = await db.from('artists').select('name').eq('id', tour.artistId).maybeSingle()
+    ownerArtistName = data?.name ?? null
+  }
+
+  const finance = await getTourArtistFinance(db, tour.id, viewingArtistId)
+  const isOwner = tour.artistId === viewingArtistId
+
+  return {
+    ...tour,
+    budget: finance?.budget ?? (isOwner ? tour.budget : null),
+    totalBudget: finance?.totalBudget ?? (isOwner ? tour.totalBudget : null),
+    currency: finance?.currency ?? tour.currency,
+    accessRole,
+    collaborators: collaborators.map((c) => ({
+      artistId: c.artistId,
+      artistName: c.artistName,
+      artistSlug: c.artistSlug,
+    })),
+    ownerArtistName,
+  }
+}
+
 export async function getToursByArtistId(db: DbClient, artistId: string, includeArchived = false): Promise<Tour[]> {
-  let query = db
+  const collaboratorTourIds = await getCollaboratorTourIds(db, artistId)
+
+  let ownedQuery = db
     .from('tours')
     .select('*')
     .eq('artist_id', artistId)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false })
 
   if (!includeArchived) {
-    query = query.eq('archived', false)
+    ownedQuery = ownedQuery.eq('archived', false)
   }
 
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToTour)
+  const { data: owned, error: ownedError } = await ownedQuery
+  if (ownedError) throw new Error(ownedError.message)
+
+  let collaboratorRows: TourRow[] = []
+  if (collaboratorTourIds.length > 0) {
+    let collabQuery = db.from('tours').select('*').in('id', collaboratorTourIds)
+    if (!includeArchived) {
+      collabQuery = collabQuery.eq('archived', false)
+    }
+    const { data, error } = await collabQuery
+    if (error) throw new Error(error.message)
+    collaboratorRows = data ?? []
+  }
+
+  const merged = new Map<string, TourRow>()
+  for (const row of owned ?? []) merged.set(row.id, row)
+  for (const row of collaboratorRows) merged.set(row.id, row)
+
+  const tours = [...merged.values()]
+    .map(rowToTour)
+    .sort((a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt))
+
+  return Promise.all(
+    tours.map((tour) =>
+      enrichTourForViewer(
+        db,
+        tour,
+        artistId,
+        tour.artistId === artistId ? 'owner' : 'collaborator',
+      ),
+    ),
+  )
 }
 
 export async function getTourById(db: DbClient, tourId: string): Promise<Tour | null> {
@@ -116,8 +181,20 @@ export async function duplicateTour(db: DbClient, tourId: string, userId: string
 
   if (stopsError) throw new Error(stopsError.message)
 
+  const ownerFinance = await getTourArtistFinance(db, tourId, source.artistId)
+  if (ownerFinance) {
+    await upsertTourArtistFinance(db, copy.id, source.artistId, {
+      budget: ownerFinance.budget,
+      totalBudget: ownerFinance.totalBudget,
+      currency: ownerFinance.currency,
+    })
+  }
+
   if (stops?.length) {
-    const { error: insertError } = await db.from('tour_stops').insert(
+    const stopIds = stops.map((s) => s.id)
+    const performingMap = await getPerformingArtistIdsByStopIds(db, stopIds)
+
+    const { data: inserted, error: insertError } = await db.from('tour_stops').insert(
       stops.map((stop) => ({
         tour_id: copy.id,
         artist_id: stop.artist_id,
@@ -141,8 +218,6 @@ export async function duplicateTour(db: DbClient, tourId: string, userId: string
         arrival_time: stop.arrival_time,
         show_status: stop.show_status,
         day_schedule: stop.day_schedule,
-        deal: stop.deal,
-        settlement: stop.settlement,
         per_diems: stop.per_diems,
         rooming: stop.rooming,
         travel_manifest: stop.travel_manifest,
@@ -150,10 +225,35 @@ export async function duplicateTour(db: DbClient, tourId: string, userId: string
         venue_contact_info: stop.venue_contact_info,
         guest_list: stop.guest_list,
         guest_list_limit: stop.guest_list_limit,
-        notes: stop.notes,
+        external_guest_notes: stop.external_guest_notes,
       })),
-    )
+    ).select('id, sort_order')
     if (insertError) throw new Error(insertError.message)
+
+    for (let i = 0; i < (inserted ?? []).length; i++) {
+      const sourceStop = stops[i]
+      const newStop = inserted![i]
+      const performingIds = performingMap.get(sourceStop.id) ?? []
+      if (performingIds.length > 0) {
+        const { error } = await db.from('tour_stop_performing_artists').insert(
+          performingIds.map((artistId) => ({ stop_id: newStop.id, artist_id: artistId })),
+        )
+        if (error) throw new Error(error.message)
+      }
+
+      const privateData = await getStopPrivateData(db, sourceStop.id, source.artistId)
+      if (privateData) {
+        const { error } = await db.from('tour_stop_artist_private').insert({
+          stop_id: newStop.id,
+          artist_id: source.artistId,
+          deal: privateData.deal as Json,
+          settlement: privateData.settlement as Json,
+          private_notes: privateData.privateNotes,
+          version: 1,
+        })
+        if (error) throw new Error(error.message)
+      }
+    }
   }
 
   return copy
