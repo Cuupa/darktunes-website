@@ -101,8 +101,11 @@ export async function middleware(request: NextRequest) {
     isLoginPage && request.nextUrl.searchParams.get('type') === 'recovery'
 
   // Recovery links must apply to the emailed account — never a stale browser session.
+  // Only sign out when a fresh ?code= is present (pre-exchange). After server callback
+  // redirects here without a code, the new recovery session must be kept.
   if (isPasswordRecoveryLogin) {
-    if (user) {
+    const hasRecoveryCode = request.nextUrl.searchParams.has('code')
+    if (user && hasRecoveryCode) {
       await supabase.auth.signOut()
     }
     return supabaseResponse

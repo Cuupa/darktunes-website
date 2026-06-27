@@ -49,10 +49,17 @@ export function CentralLoginForm() {
   useEffect(() => {
     if (view !== 'recovery') return
 
+    // Legacy emails pointed at /login?type=recovery&code=… — exchange server-side.
+    if (recoveryCode) {
+      const params = new URLSearchParams({ recovery: '1', code: recoveryCode })
+      window.location.replace(`/auth/callback?${params}`)
+      return
+    }
+
     const supabase = createBrowserSupabaseClient()
     let cancelled = false
-    let codeExchangeSucceeded = false
     let hashFallbackTimer: number | undefined
+    const trustInitialSession = true
 
     const markReady = () => {
       if (cancelled) return
@@ -67,7 +74,7 @@ export function CentralLoginForm() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || cancelled) return
-      if (isRecoverySessionEvent(event, { codeExchangeSucceeded })) {
+      if (isRecoverySessionEvent(event, { codeExchangeSucceeded: false, trustInitialSession })) {
         markReady()
       }
     })
@@ -76,29 +83,38 @@ export function CentralLoginForm() {
       setSessionReady(false)
       setRecoveryError(null)
 
-      // Clear any existing session so the reset link applies to the emailed account.
-      await supabase.auth.signOut({ scope: 'local' })
+      const hasHashTokens =
+        window.location.hash.includes('access_token') ||
+        window.location.hash.includes('type=recovery')
 
-      if (recoveryCode) {
-        const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode)
-        if (error) {
-          fail()
-          return
-        }
-        codeExchangeSucceeded = true
+      if (hasHashTokens) {
+        // Let Supabase parse the hash — do not sign out first.
+        hashFallbackTimer = window.setTimeout(() => {
+          if (cancelled) return
+          void supabase.auth.getSession().then(({ data: { session } }) => {
+            if (cancelled) return
+            if (session) markReady()
+            else fail()
+          })
+        }, 2000)
+        return
+      }
+
+      // Session already established by /auth/callback server exchange.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
         markReady()
         return
       }
 
-      // Hash-based recovery: give Supabase time to parse #access_token after sign-out.
       hashFallbackTimer = window.setTimeout(() => {
         if (cancelled) return
-        void supabase.auth.getSession().then(({ data: { session } }) => {
+        void supabase.auth.getSession().then(({ data: { session: retrySession } }) => {
           if (cancelled) return
-          if (session) markReady()
+          if (retrySession) markReady()
           else fail()
         })
-      }, 500)
+      }, 2000)
     })()
 
     return () => {

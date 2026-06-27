@@ -62,7 +62,7 @@ describe('requestPasswordReset', () => {
 
     expect(result).toEqual({ sent: true, channel: 'supabase_fallback' })
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
-      redirectTo: 'https://darktunes.com/login?type=recovery',
+      redirectTo: 'https://darktunes.com/auth/callback?recovery=1',
     })
     expect(mockGenerateLink).not.toHaveBeenCalled()
   })
@@ -90,7 +90,7 @@ describe('requestPasswordReset', () => {
     expect(mockGenerateLink).toHaveBeenCalledWith({
       type: 'recovery',
       email: 'user@example.com',
-      options: { redirectTo: 'https://darktunes.com/login?type=recovery' },
+      options: { redirectTo: 'https://darktunes.com/auth/callback?recovery=1' },
     })
     expect(mockSendPasswordResetEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -125,7 +125,7 @@ describe('requestPasswordReset', () => {
 
     expect(result).toEqual({ sent: true, channel: 'supabase_fallback' })
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', {
-      redirectTo: 'https://darktunes.com/login?type=recovery',
+      redirectTo: 'https://darktunes.com/auth/callback?recovery=1',
     })
   })
 })

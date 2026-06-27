@@ -7,16 +7,27 @@ import type { UserRole } from '@/types/users'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const isRecovery = searchParams.get('recovery') === '1'
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`)
+    const missingTarget = isRecovery
+      ? `${origin}/login?type=recovery&error=missing_code`
+      : `${origin}/login?error=missing_code`
+    return NextResponse.redirect(missingTarget)
   }
 
   const supabase = await createServerSupabaseClient()
   const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
 
   if (sessionError) {
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    const failedTarget = isRecovery
+      ? `${origin}/login?type=recovery&error=auth_failed`
+      : `${origin}/login?error=auth_failed`
+    return NextResponse.redirect(failedTarget)
+  }
+
+  if (isRecovery) {
+    return NextResponse.redirect(`${origin}/login?type=recovery`)
   }
 
   // Fetch the user's role from the profiles table to decide where to redirect.

@@ -25,7 +25,7 @@ describe('resolveRedirectPath', () => {
 describe('getPasswordRecoveryRedirectUrl', () => {
   it('builds recovery URL without trailing slash', () => {
     expect(getPasswordRecoveryRedirectUrl('https://darktunes.com/')).toBe(
-      'https://darktunes.com/login?type=recovery',
+      'https://darktunes.com/auth/callback?recovery=1',
     )
   })
 })

@@ -24,5 +24,5 @@ export function getPasswordRecoveryRedirectUrl(siteUrl?: string): string {
     /\/$/,
     '',
   )
-  return `${base}/login?type=recovery`
+  return `${base}/auth/callback?recovery=1`
 }
