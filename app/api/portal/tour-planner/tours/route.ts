@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler } from '@/lib/errors'
 import { createTour, getToursByArtistId } from '@/lib/api/tours'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 import { DEFAULT_TOUR_PLANNER_SETTINGS } from '@/lib/tour-planner/types'
 
 const createSchema = z.object({
@@ -16,7 +16,7 @@ const createSchema = z.object({
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const includeArchived = req.nextUrl.searchParams.get('includeArchived') === 'true'
   const tours = await getToursByArtistId(supabase, artist.id, includeArchived)
   return NextResponse.json({ tours })
@@ -24,7 +24,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist, user } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
 
   const tour = await createTour(supabase, {

@@ -29,11 +29,12 @@ export function useTourPlannerStops(artistId: string, tourId: string | null) {
   })
 }
 
-export function useTourPlannerTasks(artistId: string) {
+export function useTourPlannerTasks(artistId: string, tourId: string | null) {
   return useQuery({
-    queryKey: tourPlannerKeys.tasks(artistId),
+    queryKey: tourPlannerKeys.tasks(artistId, tourId),
+    enabled: Boolean(tourId),
     queryFn: async () => {
-      const res = await tourPlannerFetch(artistId, '/tasks')
+      const res = await tourPlannerFetch(artistId, `/tasks?tourId=${tourId}`)
       const json = await parseTourPlannerJson<{ tasks: TourTask[] }>(res)
       return json.tasks
     },

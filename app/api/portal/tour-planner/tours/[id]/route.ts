@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTour, duplicateTour, getTourById, updateTour } from '@/lib/api/tours'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -29,7 +29,7 @@ function tourIdFromPath(pathname: string): string {
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = tourIdFromPath(req.nextUrl.pathname)
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist, user } = await authenticateTourPlannerRequest(req, artistId)
   const body = updateSchema.parse(await req.json())
 
   const existing = await getTourById(supabase, id)
@@ -62,7 +62,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const id = tourIdFromPath(req.nextUrl.pathname)
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
 
   const existing = await getTourById(supabase, id)
   if (!existing || existing.artistId !== artist.id) {

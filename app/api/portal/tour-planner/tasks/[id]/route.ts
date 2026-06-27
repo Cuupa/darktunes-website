@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTourTask, updateTourTask } from '@/lib/api/tourTasks'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const schema = z.object({ completed: z.boolean() })
 
@@ -14,7 +14,7 @@ function taskId(pathname: string): string {
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
   const { data, error } = await supabase.from('tour_tasks').select('artist_id').eq('id', taskId(req.nextUrl.pathname)).single()
   if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Task not found')
@@ -24,7 +24,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = taskId(req.nextUrl.pathname)
 
   const { data, error } = await supabase.from('tour_tasks').select('artist_id').eq('id', id).single()

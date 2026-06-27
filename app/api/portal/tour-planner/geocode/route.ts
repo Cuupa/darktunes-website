@@ -1,42 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withErrorHandler } from '@/lib/errors'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { getTourById } from '@/lib/api/tours'
+import { authenticateTourPlannerRequest, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
+import { geocodeAddress } from '@/lib/tour-planner/geocoding'
 
 const schema = z.object({
   query: z.string().min(1),
+  tourId: z.string().uuid().optional(),
 })
-
-const NOMINATIM_USER_AGENT = process.env.NOMINATIM_USER_AGENT ?? 'darktunes-tour-planner/1.0'
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
 
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(body.query)}&format=json&limit=1`
-  const response = await fetch(url, {
-    headers: { 'User-Agent': NOMINATIM_USER_AGENT },
-    next: { revalidate: 86400 },
-  })
+  let provider: 'nominatim' | 'google' = 'nominatim'
+  let apiKey: string | undefined
 
-  if (!response.ok) {
-    return NextResponse.json({ coords: null, error: 'Geocoding service unavailable' })
+  if (body.tourId) {
+    const tour = await getTourById(supabase, body.tourId)
+    if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+    provider = tour.settings.apiProvider
+    apiKey = resolveGoogleMapsApiKey(tour.settings)
   }
 
-  const results = (await response.json()) as Array<{
-    lat: string
-    lon: string
-    display_name: string
-  }>
+  const parts = body.query.split(',').map((p) => p.trim())
+  const country = parts.pop() ?? ''
+  const city = parts.pop() ?? ''
+  const address = parts.join(', ')
 
-  if (!results.length) {
-    return NextResponse.json({ coords: null, error: 'Address not found' })
+  const result = await geocodeAddress(address, city, country, provider, apiKey)
+  if (result.error || !result.coords) {
+    return NextResponse.json({ coords: null, error: result.error ?? 'Address not found' })
   }
 
-  const [first] = results
   return NextResponse.json({
-    coords: { lat: Number(first.lat), lon: Number(first.lon) },
-    displayName: first.display_name,
+    coords: { lat: result.coords.lat, lon: result.coords.lon },
+    displayName: result.displayName,
   })
 })

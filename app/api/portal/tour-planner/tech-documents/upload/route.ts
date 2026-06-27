@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { getTourById } from '@/lib/api/tours'
 import { createR2Client } from '@/lib/r2Utils'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -34,7 +35,7 @@ async function uploadPdfToR2(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
 
   const formData = await req.formData()
   const file = formData.get('file')
@@ -50,6 +51,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     file.name.toLowerCase().endsWith('.pdf')
 
   if (!isPdf) throw new ApiError(415, 'Only PDF files are allowed')
+
+  const tour = await getTourById(supabase, tourId)
+  if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
 
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(

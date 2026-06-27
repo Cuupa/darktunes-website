@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { createTourTask, getTourTasksByArtistId } from '@/lib/api/tourTasks'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -15,14 +15,15 @@ const createSchema = z.object({
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
-  const tasks = await getTourTasksByArtistId(supabase, artist.id)
+  const tourId = req.nextUrl.searchParams.get('tourId')
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
+  const tasks = await getTourTasksByArtistId(supabase, artist.id, tourId)
   return NextResponse.json({ tasks })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
   const task = await createTourTask(supabase, {
     artist_id: artist.id,

@@ -2,6 +2,9 @@
   "nav": {
     "labelIntelligence": "Label Intelligence"
   },
+  "tour_planner_page_title": "Tour Planner",
+  "tour_planner_page_desc": "Read-only overview of artist tour production data.",
+  "tour_planner_loading": "Loading…",
   "tour_planner_heading": "Tour Planner",
   "tour_planner_readonly_desc": "Read-only view of artist tour production data. Artists manage tours in the portal.",
   "tour_planner_artist": "Artist",
@@ -20,6 +23,11 @@
   "tour_planner_no": "No",
   "tour_planner_no_stops": "No stops on this tour.",
   "tour_planner_travel_day": "travel",
+  "tour_planner_show_status_option": "Option",
+  "tour_planner_show_status_confirmed": "Confirmed",
+  "tour_planner_show_status_contract_sent": "Contract sent",
+  "tour_planner_show_status_deposit_paid": "Deposit paid",
+  "tour_planner_show_status_cancelled": "Cancelled",
   "labelIntelligence": {
     "pageTitle": "Label Intelligence",
     "pageDescription": "Persisted label-wide revenue trends, roster health, press engagement, and financial audit trail.",

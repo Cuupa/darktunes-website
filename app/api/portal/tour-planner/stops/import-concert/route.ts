@@ -5,7 +5,7 @@ import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getTourById } from '@/lib/api/tours'
 import { getTourStopsByTourId } from '@/lib/api/tourStops'
 import { importConcertToTourStop } from '@/lib/api/tourConcertBridge'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const schema = z.object({
   tourId: z.string().uuid(),
@@ -14,7 +14,7 @@ const schema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = schema.parse(await req.json())
 
   const tour = await getTourById(supabase, body.tourId)

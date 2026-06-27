@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTourContact, updateTourContact } from '@/lib/api/tourContacts'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -21,7 +21,7 @@ function contactId(pathname: string): string {
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = contactId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
@@ -41,7 +41,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = contactId(req.nextUrl.pathname)
 
   const { data, error } = await supabase.from('tour_contacts').select('artist_id').eq('id', id).single()

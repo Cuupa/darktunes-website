@@ -8,6 +8,8 @@ import { MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react
 export interface MapLegendLabels {
   title: string
   reset: string
+  zoomIn: string
+  zoomOut: string
   start: string
   hotel: string
   venue: string
@@ -216,11 +218,11 @@ export function MapVisualization({ stops, route, labels, onMapImageReady }: MapV
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">{labels.title}</h3>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleZoomIn}>
-            <MagnifyingGlassPlus size={16} />
+          <Button size="sm" variant="outline" onClick={handleZoomIn} aria-label={labels.zoomIn}>
+            <MagnifyingGlassPlus size={16} aria-hidden />
           </Button>
-          <Button size="sm" variant="outline" onClick={handleZoomOut}>
-            <MagnifyingGlassMinus size={16} />
+          <Button size="sm" variant="outline" onClick={handleZoomOut} aria-label={labels.zoomOut}>
+            <MagnifyingGlassMinus size={16} aria-hidden />
           </Button>
           <Button size="sm" variant="outline" onClick={handleReset}>
             {labels.reset}

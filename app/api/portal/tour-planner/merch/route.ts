@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler } from '@/lib/errors'
 import { createTourMerchItem, getTourMerchItemsByArtistId } from '@/lib/api/tourMerch'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const variantSchema = z.object({
   id: z.string(),
@@ -23,14 +23,14 @@ const createSchema = z.object({
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const items = await getTourMerchItemsByArtistId(supabase, artist.id)
   return NextResponse.json({ items })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
   const item = await createTourMerchItem(supabase, {
     artist_id: artist.id,

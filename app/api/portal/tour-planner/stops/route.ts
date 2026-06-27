@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createTourStop, getTourStopsByTourId, reorderTourStops } from '@/lib/api/tourStops'
 import { getTourById } from '@/lib/api/tours'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { showStatusSchema } from '@/lib/tour-planner/validation'
 
 const createSchema = z.object({
   tourId: z.string().uuid(),
@@ -15,7 +16,7 @@ const createSchema = z.object({
   venueCountry: z.string().nullable().optional(),
   venueLat: z.number().nullable().optional(),
   venueLng: z.number().nullable().optional(),
-  showStatus: z.string().optional(),
+  showStatus: showStatusSchema.optional(),
   sortOrder: z.number().optional(),
 })
 
@@ -29,7 +30,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const tourId = req.nextUrl.searchParams.get('tourId')
   if (!tourId) throw new ApiError(400, 'tourId is required')
 
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const tour = await getTourById(supabase, tourId)
   if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
 
@@ -39,13 +40,21 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const raw = await req.json()
 
   if (raw.orderedStopIds) {
     const body = reorderSchema.parse(raw)
     const tour = await getTourById(supabase, body.tourId)
     if (!tour || tour.artistId !== artist.id) throw new ApiError(404, 'Tour not found')
+    const existing = await getTourStopsByTourId(supabase, body.tourId)
+    const existingIds = new Set(existing.map((stop) => stop.id))
+    if (
+      body.orderedStopIds.length !== existing.length
+      || !body.orderedStopIds.every((id) => existingIds.has(id))
+    ) {
+      throw new ApiError(400, 'Invalid stop order')
+    }
     const stops = await reorderTourStops(supabase, body.tourId, body.orderedStopIds)
     return NextResponse.json({ stops })
   }

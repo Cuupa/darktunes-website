@@ -46,6 +46,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     artistProfile,
     statementCount,
     assetCount,
+    tourCount,
     statements,
     promoImpacts,
     settlementSummary,
@@ -69,13 +70,20 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
             .eq('artist_id', artist.id),
         ),
         countAssetsByArtist(supabase, artist.id).catch(() => 0),
+        safeHeadCount(
+          supabase
+            .from('tours')
+            .select('id', { count: 'exact', head: true })
+            .eq('artist_id', artist.id)
+            .eq('archived', false),
+        ),
         getSalesStatementsByArtistId(supabase, artist.id).catch(() => []),
         getPromoImpactByArtistId(supabase, artist.id).catch(() => []),
         statementsEnabled
           ? getArtistSettlementSummary(supabase, artist.id).catch(() => null)
           : Promise.resolve(null),
       ])
-    : [[], [], [], 0, null, 0, 0, [], [], null]
+    : [[], [], [], 0, null, 0, 0, 0, [], [], null]
 
   const aggregates = getAggregatedStreamsByPlatform(stats)
   const totalStreams = aggregates.reduce((sum, p) => sum + p.totalStreams, 0)
@@ -102,6 +110,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       openChecklistCount={openChecklistCount}
       statementCount={statementCount}
       assetCount={assetCount}
+      tourCount={tourCount}
       featureFlags={featureFlags}
       completionScore={completionScore}
       missingFields={missingFields}

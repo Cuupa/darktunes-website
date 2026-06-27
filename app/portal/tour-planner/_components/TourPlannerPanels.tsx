@@ -215,6 +215,7 @@ function StopsPanel({
         <StopCard
           key={stop.id}
           artistId={artistId}
+          tourId={tourId}
           stop={stop}
           index={index}
           total={stops.length}
@@ -234,6 +235,7 @@ function StopsPanel({
 
 function StopCard({
   artistId,
+  tourId,
   stop,
   index,
   total,
@@ -247,6 +249,7 @@ function StopCard({
   onUpdated,
 }: {
   artistId: string
+  tourId: string | null
   stop: TourStop
   index: number
   total: number
@@ -281,14 +284,16 @@ function StopCard({
   }
 
   const publishOrSync = () => {
-    const body = stop.concertId ? { syncConcert: true } : { publishConcert: true }
+    const syncing = Boolean(stop.concertId)
+    const body = syncing ? { syncConcert: true } : { publishConcert: true }
     patchStop(body)
-      .then(() => toast.success(t('tour_planner_published')))
+      .then(() => toast.success(syncing ? t('tour_planner_synced') : t('tour_planner_published')))
       .catch(() => toast.error(t('tour_planner_error')))
   }
 
   const geocodeVenue = async () => {
-    const c = await geocodeStopVenue(artistId, stop)
+    if (!tourId) return
+    const c = await geocodeStopVenue(artistId, tourId, stop)
     if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
     patchStop({ venueLat: c.lat, venueLng: c.lng, venueValidated: true })
       .then(() => toast.success(t('tour_planner_geocode_ok')))
@@ -296,7 +301,8 @@ function StopCard({
   }
 
   const geocodeHotel = async () => {
-    const c = await geocodeStopHotel(artistId, stop)
+    if (!tourId) return
+    const c = await geocodeStopHotel(artistId, tourId, stop)
     if (!c) { toast.error(t('tour_planner_geocode_fail')); return }
     patchStop({ hotelLat: c.lat, hotelLng: c.lng, hotelValidated: true })
       .then(() => toast.success(t('tour_planner_geocode_ok')))
@@ -516,7 +522,8 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
   const qc = useQueryClient()
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const { data: tasks = [] } = useTourPlannerTasks(artistId)
+  const { data: tasks = [] } = useTourPlannerTasks(artistId, tourId)
+
   const create = useMutation({
     mutationFn: async () => {
       const res = await tourPlannerFetch(artistId, '/tasks', {
@@ -527,10 +534,11 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
       return wasQueuedOffline(res)
     },
     onSuccess: (offline) => {
-      void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId) })
+      void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId, tourId) })
       setTitle('')
       setDueDate('')
       if (offline) toast.success(t('tour_planner_saved_offline'))
+      else toast.success(t('tour_planner_task_created'))
     },
   })
 
@@ -540,15 +548,17 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
       body: JSON.stringify({ completed: !completed }),
     })
     if (!res.ok) throw new Error('toggle task')
-    void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId) })
+    void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId, tourId) })
   }
 
   const deleteTask = async (taskId: string) => {
     const res = await tourPlannerFetch(artistId, `/tasks/${taskId}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('delete task')
-    void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId) })
+    void qc.invalidateQueries({ queryKey: tourPlannerKeys.tasks(artistId, tourId) })
     toast.success(wasQueuedOffline(res) ? t('tour_planner_saved_offline') : t('tour_planner_task_deleted'))
   }
+
+  if (!tourId) return <p className="text-sm text-muted-foreground">{t('tour_planner_select_tour_first')}</p>
 
   return (
     <div className="space-y-4">

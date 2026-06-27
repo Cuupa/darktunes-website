@@ -15,7 +15,6 @@ import { useTourPlannerCrew, useTourPlannerMerch } from '@/lib/tour-planner/hook
 import { tourPlannerKeys } from '@/lib/tour-planner/keys'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import {
-  downloadDaySheetPdf,
   downloadMerchSettlementPdf,
   downloadSettlementPdf,
   type TourPlannerPdfLabels,
@@ -42,7 +41,7 @@ import type {
   VenueDetails,
 } from '@/lib/tour-planner/types'
 import { EMPTY_TOUR_BUDGET } from '@/lib/tour-planner/types'
-import type { Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
+import type { Concert, Tour, TourCrewMember, TourMerchItem, TourStop } from '@/types'
 import { MapVisualization } from './MapVisualization'
 import { BudgetForm, TechDocumentsForm } from './TourPlannerProductionForms'
 
@@ -160,6 +159,8 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
           labels={{
             title: t('tour_planner_map_title'),
             reset: t('tour_planner_map_reset'),
+            zoomIn: t('tour_planner_map_zoom_in'),
+            zoomOut: t('tour_planner_map_zoom_out'),
             start: t('tour_planner_map_start'),
             hotel: t('tour_planner_hotel_name'),
             venue: t('tour_planner_stop_venue'),
@@ -279,6 +280,7 @@ export function MerchPanel({ artistId }: { artistId: string }) {
   const [basePrice, setBasePrice] = useState(0)
   const [category, setCategory] = useState<'soft' | 'hard'>('soft')
   const [variantValue, setVariantValue] = useState('')
+  const [variantDrafts, setVariantDrafts] = useState<Record<string, string>>({})
   const { data: items = [] } = useTourPlannerMerch(artistId)
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: tourPlannerKeys.merch(artistId) })
@@ -302,6 +304,7 @@ export function MerchPanel({ artistId }: { artistId: string }) {
       setBasePrice(0)
       setVariantValue('')
       if (offline) toast.success(t('tour_planner_saved_offline'))
+      else toast.success(t('tour_planner_merch_added'))
     },
   })
 
@@ -354,15 +357,28 @@ export function MerchPanel({ artistId }: { artistId: string }) {
               <p className="text-muted-foreground">{t('tour_planner_variants')}: {item.variants.map((v) => v.value).join(', ')}</p>
             )}
             <div className="flex gap-2">
-              <Input placeholder={t('tour_planner_variant')} id={`variant-${item.id}`} onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  addVariant(item, (e.target as HTMLInputElement).value).then(() => { (e.target as HTMLInputElement).value = '' })
-                }
-              }} />
-              <Button variant="outline" size="sm" onClick={(e) => {
-                const input = (e.currentTarget.previousElementSibling as HTMLInputElement | null)
-                if (input) addVariant(item, input.value).then(() => { input.value = '' })
-              }}>{t('tour_planner_add_variant')}</Button>
+              <Input
+                placeholder={t('tour_planner_variant')}
+                id={`variant-${item.id}`}
+                value={variantDrafts[item.id] ?? ''}
+                onChange={(e) => setVariantDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const value = variantDrafts[item.id] ?? ''
+                    addVariant(item, value).then(() => setVariantDrafts((prev) => ({ ...prev, [item.id]: '' })))
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const value = variantDrafts[item.id] ?? ''
+                  addVariant(item, value).then(() => setVariantDrafts((prev) => ({ ...prev, [item.id]: '' })))
+                }}
+              >
+                {t('tour_planner_add_variant')}
+              </Button>
             </div>
           </li>
         ))}
@@ -434,6 +450,7 @@ export function MerchSettlementForm({
       return
     }
     if (wasQueuedOffline(res)) toast.success(t('tour_planner_saved_offline'))
+    else toast.success(t('tour_planner_saved'))
     onSaved()
   }
 
@@ -618,7 +635,7 @@ export function ImportPanel({
 }: {
   artistId: string
   tourId: string | null
-  concerts: import('@/types').Concert[]
+  concerts: Concert[]
   stops: TourStop[]
   onImported: () => void
 }) {
@@ -713,22 +730,42 @@ export function ImportPanel({
 
 export function GuestListForm({ list, onSave }: { list: GuestListEntry[]; onSave: (l: GuestListEntry[]) => void }) {
   const t = useTranslations('portal')
+  const [draft, setDraft] = useState<GuestListEntry[]>(list)
   const [name, setName] = useState('')
   const [guests, setGuests] = useState(1)
+
   const add = () => {
     if (!name) return
-    onSave([...list, { id: crypto.randomUUID(), name, showId: '', numberOfGuests: guests }])
+    setDraft([...draft, { id: crypto.randomUUID(), name, showId: '', numberOfGuests: guests }])
     setName('')
     setGuests(1)
   }
+
   return (
     <div className="space-y-3">
+      <ul className="text-sm space-y-2 divide-y divide-border">
+        {draft.map((g) => (
+          <li key={g.id} className="flex items-center justify-between gap-2 pt-2">
+            <span>{g.name} ({g.numberOfGuests})</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('tour_planner_remove')}
+              onClick={() => setDraft(draft.filter((x) => x.id !== g.id))}
+            >
+              <Trash size={14} aria-hidden />
+            </Button>
+          </li>
+        ))}
+      </ul>
       <div className="flex gap-2">
         <Input placeholder={t('tour_planner_guest_name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input type="number" min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} aria-label={t('tour_planner_guest_count')} />
-        <Button onClick={add}>{t('tour_planner_add_guest')}</Button>
       </div>
-      <ul className="text-sm space-y-1">{list.map((g) => <li key={g.id}>{g.name} ({g.numberOfGuests})</li>)}</ul>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={add}>{t('tour_planner_add_guest')}</Button>
+        <Button onClick={() => onSave(draft)}>{t('tour_planner_save')}</Button>
+      </div>
     </div>
   )
 }
@@ -1039,35 +1076,36 @@ export function SettingsPanel({
   )
 }
 
-async function geocodeQuery(artistId: string, query: string): Promise<{ lat: number; lng: number } | null> {
-  const res = await tourPlannerFetch(artistId, '/geocode', { method: 'POST', body: JSON.stringify({ query }) })
+async function geocodeQuery(
+  artistId: string,
+  query: string,
+  tourId: string,
+): Promise<{ lat: number; lng: number } | null> {
+  const res = await tourPlannerFetch(artistId, '/geocode', {
+    method: 'POST',
+    body: JSON.stringify({ query, tourId }),
+  })
   if (!res.ok) return null
   const json = (await res.json()) as { coords?: { lat: number; lon: number } }
   return json.coords ? { lat: json.coords.lat, lng: json.coords.lon } : null
 }
 
-export async function geocodeStopVenue(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
+export async function geocodeStopVenue(
+  artistId: string,
+  tourId: string,
+  stop: TourStop,
+): Promise<{ lat: number; lng: number } | null> {
   const q = [stop.venueAddress, stop.venueCity, stop.venueCountry].filter(Boolean).join(', ')
   if (!q) return null
-  return geocodeQuery(artistId, q)
+  return geocodeQuery(artistId, q, tourId)
 }
 
-export async function geocodeStopHotel(artistId: string, stop: TourStop): Promise<{ lat: number; lng: number } | null> {
+export async function geocodeStopHotel(
+  artistId: string,
+  tourId: string,
+  stop: TourStop,
+): Promise<{ lat: number; lng: number } | null> {
   const q = [stop.hotelAddress, stop.hotelCity, stop.hotelCountry].filter(Boolean).join(', ')
   if (!q) return null
-  return geocodeQuery(artistId, q)
-}
-
-export function DaySheetPdfButton({ stop }: { stop: TourStop }) {
-  const t = useTranslations('portal')
-  const pdfLabels = buildTourPlannerPdfLabels(t)
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => downloadDaySheetPdf(stop, stop.daySchedule ?? {}, pdfLabels)}
-    >
-      {t('tour_planner_pdf')}
-    </Button>
-  )
+  return geocodeQuery(artistId, q, tourId)
 }

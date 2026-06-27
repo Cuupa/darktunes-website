@@ -7,7 +7,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from '@/components/ui/avatar'
-import { User, ChartBar, FileText, MusicNotes, MapPin, MegaphoneSimple, ChatCircleText, ArrowRight } from '@phosphor-icons/react'
+import { User, ChartBar, FileText, MusicNotes, MapPin, MapTrifold, MegaphoneSimple, ChatCircleText, ArrowRight } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ interface PortalOverviewProps {
   openChecklistCount: number
   statementCount: number
   assetCount: number
+  tourCount: number
   featureFlags: Record<string, boolean>
   completionScore: number
   missingFields: CompletionField[]
@@ -40,6 +41,7 @@ export function PortalOverview({ artistName,
   openChecklistCount,
   statementCount,
   assetCount,
+  tourCount,
   featureFlags,
   completionScore,
   missingFields,
@@ -196,6 +198,23 @@ export function PortalOverview({ artistName,
             </CardContent>
           </Card>
         </Link>
+
+        {isEnabled('artist.tour_planner') && (
+          <Link href="/portal/tour-planner">
+            <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer glow-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t('tour_planner_nav')}
+                </CardTitle>
+                <MapTrifold size={18} className="text-primary" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{tourCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('overview_tourPlanner')}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         {isEnabled('artist.marketing') && (
           <Link href="/portal/marketing">

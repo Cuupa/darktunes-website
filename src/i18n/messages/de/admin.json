@@ -2,6 +2,9 @@
   "nav": {
     "labelIntelligence": "Label Intelligence"
   },
+  "tour_planner_page_title": "Tourplaner",
+  "tour_planner_page_desc": "Nur-Lese-Übersicht der Tour-Production-Daten der Künstler.",
+  "tour_planner_loading": "Laden…",
   "tour_planner_heading": "Tourplaner",
   "tour_planner_readonly_desc": "Nur-Lese-Ansicht der Tour-Production-Daten. Künstler verwalten Touren im Portal.",
   "tour_planner_artist": "Künstler",
@@ -20,6 +23,11 @@
   "tour_planner_no": "Nein",
   "tour_planner_no_stops": "Keine Stops auf dieser Tour.",
   "tour_planner_travel_day": "Reise",
+  "tour_planner_show_status_option": "Option",
+  "tour_planner_show_status_confirmed": "Bestätigt",
+  "tour_planner_show_status_contract_sent": "Vertrag gesendet",
+  "tour_planner_show_status_deposit_paid": "Anzahlung bezahlt",
+  "tour_planner_show_status_cancelled": "Abgesagt",
   "labelIntelligence": {
     "pageTitle": "Label Intelligence",
     "pageDescription": "Persistierte Label-weite Umsatztrends, Roster-Gesundheit, Press-Engagement und Finanz-Audit-Trail.",

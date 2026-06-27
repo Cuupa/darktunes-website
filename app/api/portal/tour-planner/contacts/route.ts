@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { createTourContact, getTourContactsByArtistId } from '@/lib/api/tourContacts'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -14,14 +14,14 @@ const createSchema = z.object({
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const contacts = await getTourContactsByArtistId(supabase, artist.id)
   return NextResponse.json({ contacts })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const body = createSchema.parse(await req.json())
   const contact = await createTourContact(supabase, {
     artist_id: artist.id,

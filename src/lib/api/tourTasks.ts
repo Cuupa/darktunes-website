@@ -25,12 +25,22 @@ function rowToTask(row: Row): TourTask {
   }
 }
 
-export async function getTourTasksByArtistId(db: DbClient, artistId: string): Promise<TourTask[]> {
-  const { data, error } = await db
+export async function getTourTasksByArtistId(
+  db: DbClient,
+  artistId: string,
+  tourId?: string | null,
+): Promise<TourTask[]> {
+  let query = db
     .from('tour_tasks')
     .select('*')
     .eq('artist_id', artistId)
     .order('due_date', { ascending: true })
+
+  if (tourId) {
+    query = query.eq('tour_id', tourId)
+  }
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToTask)
 }

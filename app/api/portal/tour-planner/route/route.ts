@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { getTourStopsByTourId } from '@/lib/api/tourStops'
 import { getTourById, updateTour } from '@/lib/api/tours'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest, resolveGoogleMapsApiKey } from '@/lib/portal/tourPlannerAuth'
 import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import { calculateTourRoute } from '@/lib/tour-planner/routing'
 import type { Json } from '@/types/database'
@@ -14,7 +14,7 @@ const schema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const { tourId } = schema.parse(await req.json())
 
   const tour = await getTourById(supabase, tourId)
@@ -33,7 +33,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     trackStops,
     startLocation,
     tour.settings.apiProvider,
-    process.env.GOOGLE_MAPS_API_KEY,
+    resolveGoogleMapsApiKey(tour.settings),
     tour.settings.vehicleType,
     tour.settings.planningMode,
   )

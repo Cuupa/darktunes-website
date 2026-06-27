@@ -4,7 +4,8 @@ import type { Json } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTourStop, getTourStopById, updateTourStop } from '@/lib/api/tourStops'
 import { publishTourStopAsConcert, syncLinkedConcertFromStop } from '@/lib/api/tourConcertBridge'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
+import { showStatusSchema } from '@/lib/tour-planner/validation'
 
 const updateSchema = z.object({
   stopDate: z.string().optional(),
@@ -24,7 +25,7 @@ const updateSchema = z.object({
   hotelLng: z.number().nullable().optional(),
   hotelValidated: z.boolean().optional(),
   arrivalTime: z.string().nullable().optional(),
-  showStatus: z.string().optional(),
+  showStatus: showStatusSchema.optional(),
   daySchedule: z.record(z.string(), z.unknown()).nullable().optional(),
   deal: z.record(z.string(), z.unknown()).nullable().optional(),
   settlement: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -50,7 +51,7 @@ function stopIdFromPath(pathname: string): string {
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = stopIdFromPath(req.nextUrl.pathname)
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist, user } = await authenticateTourPlannerRequest(req, artistId)
   const body = updateSchema.parse(await req.json())
 
   const existing = await getTourStopById(supabase, id)
@@ -103,7 +104,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const id = stopIdFromPath(req.nextUrl.pathname)
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
 
   const existing = await getTourStopById(supabase, id)
   if (!existing || existing.artistId !== artist.id) {

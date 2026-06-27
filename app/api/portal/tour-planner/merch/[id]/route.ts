@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Json } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { deleteTourMerchItem, updateTourMerchItem } from '@/lib/api/tourMerch'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { authenticateTourPlannerRequest } from '@/lib/portal/tourPlannerAuth'
 
 const patchSchema = z.object({
   sku: z.string().min(1).optional(),
@@ -27,7 +27,7 @@ function merchId(pathname: string): string {
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = merchId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
@@ -47,7 +47,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = merchId(req.nextUrl.pathname)
 
   const { data, error } = await supabase.from('tour_merch_items').select('artist_id').eq('id', id).single()

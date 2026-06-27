@@ -13,9 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import type { ShowStatus } from '@/lib/tour-planner/types'
 import type { Artist, Tour, TourStop } from '@/types'
 
 const NO_ARTIST = '__none__'
+
+const SHOW_STATUS_I18N: Record<ShowStatus, 'tour_planner_show_status_option' | 'tour_planner_show_status_confirmed' | 'tour_planner_show_status_contract_sent' | 'tour_planner_show_status_deposit_paid' | 'tour_planner_show_status_cancelled'> = {
+  option: 'tour_planner_show_status_option',
+  confirmed: 'tour_planner_show_status_confirmed',
+  'contract-sent': 'tour_planner_show_status_contract_sent',
+  'deposit-paid': 'tour_planner_show_status_deposit_paid',
+  cancelled: 'tour_planner_show_status_cancelled',
+}
 
 function mapStop(row: Record<string, unknown>): TourStop {
   return {
@@ -242,7 +251,7 @@ export function AdminTourPlannerView() {
                 <tr key={stop.id}>
                   <td className="px-4 py-2">{stop.stopDate}{stop.isTravelDay ? ` (${t('tour_planner_travel_day')})` : ''}</td>
                   <td className="px-4 py-2">{stop.venueName ?? '—'}{stop.venueCity ? `, ${stop.venueCity}` : ''}</td>
-                  <td className="px-4 py-2">{stop.showStatus}</td>
+                  <td className="px-4 py-2">{t(SHOW_STATUS_I18N[stop.showStatus])}</td>
                   <td className="px-4 py-2">{stop.concertId ? t('tour_planner_yes') : t('tour_planner_no')}</td>
                 </tr>
               ))}
