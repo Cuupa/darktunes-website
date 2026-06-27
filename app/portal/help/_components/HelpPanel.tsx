@@ -49,6 +49,7 @@ export function HelpPanel() {
     { title: t('help_epk_title'), body: t('help_epk_body') },
     { title: t('help_releases_title'), body: t('help_releases_body') },
     { title: t('help_events_title'), body: t('help_events_body') },
+    { title: t('help_tour_planner_title'), body: t('help_tour_planner_body') },
     { title: t('help_invoices_title'), body: t('help_invoices_body') },
     { title: t('help_statements_title'), body: t('help_statements_body') },
     { title: t('help_settings_title'), body: t('help_settings_body') },

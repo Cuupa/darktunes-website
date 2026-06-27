@@ -131,7 +131,7 @@ export function PWAInstallPrompt() {
             ) : (
               <>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Schneller Zugriff · Offline verfügbar
+                  Schneller Zugriff · Tourplaner offline nutzbar
                 </p>
                 <button
                   onClick={handleInstall}

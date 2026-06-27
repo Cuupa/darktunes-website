@@ -39,6 +39,12 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 
+# Local tour-planner PDF test exports
+day-sheet-*.pdf
+merch-settlement-*.pdf
+settlement-*.pdf
+terminals/
+
 # Serwist / Workbox generated service worker files
 public/sw.js
 public/sw.js.map

@@ -2,6 +2,32 @@
   "nav": {
     "labelIntelligence": "Label Intelligence"
   },
+  "tour_planner_page_title": "Tourplaner",
+  "tour_planner_page_desc": "Nur-Lese-Übersicht der Tour-Production-Daten der Künstler.",
+  "tour_planner_loading": "Laden…",
+  "tour_planner_heading": "Tourplaner",
+  "tour_planner_readonly_desc": "Nur-Lese-Ansicht der Tour-Production-Daten. Künstler verwalten Touren im Portal.",
+  "tour_planner_artist": "Künstler",
+  "tour_planner_select_artist": "Künstler auswählen",
+  "tour_planner_select_artist_hint": "Wähle einen Künstler, um Touren und Stops einzusehen.",
+  "tour_planner_tour": "Tour",
+  "tour_planner_no_tours": "Keine Touren für diesen Künstler.",
+  "tour_planner_archived": "archiviert",
+  "tour_planner_dates": "Daten",
+  "tour_planner_route": "Route",
+  "tour_planner_stop_date": "Datum",
+  "tour_planner_venue": "Venue",
+  "tour_planner_status": "Status",
+  "tour_planner_linked_event": "Verknüpftes Event",
+  "tour_planner_yes": "Ja",
+  "tour_planner_no": "Nein",
+  "tour_planner_no_stops": "Keine Stops auf dieser Tour.",
+  "tour_planner_travel_day": "Reise",
+  "tour_planner_show_status_option": "Option",
+  "tour_planner_show_status_confirmed": "Bestätigt",
+  "tour_planner_show_status_contract_sent": "Vertrag gesendet",
+  "tour_planner_show_status_deposit_paid": "Anzahlung bezahlt",
+  "tour_planner_show_status_cancelled": "Abgesagt",
   "labelIntelligence": {
     "pageTitle": "Label Intelligence",
     "pageDescription": "Persistierte Label-weite Umsatztrends, Roster-Gesundheit, Press-Engagement und Finanz-Audit-Trail.",
@@ -463,7 +489,8 @@
         "invoices": "Artist-Rechnungen und PDF-Erstellung.",
         "documents": "Privater Dokumententresor für Verträge und Rider.",
         "calendar": "Label-weiter Releasekalender mit persönlichem Filter.",
-        "epk_builder": "Canvas-EPK-Builder und Share-Links."
+        "epk_builder": "Canvas-EPK-Builder und Share-Links.",
+        "tour_planner": "TRACK-Tourplaner — Multi-Tour-Production, Day Sheets, Finance und Routing."
       },
       "journalist": {
         "accreditation": "Akkreditierungsanfragen im Press-Dashboard."

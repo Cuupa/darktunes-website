@@ -13,7 +13,42 @@
 
 **Billing & invoices:** `artist_billing_profiles` at `/portal/billing`. `isBillingProfileComplete()` required before PDF generation. `InlineBillingProfileStep` gates: `/portal/invoices` (`InvoiceForm`, `FreeInvoiceGenerator`), `/portal/analytics` (Earnings), `/portal/statements` (quick invoice). SOS-linked flow: `/portal/invoices?statement={id}` → `artist_invoice_number` + `sales_statements.status = 'invoiced'`.
 
-**Key routes:** profile, analytics (11 tabs + intelligence), statements, billing, invoices, releases, tour, calendar, marketing, documents, messages, interviews, epk-builder, onboarding, help.
+**Key routes:** profile, analytics (11 tabs + intelligence), statements, billing, invoices, releases, tour (events), **tour-planner** (TRACK production), calendar, marketing, documents, messages, interviews, epk-builder, onboarding, help.
+
+### TRACK Tour Planner (`/portal/tour-planner`)
+
+Enterprise tour production module (ported from artist-tour-planner). **Distinct from** `/portal/events` + `concerts` — public events and Bandsintown/Songkick sync stay there; tour planner is optional production planning with a bridge via `tour_stops.concert_id`.
+
+| Topic | Rule |
+|-------|------|
+| Flag | `artist.tour_planner` in `portal_feature_flags` (seed `supabase/reset.sql`) |
+| Route | `/portal/tour-planner?artistId=` — gated in RSC + sidebar |
+| Data | Parallel tables: `tours`, `tour_stops`, `tour_contacts`, `tour_tasks`, `tour_crew_members`, `tour_merch_items`, `tour_merch_settlements` |
+| DAL | `src/lib/api/tours.ts`, `tourStops.ts`, `tourContacts.ts`, `tourTasks.ts`, `tourCrew.ts`, `tourMerch.ts`, `tourConcertBridge.ts` |
+| APIs | `app/api/portal/tour-planner/*` — bearer + `?artistId=` via `authenticatePortalBearerWithArtist` |
+| Offline | Dexie sync queue (`src/lib/tour-planner/offline/`) + TanStack Query persist (tour-planner keys only) |
+| PDF | Day sheet, show settlement, merch settlement — `src/lib/tour-planner/pdf.ts` (jsPDF) |
+| Admin | Read-only `/admin/tour-planner` — `AdminTourPlannerView`, RLS `"*: admin all"` |
+
+**Concert bridge:** import event → stop (`stops/import-concert`); publish stop → concert (`publishConcert`); sync linked concert (`syncConcert` when `concertId` set). Logic in `tourConcertBridge.ts`.
+
+**Portal API surface (representative):**
+
+| Path | Methods |
+|------|---------|
+| `tours`, `tours/[id]` | GET/POST, PATCH/DELETE (archive, duplicate) |
+| `stops`, `stops/[id]` | GET/POST (create, reorder), PATCH/DELETE |
+| `stops/import-concert` | POST |
+| `tasks`, `tasks/[id]` | GET/POST, PATCH/DELETE |
+| `contacts`, `contacts/[id]` | GET/POST, PATCH/DELETE |
+| `crew`, `crew/[id]` | GET/POST, PATCH/DELETE |
+| `merch`, `merch/settlement` | GET/POST |
+| `merch/[id]` | PATCH/DELETE |
+| `route`, `geocode`, `import` | POST |
+
+**Stop production UI:** per-diems, rooming, travel manifest, full finance deal fields, hotel geocode, merch count-in/out/sold per variant with comps, drag-reorder stops.
+
+**Tour settings UI:** route settings (vehicle, planning mode, geocoding provider, fuel/tolls), budget JSONB line items + total, tech document PDF upload (`/api/portal/tour-planner/tech-documents/upload`).
 
 ## Settlement & Abrechnungszentrale
 
@@ -84,7 +119,7 @@ Two independent systems — do not conflate with **Settings → Roles** (`role_p
 
 **Portal flags (seed in `supabase/reset.sql`)**
 
-- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`
+- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`, `artist.tour_planner`
 - **Journalist:** `journalist.accreditation`, `press.applications`, `press.zip_download`, `press.audio_preview`, `press.contact`
 
 **Press helpers** (`src/lib/pressAccess.ts`): `isPressApplicationsEnabled()`, `isPressZipDownloadEnabled()`, `isPressAudioPreviewEnabled()` — each reads `portal_feature_flags` for role `journalist`.

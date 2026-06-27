@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { createTourCrewMember, getTourCrewByTourId } from '@/lib/api/tourCrew'
+import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
+
+const createSchema = z.object({
+  tourId: z.string().uuid(),
+  name: z.string().min(1),
+  role: z.string().default(''),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  passportNumber: z.string().nullable().optional(),
+  passportExpiry: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
+  visaInfo: z.string().nullable().optional(),
+  roomAssignment: z.string().nullable().optional(),
+  busAssignment: z.string().nullable().optional(),
+})
+
+export const GET = withErrorHandler(async (req: NextRequest) => {
+  const artistId = req.nextUrl.searchParams.get('artistId')
+  const tourId = req.nextUrl.searchParams.get('tourId')
+  if (!tourId) throw new ApiError(400, 'tourId required')
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
+  await assertTourAccess(supabase, tourId, artist.id)
+  const crew = await getTourCrewByTourId(supabase, tourId)
+  return NextResponse.json({ crew })
+})
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const artistId = req.nextUrl.searchParams.get('artistId')
+  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
+  const body = createSchema.parse(await req.json())
+  await assertTourAccess(supabase, body.tourId, artist.id)
+  const member = await createTourCrewMember(supabase, {
+    tour_id: body.tourId,
+    artist_id: artist.id,
+    name: body.name,
+    role: body.role,
+    email: body.email ?? null,
+    phone: body.phone ?? null,
+    passport_number: body.passportNumber ?? null,
+    passport_expiry: body.passportExpiry ?? null,
+    nationality: body.nationality ?? null,
+    visa_info: body.visaInfo ?? null,
+    room_assignment: body.roomAssignment ?? null,
+    bus_assignment: body.busAssignment ?? null,
+  })
+  return NextResponse.json({ member }, { status: 201 })
+})

@@ -2,6 +2,32 @@
   "nav": {
     "labelIntelligence": "Label Intelligence"
   },
+  "tour_planner_page_title": "Tour Planner",
+  "tour_planner_page_desc": "Read-only overview of artist tour production data.",
+  "tour_planner_loading": "Loading…",
+  "tour_planner_heading": "Tour Planner",
+  "tour_planner_readonly_desc": "Read-only view of artist tour production data. Artists manage tours in the portal.",
+  "tour_planner_artist": "Artist",
+  "tour_planner_select_artist": "Select artist",
+  "tour_planner_select_artist_hint": "Select an artist to inspect their tours and stops.",
+  "tour_planner_tour": "Tour",
+  "tour_planner_no_tours": "No tours for this artist.",
+  "tour_planner_archived": "archived",
+  "tour_planner_dates": "Dates",
+  "tour_planner_route": "Route",
+  "tour_planner_stop_date": "Date",
+  "tour_planner_venue": "Venue",
+  "tour_planner_status": "Status",
+  "tour_planner_linked_event": "Linked event",
+  "tour_planner_yes": "Yes",
+  "tour_planner_no": "No",
+  "tour_planner_no_stops": "No stops on this tour.",
+  "tour_planner_travel_day": "travel",
+  "tour_planner_show_status_option": "Option",
+  "tour_planner_show_status_confirmed": "Confirmed",
+  "tour_planner_show_status_contract_sent": "Contract sent",
+  "tour_planner_show_status_deposit_paid": "Deposit paid",
+  "tour_planner_show_status_cancelled": "Cancelled",
   "labelIntelligence": {
     "pageTitle": "Label Intelligence",
     "pageDescription": "Persisted label-wide revenue trends, roster health, press engagement, and financial audit trail.",
@@ -463,7 +489,8 @@
         "invoices": "Artist-submitted invoices and PDF generation.",
         "documents": "Private document vault for contracts and riders.",
         "calendar": "Label-wide release calendar with personal filter.",
-        "epk_builder": "Canvas-based EPK builder and share links."
+        "epk_builder": "Canvas-based EPK builder and share links.",
+        "tour_planner": "TRACK tour planner — multi-tour production, day sheets, finance, and routing."
       },
       "journalist": {
         "accreditation": "Event accreditation requests in the press dashboard."
