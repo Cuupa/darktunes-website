@@ -91,6 +91,12 @@ export interface HealthResponse {
   checkedAt: string
 }
 
+export interface HealthLivenessResponse {
+  status: 'ok' | 'offline'
+  database: DatabaseHealth
+  checkedAt: string
+}
+
 export interface HealthAlertDispatchResult {
   sent: boolean
   skipped: boolean

@@ -33,6 +33,7 @@ import {
   Waveform,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { reportClientError } from '@/lib/clientErrorReporter'
 import { cn } from '@/lib/utils'
 import {
   API_CONFIG_HINTS,
@@ -167,11 +168,15 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const fetchHealth = useCallback(async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setRefreshing(true)
     try {
-      const res = await fetch('/api/health')
+      const url = showRefreshSpinner
+        ? '/api/health?mode=full&fresh=1'
+        : '/api/health?mode=full'
+      const res = await fetch(url)
       if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
       const data = (await parseAdminFetchJson(res)) as unknown as HealthResponse
       setHealth(data)
     } catch (err) {
+      reportClientError('admin.health', err, { endpoint: '/api/health' }, 'warn')
       toast.error(`Health check failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
@@ -180,11 +185,39 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   }, [])
 
   useEffect(() => {
-    void fetchHealth()
-    const interval = setInterval(() => {
+    const pollIntervalMs = 120_000
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    const startPolling = () => {
+      if (interval) return
+      interval = setInterval(() => {
+        void fetchHealth()
+      }, pollIntervalMs)
+    }
+
+    const stopPolling = () => {
+      if (!interval) return
+      clearInterval(interval)
+      interval = null
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopPolling()
+        return
+      }
       void fetchHealth()
-    }, 60_000)
-    return () => clearInterval(interval)
+      startPolling()
+    }
+
+    void fetchHealth()
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [fetchHealth])
 
   const handleForceSync = async () => {
@@ -227,7 +260,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           : 'No new jobs enqueued (artists may already be queued). Executor started.',
       )
 
-      await fetchHealth()
+      await fetchHealth(true)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       toast.error(message.includes('429') ? 'Sync failed: rate limit reached.' : `Sync failed: ${message}`)
@@ -259,7 +292,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           ? `YouTube sync completed (${syncedCount} video${syncedCount === 1 ? '' : 's'}).`
           : (typeof data.message === 'string' ? data.message : 'YouTube sync completed.'),
       )
-      await fetchHealth()
+      await fetchHealth(true)
     } catch (err) {
       toast.error(`YouTube sync failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -311,7 +344,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       } else {
         toast.success(`${getApiMeta(api).label} sync completed.`)
       }
-      await fetchHealth()
+      await fetchHealth(true)
     } catch (err) {
       toast.error(`${getApiMeta(api).label} sync failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {

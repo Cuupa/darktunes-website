@@ -10,12 +10,18 @@
  *   message — human-readable error message
  *   details — optional JSON object with extra context
  *
- * Returns: { id }
+ * Returns: { ok: true }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { resolveUserProfile } from '@/lib/api/zammadSupport'
+import { writeAppLog } from '@/lib/appLog'
+import { withErrorHandler, ApiError } from '@/lib/errors'
+import { submitAutoErrorTicket } from '@/lib/zammad/submitTicket'
+
+/** Client UI crash reports only — excludes operational admin monitoring sources. */
+const AUTO_ZAMMAD_SOURCES = new Set(['ui'])
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const supabase = await createServerSupabaseClient()
@@ -54,21 +60,42 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       ? (details as Record<string, unknown>)
       : {}
 
-  const { data, error } = await supabase
-    .from('app_logs')
-    .insert({
-      source,
-      level: resolvedLevel,
-      message,
-      details: resolvedDetails,
-      user_id: user.id,
-    })
-    .select('id')
-    .single()
+  await writeAppLog({
+    source,
+    level: resolvedLevel,
+    message,
+    details: resolvedDetails,
+    userId: user.id,
+  })
 
-  if (error) {
-    throw buildApiError('DB_ERROR', 500)
+  if (resolvedLevel === 'error' && AUTO_ZAMMAD_SOURCES.has(source)) {
+    const viewPath =
+      typeof resolvedDetails.path === 'string' ? resolvedDetails.path : null
+
+    void (async () => {
+      try {
+        const db = await createServiceRoleSupabaseClient()
+        const profile = await resolveUserProfile(
+          db,
+          user.id,
+          user.email,
+          (user.user_metadata?.full_name as string | undefined) ?? null,
+        )
+
+        submitAutoErrorTicket({
+          userId: user.id,
+          customerEmail: profile.email,
+          customerName: profile.name,
+          source,
+          message,
+          viewPath,
+          details: resolvedDetails,
+        })
+      } catch {
+        // Background ticket creation must never affect the error response
+      }
+    })()
   }
 
-  return NextResponse.json({ id: data.id }, { status: 201 })
+  return NextResponse.json({ ok: true }, { status: 201 })
 })

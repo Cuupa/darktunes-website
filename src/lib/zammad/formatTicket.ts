@@ -1,0 +1,76 @@
+/**
+ * src/lib/zammad/formatTicket.ts
+ *
+ * Formats ticket titles and bodies for Zammad submission.
+ */
+
+const AUTO_ERROR_PREFIX = '[SYSTEM ERROR REPORT — darkTunes]'
+const MANUAL_PREFIX = '[darkTunes Support Request]'
+
+export function formatAutoErrorTitle(source: string, message: string): string {
+  const truncated = message.trim().slice(0, 120)
+  return `[SYSTEM ERROR] ${source}: ${truncated}`
+}
+
+export function formatManualTicketTitle(subject: string): string {
+  return `${MANUAL_PREFIX} ${subject.trim().slice(0, 200)}`
+}
+
+export interface AutoErrorBodyInput {
+  customerName: string
+  customerEmail: string
+  source: string
+  message: string
+  viewPath?: string | null
+  details?: Record<string, unknown>
+}
+
+export function formatAutoErrorBody(input: AutoErrorBodyInput): string {
+  const lines = [
+    AUTO_ERROR_PREFIX,
+    '',
+    'This ticket was created automatically after a client-side application error.',
+    'The user saw the standard error page — no manual action was taken.',
+    '',
+    '--- Customer ---',
+    `Name:  ${input.customerName}`,
+    `Email: ${input.customerEmail}`,
+    '',
+    '--- Error ---',
+    `Source:  ${input.source}`,
+    `Message: ${input.message}`,
+  ]
+
+  if (input.viewPath) {
+    lines.push(`View:    ${input.viewPath}`)
+  }
+
+  const stack = input.details?.stack
+  if (typeof stack === 'string' && stack.length > 0) {
+    lines.push('', '--- Stack trace ---', stack.slice(0, 4000))
+  }
+
+  const extra = { ...input.details }
+  delete extra.stack
+  delete extra.path
+  if (Object.keys(extra).length > 0) {
+    lines.push('', '--- Additional context ---', JSON.stringify(extra, null, 2).slice(0, 4000))
+  }
+
+  return lines.join('\n')
+}
+
+export function formatManualTicketBody(
+  customerName: string,
+  customerEmail: string,
+  message: string,
+): string {
+  return [
+    MANUAL_PREFIX,
+    '',
+    `Submitted by: ${customerName} <${customerEmail}>`,
+    '',
+    '--- Message ---',
+    message.trim(),
+  ].join('\n')
+}

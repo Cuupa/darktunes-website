@@ -359,22 +359,40 @@ export async function countStuckSyncJobs(db: DbClient): Promise<number> {
   return data?.length ?? 0
 }
 
+async function countSyncQueueByStatus(
+  db: DbClient,
+  status: SyncJobStatus,
+  createdSince?: string,
+): Promise<number> {
+  let query = db
+    .from('sync_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', status)
+
+  if (createdSince) {
+    query = query.gte('created_at', createdSince)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(`Failed to count sync queue (${status}): ${error.message}`)
+  }
+  return count ?? 0
+}
+
 export async function getSyncQueueStats(
   db: DbClient,
 ): Promise<{ pending: number; running: number; done: number; failed: number }> {
-  const { data, error } = await db
-    .from('sync_queue')
-    .select('status')
-    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+  const createdSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const [pending, running, done, failed] = await Promise.all([
+    countSyncQueueByStatus(db, 'pending'),
+    countSyncQueueByStatus(db, 'running'),
+    countSyncQueueByStatus(db, 'done', createdSince),
+    countSyncQueueByStatus(db, 'failed', createdSince),
+  ])
 
-  if (error) throw new Error(`Failed to get sync queue stats: ${error.message}`)
-
-  const counts = { pending: 0, running: 0, done: 0, failed: 0 }
-  for (const row of data ?? []) {
-    const s = row.status as SyncJobStatus
-    if (s in counts) counts[s]++
-  }
-  return counts
+  return { pending, running, done, failed }
 }
 
 /**

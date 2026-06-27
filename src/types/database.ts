@@ -3373,6 +3373,121 @@ export interface Database {
         }
         Relationships: []
       }
+      support_known_errors: {
+        Row: {
+          id: string
+          fingerprint: string
+          label: string
+          notes: string | null
+          active: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          fingerprint: string
+          label: string
+          notes?: string | null
+          active?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          fingerprint?: string
+          label?: string
+          notes?: string | null
+          active?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_known_errors_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      zammad_ticket_log: {
+        Row: {
+          id: string
+          fingerprint: string | null
+          ticket_type: 'manual' | 'auto_error'
+          status:
+            | 'sent'
+            | 'skipped'
+            | 'failed'
+            | 'blocked_known'
+            | 'blocked_duplicate'
+            | 'blocked_unconfigured'
+          zammad_ticket_id: number | null
+          user_id: string | null
+          customer_email: string | null
+          customer_name: string | null
+          title: string
+          view_path: string | null
+          error_source: string | null
+          details: Record<string, unknown>
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          fingerprint?: string | null
+          ticket_type: 'manual' | 'auto_error'
+          status:
+            | 'sent'
+            | 'skipped'
+            | 'failed'
+            | 'blocked_known'
+            | 'blocked_duplicate'
+            | 'blocked_unconfigured'
+          zammad_ticket_id?: number | null
+          user_id?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          title: string
+          view_path?: string | null
+          error_source?: string | null
+          details?: Record<string, unknown>
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          fingerprint?: string | null
+          ticket_type?: 'manual' | 'auto_error'
+          status?:
+            | 'sent'
+            | 'skipped'
+            | 'failed'
+            | 'blocked_known'
+            | 'blocked_duplicate'
+            | 'blocked_unconfigured'
+          zammad_ticket_id?: number | null
+          user_id?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          title?: string
+          view_path?: string | null
+          error_source?: string | null
+          details?: Record<string, unknown>
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zammad_ticket_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       user_roles: {
         Row: {
           id: string

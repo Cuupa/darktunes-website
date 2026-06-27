@@ -1,45 +1,65 @@
 /**
  * app/api/health/route.ts — System health check
  *
- * GET /api/health
- *
- * Public endpoint (no auth required — returns only non-sensitive status info).
+ * GET /api/health              — Database liveness only (default)
+ * GET /api/health?mode=full    — Full dashboard snapshot (60s server cache)
+ * GET /api/health?mode=full&fresh=1 — Bypass cache (manual admin refresh)
+ * HEAD /api/health             — Liveness probe only (no JSON body)
  */
 
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler } from '@/lib/errors'
+import { getCachedHealthSnapshot } from '@/lib/health/cachedHealthSnapshot'
+import { createHealthDbClient } from '@/lib/health/healthDbClient'
+import { buildHealthLivenessResponse } from '@/lib/health/healthLiveness'
 import { buildHealthSnapshot } from '@/lib/health/healthSnapshot'
-import type { HealthResponse } from '@/lib/health/types'
+import type { HealthLivenessResponse, HealthResponse } from '@/lib/health/types'
 
 export type { HealthResponse } from '@/lib/health/types'
 
-export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const HEALTH_CACHE_CONTROL = 'private, max-age=60'
 
-  const db =
-    supabaseUrl && supabaseKey
-      ? createClient<Database>(supabaseUrl, supabaseKey, {
-          auth: { persistSession: false },
-        })
-      : null
+function isFullHealthRequest(req: NextRequest): boolean {
+  const url = new URL(req.url)
+  return url.searchParams.get('mode') === 'full'
+}
 
-  const snapshot = await buildHealthSnapshot({ db })
+function databaseHttpStatus(databaseStatus: string): number {
+  return databaseStatus === 'offline' ? 503 : 200
+}
 
-  // Reserve 503 for database reachability — missing API keys or sync issues stay 200 with body status.
-  const httpStatus = snapshot.database.status === 'offline' ? 503 : 200
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  const db = createHealthDbClient()
+
+  if (!isFullHealthRequest(req)) {
+    const liveness = await buildHealthLivenessResponse(db)
+    return NextResponse.json(liveness satisfies HealthLivenessResponse, {
+      status: databaseHttpStatus(liveness.database.status),
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
+
+  const url = new URL(req.url)
+  const fresh = url.searchParams.get('fresh') === '1'
+  const snapshot = fresh
+    ? await buildHealthSnapshot({ db })
+    : await getCachedHealthSnapshot()
+
+  const httpStatus = databaseHttpStatus(snapshot.database.status)
 
   return NextResponse.json(snapshot satisfies HealthResponse, {
     status: httpStatus,
+    headers: { 'Cache-Control': HEALTH_CACHE_CONTROL },
   })
 })
 
-export const HEAD = withErrorHandler(async (req): Promise<NextResponse> => {
-  const res = await GET(req)
-  return new NextResponse(null, { status: res.status })
+export const HEAD = withErrorHandler(async (): Promise<NextResponse> => {
+  const db = createHealthDbClient()
+  const liveness = await buildHealthLivenessResponse(db)
+  return new NextResponse(null, {
+    status: databaseHttpStatus(liveness.database.status),
+    headers: { 'Cache-Control': 'no-store' },
+  })
 })
 
 export async function OPTIONS(): Promise<NextResponse> {

@@ -23,17 +23,12 @@ import {
   sortApiSources,
   type ApiOperationalState,
 } from './apiStatus'
-import {
-  DB_LATENCY_CRITICAL_MS,
-  DB_LATENCY_WARN_MS,
-  HEALTH_LOG_FETCH_LIMIT,
-  HEALTH_LOG_LOOKBACK_MS,
-} from './thresholds'
+import { HEALTH_LOG_FETCH_LIMIT, HEALTH_LOG_LOOKBACK_MS } from './thresholds'
+import { checkDatabaseLiveness, deriveDatabaseHealth } from './healthLiveness'
 import type { CronHealthSummary } from './cronHeartbeat'
 import type {
   ApiHealthStatus,
   ApiRunStats24h,
-  DatabaseHealth,
   HealthResponse,
   SyncQueueHealth,
 } from './types'
@@ -98,48 +93,6 @@ function finalizeStats24h(stats: Map<string, ApiRunStats24h>): Map<string, ApiRu
   return result
 }
 
-function deriveDatabaseHealth(
-  online: boolean,
-  latencyMs: number | null,
-): DatabaseHealth {
-  if (!online) {
-    return {
-      status: 'offline',
-      latencyMs,
-      statusLabel: 'Unreachable',
-      statusDetail: 'Supabase ping failed — public reads and sync jobs cannot run.',
-    }
-  }
-
-  if (latencyMs !== null && latencyMs >= DB_LATENCY_CRITICAL_MS) {
-    return {
-      status: 'critical',
-      latencyMs,
-      statusLabel: 'Critical latency',
-      statusDetail: `Round-trip ${latencyMs}ms exceeds ${DB_LATENCY_CRITICAL_MS}ms threshold.`,
-    }
-  }
-
-  if (latencyMs !== null && latencyMs >= DB_LATENCY_WARN_MS) {
-    return {
-      status: 'slow',
-      latencyMs,
-      statusLabel: 'Elevated latency',
-      statusDetail: `Round-trip ${latencyMs}ms exceeds ${DB_LATENCY_WARN_MS}ms warning threshold.`,
-    }
-  }
-
-  return {
-    status: 'online',
-    latencyMs,
-    statusLabel: 'Connected',
-    statusDetail:
-      latencyMs !== null
-        ? `Healthy connection · ${latencyMs}ms round-trip`
-        : 'Healthy connection',
-  }
-}
-
 function buildUnavailableApis(knownApis: Record<string, boolean>): Record<string, ApiHealthStatus> {
   const unavailable = deriveUnavailableApiHealth()
   const apis: Record<string, ApiHealthStatus> = {}
@@ -190,12 +143,8 @@ export async function buildHealthSnapshot(
 
   if (deps.db) {
     try {
-      const start = Date.now()
-      const { error: pingError } = await deps.db.from('sync_logs').select('id').limit(1)
-      const latencyMs = Date.now() - start
-      const dbOnline = !pingError
-
-      database = deriveDatabaseHealth(dbOnline, latencyMs)
+      database = await checkDatabaseLiveness(deps.db)
+      const dbOnline = database.status !== 'offline'
 
       if (dbOnline) {
         const { data: logs } = await deps.db

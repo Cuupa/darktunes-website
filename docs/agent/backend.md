@@ -51,7 +51,7 @@ Release/video submit → `editor_notifications` + `sendSubmissionNotificationEma
 
 ## Admin system (`/admin/system`)
 
-Health (`buildHealthSnapshot`), sync logs, app errors, maintenance routes. Cron heartbeats + optional alert webhook.
+Health: `GET /api/health` defaults to **lite** (DB liveness); full dashboard snapshot only via `?mode=full` (admin widget uses this). `buildHealthSnapshot` powers full mode + `/api/health/alert`. Sync logs, app errors, maintenance routes. Cron heartbeats + optional alert webhook.
 
 ## Scheduled news publishing
 
@@ -105,3 +105,14 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Two flag systems:
 ## Error logging
 
 Non-fatal errors → `app_logs` (service role). Visible in Admin System tab.
+
+## Zammad support tickets (optional)
+
+Admin → **Support** (`/admin/support`). Env: `ZAMMAD_URL`, `ZAMMAD_API_TOKEN`, optional `ZAMMAD_GROUP` (default `Support`). See `DEPLOYMENT.md`.
+
+- **Lib:** `src/lib/zammad/` — config, client (`POST /api/v1/tickets`), fingerprint, format, `submitTicket` orchestrator.
+- **DAL:** `src/lib/api/zammadSupport.ts` — `support_known_errors`, `zammad_ticket_log`.
+- **Manual tickets:** `POST /api/admin/support/tickets` (admin only).
+- **Auto tickets:** `POST /api/log-error` with `level: error` → background Zammad ticket (`[SYSTEM ERROR REPORT — darkTunes]`).
+- **Filters:** known fingerprints (`blocked_known`); same fingerprint + user within 24 h (`blocked_duplicate`).
+- **Robustness:** unconfigured/offline Zammad never throws; status logged in `zammad_ticket_log`.

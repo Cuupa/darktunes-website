@@ -361,3 +361,31 @@ vercel --prod
 
 
 - No additional environment variables are required for the press portal expansion; existing Supabase/R2/Resend variables continue to power press logins, secure asset delivery, and optional email workflows.
+
+---
+
+## 🎫 Zammad Support Integration (optional)
+
+Admin → **Support** lets label admins submit manual tickets and reviews automatic
+system-error reports. Tickets are sent to [Zammad](https://docs.zammad.org/en/latest/)
+via REST API in the background. **If Zammad is not configured or unreachable, the
+app continues to work normally** — submissions are logged locally in
+`zammad_ticket_log` with status `blocked_unconfigured` or `failed`.
+
+### Environment variables (Vercel)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ZAMMAD_URL` | Yes (to send) | Base URL of your Zammad instance, e.g. `https://support.example.com` |
+| `ZAMMAD_API_TOKEN` | Yes (to send) | Agent API token (`Authorization: Token token=…`) |
+| `ZAMMAD_GROUP` | No | Target group name (default: `Support`) |
+
+Create the token in Zammad → **Profile → Token Access** with `ticket.agent` permission.
+
+### Behaviour
+
+- **Manual tickets:** Admin → Support → New Ticket (attributed to the admin's email/name).
+- **Auto error tickets:** Client errors reported via `POST /api/log-error` (level `error`)
+  create background tickets with `[SYSTEM ERROR REPORT — darkTunes]` prefix.
+- **Deduplication:** Same error fingerprint + user within 24 h → no duplicate Zammad ticket.
+- **Known errors:** Admin can block fingerprints in Support → Known Errors.

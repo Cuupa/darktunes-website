@@ -8,7 +8,7 @@
 export const HEALTH_LOG_LOOKBACK_MS = 48 * 60 * 60 * 1000
 
 /** Cap rows fetched — prevents unbounded reads on high-volume deployments. */
-export const HEALTH_LOG_FETCH_LIMIT = 1000
+export const HEALTH_LOG_FETCH_LIMIT = 200
 
 /** Database round-trip latency (ms) above which status is degraded. */
 export const DB_LATENCY_WARN_MS = 500
