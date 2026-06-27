@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import type { ColumnDef, PaginationState } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -341,6 +342,7 @@ function AppLogsPanel() {
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [level, setLevel] = useState('all')
+  const [userErrorsOnly, setUserErrorsOnly] = useState(false)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const { pagination, setPagination, resetPage } = useManualPagination()
 
@@ -367,6 +369,9 @@ function AppLogsPanel() {
           `message.ilike.%${search.trim()}%,source.ilike.%${search.trim()}%`,
         )
       }
+      if (userErrorsOnly) {
+        query = query.not('user_id', 'is', null)
+      }
 
       const { data, count, error } = await query
       if (error) throw error
@@ -377,11 +382,11 @@ function AppLogsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, pagination.pageIndex, source, level, search])
+  }, [supabase, pagination.pageIndex, source, level, search, userErrorsOnly])
 
   useEffect(() => {
     resetPage()
-  }, [search, source, level, resetPage])
+  }, [search, source, level, userErrorsOnly, resetPage])
 
   useEffect(() => {
     void fetchLogs()
@@ -407,6 +412,24 @@ function AppLogsPanel() {
         accessorKey: 'level',
         header: 'Level',
         cell: ({ row }) => <AppLevelBadge level={row.original.level} />,
+      },
+      {
+        accessorKey: 'user_id',
+        header: 'User',
+        cell: ({ row }) => {
+          const userId = row.original.user_id
+          if (!userId) {
+            return <span className="text-muted-foreground text-xs">—</span>
+          }
+          return (
+            <Link
+              href={`/admin/users/${userId}`}
+              className="text-xs font-mono text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              {userId.slice(0, 8)}…
+            </Link>
+          )
+        },
       },
       {
         accessorKey: 'message',
@@ -480,9 +503,20 @@ function AppLogsPanel() {
             <SelectItem value="supabase">Supabase</SelectItem>
             <SelectItem value="upload">Upload</SelectItem>
             <SelectItem value="ui">UI</SelectItem>
+            <SelectItem value="api">API</SelectItem>
+            <SelectItem value="server_action">Server Actions</SelectItem>
             <SelectItem value="vercel">Vercel</SelectItem>
           </SelectContent>
         </Select>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={userErrorsOnly}
+            onChange={(e) => setUserErrorsOnly(e.target.checked)}
+            className="rounded border-border"
+          />
+          User errors only
+        </label>
         <Select value={level} onValueChange={setLevel}>
           <SelectTrigger className="h-8 w-[120px] text-sm">
             <SelectValue placeholder="All levels" />

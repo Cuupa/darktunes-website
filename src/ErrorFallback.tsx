@@ -1,11 +1,19 @@
 'use client'
 
+import { useEffect } from 'react'
 import type { FallbackProps } from 'react-error-boundary'
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { Warning, ArrowsClockwise } from "@phosphor-icons/react";
+import { reportClientError } from '@/lib/clientErrorReporter'
 
 export const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      reportClientError('ui', error, { boundary: 'ErrorFallback' })
+    }
+  }, [error])
+
   if (process.env.NODE_ENV === 'development') throw error;
 
   return (

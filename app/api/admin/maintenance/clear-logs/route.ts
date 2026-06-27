@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { logAdminAction } from '@/lib/adminAuditLog'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
@@ -30,7 +31,7 @@ function isAllowedLogTable(value: unknown): value is LogTable {
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  await verifyAdmin(token)
+  const actorId = await verifyAdmin(token)
 
   let table: unknown
   try {
@@ -57,5 +58,14 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   if (error) throw new ApiError(500, `Failed to clear ${table}: ${error.message}`)
 
-  return NextResponse.json({ deleted: (data ?? []).length })
+  const deleted = (data ?? []).length
+
+  await logAdminAction(db, {
+    actorId,
+    action: 'cleared',
+    resource: table,
+    details: { deleted },
+  })
+
+  return NextResponse.json({ deleted })
 })

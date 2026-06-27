@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('@/lib/health/cachedHealthSnapshot', () => ({
+  getCachedHealthSnapshot: vi.fn(async () => {
+    const { buildHealthSnapshot } = await import('@/lib/health/healthSnapshot')
+    const { createHealthDbClient } = await import('@/lib/health/healthDbClient')
+    return buildHealthSnapshot({ db: createHealthDbClient() })
+  }),
+}))
+
 const ORIGINAL_ENV = { ...process.env }
 const MOCK_REQUEST = new NextRequest('http://localhost/api/health')
 
@@ -51,12 +59,25 @@ function mockSupabaseClientOnline(): void {
           return makeThenableBuilder([])
         }
         if (table === 'sync_queue') {
+          const countBuilder = (count: number) => {
+            const countResult = { count, error: null }
+            const countPromise = Promise.resolve(countResult)
+            return {
+              eq: vi.fn().mockReturnThis(),
+              or: vi.fn().mockReturnThis(),
+              gte: vi.fn().mockReturnThis(),
+              then: countPromise.then.bind(countPromise),
+              catch: countPromise.catch.bind(countPromise),
+              finally: countPromise.finally.bind(countPromise),
+            }
+          }
           return {
-            select: vi.fn((fields: string) =>
-              makeThenableBuilder(
-                fields === 'id' ? [] : [{ status: 'done' }, { status: 'pending' }],
-              ),
-            ),
+            select: vi.fn((fields: string, options?: { count?: string; head?: boolean }) => {
+              if (options?.head) {
+                return countBuilder(1)
+              }
+              return makeThenableBuilder(fields === 'id' ? [] : [{ status: 'done' }])
+            }),
             eq: vi.fn().mockReturnThis(),
             or: vi.fn().mockReturnThis(),
             gte: vi.fn().mockReturnThis(),
@@ -158,6 +179,28 @@ describe('app/api/health/route', () => {
     expect(body.database.status).toBe('online')
     expect(body.status).not.toBe('unhealthy')
     expect(body.apis.spotify?.operationalState).toBe('unconfigured')
+  })
+
+  it('GET ?mode=lite returns liveness payload without full snapshot fields', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+
+    mockSupabaseClientOnline()
+
+    const { GET } = await loadHealthRoute()
+    const response = await GET(new NextRequest('http://localhost/api/health?mode=lite'))
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      status: string
+      database: { status: string }
+      checkedAt: string
+      healthScore?: number
+    }
+    expect(body.status).toBe('ok')
+    expect(body.database.status).toBe('online')
+    expect(body.checkedAt).toBeTruthy()
+    expect(body.healthScore).toBeUndefined()
   })
 
   it('OPTIONS responds with CORS preflight headers', async () => {

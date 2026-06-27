@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logServerActionError } from '@/lib/logServerActionError'
 
 function escapeHtml(value: string): string {
   return value
@@ -15,12 +16,14 @@ export async function sendPressInquiry(data: {
   subject: string
   body: string
 }): Promise<{ success: boolean }> {
+  let userId: string | undefined
   try {
     const supabase = await createServerSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return { success: false }
+    userId = user.id
 
     const { error } = await supabase.from('app_logs').insert({
       source: 'press_inquiry',
@@ -34,8 +37,14 @@ export async function sendPressInquiry(data: {
       user_id: user.id,
     })
 
-    return { success: !error }
-  } catch {
+    if (error) {
+      await logServerActionError('press.sendInquiry', error, userId)
+      return { success: false }
+    }
+
+    return { success: true }
+  } catch (err) {
+    await logServerActionError('press.sendInquiry', err, userId)
     return { success: false }
   }
 }

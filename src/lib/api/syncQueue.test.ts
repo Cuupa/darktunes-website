@@ -9,6 +9,7 @@ import {
   markSyncJobDone,
   countStuckSyncJobs,
   conflictingArtistJobTypes,
+  getSyncQueueStats,
   MAX_ATTEMPTS,
 } from './syncQueue'
 
@@ -134,5 +135,46 @@ describe('markSyncJobFailed', () => {
     const db = makeSequentialMockDb([{ data: null }])
     await markSyncJobFailed(db, 'job-1', '429', MAX_ATTEMPTS, { rateLimited: true })
     expect(db.from).toHaveBeenCalledWith('sync_queue')
+  })
+})
+
+describe('getSyncQueueStats', () => {
+  it('aggregates per-status counts via head queries', async () => {
+    const db = makeSequentialMockDb([
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    ])
+
+    let callIndex = 0
+    const counts = [3, 1, 10, 2]
+    const gteCalls: string[] = []
+    ;(db.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const count = counts[callIndex] ?? 0
+      callIndex++
+      const countResult = { count, error: null }
+      const countPromise = Promise.resolve(countResult)
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        gte: vi.fn((field: string) => {
+          gteCalls.push(field)
+          return {
+            then: countPromise.then.bind(countPromise),
+            catch: countPromise.catch.bind(countPromise),
+            finally: countPromise.finally.bind(countPromise),
+          }
+        }),
+        then: countPromise.then.bind(countPromise),
+        catch: countPromise.catch.bind(countPromise),
+        finally: countPromise.finally.bind(countPromise),
+      }
+    })
+
+    const stats = await getSyncQueueStats(db)
+    expect(stats).toEqual({ pending: 3, running: 1, done: 10, failed: 2 })
+    expect(db.from).toHaveBeenCalledTimes(4)
+    expect(gteCalls).toEqual(['created_at', 'created_at'])
   })
 })

@@ -197,6 +197,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "streaming_stats: artist read own",
   "submission_form_schema: editor+ write",
   "submission_form_schema: public read",
+  "support_known_errors: admin read",
+  "support_known_errors: admin write",
   "sync_logs: editor+ read",
   "sync_queue: admin all",
   "user_custom_roles: admin read",
@@ -215,6 +217,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "videos: can_manage_videos insert",
   "videos: can_manage_videos update",
   "videos: public read",
+  "zammad_ticket_log: admin read",
 ]
 `;
 
@@ -296,6 +299,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "sos_rules_presets",
   "streaming_stats",
   "submission_form_schema",
+  "support_known_errors",
   "sync_logs",
   "sync_queue",
   "user_custom_roles",
@@ -303,6 +307,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "users",
   "video_submissions",
   "videos",
+  "zammad_ticket_log",
 ]
 `;
 
@@ -653,6 +658,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "submission_form_schema: editor+ write",
     "submission_form_schema: public read",
   ],
+  "support_known_errors": [
+    "support_known_errors: admin read",
+    "support_known_errors: admin write",
+  ],
   "sync_logs": [
     "sync_logs: editor+ read",
   ],
@@ -684,6 +693,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "videos: can_manage_videos insert",
     "videos: can_manage_videos update",
     "videos: public read",
+  ],
+  "zammad_ticket_log": [
+    "zammad_ticket_log: admin read",
   ],
 }
 `;

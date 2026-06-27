@@ -15,7 +15,7 @@ import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { processHealthAlerts } from '@/lib/health/alertNotifier'
-import { buildHealthSnapshot } from '@/lib/health/healthSnapshot'
+import { getCachedHealthSnapshot } from '@/lib/health/cachedHealthSnapshot'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import {
@@ -50,7 +50,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     getHealthAlertWebhookUrl(db),
   ])
 
-  const snapshot = await buildHealthSnapshot({ db })
+  const snapshot = await getCachedHealthSnapshot()
   const dispatch = await processHealthAlerts(snapshot, {
     db,
     fetch: globalThis.fetch,

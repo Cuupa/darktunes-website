@@ -6,12 +6,16 @@ import { getErrorMessage } from './clientErrors'
 import { ERROR_MESSAGES } from './errorCodes'
 import type { Dictionary } from '@/i18n/types'
 
-const mockInsert = vi.fn()
-const mockFrom = vi.fn(() => ({ insert: mockInsert }))
-const mockCreateClient = vi.fn(() => ({ from: mockFrom }))
+const { mockWriteAppLog } = vi.hoisted(() => ({
+  mockWriteAppLog: vi.fn().mockResolvedValue(undefined),
+}))
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: mockCreateClient,
+vi.mock('@/lib/appLog', () => ({
+  writeAppLog: mockWriteAppLog,
+}))
+
+vi.mock('@/lib/routeUserContext', () => ({
+  extractRouteUserContext: vi.fn().mockResolvedValue({ userId: 'user-123', userRole: 'portal' }),
 }))
 
 // Minimal mock dictionary with the errors namespace
@@ -98,9 +102,7 @@ describe('buildApiError', () => {
 
 describe('withErrorHandler', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
@@ -127,10 +129,10 @@ describe('withErrorHandler', () => {
     expect(body.error).toBe('Forbidden')
     expect(body.status).toBe(403)
     await flushAsyncWork()
-    expect(mockInsert).not.toHaveBeenCalled()
+    expect(mockWriteAppLog).not.toHaveBeenCalled()
   })
 
-  it('catches ApiError with code and includes it in the response', async () => {
+  it('logs RATE_LIMITED ApiError at warn level with user context', async () => {
     const handler = withErrorHandler(async () => {
       throw new ApiError(429, 'Rate limit exceeded', 'RATE_LIMITED')
     })
@@ -138,6 +140,20 @@ describe('withErrorHandler', () => {
     expect(res.status).toBe(429)
     const body = await res.json()
     expect(body.code).toBe('RATE_LIMITED')
+    await flushAsyncWork()
+    expect(mockWriteAppLog).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'api',
+      level: 'warn',
+      message: 'Rate limit exceeded',
+      userId: 'user-123',
+      details: expect.objectContaining({
+        path: '/api/test',
+        method: 'GET',
+        code: 'RATE_LIMITED',
+        status: 429,
+        user_role: 'portal',
+      }),
+    }))
   })
 
   it('catches ZodError and returns 400 with VALIDATION_ERROR code', async () => {
@@ -154,7 +170,7 @@ describe('withErrorHandler', () => {
     expect(body.code).toBe('VALIDATION_ERROR')
     expect(body.error).toContain('valid email address')
     await flushAsyncWork()
-    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockWriteAppLog).toHaveBeenCalledWith(expect.objectContaining({
       source: 'api',
       level: 'warn',
       message: expect.stringContaining('Validation error:'),
@@ -174,7 +190,7 @@ describe('withErrorHandler', () => {
     const res = await handler(makeRequest('POST'))
     expect(res.status).toBe(500)
     await flushAsyncWork()
-    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockWriteAppLog).toHaveBeenCalledWith(expect.objectContaining({
       source: 'api',
       level: 'error',
       message: 'Internal failure',

@@ -19,6 +19,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
+import { writeAppLog } from '@/lib/appLog'
+import { extractRouteUserContext } from '@/lib/routeUserContext'
 import { type ErrorCode, ERROR_MESSAGES } from './errorCodes'
 import { SettlementPeriodNotWritableError } from '@/lib/api/settlementPeriods'
 
@@ -87,33 +89,49 @@ function buildErrorResponse(
 }
 
 // ---------------------------------------------------------------------------
-// DB error logger — writes to app_logs for visibility in the Admin Logs tab
+// API error logging policy
 // ---------------------------------------------------------------------------
 
-async function persistErrorToDb(
-  source: string,
+/** 4xx codes worth persisting at warn level (user-impacting, not routine auth noise). */
+const WARN_LOG_API_ERROR_CODES: ReadonlySet<ErrorCode> = new Set([
+  'RATE_LIMITED',
+  'UPLOAD_TOO_LARGE',
+  'UPLOAD_WRONG_TYPE',
+  'UPLOAD_NO_FILE',
+  'UPLOAD_PARSE_FAILED',
+  'STORAGE_QUOTA_EXCEEDED',
+  'EXTERNAL_API_ERROR',
+  'EMAIL_SEND_FAILED',
+  'AUTH_TOKEN_INVALID',
+])
+
+function resolveApiErrorLogLevel(err: ApiError): 'error' | 'warn' | null {
+  if (err.status >= 500) return 'error'
+  if (err.code && WARN_LOG_API_ERROR_CODES.has(err.code as ErrorCode)) return 'warn'
+  return null
+}
+
+type AppLogLevel = 'error' | 'warn' | 'info'
+
+function persistRouteError(
+  req: NextRequest,
   message: string,
   details: Record<string, unknown>,
-  level: 'error' | 'warn' | 'info' = 'error',
-): Promise<void> {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceKey) return
-
-    // Use a fire-and-forget fetch so we never block the error response
-    const { createClient } = await import('@supabase/supabase-js')
-    const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-    await db.from('app_logs').insert({
-      source,
+  level: AppLogLevel,
+): void {
+  void (async () => {
+    const ctx = await extractRouteUserContext(req)
+    await writeAppLog({
+      source: 'api',
       level,
       message,
-      details,
+      details: {
+        ...details,
+        ...(ctx.userRole ? { user_role: ctx.userRole } : {}),
+      },
+      userId: ctx.userId,
     })
-  } catch {
-    // Never throw from the error logger — silently ignore any DB failures
-  }
+  })()
 }
 
 // ---------------------------------------------------------------------------
@@ -145,20 +163,21 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       }
 
       if (err instanceof ApiError) {
-        if (err.status >= 500) {
-          void persistErrorToDb('api', err.message, {
+        const logLevel = resolveApiErrorLogLevel(err)
+        if (logLevel) {
+          persistRouteError(req, err.message, {
             path: routePath,
             method: req.method,
             code: err.code ?? null,
             status: err.status,
-          })
+          }, logLevel)
         }
         return buildErrorResponse(err.message, err.status, err.code)
       }
 
       if (err instanceof ZodError) {
         const message = err.issues.map((e) => e.message).join('; ')
-        void persistErrorToDb('api', `Validation error: ${message}`, {
+        persistRouteError(req, `Validation error: ${message}`, {
           path: routePath,
           method: req.method,
           issues: err.issues,
@@ -174,24 +193,24 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
           details: err.details ?? null,
           path: routePath,
         })
-        void persistErrorToDb('api', message, {
+        persistRouteError(req, message, {
           path: routePath,
           method: req.method,
           code: err.code ?? null,
           details: err.details ?? null,
           hint: err.hint ?? null,
-        })
+        }, 'error')
         return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
       }
 
       // Unknown error — log server-side and persist to app_logs
       console.error('[withErrorHandler] Unhandled route error:', err)
       const errMessage = err instanceof Error ? err.message : String(err)
-      void persistErrorToDb('api', errMessage, {
+      persistRouteError(req, errMessage, {
         path: routePath,
         method: req.method,
         stack: err instanceof Error ? (err.stack ?? null) : null,
-      })
+      }, 'error')
       // Never expose internal error details — always return a safe generic message
       return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
     }

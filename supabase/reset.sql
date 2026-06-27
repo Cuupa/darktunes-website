@@ -1914,6 +1914,46 @@ CREATE INDEX IF NOT EXISTS idx_app_logs_source     ON public.app_logs (source);
 CREATE INDEX IF NOT EXISTS idx_app_logs_level      ON public.app_logs (level);
 CREATE INDEX IF NOT EXISTS idx_app_logs_created_at ON public.app_logs (created_at DESC);
 
+-- ---------------------------------------------------------------------------
+-- TABLE: support_known_errors  (fingerprints excluded from Zammad auto-tickets)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.support_known_errors (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  fingerprint TEXT        NOT NULL UNIQUE,
+  label       TEXT        NOT NULL,
+  notes       TEXT,
+  active      BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_by  UUID        REFERENCES public.users (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_known_errors_active ON public.support_known_errors (active) WHERE active = TRUE;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: zammad_ticket_log  (local audit trail + deduplication for Zammad)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.zammad_ticket_log (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  fingerprint      TEXT,
+  ticket_type      TEXT        NOT NULL CHECK (ticket_type IN ('manual', 'auto_error')),
+  status           TEXT        NOT NULL CHECK (status IN (
+    'sent', 'skipped', 'failed', 'blocked_known', 'blocked_duplicate', 'blocked_unconfigured'
+  )),
+  zammad_ticket_id INTEGER,
+  user_id          UUID        REFERENCES public.users (id) ON DELETE SET NULL,
+  customer_email   TEXT,
+  customer_name    TEXT,
+  title            TEXT        NOT NULL,
+  view_path        TEXT,
+  error_source     TEXT,
+  details          JSONB       NOT NULL DEFAULT '{}',
+  error_message    TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_zammad_ticket_log_fingerprint_user ON public.zammad_ticket_log (fingerprint, user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_zammad_ticket_log_created_at ON public.zammad_ticket_log (created_at DESC);
+
 -- =============================================================================
 -- IDEMPOTENCY KEYS — prevent duplicate financial transactions
 -- Used by Portal write operations (submit-release, SOS confirm) to ensure
@@ -2053,6 +2093,8 @@ ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.support_known_errors  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.zammad_ticket_log     ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
 -- RLS: users
@@ -2397,6 +2439,27 @@ CREATE POLICY "app_logs: admin read" ON public.app_logs
 -- Allows any authenticated user to write error logs from the UI
 CREATE POLICY "app_logs: authenticated insert" ON public.app_logs
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- ---------------------------------------------------------------------------
+-- RLS: support_known_errors
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "support_known_errors: admin read"   ON public.support_known_errors;
+DROP POLICY IF EXISTS "support_known_errors: admin write" ON public.support_known_errors;
+
+CREATE POLICY "support_known_errors: admin read" ON public.support_known_errors
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE POLICY "support_known_errors: admin write" ON public.support_known_errors
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: zammad_ticket_log
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "zammad_ticket_log: admin read" ON public.zammad_ticket_log;
+
+CREATE POLICY "zammad_ticket_log: admin read" ON public.zammad_ticket_log
+  FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: concerts
