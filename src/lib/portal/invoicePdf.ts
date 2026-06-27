@@ -3,6 +3,7 @@ type AutoTableTextAlignment = 'left' | 'center' | 'right'
 
 type AutoTableOptions = {
   startY: number
+  theme: 'plain'
   head: string[][]
   body: string[][]
   margin: { left: number; right: number }
@@ -213,6 +214,7 @@ export function generateInvoicePdf(options: InvoicePdfOptions): Uint8Array {
 
   autoTableFn(doc, {
     startY: cursorY,
+    theme: 'plain',
     head: [['Beschreibung', 'Menge', 'Einzelpreis', 'Gesamt']],
     body: options.lineItems.map((item) => [
       item.description,
