@@ -3,23 +3,15 @@
 /**
  * src/components/admin/FeatureTogglesManager.tsx
  *
- * Admin UI for enabling or disabling portal feature modules.
- * Follows AdminPanelProps<FeatureToggles> contract (IoC: receives value + onChange).
- *
- * Features:
- *  - Toggle Promo Pool (journalist access)
- *  - Toggle Editor Tools (editor CMS access)
+ * Admin UI for global site feature toggles (site_settings.feature_toggles).
  */
 
+import { useTranslations } from 'next-intl'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import {
-  MusicNote,
-  Newspaper,
-  Info,
-} from '@phosphor-icons/react'
+import { MusicNote, Newspaper, Info } from '@phosphor-icons/react'
 import type { FeatureToggles } from '@/types'
 
 interface FeatureToggleRowProps {
@@ -29,6 +21,8 @@ interface FeatureToggleRowProps {
   description: string
   affectedRole: string
   checked: boolean
+  disabledLabel: string
+  toggleAria: string
   onCheckedChange: (checked: boolean) => void
   disabled?: boolean
 }
@@ -40,6 +34,8 @@ function FeatureToggleRow({
   description,
   affectedRole,
   checked,
+  disabledLabel,
+  toggleAria,
   onCheckedChange,
   disabled = false,
 }: FeatureToggleRowProps) {
@@ -57,7 +53,7 @@ function FeatureToggleRow({
             </Badge>
             {!checked && (
               <Badge variant="destructive" className="text-xs px-1.5 py-0">
-                Disabled
+                {disabledLabel}
               </Badge>
             )}
           </div>
@@ -69,7 +65,7 @@ function FeatureToggleRow({
         checked={checked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
-        aria-label={`Toggle ${label}`}
+        aria-label={toggleAria}
       />
     </div>
   )
@@ -82,18 +78,17 @@ interface FeatureTogglesManagerProps {
 }
 
 export function FeatureTogglesManager({ value, onChange, isLoading = false }: FeatureTogglesManagerProps) {
+  const t = useTranslations('admin.features')
+
   const handleChange = (key: keyof FeatureToggles, checked: boolean) => {
     onChange({ ...value, [key]: checked })
   }
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <Info size={14} aria-hidden="true" />
-        <span>
-          Disabling a feature hides it from the respective dashboard and secures the underlying routes.
-          Changes take effect immediately on the next page load.
-        </span>
+      <div className="flex items-start gap-2 text-sm text-muted-foreground mb-4">
+        <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{t('globalHint')}</span>
       </div>
 
       <div className="rounded-lg border border-border divide-y divide-border">
@@ -101,10 +96,12 @@ export function FeatureTogglesManager({ value, onChange, isLoading = false }: Fe
           <FeatureToggleRow
             id="toggle-promo-pool"
             icon={<MusicNote size={18} aria-hidden="true" />}
-            label="Promo Pool"
-            description="Gives verified journalists access to unreleased music at /promo-pool and /press/dashboard/promo-pool."
-            affectedRole="journalist"
+            label={t('globalToggles.promoPool.label')}
+            description={t('globalToggles.promoPool.description')}
+            affectedRole={t('globalToggles.promoPool.role')}
             checked={value.promoPool}
+            disabledLabel={t('disabledBadge')}
+            toggleAria={t('toggleAria', { label: t('globalToggles.promoPool.label') })}
             onCheckedChange={(checked) => handleChange('promoPool', checked)}
             disabled={isLoading}
           />
@@ -116,10 +113,12 @@ export function FeatureTogglesManager({ value, onChange, isLoading = false }: Fe
           <FeatureToggleRow
             id="toggle-editor-tools"
             icon={<Newspaper size={18} aria-hidden="true" />}
-            label="Editor Tools"
-            description="Editors can access the restricted CMS to manage news, artists, and releases."
-            affectedRole="editor"
+            label={t('globalToggles.editorTools.label')}
+            description={t('globalToggles.editorTools.description')}
+            affectedRole={t('globalToggles.editorTools.role')}
             checked={value.editorTools}
+            disabledLabel={t('disabledBadge')}
+            toggleAria={t('toggleAria', { label: t('globalToggles.editorTools.label') })}
             onCheckedChange={(checked) => handleChange('editorTools', checked)}
             disabled={isLoading}
           />
