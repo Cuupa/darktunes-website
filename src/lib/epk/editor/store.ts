@@ -44,6 +44,7 @@ export interface EpkEditorActions {
   addElement: (type: EpkElement['type'], overrides?: Partial<EpkElement>) => string
   deleteSelected: () => void
   moveElementZ: (id: string, direction: 'up' | 'down' | 'front' | 'back') => void
+  reorderElementLayers: (orderedIds: string[]) => void
   toggleElementVisibility: (id: string) => void
   toggleElementLock: (id: string) => void
   addPage: (name?: string) => string
@@ -281,6 +282,22 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
                 elB.zIndex = tmp
               }
             }
+
+            state.document.elements = reorderZIndex(state.document.elements, pageId)
+            state.isDirty = true
+          }),
+
+        reorderElementLayers: (orderedIds) =>
+          set((state) => {
+            const pageId = state.activePageId
+            const pageElements = state.document.elements.filter((el) => el.pageId === pageId)
+            if (orderedIds.length !== pageElements.length) return
+            if (!orderedIds.every((id) => pageElements.some((el) => el.id === id))) return
+
+            orderedIds.forEach((id, visualIndex) => {
+              const el = state.document.elements.find((e) => e.id === id)
+              if (el) el.zIndex = orderedIds.length - visualIndex
+            })
 
             state.document.elements = reorderZIndex(state.document.elements, pageId)
             state.isDirty = true
