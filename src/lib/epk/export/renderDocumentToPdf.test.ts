@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderDocumentToPdf } from './renderDocumentToPdf'
+import { generateEpkPdfBytes } from './generateEpkPdfBytes'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 
 const minimalDocument: EpkDocumentV2 = {
@@ -60,5 +61,18 @@ describe('renderDocumentToPdf', () => {
     expect(bytes.length).toBeGreaterThan(500)
     const header = String.fromCharCode(...bytes.slice(0, 4))
     expect(header).toBe('%PDF')
+  })
+})
+
+describe('generateEpkPdfBytes', () => {
+  it('returns PDF/A-marked bytes with embedded fonts', async () => {
+    const bytes = await generateEpkPdfBytes({ document: minimalDocument })
+    expect(bytes.length).toBeGreaterThan(500)
+
+    const text = new TextDecoder().decode(bytes)
+    expect(text).toContain('pdfaid:part>2')
+    expect(text).toContain('pdfaid:conformance>B')
+    expect(text).toContain('/OutputIntent')
+    expect(text).toContain('/FontFile')
   })
 })

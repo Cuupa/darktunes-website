@@ -26,6 +26,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1062.0",
     "@aws-sdk/s3-request-presigner": "^3.1056.0",
+    "@fontsource/noto-sans": "^5.2.10",
     "@hookform/resolvers": "^5.4.0",
     "@octokit/core": "^7.0.6",
     "@phosphor-icons/react": "^2.1.7",

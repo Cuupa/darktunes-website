@@ -23,6 +23,7 @@ import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import { layoutWrappedText, type TextAlign } from '@/lib/epk/textLayout'
 import { parseGradientFromBackground, parseGradientFromStyle } from '@/lib/epk/gradients'
 import { renderGradientToJpeg } from './renderGradientToJpeg'
+import { EPK_PDF_SAVE_OPTIONS } from './pdfSaveOptions'
 
 const DEFAULT_TEXT: RGB = rgb(1, 1, 1)
 const DEFAULT_SHAPE: RGB = rgb(0.16, 0.16, 0.16)
@@ -218,5 +219,5 @@ export async function renderDocumentToPdf(
 
   embedPdfMetadata(pdfDoc, document.metadata)
 
-  return pdfDoc.save({ useObjectStreams: true })
+  return pdfDoc.save(EPK_PDF_SAVE_OPTIONS)
 }
