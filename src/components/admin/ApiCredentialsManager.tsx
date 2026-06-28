@@ -41,6 +41,7 @@ function secretMaskStyle(hidden: boolean): CSSProperties | undefined {
 }
 
 export function ApiCredentialsManager() {
+  const t = useTranslations('admin.apiKeys')
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [credentials, setCredentials] = useState<CredentialStatus[]>([])
@@ -163,19 +164,14 @@ export function ApiCredentialsManager() {
   }, [credentials])
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading API credentials…</p>
+    return <p className="text-sm text-muted-foreground">{t('loading')}</p>
   }
 
   return (
     <div className="space-y-6">
       <Alert>
-        <AlertTitle>Encrypted storage</AlertTitle>
-        <AlertDescription>
-          Values are encrypted with AES-256-GCM before being stored in Supabase. The master key
-          lives only in <code>API_CREDENTIALS_ENCRYPTION_KEY</code> (Vercel env). The newsletter
-          Edge Function <code>newsletter-confirm</code> still uses separate Supabase Edge Secrets
-          for Resend until migrated.
-        </AlertDescription>
+        <AlertTitle>{t('storageAlertTitle')}</AlertTitle>
+        <AlertDescription>{t('storageAlertDescription')}</AlertDescription>
       </Alert>
 
       {CREDENTIAL_CATEGORIES.map((category) => {

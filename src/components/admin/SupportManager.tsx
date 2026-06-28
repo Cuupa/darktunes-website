@@ -3,7 +3,7 @@
 /**
  * src/components/admin/SupportManager.tsx
  *
- * Admin support area: manual Zammad tickets, known-error filter, ticket audit log.
+ * Admin support area: manual requests, ignored-error list, submission history.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -46,7 +46,40 @@ function formatDate(iso: string): string {
   })
 }
 
-function StatusBadge({ status }: { status: TicketLogRow['status'] }) {
+type SupportStatusKey =
+  | 'statusSent'
+  | 'statusFailed'
+  | 'statusSkipped'
+  | 'statusBlockedKnown'
+  | 'statusBlockedDuplicate'
+  | 'statusBlockedUnconfigured'
+
+function statusLabelKey(status: TicketLogRow['status']): SupportStatusKey {
+  switch (status) {
+    case 'sent':
+      return 'statusSent'
+    case 'failed':
+      return 'statusFailed'
+    case 'skipped':
+      return 'statusSkipped'
+    case 'blocked_known':
+      return 'statusBlockedKnown'
+    case 'blocked_duplicate':
+      return 'statusBlockedDuplicate'
+    case 'blocked_unconfigured':
+      return 'statusBlockedUnconfigured'
+    default:
+      return 'statusSkipped'
+  }
+}
+
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: TicketLogRow['status']
+  label: string
+}) {
   const styles: Record<TicketLogRow['status'], string> = {
     sent: 'bg-green-500/20 text-green-400 border-green-500/30',
     failed: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -56,11 +89,14 @@ function StatusBadge({ status }: { status: TicketLogRow['status'] }) {
     blocked_unconfigured: 'bg-muted text-muted-foreground border-border',
   }
 
-  return (
-    <Badge className={styles[status]}>
-      {status.replace(/_/g, ' ')}
-    </Badge>
-  )
+  return <Badge className={styles[status]}>{label}</Badge>
+}
+
+function ticketTypeLabel(
+  type: TicketLogRow['ticket_type'],
+  t: (key: 'typeManual' | 'typeAuto') => string,
+): string {
+  return type === 'manual' ? t('typeManual') : t('typeAuto')
 }
 
 export function SupportManager() {
@@ -68,7 +104,6 @@ export function SupportManager() {
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [configured, setConfigured] = useState<boolean | null>(null)
-  const [group, setGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [subject, setSubject] = useState('')
@@ -100,7 +135,6 @@ export function SupportManager() {
     }
     const body = (await res.json()) as { configured: boolean; group: string | null }
     setConfigured(body.configured)
-    setGroup(body.group)
   }, [getToken, tErrors])
 
   const fetchKnownErrors = useCallback(async () => {
@@ -108,31 +142,31 @@ export function SupportManager() {
     const res = await fetch('/api/admin/support/known-errors', {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!res.ok) throw new Error('Failed to load known errors')
+    if (!res.ok) throw new Error(t('loadFailed'))
     const body = (await res.json()) as { items: KnownErrorRow[] }
     setKnownErrors(body.items)
-  }, [getToken])
+  }, [getToken, t])
 
   const fetchTicketLog = useCallback(async () => {
     const token = await getToken()
     const res = await fetch('/api/admin/support/ticket-log?limit=50', {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!res.ok) throw new Error('Failed to load ticket log')
+    if (!res.ok) throw new Error(t('loadFailed'))
     const body = (await res.json()) as { items: TicketLogRow[] }
     setTicketLog(body.items)
-  }, [getToken])
+  }, [getToken, t])
 
   useEffect(() => {
     void Promise.all([fetchStatus(), fetchKnownErrors(), fetchTicketLog()])
-      .catch((err) => toast.error(err instanceof Error ? err.message : 'Failed to load support data'))
+      .catch((err) => toast.error(err instanceof Error ? err.message : t('loadFailed')))
       .finally(() => setLoading(false))
-  }, [fetchStatus, fetchKnownErrors, fetchTicketLog])
+  }, [fetchStatus, fetchKnownErrors, fetchTicketLog, t])
 
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!subject.trim() || !message.trim()) {
-      toast.error('Subject and message are required')
+      toast.error(t('validationRequired'))
       return
     }
 
@@ -159,7 +193,7 @@ export function SupportManager() {
       setMessage('')
       void fetchTicketLog()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit ticket')
+      toast.error(err instanceof Error ? err.message : t('submitFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -168,7 +202,7 @@ export function SupportManager() {
   const handleAddKnownError = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newFingerprint.trim() || !newLabel.trim()) {
-      toast.error('Fingerprint and label are required')
+      toast.error(t('validationRequired'))
       return
     }
 
@@ -192,13 +226,13 @@ export function SupportManager() {
         throw new Error(getErrorMessage(body, tErrors))
       }
 
-      toast.success('Known error fingerprint added')
+      toast.success(t('knownErrorAdded'))
       setNewFingerprint('')
       setNewLabel('')
       setNewNotes('')
       await fetchKnownErrors()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add known error')
+      toast.error(err instanceof Error ? err.message : t('knownErrorAddFailed'))
     } finally {
       setSavingKnown(false)
     }
@@ -211,11 +245,11 @@ export function SupportManager() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error('Failed to delete')
-      toast.success('Known error removed')
+      if (!res.ok) throw new Error(t('knownErrorDeleteFailed'))
+      toast.success(t('knownErrorRemoved'))
       await fetchKnownErrors()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete')
+      toast.error(err instanceof Error ? err.message : t('knownErrorDeleteFailed'))
     }
   }
 
@@ -235,17 +269,15 @@ export function SupportManager() {
           {configured ? t('statusAvailableTitle') : t('statusUnavailableTitle')}
         </AlertTitle>
         <AlertDescription>
-          {configured && group
-            ? t('statusAvailableDescription', { group })
-            : t('statusUnavailableDescription')}
+          {configured ? t('statusAvailableDescription') : t('statusUnavailableDescription')}
         </AlertDescription>
       </Alert>
 
       <Tabs defaultValue="ticket">
-        <TabsList aria-label="Support sections">
-          <TabsTrigger value="ticket">New Ticket</TabsTrigger>
-          <TabsTrigger value="known">Known Errors</TabsTrigger>
-          <TabsTrigger value="log">Ticket Log</TabsTrigger>
+        <TabsList aria-label={t('tabsLabel')}>
+          <TabsTrigger value="ticket">{t('tabNewRequest')}</TabsTrigger>
+          <TabsTrigger value="known">{t('tabIgnoredErrors')}</TabsTrigger>
+          <TabsTrigger value="log">{t('tabHistory')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ticket" className="mt-4">
@@ -258,19 +290,19 @@ export function SupportManager() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="support-subject">Subject</Label>
+              <Label htmlFor="support-subject">{t('subjectLabel')}</Label>
               <Input
                 id="support-subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 maxLength={200}
                 required
-                placeholder="Brief summary of your question or issue"
+                placeholder={t('subjectPlaceholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="support-message">Message</Label>
+              <Label htmlFor="support-message">{t('messageLabel')}</Label>
               <Textarea
                 id="support-message"
                 value={message}
@@ -278,7 +310,7 @@ export function SupportManager() {
                 maxLength={10000}
                 required
                 rows={8}
-                placeholder="Describe your question or concern in detail…"
+                placeholder={t('messagePlaceholder')}
               />
             </div>
 
@@ -294,64 +326,63 @@ export function SupportManager() {
             <div className="flex items-start gap-3">
               <ShieldCheck size={22} className="text-primary shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <h2 className="text-lg font-semibold">Known error fingerprints</h2>
+                <h2 className="text-lg font-semibold">{t('ignoredErrorsTitle')}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Auto-generated system error tickets matching these fingerprints are suppressed.
-                  Copy fingerprints from the Ticket Log after an error occurs.
+                  {t('ignoredErrorsDescription')}
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleAddKnownError} className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="known-fingerprint">Fingerprint (SHA-256)</Label>
+                <Label htmlFor="known-fingerprint">{t('errorReferenceLabel')}</Label>
                 <Input
                   id="known-fingerprint"
                   value={newFingerprint}
                   onChange={(e) => setNewFingerprint(e.target.value)}
                   maxLength={128}
                   required
-                  placeholder="64-character hex fingerprint"
+                  placeholder={t('errorReferencePlaceholder')}
                   className="font-mono text-xs"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="known-label">Label</Label>
+                <Label htmlFor="known-label">{t('nameLabel')}</Label>
                 <Input
                   id="known-label"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   required
-                  placeholder="e.g. Hydration mismatch in portal"
+                  placeholder={t('namePlaceholder')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="known-notes">Notes (optional)</Label>
+                <Label htmlFor="known-notes">{t('notesLabel')}</Label>
                 <Input
                   id="known-notes"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  placeholder="Internal reference"
+                  placeholder={t('notesPlaceholder')}
                 />
               </div>
               <div className="sm:col-span-2">
                 <Button type="submit" disabled={savingKnown}>
-                  {savingKnown ? 'Saving…' : 'Add fingerprint'}
+                  {savingKnown ? t('saving') : t('addReference')}
                 </Button>
               </div>
             </form>
           </div>
 
           {knownErrors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No known error fingerprints yet.</p>
+            <p className="text-sm text-muted-foreground">{t('noIgnoredErrors')}</p>
           ) : (
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Fingerprint</TableHead>
-                    <TableHead>Added</TableHead>
+                    <TableHead>{t('tableLabel')}</TableHead>
+                    <TableHead>{t('tableReference')}</TableHead>
+                    <TableHead>{t('tableAdded')}</TableHead>
                     <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -371,7 +402,7 @@ export function SupportManager() {
                           variant="ghost"
                           size="icon"
                           onClick={() => void handleDeleteKnownError(row.id)}
-                          aria-label={`Remove ${row.label}`}
+                          aria-label={t('removeItem', { label: row.label })}
                           className="min-h-[44px] min-w-[44px]"
                         >
                           <Trash size={16} aria-hidden="true" />
@@ -387,18 +418,18 @@ export function SupportManager() {
 
         <TabsContent value="log" className="mt-4">
           {ticketLog.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No ticket submissions yet.</p>
+            <p className="text-sm text-muted-foreground">{t('historyEmpty')}</p>
           ) : (
             <div className="rounded-lg border border-border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Fingerprint</TableHead>
+                    <TableHead>{t('historyTime')}</TableHead>
+                    <TableHead>{t('historyType')}</TableHead>
+                    <TableHead>{t('historyStatus')}</TableHead>
+                    <TableHead>{t('historyFrom')}</TableHead>
+                    <TableHead>{t('historySubject')}</TableHead>
+                    <TableHead>{t('historyReference')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -408,10 +439,13 @@ export function SupportManager() {
                         {formatDate(row.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{row.ticket_type}</Badge>
+                        <Badge variant="outline">{ticketTypeLabel(row.ticket_type, t)}</Badge>
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={row.status} />
+                        <StatusBadge
+                          status={row.status}
+                          label={t(statusLabelKey(row.status))}
+                        />
                       </TableCell>
                       <TableCell className="text-sm">
                         <div>{row.customer_name ?? '—'}</div>
