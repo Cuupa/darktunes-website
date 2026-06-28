@@ -1,6 +1,7 @@
 /**
- * Last.fm API client — free listener history for artist analytics.
- * https://www.last.fm/api
+ * Last.fm API client — listener snapshots for artist analytics.
+ * Uses artist.getInfo (artist.getListeners is not a valid Last.fm method).
+ * https://www.last.fm/api/show/artist.getInfo
  */
 
 export interface LastfmListenerPoint {
@@ -8,12 +9,12 @@ export interface LastfmListenerPoint {
   listeners: number
 }
 
-interface LastfmListenersResponse {
-  listeners?: Array<{
-    '@attr'?: { from?: string; to?: string }
-    date?: { '#text'?: string; uts?: string }
-    listeners?: string
-  }>
+interface LastfmArtistInfoResponse {
+  artist?: {
+    stats?: {
+      listeners?: string
+    }
+  }
   error?: number
   message?: string
 }
@@ -36,35 +37,41 @@ export function aggregateLastfmListenersMonthly(
     .map(([period, listeners]) => ({ period, listeners }))
 }
 
+/** Returns the current UTC month as YYYY-MM. */
+export function currentUtcMonthPeriod(referenceDate = new Date()): string {
+  return referenceDate.toISOString().slice(0, 7)
+}
+
 export async function fetchLastfmListenerHistory(
   apiKey: string,
   artistName: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<LastfmListenerPoint[]> {
   const url = new URL(LASTFM_BASE)
-  url.searchParams.set('method', 'artist.getListeners')
+  url.searchParams.set('method', 'artist.getInfo')
   url.searchParams.set('artist', artistName)
   url.searchParams.set('api_key', apiKey)
   url.searchParams.set('format', 'json')
   url.searchParams.set('autocorrect', '1')
 
   const res = await fetchFn(url.toString())
-  if (!res.ok) {
-    throw new Error(`Last.fm request failed (${res.status})`)
-  }
+  const data = (await res.json()) as LastfmArtistInfoResponse
 
-  const data = (await res.json()) as LastfmListenersResponse
   if (data.error) {
     throw new Error(data.message ?? `Last.fm error ${data.error}`)
   }
 
-  const raw = (data.listeners ?? [])
-    .map((row) => {
-      const date = row.date?.['#text'] ?? ''
-      const listeners = Number.parseInt(row.listeners ?? '0', 10)
-      return { date, listeners: Number.isFinite(listeners) ? listeners : 0 }
-    })
-    .filter((row) => row.date.length > 0)
+  if (!res.ok) {
+    throw new Error(`Last.fm request failed (${res.status})`)
+  }
 
-  return aggregateLastfmListenersMonthly(raw)
+  const listeners = Number.parseInt(data.artist?.stats?.listeners ?? '0', 10)
+  const period = currentUtcMonthPeriod()
+
+  return [
+    {
+      period,
+      listeners: Number.isFinite(listeners) ? listeners : 0,
+    },
+  ]
 }

@@ -20,7 +20,16 @@ import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { updateUserRole, addUserRole, removeUserRole, banUser, deleteUser, logBanAction } from '@/lib/api/users'
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  updateUserRole,
+  addUserRole,
+  removeUserRole,
+  banUser,
+  deleteUser,
+  logBanAction,
+  updateUserDisplayName,
+} from '@/lib/api/users'
 import type { UserRole } from '@/types/users'
 
 // ---------------------------------------------------------------------------
@@ -35,6 +44,7 @@ const patchSchema = z.object({
   removeRole: z.enum(ROLES).optional(),
   ban: z.boolean().optional(),
   reason: z.string().optional(),
+  displayName: z.string().max(DISPLAY_NAME_MAX_LENGTH).nullable().optional(),
 })
 
 // ---------------------------------------------------------------------------
@@ -85,7 +95,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 
-  const { role, addRole, removeRole, ban, reason } = parsed.data
+  const { role, addRole, removeRole, ban, reason, displayName } = parsed.data
+
+  if (displayName !== undefined) {
+    await updateUserDisplayName(adminClient, targetId, displayName)
+  }
 
   // Legacy single-role update
   if (role !== undefined) {

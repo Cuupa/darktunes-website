@@ -30,13 +30,15 @@ function makeArtistBuilder(
 }
 
 function makeReleasesTableBuilder(
-  data: unknown = { id: 'r1', title: 'Test' },
+  data: unknown = DEFAULT_RELEASE_ROW,
   listData: unknown[] = [],
 ) {
   const listResult = { data: listData, error: null }
   const listPromise = Promise.resolve(listResult)
   const singleResult = { data, error: null }
   const singlePromise = Promise.resolve(singleResult)
+  const maybeSingleResult = { data: null, error: null }
+  const maybeSinglePromise = Promise.resolve(maybeSingleResult)
   const updateResult = { data: null, error: null }
   const updatePromise = Promise.resolve(updateResult)
 
@@ -52,6 +54,12 @@ function makeReleasesTableBuilder(
     finally: listPromise.finally.bind(listPromise),
   }
 
+  builder.maybeSingle = vi.fn().mockImplementation(() => ({
+    then: maybeSinglePromise.then.bind(maybeSinglePromise),
+    catch: maybeSinglePromise.catch.bind(maybeSinglePromise),
+    finally: maybeSinglePromise.finally.bind(maybeSinglePromise),
+  }))
+
   builder.single = vi.fn().mockImplementation(() => ({
     then: singlePromise.then.bind(singlePromise),
     catch: singlePromise.catch.bind(singlePromise),
@@ -60,6 +68,13 @@ function makeReleasesTableBuilder(
 
   builder.update = vi.fn().mockReturnValue({
     eq: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockImplementation(() => ({
+          then: singlePromise.then.bind(singlePromise),
+          catch: singlePromise.catch.bind(singlePromise),
+          finally: singlePromise.finally.bind(singlePromise),
+        })),
+      }),
       then: updatePromise.then.bind(updatePromise),
       catch: updatePromise.catch.bind(updatePromise),
       finally: updatePromise.finally.bind(updatePromise),
@@ -90,6 +105,22 @@ function makeGenericBuilder(data: unknown = null, error: unknown = null) {
 
 const ARTIST_ID = 'artist-uuid-1'
 const ARTIST_ROW: ArtistRow = { id: ARTIST_ID, name: 'Test Artist' }
+
+const DEFAULT_RELEASE_ROW = {
+  id: 'r1',
+  title: 'Test Album',
+  release_date: '2024-01-15',
+  spotify_id: null,
+  itunes_id: '123',
+  discogs_id: null,
+  isrc: null,
+  barcode: null,
+  artist_id: ARTIST_ID,
+  cover_art: null,
+  type: 'album',
+  apple_music_url: 'https://music.apple.com/album/123',
+  featured: false,
+}
 
 const ITUNES_RELEASE = {
   wrapperType: 'collection',

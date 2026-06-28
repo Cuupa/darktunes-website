@@ -12,6 +12,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { UserRole, UserWithProfile, RoleChangeRecord, BanRecord, LinkedArtist } from '@/types/users'
 import { parseCompactArtist } from '@/lib/types/jsonColumns'
+import { stripEmojis } from '@/lib/stripEmojis'
+
+export const DISPLAY_NAME_MAX_LENGTH = 80
+
+/** Normalises a user-visible display name for storage in users.full_name. */
+export function normalizeDisplayName(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const trimmed = stripEmojis(value).trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, DISPLAY_NAME_MAX_LENGTH)
+}
 
 type DbClient = SupabaseClient<Database>
 
@@ -265,6 +276,30 @@ export async function removeUserRole(
  * Requires service-role client (bypasses RLS).
  * @deprecated Prefer addUserRole / removeUserRole for multi-role support.
  */
+/**
+ * Updates users.full_name for the given account.
+ * Pass null/empty to clear the stored display name.
+ */
+export async function updateUserDisplayName(
+  db: DbClient,
+  userId: string,
+  displayName: string | null | undefined,
+): Promise<string | null> {
+  const full_name = normalizeDisplayName(displayName)
+
+  const { data, error } = await db
+    .from('users')
+    .update({ full_name })
+    .eq('id', userId)
+    .select('full_name')
+    .single()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error(`No profile found for user ${userId}`)
+
+  return data.full_name
+}
+
 export async function updateUserRole(
   adminClient: DbClient,
   userId: string,

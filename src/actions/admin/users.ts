@@ -17,6 +17,8 @@ import {
   banUser,
   deleteUser,
   logBanAction,
+  updateUserDisplayName,
+  DISPLAY_NAME_MAX_LENGTH,
 } from '@/lib/api/users'
 import { requestUserInvite } from '@/lib/auth/requestUserInvite'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
@@ -70,6 +72,7 @@ const patchSchema = z.object({
   removeRole: z.enum(ROLES).optional(),
   ban: z.boolean().optional(),
   reason: z.string().optional(),
+  displayName: z.string().max(DISPLAY_NAME_MAX_LENGTH).nullable().optional(),
 })
 
 export async function updateUserAction(
@@ -80,6 +83,7 @@ export async function updateUserAction(
     removeRole?: UserRole
     ban?: boolean
     reason?: string
+    displayName?: string | null
   }
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
@@ -95,7 +99,11 @@ export async function updateUserAction(
       throw new Error(`Validation Error: ${message}`)
     }
 
-    const { role, addRole, removeRole, ban, reason } = parsed.data
+    const { role, addRole, removeRole, ban, reason, displayName } = parsed.data
+
+    if (displayName !== undefined) {
+      await updateUserDisplayName(adminClient, targetId, displayName)
+    }
 
     if (role !== undefined) {
       await updateUserRole(adminClient, targetId, role)

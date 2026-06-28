@@ -5,6 +5,7 @@
  */
 
 import { PDFDocument, PDFName, PDFString } from 'pdf-lib'
+import { EPK_PDF_SAVE_OPTIONS } from './pdfSaveOptions'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 
 export async function addPdfBookmarksFromPages(
@@ -50,7 +51,7 @@ export async function addPdfBookmarksFromPages(
     outlinesDict.set(PDFName.of('Last'), itemRefs[itemRefs.length - 1])
     pdfDoc.catalog.set(PDFName.of('Outlines'), outlinesRef)
 
-    return pdfDoc.save({ useObjectStreams: true })
+    return pdfDoc.save(EPK_PDF_SAVE_OPTIONS)
   } catch {
     return pdfBytes
   }

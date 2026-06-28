@@ -1,6 +1,5 @@
 declare module 'fontkit' {
-  import type { Fontkit } from 'pdf-lib'
+  import type { Font } from 'pdf-lib'
 
-  const fontkit: Fontkit
-  export default fontkit
+  export function create(buffer: Uint8Array, postscriptName?: string): Font
 }

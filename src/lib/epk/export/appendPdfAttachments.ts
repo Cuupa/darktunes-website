@@ -5,6 +5,7 @@
  */
 
 import { PDFDocument } from 'pdf-lib'
+import { EPK_PDF_SAVE_OPTIONS } from './pdfSaveOptions'
 import { fetchRemoteBytes } from './fetchRemoteBytes'
 
 export async function appendPdfAttachments(
@@ -32,5 +33,5 @@ export async function appendPdfAttachments(
     }
   }
 
-  return mainDoc.save({ useObjectStreams: true })
+  return mainDoc.save(EPK_PDF_SAVE_OPTIONS)
 }

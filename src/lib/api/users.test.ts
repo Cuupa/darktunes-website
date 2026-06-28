@@ -15,6 +15,8 @@ import {
   linkArtistToUser,
   unlinkArtistFromUser,
   syncInvitedUserAccess,
+  normalizeDisplayName,
+  updateUserDisplayName,
 } from './users'
 
 type DbClient = SupabaseClient<Database>
@@ -212,6 +214,35 @@ describe('listUsersWithProfiles', () => {
     })
 
     await expect(listUsersWithProfiles(client)).rejects.toThrow('DB error')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// normalizeDisplayName / updateUserDisplayName
+// ---------------------------------------------------------------------------
+
+describe('normalizeDisplayName', () => {
+  it('trims and caps length', () => {
+    expect(normalizeDisplayName('  Alex  ')).toBe('Alex')
+    expect(normalizeDisplayName('a'.repeat(120))?.length).toBe(80)
+  })
+
+  it('returns null for empty values', () => {
+    expect(normalizeDisplayName('   ')).toBeNull()
+    expect(normalizeDisplayName(null)).toBeNull()
+  })
+})
+
+describe('updateUserDisplayName', () => {
+  it('updates users.full_name', async () => {
+    const builder = makeBuilder({ full_name: 'Alex' }, null)
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+
+    const result = await updateUserDisplayName(db, 'user-1', 'Alex')
+
+    expect(result).toBe('Alex')
+    expect(builder.update).toHaveBeenCalledWith({ full_name: 'Alex' })
+    expect(builder.eq).toHaveBeenCalledWith('id', 'user-1')
   })
 })
 

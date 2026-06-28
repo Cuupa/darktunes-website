@@ -15,7 +15,7 @@
  *  - Skeleton loading states consistent with ArtistsManager
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Users,
@@ -29,6 +29,8 @@ import {
   EnvelopeSimple,
   UserPlus,
   PencilSimple,
+  CaretUp,
+  CaretDown,
 } from '@phosphor-icons/react'
 import { useUsers } from '@/hooks/useUsers'
 import { useArtists } from '@/hooks/useArtists'
@@ -80,6 +82,67 @@ import {
 } from '@/components/ui/tooltip'
 import { INVITABLE_ROLES, type InvitableRole, type UserWithProfile, type UserRole } from '@/types/users'
 
+type UserSortField = 'email' | 'name' | 'role' | 'status' | 'lastLogin'
+type SortDir = 'asc' | 'desc'
+
+function compareUsers(a: UserWithProfile, b: UserWithProfile, field: UserSortField): number {
+  switch (field) {
+    case 'email':
+      return a.email.localeCompare(b.email, undefined, { sensitivity: 'base' })
+    case 'name':
+      return (a.displayName ?? '').localeCompare(b.displayName ?? '', undefined, { sensitivity: 'base' })
+    case 'role':
+      return (a.roles?.[0] ?? a.role).localeCompare(b.roles?.[0] ?? b.role)
+    case 'status': {
+      const aBanned = !!a.banned_until && new Date(a.banned_until) > new Date()
+      const bBanned = !!b.banned_until && new Date(b.banned_until) > new Date()
+      return Number(aBanned) - Number(bBanned)
+    }
+    case 'lastLogin': {
+      const aTime = a.last_sign_in_at ? new Date(a.last_sign_in_at).getTime() : 0
+      const bTime = b.last_sign_in_at ? new Date(b.last_sign_in_at).getTime() : 0
+      return aTime - bTime
+    }
+  }
+}
+
+function SortableHeader({
+  label,
+  field,
+  activeField,
+  sortDir,
+  onSort,
+}: {
+  label: string
+  field: UserSortField
+  activeField: UserSortField
+  sortDir: SortDir
+  onSort: (field: UserSortField) => void
+}) {
+  const active = activeField === field
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+      onClick={() => onSort(field)}
+      aria-label={
+        active
+          ? `Sort ${label} ${sortDir === 'asc' ? 'descending' : 'ascending'}`
+          : `Sort by ${label}`
+      }
+    >
+      {label}
+      {active ? (
+        sortDir === 'asc' ? (
+          <CaretUp size={12} aria-hidden="true" />
+        ) : (
+          <CaretDown size={12} aria-hidden="true" />
+        )
+      ) : null}
+    </button>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Skeleton rows — same column count as the real table
 // ---------------------------------------------------------------------------
@@ -95,6 +158,7 @@ function UserSkeletonRows() {
           <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-8 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-24" /></TableCell>
         </TableRow>
       ))}
     </>
@@ -135,11 +199,14 @@ function RoleBadgeList({ roles }: { roles: UserRole[] }) {
 export function UsersManager() {
   const { user: currentUser } = useAuthContext()
   const router = useRouter()
-  const { users, isLoading, toggleBan, deleteUser, linkArtist, unlinkArtist } = useUsers()
+  const { users, isLoading, toggleBan, deleteUser, linkArtist, unlinkArtist, updateDisplayName } =
+    useUsers()
   const { artists } = useArtists()
 
-  // Filter state
+  // Filter + sort state
   const [filter, setFilter] = useState('')
+  const [sortField, setSortField] = useState<UserSortField>('email')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   // Confirmation dialogs
   const [banTarget, setBanTarget] = useState<UserWithProfile | null>(null)
@@ -158,6 +225,8 @@ export function UsersManager() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<InvitableRole>('artist')
   const [isInviting, setIsInviting] = useState(false)
+  const [nameEditTarget, setNameEditTarget] = useState<UserWithProfile | null>(null)
+  const [nameEditValue, setNameEditValue] = useState('')
 
   const [isMutating, setIsMutating] = useState(false)
 
@@ -173,17 +242,39 @@ export function UsersManager() {
     [artists, linkedArtistIds],
   )
 
-  // Client-side filter — matches email, display name, or any role
+  const handleSort = useCallback((field: UserSortField) => {
+    setSortField((current) => {
+      if (current === field) {
+        setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+        return current
+      }
+      setSortDir('asc')
+      return field
+    })
+  }, [])
+
+  // Client-side quick search + column sort
   const filteredUsers = useMemo(() => {
-    if (!filter.trim()) return users
-    const q = filter.toLowerCase()
-    return users.filter(
-      (u) =>
-        u.email.toLowerCase().includes(q) ||
-        (u.displayName?.toLowerCase().includes(q) ?? false) ||
-        (u.roles ?? [u.role]).some((r) => r.toLowerCase().includes(q)),
-    )
-  }, [users, filter])
+    const q = filter.trim().toLowerCase()
+    const matched = q
+      ? users.filter((u) => {
+          const bandNames = (u.linked_artists ?? [])
+            .map((a) => a.name)
+            .concat(u.linked_artist?.name ?? '')
+          return (
+            u.email.toLowerCase().includes(q) ||
+            (u.displayName?.toLowerCase().includes(q) ?? false) ||
+            (u.roles ?? [u.role]).some((r) => r.toLowerCase().includes(q)) ||
+            bandNames.some((name) => name.toLowerCase().includes(q))
+          )
+        })
+      : users
+
+    return [...matched].sort((a, b) => {
+      const cmp = compareUsers(a, b, sortField)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [users, filter, sortField, sortDir])
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -230,6 +321,23 @@ export function UsersManager() {
       await unlinkArtist(user.id)
     } finally {
       setIsMutating(false)
+    }
+  }
+
+  const handleNameEditOpen = (user: UserWithProfile) => {
+    setNameEditTarget(user)
+    setNameEditValue(user.displayName ?? '')
+  }
+
+  const handleNameEditConfirm = async () => {
+    if (!nameEditTarget) return
+    setIsMutating(true)
+    try {
+      await updateDisplayName(nameEditTarget.id, nameEditValue.trim() || null)
+    } finally {
+      setIsMutating(false)
+      setNameEditTarget(null)
+      setNameEditValue('')
     }
   }
 
@@ -291,10 +399,11 @@ export function UsersManager() {
               aria-hidden="true"
             />
             <Input
-              placeholder="Filter by email or role…"
+              placeholder="Quick search: email, name, role, band…"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="pl-8 h-8 text-sm"
+              aria-label="Search users"
             />
           </div>
         </div>
@@ -303,12 +412,52 @@ export function UsersManager() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Role</TableHead>
+              <TableHead>
+                <SortableHeader
+                  label="Email"
+                  field="email"
+                  activeField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableHeader
+                  label="Name"
+                  field="name"
+                  activeField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableHeader
+                  label="Role"
+                  field="role"
+                  activeField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </TableHead>
               <TableHead>Linked Band</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
+              <TableHead>
+                <SortableHeader
+                  label="Status"
+                  field="status"
+                  activeField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableHeader
+                  label="Last Login"
+                  field="lastLogin"
+                  activeField={sortField}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -317,7 +466,7 @@ export function UsersManager() {
               <UserSkeletonRows />
             ) : filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   {filter ? 'No users match the filter.' : 'No users found.'}
                 </TableCell>
               </TableRow>
@@ -340,7 +489,21 @@ export function UsersManager() {
 
                     {/* Display name from profiles */}
                     <TableCell className="text-sm text-muted-foreground">
-                      {u.displayName ?? '—'}
+                      <div className="flex items-center gap-1.5">
+                        <span>{u.displayName ?? '—'}</span>
+                        {!self && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleNameEditOpen(u)}
+                            disabled={isMutating}
+                            aria-label={`Edit display name for ${u.email}`}
+                          >
+                            <PencilSimple size={13} aria-hidden="true" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Role display — multi-role badges, click to edit detail */}
@@ -670,6 +833,52 @@ export function UsersManager() {
             {historyTarget && (
               <RoleChangeHistory userId={historyTarget.id} />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Display name edit dialog */}
+        <Dialog
+          open={!!nameEditTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setNameEditTarget(null)
+              setNameEditValue('')
+            }
+          }}
+        >
+          <DialogContent aria-describedby="name-edit-desc" aria-labelledby="name-edit-title">
+            <DialogHeader>
+              <DialogTitle id="name-edit-title">Edit display name</DialogTitle>
+            </DialogHeader>
+            <p id="name-edit-desc" className="text-sm text-muted-foreground">
+              Set how <strong>{nameEditTarget?.email}</strong> appears in the admin dashboard.
+            </p>
+            <div className="space-y-1.5 py-2">
+              <Label htmlFor="user-display-name">Display name</Label>
+              <Input
+                id="user-display-name"
+                value={nameEditValue}
+                onChange={(e) => setNameEditValue(e.target.value)}
+                placeholder="e.g. Alex Müller"
+                maxLength={80}
+                disabled={isMutating}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setNameEditTarget(null)
+                  setNameEditValue('')
+                }}
+                disabled={isMutating}
+              >
+                Cancel
+              </Button>
+              <Button onClick={() => void handleNameEditConfirm()} disabled={isMutating}>
+                Save
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
