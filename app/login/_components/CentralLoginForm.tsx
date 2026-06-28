@@ -42,10 +42,18 @@ export function CentralLoginForm() {
   const errorParam = searchParams.get('error')
   const isRecoveryUrl = searchParams.get('type') === 'recovery'
   const isInviteUrl = searchParams.get('type') === 'invite'
-  const isPasswordSetupUrl = isRecoveryUrl || isInviteUrl
+  const [hashInviteFlow, setHashInviteFlow] = useState(false)
+  const isPasswordSetupUrl = isRecoveryUrl || isInviteUrl || hashInviteFlow
+  const allowInviteSignIn = isInviteUrl || hashInviteFlow
   const recoveryCode = searchParams.get('code')
   const recoveryTokenHash = searchParams.get('token_hash')
   const recoveryExchanged = searchParams.get('exchanged') === '1'
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=invite')) {
+      setHashInviteFlow(true)
+    }
+  }, [])
 
   useEffect(() => {
     if (isPasswordSetupUrl) {
@@ -64,11 +72,11 @@ export function CentralLoginForm() {
     }
 
     if (recoveryTokenHash) {
-      const params = new URLSearchParams({
-        recovery: '1',
-        token_hash: recoveryTokenHash,
-        type: 'recovery',
-      })
+      const params = new URLSearchParams(
+        allowInviteSignIn
+          ? { invite: '1', token_hash: recoveryTokenHash, type: 'invite' }
+          : { recovery: '1', token_hash: recoveryTokenHash, type: 'recovery' },
+      )
       window.location.replace(`/auth/callback?${params}`)
       return
     }
@@ -77,6 +85,7 @@ export function CentralLoginForm() {
     let cancelled = false
     let hashFallbackTimer: number | undefined
     const serverExchangeSucceeded = recoveryExchanged
+    const passwordSetupOptions = { serverExchangeSucceeded, allowInviteSignIn }
 
     const markReady = () => {
       if (cancelled) return
@@ -93,8 +102,8 @@ export function CentralLoginForm() {
       event: string,
       accessToken: string | undefined,
     ) => {
-      if (!isRecoverySessionEvent(event, { serverExchangeSucceeded })) return
-      if (canUseRecoverySession(accessToken, { serverExchangeSucceeded })) {
+      if (!isRecoverySessionEvent(event, passwordSetupOptions)) return
+      if (canUseRecoverySession(accessToken, passwordSetupOptions)) {
         markReady()
       }
     }
@@ -133,7 +142,10 @@ export function CentralLoginForm() {
           const { data: { session } } = await supabase.auth.getSession()
           if (
             session &&
-            canUseRecoverySession(session.access_token, { serverExchangeSucceeded: true })
+            canUseRecoverySession(session.access_token, {
+              serverExchangeSucceeded: true,
+              allowInviteSignIn,
+            })
           ) {
             markReady()
             return
@@ -144,7 +156,10 @@ export function CentralLoginForm() {
             const { data: { session: refreshed } } = await supabase.auth.getSession()
             if (
               refreshed &&
-              canUseRecoverySession(refreshed.access_token, { serverExchangeSucceeded: true })
+              canUseRecoverySession(refreshed.access_token, {
+                serverExchangeSucceeded: true,
+                allowInviteSignIn,
+              })
             ) {
               markReady()
               return
@@ -168,7 +183,7 @@ export function CentralLoginForm() {
       if (hashFallbackTimer !== undefined) window.clearTimeout(hashFallbackTimer)
       subscription.unsubscribe()
     }
-  }, [view, recoveryCode, recoveryTokenHash, recoveryExchanged, errorParam, isInviteUrl, t])
+  }, [view, recoveryCode, recoveryTokenHash, recoveryExchanged, errorParam, allowInviteSignIn, t])
 
   const redirectAfterAuth = async () => {
     const supabase = createBrowserSupabaseClient()
@@ -256,6 +271,7 @@ export function CentralLoginForm() {
         !session ||
         !canUseRecoverySession(session.access_token, {
           serverExchangeSucceeded: recoveryExchanged,
+          allowInviteSignIn,
         })
       ) {
         setRecoveryError(t('login_recovery_error'))

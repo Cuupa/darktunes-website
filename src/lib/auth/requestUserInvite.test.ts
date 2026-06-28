@@ -81,7 +81,7 @@ describe('requestUserInvite', () => {
       userId: 'new-user-id',
     })
     expect(mockInviteUserByEmail).toHaveBeenCalledWith('user@example.com', {
-      redirectTo: 'https://darktunes.com/login',
+      redirectTo: 'https://darktunes.com/login?type=invite',
       data: { role: 'editor' },
     })
     expect(mockSyncInvitedUserAccess).toHaveBeenCalledWith(

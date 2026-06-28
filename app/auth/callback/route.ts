@@ -189,6 +189,23 @@ export async function GET(request: NextRequest) {
     return exchangeRecoveryCode(request, code, origin)
   }
 
+  if (isInvite && code) {
+    const destination = searchParams.get('portal') === '1'
+      ? invitePortalUrl(origin, { exchanged: '1' })
+      : inviteLoginUrl(origin, { exchanged: '1' })
+    const { supabase, getResponse } = createInviteCookieClient(request, destination)
+    await supabase.auth.signOut()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      const failureResponse = NextResponse.redirect(inviteLoginUrl(origin, { error: 'auth_failed' }))
+      for (const cookie of getResponse().cookies.getAll()) {
+        failureResponse.cookies.set(cookie.name, cookie.value)
+      }
+      return failureResponse
+    }
+    return getResponse()
+  }
+
   const supabase = await createServerSupabaseClient()
   const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
 

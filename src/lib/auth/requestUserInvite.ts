@@ -65,7 +65,7 @@ async function sendViaSupabaseFallback(
 ): Promise<RequestUserInviteResult> {
   const redirectTo = options.portal
     ? `${siteUrl.replace(/\/$/, '')}/portal/accept-invite`
-    : `${siteUrl.replace(/\/$/, '')}/login`
+    : `${siteUrl.replace(/\/$/, '')}/login?type=invite`
 
   const { data, error } = await client.auth.admin.inviteUserByEmail(options.email, {
     redirectTo,

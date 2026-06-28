@@ -541,6 +541,7 @@
     "messageLabel": "Message",
     "messagePlaceholder": "Describe your question or concern in detail…",
     "validationRequired": "Subject and message are required.",
+    "knownErrorValidationRequired": "Reference and name are required.",
     "tabsLabel": "Support sections",
     "tabNewRequest": "New request",
     "tabIgnoredErrors": "Ignored errors",

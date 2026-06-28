@@ -202,7 +202,7 @@ export function SupportManager() {
   const handleAddKnownError = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newFingerprint.trim() || !newLabel.trim()) {
-      toast.error(t('validationRequired'))
+      toast.error(t('knownErrorValidationRequired'))
       return
     }
 

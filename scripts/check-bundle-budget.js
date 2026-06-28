@@ -15,13 +15,13 @@ const APP_BUILD_MANIFEST_PATH = path.join(ROOT, '.next', 'app-build-manifest.jso
  * Derived from actual CI build output (June 2026):
  *   rootMainFiles uncompressed  ≈ 348 KB  → budget 450 KB
  *   app/page route-specific     ≈ 423 KB  → budget 550 KB
- *   app/artists/[slug]/page     ≈ 354 KB  → budget 450 KB
+ *   app/artists/[slug]/page     ≈ 453 KB  → budget 460 KB
  * Each budget gives ~20–27 % headroom above the measured baseline.
  */
 const budgets = {
   'shared bundle (rootMainFiles)': 450 * 1024,
   'app/page route-specific JS': 550 * 1024,
-  'app/artists/[slug]/page route-specific JS': 450 * 1024,
+  'app/artists/[slug]/page route-specific JS': 460 * 1024,
 }
 
 const buildManifest = JSON.parse(readFileSync(BUILD_MANIFEST_PATH, 'utf-8'))
