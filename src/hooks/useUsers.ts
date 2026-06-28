@@ -155,6 +155,31 @@ export function useUsers() {
     [authHeaders, load],
   )
 
+  const updateDisplayName = useCallback(
+    async (userId: string, displayName: string | null): Promise<void> => {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, displayName: displayName?.trim() || null } : u)),
+      )
+      try {
+        const res = await fetch(`/api/admin/users/${userId}`, {
+          method: 'PATCH',
+          headers: await authHeaders(),
+          body: JSON.stringify({ displayName }),
+        })
+        if (!res.ok) {
+          const err = (await res.json()) as { error?: string }
+          throw new Error(err.error ?? 'Failed to update display name')
+        }
+        toast.success('Display name updated')
+        await load()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to update display name')
+        await load()
+      }
+    },
+    [authHeaders, load],
+  )
+
   const unlinkArtist = useCallback(
     async (userId: string): Promise<void> => {
       try {
@@ -185,5 +210,6 @@ export function useUsers() {
     deleteUser,
     linkArtist,
     unlinkArtist,
+    updateDisplayName,
   }
 }

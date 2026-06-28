@@ -11,5 +11,11 @@ export default async function PortalSettingsPage() {
 
   if (!user?.email) return null
 
-  return <SettingsPanel email={user.email} />
+  const { data: profile } = await supabase
+    .from('users')
+    .select('full_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  return <SettingsPanel email={user.email} displayName={profile?.full_name ?? ''} />
 }

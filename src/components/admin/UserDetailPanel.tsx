@@ -33,6 +33,7 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -119,6 +120,7 @@ export function UserDetailPanel() {
   const [linkArtistId, setLinkArtistId] = useState('')
   const [linkMemberRole, setLinkMemberRole] = useState<'owner' | 'member' | 'guest'>('owner')
   const [showLinkDialog, setShowLinkDialog] = useState(false)
+  const [displayNameValue, setDisplayNameValue] = useState('')
 
   // ---------------------------------------------------------------------------
   // Fetch helpers
@@ -153,6 +155,7 @@ export function UserDetailPanel() {
         return
       }
       setUser(found)
+      setDisplayNameValue(found.displayName ?? '')
 
       if (artistsRes.ok) {
         const { artists } = (await artistsRes.json()) as { artists: Artist[] }
@@ -203,6 +206,24 @@ export function UserDetailPanel() {
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to remove role')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const saveDisplayName = async () => {
+    setIsMutating(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ displayName: displayNameValue.trim() || null }),
+      })
+      if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
+      toast.success('Display name updated')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update display name')
     } finally {
       setIsMutating(false)
     }
@@ -361,6 +382,27 @@ export function UserDetailPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2 max-w-md">
+            <Label htmlFor="admin-user-display-name">Display name</Label>
+            <div className="flex gap-2">
+              <Input
+                id="admin-user-display-name"
+                value={displayNameValue}
+                onChange={(e) => setDisplayNameValue(e.target.value)}
+                placeholder="e.g. Alex Müller"
+                maxLength={80}
+                disabled={isMutating}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void saveDisplayName()}
+                disabled={isMutating}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
             <div>
               <span className="font-medium text-foreground">Created: </span>
