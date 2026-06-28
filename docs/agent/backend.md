@@ -80,6 +80,17 @@ Both use `requestPasswordReset()` in `src/lib/auth/requestPasswordReset.ts`:
 
 Recovery landing page unchanged: `/login?type=recovery`.
 
+## User invite email
+
+Admin: `POST /api/admin/users/invite` and `POST /api/admin/artists/:id/invite`.
+
+Both use `requestUserInvite()` in `src/lib/auth/requestUserInvite.ts`:
+
+1. **Resend configured**: `auth.admin.generateLink({ type: 'invite' })` → branded HTML via `sendInviteEmail()`; link verifies at `/auth/callback?invite=1` then lands on `/login?type=invite` (general) or `/portal/accept-invite` (artist).
+2. **Resend not configured or send fails**: falls back to `auth.admin.inviteUserByEmail()` (Supabase built-in template).
+
+Role and optional `artist_id` are written to auth user metadata; `handle_new_auth_user` + `syncInvitedUserAccess()` keep `users`, `user_roles`, and `artist_members` in sync.
+
 ## Admin users & feature flags
 
 Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `site_settings.feature_toggles` (global `promoPool`, `editorTools`) + `portal_feature_flags` (per-module). See [features.md](features.md#feature-flags-admin-adminfeatures).

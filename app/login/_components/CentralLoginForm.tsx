@@ -41,15 +41,17 @@ export function CentralLoginForm() {
 
   const errorParam = searchParams.get('error')
   const isRecoveryUrl = searchParams.get('type') === 'recovery'
+  const isInviteUrl = searchParams.get('type') === 'invite'
+  const isPasswordSetupUrl = isRecoveryUrl || isInviteUrl
   const recoveryCode = searchParams.get('code')
   const recoveryTokenHash = searchParams.get('token_hash')
   const recoveryExchanged = searchParams.get('exchanged') === '1'
 
   useEffect(() => {
-    if (isRecoveryUrl) {
+    if (isPasswordSetupUrl) {
       setView('recovery')
     }
-  }, [isRecoveryUrl])
+  }, [isPasswordSetupUrl])
 
   useEffect(() => {
     if (view !== 'recovery') return
@@ -113,7 +115,8 @@ export function CentralLoginForm() {
 
       const hasHashTokens =
         window.location.hash.includes('access_token') ||
-        window.location.hash.includes('type=recovery')
+        window.location.hash.includes('type=recovery') ||
+        window.location.hash.includes('type=invite')
 
       if (hasHashTokens) {
         // Let Supabase parse the hash — only PASSWORD_RECOVERY unlocks the form.
@@ -165,7 +168,7 @@ export function CentralLoginForm() {
       if (hashFallbackTimer !== undefined) window.clearTimeout(hashFallbackTimer)
       subscription.unsubscribe()
     }
-  }, [view, recoveryCode, recoveryTokenHash, recoveryExchanged, errorParam, t])
+  }, [view, recoveryCode, recoveryTokenHash, recoveryExchanged, errorParam, isInviteUrl, t])
 
   const redirectAfterAuth = async () => {
     const supabase = createBrowserSupabaseClient()

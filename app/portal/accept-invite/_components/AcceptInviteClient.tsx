@@ -16,7 +16,7 @@ import { useTranslations } from 'next-intl'
  */
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { MusicNote, CheckCircle, Warning } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,8 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 export function AcceptInviteClient() {
   const t = useTranslations('portal')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteExchanged = searchParams.get('exchanged') === '1'
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -51,15 +53,17 @@ export function AcceptInviteClient() {
       }
     })
 
-    // Also check if there's already an active session (e.g. page refresh)
+    // Server-side /auth/callback exchange (Resend branded invite links)
     void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setSessionReady(true)
+      if (session && (inviteExchanged || session.user)) {
+        setSessionReady(true)
+      }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [inviteExchanged])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

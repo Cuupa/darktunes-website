@@ -18,6 +18,8 @@ import {
   deleteUser,
   logBanAction,
 } from '@/lib/api/users'
+import { requestUserInvite } from '@/lib/auth/requestUserInvite'
+import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import type { UserRole, UserWithProfile } from '@/types/users'
 
 // ---------------------------------------------------------------------------
@@ -199,7 +201,7 @@ const inviteSchema = z.object({
 
 export async function inviteUserAction(payload: { email: string; role: UserRole }): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    const { adminClient } = await requireAdmin()
+    const { adminClient, currentUserId } = await requireAdmin()
 
     const parsed = inviteSchema.safeParse(payload)
     if (!parsed.success) {
@@ -207,16 +209,26 @@ export async function inviteUserAction(payload: { email: string; role: UserRole 
     }
     const { email, role } = parsed.data
 
-    const { error: inviteError, data } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { role },
-    })
+    const { resendApiKey, resendFromEmail } = await getEmailCredentials(adminClient)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com'
 
-    if (inviteError) {
-      throw new Error(inviteError.message)
+    const result = await requestUserInvite(
+      adminClient,
+      { email, role, grantedBy: currentUserId },
+      {
+        resendApiKey,
+        resendFromEmail: resendFromEmail ?? 'noreply@darktunes.com',
+        siteUrl,
+        fetch,
+      },
+    )
+
+    if (result.alreadyRegistered) {
+      throw new Error(`A user with email "${email}" already exists.`)
     }
 
-    if (data?.user?.id && role !== 'user') {
-      await updateUserRole(adminClient, data.user.id, role)
+    if (!result.sent) {
+      throw new Error(result.error ?? 'Failed to send invite')
     }
 
     return { success: true }
