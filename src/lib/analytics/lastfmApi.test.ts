@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   aggregateLastfmListenersMonthly,
+  currentUtcMonthPeriod,
   fetchLastfmListenerHistory,
 } from './lastfmApi'
 
@@ -17,21 +18,26 @@ describe('lastfmApi', () => {
     ])
   })
 
-  it('parses Last.fm listener history response', async () => {
+  it('parses Last.fm artist.getInfo listener snapshot', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
-          listeners: [
-            { date: { '#text': '2024-01-10' }, listeners: '42' },
-            { date: { '#text': '2024-01-25' }, listeners: '55' },
-          ],
+          artist: {
+            stats: {
+              listeners: '12345',
+            },
+          },
         }),
     })
 
     const result = await fetchLastfmListenerHistory('test-key', 'Test Artist', mockFetch)
-    expect(result).toEqual([{ period: '2024-01', listeners: 55 }])
+    expect(result).toEqual([
+      { period: currentUtcMonthPeriod(), listeners: 12345 },
+    ])
     expect(mockFetch).toHaveBeenCalledOnce()
+    const calledUrl = new URL(mockFetch.mock.calls[0][0] as string)
+    expect(calledUrl.searchParams.get('method')).toBe('artist.getInfo')
   })
 
   it('throws on Last.fm API error payload', async () => {

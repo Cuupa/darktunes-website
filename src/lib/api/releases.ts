@@ -338,6 +338,46 @@ function pickSyncWritableFields(data: ReleaseInsert): ReleaseUpdate {
   return patch
 }
 
+const CROSS_SOURCE_RELEASE_SELECT =
+  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode'
+
+function rowToCrossSourceRelease(row: {
+  id: string
+  title: string
+  release_date: string
+  spotify_id: string | null
+  itunes_id: string | null
+  discogs_id: string | null
+  isrc: string | null
+  barcode: string | null
+}): CrossSourceReleaseRow {
+  return {
+    id: row.id,
+    title: row.title,
+    release_date: row.release_date,
+    spotify_id: row.spotify_id,
+    itunes_id: row.itunes_id,
+    discogs_id: row.discogs_id,
+    isrc: row.isrc,
+    barcode: row.barcode,
+  }
+}
+
+async function findReleaseByExternalId(
+  db: DbClient,
+  column: 'itunes_id' | 'spotify_id' | 'discogs_id',
+  value: string,
+): Promise<CrossSourceReleaseRow | null> {
+  const { data, error } = await db
+    .from('releases')
+    .select(CROSS_SOURCE_RELEASE_SELECT)
+    .eq(column, value)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? rowToCrossSourceRelease(data) : null
+}
+
 async function preserveFeaturedByColumn(
   db: DbClient,
   column: 'itunes_id' | 'spotify_id' | 'discogs_id',
@@ -471,6 +511,31 @@ export async function syncReleaseFromExternalSource(
   const sanitized = sanitizeReleaseWrite(releaseData)
 
   if (source === 'itunes') {
+    // Prefer the row that already owns this iTunes ID — avoids setting itunes_id on a
+    // fuzzy-matched row when another release row already has the same unique key.
+    if (sanitized.itunes_id) {
+      const existingByItunesId = await findReleaseByExternalId(
+        db,
+        'itunes_id',
+        sanitized.itunes_id,
+      )
+
+      if (existingByItunesId) {
+        const patch = pickSyncWritableFields(sanitized)
+        const { data, error } = await db
+          .from('releases')
+          .update(patch)
+          .eq('id', existingByItunesId.id)
+          .select()
+          .single()
+
+        if (error) throw new Error(error.message)
+        if (!data) throw new Error('No data returned from iTunes ID merge update')
+
+        return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+      }
+    }
+
     const mergeTarget = findCrossSourceMergeTarget(
       existingReleases,
       {
