@@ -60,3 +60,80 @@ describe('epk editor store pages', () => {
     expect(store.getState().document.pages).toHaveLength(1)
   })
 })
+
+describe('epk editor store layers', () => {
+  const multiLayerDocument: EpkDocumentV2 = {
+    ...baseDocument,
+    elements: [
+      {
+        id: 'el-back',
+        pageId: 'page-1',
+        type: 'shape',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        rotation: 0,
+        zIndex: 1,
+        locked: false,
+        visible: true,
+        style: {},
+      },
+      {
+        id: 'el-mid',
+        pageId: 'page-1',
+        type: 'text',
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 40,
+        rotation: 0,
+        zIndex: 2,
+        locked: false,
+        visible: true,
+        style: {},
+        content: 'Middle',
+      },
+      {
+        id: 'el-front',
+        pageId: 'page-1',
+        type: 'image',
+        x: 20,
+        y: 20,
+        width: 80,
+        height: 80,
+        rotation: 0,
+        zIndex: 3,
+        locked: false,
+        visible: true,
+        style: {},
+        src: 'https://example.com/img.jpg',
+      },
+    ],
+  }
+
+  it('reorders layers via drag-and-drop order (front to back)', () => {
+    const store = createEpkEditorStore(multiLayerDocument)
+    store.getState().reorderElementLayers(['el-mid', 'el-front', 'el-back'])
+
+    const pageElements = store
+      .getState()
+      .document.elements.filter((el) => el.pageId === 'page-1')
+      .sort((a, b) => b.zIndex - a.zIndex)
+
+    expect(pageElements.map((el) => el.id)).toEqual(['el-mid', 'el-front', 'el-back'])
+    expect(store.getState().isDirty).toBe(true)
+  })
+
+  it('ignores invalid layer reorder payloads', () => {
+    const store = createEpkEditorStore(multiLayerDocument)
+    store.getState().reorderElementLayers(['el-front', 'el-back'])
+
+    const pageElements = store
+      .getState()
+      .document.elements.filter((el) => el.pageId === 'page-1')
+      .sort((a, b) => b.zIndex - a.zIndex)
+
+    expect(pageElements.map((el) => el.id)).toEqual(['el-front', 'el-mid', 'el-back'])
+  })
+})
