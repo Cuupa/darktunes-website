@@ -78,7 +78,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { UserWithProfile, UserRole } from '@/types/users'
+import { INVITABLE_ROLES, type InvitableRole, type UserWithProfile, type UserRole } from '@/types/users'
 
 // ---------------------------------------------------------------------------
 // Skeleton rows — same column count as the real table
@@ -156,7 +156,7 @@ export function UsersManager() {
   // Invite dialog
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<UserRole>('user')
+  const [inviteRole, setInviteRole] = useState<InvitableRole>('artist')
   const [isInviting, setIsInviting] = useState(false)
 
   const [isMutating, setIsMutating] = useState(false)
@@ -250,7 +250,7 @@ export function UsersManager() {
       toast.success(`Invite sent to ${inviteEmail.trim()}`)
       setInviteOpen(false)
       setInviteEmail('')
-      setInviteRole('user')
+      setInviteRole('artist')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send invite')
     } finally {
@@ -680,7 +680,7 @@ export function UsersManager() {
             if (!open) {
               setInviteOpen(false)
               setInviteEmail('')
-              setInviteRole('user')
+              setInviteRole('artist')
             }
           }}
         >
@@ -712,16 +712,16 @@ export function UsersManager() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="invite-role">Initial role</Label>
-                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as InvitableRole)}>
                   <SelectTrigger id="invite-role" aria-label="Select initial role">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="artist">Artist</SelectItem>
-                    <SelectItem value="editor">Editor</SelectItem>
-                    <SelectItem value="journalist">Journalist</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    {INVITABLE_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

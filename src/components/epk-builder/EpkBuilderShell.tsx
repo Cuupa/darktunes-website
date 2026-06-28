@@ -264,7 +264,7 @@ export function EpkBuilderShell({
 
         <aside
           className={cn(
-            'hidden w-72 shrink-0 flex-col border-l border-border bg-card xl:w-80',
+            'hidden w-72 shrink-0 flex-col border-l border-border bg-card lg:flex xl:w-80',
             mobilePanel === 'properties' && 'flex w-full lg:w-72',
             mobilePanel !== 'properties' && 'max-lg:hidden',
           )}

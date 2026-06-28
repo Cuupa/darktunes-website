@@ -4,7 +4,7 @@
  * POST /api/admin/users/invite
  *
  * Sends a branded invite email (Resend when configured) so a new user can set a
- * password and sign in. Optionally assigns a role (defaults to 'user').
+ * password and sign in. Requires a staff role (admin, artist, editor, or journalist).
  *
  * Security: only users with role = 'admin' may call this endpoint.
  */
@@ -15,9 +15,7 @@ import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
-import type { UserRole } from '@/types/users'
-
-const INVITE_ROLES = ['admin', 'artist', 'editor', 'journalist', 'user'] as const
+import { INVITABLE_ROLES, type InvitableRole } from '@/types/users'
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const supabase = await createServerSupabaseClient()
@@ -42,11 +40,12 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   const email = typeof body.email === 'string' ? body.email.trim() : ''
   if (!email) throw new ApiError(400, 'email is required')
 
-  const roleRaw = typeof body.role === 'string' ? body.role : 'user'
-  if (!INVITE_ROLES.includes(roleRaw as (typeof INVITE_ROLES)[number])) {
-    throw new ApiError(400, 'Invalid role')
+  const roleRaw = typeof body.role === 'string' ? body.role.trim() : ''
+  if (!roleRaw) throw new ApiError(400, 'role is required')
+  if (!INVITABLE_ROLES.includes(roleRaw as InvitableRole)) {
+    throw new ApiError(400, 'Invalid role — must be admin, artist, editor, or journalist')
   }
-  const role = roleRaw as UserRole
+  const role = roleRaw as InvitableRole
 
   const adminClient = await createServiceRoleSupabaseClient()
   const { resendApiKey, resendFromEmail } = await getEmailCredentials(adminClient)
