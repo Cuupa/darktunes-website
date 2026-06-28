@@ -20,7 +20,7 @@ import {
 } from '@/lib/api/users'
 import { requestUserInvite } from '@/lib/auth/requestUserInvite'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
-import type { UserRole, UserWithProfile } from '@/types/users'
+import { INVITABLE_ROLES, type InvitableRole, type UserRole, type UserWithProfile } from '@/types/users'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -196,10 +196,10 @@ export async function linkArtistAction(userId: string, payload: { artistId: stri
 
 const inviteSchema = z.object({
   email: z.string().email(),
-  role: z.enum(ROLES).default('user'),
+  role: z.enum(INVITABLE_ROLES),
 })
 
-export async function inviteUserAction(payload: { email: string; role: UserRole }): Promise<{ success: true } | { success: false; error: string }> {
+export async function inviteUserAction(payload: { email: string; role: InvitableRole }): Promise<{ success: true } | { success: false; error: string }> {
   try {
     const { adminClient, currentUserId } = await requireAdmin()
 

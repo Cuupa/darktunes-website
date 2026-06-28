@@ -7,6 +7,10 @@
 
 export type UserRole = 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
 
+/** Roles assignable via admin invite — plain `user` is reserved for organic signups. */
+export const INVITABLE_ROLES = ['admin', 'artist', 'editor', 'journalist'] as const
+export type InvitableRole = (typeof INVITABLE_ROLES)[number]
+
 export interface LinkedArtist {
   id: string
   name: string
