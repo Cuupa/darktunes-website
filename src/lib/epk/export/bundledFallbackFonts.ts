@@ -1,11 +1,12 @@
 /**
  * Bundled Noto Sans fallback fonts for PDF export (fully embedded, offline-safe).
+ * Fonts are vendored under src/lib/epk/export/assets/fonts so Vercel serverless traces include them.
  */
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const FONT_DIR = join(process.cwd(), 'node_modules/@fontsource/noto-sans/files')
+const FONT_DIR = join(process.cwd(), 'src/lib/epk/export/assets/fonts')
 
 export const FALLBACK_FONT_FAMILY = 'Noto Sans'
 
