@@ -14,6 +14,7 @@ import {
   deleteUser,
   linkArtistToUser,
   unlinkArtistFromUser,
+  syncInvitedUserAccess,
 } from './users'
 
 type DbClient = SupabaseClient<Database>
@@ -279,6 +280,63 @@ describe('deleteUser', () => {
   it('throws on Auth Admin API error', async () => {
     const client = makeAdminClient({ deleteUserError: { message: 'Delete denied' } })
     await expect(deleteUser(client, 'user-1')).rejects.toThrow('Delete denied')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncInvitedUserAccess
+// ---------------------------------------------------------------------------
+
+describe('syncInvitedUserAccess', () => {
+  it('upserts user role without artist linkage when artistId is omitted', async () => {
+    const rolesBuilder = makeBuilder(null, null)
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'user_roles') return rolesBuilder
+        throw new Error(`unexpected table ${table}`)
+      }),
+    } as unknown as DbClient
+
+    await expect(
+      syncInvitedUserAccess(db, 'user-1', 'editor', 'admin-1'),
+    ).resolves.toBeUndefined()
+
+    expect(db.from).toHaveBeenCalledWith('user_roles')
+    expect(rolesBuilder.upsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', role: 'editor', granted_by: 'admin-1' },
+      { onConflict: 'user_id,role' },
+    )
+  })
+
+  it('links artist when artistId is provided', async () => {
+    const rolesBuilder = makeBuilder(null, null)
+    const artistLookupBuilder = makeBuilder({ id: 'artist-1', user_id: null }, null)
+    const membersBuilder = makeBuilder(null, null)
+    const artistsUpdateBuilder = makeBuilder(null, null)
+    const artistsTable = {
+      select: vi.fn().mockReturnValue(artistLookupBuilder),
+      update: vi.fn().mockReturnValue(artistsUpdateBuilder),
+    }
+
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'user_roles') return rolesBuilder
+        if (table === 'artists') return artistsTable
+        if (table === 'artist_members') return membersBuilder
+        throw new Error(`unexpected table ${table}`)
+      }),
+    } as unknown as DbClient
+
+    await expect(
+      syncInvitedUserAccess(db, 'user-1', 'artist', 'admin-1', 'artist-1'),
+    ).resolves.toBeUndefined()
+
+    expect(membersBuilder.upsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', artist_id: 'artist-1', member_role: 'owner' },
+      { onConflict: 'user_id,artist_id' },
+    )
+    expect(artistsTable.update).toHaveBeenCalledWith({ user_id: 'user-1' })
+    expect(artistsUpdateBuilder.eq).toHaveBeenCalledWith('id', 'artist-1')
   })
 })
 

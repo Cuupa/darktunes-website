@@ -245,10 +245,41 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public AS $$
+DECLARE
+  v_role      public.user_role := 'user';
+  v_meta_role TEXT;
+  v_artist_id UUID;
 BEGIN
+  v_meta_role := NEW.raw_user_meta_data->>'role';
+  IF v_meta_role IN ('admin', 'editor', 'journalist', 'artist', 'user', 'press') THEN
+    v_role := v_meta_role::public.user_role;
+  END IF;
+
   INSERT INTO public.users (id, email, role)
-  VALUES (NEW.id, NEW.email, 'user')
+  VALUES (NEW.id, NEW.email, v_role)
   ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (NEW.id, v_role)
+  ON CONFLICT (user_id, role) DO NOTHING;
+
+  -- Artist portal invites pass artist_id in user metadata
+  BEGIN
+    v_artist_id := (NEW.raw_user_meta_data->>'artist_id')::UUID;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_artist_id := NULL;
+  END;
+
+  IF v_artist_id IS NOT NULL THEN
+    UPDATE public.artists
+    SET user_id = NEW.id
+    WHERE id = v_artist_id AND (user_id IS NULL OR user_id = NEW.id);
+
+    INSERT INTO public.artist_members (user_id, artist_id, member_role)
+    VALUES (NEW.id, v_artist_id, 'owner')
+    ON CONFLICT (user_id, artist_id) DO NOTHING;
+  END IF;
+
   RETURN NEW;
 END;
 $$;

@@ -1,18 +1,18 @@
 /**
- * app/admin/api-keys/page.tsx — External API credentials (admin-only)
+ * app/admin/api-keys/page.tsx — External integration credentials (admin-only)
  */
 
 export const dynamic = 'force-dynamic'
 
+import { getTranslations } from 'next-intl/server'
 import { AdminPageShell } from '../_components/AdminPageShell'
 import { AdminApiKeysWrapper } from '../_components/AdminApiKeysWrapper'
 
-export default function AdminApiKeysPage() {
+export default async function AdminApiKeysPage() {
+  const t = await getTranslations('admin.apiKeys')
+
   return (
-    <AdminPageShell
-      title="API Keys"
-      description="Manage encrypted credentials for external integrations (Spotify, Resend, YouTube, etc.)."
-    >
+    <AdminPageShell title={t('pageTitle')} description={t('pageDescription')}>
       <AdminApiKeysWrapper />
     </AdminPageShell>
   )

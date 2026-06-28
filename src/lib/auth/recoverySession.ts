@@ -39,13 +39,25 @@ export function sessionHasRecoveryAmr(accessToken: string | undefined): boolean 
   return payload?.amr?.some((entry) => entry.method === 'recovery') ?? false
 }
 
+export interface PasswordSetupSessionOptions {
+  serverExchangeSucceeded: boolean
+  /** Invite links sign the user in via SIGNED_IN (not PASSWORD_RECOVERY). */
+  allowInviteSignIn?: boolean
+}
+
 /** Whether an auth event should unlock the recovery password form. */
 export function isRecoverySessionEvent(
   event: RecoveryAuthChangeEvent,
-  options: { serverExchangeSucceeded: boolean },
+  options: PasswordSetupSessionOptions,
 ): boolean {
   if (event === 'PASSWORD_RECOVERY') return true
   if (options.serverExchangeSucceeded && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+    return true
+  }
+  if (
+    options.allowInviteSignIn &&
+    (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')
+  ) {
     return true
   }
   return false
@@ -57,8 +69,9 @@ export function isRecoverySessionEvent(
  */
 export function canUseRecoverySession(
   accessToken: string | undefined,
-  options: { serverExchangeSucceeded: boolean },
+  options: PasswordSetupSessionOptions,
 ): boolean {
   if (options.serverExchangeSucceeded) return Boolean(accessToken)
+  if (options.allowInviteSignIn && accessToken) return true
   return sessionHasRecoveryAmr(accessToken)
 }

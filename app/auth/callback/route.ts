@@ -12,6 +12,17 @@ function recoveryLoginUrl(origin: string, params?: Record<string, string>): stri
   return `${origin}/login?${search}`
 }
 
+function inviteLoginUrl(origin: string, params?: Record<string, string>): string {
+  const search = new URLSearchParams({ type: 'invite', ...params })
+  return `${origin}/login?${search}`
+}
+
+function invitePortalUrl(origin: string, params?: Record<string, string>): string {
+  const search = new URLSearchParams(params ?? {})
+  const query = search.toString()
+  return query ? `${origin}/portal/accept-invite?${query}` : `${origin}/portal/accept-invite`
+}
+
 function createRecoveryCookieClient(request: NextRequest, destination: string) {
   let response = NextResponse.redirect(destination)
 
@@ -94,11 +105,74 @@ async function verifyRecoveryTokenHash(
   })
 }
 
+function createInviteCookieClient(request: NextRequest, destination: string) {
+  let response = NextResponse.redirect(destination)
+
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.redirect(destination)
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          )
+        },
+      },
+    },
+  )
+
+  return { supabase, getResponse: () => response }
+}
+
+async function establishInviteSession(
+  request: NextRequest,
+  origin: string,
+  destination: string,
+): Promise<NextResponse> {
+  const tokenHash = new URL(request.url).searchParams.get('token_hash')
+  if (!tokenHash) {
+    return NextResponse.redirect(inviteLoginUrl(origin, { error: 'missing_code' }))
+  }
+
+  const { supabase, getResponse } = createInviteCookieClient(request, destination)
+
+  await supabase.auth.signOut()
+
+  const { error } = await supabase.auth.verifyOtp({
+    type: 'invite',
+    token_hash: tokenHash,
+  })
+
+  if (error) {
+    const failureResponse = NextResponse.redirect(inviteLoginUrl(origin, { error: 'auth_failed' }))
+    for (const cookie of getResponse().cookies.getAll()) {
+      failureResponse.cookies.set(cookie.name, cookie.value)
+    }
+    return failureResponse
+  }
+
+  return getResponse()
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const tokenHash = searchParams.get('token_hash')
   const isRecovery = searchParams.get('recovery') === '1' || searchParams.get('type') === 'recovery'
+  const isInvite = searchParams.get('invite') === '1' || searchParams.get('type') === 'invite'
+
+  if (isInvite && tokenHash) {
+    const destination = searchParams.get('portal') === '1'
+      ? invitePortalUrl(origin, { exchanged: '1' })
+      : inviteLoginUrl(origin, { exchanged: '1' })
+    return establishInviteSession(request, origin, destination)
+  }
 
   if (isRecovery && tokenHash) {
     return verifyRecoveryTokenHash(request, tokenHash, origin)
@@ -113,6 +187,23 @@ export async function GET(request: NextRequest) {
 
   if (isRecovery) {
     return exchangeRecoveryCode(request, code, origin)
+  }
+
+  if (isInvite && code) {
+    const destination = searchParams.get('portal') === '1'
+      ? invitePortalUrl(origin, { exchanged: '1' })
+      : inviteLoginUrl(origin, { exchanged: '1' })
+    const { supabase, getResponse } = createInviteCookieClient(request, destination)
+    await supabase.auth.signOut()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      const failureResponse = NextResponse.redirect(inviteLoginUrl(origin, { error: 'auth_failed' }))
+      for (const cookie of getResponse().cookies.getAll()) {
+        failureResponse.cookies.set(cookie.name, cookie.value)
+      }
+      return failureResponse
+    }
+    return getResponse()
   }
 
   const supabase = await createServerSupabaseClient()

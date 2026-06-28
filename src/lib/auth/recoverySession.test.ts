@@ -32,6 +32,15 @@ describe('isRecoverySessionEvent', () => {
     expect(isRecoverySessionEvent('SIGNED_IN', { serverExchangeSucceeded: false })).toBe(false)
     expect(isRecoverySessionEvent('SIGNED_IN', { serverExchangeSucceeded: true })).toBe(true)
   })
+
+  it('accepts SIGNED_IN for invite links without server exchange', () => {
+    expect(
+      isRecoverySessionEvent('SIGNED_IN', {
+        serverExchangeSucceeded: false,
+        allowInviteSignIn: true,
+      }),
+    ).toBe(true)
+  })
 })
 
 describe('sessionHasRecoveryAmr', () => {
@@ -68,5 +77,14 @@ describe('canUseRecoverySession', () => {
     expect(
       canUseRecoverySession(passwordToken, { serverExchangeSucceeded: false }),
     ).toBe(false)
+  })
+
+  it('allows invite sessions without recovery amr when allowInviteSignIn is set', () => {
+    expect(
+      canUseRecoverySession(passwordToken, {
+        serverExchangeSucceeded: false,
+        allowInviteSignIn: true,
+      }),
+    ).toBe(true)
   })
 })

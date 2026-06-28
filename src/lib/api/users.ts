@@ -378,6 +378,45 @@ export async function softDeleteAccount(
 }
 
 /**
+ * Ensures invite metadata is reflected in user_roles and optional artist linkage.
+ * Idempotent — safe to call after the handle_new_auth_user trigger.
+ */
+export async function syncInvitedUserAccess(
+  adminClient: DbClient,
+  userId: string,
+  role: UserRole,
+  grantedBy: string,
+  artistId?: string | null,
+): Promise<void> {
+  await addUserRole(adminClient, userId, role, grantedBy)
+
+  if (!artistId) return
+
+  const { data: targetArtist, error: lookupErr } = await adminClient
+    .from('artists')
+    .select('id, user_id')
+    .eq('id', artistId)
+    .maybeSingle()
+
+  if (lookupErr) throw new Error(lookupErr.message)
+  if (!targetArtist) throw new Error('Artist not found')
+  if (targetArtist.user_id && targetArtist.user_id !== userId) {
+    throw new Error('Artist already linked to another user')
+  }
+
+  const { error: memberErr } = await adminClient
+    .from('artist_members')
+    .upsert(
+      { user_id: userId, artist_id: artistId, member_role: 'owner' },
+      { onConflict: 'user_id,artist_id' },
+    )
+
+  if (memberErr) throw new Error(memberErr.message)
+
+  await linkArtistToUser(adminClient, artistId, userId)
+}
+
+/**
  * Sets `artists.user_id = userId` for the given artist.
  * Conflict protection (artist already linked to another user) is handled by the route handler.
  */

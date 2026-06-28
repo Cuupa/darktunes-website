@@ -5,15 +5,18 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, lazy } from 'react'
+import { getTranslations } from 'next-intl/server'
 import { AdminPageShell } from '../_components/AdminPageShell'
 
 const AssetsManager = lazy(() =>
   import('@/components/admin/AssetsManager').then((m) => ({ default: m.AssetsManager })),
 )
 
-export default function AdminAssetsPage() {
+export default async function AdminAssetsPage() {
+  const t = await getTranslations('admin.pages')
+
   return (
-    <AdminPageShell title="Assets" description="Browse, upload, and manage media files in Cloudflare R2.">
+    <AdminPageShell title="Assets" description={t('assetsDescription')}>
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <AssetsManager />
       </Suspense>

@@ -44,3 +44,33 @@ export function buildPasswordRecoveryVerifyUrl(siteUrl: string, hashedToken: str
 export function getPasswordRecoveryClientLandingUrl(siteUrl?: string): string {
   return `${normalizeSiteUrl(siteUrl)}/login?type=recovery`
 }
+
+/** redirectTo for auth.admin.generateLink invite (general users). */
+export function getUserInviteRedirectUrl(siteUrl?: string): string {
+  return `${normalizeSiteUrl(siteUrl)}/auth/callback?invite=1`
+}
+
+/** redirectTo for auth.admin.generateLink invite (artist portal). */
+export function getArtistInviteRedirectUrl(siteUrl?: string): string {
+  return `${normalizeSiteUrl(siteUrl)}/auth/callback?invite=1&portal=1`
+}
+
+/**
+ * Direct server-verifiable invite URL from generateLink hashed_token.
+ * portal=1 routes to /portal/accept-invite after session exchange.
+ */
+export function buildInviteVerifyUrl(
+  siteUrl: string,
+  hashedToken: string,
+  options?: { portal?: boolean },
+): string {
+  const params = new URLSearchParams({
+    invite: '1',
+    token_hash: hashedToken,
+    type: 'invite',
+  })
+  if (options?.portal) {
+    params.set('portal', '1')
+  }
+  return `${normalizeSiteUrl(siteUrl)}/auth/callback?${params}`
+}

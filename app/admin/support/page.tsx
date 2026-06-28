@@ -1,18 +1,18 @@
 /**
- * app/admin/support/page.tsx — Manual support tickets & Zammad integration
+ * app/admin/support/page.tsx — Manual support tickets
  */
 
 export const dynamic = 'force-dynamic'
 
+import { getTranslations } from 'next-intl/server'
 import { AdminPageShell } from '../_components/AdminPageShell'
 import { SupportManager } from '@/components/admin/SupportManager'
 
-export default function AdminSupportPage() {
+export default async function AdminSupportPage() {
+  const t = await getTranslations('admin.support')
+
   return (
-    <AdminPageShell
-      title="Support"
-      description="Submit support requests to Zammad, manage known error filters, and review ticket delivery."
-    >
+    <AdminPageShell title={t('pageTitle')} description={t('pageDescription')}>
       <SupportManager />
     </AdminPageShell>
   )
