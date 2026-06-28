@@ -506,5 +506,24 @@
         "contact": "Press inquiry form in the journalist dashboard."
       }
     }
+  },
+  "setup": {
+    "supabaseUnavailableTitle": "Admin area unavailable",
+    "supabaseUnavailableDescription": "The database connection is not set up yet. Please contact your administrator or refer to the deployment documentation."
+  },
+  "support": {
+    "pageTitle": "Support",
+    "pageDescription": "Submit support requests, manage known error filters, and review ticket delivery.",
+    "loading": "Loading support area…",
+    "statusAvailableTitle": "Support is available",
+    "statusAvailableDescription": "Tickets are routed to the {group} support group.",
+    "statusUnavailableTitle": "Support not available yet",
+    "statusUnavailableDescription": "Support requests cannot be delivered at the moment. The rest of the admin area works as usual.",
+    "ticketSubmitSuccessAvailable": "Support request submitted — it will be processed shortly.",
+    "ticketSubmitSuccessUnavailable": "Support request recorded. Delivery will begin once support is available.",
+    "ticketFormTitle": "Submit a support request",
+    "ticketFormDescription": "Your ticket is attributed to your account email and processed in the background.",
+    "ticketSubmitting": "Submitting…",
+    "ticketSubmit": "Submit ticket"
   }
 }

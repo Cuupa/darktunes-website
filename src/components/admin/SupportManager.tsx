@@ -64,6 +64,7 @@ function StatusBadge({ status }: { status: TicketLogRow['status'] }) {
 }
 
 export function SupportManager() {
+  const t = useTranslations('admin.support')
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [configured, setConfigured] = useState<boolean | null>(null)
@@ -152,9 +153,7 @@ export function SupportManager() {
       }
 
       toast.success(
-        configured
-          ? 'Support request submitted — it will be delivered to Zammad shortly.'
-          : 'Support request recorded. Zammad is not configured yet.',
+        configured ? t('ticketSubmitSuccessAvailable') : t('ticketSubmitSuccessUnavailable'),
       )
       setSubject('')
       setMessage('')
@@ -221,7 +220,7 @@ export function SupportManager() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading support area…</p>
+    return <p className="text-sm text-muted-foreground">{t('loading')}</p>
   }
 
   return (
@@ -233,18 +232,12 @@ export function SupportManager() {
           <WarningCircle size={18} aria-hidden="true" />
         )}
         <AlertTitle>
-          Zammad {configured ? 'configured' : 'not configured'}
+          {configured ? t('statusAvailableTitle') : t('statusUnavailableTitle')}
         </AlertTitle>
         <AlertDescription>
-          {configured ? (
-            <>Tickets are sent to the <strong>{group}</strong> group in Zammad.</>
-          ) : (
-            <>
-              Set <code className="text-xs">ZAMMAD_URL</code> and{' '}
-              <code className="text-xs">ZAMMAD_API_TOKEN</code> in your environment.
-              The app continues to work normally without Zammad.
-            </>
-          )}
+          {configured && group
+            ? t('statusAvailableDescription', { group })
+            : t('statusUnavailableDescription')}
         </AlertDescription>
       </Alert>
 
@@ -258,9 +251,9 @@ export function SupportManager() {
         <TabsContent value="ticket" className="mt-4">
           <form onSubmit={handleSubmitTicket} className="space-y-4 rounded-lg border border-border bg-card p-6">
             <div>
-              <h2 className="text-lg font-semibold">Submit a support request</h2>
+              <h2 className="text-lg font-semibold">{t('ticketFormTitle')}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Your ticket is attributed to your account email and sent to Zammad in the background.
+                {t('ticketFormDescription')}
               </p>
             </div>
 
@@ -291,7 +284,7 @@ export function SupportManager() {
 
             <Button type="submit" disabled={submitting} className="gap-2">
               <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" />
-              {submitting ? 'Submitting…' : 'Submit ticket'}
+              {submitting ? t('ticketSubmitting') : t('ticketSubmit')}
             </Button>
           </form>
         </TabsContent>

@@ -506,5 +506,24 @@
         "contact": "Presse-Anfrageformular im Journalisten-Dashboard."
       }
     }
+  },
+  "setup": {
+    "supabaseUnavailableTitle": "Admin-Bereich nicht verfügbar",
+    "supabaseUnavailableDescription": "Die Datenbankverbindung ist noch nicht eingerichtet. Bitte wende dich an deinen Administrator oder sieh in der Deployment-Dokumentation nach."
+  },
+  "support": {
+    "pageTitle": "Support",
+    "pageDescription": "Support-Anfragen senden, bekannte Fehlerfilter verwalten und Ticket-Zustellung einsehen.",
+    "loading": "Support-Bereich wird geladen…",
+    "statusAvailableTitle": "Support ist erreichbar",
+    "statusAvailableDescription": "Tickets werden an die Support-Gruppe {group} weitergeleitet.",
+    "statusUnavailableTitle": "Support noch nicht erreichbar",
+    "statusUnavailableDescription": "Support-Anfragen können derzeit nicht zugestellt werden. Der restliche Admin-Bereich funktioniert wie gewohnt.",
+    "ticketSubmitSuccessAvailable": "Support-Anfrage gesendet — sie wird in Kürze bearbeitet.",
+    "ticketSubmitSuccessUnavailable": "Support-Anfrage gespeichert. Zustellung erfolgt, sobald Support verfügbar ist.",
+    "ticketFormTitle": "Support-Anfrage senden",
+    "ticketFormDescription": "Dein Ticket wird deiner Konto-E-Mail zugeordnet und im Hintergrund verarbeitet.",
+    "ticketSubmitting": "Wird gesendet…",
+    "ticketSubmit": "Ticket absenden"
   }
 }
