@@ -18,10 +18,12 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { isEditorAllowedAdminPath } from '@/lib/editor/editorAdminPaths'
 import { DEFAULT_FEATURE_TOGGLES, getFeatureToggles } from '@/lib/featureToggles'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
 import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
+import type { UserRole } from '@/types/users'
 
 const ADMIN_ROLES = new Set(['admin', 'editor'])
 
@@ -54,6 +56,20 @@ function redirectUnauthenticatedToLogin(request: NextRequest): NextResponse {
   loginUrl.pathname = '/login'
   loginUrl.searchParams.set('returnTo', request.nextUrl.pathname)
   return NextResponse.redirect(loginUrl)
+}
+
+function redirectToLoginWithError(request: NextRequest, error: string): NextResponse {
+  const loginUrl = request.nextUrl.clone()
+  loginUrl.pathname = '/login'
+  loginUrl.search = ''
+  loginUrl.searchParams.set('error', error)
+  return NextResponse.redirect(loginUrl)
+}
+
+function shouldStayOnLoginPage(searchParams: URLSearchParams): boolean {
+  if (searchParams.get('type') === 'invite') return true
+  const error = searchParams.get('error')
+  return error === 'no_artist' || error === 'unauthorized'
 }
 
 export async function middleware(request: NextRequest) {
@@ -113,6 +129,11 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Invite links must let the user set a password before role-based redirects.
+  if (isLoginPage && request.nextUrl.searchParams.get('type') === 'invite') {
+    return supabaseResponse
+  }
+
   const isAdminRoute = route.isAdminRoute
   const isEditorRoute = route.isEditorRoute
   const isPortalAcceptInvitePage = route.isPortalAcceptInvitePage
@@ -135,30 +156,23 @@ export async function middleware(request: NextRequest) {
 
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profile) {
+    if (shouldStayOnLoginPage(request.nextUrl.searchParams)) {
+      return supabaseResponse
+    }
+
     const returnTo = request.nextUrl.searchParams.get('returnTo')
     const url = request.nextUrl.clone()
 
     // Validate returnTo to prevent open redirects (only allow local paths)
     if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
       url.pathname = returnTo
-      url.search = '' // Clear query params after redirecting back
+      url.search = ''
       return NextResponse.redirect(url)
     }
 
-    if (['admin'].includes(profile.role)) {
-      url.pathname = '/admin'
-      return NextResponse.redirect(url)
-    } else if (['editor'].includes(profile.role)) {
-      url.pathname = '/editor'
-      return NextResponse.redirect(url)
-    } else if (['journalist'].includes(profile.role)) {
-      url.pathname = '/press/dashboard'
-      return NextResponse.redirect(url)
-    } else {
-      // Default / artist fallback
-      url.pathname = '/portal'
-      return NextResponse.redirect(url)
-    }
+    url.pathname = resolveRedirectPath(profile.role as UserRole)
+    url.search = ''
+    return NextResponse.redirect(url)
   }
 
   // Redirect unauthenticated users away from protected routes
@@ -221,17 +235,11 @@ export async function middleware(request: NextRequest) {
       try {
         hasMembership = await hasPortalArtistMembership(supabase, user.id)
       } catch {
-        const loginUrl = request.nextUrl.clone()
-        loginUrl.pathname = '/login'
-        loginUrl.searchParams.set('error', 'no_artist')
-        return NextResponse.redirect(loginUrl)
+        return redirectToLoginWithError(request, 'no_artist')
       }
 
       if (!hasMembership) {
-        const loginUrl = request.nextUrl.clone()
-        loginUrl.pathname = '/login'
-        loginUrl.searchParams.set('error', 'no_artist')
-        return NextResponse.redirect(loginUrl)
+        return redirectToLoginWithError(request, 'no_artist')
       }
     }
   }
