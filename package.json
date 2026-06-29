@@ -98,7 +98,7 @@
     "marked": "^15.0.7",
     "next": "^15.5.15",
     "next-intl": "^4.13.0",
-    "papaparse": "^5.5.3",
+    "papaparse": "^5.5.4",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.7",
     "react-day-picker": "^10.0.1",
