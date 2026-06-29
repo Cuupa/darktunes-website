@@ -79,12 +79,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // Revalidate each requested list-level tag
   for (const tag of tags) {
-    revalidateTag(tag)
+    revalidateTag(tag, 'max')
   }
 
   // Revalidate the specific entity page if provided (e.g. only artist-my-slug)
   if (entityTag) {
-    revalidateTag(entityTag)
+    revalidateTag(entityTag, 'max')
   }
 
   return NextResponse.json({ revalidated: true, tags, entityTag })

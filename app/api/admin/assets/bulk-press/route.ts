@@ -39,19 +39,19 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     case 'addToKit': {
       const items = await bulkAddToPressKit(supabase, assetIds, artistId)
       affected = items.length
-      revalidateTag('press-kit')
+      revalidateTag('press-kit', 'max')
       break
     }
     case 'removeFromKit':
       affected = await bulkRemoveFromPressKitByAssetIds(supabase, assetIds, artistId)
-      revalidateTag('press-kit')
+      revalidateTag('press-kit', 'max')
       break
     default:
       throw new ApiError(400, `Unknown action: ${String(body.action)}`)
   }
 
   if (body.action === 'approve' || body.action === 'unapprove') {
-    revalidateTag('press-kit')
+    revalidateTag('press-kit', 'max')
   }
 
   return NextResponse.json({ success: true, affected })

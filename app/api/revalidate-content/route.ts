@@ -82,12 +82,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   for (const tag of tags) {
-    revalidateTag(tag)
+    revalidateTag(tag, 'max')
   }
 
   // Revalidate granular entity-specific tags (e.g. after updating a single artist)
   for (const tag of entityTags) {
-    revalidateTag(tag)
+    revalidateTag(tag, 'max')
   }
 
   return NextResponse.json({ revalidated: true, tags, entityTags })

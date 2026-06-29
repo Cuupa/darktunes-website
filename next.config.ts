@@ -7,6 +7,7 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 import { buildContentSecurityPolicy } from './src/lib/security/contentSecurityPolicy'
 
 const withSerwist = withSerwistInit({
+  disable: process.env.NODE_ENV !== 'production',
   swSrc: 'app/sw.ts',
   swDest: 'public/sw.js',
   // Never intercept admin / API / auth routes in the service worker

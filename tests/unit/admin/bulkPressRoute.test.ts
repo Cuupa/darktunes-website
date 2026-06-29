@@ -69,7 +69,7 @@ describe('POST /api/admin/assets/bulk-press', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ success: true, affected: 2 })
     expect(bulkSetPressApprovedMock).toHaveBeenCalledWith({}, ASSET_IDS, true)
-    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
   })
 
   it('unapproves press assets', async () => {
@@ -78,7 +78,7 @@ describe('POST /api/admin/assets/bulk-press', () => {
 
     expect(response.status).toBe(200)
     expect(bulkSetPressApprovedMock).toHaveBeenCalledWith({}, ASSET_IDS, false)
-    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
   })
 
   it('adds assets to the press kit for an artist scope', async () => {
@@ -90,7 +90,7 @@ describe('POST /api/admin/assets/bulk-press', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ success: true, affected: 2 })
     expect(bulkAddToPressKitMock).toHaveBeenCalledWith({}, ASSET_IDS, 'artist-1')
-    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
   })
 
   it('removes assets from the press kit', async () => {
@@ -101,7 +101,7 @@ describe('POST /api/admin/assets/bulk-press', () => {
 
     expect(response.status).toBe(200)
     expect(bulkRemoveFromPressKitByAssetIdsMock).toHaveBeenCalledWith({}, ASSET_IDS, null)
-    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+    expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
   })
 
   it('returns 400 when assetIds is empty', async () => {

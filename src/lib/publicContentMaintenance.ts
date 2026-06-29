@@ -16,15 +16,15 @@ export const runPublicContentMaintenance = cache(async (): Promise<void> => {
     const emojiChanged = await persistEmojiCleanup(serviceDb)
 
     if (publishedCount > 0 || featuredChanged > 0 || emojiChanged > 0) {
-      revalidateTag('news')
+      revalidateTag('news', 'max')
     }
     if (featuredChanged > 0) {
-      revalidateTag('releases')
+      revalidateTag('releases', 'max')
     }
     if (emojiChanged > 0) {
-      revalidateTag('releases')
-      revalidateTag('artists')
-      revalidateTag('site-settings')
+      revalidateTag('releases', 'max')
+      revalidateTag('artists', 'max')
+      revalidateTag('site-settings', 'max')
     }
   } catch (err) {
     console.error('[runPublicContentMaintenance] Failed:', err)

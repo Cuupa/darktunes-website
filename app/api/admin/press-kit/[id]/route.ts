@@ -20,7 +20,7 @@ export const DELETE = withErrorHandler(async (request: NextRequest): Promise<Nex
   const supabase = await createServerSupabaseClient()
   await removeFromPressKit(supabase, id)
 
-  revalidateTag('press-kit')
+  revalidateTag('press-kit', 'max')
 
   return NextResponse.json({ success: true })
 })

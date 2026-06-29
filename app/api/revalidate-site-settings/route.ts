@@ -32,6 +32,6 @@ export const POST = withErrorHandler(async () => {
     throw new ApiError(403, 'Forbidden')
   }
 
-  revalidateTag('site-settings')
+  revalidateTag('site-settings', 'max')
   return NextResponse.json({ revalidated: true })
 })

@@ -28,7 +28,7 @@ export const PATCH = withErrorHandler(async (request: NextRequest): Promise<Next
   const supabase = await createServerSupabaseClient()
   await reorderPressKit(supabase, artistId, orderedItemIds)
 
-  revalidateTag('press-kit')
+  revalidateTag('press-kit', 'max')
 
   return NextResponse.json({ success: true })
 })

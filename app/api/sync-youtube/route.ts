@@ -132,7 +132,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     rate_limited: false,
   })
 
-  revalidateTag('videos')
+  revalidateTag('videos', 'max')
 
   await recordHealthHeartbeat(db, 'sync_youtube')
 

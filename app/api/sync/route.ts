@@ -59,8 +59,8 @@ async function processSyncJob(
       await markSyncJobDone(db, job.id)
     }
 
-    revalidateTag('releases')
-    revalidateTag('artists')
+    revalidateTag('releases', 'max')
+    revalidateTag('artists', 'max')
     return
   }
 
@@ -81,9 +81,9 @@ async function processSyncJob(
     await markSyncJobDone(db, job.id)
   }
 
-  revalidateTag('releases')
-  revalidateTag('artists')
-  revalidateTag('concerts')
+  revalidateTag('releases', 'max')
+  revalidateTag('artists', 'max')
+  revalidateTag('concerts', 'max')
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {

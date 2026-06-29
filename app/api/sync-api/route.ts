@@ -138,7 +138,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       rate_limited: false,
     })
 
-    revalidateTag('videos')
+    revalidateTag('videos', 'max')
     return NextResponse.json({ synced: videos.length })
   }
 
@@ -221,8 +221,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     onlyApi: apiSource,
   })
 
-  revalidateTag('releases')
-  revalidateTag('artists')
-  revalidateTag('concerts')
+  revalidateTag('releases', 'max')
+  revalidateTag('artists', 'max')
+  revalidateTag('concerts', 'max')
   return NextResponse.json(result)
 })

@@ -1,5 +1,5 @@
 /**
- * middleware.ts — Next.js Edge Middleware
+ * proxy.ts — Next.js request proxy (formerly Edge Middleware)
  *
  * Intercepts all requests BEFORE the page renders, allowing auth checks
  * to redirect unauthenticated users away from /admin without any client-side
@@ -12,7 +12,7 @@
  *   - If a session exists but the role is insufficient, redirect to /admin/login?error=unauthorized.
  *   - If a session with sufficient role exists and the user visits /admin/login, redirect to /admin.
  *
- * The middleware also refreshes the Supabase session cookie on every request
+ * The proxy also refreshes the Supabase session cookie on every request
  * so tokens stay alive for active users.
  */
 
@@ -72,7 +72,7 @@ function shouldStayOnLoginPage(searchParams: URLSearchParams): boolean {
   return error === 'no_artist' || error === 'unauthorized'
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const route = classifyRoute(pathname)
   const protectedRoute = routeIsProtected(route)
@@ -143,7 +143,7 @@ export async function middleware(request: NextRequest) {
 
   // Fetch the user's role once for all route sections that need it.
   // This avoids repeated round-trips to the users table within the same
-  // middleware invocation when a request touches multiple guarded areas.
+  // proxy invocation when a request touches multiple guarded areas.
   let profile: { role: string } | null = null
   if (user && (isProtectedRoute || isLoginPage)) {
     const { data } = await supabase

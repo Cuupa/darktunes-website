@@ -122,7 +122,7 @@ describe('admin press-kit routes', () => {
         {},
         { assetId: 'asset-1', artistId: 'artist-1', displayOrder: 3 },
       )
-      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
     })
 
     it('returns 400 when assetId is missing', async () => {
@@ -150,7 +150,7 @@ describe('admin press-kit routes', () => {
       expect(response.status).toBe(200)
       await expect(response.json()).resolves.toEqual({ success: true })
       expect(removeFromPressKitMock).toHaveBeenCalledWith({}, 'kit-item-1')
-      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
     })
   })
 
@@ -171,7 +171,7 @@ describe('admin press-kit routes', () => {
       expect(response.status).toBe(200)
       await expect(response.json()).resolves.toEqual({ success: true })
       expect(reorderPressKitMock).toHaveBeenCalledWith({}, 'artist-1', ['kit-item-2', 'kit-item-1'])
-      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit')
+      expect(revalidateTagMock).toHaveBeenCalledWith('press-kit', 'max')
     })
 
     it('returns 400 when orderedItemIds is empty', async () => {

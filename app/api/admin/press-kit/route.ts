@@ -44,7 +44,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     displayOrder: body.displayOrder,
   })
 
-  revalidateTag('press-kit')
+  revalidateTag('press-kit', 'max')
 
   return NextResponse.json({ item }, { status: 201 })
 })
