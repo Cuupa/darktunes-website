@@ -1,7 +1,14 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { renderDocumentToPdf } from './renderDocumentToPdf'
 import { generateEpkPdfBytes } from './generateEpkPdfBytes'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
+
+const SRGB_ICC_PATH = join(
+  process.cwd(),
+  'src/lib/epk/export/assets/sRGB-IEC61966-2.1.icc',
+)
 
 const minimalDocument: EpkDocumentV2 = {
   version: 2,
@@ -61,6 +68,20 @@ describe('renderDocumentToPdf', () => {
     expect(bytes.length).toBeGreaterThan(500)
     const header = String.fromCharCode(...bytes.slice(0, 4))
     expect(header).toBe('%PDF')
+  })
+})
+
+describe('bundled sRGB ICC profile', () => {
+  it('is a valid ICC file on disk (not HTML)', () => {
+    const bytes = readFileSync(SRGB_ICC_PATH)
+    expect(bytes.length).toBeGreaterThan(500)
+
+    const header = bytes.slice(0, 9).toString('utf8')
+    expect(header).not.toMatch(/^<!DOCTYPE/i)
+    expect(header).not.toMatch(/^<html/i)
+
+    const acsp = bytes.slice(36, 40).toString('ascii')
+    expect(acsp).toBe('acsp')
   })
 })
 

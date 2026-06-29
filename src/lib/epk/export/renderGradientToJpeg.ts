@@ -22,7 +22,10 @@ export async function renderGradientToJpeg(
 
   try {
     const svg = gradientToSvg(outW, outH, gradient, `grad-${outW}x${outH}`)
-    const bytes = await sharp(Buffer.from(svg)).jpeg({ quality: 92 }).toBuffer()
+    const bytes = await sharp(Buffer.from(svg))
+      .toColorspace('srgb')
+      .jpeg({ quality: 92 })
+      .toBuffer()
     return { bytes: new Uint8Array(bytes), width: outW, height: outH }
   } catch {
     return null

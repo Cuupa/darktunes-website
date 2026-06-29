@@ -59,7 +59,18 @@ function buildPdfAXmp(metadata: EpkDocumentMetadata, now: Date): string {
 }
 
 function loadSrgbIccProfile(): Uint8Array {
-  return new Uint8Array(readFileSync(SRGB_ICC_PATH))
+  const bytes = readFileSync(SRGB_ICC_PATH)
+  if (bytes.length < 128) {
+    throw new Error('Bundled sRGB ICC profile is too small to be valid')
+  }
+  const header = bytes.subarray(0, 9).toString('utf8')
+  if (header.startsWith('<!DOCTYPE') || header.startsWith('<html')) {
+    throw new Error('Bundled sRGB ICC profile is HTML, not a binary ICC file')
+  }
+  if (bytes.subarray(36, 40).toString('ascii') !== 'acsp') {
+    throw new Error('Bundled sRGB ICC profile is missing the acsp signature')
+  }
+  return new Uint8Array(bytes)
 }
 
 export async function finalizeEpkPdfA(

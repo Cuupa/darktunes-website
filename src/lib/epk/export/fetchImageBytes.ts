@@ -58,6 +58,7 @@ export async function fetchAndCompressImage(
     if (flipX) pipeline = pipeline.flop()
     if (flipY) pipeline = pipeline.flip()
     const processed = await pipeline
+      .toColorspace('srgb')
       .resize({ width: maxWidth, withoutEnlargement: true })
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer({ resolveWithObject: true })
