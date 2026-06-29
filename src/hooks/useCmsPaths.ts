@@ -29,6 +29,6 @@ export function useCmsPaths() {
       artistEdit: getCmsArtistEditPath,
       promoLog: getCmsPromoLogPath(audience),
     }),
-    [audience, loading],
+    [audience],
   )
 }

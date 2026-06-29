@@ -13,7 +13,6 @@ import {
   AppleLogo,
   YoutubeLogo,
   MusicNote,
-  Globe,
 } from '@phosphor-icons/react'
 import type { ElementType } from 'react'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
