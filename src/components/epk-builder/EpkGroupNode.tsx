@@ -1,5 +1,7 @@
 'use client'
 
+import '@/lib/epk/konvaShapes'
+
 /**
  * src/components/epk-builder/EpkGroupNode.tsx
  *
