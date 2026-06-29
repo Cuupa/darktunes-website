@@ -343,7 +343,7 @@ export function FileExplorer({ className }: { className?: string }) {
       {/* Desktop: resizable side-by-side panels */}
       <div className={cn('hidden md:flex h-[calc(100vh-10rem)]', className)}>
         <ResizablePanelGroup direction="horizontal" className="rounded-lg border border-border bg-background w-full">
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+          <ResizablePanel defaultSize="20%" minSize="15%" maxSize="40%">
             <FolderTree
               folders={explorer.allFolders}
               currentFolderId={explorer.currentFolderId}
@@ -352,7 +352,7 @@ export function FileExplorer({ className }: { className?: string }) {
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={80}>
+          <ResizablePanel defaultSize="80%">
             <div className="flex h-full flex-col">
               <ExplorerToolbar
                 searchQuery={explorer.searchQuery}
