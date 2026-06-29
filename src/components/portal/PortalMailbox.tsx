@@ -14,8 +14,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import DOMPurify from 'dompurify'
 import { toast } from 'sonner'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import {
   PaperPlaneTilt,
@@ -79,11 +79,6 @@ const DEFAULT_DRAFT: ComposeDraft = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sanitize(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html)
-}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -445,12 +440,14 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                 return (
                   <li key={msg.id}>
                     <button
+                      type="button"
                       onClick={() => {
                         setSelectedMessageId(msg.id)
                         if (isUnread) void markRead(msg.id)
                       }}
+                      aria-label={`${isUnread ? 'Unread: ' : ''}${msg.subject}`}
                       className={[
-                        'w-full text-left px-3 py-3 border-b border-border transition-colors',
+                        'w-full min-h-[44px] text-left px-3 py-3 border-b border-border transition-colors',
                         isSelected
                           ? 'bg-primary/10 border-l-2 border-l-primary'
                           : 'hover:bg-muted',
@@ -546,7 +543,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
               {selectedMessage.bodyHtml ? (
                 <div
                   className="prose prose-sm dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: sanitize(selectedMessage.bodyHtml) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedMessage.bodyHtml) }}
                 />
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
