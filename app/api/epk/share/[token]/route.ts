@@ -13,7 +13,7 @@ import { getEpkShareLinkByToken } from '@/lib/api/epkShareLinks'
 import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 import { getArtistById } from '@/lib/api/artists'
 import { listEpkFonts, buildEpkFontPublicUrl } from '@/lib/api/epkFonts'
-import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
+import { ensureDocumentFontsForExport } from '@/lib/epk/editor/ensureDocumentFontsForExport'
 import { verifySharePassword } from '@/lib/epk/sharePassword'
 import { generateEpkPdfBytes } from '@/lib/epk/export/generateEpkPdfBytes'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
@@ -74,11 +74,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const { serverEnv } = await import('@/lib/env.server')
   const fonts = await listEpkFonts(db, link.artistId).catch(() => [])
-  const fontAssets = fonts.map((font) => ({
-    id: font.id,
-    publicUrl: buildEpkFontPublicUrl(font.r2Key, serverEnv.CLOUDFLARE_R2_PUBLIC_URL),
-  }))
-  const document = hydrateDocumentFonts(publicEpk.document, fontAssets)
+  const document = ensureDocumentFontsForExport(
+    publicEpk.document,
+    fonts.map((font) => ({
+      id: font.id,
+      name: font.name,
+      r2Key: font.r2Key,
+      publicUrl: buildEpkFontPublicUrl(font.r2Key, serverEnv.CLOUDFLARE_R2_PUBLIC_URL),
+    })),
+  )
 
   const action = req.nextUrl.searchParams.get('action')
   if (action === 'export') {

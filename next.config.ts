@@ -78,7 +78,7 @@ const nextConfig: NextConfig = {
   },
   // Tailwind v4 + tw-animate-css use PostCSS features that require transpiling
   transpilePackages: [],
-  serverExternalPackages: ['sharp', 'fontkit'],
+  serverExternalPackages: ['sharp', 'fontkit', '@pdf-lib/fontkit'],
   outputFileTracingIncludes: {
     '/api/portal/epk/export': ['./src/lib/epk/export/assets/**/*'],
     '/api/epk/share/[token]': ['./src/lib/epk/export/assets/**/*'],

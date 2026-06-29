@@ -11,7 +11,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { getArtistBySlug } from '@/lib/api/artists'
 import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 import { listEpkFonts, buildEpkFontPublicUrl } from '@/lib/api/epkFonts'
-import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
+import { ensureDocumentFontsForExport } from '@/lib/epk/editor/ensureDocumentFontsForExport'
 import { generateEpkPdfBytes } from '@/lib/epk/export/generateEpkPdfBytes'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 import { recordEpkDownloadAsync } from '@/lib/epk/recordEpkDownload'
@@ -48,16 +48,15 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   const fonts = await listEpkFonts(db, artist.id).catch(() => [])
-  const document =
-    fonts.length > 0
-      ? hydrateDocumentFonts(
-          publicEpk.document,
-          fonts.map((font) => ({
-            id: font.id,
-            publicUrl: buildEpkFontPublicUrl(font.r2Key, serverEnv.CLOUDFLARE_R2_PUBLIC_URL),
-          })),
-        )
-      : publicEpk.document
+  const document = ensureDocumentFontsForExport(
+    publicEpk.document,
+    fonts.map((font) => ({
+      id: font.id,
+      name: font.name,
+      r2Key: font.r2Key,
+      publicUrl: buildEpkFontPublicUrl(font.r2Key, serverEnv.CLOUDFLARE_R2_PUBLIC_URL),
+    })),
+  )
 
   const riderAttachments: string[] = []
   if (publicEpk.profile.riderStagePlotUrl) riderAttachments.push(publicEpk.profile.riderStagePlotUrl)

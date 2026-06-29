@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo } from 'react'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
+import { parsePrimaryFontFamily } from '@/lib/epk/fontFamily'
 import { buildGoogleFontsCssUrl, isGoogleFontFamily } from '@/lib/epk/googleFonts'
 import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
 
@@ -27,7 +28,9 @@ export function EpkFontLoader() {
     }
     for (const el of elements) {
       const family = el.style?.fontFamily
-      if (family && isGoogleFontFamily(family)) families.add(family)
+      if (!family) continue
+      const primary = parsePrimaryFontFamily(family)
+      if (isGoogleFontFamily(primary)) families.add(primary)
     }
     return [...families]
   }, [elements, fonts])

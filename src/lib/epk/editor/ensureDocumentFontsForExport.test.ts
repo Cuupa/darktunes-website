@@ -69,4 +69,19 @@ describe('ensureDocumentFontsForExport', () => {
     const result = ensureDocumentFontsForExport(doc, [])
     expect(result.fonts.some((font) => font.family === 'Inter')).toBe(true)
   })
+
+  it('registers google fonts from CSS font-family stacks', () => {
+    const doc: EpkDocumentV2 = {
+      ...baseDocument,
+      elements: [
+        {
+          ...baseDocument.elements[0]!,
+          style: { fontFamily: 'Inter, Helvetica, Arial, sans-serif', fontSize: 18 },
+        },
+      ],
+    }
+
+    const result = ensureDocumentFontsForExport(doc, [])
+    expect(result.fonts.some((font) => font.family === 'Inter')).toBe(true)
+  })
 })
