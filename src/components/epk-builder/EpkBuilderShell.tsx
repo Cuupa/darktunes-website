@@ -86,7 +86,7 @@ export function EpkBuilderShell({
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('canvas')
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'epk-builder-layout-v1',
+    id: 'epk-builder-layout-v2',
     panelIds: ['epk-left-panel', 'epk-canvas-panel', 'epk-right-panel'],
     storage: localStorage,
   })
@@ -294,9 +294,9 @@ export function EpkBuilderShell({
         >
           <ResizablePanel
             id="epk-left-panel"
-            defaultSize={18}
-            minSize={14}
-            maxSize={32}
+            defaultSize="18%"
+            minSize="14%"
+            maxSize="32%"
             className="min-w-0"
           >
             <aside className="flex h-full flex-col border-r border-border bg-card">
@@ -316,7 +316,7 @@ export function EpkBuilderShell({
             className="bg-border"
           />
 
-          <ResizablePanel id="epk-canvas-panel" defaultSize={52} minSize={35} className="min-w-0">
+          <ResizablePanel id="epk-canvas-panel" defaultSize="52%" minSize="35%" className="min-w-0">
             <main className="h-full overflow-hidden bg-muted/20">
               <EpkCanvas
                 onOpenAssetPicker={() => openAssetPicker('insert')}
@@ -333,9 +333,9 @@ export function EpkBuilderShell({
 
           <ResizablePanel
             id="epk-right-panel"
-            defaultSize={30}
-            minSize={18}
-            maxSize={42}
+            defaultSize="30%"
+            minSize="18%"
+            maxSize="42%"
             className="min-w-0"
           >
             <aside className="flex h-full flex-col border-l border-border bg-card">
