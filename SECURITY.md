@@ -60,7 +60,7 @@ IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 | `/api/newsletter` | 3 requests | 10 minutes | + silent success on duplicate email |
 | `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
 | `/api/page-events` | 120 requests | 10 minutes | Consent-gated analytics only; service-role insert |
-| `/api/vitals` | — | — | No IP limit; critical vitals logged to `app_logs` |
+| `/api/vitals` | 120 requests | 10 minutes | Critical vitals logged to `app_logs` |
 
 **Website engagement privacy**: `page_events` are recorded only when visitors accept the analytics cookie (`darktunes_consent=accepted`). Session identifiers are hashed server-side (`hashSessionForPageEvents`); no raw IPs are stored. Admin/portal/press/editor routes are excluded from tracking.
 

@@ -159,8 +159,9 @@
     "smol-toml": "1.6.1",
     "postcss": "^8.5.15",
     "@vercel/node": {
-      "undici": "6.24.1"
+      "undici": "6.27.0"
     },
+    "tmp": "0.2.7",
     "@vercel/python-analysis": {
       "minimatch": "10.2.5"
     }

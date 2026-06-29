@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import DOMPurify from 'dompurify'
 import { useTranslations } from 'next-intl'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { getOptimizedImageUrl } from '@/lib/imageUtils'
@@ -31,7 +31,10 @@ export function PressReleaseDetailClient({ post }: PressReleaseDetailClientProps
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8">
-        <Link href="/press/dashboard/press-releases" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href="/press/dashboard/press-releases"
+          className="inline-flex min-h-[44px] items-center text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        >
           {t('detail.backLink')}
         </Link>
 
@@ -81,7 +84,11 @@ export function PressReleaseDetailClient({ post }: PressReleaseDetailClientProps
 
         <article className="rounded-3xl border border-border bg-card/60 p-6">
           {post.content.trimStart().startsWith('<') ? (
-            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content, { ADD_ATTR: ['target'] }) }} />
+            <div
+              className="prose prose-invert prose-sm max-w-none"
+              suppressHydrationWarning
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
+            />
           ) : (
             <MarkdownContent content={post.content} className="max-w-none" />
           )}

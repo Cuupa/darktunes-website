@@ -53,6 +53,11 @@ export function AboutContent({ siteSettings, artists, news }: AboutContentProps)
     return null // render via MarkdownContent below
   }, [body])
 
+  const sanitizedBodyHtml = useMemo(() => {
+    if (!bodyHtml) return ''
+    return sanitizeHtml(processHtmlImages(bodyHtml))
+  }, [bodyHtml])
+
   const stats = [
     { label: 'Artists', value: artists.length },
     { label: 'News Posts', value: news.length },
@@ -105,11 +110,7 @@ export function AboutContent({ siteSettings, artists, news }: AboutContentProps)
                 [&_a]:text-accent [&_a]:underline [&_a]:hover:no-underline
                 [&_strong]:text-foreground [&_strong]:font-semibold
                 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-muted-foreground"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeHtml(
-                  typeof window !== 'undefined' ? processHtmlImages(bodyHtml) : bodyHtml,
-                ),
-              }}
+              dangerouslySetInnerHTML={{ __html: sanitizedBodyHtml }}
             />
           ) : (
             <MarkdownContent content={body} className="max-w-3xl text-lg" />

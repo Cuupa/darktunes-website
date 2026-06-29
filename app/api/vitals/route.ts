@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 type ConnectionType = '4g' | '3g' | '2g' | 'slow-2g' | 'unknown'
@@ -46,6 +47,11 @@ function isWebVitalMetric(value: unknown): value is WebVitalMetric {
 }
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  const ip = getClientIp(request)
+  if (checkRateLimit(`vitals:${ip}`, 120, 10 * 60_000).limited) {
+    throw new ApiError(429, 'Too many requests')
+  }
+
   let body: unknown
 
   try {
