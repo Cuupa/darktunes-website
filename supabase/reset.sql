@@ -4372,6 +4372,7 @@ CREATE TABLE IF NOT EXISTS public.video_submissions (
   youtube_category      TEXT,
   target_publish_date   DATE,
   notes                 TEXT,
+  form_data             JSONB,
   admin_reply           TEXT,
   admin_reply_at        TIMESTAMPTZ,
   created_at            TIMESTAMPTZ               NOT NULL DEFAULT NOW(),

@@ -907,6 +907,7 @@ export interface VideoSubmission {
   youtubeCategory: string | null
   targetPublishDate: string | null
   notes: string | null
+  formData: Record<string, unknown> | null
   adminReply: string | null
   adminReplyAt: string | null
   createdAt: string

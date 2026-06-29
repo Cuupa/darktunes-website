@@ -1,7 +1,7 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import type { SubmissionFormField } from '@/types'
 
 const YT_CATEGORIES = [
   { value: '10', label: 'Music' },
@@ -18,19 +19,127 @@ const YT_CATEGORIES = [
   { value: '27', label: 'Education' },
 ]
 
-export function VideoSubmissionForm() {
+const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
+  title: 'title',
+  download_url: 'downloadUrl',
+  thumbnail_url: 'thumbnailUrl',
+  youtube_title: 'youtubeTitle',
+  youtube_description: 'youtubeDescription',
+  youtube_tags: 'youtubeTags',
+  youtube_category: 'youtubeCategory',
+  target_publish_date: 'targetPublishDate',
+  description: 'description',
+  notes: 'notes',
+}
+
+interface VideoSubmissionFormProps {
+  formSchema: SubmissionFormField[]
+}
+
+function fieldLabel(field: SubmissionFormField, locale: string): string {
+  return locale === 'de' ? field.fieldLabelDe : field.fieldLabelEn
+}
+
+function fieldPlaceholder(field: SubmissionFormField, locale: string): string {
+  return locale === 'de' ? (field.placeholderDe ?? '') : (field.placeholderEn ?? '')
+}
+
+function SchemaField({
+  field,
+  locale,
+  value,
+  onChange,
+}: {
+  field: SubmissionFormField
+  locale: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const label = fieldLabel(field, locale)
+  const placeholder = fieldPlaceholder(field, locale)
+  const id = `video-field-${field.fieldKey}`
+
+  if (field.fieldType === 'boolean') {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          type="checkbox"
+          checked={value === 'true'}
+          onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
+        />
+        <Label htmlFor={id}>{label}</Label>
+      </div>
+    )
+  }
+
+  if (field.fieldType === 'select' && field.fieldKey === 'youtube_category') {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={id}>
+          {label}
+          {field.isRequired && <span className="text-destructive ml-1">*</span>}
+        </Label>
+        <select
+          id={id}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+          value={value || '10'}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.isRequired}
+        >
+          {YT_CATEGORIES.map((cat) => (
+            <option key={cat.value} value={cat.value}>{cat.label}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>
+        {label}
+        {field.isRequired && <span className="text-destructive ml-1">*</span>}
+      </Label>
+      {field.fieldType === 'textarea' ? (
+        <Textarea
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={field.isRequired}
+        />
+      ) : (
+        <Input
+          id={id}
+          type={field.fieldType === 'url' ? 'url' : field.fieldType === 'date' ? 'date' : 'text'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={field.isRequired}
+        />
+      )}
+    </div>
+  )
+}
+
+export function VideoSubmissionForm({ formSchema }: VideoSubmissionFormProps) {
   const t = useTranslations('portal')
+  const locale = useLocale()
   const router = useRouter()
-  const [title, setTitle] = useState('')
-  const [downloadUrl, setDownloadUrl] = useState('')
-  const [thumbnailUrl, setThumbnailUrl] = useState('')
-  const [youtubeTitle, setYoutubeTitle] = useState('')
-  const [youtubeDescription, setYoutubeDescription] = useState('')
-  const [youtubeTags, setYoutubeTags] = useState('')
-  const [youtubeCategory, setYoutubeCategory] = useState('10')
-  const [targetPublishDate, setTargetPublishDate] = useState('')
-  const [notes, setNotes] = useState('')
+  const [values, setValues] = useState<Record<string, string>>({
+    youtube_category: '10',
+  })
   const [submitting, setSubmitting] = useState(false)
+
+  const visibleFields = useMemo(
+    () => [...formSchema].filter((f) => f.isVisible).sort((a, b) => a.displayOrder - b.displayOrder),
+    [formSchema],
+  )
+
+  const setFieldValue = (key: string, value: string) => {
+    setValues((prev) => ({ ...prev, [key]: value }))
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,6 +152,25 @@ export function VideoSubmissionForm() {
         return
       }
 
+      const standardBody: Record<string, unknown> = {}
+      const formData: Record<string, string> = {}
+
+      for (const field of visibleFields) {
+        const raw = values[field.fieldKey] ?? ''
+        const bodyKey = STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
+        if (bodyKey !== undefined) {
+          if (field.fieldKey === 'youtube_tags') {
+            standardBody[bodyKey] = raw.split(',').map((tag) => tag.trim()).filter(Boolean)
+          } else if (field.fieldType === 'boolean') {
+            standardBody[bodyKey] = raw === 'true'
+          } else {
+            standardBody[bodyKey] = raw.trim() || null
+          }
+        } else if (raw.trim()) {
+          formData[field.fieldKey] = raw.trim()
+        }
+      }
+
       const res = await fetch('/api/portal/submit-video', {
         method: 'POST',
         headers: {
@@ -50,15 +178,8 @@ export function VideoSubmissionForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim(),
-          downloadUrl,
-          thumbnailUrl: thumbnailUrl || null,
-          youtubeTitle: youtubeTitle.trim(),
-          youtubeDescription: youtubeDescription.trim(),
-          youtubeTags: youtubeTags.split(',').map((t) => t.trim()).filter(Boolean),
-          youtubeCategory: youtubeCategory || null,
-          targetPublishDate: targetPublishDate || null,
-          notes: notes || null,
+          ...standardBody,
+          formData: Object.keys(formData).length > 0 ? formData : null,
         }),
       })
 
@@ -87,73 +208,17 @@ export function VideoSubmissionForm() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(e) => void submit(e)}>
-            <div className="space-y-2">
-              <Label htmlFor="video-title">
-                {t('video_submit_title')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input id="video-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            </div>
+            {visibleFields.map((field) => (
+              <SchemaField
+                key={field.id}
+                field={field}
+                locale={locale}
+                value={values[field.fieldKey] ?? ''}
+                onChange={(v) => setFieldValue(field.fieldKey, v)}
+              />
+            ))}
 
-            <div className="space-y-2">
-              <Label htmlFor="download-url">
-                {t('video_submit_download_url')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input id="download-url" type="url" value={downloadUrl} onChange={(e) => setDownloadUrl(e.target.value)} placeholder="https://drive.google.com/…" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="thumbnail-url">{t('video_submit_thumbnail_url')}</Label>
-              <Input id="thumbnail-url" type="url" value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="yt-title">
-                {t('video_submit_yt_title')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input id="yt-title" value={youtubeTitle} onChange={(e) => setYoutubeTitle(e.target.value)} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="yt-description">
-                {t('video_submit_yt_description')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Textarea id="yt-description" value={youtubeDescription} onChange={(e) => setYoutubeDescription(e.target.value)} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="yt-tags">{t('video_submit_yt_tags')}</Label>
-              <Input id="yt-tags" value={youtubeTags} onChange={(e) => setYoutubeTags(e.target.value)} placeholder="electronic, dark techno, techno" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="yt-category">{t('video_submit_yt_category')}</Label>
-              <select
-                id="yt-category"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                value={youtubeCategory}
-                onChange={(e) => setYoutubeCategory(e.target.value)}
-              >
-                {YT_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>{cat.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="publish-date">{t('video_submit_publish_date')}</Label>
-              <Input id="publish-date" type="date" value={targetPublishDate} onChange={(e) => setTargetPublishDate(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="video-notes">{t('video_submit_notes')}</Label>
-              <Textarea id="video-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || visibleFields.length === 0}>
               {submitting ? t('video_submit_saving') : t('video_submit_save')}
             </Button>
           </form>

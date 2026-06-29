@@ -21,6 +21,7 @@ function rowToSubmission(row: Row): VideoSubmission {
     youtubeCategory: row.youtube_category,
     targetPublishDate: row.target_publish_date,
     notes: row.notes,
+    formData: row.form_data as Record<string, unknown> | null,
     adminReply: row.admin_reply,
     adminReplyAt: row.admin_reply_at,
     createdAt: row.created_at,

@@ -3802,6 +3802,7 @@ export interface Database {
           youtube_category: string | null
           target_publish_date: string | null
           notes: string | null
+          form_data: Record<string, unknown> | null
           admin_reply: string | null
           admin_reply_at: string | null
           created_at: string
@@ -3821,6 +3822,7 @@ export interface Database {
           youtube_category?: string | null
           target_publish_date?: string | null
           notes?: string | null
+          form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
           created_at?: string
@@ -3840,6 +3842,7 @@ export interface Database {
           youtube_category?: string | null
           target_publish_date?: string | null
           notes?: string | null
+          form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
           created_at?: string

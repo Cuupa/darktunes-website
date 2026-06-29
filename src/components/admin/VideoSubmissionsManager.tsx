@@ -130,6 +130,16 @@ export function VideoSubmissionsManager() {
               <p className="text-sm text-muted-foreground">Tags: {selected.youtubeTags.join(', ')}</p>
             )}
             {selected.notes && <p className="text-sm text-muted-foreground">{selected.notes}</p>}
+            {selected.formData && Object.keys(selected.formData).length > 0 && (
+              <div className="space-y-1 text-sm text-muted-foreground">
+                {Object.entries(selected.formData).map(([key, value]) => (
+                  <p key={key}>
+                    <span className="font-medium">{key}: </span>
+                    {String(value)}
+                  </p>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Update Status</Label>
               <Select value={newStatus} onValueChange={(v) => setNewStatus(v as SubmissionStatus)}>
