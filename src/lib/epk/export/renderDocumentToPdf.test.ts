@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -62,12 +63,90 @@ const minimalDocument: EpkDocumentV2 = {
   },
 }
 
+function assertEmbeddedFontStreamsAreNotWebFonts(pdfBytes: Uint8Array): void {
+  const text = new TextDecoder('latin1').decode(pdfBytes)
+  const streams = [...text.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)]
+
+  for (const match of streams) {
+    const raw = match[1]
+    if (!raw) continue
+    try {
+      const inflated = inflateSync(Buffer.from(raw, 'latin1'))
+      if (inflated.length < 4) continue
+      const magic = inflated.subarray(0, 4).toString('ascii')
+      expect(magic).not.toBe('wOF2')
+      expect(magic).not.toBe('wOFF')
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('web font')) throw error
+    }
+  }
+}
+
 describe('renderDocumentToPdf', () => {
   it('returns valid PDF bytes', async () => {
     const bytes = await renderDocumentToPdf({ document: minimalDocument })
     expect(bytes.length).toBeGreaterThan(500)
     const header = String.fromCharCode(...bytes.slice(0, 4))
     expect(header).toBe('%PDF')
+  })
+
+  it('embeds subsetted SFNT fonts instead of raw WOFF2', async () => {
+    const bytes = await renderDocumentToPdf({ document: minimalDocument })
+    assertEmbeddedFontStreamsAreNotWebFonts(bytes)
+  })
+
+  it('renders rotated elements and rounded shapes', async () => {
+    const document: EpkDocumentV2 = {
+      ...minimalDocument,
+      elements: [
+        {
+          id: 'shape-rounded',
+          pageId: 'page-1',
+          type: 'shape',
+          x: 60,
+          y: 260,
+          width: 180,
+          height: 80,
+          rotation: 12,
+          zIndex: 3,
+          locked: false,
+          visible: true,
+          style: { fill: '#493687', cornerRadius: 16 },
+        },
+        {
+          ...minimalDocument.elements[1]!,
+          id: 'text-rotated',
+          y: 360,
+          rotation: -8,
+          content: 'Rotated copy',
+        },
+      ],
+    }
+
+    const bytes = await renderDocumentToPdf({ document })
+    expect(bytes.length).toBeGreaterThan(500)
+    assertEmbeddedFontStreamsAreNotWebFonts(bytes)
+  })
+
+  it('renders German punctuation with bundled fallback fonts', async () => {
+    const document: EpkDocumentV2 = {
+      ...minimalDocument,
+      elements: [
+        {
+          ...minimalDocument.elements[1]!,
+          content: 'Müller — äöüß',
+          style: {
+            fill: '#ffffff',
+            fontSize: 20,
+            fontWeight: 600,
+          },
+        },
+      ],
+    }
+
+    const bytes = await renderDocumentToPdf({ document })
+    expect(bytes.length).toBeGreaterThan(500)
+    assertEmbeddedFontStreamsAreNotWebFonts(bytes)
   })
 })
 

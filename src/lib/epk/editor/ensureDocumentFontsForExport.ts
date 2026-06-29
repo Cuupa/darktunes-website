@@ -6,6 +6,7 @@
  */
 
 import type { EpkDocumentV2, EpkFont } from '@/lib/epk/schema/documentV2'
+import { DEFAULT_FONT_STACK, parsePrimaryFontFamily } from '@/lib/epk/fontFamily'
 import { hydrateDocumentFonts } from './hydrateDocumentFonts'
 import { EPK_GOOGLE_FONTS, isGoogleFontFamily } from '@/lib/epk/googleFonts'
 
@@ -56,8 +57,8 @@ export function ensureDocumentFontsForExport(
 
   for (const element of next.elements) {
     if (element.type !== 'text') continue
-    const family = element.style.fontFamily
-    if (!family || family === 'Helvetica, Arial, sans-serif') continue
+    const family = parsePrimaryFontFamily(element.style.fontFamily)
+    if (!element.style.fontFamily || element.style.fontFamily === DEFAULT_FONT_STACK) continue
     if (existing.has(family)) continue
 
     const custom = byFamily.get(family)

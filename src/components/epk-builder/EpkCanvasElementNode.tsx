@@ -12,6 +12,7 @@ import { Group, Rect, Text, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
 import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
+import { resolveKonvaFontStyle } from '@/lib/epk/konvaFontStyle'
 import { getEpkImageLayout } from '@/lib/epk/imageFit'
 import type { EpkElement } from '@/lib/epk/schema/documentV2'
 import { parseGradientFromStyle } from '@/lib/epk/gradients'
@@ -169,11 +170,7 @@ export function EpkCanvasElementNode({
           text={element.content ?? ''}
           fontSize={element.style.fontSize ?? 14}
           fontFamily={formatKonvaFontFamily(element.style.fontFamily)}
-          fontStyle={
-            element.style.fontWeight === 700 || element.style.fontWeight === 'bold'
-              ? 'bold'
-              : 'normal'
-          }
+          fontStyle={resolveKonvaFontStyle(element.style)}
           fill={element.style.fill ?? '#ffffff'}
           align={element.style.textAlign ?? 'left'}
           lineHeight={element.style.lineHeight}

@@ -29,6 +29,7 @@
     "@fontsource/noto-sans": "^5.2.10",
     "@hookform/resolvers": "^5.4.0",
     "@octokit/core": "^7.0.6",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@phosphor-icons/react": "^2.1.7",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -72,7 +73,6 @@
     "@tiptap/extension-underline": "^3.27.1",
     "@tiptap/react": "^3.27.1",
     "@tiptap/starter-kit": "^3.27.1",
-
     "@types/papaparse": "^5.5.2",
     "@vercel/functions": "^3.7.1",
     "busboy": "^1.6.0",
