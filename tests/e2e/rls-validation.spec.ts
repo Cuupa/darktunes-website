@@ -10,7 +10,6 @@ const SENSITIVE_TABLES = [
   'artist_assets',
   'artist_profiles',
   'promo_tracks',
-  'newsletter_subscribers',
 ]
 
 type PgTableRow = {

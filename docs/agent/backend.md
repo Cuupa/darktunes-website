@@ -65,9 +65,9 @@ User-facing text is stripped of emoji characters via `src/lib/stripEmojis.ts` on
 
 Releases and news posts support `featured_until` and `featured_removed_reason`. The hero carousel shows at most 10 eligible featured items (`src/lib/heroFeatured.ts`). `enforceHeroFeaturedLimits()` runs during public cache revalidation; enabling an 11th feature in admin prompts a confirmation modal and bumps the oldest active hero item.
 
-## Newsletter DOI
+## Newsletter (Shopify)
 
-`subscribeToNewsletter` Server Action → pending row → Edge Function email → `GET /api/newsletter/verify`.
+Public sign-up is embedded via `NewsletterSection` (`https://darkmerch.com/pages/newsletter` iframe). Legacy DOI routes (`/api/newsletter`, `/api/newsletter/verify`, `/api/newsletter/unsubscribe`) redirect or return 410 — the `newsletter_subscribers` table and Edge Function were removed.
 
 ## Password recovery email
 
@@ -101,7 +101,6 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 |-------|-------|
 | `/api/contact` | 5 / 10 min |
 | `/api/auth/forgot-password` | 3 / 10 min |
-| `/api/newsletter` | 3 / 10 min |
 | `/api/journalist-applications` | 3 / 30 min |
 | `/api/page-events` | 120 / 10 min |
 

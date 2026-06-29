@@ -57,7 +57,6 @@ IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 | Route | Limit | Window | Notes |
 |---|---|---|---|
 | `/api/contact` | 5 requests | 10 minutes | + honeypot field |
-| `/api/newsletter` | 3 requests | 10 minutes | + silent success on duplicate email |
 | `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
 | `/api/page-events` | 120 requests | 10 minutes | Consent-gated analytics only; service-role insert |
 | `/api/vitals` | 120 requests | 10 minutes | Critical vitals logged to `app_logs` |

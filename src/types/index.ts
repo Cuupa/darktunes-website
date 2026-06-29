@@ -866,14 +866,6 @@ export interface TourMerchSettlementRecord {
   updatedAt: string
 }
 
-export interface NewsletterSubscriber {
-  id: string
-  email: string
-  name: string | null
-  subscribedAt: string
-  source: string
-}
-
 export type SubmissionStatus = 'received' | 'reviewed' | 'accepted' | 'rejected'
 
 export interface ReleaseSubmission {

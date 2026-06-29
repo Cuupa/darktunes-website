@@ -1,11 +1,10 @@
 /**
  * app/newsletter/confirmed/page.tsx
  *
- * Newsletter Double Opt-In confirmation landing page.
- *
- * Shown after the user clicks the verification link in their confirmation email.
- *   - Without ?error=1 → success (subscription confirmed).
- *   - With    ?error=1 → failure (invalid / expired token).
+ * Legacy newsletter confirmation landing page (kept for bookmarks).
+ * New sign-ups use the Shopify embed on /newsletter.
+ *   - Without ?error=1 → success message.
+ *   - With    ?error=1 → failure message.
  */
 
 import Link from 'next/link'
