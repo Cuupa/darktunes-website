@@ -1,5 +1,6 @@
 'use client'
 
+import '@/lib/epk/konvaShapes'
 import { useTranslations } from 'next-intl'
 /**
  * app/portal/epk-builder/_components/EpkBuilderClient.tsx

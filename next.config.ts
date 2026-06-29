@@ -85,7 +85,9 @@ const nextConfig: NextConfig = {
     '/api/epk/press/[slug]/export': ['./src/lib/epk/export/assets/**/*'],
   },
   experimental: {
-    optimizePackageImports: ['framer-motion', '@phosphor-icons/react', 'lenis', 'konva', 'react-konva'],
+    // konva/react-konva omitted: optimizePackageImports tree-shakes shape side-effects
+    // required by react-konva (see src/lib/epk/konvaShapes.ts).
+    optimizePackageImports: ['framer-motion', '@phosphor-icons/react', 'lenis'],
   },
 }
 

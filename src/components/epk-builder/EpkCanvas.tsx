@@ -145,7 +145,7 @@ export function EpkCanvas({ onOpenAssetPicker, onReplaceImage, onEditText }: Epk
 
   useEffect(() => {
     const tr = transformerRef.current
-    if (!tr) return
+    if (!tr || typeof tr.nodes !== 'function') return
     const nodes = selectedIds
       .map((id) => nodeRefs.current.get(id))
       .filter((n): n is Konva.Node => Boolean(n))

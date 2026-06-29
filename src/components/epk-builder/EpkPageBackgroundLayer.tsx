@@ -1,5 +1,6 @@
 'use client'
 
+import '@/lib/epk/konvaShapes'
 import { useEffect, useState } from 'react'
 import { Rect, Image as KonvaImage } from 'react-konva'
 import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
