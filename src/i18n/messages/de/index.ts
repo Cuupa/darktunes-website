@@ -18,6 +18,7 @@ import newsPage from './newsPage.json'
 import newsletter from './newsletter.json'
 import pages from './pages.json'
 import portal from './portal.json'
+import portalHelp from './portalHelp.json'
 import press from './press.json'
 import pressContact from './pressContact.json'
 import pressDashboard from './pressDashboard.json'
@@ -53,6 +54,7 @@ export default {
   newsletter,
   pages,
   portal,
+  portalHelp,
   press,
   pressContact,
   pressDashboard,
