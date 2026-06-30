@@ -3986,7 +3986,8 @@ export interface Database {
           id: string
           form_type: 'release' | 'video'
           field_key: string
-          field_labels: Record<string, string>
+          field_label_en: string
+          field_label_de: string
           field_type:
             | 'text'
             | 'url'
@@ -4010,13 +4011,15 @@ export interface Database {
           is_required: boolean
           is_visible: boolean
           display_order: number
-          placeholders: Record<string, string> | null
+          placeholder_en: string | null
+          placeholder_de: string | null
         }
         Insert: {
           id?: string
           form_type: 'release' | 'video'
           field_key: string
-          field_labels: Record<string, string>
+          field_label_en: string
+          field_label_de: string
           field_type:
             | 'text'
             | 'url'
@@ -4040,13 +4043,15 @@ export interface Database {
           is_required?: boolean
           is_visible?: boolean
           display_order?: number
-          placeholders?: Record<string, string> | null
+          placeholder_en?: string | null
+          placeholder_de?: string | null
         }
         Update: {
           id?: string
           form_type?: 'release' | 'video'
           field_key?: string
-          field_labels?: Record<string, string>
+          field_label_en?: string
+          field_label_de?: string
           field_type?:
             | 'text'
             | 'url'
@@ -4070,7 +4075,8 @@ export interface Database {
           is_required?: boolean
           is_visible?: boolean
           display_order?: number
-          placeholders?: Record<string, string> | null
+          placeholder_en?: string | null
+          placeholder_de?: string | null
         }
         Relationships: []
       }
