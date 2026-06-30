@@ -156,7 +156,7 @@ export function EpkTemplatePicker({ open, onClose, onApply }: EpkTemplatePickerP
           </div>
         </div>
 
-        <div className="overflow-y-auto max-h-[60vh] p-6 space-y-4">
+        <div className="overflow-y-auto overscroll-contain max-h-[60vh] p-6 space-y-4" data-lenis-prevent>
           {loading ? (
             <p className="text-sm text-muted-foreground">{t('epk_templates_loading')}</p>
           ) : filteredTemplates.length === 0 ? (

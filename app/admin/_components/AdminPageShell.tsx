@@ -13,12 +13,14 @@ interface AdminPageShellProps {
   description?: string
   children: React.ReactNode
   actions?: React.ReactNode
+  /** Fill the admin viewport so nested panels (e.g. file explorer) scroll internally. */
+  fill?: boolean
 }
 
-export function AdminPageShell({ title, description, children, actions }: AdminPageShellProps) {
+export function AdminPageShell({ title, description, children, actions, fill }: AdminPageShellProps) {
   return (
-    <div className="flex flex-col min-h-full">
-      <header className="border-b border-border bg-card px-6 py-5 flex items-start justify-between gap-4">
+    <div className={fill ? 'flex flex-col h-full min-h-0' : 'flex flex-col min-h-full'}>
+      <header className="shrink-0 border-b border-border bg-card px-6 py-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">{title}</h1>
           {description && (
@@ -27,7 +29,7 @@ export function AdminPageShell({ title, description, children, actions }: AdminP
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
       </header>
-      <div className="flex-1 p-6">
+      <div className={fill ? 'flex flex-col flex-1 min-h-0 p-6' : 'flex-1 p-6'}>
         {children}
       </div>
     </div>

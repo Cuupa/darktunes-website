@@ -2,13 +2,14 @@
 
 import { FileExplorer } from './file-explorer/FileExplorer'
 
-export function AssetsManager() {
+interface AssetsManagerProps {
+  variant?: 'fill' | 'embedded'
+}
+
+export function AssetsManager({ variant = 'fill' }: AssetsManagerProps) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        Manage all media assets. Upload files, organize in folders, assign to artists.
-      </p>
-      <FileExplorer />
+    <div className="flex flex-col flex-1 min-h-0 h-full">
+      <FileExplorer variant={variant} />
     </div>
   )
 }

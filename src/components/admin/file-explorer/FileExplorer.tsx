@@ -26,7 +26,17 @@ interface RenamingState {
   id: string
 }
 
-export function FileExplorer({ className }: { className?: string }) {
+export function FileExplorer({
+  className,
+  variant = 'fill',
+}: {
+  className?: string
+  variant?: 'fill' | 'embedded'
+}) {
+  const heightClass =
+    variant === 'fill'
+      ? 'h-full min-h-0 flex-1'
+      : 'h-[min(70dvh,calc(100dvh-14rem))] min-h-0'
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -341,9 +351,9 @@ export function FileExplorer({ className }: { className?: string }) {
   return (
     <>
       {/* Desktop: resizable side-by-side panels */}
-      <div className={cn('hidden md:flex h-[calc(100vh-10rem)]', className)}>
-        <ResizablePanelGroup direction="horizontal" className="rounded-lg border border-border bg-background w-full">
-          <ResizablePanel defaultSize="20%" minSize="15%" maxSize="40%">
+      <div className={cn('hidden md:flex', heightClass, className)}>
+        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0 rounded-lg border border-border bg-background w-full">
+          <ResizablePanel defaultSize="20%" minSize="15%" maxSize="40%" className="min-h-0">
             <FolderTree
               folders={explorer.allFolders}
               currentFolderId={explorer.currentFolderId}
@@ -352,8 +362,8 @@ export function FileExplorer({ className }: { className?: string }) {
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize="80%">
-            <div className="flex h-full flex-col">
+          <ResizablePanel defaultSize="80%" className="min-h-0">
+            <div className="flex h-full min-h-0 flex-col">
               <ExplorerToolbar
                 searchQuery={explorer.searchQuery}
                 onSearchChange={explorer.setSearchQuery}
@@ -394,7 +404,7 @@ export function FileExplorer({ className }: { className?: string }) {
       </div>
 
       {/* Mobile: stacked layout with collapsible folder tree */}
-      <div className={cn('flex md:hidden flex-col rounded-lg border border-border bg-background h-[calc(100vh-8rem)]', className)}>
+      <div className={cn('flex md:hidden flex-col rounded-lg border border-border bg-background', heightClass, className)}>
         {/* Mobile toolbar row: sidebar toggle + search/sort */}
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <Button

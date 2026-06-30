@@ -121,18 +121,25 @@ export function TacticalModal({
 
   // ── Focus management & scroll lock ──────────────────────────────────────
   useEffect(() => {
-    if (open) {
-      returnFocusRef.current = document.activeElement
-      document.body.style.overflow = 'hidden'
-      // Brief timeout lets the clip-path animation start before stealing focus,
-      // so screen readers don't read the panel before it is visually revealed.
-      const id = setTimeout(() => closeRef.current?.focus(), 60)
-      return () => clearTimeout(id)
-    } else {
+    if (!open) {
       document.body.style.overflow = ''
+      delete document.body.dataset.scrollLocked
       if (returnFocusRef.current instanceof HTMLElement) {
         returnFocusRef.current.focus()
       }
+      return
+    }
+
+    returnFocusRef.current = document.activeElement
+    document.body.style.overflow = 'hidden'
+    document.body.dataset.scrollLocked = '1'
+    // Brief timeout lets the clip-path animation start before stealing focus,
+    // so screen readers don't read the panel before it is visually revealed.
+    const id = setTimeout(() => closeRef.current?.focus(), 60)
+    return () => {
+      clearTimeout(id)
+      document.body.style.overflow = ''
+      delete document.body.dataset.scrollLocked
     }
   }, [open])
 

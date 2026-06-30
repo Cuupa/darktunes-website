@@ -101,7 +101,8 @@ export function FileList({
   }
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      <ScrollArea className="h-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -204,5 +205,6 @@ export function FileList({
         </TableBody>
       </Table>
     </ScrollArea>
+    </div>
   )
 }

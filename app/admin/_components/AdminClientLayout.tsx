@@ -50,7 +50,7 @@ export function AdminClientLayout({ children }: AdminClientLayoutProps) {
                 intercepts all events at document level and the overflow-y-auto
                 panel cannot be scrolled. */}
             <div
-              className="flex-1 overflow-y-auto min-h-0"
+              className="flex flex-col flex-1 overflow-y-auto min-h-0"
               style={{ overscrollBehavior: 'contain' }}
               data-lenis-prevent
             >

@@ -71,7 +71,7 @@ export function EpkDownloadStatsPanel({
             {t('epk_analytics_title')}
           </DialogTitle>
         </DialogHeader>
-        <div className="overflow-y-auto max-h-[70vh] p-6 space-y-4">
+        <div className="overflow-y-auto overscroll-contain max-h-[70vh] p-6 space-y-4" data-lenis-prevent>
           {loading ? (
             <p className="text-sm text-muted-foreground">{t('epk_analytics_loading')}</p>
           ) : !stats ? (

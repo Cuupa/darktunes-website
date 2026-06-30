@@ -46,7 +46,7 @@ export function EpkPagesPanel() {
         </Button>
       </div>
 
-      <ul className="space-y-2 p-4 max-h-[min(240px,35vh)] overflow-y-auto list-none">
+      <ul className="space-y-2 p-4 max-h-[min(240px,35vh)] overflow-y-auto overscroll-contain list-none" data-lenis-prevent>
         {pages.map((page, index) => {
           const isActive = page.id === activePageId
           return (
