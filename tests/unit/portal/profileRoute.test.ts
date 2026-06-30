@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const createServiceRoleSupabaseClientMock = vi.fn()
 const resolvePortalArtistMock = vi.fn()
 const upsertArtistProfileMock = vi.fn()
+const syncPortalGalleryToPressKitMock = vi.fn()
 const revalidatePathMock = vi.fn()
 const authenticatePortalBearerMock = vi.fn()
 
@@ -18,6 +19,10 @@ vi.mock('@/lib/portal/bearerAuth', () => ({
 vi.mock('@/lib/api/artistProfiles', () => ({
   resolvePortalArtist: resolvePortalArtistMock,
   upsertArtistProfile: upsertArtistProfileMock,
+}))
+
+vi.mock('@/lib/api/portalGalleryPress', () => ({
+  syncPortalGalleryToPressKit: syncPortalGalleryToPressKitMock,
 }))
 
 vi.mock('next/cache', () => ({
@@ -49,6 +54,7 @@ describe('PUT /api/portal/profile', () => {
 
     resolvePortalArtistMock.mockResolvedValue({ id: artistId, slug: 'artist-slug' })
     upsertArtistProfileMock.mockResolvedValue({ id: 'profile-1' })
+    syncPortalGalleryToPressKitMock.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -121,7 +127,14 @@ describe('PUT /api/portal/profile', () => {
         soundcloud_url: null,
       }),
     )
+    expect(syncPortalGalleryToPressKitMock).toHaveBeenCalledWith(
+      expect.anything(),
+      artistId,
+      ['https://images.example.com/gallery.jpg'],
+      'user-1',
+    )
     expect(revalidatePathMock).toHaveBeenCalledWith('/artists/artist-slug')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/press/artists/artist-slug')
     expect(revalidatePathMock).toHaveBeenCalledWith('/artists')
   })
 })
