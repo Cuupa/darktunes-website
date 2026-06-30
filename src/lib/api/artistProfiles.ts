@@ -119,11 +119,16 @@ function hasAnySocialOrStreamingLink(artist: Artist): boolean {
   )
 }
 
+function hasBioContent(profile: ArtistProfile | null, artist: Artist): boolean {
+  if (profile?.bioShort || profile?.bioMedium || profile?.bioLong) return true
+  const labelBio = artist.bio?.replace(/<[^>]*>/g, '').trim()
+  return Boolean(labelBio)
+}
+
 export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
-  if (!profile || !artist) return false
+  if (!artist) return false
   const hasPhoto = Boolean(artist.imageUrl)
-  const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong)
-  return hasPhoto && hasBio && hasAnySocialOrStreamingLink(artist)
+  return hasPhoto && hasBioContent(profile, artist) && hasAnySocialOrStreamingLink(artist)
 }
 
 // ---------------------------------------------------------------------------
