@@ -199,10 +199,11 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           featureFlags={featureFlags}
         />
         <main
-          className={`flex-1 w-full min-w-0 border-t md:border-t-0 border-primary/10 ${
+          data-lenis-prevent=""
+          className={`flex-1 w-full min-w-0 border-t md:border-t-0 border-primary/10 overscroll-contain ${
             currentPath.includes('/portal/epk-builder')
               ? 'p-0 overflow-hidden'
-              : 'p-4 sm:p-6 md:p-8 max-w-none'
+              : 'p-4 sm:p-6 md:p-8 max-w-none overflow-y-auto'
           }`}
         >
           <PortalOfflineProvider>

@@ -13,7 +13,7 @@ const ArtistsManager = lazy(() =>
 
 export default function AdminArtistsPage() {
   return (
-    <AdminPageShell title="Artists" description="Manage label artists, their information, and social links.">
+    <AdminPageShell fill title="Artists" description="Manage label artists, their information, and social links.">
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <ArtistsManager />
       </Suspense>

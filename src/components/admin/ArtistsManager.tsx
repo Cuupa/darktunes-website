@@ -440,6 +440,7 @@ export function ArtistsManager() {
     : 'No artists yet. Click "New Artist" to add one.'
 
   return (
+    <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overscroll-contain" data-lenis-prevent>
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <div className="relative flex-1 min-w-0">
@@ -523,6 +524,7 @@ export function ArtistsManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
     </div>
   )
 }

@@ -5,12 +5,14 @@ import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { AdminPanelProps } from '@/lib/component-contracts'
 import { stripEmojisOnPaste } from '@/lib/stripEmojisPaste'
+import { PromoLogManager } from '@/components/admin/PromoLogManager'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import Link from 'next/link'
 import {
   ArrowsClockwise,
   VinylRecord,
@@ -21,6 +23,7 @@ import {
   Database,
   FloppyDisk,
   Image as ImageIcon,
+  Megaphone,
   Plus,
   Trash,
 } from '@phosphor-icons/react'
@@ -545,6 +548,12 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
             <TabsTrigger value="sync" className="gap-1.5">
               <Database size={14} aria-hidden="true" />
               Sync-IDs
+            </TabsTrigger>
+          )}
+          {mode === 'admin' && artistId && (
+            <TabsTrigger value="marketing" className="gap-1.5">
+              <Megaphone size={14} aria-hidden="true" />
+              Marketing
             </TabsTrigger>
           )}
         </TabsList>
@@ -1105,6 +1114,20 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                 />
               </div>
             </div>
+          </TabsContent>
+        )}
+
+        {mode === 'admin' && artistId && (
+          <TabsContent value="marketing" className="space-y-4 mt-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Marketing activities documented here are visible to the artist in the portal.
+              </p>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin/assets">Assign label assets</Link>
+              </Button>
+            </div>
+            <PromoLogManager artistId={artistId} artistName={watch('name')} />
           </TabsContent>
         )}
       </Tabs>

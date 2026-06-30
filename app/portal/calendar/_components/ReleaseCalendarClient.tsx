@@ -35,8 +35,16 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getSquareThumbnail } from '@/lib/imageUtils'
+import { Input } from '@/components/ui/input'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
 import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
+import {
+  filterCalendarReleases,
+  formatReleaseArtistNames,
+  isReleasePubliclyVisible,
+  type ReleaseSortOrder,
+  type ReleaseTypeFilter,
+} from '@/lib/portal/releaseCalendarFilters'
 import type { Release } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -155,10 +163,8 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
   if (!release) return null
 
   const status = getReleaseStatus(release.releaseDate, today)
-  const artistNames =
-    release.artists && release.artists.length > 0
-      ? release.artists.map((a) => a.name).join(', ')
-      : release.artistName
+  const artistNames = formatReleaseArtistNames(release)
+  const showPublicPage = isReleasePubliclyVisible(release)
 
   const hasPresaveLink = status !== 'past' && !!release.smartlinkUrl
   const platformEntries =
@@ -279,6 +285,19 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
               </div>
             )}
 
+            {showPublicPage && (
+              <Link
+                href={`/releases/${release.id}`}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium',
+                  'border border-border bg-card hover:bg-muted transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
+              >
+                {t('calendar_view_release')}
+              </Link>
+            )}
+
             {/* Promo notes */}
             {release.promoText && (
               <div className="rounded-md border border-border bg-muted/50 p-4 space-y-1">
@@ -306,6 +325,16 @@ interface DayCellProps {
   today: string
   isCurrentMonth: boolean
   onSelectRelease: (r: Release) => void
+}
+
+function ReleaseStatusIcon({ status }: { status: ReleaseStatus }) {
+  if (status === 'today') {
+    return <CalendarDots size={10} weight="fill" className="shrink-0" aria-hidden="true" />
+  }
+  if (status === 'upcoming') {
+    return <MusicNote size={10} weight="fill" className="shrink-0" aria-hidden="true" />
+  }
+  return <Globe size={10} weight="fill" className="shrink-0" aria-hidden="true" />
 }
 
 function DayCell({ day, dateStr, releases, today, isCurrentMonth, onSelectRelease }: DayCellProps) {
@@ -342,12 +371,19 @@ function DayCell({ day, dateStr, releases, today, isCurrentMonth, onSelectReleas
       <div className="flex flex-col gap-0.5 overflow-hidden">
         {releases.slice(0, 3).map((release) => {
           const status = getReleaseStatus(release.releaseDate, today)
+          const artistNames = formatReleaseArtistNames(release)
+          const statusLabel =
+            status === 'today'
+              ? t('calendar_status_today')
+              : status === 'upcoming'
+                ? t('calendar_status_presave')
+                : t('calendar_status_released')
           return (
             <button
               key={release.id}
               onClick={() => onSelectRelease(release)}
               className={cn(
-                'w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
+                'w-full text-left rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 status === 'past'
                   ? 'bg-muted/60 text-muted-foreground/70 hover:bg-muted'
@@ -355,10 +391,18 @@ function DayCell({ day, dateStr, releases, today, isCurrentMonth, onSelectReleas
                   ? 'bg-secondary/20 text-secondary hover:bg-secondary/30'
                   : 'bg-primary/20 text-primary hover:bg-primary/30',
               )}
-              aria-label={`${release.title} — ${t('calendar_status_upcoming')}`}
-              title={release.title}
+              aria-label={[release.title, artistNames, statusLabel].filter(Boolean).join(' — ')}
+              title={[release.title, artistNames].filter(Boolean).join(' — ')}
             >
-              {release.title}
+              <span className="flex items-center gap-0.5 min-w-0">
+                <ReleaseStatusIcon status={status} />
+                <span className="truncate">{release.title}</span>
+              </span>
+              {artistNames && (
+                <span className="block truncate text-[9px] font-normal opacity-80 pl-3">
+                  {artistNames}
+                </span>
+              )}
             </button>
           )
         })}
@@ -385,19 +429,22 @@ export function ReleaseCalendarClient({ releases,
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1) // 1-based
   const [filterMode, setFilterMode] = useState<'all' | 'mine'>('all')
+  const [typeFilter, setTypeFilter] = useState<ReleaseTypeFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<ReleaseSortOrder>('asc')
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null)
 
-  // Filtered releases
-  const filteredReleases = useMemo(() => {
-    if (filterMode === 'mine' && currentArtistId) {
-      return releases.filter((r) => {
-        const isLegacy = r.artistId === currentArtistId
-        const isJunction = r.artists?.some((a) => a.id === currentArtistId)
-        return isLegacy || isJunction
-      })
-    }
-    return releases
-  }, [releases, filterMode, currentArtistId])
+  const filteredReleases = useMemo(
+    () =>
+      filterCalendarReleases(releases, {
+        filterMode,
+        currentArtistId,
+        typeFilter,
+        searchQuery,
+        sortOrder,
+      }),
+    [releases, filterMode, currentArtistId, typeFilter, searchQuery, sortOrder],
+  )
 
   // Group releases by date string for O(1) day lookup
   const releasesByDate = useMemo(() => {
@@ -486,7 +533,33 @@ export function ReleaseCalendarClient({ releases,
         {t('calendar_heading')}
       </h1>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('calendar_search_placeholder')}
+          aria-label={t('calendar_search_placeholder')}
+          className="max-w-md"
+        />
+        <div className="flex items-center gap-2">
+          <label htmlFor="calendar-sort" className="text-sm text-muted-foreground whitespace-nowrap">
+            {t('calendar_sort_label')}
+          </label>
+          <select
+            id="calendar-sort"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as ReleaseSortOrder)}
+            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+          >
+            <option value="asc">{t('calendar_sort_date_asc')}</option>
+            <option value="desc">{t('calendar_sort_date_desc')}</option>
+          </select>
+        </div>
+      </div>
+
       {/* Filter toggle */}
+      <div className="flex flex-wrap gap-2">
       <div
         role="group"
         aria-label="Filter releases"
@@ -520,6 +593,30 @@ export function ReleaseCalendarClient({ releases,
             {t('calendar_filter_mine')}
           </button>
         )}
+      </div>
+
+      <div
+        role="group"
+        aria-label="Filter by release type"
+        className="inline-flex rounded-full border border-border bg-card p-0.5 gap-0.5"
+      >
+        {(['all', 'single', 'ep', 'album'] as const).map((type) => (
+          <button
+            key={type}
+            onClick={() => setTypeFilter(type)}
+            aria-pressed={typeFilter === type}
+            className={cn(
+              'rounded-full px-4 py-1.5 text-sm font-medium transition-colors capitalize',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              typeFilter === type
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {type === 'all' ? t('calendar_filter_type_all') : t(`calendar_filter_type_${type}`)}
+          </button>
+        ))}
+      </div>
       </div>
 
       {/* Month navigation */}
@@ -592,15 +689,15 @@ export function ReleaseCalendarClient({ releases,
         aria-label="Calendar legend"
       >
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary/30" aria-hidden="true" />
+          <MusicNote size={12} weight="fill" className="text-primary" aria-hidden="true" />
           {t('calendar_status_presave')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-secondary/30" aria-hidden="true" />
+          <CalendarDots size={12} weight="fill" className="text-secondary" aria-hidden="true" />
           {t('calendar_status_today')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" aria-hidden="true" />
+          <Globe size={12} weight="fill" className="text-muted-foreground" aria-hidden="true" />
           {t('calendar_status_released')}
         </span>
       </div>

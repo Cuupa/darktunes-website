@@ -64,6 +64,12 @@ export const profileSchema = z.object({
 
 export type ProfileFormValues = z.infer<typeof profileSchema>
 
+/** Use profile value when non-empty; otherwise fall back to the label artist record. */
+function coalesceNonEmpty(profileValue: string | undefined, fallback: string | undefined): string {
+  if (profileValue?.trim()) return profileValue
+  return fallback?.trim() ?? ''
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -102,10 +108,10 @@ export function usePortalProfileForm({
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      bio: artist?.bio ?? '',
-      bio_short: initialProfile?.bioShort ?? '',
-      bio_medium: initialProfile?.bioMedium ?? '',
-      bio_long: initialProfile?.bioLong ?? '',
+      bio: coalesceNonEmpty(undefined, artist?.bio),
+      bio_short: coalesceNonEmpty(initialProfile?.bioShort, artist?.bio),
+      bio_medium: coalesceNonEmpty(initialProfile?.bioMedium, artist?.bio),
+      bio_long: coalesceNonEmpty(initialProfile?.bioLong, artist?.bio),
       genres: (artist?.genres ?? []).join(', '),
       press_quote: initialProfile?.pressQuote ?? '',
       founding_year: artist?.foundedYear?.toString() ?? '',

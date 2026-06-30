@@ -15,8 +15,7 @@ export function shouldRedirectToOnboarding(
 ): boolean {
   if (!artist) return false
   if (pathname.startsWith('/portal/onboarding')) return false
-
-  if (profile === null) return true
-
-  return !profile.onboardingCompleted && !checkComplete(profile, artist)
+  if (profile?.onboardingCompleted) return false
+  if (checkComplete(profile, artist)) return false
+  return true
 }
