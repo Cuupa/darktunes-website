@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { SubmissionFormField } from '@/types'
+import type { SubmissionFieldScope, SubmissionFieldType, VisibilityCondition } from '@/lib/submissions/fieldTypes'
 
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['submission_form_schema']['Row']
@@ -11,15 +12,17 @@ function rowToField(row: Row): SubmissionFormField {
     id: row.id,
     formType: row.form_type,
     fieldKey: row.field_key,
-    fieldLabelEn: row.field_label_en,
-    fieldLabelDe: row.field_label_de,
-    fieldType: row.field_type,
+    fieldLabels: row.field_labels as Record<string, string>,
+    fieldType: row.field_type as SubmissionFieldType,
+    fieldScope: row.field_scope as SubmissionFieldScope,
+    fieldGroup: row.field_group,
     fieldOptions: row.field_options as Record<string, unknown> | null,
+    visibilityCondition: row.visibility_condition as VisibilityCondition | null,
+    validation: row.validation as Record<string, unknown> | null,
     isRequired: row.is_required,
     isVisible: row.is_visible,
     displayOrder: row.display_order,
-    placeholderEn: row.placeholder_en,
-    placeholderDe: row.placeholder_de,
+    placeholders: row.placeholders as Record<string, string> | null,
   }
 }
 
@@ -69,4 +72,26 @@ export async function upsertFormField(
 export async function deleteFormField(db: DbClient, id: string): Promise<void> {
   const { error } = await db.from('submission_form_schema').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export function fieldToApiPayload(
+  field: Partial<SubmissionFormField>,
+  formType: 'release' | 'video',
+): Omit<Insert, 'id'> & { id?: string } {
+  return {
+    id: field.id,
+    form_type: formType,
+    field_key: field.fieldKey!,
+    field_labels: field.fieldLabels!,
+    field_type: field.fieldType!,
+    field_scope: field.fieldScope ?? 'release',
+    field_group: field.fieldGroup ?? null,
+    field_options: field.fieldOptions ?? null,
+    visibility_condition: (field.visibilityCondition ?? null) as Record<string, unknown> | null,
+    validation: field.validation ?? null,
+    is_required: field.isRequired ?? false,
+    is_visible: field.isVisible ?? true,
+    display_order: field.displayOrder ?? 0,
+    placeholders: field.placeholders ?? null,
+  }
 }

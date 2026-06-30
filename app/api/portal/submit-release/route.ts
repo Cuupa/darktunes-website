@@ -3,11 +3,26 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
+import { createReleaseSubmissionTracks } from '@/lib/api/releaseSubmissionTracks'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
+import { buildTrackInsert } from '@/lib/submissions/trackFieldMapping'
+import {
+  coerceReleaseDate,
+  getReleaseFieldValue,
+  RELEASE_STANDARD_FIELD_TO_BODY_KEY,
+  validateSchemaFields,
+  validateStringField,
+} from '@/lib/submissions/submissionSchemaValidation'
+import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
+
+const trackInputSchema = z.object({
+  trackNumber: z.number().int().min(1),
+  values: z.record(z.string(), z.string()),
+})
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -15,7 +30,7 @@ const bodySchema = z.object({
   coverArtUrl: z.string().url(),
   coverArtVerified: z.boolean().optional().default(false),
   releaseDate: z.string().nullable().optional(),
-  type: z.enum(['album', 'ep', 'single']).nullable().optional(),
+  type: z.enum(['album', 'ep', 'single', 'compilation']).nullable().optional(),
   genre: z.string().nullable().optional(),
   catalogNumber: z.string().nullable().optional(),
   isrc: z.string().nullable().optional(),
@@ -25,37 +40,16 @@ const bodySchema = z.object({
   youtubeUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
   formData: z.record(z.string(), z.unknown()).nullable().optional(),
+  tracks: z.array(trackInputSchema).optional(),
   idempotencyKey: z.string().uuid().optional(),
 })
-
-/**
- * Maps snake_case DB field keys (from submission_form_schema) to their
- * camelCase counterparts in the validated request body.
- * Any field key NOT present in this map is a custom/dynamic field and must
- * be looked up inside body.formData instead.
- */
-const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
-  title: 'title',
-  audio_download_url: 'audioDownloadUrl',
-  cover_art_url: 'coverArtUrl',
-  cover_art_verified: 'coverArtVerified',
-  release_date: 'releaseDate',
-  type: 'type',
-  genre: 'genre',
-  catalog_number: 'catalogNumber',
-  isrc: 'isrc',
-  label_copy: 'labelCopy',
-  spotify_url: 'spotifyUrl',
-  apple_music_url: 'appleMusicUrl',
-  youtube_url: 'youtubeUrl',
-  notes: 'notes',
-}
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
   const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
   const body = bodySchema.parse(await req.json())
+  const formData = (body.formData ?? {}) as Record<string, unknown>
 
   const serviceRole = await createServiceRoleSupabaseClient()
   if (body.idempotencyKey) {
@@ -70,15 +64,38 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const schemaFields = await getFormSchema(supabase, 'release')
-  for (const field of schemaFields) {
-    if (!field.isRequired) continue
-    const bodyKey = STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
-    const val = bodyKey !== undefined
+  const releaseFields = schemaFields.filter((f) => f.fieldScope === 'release')
+  const trackFields = schemaFields.filter((f) => f.fieldScope === 'track')
+
+  const standardBody: Record<string, unknown> = { ...body, releaseDate: coerceReleaseDate(body.releaseDate) }
+
+  for (const field of releaseFields) {
+    const bodyKey = RELEASE_STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
+    const raw = bodyKey !== undefined
       ? (body as Record<string, unknown>)[bodyKey]
-      : (body.formData ?? {})[field.fieldKey]
-    if (val === undefined || val === null || val === '') {
-      throw new ApiError(400, `Required field missing: ${field.fieldKey}`)
+      : formData[field.fieldKey]
+    if (typeof raw === 'string') {
+      validateStringField(field.fieldType, raw, field.fieldKey)
     }
+  }
+
+  validateSchemaFields(releaseFields, (field) =>
+    getReleaseFieldValue(field, standardBody, formData),
+  )
+
+  const tracks = body.tracks ?? []
+  if (tracks.length > 0) {
+    for (const track of tracks) {
+      for (const field of trackFields) {
+        const raw = track.values[field.fieldKey] ?? ''
+        if (field.isRequired && !raw.trim()) {
+          throw new ApiError(400, `Required track field missing: ${field.fieldKey} (track ${track.trackNumber})`)
+        }
+        validateStringField(field.fieldType, raw, `${field.fieldKey} (track ${track.trackNumber})`)
+      }
+    }
+  } else if (trackFields.some((f) => f.isRequired)) {
+    throw new ApiError(400, 'At least one track is required')
   }
 
   const submission = await createReleaseSubmission(supabase, {
@@ -87,7 +104,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     audio_download_url: body.audioDownloadUrl,
     cover_art_url: body.coverArtUrl,
     cover_art_verified: body.coverArtVerified ?? false,
-    release_date: body.releaseDate ?? null,
+    release_date: coerceReleaseDate(body.releaseDate),
     type: body.type ?? null,
     genre: body.genre ?? null,
     catalog_number: body.catalogNumber ?? null,
@@ -97,8 +114,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     apple_music_url: body.appleMusicUrl ?? null,
     youtube_url: body.youtubeUrl ?? null,
     notes: body.notes ?? null,
-    form_data: body.formData ?? null,
+    form_data: Object.keys(formData).length > 0 ? formData : null,
   })
+
+  if (tracks.length > 0) {
+    const inserts = tracks.map((track, index) => {
+      const fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }> = {}
+      for (const field of trackFields) {
+        fieldValues[field.fieldKey] = {
+          value: track.values[field.fieldKey] ?? '',
+          fieldType: field.fieldType,
+        }
+      }
+      return buildTrackInsert(submission.id, track.trackNumber, index, fieldValues)
+    })
+    await createReleaseSubmissionTracks(supabase, inserts)
+  }
 
   const { data: recipientProfiles } = await serviceRole
     .from('users')

@@ -40,8 +40,19 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single');
+  CREATE TYPE public.release_type AS ENUM ('album', 'ep', 'single', 'compilation');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumtypid = 'public.release_type'::regtype
+      AND enumlabel = 'compilation'
+  ) THEN
+    ALTER TYPE public.release_type ADD VALUE IF NOT EXISTS 'compilation';
+  END IF;
+END $$;
 
 DO $$ BEGIN
   CREATE TYPE public.sync_status AS ENUM ('success', 'partial', 'error');
@@ -4505,6 +4516,35 @@ CREATE TRIGGER trg_release_submissions_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: release_submission_tracks
+-- Per-track metadata for release submissions (albums, EPs, compilations, singles).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.release_submission_tracks (
+  id                    UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  submission_id         UUID        NOT NULL REFERENCES public.release_submissions (id) ON DELETE CASCADE,
+  track_number          INTEGER     NOT NULL,
+  title                 TEXT,
+  isrc                  TEXT,
+  composer              TEXT,
+  author                TEXT,
+  genre                 TEXT,
+  language              TEXT,
+  gema                  BOOLEAN,
+  explicit              BOOLEAN,
+  live                  BOOLEAN,
+  cover                 BOOLEAN,
+  instrumental          BOOLEAN,
+  preview_start_seconds INTEGER,
+  duration_seconds      INTEGER,
+  form_data             JSONB,
+  display_order         INTEGER     NOT NULL DEFAULT 0,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_submission_tracks_submission
+  ON public.release_submission_tracks (submission_id, display_order);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: video_submissions
 -- Artist-submitted music video drafts for label/YouTube processing.
 -- ---------------------------------------------------------------------------
@@ -4543,18 +4583,23 @@ CREATE TRIGGER trg_video_submissions_updated_at
 -- Admin-configurable field definitions for the release and video submission forms.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.submission_form_schema (
-  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  form_type        TEXT        NOT NULL CHECK (form_type IN ('release', 'video')),
-  field_key        TEXT        NOT NULL,
-  field_label_en   TEXT        NOT NULL,
-  field_label_de   TEXT        NOT NULL,
-  field_type       TEXT        NOT NULL CHECK (field_type IN ('text', 'url', 'date', 'select', 'textarea', 'boolean')),
-  field_options    JSONB,
-  is_required      BOOLEAN     NOT NULL DEFAULT FALSE,
-  is_visible       BOOLEAN     NOT NULL DEFAULT TRUE,
-  display_order    INTEGER     NOT NULL DEFAULT 0,
-  placeholder_en   TEXT,
-  placeholder_de   TEXT,
+  id                   UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  form_type            TEXT        NOT NULL CHECK (form_type IN ('release', 'video')),
+  field_key            TEXT        NOT NULL,
+  field_labels         JSONB       NOT NULL,
+  field_type           TEXT        NOT NULL CHECK (field_type IN (
+    'text', 'url', 'date', 'date_dmy', 'select', 'textarea', 'boolean',
+    'number', 'year', 'ean', 'isrc', 'duration', 'seconds', 'email'
+  )),
+  field_scope          TEXT        NOT NULL DEFAULT 'release' CHECK (field_scope IN ('release', 'track')),
+  field_group          TEXT,
+  field_options        JSONB,
+  visibility_condition JSONB,
+  validation           JSONB,
+  is_required          BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_visible           BOOLEAN     NOT NULL DEFAULT TRUE,
+  display_order        INTEGER     NOT NULL DEFAULT 0,
+  placeholders         JSONB,
   UNIQUE (form_type, field_key)
 );
 
@@ -4563,45 +4608,69 @@ CREATE INDEX IF NOT EXISTS idx_submission_form_schema_order ON public.submission
 
 -- Seed default schema for release form
 INSERT INTO public.submission_form_schema
-  (form_type, field_key, field_label_en, field_label_de, field_type, is_required, is_visible, display_order, placeholder_en, placeholder_de)
+  (form_type, field_key, field_labels, field_type, field_scope, field_group, field_options, is_required, is_visible, display_order, placeholders)
 VALUES
-  ('release', 'title',             'Release Title',       'Release-Titel',        'text',     TRUE,  TRUE, 10, 'My New Album', 'Mein neues Album'),
-  ('release', 'release_date',      'Release Date',        'Veröffentlichungsdatum','date',    TRUE,  TRUE, 20, NULL, NULL),
-  ('release', 'type',              'Release Type',        'Release-Typ',          'select',   TRUE,  TRUE, 30, NULL, NULL),
-  ('release', 'genre',             'Genre',               'Genre',                'text',     FALSE, TRUE, 40, 'e.g. Techno, House', 'z.B. Techno, House'),
-  ('release', 'audio_download_url','Audio Download Link', 'Audio-Download-Link',  'url',      TRUE,  TRUE, 50, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('release', 'cover_art_url',     'Cover Art URL',       'Cover-Art-URL',        'url',      TRUE,  TRUE, 60, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('release', 'catalog_number',    'Catalog Number',      'Katalognummer',        'text',     FALSE, TRUE, 70, 'DT-001', 'DT-001'),
-  ('release', 'isrc',              'ISRC',                'ISRC',                 'text',     FALSE, TRUE, 80, 'DEXX12345678', 'DEXX12345678'),
-  ('release', 'label_copy',        'Label Copy / Credits','Label-Text / Credits', 'textarea', FALSE, TRUE, 90, NULL, NULL),
-  ('release', 'spotify_url',       'Spotify Link',        'Spotify-Link',         'url',      FALSE, TRUE,100, NULL, NULL),
-  ('release', 'apple_music_url',   'Apple Music Link',    'Apple Music-Link',     'url',      FALSE, TRUE,110, NULL, NULL),
-  ('release', 'youtube_url',       'YouTube Link',        'YouTube-Link',         'url',      FALSE, TRUE,120, NULL, NULL),
-  ('release', 'notes',             'Additional Notes',    'Zusätzliche Hinweise', 'textarea', FALSE, TRUE,130, NULL, NULL)
+  ('release', 'title',              '{"en":"Release Title","de":"Release-Titel"}', 'text', 'release', 'metadata', NULL, TRUE, TRUE, 10, '{"en":"My New Album","de":"Mein neues Album"}'),
+  ('release', 'artist_name',        '{"en":"Artist Name","de":"Künstlername"}', 'text', 'release', 'metadata', NULL, FALSE, TRUE, 15, NULL),
+  ('release', 'release_date',       '{"en":"Release Date","de":"Veröffentlichungsdatum"}', 'date_dmy', 'release', 'metadata', NULL, TRUE, TRUE, 20, '{"en":"DD/MM/YYYY","de":"TT/MM/JJJJ"}'),
+  ('release', 'type',               '{"en":"Release Type","de":"Release-Typ"}', 'select', 'release', 'metadata',
+    '{"options":[{"value":"single","labels":{"en":"Single","de":"Single"}},{"value":"ep","labels":{"en":"EP","de":"EP"}},{"value":"album","labels":{"en":"Album","de":"Album"}},{"value":"compilation","labels":{"en":"Compilation","de":"Compilation"}}]}',
+    TRUE, TRUE, 30, NULL),
+  ('release', 'prod_year',          '{"en":"Prod Year","de":"Produktionsjahr"}', 'year', 'release', 'metadata', NULL, FALSE, TRUE, 35, NULL),
+  ('release', 'genre',              '{"en":"Genre","de":"Genre"}', 'text', 'release', 'metadata', NULL, FALSE, TRUE, 40, '{"en":"e.g. Techno, House","de":"z.B. Techno, House"}'),
+  ('release', 'language',           '{"en":"Language","de":"Sprache"}', 'text', 'release', 'metadata', NULL, FALSE, TRUE, 45, NULL),
+  ('release', 'audio_download_url', '{"en":"Audio Download Link","de":"Audio-Download-Link"}', 'url', 'release', 'distribution', NULL, TRUE, TRUE, 50, '{"en":"https://drive.google.com/...","de":"https://drive.google.com/..."}'),
+  ('release', 'cover_art_url',      '{"en":"Cover Art URL","de":"Cover-Art-URL"}', 'url', 'release', 'distribution', NULL, TRUE, TRUE, 60, '{"en":"https://drive.google.com/...","de":"https://drive.google.com/..."}'),
+  ('release', 'catalog_number',     '{"en":"Catalogue Number","de":"Katalognummer"}', 'text', 'release', 'metadata', NULL, FALSE, TRUE, 70, '{"en":"DT-001","de":"DT-001"}'),
+  ('release', 'ean',                '{"en":"EAN","de":"EAN"}', 'ean', 'release', 'metadata', NULL, FALSE, TRUE, 75, NULL),
+  ('release', 'isrc',               '{"en":"ISRC (release)","de":"ISRC (Release)"}', 'isrc', 'release', 'metadata', NULL, FALSE, TRUE, 80, '{"en":"DE-XXX-24-00001","de":"DE-XXX-24-00001"}'),
+  ('release', 'label_copy',         '{"en":"Label Copy / Credits","de":"Label-Text / Credits"}', 'textarea', 'release', 'rights', NULL, FALSE, TRUE, 90, NULL),
+  ('release', 'gema_release',       '{"en":"GEMA","de":"GEMA"}', 'boolean', 'release', 'rights', NULL, FALSE, TRUE, 95, NULL),
+  ('release', 'spotify_url',        '{"en":"Spotify Link","de":"Spotify-Link"}', 'url', 'release', 'distribution', NULL, FALSE, TRUE, 100, NULL),
+  ('release', 'apple_music_url',    '{"en":"Apple Music Link","de":"Apple Music-Link"}', 'url', 'release', 'distribution', NULL, FALSE, TRUE, 110, NULL),
+  ('release', 'youtube_url',        '{"en":"YouTube Link","de":"YouTube-Link"}', 'url', 'release', 'distribution', NULL, FALSE, TRUE, 120, NULL),
+  ('release', 'notes',              '{"en":"Additional Notes","de":"Zusätzliche Hinweise"}', 'textarea', 'release', 'metadata', NULL, FALSE, TRUE, 130, NULL),
+  ('release', 'track_number',       '{"en":"Track Nr","de":"Track-Nr."}', 'number', 'track', 'track', NULL, TRUE, TRUE, 200, NULL),
+  ('release', 'song_title',         '{"en":"Song Title","de":"Songtitel"}', 'text', 'track', 'track', NULL, TRUE, TRUE, 210, NULL),
+  ('release', 'track_isrc',         '{"en":"ISRC","de":"ISRC"}', 'isrc', 'track', 'track', NULL, FALSE, TRUE, 220, NULL),
+  ('release', 'composer',           '{"en":"Composer","de":"Komponist"}', 'text', 'track', 'track', NULL, FALSE, TRUE, 230, NULL),
+  ('release', 'author',             '{"en":"Author","de":"Autor"}', 'text', 'track', 'track', NULL, FALSE, TRUE, 240, NULL),
+  ('release', 'track_genre',        '{"en":"Genre","de":"Genre"}', 'text', 'track', 'track', NULL, FALSE, TRUE, 250, NULL),
+  ('release', 'track_language',     '{"en":"Language","de":"Sprache"}', 'text', 'track', 'track', NULL, FALSE, TRUE, 260, NULL),
+  ('release', 'gema_track',         '{"en":"GEMA","de":"GEMA"}', 'boolean', 'track', 'rights', NULL, FALSE, TRUE, 270, NULL),
+  ('release', 'explicit',           '{"en":"Explicit","de":"Explicit"}', 'boolean', 'track', 'rights', NULL, FALSE, TRUE, 280, NULL),
+  ('release', 'live',               '{"en":"Live","de":"Live"}', 'boolean', 'track', 'rights', NULL, FALSE, TRUE, 290, NULL),
+  ('release', 'cover_version',      '{"en":"Cover","de":"Cover"}', 'boolean', 'track', 'rights', NULL, FALSE, TRUE, 300, NULL),
+  ('release', 'instrumental',       '{"en":"Instrumental","de":"Instrumental"}', 'boolean', 'track', 'rights', NULL, FALSE, TRUE, 310, NULL),
+  ('release', 'preview_start_seconds', '{"en":"Preview Start (seconds)","de":"Preview-Start (Sekunden)"}', 'seconds', 'track', 'distribution', NULL, FALSE, TRUE, 320, NULL),
+  ('release', 'duration',           '{"en":"Duration","de":"Dauer"}', 'duration', 'track', 'track', NULL, FALSE, TRUE, 330, '{"en":"HH:MM:SS","de":"HH:MM:SS"}')
 ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- Seed default schema for video form
 INSERT INTO public.submission_form_schema
-  (form_type, field_key, field_label_en, field_label_de, field_type, is_required, is_visible, display_order, placeholder_en, placeholder_de)
+  (form_type, field_key, field_labels, field_type, field_scope, is_required, is_visible, display_order, placeholders)
 VALUES
-  ('video', 'title',               'Video Title',             'Video-Titel',              'text',     TRUE,  TRUE, 10, 'My Music Video', 'Mein Musikvideo'),
-  ('video', 'download_url',        'Video Download Link',     'Video-Download-Link',      'url',      TRUE,  TRUE, 20, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('video', 'thumbnail_url',       'Thumbnail URL',           'Thumbnail-URL',            'url',      FALSE, TRUE, 30, NULL, NULL),
-  ('video', 'youtube_title',       'YouTube Title',           'YouTube-Titel',            'text',     FALSE, TRUE, 40, NULL, NULL),
-  ('video', 'youtube_description', 'YouTube Description',     'YouTube-Beschreibung',     'textarea', FALSE, TRUE, 50, NULL, NULL),
-  ('video', 'youtube_tags',        'YouTube Tags',            'YouTube-Tags',             'text',     FALSE, TRUE, 60, 'techno, club, dj', 'techno, club, dj'),
-  ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',        'select',   FALSE, TRUE, 70, NULL, NULL),
-  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',FALSE, TRUE, 80, NULL, NULL),
-  ('video', 'description',         'Video Description',       'Video-Beschreibung',       'textarea', FALSE, TRUE, 90, NULL, NULL),
-  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',     'textarea', FALSE, TRUE,100, NULL, NULL)
+  ('video', 'title',               '{"en":"Video Title","de":"Video-Titel"}', 'text', 'release', TRUE, TRUE, 10, '{"en":"My Music Video","de":"Mein Musikvideo"}'),
+  ('video', 'download_url',        '{"en":"Video Download Link","de":"Video-Download-Link"}', 'url', 'release', TRUE, TRUE, 20, '{"en":"https://drive.google.com/...","de":"https://drive.google.com/..."}'),
+  ('video', 'thumbnail_url',       '{"en":"Thumbnail URL","de":"Thumbnail-URL"}', 'url', 'release', FALSE, TRUE, 30, NULL),
+  ('video', 'youtube_title',       '{"en":"YouTube Title","de":"YouTube-Titel"}', 'text', 'release', FALSE, TRUE, 40, NULL),
+  ('video', 'youtube_description', '{"en":"YouTube Description","de":"YouTube-Beschreibung"}', 'textarea', 'release', FALSE, TRUE, 50, NULL),
+  ('video', 'youtube_tags',        '{"en":"YouTube Tags","de":"YouTube-Tags"}', 'text', 'release', FALSE, TRUE, 60, '{"en":"techno, club, dj","de":"techno, club, dj"}'),
+  ('video', 'youtube_category',    '{"en":"YouTube Category","de":"YouTube-Kategorie"}', 'select', 'release',
+    '{"options":[{"value":"10","labels":{"en":"Music","de":"Musik"}},{"value":"24","labels":{"en":"Entertainment","de":"Unterhaltung"}},{"value":"22","labels":{"en":"People & Blogs","de":"People & Blogs"}},{"value":"27","labels":{"en":"Education","de":"Bildung"}}]}',
+    FALSE, TRUE, 70, NULL),
+  ('video', 'target_publish_date', '{"en":"Target Publish Date","de":"Geplantes Veröffentlichungsdatum"}', 'date', 'release', FALSE, TRUE, 80, NULL),
+  ('video', 'description',         '{"en":"Video Description","de":"Video-Beschreibung"}', 'textarea', 'release', FALSE, TRUE, 90, NULL),
+  ('video', 'notes',               '{"en":"Additional Notes","de":"Zusätzliche Hinweise"}', 'textarea', 'release', FALSE, TRUE, 100, NULL)
 ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- RLS for submission tables
 -- ---------------------------------------------------------------------------
-ALTER TABLE public.release_submissions    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.video_submissions      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.submission_form_schema ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.release_submissions         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.release_submission_tracks   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.video_submissions           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submission_form_schema      ENABLE ROW LEVEL SECURITY;
 
 -- release_submissions: artist can insert/read own rows
 DROP POLICY IF EXISTS "release_submissions: artist insert own" ON public.release_submissions;
@@ -4623,6 +4692,31 @@ CREATE POLICY "release_submissions: editor+ read all" ON public.release_submissi
 DROP POLICY IF EXISTS "release_submissions: editor+ update" ON public.release_submissions;
 CREATE POLICY "release_submissions: editor+ update" ON public.release_submissions
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+
+-- release_submission_tracks: artist insert/read via submission ownership
+DROP POLICY IF EXISTS "release_submission_tracks: artist insert own" ON public.release_submission_tracks;
+CREATE POLICY "release_submission_tracks: artist insert own" ON public.release_submission_tracks
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.release_submissions rs
+      JOIN public.artist_members am ON am.artist_id = rs.artist_id
+      WHERE rs.id = submission_id AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "release_submission_tracks: artist read own" ON public.release_submission_tracks;
+CREATE POLICY "release_submission_tracks: artist read own" ON public.release_submission_tracks
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.release_submissions rs
+      JOIN public.artist_members am ON am.artist_id = rs.artist_id
+      WHERE rs.id = submission_id AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "release_submission_tracks: editor+ read all" ON public.release_submission_tracks;
+CREATE POLICY "release_submission_tracks: editor+ read all" ON public.release_submission_tracks
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
 
 -- video_submissions: same pattern
 DROP POLICY IF EXISTS "video_submissions: artist insert own" ON public.video_submissions;

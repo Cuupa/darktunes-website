@@ -6,6 +6,7 @@ import {
   getAllFormSchemaFields,
   upsertFormField,
   deleteFormField,
+  fieldToApiPayload,
 } from './submissionFormSchema'
 
 type DbClient = SupabaseClient<Database>
@@ -36,15 +37,17 @@ const row = {
   id: 'field-1',
   form_type: 'release' as const,
   field_key: 'genre',
-  field_label_en: 'Genre',
-  field_label_de: 'Genre',
+  field_labels: { en: 'Genre', de: 'Genre' },
   field_type: 'text' as const,
+  field_scope: 'release' as const,
+  field_group: 'metadata',
   field_options: null,
+  visibility_condition: null,
+  validation: null,
   is_required: false,
   is_visible: true,
   display_order: 5,
-  placeholder_en: 'e.g. Techno',
-  placeholder_de: 'z.B. Techno',
+  placeholders: { en: 'e.g. Techno', de: 'z.B. Techno' },
 }
 
 describe('submissionFormSchema DAL', () => {
@@ -54,7 +57,7 @@ describe('submissionFormSchema DAL', () => {
     expect(fields).toHaveLength(1)
     expect(fields[0].id).toBe('field-1')
     expect(fields[0].fieldKey).toBe('genre')
-    expect(fields[0].fieldLabelEn).toBe('Genre')
+    expect(fields[0].fieldLabels.en).toBe('Genre')
     expect(fields[0].isVisible).toBe(true)
     expect(fields[0].displayOrder).toBe(5)
   })
@@ -83,12 +86,27 @@ describe('submissionFormSchema DAL', () => {
     const result = await upsertFormField(db, {
       form_type: 'release',
       field_key: 'genre',
-      field_label_en: 'Genre',
-      field_label_de: 'Genre',
+      field_labels: { en: 'Genre', de: 'Genre' },
       field_type: 'text',
     })
     expect(result.fieldKey).toBe('genre')
     expect(result.formType).toBe('release')
+  })
+
+  it('fieldToApiPayload maps camelCase to snake_case', () => {
+    const payload = fieldToApiPayload(
+      {
+        fieldKey: 'ean',
+        fieldLabels: { en: 'EAN', de: 'EAN' },
+        fieldType: 'ean',
+        fieldScope: 'release',
+        isRequired: true,
+      },
+      'release',
+    )
+    expect(payload.field_key).toBe('ean')
+    expect(payload.field_labels.en).toBe('EAN')
+    expect(payload.is_required).toBe(true)
   })
 
   it('upsertFormField throws when no data returned', async () => {
@@ -97,8 +115,7 @@ describe('submissionFormSchema DAL', () => {
       upsertFormField(db, {
         form_type: 'release',
         field_key: 'genre',
-        field_label_en: 'Genre',
-        field_label_de: 'Genre',
+        field_labels: { en: 'Genre', de: 'Genre' },
         field_type: 'text',
       }),
     ).rejects.toThrow('No data returned')
