@@ -73,6 +73,7 @@ const mockArtistRow: ArtistRow = {
   image_position_x: null,
   image_position_y: null,
   image_scale: null,
+  landing_publish_trusted: false,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

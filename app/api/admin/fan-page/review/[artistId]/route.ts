@@ -15,10 +15,11 @@ const bodySchema = z.object({
   comment: z.string().max(500).optional(),
 })
 
-export const POST = withErrorHandler(async (req: NextRequest, ctx: { params: Promise<{ artistId: string }> }) => {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
   const userId = await verifyAdminOrEditor(token)
-  const { artistId } = await ctx.params
+  const artistId = req.nextUrl.pathname.split('/').at(-2)
+  if (!artistId) throw new ApiError(400, 'Missing artist id')
   const body = bodySchema.parse(await req.json())
 
   const supabase = await createServerSupabaseClient()
@@ -34,7 +35,7 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: { params: Pro
   const result = await reviewFanPage(supabase, artistId, body.approved, userId, body.comment)
 
   if (result.publishStatus === 'published') {
-    revalidateTag(`fan-page-${artist.slug}`)
+    revalidateTag(`fan-page-${artist.slug}`, 'max')
   }
 
   return NextResponse.json(result)

@@ -74,7 +74,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (result.publishStatus === 'published') {
-    revalidateTag(`fan-page-${artist.slug}`)
+    revalidateTag(`fan-page-${artist.slug}`, 'max')
   }
 
   return NextResponse.json({ ...result, warnings })

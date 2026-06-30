@@ -37,7 +37,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  const { supabase } = await authenticatePortalBearer(req)
+  const { supabase, user } = await authenticatePortalBearer(req)
   const body = putBodySchema.parse(await req.json())
 
   const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
