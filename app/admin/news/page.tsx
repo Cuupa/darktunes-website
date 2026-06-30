@@ -13,7 +13,7 @@ const NewsManager = lazy(() =>
 
 export default function AdminNewsPage() {
   return (
-    <AdminPageShell title="News" description="Create and manage news posts and announcements.">
+    <AdminPageShell layout="list" title="News" description="Create and manage news posts and announcements.">
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <NewsManager />
       </Suspense>

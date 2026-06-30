@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
 import { flexRender } from '@tanstack/react-table'
+import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -18,6 +19,8 @@ type AdminDataTableProps<TData> = {
   skeletonRowCount?: number
   renderSubRow?: (row: Row<TData>) => ReactNode
   getRowClassName?: (row: Row<TData>) => string | undefined
+  className?: string
+  stickyHeader?: boolean
 }
 
 export function AdminDataTable<TData>({
@@ -27,18 +30,24 @@ export function AdminDataTable<TData>({
   skeletonRowCount = 5,
   renderSubRow,
   getRowClassName,
+  className,
+  stickyHeader = false,
 }: AdminDataTableProps<TData>) {
   const columnCount = table.getAllColumns().length
   const rows = table.getRowModel().rows
 
   return (
-    <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+    <div className={cn('overflow-x-auto overscroll-contain', className)} data-lenis-prevent>
       <Table>
-        <TableHeader>
+        <TableHeader
+          className={cn(
+            stickyHeader && 'sticky top-0 z-10 border-b border-border bg-card',
+          )}
+        >
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow key={headerGroup.id} className={stickyHeader ? 'bg-card hover:bg-card' : undefined}>
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead key={header.id} className={stickyHeader ? 'bg-card' : undefined}>
                   {header.isPlaceholder
                     ? null
                     : flexRender(header.column.columnDef.header, header.getContext())}

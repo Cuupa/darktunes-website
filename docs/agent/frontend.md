@@ -21,13 +21,15 @@ Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-be
 
 **Dashboard routes:** `DashboardLenisGuard` in `LenisProvider.tsx` calls `lenis.stop()` on `/admin/*` and `/portal/*` (`src/lib/scroll/dashboardRoutes.ts`) so wheel events reach native scroll inside `ScrollableAppShell`. Public pages keep Lenis active.
 
-**Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`. That inner pane is the **sole vertical scroll owner** for list pages.
+**Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`.
+
+**Admin list pages** (Artists, Releases, News, future CRUD lists): use `AdminPageShell layout="list"` + `AdminListShell` (`src/components/admin/AdminListShell.tsx`). The shell passes viewport height down the flex chain; `AdminListShell` keeps toolbar/pagination fixed and scrolls the table pane internally with sticky headers via `AdminDataTable stickyHeader`.
 
 | Do | Don't |
 |----|-------|
-| Let `ScrollableAppShell` scroll page content | Put `min-h-screen` on admin/portal content pages |
-| Use `overflow-x-auto` on wide tables | Add a root `overflow-y-auto` wrapper on list managers |
-| Use `AdminPageShell` `fill` only for full-bleed tools (e.g. `/admin/assets` file explorer) | Use `fill` + nested `overflow-y-auto` on standard CRUD lists |
+| `AdminPageShell layout="list"` + `AdminListShell` on CRUD lists | Put `min-h-screen` on admin/portal content pages |
+| `AdminPageShell fill` for full-bleed tools (e.g. `/admin/assets` file explorer) | Ad-hoc root `overflow-y-auto` on list managers |
+| `overflow-x-auto` on wide tables | Break the `min-h-0` flex chain with `h-screen` / `overflow-hidden` |
 
 CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`). Fullscreen auth/loading gates (`items-center justify-center`) may still use `min-h-screen`.
 

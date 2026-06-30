@@ -8,17 +8,9 @@ import { useArtists } from '@/hooks/useArtists'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
+import { AdminListShell } from '@/components/admin/AdminListShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   AdminDataTable,
   AdminSortableHeader,
@@ -132,30 +124,6 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
     image_position_y: data.imagePositionY,
     image_scale: data.imageScale,
   }
-}
-
-/** Skeleton placeholder rows shown while artist data loads */
-function ArtistSkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-          </TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell />
-        </TableRow>
-      ))}
-    </>
-  )
 }
 
 export function ArtistsManager() {
@@ -440,58 +408,47 @@ export function ArtistsManager() {
     : 'No artists yet. Click "New Artist" to add one.'
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 min-w-0">
-          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <Input
-            placeholder="Search artists…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              table.setPageIndex(0)
-            }}
-            className="pl-8"
-          />
-        </div>
-        <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {artists.length}</p>
-        <Button size="sm" onClick={openNew} className="gap-2">
-          <Plus size={16} weight="bold" />
-          New Artist
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Genres</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Visibility</TableHead>
-                <TableHead>Featured</TableHead>
-                <TableHead>Last Synced</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <ArtistSkeletonRows />
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <AdminDataTable table={table} emptyMessage={emptyMessage} />
-      )}
-
-      {table.getPageCount() > 1 && (
-        <AdminTablePagination
-          pageIndex={table.getState().pagination.pageIndex}
-          totalCount={filtered.length}
-          onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
-          entityLabel="artists"
+    <>
+      <AdminListShell
+        header={(
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                placeholder="Search artists…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  table.setPageIndex(0)
+                }}
+                className="pl-8"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground whitespace-nowrap">{filtered.length} / {artists.length}</p>
+            <Button size="sm" onClick={openNew} className="gap-2">
+              <Plus size={16} weight="bold" />
+              New Artist
+            </Button>
+          </div>
+        )}
+        footer={
+          table.getPageCount() > 1 ? (
+            <AdminTablePagination
+              pageIndex={table.getState().pagination.pageIndex}
+              totalCount={filtered.length}
+              onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
+              entityLabel="artists"
+            />
+          ) : null
+        }
+      >
+        <AdminDataTable
+          table={table}
+          loading={isLoading}
+          emptyMessage={emptyMessage}
+          stickyHeader
         />
-      )}
+      </AdminListShell>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined} aria-labelledby="artists-form-dialog-title" data-lenis-prevent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -523,6 +480,6 @@ export function ArtistsManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }
