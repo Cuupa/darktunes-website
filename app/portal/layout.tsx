@@ -25,6 +25,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistsByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { shouldRedirectToOnboarding } from '@/lib/portal/onboardingGate'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import { getPortalBadgeCounts } from '@/lib/api/portalBadgeCounts'
 import { PortalSidebar } from './_components/PortalSidebar'
 import { PortalQueryProvider } from './_components/PortalQueryProvider'
 import { PortalOfflineProvider } from './_components/PortalOfflineProvider'
@@ -168,21 +169,15 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     ? artists.find((a) => a.id === requestedArtistId)
     : null) ?? artists[0] ?? null
 
-  const [featureFlags, unreadMessagesResult, artistProfile] = await Promise.all([
+  const [featureFlags, badgeCounts, artistProfile] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
     artist
-      ? supabase
-          .from('label_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('artist_id', artist.id)
-          .eq('read', false)
-          .is('deleted_at', null)
-      : Promise.resolve({ count: 0, error: null }),
+      ? getPortalBadgeCounts(supabase, artist.id).catch(() => ({ messages: 0, interviews: 0, statements: 0 }))
+      : Promise.resolve({ messages: 0, interviews: 0, statements: 0 }),
     artist
       ? getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
       : Promise.resolve(null),
   ])
-  const unreadMessages = unreadMessagesResult.count ?? 0
 
   if (shouldRedirectToOnboarding(artist, artistProfile, currentPath)) {
     const onboardingUrl = artist ? `/portal/onboarding?artistId=${artist.id}` : '/portal/onboarding'
@@ -194,7 +189,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   return (
     <PortalNotificationProvider
       artistId={artist?.id ?? null}
-      initialUnreadCount={unreadMessages}
+      initialBadges={badgeCounts}
     >
       <ScrollableAppShell
         lockScroll={isEpkBuilder}

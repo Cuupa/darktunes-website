@@ -50,19 +50,49 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<EditorNotification[]>([])
 
+  const [unreadCount, setUnreadCount] = useState(0)
+
   const loadNotifications = useCallback(async () => {
-    const { data } = await supabase
-      .from('editor_notifications')
-      .select('*')
-      .eq('recipient_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10)
+    const [{ data }, { count }] = await Promise.all([
+      supabase
+        .from('editor_notifications')
+        .select('*')
+        .eq('recipient_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase
+        .from('editor_notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_id', userId)
+        .eq('read', false),
+    ])
     setItems((data ?? []).map(rowToNotification))
+    setUnreadCount(count ?? 0)
   }, [supabase, userId])
 
   useEffect(() => {
     void loadNotifications()
   }, [loadNotifications])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`editor-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'editor_notifications',
+          filter: `recipient_id=eq.${userId}`,
+        },
+        () => { void loadNotifications() },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadNotifications, supabase, userId])
 
   useEffect(() => {
     if (!open) return
@@ -78,7 +108,6 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
   }, [items, open, supabase])
 
-  const unreadCount = items.filter((item) => !item.read).length
   const ariaLabel =
     unreadCount > 0
       ? `Open admin notifications, ${unreadCount} unread`

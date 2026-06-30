@@ -26,6 +26,12 @@ import {
   markMessageRead,
 } from '@/lib/api/labelMessages'
 import {
+  getIncomingToLabelMessages,
+  markPortalMessageRead,
+  softDeletePortalMessage,
+  togglePortalMessageStar,
+} from '@/lib/api/portalMessages'
+import {
   getFolders,
   createFolder,
   updateFolder,
@@ -34,7 +40,15 @@ import {
 } from '@/lib/api/messageFolders'
 import { getRules, createRule, updateRule, deleteRule } from '@/lib/api/messageRules'
 import { getAttachmentsForMessage } from '@/lib/api/messageAttachments'
-import type { ArtistReply, LabelMessage, MessageFolder, MessageRule, MessageAttachment, MessageTemplate } from '@/types'
+import type {
+  ArtistReply,
+  LabelMessage,
+  MessageFolder,
+  MessageRule,
+  MessageAttachment,
+  MessageTemplate,
+  PortalMessage,
+} from '@/types'
 import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -61,6 +75,25 @@ interface SearchState {
 
 type MessageRow = Database['public']['Tables']['label_messages']['Row']
 type ReplyRow = Database['public']['Tables']['artist_replies']['Row']
+type PortalMessageRow = Database['public']['Tables']['portal_messages']['Row']
+
+function rowToPortalMessage(row: PortalMessageRow): PortalMessage {
+  return {
+    id: row.id,
+    fromArtistId: row.from_artist_id,
+    toArtistId: row.to_artist_id,
+    toLabel: row.to_label,
+    subject: row.subject,
+    body: row.body,
+    bodyHtml: row.body_html,
+    sentAt: row.sent_at,
+    readAt: row.read_at,
+    starred: row.starred,
+    deletedAt: row.deleted_at,
+    folderId: row.folder_id,
+    hasAttachments: row.has_attachments,
+  }
+}
 
 const DEFAULT_SEARCH: SearchState = { query: '', artistId: null, unreadOnly: false }
 
@@ -133,6 +166,7 @@ export function MessagesManager() {
   // Core data
   const [artists, setArtists] = useState<Array<{ id: string; name: string }>>([])
   const [messages, setMessages] = useState<LabelMessage[]>([])
+  const [fromArtistMessages, setFromArtistMessages] = useState<PortalMessage[]>([])
   const [repliesByMessageId, setRepliesByMessageId] = useState<Record<string, ArtistReply[]>>({})
   const [templates, setTemplates] = useState<MessageTemplate[]>([])
   const [folders, setFolders] = useState<MessageFolder[]>([])
@@ -151,7 +185,10 @@ export function MessagesManager() {
 
   // ── Folder-filtered message lists ─────────────────────────────────────────
 
+  const isFromArtistsFolder = selectedFolder === 'from-artists'
+
   const folderMessages = useMemo(() => {
+    if (isFromArtistsFolder) return []
     switch (selectedFolder) {
       case 'inbox':
         return messages.filter((m) => !m.deletedAt && !m.folderId)
@@ -164,7 +201,12 @@ export function MessagesManager() {
       default:
         return messages.filter((m) => !m.deletedAt && m.folderId === selectedFolder)
     }
-  }, [messages, selectedFolder])
+  }, [messages, selectedFolder, isFromArtistsFolder])
+
+  const fromArtistFolderMessages = useMemo(() => {
+    if (!isFromArtistsFolder) return []
+    return fromArtistMessages.filter((m) => !m.deletedAt)
+  }, [fromArtistMessages, isFromArtistsFolder])
 
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return folderMessages
@@ -174,9 +216,18 @@ export function MessagesManager() {
     )
   }, [folderMessages, searchQuery])
 
+  const filteredFromArtistMessages = useMemo(() => {
+    if (!searchQuery.trim()) return fromArtistFolderMessages
+    const q = searchQuery.toLowerCase()
+    return fromArtistFolderMessages.filter(
+      (m) => m.subject.toLowerCase().includes(q) || m.body.toLowerCase().includes(q),
+    )
+  }, [fromArtistFolderMessages, searchQuery])
+
   const unreadCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     counts['inbox'] = messages.filter((m) => !m.deletedAt && !m.folderId && !m.read).length
+    counts['from-artists'] = fromArtistMessages.filter((m) => !m.deletedAt && !m.readAt).length
     counts['starred'] = messages.filter((m) => !m.deletedAt && m.starred && !m.read).length
     counts['sent'] = 0
     counts['trash'] = 0
@@ -184,12 +235,17 @@ export function MessagesManager() {
       counts[f.id] = messages.filter((m) => !m.deletedAt && m.folderId === f.id && !m.read).length
     })
     return counts
-  }, [messages, folders])
+  }, [messages, folders, fromArtistMessages])
 
   // Selected message
   const selectedMessage = useMemo(
     () => messages.find((m) => m.id === selectedMessageId) ?? null,
     [messages, selectedMessageId],
+  )
+
+  const selectedFromArtistMessage = useMemo(
+    () => fromArtistMessages.find((m) => m.id === selectedMessageId) ?? null,
+    [fromArtistMessages, selectedMessageId],
   )
 
   // ── Data Loading ──────────────────────────────────────────────────────────
@@ -241,6 +297,8 @@ export function MessagesManager() {
       }
       if (folderRes.status === 'fulfilled') setFolders(folderRes.value)
       if (ruleRes.status === 'fulfilled') setRules(ruleRes.value)
+      const fromArtists = await getIncomingToLabelMessages(supabase)
+      setFromArtistMessages(fromArtists)
       await refreshMessages(searchStateRef.current)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load messages'
@@ -276,7 +334,18 @@ export function MessagesManager() {
         }))
       })
       .subscribe()
-    return () => { void supabase.removeChannel(msgCh); void supabase.removeChannel(replyCh) }
+    const portalCh = supabase
+      .channel('admin-portal-messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'portal_messages', filter: 'to_label=eq.true' }, (payload: RealtimePostgresInsertPayload<PortalMessageRow>) => {
+        const next = rowToPortalMessage(payload.new)
+        setFromArtistMessages((cur) => [next, ...cur.filter((m) => m.id !== next.id)])
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(msgCh)
+      void supabase.removeChannel(replyCh)
+      void supabase.removeChannel(portalCh)
+    }
   }, [refreshMessages, supabase])
 
   // Load attachments when a message is selected
@@ -368,6 +437,45 @@ export function MessagesManager() {
     [supabase],
   )
 
+  const handleMarkPortalRead = useCallback(
+    async (id: string) => {
+      try {
+        await markPortalMessageRead(supabase, id)
+        setFromArtistMessages((cur) =>
+          cur.map((m) => (m.id === id ? { ...m, readAt: new Date().toISOString() } : m)),
+        )
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to mark as read')
+      }
+    },
+    [supabase],
+  )
+
+  const handlePortalStar = useCallback(
+    async (id: string, starred: boolean) => {
+      try {
+        await togglePortalMessageStar(supabase, id, starred)
+        setFromArtistMessages((cur) => cur.map((m) => (m.id === id ? { ...m, starred } : m)))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to update star')
+      }
+    },
+    [supabase],
+  )
+
+  const handlePortalDelete = useCallback(
+    async (id: string) => {
+      try {
+        await softDeletePortalMessage(supabase, id)
+        if (selectedMessageId === id) setSelectedMessageId(null)
+        setFromArtistMessages((cur) => cur.filter((m) => m.id !== id))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to delete message')
+      }
+    },
+    [selectedMessageId, supabase],
+  )
+
   const handleSelectMessage = useCallback(
     async (id: string) => {
       setSelectedMessageId(id)
@@ -375,6 +483,15 @@ export function MessagesManager() {
       if (msg && !msg.read) await handleMarkRead(id)
     },
     [messages, handleMarkRead],
+  )
+
+  const handleSelectFromArtistMessage = useCallback(
+    async (id: string) => {
+      setSelectedMessageId(id)
+      const msg = fromArtistMessages.find((m) => m.id === id)
+      if (msg && !msg.readAt) await handleMarkPortalRead(id)
+    },
+    [fromArtistMessages, handleMarkPortalRead],
   )
 
   const handleExport = useCallback(
@@ -425,7 +542,9 @@ export function MessagesManager() {
     setRules((cur) => cur.filter((r) => r.id !== id))
   }, [supabase])
 
-  const totalUnread = messages.filter((m) => !m.read && !m.deletedAt).length
+  const totalUnread =
+    messages.filter((m) => !m.read && !m.deletedAt).length +
+    fromArtistMessages.filter((m) => !m.readAt && !m.deletedAt).length
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -457,7 +576,7 @@ export function MessagesManager() {
       {/* ── Middle: Message List — full width on mobile (hidden when detail is open), fixed on md ── */}
       <div className={cn(
         "flex flex-col border-border",
-        selectedMessage
+        selectedMessage || selectedFromArtistMessage
           ? "hidden md:flex md:w-72 md:shrink-0 md:border-r"
           : "flex-1 md:w-72 md:shrink-0 md:border-r",
       )}>
@@ -505,7 +624,50 @@ export function MessagesManager() {
 
         {/* Message list */}
         <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
-          {filteredMessages.length === 0 ? (
+          {isFromArtistsFolder ? (
+            filteredFromArtistMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground text-sm gap-2">
+                <p>No messages from artists</p>
+              </div>
+            ) : (
+              filteredFromArtistMessages.map((msg) => {
+                const artist = artists.find((a) => a.id === msg.fromArtistId)
+                const isSelected = msg.id === selectedMessageId
+                return (
+                  <button
+                    key={msg.id}
+                    type="button"
+                    onClick={() => void handleSelectFromArtistMessage(msg.id)}
+                    className={cn(
+                      'w-full text-left px-3 py-3 border-b border-border/50 transition-colors',
+                      isSelected ? 'bg-primary/10' : 'hover:bg-muted/50',
+                      !msg.readAt && !isSelected ? 'bg-card/60' : '',
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          {!msg.readAt && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-label="Unread" />
+                          )}
+                          <span className={cn('text-sm truncate', !msg.readAt ? 'font-semibold' : 'font-medium')}>
+                            {msg.subject}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {artist?.name ?? 'Unknown artist'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-xs text-muted-foreground">{formatDate(msg.sentAt)}</span>
+                        {msg.starred && <StarFour size={12} weight="fill" className="text-yellow-400" aria-hidden="true" />}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+            )
+          ) : filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground text-sm gap-2">
               <p>No messages</p>
             </div>
@@ -562,10 +724,91 @@ export function MessagesManager() {
       <div
         className={cn(
           "flex-1 flex flex-col min-w-0 overflow-hidden",
-          !selectedMessage && "hidden md:flex",
+          !selectedMessage && !selectedFromArtistMessage && "hidden md:flex",
         )}
       >
-        {selectedMessage ? (
+        {selectedFromArtistMessage ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setSelectedMessageId(null)}
+              className="md:hidden flex items-center gap-2 px-4 py-2.5 border-b border-border text-sm text-muted-foreground hover:text-foreground transition-colors bg-card/20"
+            >
+              <ArrowBendUpLeft size={14} aria-hidden="true" />
+              Back to messages
+            </button>
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border bg-card/20 shrink-0">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold leading-snug">{selectedFromArtistMessage.subject}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  From: {artists.find((a) => a.id === selectedFromArtistMessage.fromArtistId)?.name ?? 'Unknown artist'}
+                  {' · '}
+                  {new Date(selectedFromArtistMessage.sentAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => void handlePortalStar(selectedFromArtistMessage.id, !selectedFromArtistMessage.starred)}
+                  title={selectedFromArtistMessage.starred ? 'Unstar' : 'Star'}
+                >
+                  {selectedFromArtistMessage.starred
+                    ? <StarFour size={15} weight="fill" className="text-yellow-400" aria-hidden="true" />
+                    : <Star size={15} aria-hidden="true" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => void handlePortalDelete(selectedFromArtistMessage.id)}
+                  title="Delete"
+                >
+                  <Trash size={15} aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
+              {selectedFromArtistMessage.bodyHtml ? (
+                <div
+                  suppressHydrationWarning
+                  className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedFromArtistMessage.bodyHtml) }}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{selectedFromArtistMessage.body}</p>
+              )}
+              <div className="mt-6">
+                <Separator className="mb-4" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  <ArrowBendUpLeft size={12} className="inline mr-1" aria-hidden="true" />
+                  Reply to Artist
+                </p>
+                <QuickReply
+                  message={{
+                    id: selectedFromArtistMessage.id,
+                    artistId: selectedFromArtistMessage.fromArtistId,
+                    subject: selectedFromArtistMessage.subject,
+                    body: selectedFromArtistMessage.body,
+                    bodyHtml: selectedFromArtistMessage.bodyHtml,
+                    read: Boolean(selectedFromArtistMessage.readAt),
+                    readAt: selectedFromArtistMessage.readAt,
+                    starred: selectedFromArtistMessage.starred,
+                    deletedAt: selectedFromArtistMessage.deletedAt,
+                    sentAt: selectedFromArtistMessage.sentAt,
+                  }}
+                  artists={artists}
+                  templates={templates}
+                  isSending={isSending}
+                  isArtistsLoading={isLoadingArtists}
+                  artistLoadError={artistLoadError}
+                  onSend={handleSend}
+                />
+              </div>
+            </div>
+          </>
+        ) : selectedMessage ? (
           <>
             {/* Mobile back button */}
             <button

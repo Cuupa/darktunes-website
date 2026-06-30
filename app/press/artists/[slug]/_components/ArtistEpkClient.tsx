@@ -112,6 +112,13 @@ export function ArtistEpkClient({
   }
 
   const imagePhotos = photos.filter((photo) => photo.mimeType.startsWith('image/'))
+  const documentPhotos = photos.filter((photo) => !photo.mimeType.startsWith('image/'))
+
+  const riderDocuments = [
+    { label: t('downloadStagePlot'), url: profile?.riderStagePlotUrl },
+    { label: t('downloadTechnicalRider'), url: profile?.riderTechnicalUrl },
+    { label: t('downloadHospitalityRider'), url: profile?.riderHospitalityUrl },
+  ].filter((item): item is { label: string; url: string } => Boolean(item.url))
 
   const openLightbox = (photoId: string) => {
     const index = imagePhotos.findIndex((photo) => photo.id === photoId)
@@ -241,16 +248,60 @@ export function ArtistEpkClient({
           </section>
         )}
 
+        {(riderDocuments.length > 0 || documentPhotos.length > 0) && (
+          <section aria-labelledby="artist-technical-docs" className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="artist-technical-docs" className="text-2xl font-bold tracking-tight">
+                {t('technicalDocumentsHeading')}
+              </h2>
+              <p className="text-sm text-muted-foreground">{t('technicalDocumentsDescription')}</p>
+            </div>
+            <div className="space-y-3">
+              {riderDocuments.map((doc) => (
+                <div
+                  key={doc.url}
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card/70 px-4 py-3"
+                >
+                  <p className="font-medium">{doc.label}</p>
+                  <Button asChild variant="outline">
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" download>
+                      <DownloadSimple size={16} weight="bold" aria-hidden="true" />
+                      {t('downloadPhoto')}
+                    </a>
+                  </Button>
+                </div>
+              ))}
+              {documentPhotos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card/70 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{pressAssetTitle(photo)}</p>
+                    <p className="text-sm text-muted-foreground">{photo.pressCategory ?? 'document'}</p>
+                  </div>
+                  <Button asChild variant="outline">
+                    <a href={photo.publicUrl} target="_blank" rel="noopener noreferrer" download>
+                      <DownloadSimple size={16} weight="bold" aria-hidden="true" />
+                      {t('downloadPhoto')}
+                    </a>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section aria-labelledby="artist-photos" className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <h2 id="artist-photos" className="text-2xl font-bold tracking-tight">{t('pressPhotosHeading')}</h2>
             <p className="text-sm text-muted-foreground">{t('pressPhotosDescription')}</p>
           </div>
-          {photos.length === 0 ? (
+          {imagePhotos.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('noPressPhotos')}</p>
           ) : (
             <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
-              {photos.map((photo) => (
+              {imagePhotos.map((photo) => (
                 <li key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-card/70">
                   {photo.mimeType.startsWith('image/') ? (
                     <button

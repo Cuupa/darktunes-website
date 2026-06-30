@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { getLabelMessages } from '@/lib/api/labelMessages'
+import { getRepliesForMessage } from '@/lib/api/artistReplies'
 import {
   getInboxMessages,
   getSentMessages,
@@ -54,6 +56,21 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   } else {
     // Custom folder by ID
     messages = await getInboxMessages(supabase, artistId, folder)
+  }
+
+  if (folder === 'inbox') {
+    const labelMessages = await getLabelMessages(supabase, artistId)
+    const repliesEntries = await Promise.allSettled(
+      labelMessages.map(async (message) => [message.id, await getRepliesForMessage(supabase, message.id)] as const),
+    )
+    const labelReplies = repliesEntries.reduce<Record<string, Awaited<ReturnType<typeof getRepliesForMessage>>>>(
+      (acc, result) => {
+        if (result.status === 'fulfilled') acc[result.value[0]] = result.value[1]
+        return acc
+      },
+      {},
+    )
+    return NextResponse.json({ messages, labelMessages, labelReplies })
   }
 
   return NextResponse.json({ messages })

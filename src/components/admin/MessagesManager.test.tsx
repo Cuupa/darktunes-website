@@ -58,6 +58,7 @@ vi.mock('@phosphor-icons/react', () => ({
   Download: () => null,
   Paperclip: () => null,
   Tray: () => null,
+  Microphone: () => null,
   PaperPlaneTilt: () => null,
   Folder: () => null,
   Plus: () => null,
@@ -122,6 +123,13 @@ vi.mock('@/lib/api/labelMessages', () => ({
   sendMessage: vi.fn(),
   softDeleteMessage: vi.fn(),
   starMessage: vi.fn(),
+}))
+
+vi.mock('@/lib/api/portalMessages', () => ({
+  getIncomingToLabelMessages: vi.fn().mockResolvedValue([]),
+  markPortalMessageRead: vi.fn(),
+  softDeletePortalMessage: vi.fn(),
+  togglePortalMessageStar: vi.fn(),
 }))
 
 vi.mock('@/components/ui/dialog', () => ({

@@ -31,15 +31,15 @@ export default async function PressDashboardLayout({ children }: { children: Rea
     { href: '/press/dashboard/promo-pool', label: t('promoPool'), enabled: promoPoolEnabled },
     { href: '/press/dashboard/press-kit', label: t('pressKit'), enabled: true },
     { href: '/press/dashboard/press-releases', label: t('pressReleases'), enabled: true },
-    { href: '/press/dashboard/interviews', label: t('interviews'), enabled: true },
-    { href: '/press/dashboard/accreditation', label: t('accreditation'), enabled: flags['journalist.accreditation'] ?? true },
+    { href: '/press/dashboard/interviews', label: t('interviews'), enabled: true, badgeKey: 'interviews' as const },
+    { href: '/press/dashboard/accreditation', label: t('accreditation'), enabled: flags['journalist.accreditation'] ?? true, badgeKey: 'accreditation' as const },
     { href: '/press/dashboard/contact', label: t('contact'), enabled: flags['press.contact'] ?? true },
     { href: '/press/dashboard/download-history', label: t('downloadHistory'), enabled: true },
-  ].filter((item) => item.enabled).map(({ href, label }) => ({ href, label }))
+  ].filter((item) => item.enabled).map(({ href, label, badgeKey }) => ({ href, label, badgeKey }))
 
   return (
     <div className="min-h-screen bg-background md:flex">
-      <PressNav email={user.email ?? ''} links={links} />
+      <PressNav email={user.email ?? ''} userId={user.id} links={links} />
       <main className="mx-auto w-full max-w-5xl flex-1 p-6 md:p-8">{children}</main>
     </div>
   )
