@@ -4,9 +4,11 @@ import { useTranslations } from 'next-intl'
 import {
   ArrowCounterClockwise,
   ArrowClockwise,
+  ClockCounterClockwise,
+  Command,
   DeviceMobile,
   Desktop,
-  FloppyDisk,
+  Eye,
   RocketLaunch,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -18,30 +20,42 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useFanPageEditorStore, useFanPageEditorStoreApi, useFanPageEditorTemporal } from '@/lib/fan-page/editor/FanPageEditorProvider'
+import {
+  useFanPageEditorStore,
+  useFanPageEditorStoreApi,
+  useFanPageEditorTemporal,
+} from '@/lib/fan-page/editor/FanPageEditorProvider'
+import { FanPageSaveStatus } from './FanPageSaveStatus'
+import { FAN_PAGE_OPEN_COMMAND_PALETTE_EVENT } from './FanPageCommandPalette'
+import type { FanPageSaveStatus as SaveStatus } from '@/hooks/useFanPageAutosave'
 
 interface FanPageToolbarProps {
-  onSave: () => void
   onPublish: (mode: 'submit_review' | 'publish_direct') => void
-  isSaving: boolean
+  onOpenHistory: () => void
+  onOpenSmartPreview: () => void
   isPublishing: boolean
   canPublishDirect: boolean
   publishStatus: string
+  saveStatus: SaveStatus
+  isDirty: boolean
+  isPreviewLoading?: boolean
 }
 
 export function FanPageToolbar({
-  onSave,
   onPublish,
-  isSaving,
+  onOpenHistory,
+  onOpenSmartPreview,
   isPublishing,
   canPublishDirect,
   publishStatus,
+  saveStatus,
+  isDirty,
+  isPreviewLoading = false,
 }: FanPageToolbarProps) {
   const t = useTranslations('portal')
   const store = useFanPageEditorStoreApi()
   const previewDevice = useFanPageEditorStore((s) => s.previewDevice)
   const setPreviewDevice = useFanPageEditorStore((s) => s.setPreviewDevice)
-  const isDirty = useFanPageEditorStore((s) => s.isDirty)
 
   const pastStates = useFanPageEditorTemporal((s) => s.pastStates)
   const futureStates = useFanPageEditorTemporal((s) => s.futureStates)
@@ -87,6 +101,23 @@ export function FanPageToolbar({
           <TooltipContent>{t('fanPage_redo')}</TooltipContent>
         </Tooltip>
 
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={pastStates.length === 0}
+              onClick={onOpenHistory}
+              aria-label={t('fanPage_history_title')}
+            >
+              <ClockCounterClockwise size={18} aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('fanPage_history_title')}</TooltipContent>
+        </Tooltip>
+
         <Separator orientation="vertical" className="mx-1 h-6" />
 
         <Button
@@ -112,16 +143,40 @@ export function FanPageToolbar({
 
         <Separator orientation="vertical" className="mx-1 h-6" />
 
-        <Button
-          type="button"
-          size="sm"
-          className="min-h-[36px]"
-          disabled={isSaving || !isDirty}
-          onClick={onSave}
-        >
-          <FloppyDisk size={16} className="mr-1.5" aria-hidden />
-          {isSaving ? t('fanPage_saving') : t('fanPage_save')}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-[36px]"
+              disabled={isPreviewLoading || saveStatus === 'saving' || saveStatus === 'pending'}
+              onClick={onOpenSmartPreview}
+            >
+              <Eye size={16} className="mr-1.5" aria-hidden />
+              {isPreviewLoading ? t('fanPage_preview_opening') : t('fanPage_smart_preview')}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('fanPage_smart_preview_hint')}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent(FAN_PAGE_OPEN_COMMAND_PALETTE_EVENT))
+              }
+              aria-label={t('fanPage_cmd_tooltip')}
+            >
+              <Command size={18} aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('fanPage_cmd_tooltip')}</TooltipContent>
+        </Tooltip>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -142,7 +197,9 @@ export function FanPageToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <span className="ml-auto text-xs text-muted-foreground capitalize">
+        <FanPageSaveStatus status={saveStatus} isDirty={isDirty} className="ml-auto" />
+
+        <span className="text-xs text-muted-foreground capitalize">
           {publishStatus.replace(/_/g, ' ')}
         </span>
       </div>

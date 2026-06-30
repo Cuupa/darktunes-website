@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useDefaultLayout } from 'react-resizable-panels'
 import {
   ResizableHandle,
@@ -15,7 +16,11 @@ import { FanPageCanvas } from './FanPageCanvas'
 import { FanPagePreviewPanel } from './FanPagePreviewPanel'
 import { FanPagePropertiesPanel } from './FanPagePropertiesPanel'
 import { FanPageThemePanel } from './FanPageThemePanel'
+import { FanPageCommandPalette } from './FanPageCommandPalette'
+import { FanPageHistoryPanel } from './FanPageHistoryPanel'
+import { FanPageOnboardingTour } from './FanPageOnboardingTour'
 import type { FanPageLiveData } from './FanPageBlockRenderer'
+import type { FanPageSaveStatus } from '@/hooks/useFanPageAutosave'
 import { cn } from '@/lib/utils'
 
 type MobilePanel = 'sections' | 'preview' | 'properties'
@@ -23,27 +28,32 @@ type MobilePanel = 'sections' | 'preview' | 'properties'
 interface FanPageBuilderShellProps {
   artistId: string
   liveData: FanPageLiveData
-  onSave: () => void
   onPublish: (mode: 'submit_review' | 'publish_direct') => void
-  isSaving: boolean
+  onSmartPreview: () => Promise<void>
   isPublishing: boolean
   canPublishDirect: boolean
   publishStatus: string
+  saveStatus: FanPageSaveStatus
+  isDirty: boolean
+  isPreviewLoading: boolean
 }
 
 export function FanPageBuilderShell({
   artistId,
   liveData,
-  onSave,
   onPublish,
-  isSaving,
+  onSmartPreview,
   isPublishing,
   canPublishDirect,
   publishStatus,
+  saveStatus,
+  isDirty,
+  isPreviewLoading,
 }: FanPageBuilderShellProps) {
   const t = useTranslations('portal')
   const store = useFanPageEditorStoreApi()
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('preview')
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'fan-page-builder-layout-v1',
@@ -70,6 +80,14 @@ export function FanPageBuilderShell({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [store])
 
+  const handleSmartPreview = useCallback(async () => {
+    try {
+      await onSmartPreview()
+    } catch {
+      toast.error(t('fanPage_preview_error'))
+    }
+  }, [onSmartPreview, t])
+
   const leftPanel = (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3" data-lenis-prevent>
       <FanPageBlockLibrary />
@@ -88,12 +106,15 @@ export function FanPageBuilderShell({
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-[560px] flex-col md:h-[calc(100dvh-0px)]">
       <div className="shrink-0 border-b border-border bg-card px-3 py-2 md:px-4">
         <FanPageToolbar
-          onSave={onSave}
           onPublish={onPublish}
-          isSaving={isSaving}
+          onOpenHistory={() => setHistoryOpen(true)}
+          onOpenSmartPreview={() => void handleSmartPreview()}
           isPublishing={isPublishing}
           canPublishDirect={canPublishDirect}
           publishStatus={publishStatus}
+          saveStatus={saveStatus}
+          isDirty={isDirty}
+          isPreviewLoading={isPreviewLoading}
         />
       </div>
 
@@ -172,6 +193,15 @@ export function FanPageBuilderShell({
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <FanPageCommandPalette
+        onOpenHistory={() => setHistoryOpen(true)}
+        onOpenSmartPreview={() => void handleSmartPreview()}
+        onPublish={onPublish}
+        canPublishDirect={canPublishDirect}
+      />
+      <FanPageHistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <FanPageOnboardingTour />
     </div>
   )
 }

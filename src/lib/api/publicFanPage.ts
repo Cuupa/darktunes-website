@@ -21,6 +21,39 @@ export interface PublicFanPage {
   publishedAt: string | null
 }
 
+export async function getDraftFanPageByArtistId(
+  db: DbClient,
+  artistId: string,
+): Promise<PublicFanPage | null> {
+  const { data: artist, error: artistError } = await db
+    .from('artists')
+    .select('id, slug, name, is_visible')
+    .eq('id', artistId)
+    .maybeSingle()
+
+  if (artistError) throw new Error(artistError.message)
+  if (!artist || !artist.is_visible) return null
+
+  const { data: page, error: pageError } = await db
+    .from('artist_landing_pages')
+    .select('document, seo_title, seo_description, published_at')
+    .eq('artist_id', artist.id)
+    .maybeSingle()
+
+  if (pageError) throw new Error(pageError.message)
+  if (!page?.document) return null
+
+  return {
+    artistId: artist.id,
+    artistSlug: artist.slug,
+    artistName: artist.name,
+    document: parseLandingPageDocumentV1(page.document),
+    seoTitle: page.seo_title,
+    seoDescription: page.seo_description,
+    publishedAt: page.published_at,
+  }
+}
+
 export async function getPublishedFanPageBySlug(
   db: DbClient,
   slug: string,

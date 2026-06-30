@@ -50,8 +50,8 @@ function FanPageBuilderWorkspace({
   const markClean = useFanPageEditorStore((s) => s.markClean)
   const [documentVersion, setDocumentVersion] = useState(initialVersion)
   const [publishStatus, setPublishStatus] = useState(initialPublishStatus)
-  const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
 
   const liveData: FanPageLiveData = {
     artist,
@@ -61,7 +61,7 @@ function FanPageBuilderWorkspace({
     smartLinks: artist.smartLinks,
   }
 
-  const { saveNow } = useFanPageAutosave({
+  const { saveStatus, saveNow } = useFanPageAutosave({
     artistId,
     document,
     isDirty,
@@ -69,16 +69,6 @@ function FanPageBuilderWorkspace({
     onSaved: setDocumentVersion,
     saveErrorMessage: t('fanPage_save_error'),
   })
-
-  const handleSave = useCallback(async () => {
-    setIsSaving(true)
-    try {
-      await saveNow()
-      toast.success(t('fanPage_save_success'))
-    } finally {
-      setIsSaving(false)
-    }
-  }, [saveNow, t])
 
   const handlePublish = useCallback(
     async (mode: 'submit_review' | 'publish_direct') => {
@@ -133,6 +123,41 @@ function FanPageBuilderWorkspace({
     [artistId, isDirty, saveNow, t],
   )
 
+  const handleSmartPreview = useCallback(async () => {
+    setIsPreviewLoading(true)
+    try {
+      if (isDirty) await saveNow()
+
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        toast.error(t('fanPage_publish_auth_error'))
+        return
+      }
+
+      const response = await fetch('/api/portal/fan-page/preview-token', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ artist_id: artistId }),
+      })
+
+      if (!response.ok) {
+        toast.error(t('fanPage_preview_error'))
+        return
+      }
+
+      const payload = (await response.json()) as { previewPath: string }
+      window.open(payload.previewPath, '_blank', 'noopener,noreferrer')
+    } finally {
+      setIsPreviewLoading(false)
+    }
+  }, [artistId, isDirty, saveNow, t])
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
@@ -145,8 +170,7 @@ function FanPageBuilderWorkspace({
           </Button>
           <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{t('fanPage_title')}</h1>
           <p className="text-xs text-muted-foreground">
-            {t('fanPage_version_label').replace('{version}', String(documentVersion))}
-            {isDirty ? ` · ${t('fanPage_unsaved')}` : ''}
+            {t('fanPage_version_label', { version: String(documentVersion) })}
           </p>
         </div>
       </div>
@@ -154,12 +178,14 @@ function FanPageBuilderWorkspace({
       <FanPageBuilderShell
         artistId={artistId}
         liveData={liveData}
-        onSave={() => void handleSave()}
         onPublish={(mode) => void handlePublish(mode)}
-        isSaving={isSaving}
+        onSmartPreview={handleSmartPreview}
         isPublishing={isPublishing}
         canPublishDirect={artist.landingPublishTrusted ?? false}
         publishStatus={publishStatus}
+        saveStatus={saveStatus}
+        isDirty={isDirty}
+        isPreviewLoading={isPreviewLoading}
       />
     </div>
   )

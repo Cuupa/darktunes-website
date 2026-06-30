@@ -62,7 +62,7 @@ export function createFanPageEditorStore(initialDocument: LandingPageDocumentV1)
       immer((set) => ({
         document: initialDocument,
         selectedSectionId: initialDocument.sections[0]?.id ?? null,
-        previewDevice: 'desktop',
+        previewDevice: 'mobile',
         isDirty: false,
 
         setDocument: (document) =>
@@ -171,7 +171,10 @@ export function createFanPageEditorStore(initialDocument: LandingPageDocumentV1)
             state.isDirty = true
           }),
       })),
-      { limit: 100 },
+      {
+        limit: 100,
+        partialize: (state) => ({ document: state.document }),
+      },
     ),
   )
 }

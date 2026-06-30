@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { Eye } from '@phosphor-icons/react'
 import type { LandingPageDocumentV1 } from '@/lib/fan-page/schema/documentV1'
 import type { FanPageDevice } from '@/lib/fan-page/editor/store'
 import type { Artist, Release, Concert, Video } from '@/types'
@@ -13,6 +15,7 @@ interface FanPagePublicViewProps {
   releases: Release[]
   concerts: Concert[]
   videos: Video[]
+  isPreview?: boolean
 }
 
 export function FanPagePublicView({
@@ -21,7 +24,9 @@ export function FanPagePublicView({
   releases,
   concerts,
   videos,
+  isPreview = false,
 }: FanPagePublicViewProps) {
+  const t = useTranslations('portal')
   const [device, setDevice] = useState<FanPageDevice>('desktop')
 
   useEffect(() => {
@@ -45,6 +50,15 @@ export function FanPagePublicView({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: colors.background, color: colors.text }}>
+      {isPreview ? (
+        <div
+          className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-950 dark:text-amber-100"
+          role="status"
+        >
+          <Eye size={16} aria-hidden />
+          <span>{t('fanPage_preview_banner')}</span>
+        </div>
+      ) : null}
       {sections.map((section) => (
         <FanPageBlockRenderer
           key={section.id}
