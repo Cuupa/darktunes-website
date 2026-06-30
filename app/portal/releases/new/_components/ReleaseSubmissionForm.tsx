@@ -1,23 +1,17 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { useState, useCallback } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
+import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { validateFieldValue } from '@/lib/submissions/fieldValidation'
+import { RELEASE_STANDARD_FIELD_TO_BODY_KEY } from '@/lib/submissions/releaseFieldMapping'
+import { isFieldVisible } from '@/lib/submissions/visibilityCondition'
 import type { Artist, SubmissionFormField } from '@/types'
 
 interface ReleaseSubmissionFormProps {
@@ -25,80 +19,124 @@ interface ReleaseSubmissionFormProps {
   formSchema: SubmissionFormField[]
 }
 
-type ReleaseType = 'album' | 'ep' | 'single'
+type ReleaseType = 'album' | 'ep' | 'single' | 'compilation'
 
-function DynamicField({
-  field,
-  value,
-  onChange,
-}: {
-  field: SubmissionFormField
-  value: string
-  onChange: (v: string) => void
-}) {
-  const label = field.fieldLabelEn
-  const placeholder = field.placeholderEn ?? ''
-  const id = `dynamic-${field.fieldKey}`
+interface TrackRow {
+  id: string
+  values: Record<string, string>
+}
 
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>
-        {label}
-        {field.isRequired && <span className="text-destructive ml-1">*</span>}
-      </Label>
-      {field.fieldType === 'textarea' ? (
-        <Textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={field.isRequired}
-        />
-      ) : (
-        <Input
-          id={id}
-          type={field.fieldType === 'url' ? 'url' : field.fieldType === 'date' ? 'date' : 'text'}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={field.isRequired}
-        />
-      )}
-    </div>
-  )
+function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const f of trackFields) {
+    values[f.fieldKey] = f.fieldType === 'boolean' ? 'false' : ''
+  }
+  return values
 }
 
 export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionFormProps) {
   const t = useTranslations('portal')
-
+  const locale = useLocale()
   const router = useRouter()
-  const [title, setTitle] = useState(artist?.name ?? '')
-  const [releaseDate, setReleaseDate] = useState('')
-  const [type, setType] = useState<ReleaseType>('single')
-  const [audioDownloadUrl, setAudioDownloadUrl] = useState('')
-  const [coverArtUrl, setCoverArtUrl] = useState('')
+
+  const releaseFields = useMemo(
+    () => formSchema.filter((f) => f.isVisible && f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
+    [formSchema],
+  )
+  const trackFields = useMemo(
+    () => formSchema.filter((f) => f.isVisible && f.fieldScope === 'track').sort((a, b) => a.displayOrder - b.displayOrder),
+    [formSchema],
+  )
+
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = { type: 'single' }
+    if (artist?.name) init.artist_name = artist.name
+    if (artist?.genres?.[0]) init.genre = artist.genres[0]
+    if (artist?.spotifyUrl) init.spotify_url = artist.spotifyUrl
+    if (artist?.appleMusicUrl) init.apple_music_url = artist.appleMusicUrl
+    if (artist?.youtubeUrl) init.youtube_url = artist.youtubeUrl
+    if (artist?.name) init.title = artist.name
+    for (const f of formSchema) {
+      if (init[f.fieldKey] === undefined) {
+        init[f.fieldKey] = f.fieldType === 'boolean' ? 'false' : ''
+      }
+    }
+    return init
+  })
+
+  const [tracks, setTracks] = useState<TrackRow[]>([
+    { id: 'track-1', values: emptyTrackValues(trackFields) },
+  ])
   const [coverArtVerified, setCoverArtVerified] = useState(false)
-  const [genre, setGenre] = useState(artist?.genres?.[0] ?? '')
-  const [catalogNumber, setCatalogNumber] = useState('')
-  const [isrc, setIsrc] = useState('')
-  const [labelCopy, setLabelCopy] = useState('')
-  const [spotifyUrl, setSpotifyUrl] = useState(artist?.spotifyUrl ?? '')
-  const [appleMusicUrl, setAppleMusicUrl] = useState(artist?.appleMusicUrl ?? '')
-  const [youtubeUrl, setYoutubeUrl] = useState(artist?.youtubeUrl ?? '')
-  const [notes, setNotes] = useState('')
-  const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
-  const FIXED_KEYS = new Set([
-    'title', 'release_date', 'type', 'audio_download_url', 'cover_art_url',
-    'genre', 'catalog_number', 'isrc', 'label_copy', 'spotify_url',
-    'apple_music_url', 'youtube_url', 'notes',
-  ])
-  const extraFields = formSchema.filter((f) => f.isVisible && !FIXED_KEYS.has(f.fieldKey))
+  const releaseType = (values.type || 'single') as ReleaseType
+  const showMultiTracks = releaseType !== 'single'
+
+  const visibleReleaseFields = useMemo(
+    () => releaseFields.filter((f) => isFieldVisible(f.visibilityCondition, values)),
+    [releaseFields, values],
+  )
+
+  const setFieldValue = (key: string, value: string) => {
+    setValues((prev) => ({ ...prev, [key]: value }))
+    if (key === 'cover_art_url') setCoverArtVerified(false)
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
 
   const handleCoverArtVerified = useCallback((verified: boolean) => {
     setCoverArtVerified(verified)
   }, [])
+
+  const addTrack = () => {
+    setTracks((prev) => [
+      ...prev,
+      { id: `track-${Date.now()}`, values: emptyTrackValues(trackFields) },
+    ])
+  }
+
+  const removeTrack = (id: string) => {
+    setTracks((prev) => (prev.length <= 1 ? prev : prev.filter((tr) => tr.id !== id)))
+  }
+
+  const setTrackValue = (trackId: string, key: string, value: string) => {
+    setTracks((prev) =>
+      prev.map((tr) => (tr.id === trackId ? { ...tr, values: { ...tr.values, [key]: value } } : tr)),
+    )
+  }
+
+  const validateBeforeSubmit = (): boolean => {
+    const errors: Record<string, string> = {}
+    for (const field of visibleReleaseFields) {
+      const raw = values[field.fieldKey] ?? ''
+      if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
+        errors[field.fieldKey] = t('releases_submit_required')
+      } else if (raw.trim()) {
+        const err = validateFieldValue(field.fieldType, raw)
+        if (err) errors[field.fieldKey] = err
+      }
+    }
+    const rows = showMultiTracks ? tracks : tracks.slice(0, 1)
+    for (const track of rows) {
+      for (const field of trackFields) {
+        const raw = track.values[field.fieldKey] ?? ''
+        const errKey = `${track.id}:${field.fieldKey}`
+        if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
+          errors[errKey] = t('releases_submit_required')
+        } else if (raw.trim()) {
+          const err = validateFieldValue(field.fieldType, raw)
+          if (err) errors[errKey] = err
+        }
+      }
+    }
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,44 +145,61 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
       toast.error(t('releases_submit_cover_check_required'))
       return
     }
+    if (!validateBeforeSubmit()) {
+      toast.error(t('releases_submit_validation_error'))
+      return
+    }
 
     setSubmitting(true)
     try {
       const supabase = createBrowserSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
-
       if (!session) {
         toast.error(t('releases_submit_error'))
         return
       }
 
+      const standardBody: Record<string, unknown> = {
+        coverArtVerified,
+      }
+      const formData: Record<string, unknown> = {}
+
+      for (const field of visibleReleaseFields) {
+        const raw = values[field.fieldKey] ?? ''
+        const bodyKey = RELEASE_STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
+        if (bodyKey !== undefined) {
+          if (field.fieldType === 'boolean') {
+            standardBody[bodyKey] = raw === 'true'
+          } else {
+            standardBody[bodyKey] = raw.trim() || null
+          }
+        } else if (raw.trim()) {
+          formData[field.fieldKey] = field.fieldType === 'boolean' ? raw === 'true' : raw.trim()
+        }
+      }
+
+      const rows = showMultiTracks ? tracks : tracks.slice(0, 1)
+      const trackPayload = rows.map((track, index) => ({
+        trackNumber: Number(track.values.track_number) || index + 1,
+        values: track.values,
+      }))
+
       const res = await fetch('/api/portal/submit-release', {
         method: 'POST',
         headers: {
-                    Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim(),
-          releaseDate: releaseDate || null,
-          type,
-          audioDownloadUrl,
-          coverArtUrl,
-          coverArtVerified,
-          genre: genre || null,
-          catalogNumber: catalogNumber || null,
-          isrc: isrc || null,
-          labelCopy: labelCopy || null,
-          spotifyUrl: spotifyUrl || null,
-          appleMusicUrl: appleMusicUrl || null,
-          youtubeUrl: youtubeUrl || null,
-          notes: notes || null,
-          formData: Object.keys(dynamicValues).length > 0 ? dynamicValues : null,
+          ...standardBody,
+          formData: Object.keys(formData).length > 0 ? formData : null,
+          tracks: trackPayload,
         }),
       })
 
       if (!res.ok) {
-        toast.error(t('releases_submit_error'))
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        toast.error(err.error ?? t('releases_submit_error'))
         return
       }
 
@@ -169,118 +224,69 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(e) => void submit(e)}>
-            <div className="space-y-2">
-              <Label htmlFor="release-title">
-                {t('releases_submit_title')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input id="release-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="release-date">{t('releases_submit_date')}</Label>
-                <Input id="release-date" type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} />
+            {visibleReleaseFields.map((field) => (
+              <div key={field.id}>
+                {field.fieldKey === 'cover_art_url' ? (
+                  <div className="space-y-2">
+                    <SchemaDrivenField
+                      field={field}
+                      locale={locale}
+                      value={values[field.fieldKey] ?? ''}
+                      onChange={(v) => setFieldValue(field.fieldKey, v)}
+                      error={fieldErrors[field.fieldKey]}
+                    />
+                    <CoverArtAnalyzer
+                      url={values.cover_art_url ?? ''}
+                      onVerified={handleCoverArtVerified}
+                    />
+                  </div>
+                ) : (
+                  <SchemaDrivenField
+                    field={field}
+                    locale={locale}
+                    value={values[field.fieldKey] ?? ''}
+                    onChange={(v) => setFieldValue(field.fieldKey, v)}
+                    error={fieldErrors[field.fieldKey]}
+                  />
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>
-                  {t('releases_submit_type')}
-                  <span className="text-destructive ml-1">*</span>
-                </Label>
-                <Select value={type} onValueChange={(val) => setType(val as ReleaseType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="album">Album</SelectItem>
-                    <SelectItem value="ep">EP</SelectItem>
-                    <SelectItem value="single">Single</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audio-url">
-                {t('releases_submit_audio_url')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input
-                id="audio-url"
-                type="url"
-                value={audioDownloadUrl}
-                onChange={(e) => setAudioDownloadUrl(e.target.value)}
-                placeholder="https://drive.google.com/…"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cover-art-url">
-                {t('releases_submit_cover_url')}
-                <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input
-                id="cover-art-url"
-                type="url"
-                value={coverArtUrl}
-                onChange={(e) => {
-                  setCoverArtUrl(e.target.value)
-                  setCoverArtVerified(false)
-                }}
-                placeholder="https://drive.google.com/…"
-                required
-              />
-              <CoverArtAnalyzer url={coverArtUrl} onVerified={handleCoverArtVerified} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="genre">{t('releases_submit_genre')}</Label>
-              <Input id="genre" value={genre} onChange={(e) => setGenre(e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="catalog-number">{t('releases_submit_catalog_number')}</Label>
-                <Input id="catalog-number" value={catalogNumber} onChange={(e) => setCatalogNumber(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="isrc">{t('releases_submit_isrc')}</Label>
-                <Input id="isrc" value={isrc} onChange={(e) => setIsrc(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="label-copy">{t('releases_submit_label_copy')}</Label>
-              <Input id="label-copy" value={labelCopy} onChange={(e) => setLabelCopy(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="spotify-url">{t('releases_submit_spotify')}</Label>
-              <Input id="spotify-url" type="url" value={spotifyUrl} onChange={(e) => setSpotifyUrl(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="apple-url">{t('releases_submit_apple')}</Label>
-              <Input id="apple-url" type="url" value={appleMusicUrl} onChange={(e) => setAppleMusicUrl(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="youtube-url">{t('releases_submit_youtube')}</Label>
-              <Input id="youtube-url" type="url" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="release-notes">{t('releases_submit_notes')}</Label>
-              <Textarea id="release-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-
-            {extraFields.map((field) => (
-              <DynamicField
-                key={field.id}
-                field={field}
-                value={dynamicValues[field.fieldKey] ?? ''}
-                onChange={(v) => setDynamicValues((prev) => ({ ...prev, [field.fieldKey]: v }))}
-              />
             ))}
+
+            {trackFields.length > 0 && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">{t('releases_submit_tracks_heading')}</h2>
+                  {showMultiTracks && (
+                    <Button type="button" variant="outline" size="sm" onClick={addTrack}>
+                      {t('releases_submit_add_track')}
+                    </Button>
+                  )}
+                </div>
+                {(showMultiTracks ? tracks : tracks.slice(0, 1)).map((track, index) => (
+                  <div key={track.id} className="rounded-md border border-border p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{t('releases_submit_track_label', { n: index + 1 })}</p>
+                      {showMultiTracks && tracks.length > 1 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeTrack(track.id)}>
+                          {t('releases_submit_remove_track')}
+                        </Button>
+                      )}
+                    </div>
+                    {trackFields.map((field) => (
+                      <SchemaDrivenField
+                        key={`${track.id}-${field.id}`}
+                        field={field}
+                        locale={locale}
+                        value={track.values[field.fieldKey] ?? ''}
+                        onChange={(v) => setTrackValue(track.id, field.fieldKey, v)}
+                        idPrefix={track.id}
+                        error={fieldErrors[`${track.id}:${field.fieldKey}`]}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <Button
               type="submit"

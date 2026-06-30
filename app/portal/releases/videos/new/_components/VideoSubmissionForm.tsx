@@ -6,18 +6,9 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { SubmissionFormField } from '@/types'
-
-const YT_CATEGORIES = [
-  { value: '10', label: 'Music' },
-  { value: '24', label: 'Entertainment' },
-  { value: '22', label: 'People & Blogs' },
-  { value: '27', label: 'Education' },
-]
 
 const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
   title: 'title',
@@ -34,93 +25,6 @@ const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
 
 interface VideoSubmissionFormProps {
   formSchema: SubmissionFormField[]
-}
-
-function fieldLabel(field: SubmissionFormField, locale: string): string {
-  return locale === 'de' ? field.fieldLabelDe : field.fieldLabelEn
-}
-
-function fieldPlaceholder(field: SubmissionFormField, locale: string): string {
-  return locale === 'de' ? (field.placeholderDe ?? '') : (field.placeholderEn ?? '')
-}
-
-function SchemaField({
-  field,
-  locale,
-  value,
-  onChange,
-}: {
-  field: SubmissionFormField
-  locale: string
-  value: string
-  onChange: (v: string) => void
-}) {
-  const label = fieldLabel(field, locale)
-  const placeholder = fieldPlaceholder(field, locale)
-  const id = `video-field-${field.fieldKey}`
-
-  if (field.fieldType === 'boolean') {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          id={id}
-          type="checkbox"
-          checked={value === 'true'}
-          onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-        />
-        <Label htmlFor={id}>{label}</Label>
-      </div>
-    )
-  }
-
-  if (field.fieldType === 'select' && field.fieldKey === 'youtube_category') {
-    return (
-      <div className="space-y-2">
-        <Label htmlFor={id}>
-          {label}
-          {field.isRequired && <span className="text-destructive ml-1">*</span>}
-        </Label>
-        <select
-          id={id}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-          value={value || '10'}
-          onChange={(e) => onChange(e.target.value)}
-          required={field.isRequired}
-        >
-          {YT_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>{cat.label}</option>
-          ))}
-        </select>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>
-        {label}
-        {field.isRequired && <span className="text-destructive ml-1">*</span>}
-      </Label>
-      {field.fieldType === 'textarea' ? (
-        <Textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={field.isRequired}
-        />
-      ) : (
-        <Input
-          id={id}
-          type={field.fieldType === 'url' ? 'url' : field.fieldType === 'date' ? 'date' : 'text'}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={field.isRequired}
-        />
-      )}
-    </div>
-  )
 }
 
 export function VideoSubmissionForm({ formSchema }: VideoSubmissionFormProps) {
@@ -209,11 +113,11 @@ export function VideoSubmissionForm({ formSchema }: VideoSubmissionFormProps) {
         <CardContent>
           <form className="space-y-4" onSubmit={(e) => void submit(e)}>
             {visibleFields.map((field) => (
-              <SchemaField
+              <SchemaDrivenField
                 key={field.id}
                 field={field}
                 locale={locale}
-                value={values[field.fieldKey] ?? ''}
+                value={values[field.fieldKey] ?? (field.fieldKey === 'youtube_category' ? '10' : '')}
                 onChange={(v) => setFieldValue(field.fieldKey, v)}
               />
             ))}

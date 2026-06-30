@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { updateReleaseSubmissionStatus } from '@/lib/api/releaseSubmissions'
+import { getTracksBySubmissionId } from '@/lib/api/releaseSubmissionTracks'
 
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
@@ -13,6 +14,15 @@ function extractId(req: NextRequest): string {
 const patchSchema = z.object({
   status: z.enum(['received', 'reviewed', 'accepted', 'rejected']),
   adminReply: z.string().optional(),
+})
+
+export const GET = withErrorHandler(async (req: NextRequest) => {
+  const token = extractBearerToken(req.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
+  const supabase = await createServiceRoleSupabaseClient()
+  const id = extractId(req)
+  const tracks = await getTracksBySubmissionId(supabase, id)
+  return NextResponse.json({ tracks })
 })
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {

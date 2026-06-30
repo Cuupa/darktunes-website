@@ -876,7 +876,7 @@ export interface ReleaseSubmission {
   status: SubmissionStatus
   title: string
   releaseDate: string | null
-  type: 'album' | 'ep' | 'single' | null
+  type: 'album' | 'ep' | 'single' | 'compilation' | null
   genre: string | null
   catalogNumber: string | null
   isrc: string | null
@@ -916,19 +916,49 @@ export interface VideoSubmission {
   updatedAt: string
 }
 
+export type {
+  SubmissionFieldType,
+  SubmissionFieldScope,
+  VisibilityCondition,
+} from '@/lib/submissions/fieldTypes'
+
 export interface SubmissionFormField {
   id: string
   formType: 'release' | 'video'
   fieldKey: string
-  fieldLabelEn: string
-  fieldLabelDe: string
-  fieldType: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+  fieldLabels: Record<string, string>
+  fieldType: import('@/lib/submissions/fieldTypes').SubmissionFieldType
+  fieldScope: import('@/lib/submissions/fieldTypes').SubmissionFieldScope
+  fieldGroup: string | null
   fieldOptions: Record<string, unknown> | null
+  visibilityCondition: import('@/lib/submissions/fieldTypes').VisibilityCondition | null
+  validation: Record<string, unknown> | null
   isRequired: boolean
   isVisible: boolean
   displayOrder: number
-  placeholderEn: string | null
-  placeholderDe: string | null
+  placeholders: Record<string, string> | null
+}
+
+export interface ReleaseSubmissionTrack {
+  id: string
+  submissionId: string
+  trackNumber: number
+  title: string | null
+  isrc: string | null
+  composer: string | null
+  author: string | null
+  genre: string | null
+  language: string | null
+  gema: boolean | null
+  explicit: boolean | null
+  live: boolean | null
+  cover: boolean | null
+  instrumental: boolean | null
+  previewStartSeconds: number | null
+  durationSeconds: number | null
+  formData: Record<string, unknown> | null
+  displayOrder: number
+  createdAt: string
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -14,8 +15,9 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
+import { formatSecondsToDuration } from '@/lib/submissions/fieldValidation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { ReleaseSubmission, SubmissionStatus } from '@/types'
+import type { ReleaseSubmission, ReleaseSubmissionTrack, SubmissionStatus } from '@/types'
 
 const STATUS_OPTIONS: SubmissionStatus[] = ['received', 'reviewed', 'accepted', 'rejected']
 
@@ -35,25 +37,31 @@ function statusBadgeVariant(status: SubmissionStatus) {
   }
 }
 
-async function getToken(): Promise<string> {
-  const session = await createBrowserSupabaseClient().auth.getSession()
-  return session.data.session?.access_token ?? ''
-}
-
 export function ReleaseSubmissionsManager() {
+  const t = useTranslations('adminSubmissions')
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+
   const [submissions, setSubmissions] = useState<ReleaseSubmission[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ReleaseSubmission | null>(null)
+  const [tracks, setTracks] = useState<ReleaseSubmissionTrack[]>([])
   const [newStatus, setNewStatus] = useState<SubmissionStatus>('received')
   const [adminReply, setAdminReply] = useState('')
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null)
+
+  const getToken = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Not authenticated')
+    return session.access_token
+  }, [supabase])
 
   const fetchSubmissions = useCallback(async () => {
     setLoading(true)
     try {
       const token = await getToken()
       const res = await fetch('/api/admin/release-submissions', {
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
         const data = (await res.json()) as ReleaseSubmission[]
@@ -64,16 +72,29 @@ export function ReleaseSubmissionsManager() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getToken])
 
   useEffect(() => {
     void fetchSubmissions()
   }, [fetchSubmissions])
 
-  const openDetail = (sub: ReleaseSubmission) => {
+  const openDetail = async (sub: ReleaseSubmission) => {
     setSelected(sub)
     setNewStatus(sub.status)
     setAdminReply(sub.adminReply ?? '')
+    setTracks([])
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/admin/release-submissions/${sub.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { tracks: ReleaseSubmissionTrack[] }
+        setTracks(data.tracks)
+      }
+    } catch {
+      /* tracks optional in detail */
+    }
   }
 
   const saveStatus = async () => {
@@ -84,7 +105,7 @@ export function ReleaseSubmissionsManager() {
       const res = await fetch('/api/admin/release-submissions/' + selected.id, {
         method: 'PATCH',
         headers: {
-          Authorization: 'Bearer ' + token,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ status: newStatus, adminReply: adminReply || undefined }),
@@ -100,10 +121,54 @@ export function ReleaseSubmissionsManager() {
     }
   }
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>
+  const downloadExport = async (format: 'csv' | 'xlsx') => {
+    setExporting(format)
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/admin/release-submissions/export?format=${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `release-submissions.${format === 'xlsx' ? 'xlsx' : 'csv'}`
+      anchor.click()
+      URL.revokeObjectURL(url)
+      toast.success(t('export_done'))
+    } catch {
+      toast.error(t('export_error'))
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  if (loading) return <p className="text-muted-foreground">{t('loading')}</p>
 
   return (
     <div className="space-y-4">
+      {!selected && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting !== null}
+            onClick={() => void downloadExport('csv')}
+          >
+            {exporting === 'csv' ? t('saving') : t('export_csv')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting !== null}
+            onClick={() => void downloadExport('xlsx')}
+          >
+            {exporting === 'xlsx' ? t('saving') : t('export_excel')}
+          </Button>
+        </div>
+      )}
+
       {selected ? (
         <Card className="border-border">
           <CardHeader>
@@ -114,8 +179,8 @@ export function ReleaseSubmissionsManager() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="font-medium">Type: </span>{selected.type ?? '—'}</div>
-              <div><span className="font-medium">Date: </span>{selected.releaseDate ?? '—'}</div>
+              <div><span className="font-medium">{t('submission_type')}: </span>{selected.type ?? '—'}</div>
+              <div><span className="font-medium">{t('submission_submitted')}: </span>{selected.releaseDate ?? '—'}</div>
               <div><span className="font-medium">Genre: </span>{selected.genre ?? '—'}</div>
               <div><span className="font-medium">ISRC: </span>{selected.isrc ?? '—'}</div>
               <div><span className="font-medium">Catalog #: </span>{selected.catalogNumber ?? '—'}</div>
@@ -136,8 +201,48 @@ export function ReleaseSubmissionsManager() {
               </div>
             )}
             {selected.notes && <p className="text-sm text-muted-foreground">{selected.notes}</p>}
+            {selected.formData && Object.keys(selected.formData).length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t('submission_form_data')}</p>
+                <dl className="text-sm grid grid-cols-2 gap-2">
+                  {Object.entries(selected.formData).map(([k, v]) => (
+                    <div key={k}>
+                      <dt className="text-muted-foreground font-mono text-xs">{k}</dt>
+                      <dd>{String(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+            {tracks.length > 0 && (
+              <div className="space-y-2 overflow-x-auto" data-lenis-prevent>
+                <p className="text-sm font-medium">{t('submission_tracks')}</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-1 pr-2">#</th>
+                      <th className="text-left py-1 pr-2">Title</th>
+                      <th className="text-left py-1 pr-2">ISRC</th>
+                      <th className="text-left py-1 pr-2">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tracks.map((track) => (
+                      <tr key={track.id} className="border-b border-border">
+                        <td className="py-1 pr-2">{track.trackNumber}</td>
+                        <td className="py-1 pr-2">{track.title ?? '—'}</td>
+                        <td className="py-1 pr-2 font-mono text-xs">{track.isrc ?? '—'}</td>
+                        <td className="py-1 pr-2">
+                          {track.durationSeconds != null ? formatSecondsToDuration(track.durationSeconds) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label>Update Status</Label>
+              <Label>{t('submission_status_update')}</Label>
               <Select value={newStatus} onValueChange={(v) => setNewStatus(v as SubmissionStatus)}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
@@ -150,7 +255,7 @@ export function ReleaseSubmissionsManager() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Reply to Artist</Label>
+              <Label>{t('submission_reply')}</Label>
               <Textarea
                 value={adminReply}
                 onChange={(e) => setAdminReply(e.target.value)}
@@ -158,7 +263,7 @@ export function ReleaseSubmissionsManager() {
               />
             </div>
             <Button onClick={() => void saveStatus()} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t('saving') : t('field_save')}
             </Button>
           </CardContent>
         </Card>
@@ -167,10 +272,10 @@ export function ReleaseSubmissionsManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-2 pr-4">Title</th>
-                <th className="text-left py-2 pr-4">Type</th>
-                <th className="text-left py-2 pr-4">Submitted</th>
-                <th className="text-left py-2">Status</th>
+                <th className="text-left py-2 pr-4">{t('submission_title')}</th>
+                <th className="text-left py-2 pr-4">{t('submission_type')}</th>
+                <th className="text-left py-2 pr-4">{t('submission_submitted')}</th>
+                <th className="text-left py-2">{t('submission_status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +283,7 @@ export function ReleaseSubmissionsManager() {
                 <tr
                   key={sub.id}
                   className="border-b border-border cursor-pointer hover:bg-muted/30"
-                  onClick={() => openDetail(sub)}
+                  onClick={() => void openDetail(sub)}
                 >
                   <td className="py-2 pr-4 font-medium">{sub.title}</td>
                   <td className="py-2 pr-4 capitalize">{sub.type ?? '—'}</td>

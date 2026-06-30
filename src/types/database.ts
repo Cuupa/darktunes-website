@@ -3776,7 +3776,7 @@ export interface Database {
           status: 'received' | 'reviewed' | 'accepted' | 'rejected'
           title: string
           release_date: string | null
-          type: 'album' | 'ep' | 'single' | null
+          type: 'album' | 'ep' | 'single' | 'compilation' | null
           genre: string | null
           catalog_number: string | null
           isrc: string | null
@@ -3800,7 +3800,7 @@ export interface Database {
           status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
           title: string
           release_date?: string | null
-          type?: 'album' | 'ep' | 'single' | null
+          type?: 'album' | 'ep' | 'single' | 'compilation' | null
           genre?: string | null
           catalog_number?: string | null
           isrc?: string | null
@@ -3824,7 +3824,7 @@ export interface Database {
           status?: 'received' | 'reviewed' | 'accepted' | 'rejected'
           title?: string
           release_date?: string | null
-          type?: 'album' | 'ep' | 'single' | null
+          type?: 'album' | 'ep' | 'single' | 'compilation' | null
           genre?: string | null
           catalog_number?: string | null
           isrc?: string | null
@@ -3843,6 +3843,80 @@ export interface Database {
           updated_at?: string
         }
         Relationships: []
+      }
+      release_submission_tracks: {
+        Row: {
+          id: string
+          submission_id: string
+          track_number: number
+          title: string | null
+          isrc: string | null
+          composer: string | null
+          author: string | null
+          genre: string | null
+          language: string | null
+          gema: boolean | null
+          explicit: boolean | null
+          live: boolean | null
+          cover: boolean | null
+          instrumental: boolean | null
+          preview_start_seconds: number | null
+          duration_seconds: number | null
+          form_data: Record<string, unknown> | null
+          display_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          submission_id: string
+          track_number: number
+          title?: string | null
+          isrc?: string | null
+          composer?: string | null
+          author?: string | null
+          genre?: string | null
+          language?: string | null
+          gema?: boolean | null
+          explicit?: boolean | null
+          live?: boolean | null
+          cover?: boolean | null
+          instrumental?: boolean | null
+          preview_start_seconds?: number | null
+          duration_seconds?: number | null
+          form_data?: Record<string, unknown> | null
+          display_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          submission_id?: string
+          track_number?: number
+          title?: string | null
+          isrc?: string | null
+          composer?: string | null
+          author?: string | null
+          genre?: string | null
+          language?: string | null
+          gema?: boolean | null
+          explicit?: boolean | null
+          live?: boolean | null
+          cover?: boolean | null
+          instrumental?: boolean | null
+          preview_start_seconds?: number | null
+          duration_seconds?: number | null
+          form_data?: Record<string, unknown> | null
+          display_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'release_submission_tracks_submission_id_fkey'
+            columns: ['submission_id']
+            isOneToOne: false
+            referencedRelation: 'release_submissions'
+            referencedColumns: ['id']
+          },
+        ]
       }
       video_submissions: {
         Row: {
@@ -3912,43 +3986,91 @@ export interface Database {
           id: string
           form_type: 'release' | 'video'
           field_key: string
-          field_label_en: string
-          field_label_de: string
-          field_type: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_labels: Record<string, string>
+          field_type:
+            | 'text'
+            | 'url'
+            | 'date'
+            | 'date_dmy'
+            | 'select'
+            | 'textarea'
+            | 'boolean'
+            | 'number'
+            | 'year'
+            | 'ean'
+            | 'isrc'
+            | 'duration'
+            | 'seconds'
+            | 'email'
+          field_scope: 'release' | 'track'
+          field_group: string | null
           field_options: Record<string, unknown> | null
+          visibility_condition: Record<string, unknown> | null
+          validation: Record<string, unknown> | null
           is_required: boolean
           is_visible: boolean
           display_order: number
-          placeholder_en: string | null
-          placeholder_de: string | null
+          placeholders: Record<string, string> | null
         }
         Insert: {
           id?: string
           form_type: 'release' | 'video'
           field_key: string
-          field_label_en: string
-          field_label_de: string
-          field_type: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_labels: Record<string, string>
+          field_type:
+            | 'text'
+            | 'url'
+            | 'date'
+            | 'date_dmy'
+            | 'select'
+            | 'textarea'
+            | 'boolean'
+            | 'number'
+            | 'year'
+            | 'ean'
+            | 'isrc'
+            | 'duration'
+            | 'seconds'
+            | 'email'
+          field_scope?: 'release' | 'track'
+          field_group?: string | null
           field_options?: Record<string, unknown> | null
+          visibility_condition?: Record<string, unknown> | null
+          validation?: Record<string, unknown> | null
           is_required?: boolean
           is_visible?: boolean
           display_order?: number
-          placeholder_en?: string | null
-          placeholder_de?: string | null
+          placeholders?: Record<string, string> | null
         }
         Update: {
           id?: string
           form_type?: 'release' | 'video'
           field_key?: string
-          field_label_en?: string
-          field_label_de?: string
-          field_type?: 'text' | 'url' | 'date' | 'select' | 'textarea' | 'boolean'
+          field_labels?: Record<string, string>
+          field_type?:
+            | 'text'
+            | 'url'
+            | 'date'
+            | 'date_dmy'
+            | 'select'
+            | 'textarea'
+            | 'boolean'
+            | 'number'
+            | 'year'
+            | 'ean'
+            | 'isrc'
+            | 'duration'
+            | 'seconds'
+            | 'email'
+          field_scope?: 'release' | 'track'
+          field_group?: string | null
           field_options?: Record<string, unknown> | null
+          visibility_condition?: Record<string, unknown> | null
+          validation?: Record<string, unknown> | null
           is_required?: boolean
           is_visible?: boolean
           display_order?: number
-          placeholder_en?: string | null
-          placeholder_de?: string | null
+          placeholders?: Record<string, string> | null
         }
         Relationships: []
       }
