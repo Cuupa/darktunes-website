@@ -13,7 +13,7 @@ const ReleasesManager = lazy(() =>
 
 export default function AdminReleasesPage() {
   return (
-    <AdminPageShell title="Releases" description="Manage music releases, albums, EPs, and singles.">
+    <AdminPageShell layout="list" title="Releases" description="Manage music releases, albums, EPs, and singles.">
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <ReleasesManager />
       </Suspense>

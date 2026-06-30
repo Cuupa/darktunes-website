@@ -4,7 +4,8 @@
  * Rules:
  * 1. Admin/portal layouts must use ScrollableAppShell.
  * 2. No min-h-screen on dashboard content pages (auth/loading gates exempt).
- * 3. List managers must not nest a root overflow-y-auto scroll pane.
+ * 3. List managers must use AdminListShell (not ad-hoc root overflow-y-auto).
+ * 4. Standard list pages must use AdminPageShell layout="list".
  */
 
 import fs from 'fs'
@@ -66,7 +67,21 @@ for (const dir of dashboardDirs) {
   }
 }
 
-// --- Manager root nested vertical scroll ---
+// --- List managers must use AdminListShell ---
+const listManagers = [
+  'ArtistsManager.tsx',
+  'ReleasesManager.tsx',
+  'NewsManager.tsx',
+]
+
+for (const name of listManagers) {
+  const file = path.join(root, 'src/components/admin', name)
+  const content = fs.readFileSync(file, 'utf8')
+  if (!content.includes('AdminListShell')) {
+    errors.push(`${rel(file)}: must use AdminListShell for viewport list layout`)
+  }
+}
+
 const managersDir = path.join(root, 'src/components/admin')
 const nestedScrollPattern =
   /className="[^"]*flex[^"]*flex-1[^"]*min-h-0[^"]*overflow-y-auto/
@@ -78,8 +93,23 @@ for (const file of walk(managersDir)) {
   if (!returnMatch) continue
   if (nestedScrollPattern.test(returnMatch[0])) {
     errors.push(
-      `${rel(file)}: root wrapper must not be overflow-y-auto — ScrollableAppShell owns vertical scroll`,
+      `${rel(file)}: root wrapper must not be overflow-y-auto — use AdminListShell instead`,
     )
+  }
+}
+
+// --- List pages need viewport height chain ---
+const listPages = [
+  'app/admin/artists/page.tsx',
+  'app/admin/releases/page.tsx',
+  'app/admin/news/page.tsx',
+]
+
+for (const page of listPages) {
+  const file = path.join(root, page)
+  const content = fs.readFileSync(file, 'utf8')
+  if (!/layout=["']list["']/.test(content)) {
+    errors.push(`${page}: AdminPageShell must set layout="list"`)
   }
 }
 

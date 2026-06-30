@@ -12,6 +12,7 @@ import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { formatZonedDateTime } from '@/lib/datetime/zonedDateTime'
 import { resolveOperatorTimezone } from '@/lib/operator/defaultTimezone'
+import { AdminListShell } from '@/components/admin/AdminListShell'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -211,7 +212,10 @@ export function NewsManager() {
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      <AdminListShell
+        header={(
+          <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <div className="relative min-w-[200px]">
@@ -261,19 +265,20 @@ export function NewsManager() {
           <TabsTrigger value="archived">Archived ({news.filter((p) => p.status === 'archived').length})</TabsTrigger>
         </TabsList>
       </Tabs>
-
-      <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+          </div>
+        )}
+      >
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Bands</TableHead>
-            <TableHead>Date &amp; Time</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Audience</TableHead>
-            <TableHead title="Show in hero carousel">Featured</TableHead>
-            <TableHead title="Toggle published/draft">Published</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+        <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
+          <TableRow className="bg-card hover:bg-card">
+            <TableHead className="bg-card">Title</TableHead>
+            <TableHead className="bg-card">Bands</TableHead>
+            <TableHead className="bg-card">Date &amp; Time</TableHead>
+            <TableHead className="bg-card">Status</TableHead>
+            <TableHead className="bg-card">Audience</TableHead>
+            <TableHead className="bg-card" title="Show in hero carousel">Featured</TableHead>
+            <TableHead className="bg-card" title="Toggle published/draft">Published</TableHead>
+            <TableHead className="bg-card text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -391,7 +396,7 @@ export function NewsManager() {
           )}
         </TableBody>
       </Table>
-      </div>
+      </AdminListShell>
 
       <AlertDialog
         open={!!featuredBumpConfirm}
@@ -446,6 +451,6 @@ export function NewsManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }

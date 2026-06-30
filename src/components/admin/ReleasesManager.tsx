@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
+import { AdminListShell } from '@/components/admin/AdminListShell'
 import {
   AdminDataTable,
   AdminSortableHeader,
@@ -718,7 +719,10 @@ export function ReleasesManager() {
     : 'No releases yet. Click "New Release" or sync from iTunes.'
 
   return (
-    <div className="space-y-4">
+    <>
+      <AdminListShell
+        header={(
+          <div className="space-y-4">
       <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-card sm:flex-row sm:items-center">
         <div className="flex-1">
           <p className="text-sm font-medium">Sync All APIs</p>
@@ -793,22 +797,27 @@ export function ReleasesManager() {
           New Release
         </Button>
       </div>
-
-      <AdminDataTable
-        table={table}
-        loading={isLoading}
-        emptyMessage={emptyMessage}
-        getRowClassName={(row) => (selectedIds.has(row.original.id) ? 'bg-muted/40' : undefined)}
-      />
-
-      {table.getPageCount() > 1 && (
-        <AdminTablePagination
-          pageIndex={table.getState().pagination.pageIndex}
-          totalCount={filtered.length}
-          onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
-          entityLabel="releases"
+          </div>
+        )}
+        footer={
+          table.getPageCount() > 1 ? (
+            <AdminTablePagination
+              pageIndex={table.getState().pagination.pageIndex}
+              totalCount={filtered.length}
+              onPageChange={(pageIndex) => table.setPageIndex(pageIndex)}
+              entityLabel="releases"
+            />
+          ) : null
+        }
+      >
+        <AdminDataTable
+          table={table}
+          loading={isLoading}
+          emptyMessage={emptyMessage}
+          stickyHeader
+          getRowClassName={(row) => (selectedIds.has(row.original.id) ? 'bg-muted/40' : undefined)}
         />
-      )}
+      </AdminListShell>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined} aria-labelledby="releases-form-dialog-title" data-lenis-prevent className="sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -986,6 +995,6 @@ export function ReleasesManager() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
