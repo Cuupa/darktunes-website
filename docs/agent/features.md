@@ -97,6 +97,21 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 API surface: document, versions, fonts, share, templates, press export. DAL: `epkDocument.ts`, `epkFonts.ts`, `epkShareLinks.ts`.
 
+## Fan Page (`/portal/fan-page`, public `/@{slug}`)
+
+Distinct from EPK (press/PDF) and the fixed `/artists/[slug]` profile. One customizable fan landing page per artist.
+
+| Topic | Rule |
+|-------|------|
+| Flag | `artist.fan_page` in `portal_feature_flags` |
+| Storage | `artist_landing_pages` (1:1 `artist_id`, JSON `LandingPageDocumentV1`) |
+| Editor | Section-based builder (`@dnd-kit`), TipTap bio blocks, shared image crop from EPK |
+| Public URL | Rewrite `/@:slug` → `/fan/:slug`; ISR tag `fan-page-{slug}` |
+| Publish | `draft` → `pending_review` (default) or direct when `artists.landing_publish_trusted` |
+| Assets | Upload `source=landing` → `asset_folders/landing`, tag `landing_editor` |
+
+DAL: `fanPageDocument.ts`, `publicFanPage.ts`. APIs: `app/api/portal/fan-page/document`, `publish`; admin `fan-page/review/[artistId]`.
+
 ## Journalist dashboard (`/press/dashboard/*`)
 
 Role `journalist` or `admin`. Feature flags: `journalist.*` and `press.*`. Promo pool dual-gate (middleware + layout).
@@ -119,7 +134,7 @@ Two independent systems — do not conflate with **Settings → Roles** (`role_p
 
 **Portal flags (seed in `supabase/reset.sql`)**
 
-- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`, `artist.tour_planner`
+- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`, `artist.fan_page`, `artist.tour_planner`
 - **Journalist:** `journalist.accreditation`, `press.applications`, `press.zip_download`, `press.audio_preview`, `press.contact`
 
 **Press helpers** (`src/lib/pressAccess.ts`): `isPressApplicationsEnabled()`, `isPressZipDownloadEnabled()`, `isPressAudioPreviewEnabled()` — each reads `portal_feature_flags` for role `journalist`.

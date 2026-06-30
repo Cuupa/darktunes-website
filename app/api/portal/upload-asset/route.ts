@@ -71,8 +71,41 @@ async function getOrCreateArtistFolder(
   return data?.id ?? null
 }
 
+/** Lazy-create a `landing` subfolder under the artist's asset folder for Fan Page uploads. */
+async function getOrCreateLandingSubfolder(
+  serviceRole: SupabaseClient<Database>,
+  artistId: string,
+): Promise<string | null> {
+  const artistFolderId = await getOrCreateArtistFolder(serviceRole, artistId)
+  if (!artistFolderId) return null
+
+  const { data: existing } = await serviceRole
+    .from('asset_folders')
+    .select('id')
+    .eq('parent_id', artistFolderId)
+    .eq('name', 'landing')
+    .maybeSingle()
+
+  if (existing?.id) return existing.id
+
+  const { data: created, error } = await serviceRole
+    .from('asset_folders')
+    .insert({
+      name: 'landing',
+      parent_id: artistFolderId,
+      artist_id: artistId,
+    })
+    .select('id')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return created?.id ?? null
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const artistId = new URL(req.url).searchParams.get('artistId')
+  const url = new URL(req.url)
+  const artistId = url.searchParams.get('artistId')
+  const source = url.searchParams.get('source')
   const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
   const userId = user.id
 
@@ -116,8 +149,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
 
+  const isLandingUpload = source === 'landing'
+  const serviceRole = await createServiceRoleSupabaseClient()
+
   // Get artist's folder id (auto-created by DB trigger on artist insert)
-  const folderId = await getOrCreateArtistFolder(supabase, artist.id)
+  const folderId = isLandingUpload
+    ? await getOrCreateLandingSubfolder(serviceRole, artist.id)
+    : await getOrCreateArtistFolder(supabase, artist.id)
 
   // Write DB records. On failure, delete the already-uploaded R2 object so it
   // doesn't become an orphaned (cost-incurring) file in the bucket.
@@ -126,7 +164,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   let asset
   let mainAssetId: string | null = null
-  const serviceRole = await createServiceRoleSupabaseClient()
   try {
     // Portal artists cannot insert into `assets` under RLS — use service role.
     const mainAsset = await createAssetRecord(serviceRole, {
@@ -140,6 +177,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       folder_id: folderId,
       artist_id: artist.id,
       press_suggested: pressSuggested,
+      tags: isLandingUpload ? ['landing_editor'] : undefined,
     })
     mainAssetId = mainAsset.id
 

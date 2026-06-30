@@ -494,6 +494,7 @@
         "documents": "Private document vault for contracts and riders.",
         "calendar": "Label-wide release calendar with personal filter.",
         "epk_builder": "Canvas-based EPK builder and share links.",
+        "fan_page": "Section-based fan landing page builder (public /@slug).",
         "tour_planner": "TRACK tour planner — multi-tour production, day sheets, finance, and routing."
       },
       "journalist": {

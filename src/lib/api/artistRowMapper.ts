@@ -49,6 +49,7 @@ export function rowToArtist(row: ArtistRow): Artist {
     soundchartsId: row.soundcharts_id ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
     isVisible: row.is_visible,
+    landingPublishTrusted: row.landing_publish_trusted ?? false,
     logoUrl: row.logo_url ?? undefined,
     platformLinks: row.platform_links ?? undefined,
     storageQuotaBytes: row.storage_quota_bytes ?? null,

@@ -7,7 +7,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from '@/components/ui/avatar'
-import { User, ChartBar, FileText, MusicNotes, MapPin, MapTrifold, MegaphoneSimple, ChatCircleText, ArrowRight } from '@phosphor-icons/react'
+import { User, ChartBar, FileText, MusicNotes, MapPin, MapTrifold, MegaphoneSimple, ChatCircleText, ArrowRight, Globe } from '@phosphor-icons/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +31,7 @@ interface PortalOverviewProps {
   completionScore: number
   missingFields: CompletionField[]
   overviewInsights: OverviewInsight[]
+  artistSlug?: string | null
 }
 
 export function PortalOverview({ artistName,
@@ -46,6 +47,7 @@ export function PortalOverview({ artistName,
   completionScore,
   missingFields,
   overviewInsights,
+  artistSlug,
 }: PortalOverviewProps) {
   const t = useTranslations('portal')
 
@@ -78,6 +80,61 @@ export function PortalOverview({ artistName,
 
       {overviewInsights.length > 0 && (
         <PortalIntelligencePanel insights={overviewInsights} />
+      )}
+
+      {(isEnabled('artist.epk_builder') || isEnabled('artist.fan_page')) && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">{t('fanPage_pages_heading')}</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Link href="/portal/profile">
+              <Card className="border-border bg-card hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">{t('profile')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">{t('fanPage_pages_profile_desc')}</p>
+                </CardContent>
+              </Card>
+            </Link>
+            {isEnabled('artist.epk_builder') && (
+              <Link href="/portal/epk-builder">
+                <Card className="border-border bg-card hover:border-primary/50 transition-colors cursor-pointer h-full">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">{t('epk_builder_nav')}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">{t('fanPage_pages_epk_desc')}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+            {isEnabled('artist.fan_page') && (
+              <Link href="/portal/fan-page">
+                <Card className="border-border bg-card hover:border-primary/50 transition-colors cursor-pointer h-full">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">{t('fan_page_nav')}</CardTitle>
+                    <Globe size={16} className="text-primary" aria-hidden />
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">{t('fanPage_pages_fan_desc')}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+            {artistSlug && (
+              <a href={`/@${artistSlug}`} target="_blank" rel="noopener noreferrer">
+                <Card className="border-border bg-card hover:border-primary/50 transition-colors cursor-pointer h-full">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">{t('fanPage_pages_live')}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs font-mono text-muted-foreground">/@{artistSlug}</p>
+                  </CardContent>
+                </Card>
+              </a>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Profile Completion Card — hidden when 100% complete */}

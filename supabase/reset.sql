@@ -1969,6 +1969,41 @@ CREATE TRIGGER trg_epk_templates_updated_at
   BEFORE UPDATE ON public.epk_templates
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_landing_pages  (fan-facing customizable landing page, 1:1 per artist)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_landing_pages (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id           UUID        NOT NULL UNIQUE REFERENCES public.artists (id) ON DELETE CASCADE,
+  document            JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  document_version    INTEGER     NOT NULL DEFAULT 0,
+  template_id         TEXT,
+  publish_status      TEXT        NOT NULL DEFAULT 'draft'
+    CHECK (publish_status IN ('draft', 'pending_review', 'published', 'rejected')),
+  seo_title           TEXT,
+  seo_description     TEXT,
+  og_image_asset_id   UUID        REFERENCES public.assets (id) ON DELETE SET NULL,
+  published_at        TIMESTAMPTZ,
+  reviewed_by         UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  reviewed_at         TIMESTAMPTZ,
+  review_comment      TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_landing_pages_artist_id
+  ON public.artist_landing_pages (artist_id);
+CREATE INDEX IF NOT EXISTS idx_artist_landing_pages_published
+  ON public.artist_landing_pages (publish_status)
+  WHERE publish_status = 'published';
+
+DROP TRIGGER IF EXISTS trg_artist_landing_pages_updated_at ON public.artist_landing_pages;
+CREATE TRIGGER trg_artist_landing_pages_updated_at
+  BEFORE UPDATE ON public.artist_landing_pages
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS landing_publish_trusted BOOLEAN NOT NULL DEFAULT FALSE;
+
 COMMENT ON COLUMN public.artist_epks.epk_gallery_photos IS
   'Array of R2 URLs for additional press/EPK gallery photos.';
 COMMENT ON COLUMN public.artist_epks.epk_custom_theme_tokens IS
@@ -2618,6 +2653,7 @@ ALTER TABLE public.epk_fonts         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_share_links   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_download_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_templates     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_landing_pages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.distributor_import_batches     ENABLE ROW LEVEL SECURITY;
@@ -3210,6 +3246,43 @@ CREATE POLICY "epk_versions: admin all" ON public.epk_versions
   WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
+-- RLS: artist_landing_pages
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "artist_landing_pages: artist read own"   ON public.artist_landing_pages;
+DROP POLICY IF EXISTS "artist_landing_pages: artist insert own" ON public.artist_landing_pages;
+DROP POLICY IF EXISTS "artist_landing_pages: artist update own" ON public.artist_landing_pages;
+DROP POLICY IF EXISTS "artist_landing_pages: admin all"         ON public.artist_landing_pages;
+DROP POLICY IF EXISTS "artist_landing_pages: public read published" ON public.artist_landing_pages;
+
+CREATE POLICY "artist_landing_pages: artist read own" ON public.artist_landing_pages
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "artist_landing_pages: artist insert own" ON public.artist_landing_pages
+  FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+
+CREATE POLICY "artist_landing_pages: artist update own" ON public.artist_landing_pages
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+
+CREATE POLICY "artist_landing_pages: admin all" ON public.artist_landing_pages
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+CREATE POLICY "artist_landing_pages: public read published" ON public.artist_landing_pages
+  FOR SELECT USING (
+    publish_status = 'published'
+    AND EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id AND a.is_visible = TRUE
+    )
+  );
+
+-- ---------------------------------------------------------------------------
 -- RLS: epk_fonts
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "epk_fonts: artist read own"   ON public.epk_fonts;
@@ -3749,6 +3822,7 @@ INSERT INTO public.portal_feature_flags (id, label, enabled, target_role) VALUES
   ('artist.documents', 'Artist Document Vault', TRUE, 'artist'),
   ('artist.calendar', 'Artist Release Calendar', TRUE, 'artist'),
   ('artist.epk_builder', 'EPK Canvas Builder', TRUE, 'artist'),
+  ('artist.fan_page', 'Fan Page Builder', TRUE, 'artist'),
   ('artist.tour_planner', 'Tour Planner (TRACK)', TRUE, 'artist'),
   ('journalist.accreditation', 'Journalist Accreditation', TRUE, 'journalist')
 ON CONFLICT (id) DO NOTHING;

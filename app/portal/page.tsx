@@ -115,6 +115,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       completionScore={completionScore}
       missingFields={missingFields}
       overviewInsights={overviewInsights}
+      artistSlug={artist?.slug ?? null}
     />
   )
 }

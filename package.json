@@ -26,6 +26,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1062.0",
     "@aws-sdk/s3-request-presigner": "^3.1056.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/noto-sans": "^5.2.10",
     "@hookform/resolvers": "^5.4.0",
     "@octokit/core": "^7.0.6",
