@@ -18,8 +18,8 @@ const bodySchema = z.object({
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
   const userId = await verifyAdminOrEditor(token)
-  const artistId = req.nextUrl.pathname.split('/').at(-2)
-  if (!artistId) throw new ApiError(400, 'Missing artist id')
+  const artistId = req.nextUrl.pathname.split('/').at(-1)
+  if (!artistId || artistId === 'review') throw new ApiError(400, 'Missing artist id')
   const body = bodySchema.parse(await req.json())
 
   const supabase = await createServerSupabaseClient()
