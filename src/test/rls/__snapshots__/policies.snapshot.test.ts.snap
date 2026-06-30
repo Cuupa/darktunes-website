@@ -35,6 +35,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "artist_landing_pages: artist insert own",
   "artist_landing_pages: artist read own",
   "artist_landing_pages: artist update own",
+  "artist_landing_pages: editor+ read all",
+  "artist_landing_pages: editor+ update",
   "artist_landing_pages: public read published",
   "artist_listener_metrics: admin all",
   "artist_listener_metrics: artist read own",
@@ -404,6 +406,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "artist_landing_pages: artist insert own",
     "artist_landing_pages: artist read own",
     "artist_landing_pages: artist update own",
+    "artist_landing_pages: editor+ read all",
+    "artist_landing_pages: editor+ update",
     "artist_landing_pages: public read published",
   ],
   "artist_listener_metrics": [

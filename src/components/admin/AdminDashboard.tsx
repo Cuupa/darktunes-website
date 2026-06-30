@@ -19,6 +19,7 @@ import {
   Wrench,
   Tag,
   MegaphoneSimple,
+  Globe,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -39,6 +40,7 @@ const StatementsManager = lazy(() => import('./StatementsManager').then((m) => (
 const PressManager = lazy(() => import('./PressManager').then((m) => ({ default: m.PressManager })))
 const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager').then((m) => ({ default: m.ReleaseSubmissionsManager })))
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
+const FanPageReviewsManager = lazy(() => import('./FanPageReviewsManager').then((m) => ({ default: m.FanPageReviewsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
 const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
 const MaintenanceManager = lazy(() => import('./MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })))
@@ -62,7 +64,7 @@ function TabFallback() {
 type TabValue =
   | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
   | 'accreditations' | 'press' | 'statements'
-  | 'release-submissions' | 'video-submissions' | 'submission-form'
+  | 'release-submissions' | 'video-submissions' | 'fan-page-reviews' | 'submission-form'
   | 'events' | 'genres' | 'maintenance' | 'promo-log'
 
 interface TabDef {
@@ -86,6 +88,7 @@ const TAB_DEFS: TabDef[] = [
   { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
   { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
   { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
+  { value: 'fan-page-reviews',    label: 'Fan Page Reviews',    adminOnly: false, icon: Globe },
   { value: 'promo-log',           label: 'Promo Log',           adminOnly: false, icon: MegaphoneSimple },
   { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
   { value: 'maintenance',         label: 'Maintenance',         adminOnly: true,  icon: Wrench },
@@ -107,6 +110,7 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   statements:      { title: 'Statements',                        description: 'Read-only overview of all uploaded Statement-of-Sales PDFs across all artists.' },
   'release-submissions': { title: 'Release Submissions',          description: 'Review and manage artist release submissions.' },
   'video-submissions':   { title: 'Video Submissions',            description: 'Review and manage artist music video submissions.' },
+  'fan-page-reviews':    { title: 'Fan Page Reviews',             description: 'Review artist fan pages submitted from the portal and approve or reject publication.' },
   'promo-log':           { title: 'Promo Log',                    description: 'Document label marketing work per artist and keep the portal timeline up to date.' },
   'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
   'maintenance':         { title: 'Maintenance',                  description: 'System maintenance: clear logs, purge data, reset states, revalidate caches.' },
@@ -322,6 +326,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               statements:      <StatementsManager />,
               'release-submissions': <ReleaseSubmissionsManager />,
               'video-submissions':   <VideoSubmissionsManager />,
+              'fan-page-reviews':    <FanPageReviewsManager />,
               'promo-log':           <EditorPromoLogPanel />,
               'submission-form':     <SubmissionFormManager />,
               'maintenance':         <MaintenanceManager />,

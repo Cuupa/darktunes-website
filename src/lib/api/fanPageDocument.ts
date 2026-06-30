@@ -28,6 +28,46 @@ export interface FanPageDocumentState {
   reviewComment: string | null
 }
 
+export interface FanPageReviewListItem {
+  artistId: string
+  artistName: string
+  artistSlug: string
+  landingPublishTrusted: boolean
+  publishStatus: FanPagePublishStatus
+  documentVersion: number
+  templateId: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  reviewComment: string | null
+  reviewedAt: string | null
+  publishedAt: string | null
+  updatedAt: string
+  createdAt: string
+}
+
+type LandingPageListRow = LandingRow & {
+  artists: { id: string; name: string; slug: string; landing_publish_trusted: boolean }
+}
+
+function rowToReviewListItem(row: LandingPageListRow): FanPageReviewListItem {
+  return {
+    artistId: row.artist_id,
+    artistName: row.artists.name,
+    artistSlug: row.artists.slug,
+    landingPublishTrusted: row.artists.landing_publish_trusted ?? false,
+    publishStatus: row.publish_status,
+    documentVersion: row.document_version,
+    templateId: row.template_id,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
+    reviewComment: row.review_comment,
+    reviewedAt: row.reviewed_at,
+    publishedAt: row.published_at,
+    updatedAt: row.updated_at,
+    createdAt: row.created_at,
+  }
+}
+
 function rowToState(row: LandingRow): FanPageDocumentState {
   const raw = row.document
   const document =
@@ -163,6 +203,43 @@ export async function publishFanPage(
 
   if (error) throw new Error(error.message)
   return rowToState(data)
+}
+
+export async function listFanPageReviews(
+  db: DbClient,
+  status?: FanPagePublishStatus,
+): Promise<FanPageReviewListItem[]> {
+  let query = db
+    .from('artist_landing_pages')
+    .select(
+      'artist_id, document_version, template_id, publish_status, seo_title, seo_description, review_comment, reviewed_at, published_at, updated_at, created_at, artists!inner ( id, name, slug, landing_publish_trusted )',
+    )
+    .order('updated_at', { ascending: false })
+
+  if (status) {
+    query = query.eq('publish_status', status)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  return (data as LandingPageListRow[]).map(rowToReviewListItem)
+}
+
+export async function setArtistLandingPublishTrusted(
+  db: DbClient,
+  artistId: string,
+  trusted: boolean,
+): Promise<void> {
+  const { error } = await db
+    .from('artists')
+    .update({
+      landing_publish_trusted: trusted,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', artistId)
+
+  if (error) throw new Error(error.message)
 }
 
 export async function reviewFanPage(
