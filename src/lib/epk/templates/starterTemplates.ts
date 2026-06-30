@@ -437,7 +437,7 @@ function threePagePressPack(): EpkDocumentV2 {
         }),
         textEl({
           x: margin, y: 610, width: contentW, height: 120, zIndex: 6, role: 'info',
-          content: 'Stage plot, technical rider, and hospitality rider PDFs can be attached on export.',
+          content: 'Upload stage plot, technical rider, and hospitality rider PDFs in your portal profile.',
           style: { fill: '#d8d8d8', fontSize: 12, fontFamily: 'Helvetica, Arial, sans-serif', textAlign: 'left', lineHeight: 1.5 },
         }),
       ],
