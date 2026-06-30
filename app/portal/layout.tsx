@@ -31,6 +31,7 @@ import { PortalOfflineProvider } from './_components/PortalOfflineProvider'
 import { PortalOfflineBanner } from './_components/PortalOfflineBanner'
 import { PortalAccessGate } from './_components/PortalAccessGate'
 import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
+import { PortalHelpPalette } from './_components/PortalHelpPalette'
 import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
@@ -210,6 +211,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
         <PortalOfflineProvider>
           <PortalQueryProvider>
             <PortalOfflineBanner />
+            <PortalHelpPalette />
             {children}
           </PortalQueryProvider>
         </PortalOfflineProvider>

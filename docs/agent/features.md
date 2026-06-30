@@ -90,6 +90,17 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 `PortalAccessGate` for unlinked roles. Onboarding: `shouldRedirectToOnboarding()` → `/portal/onboarding?artistId=…`.
 
+## Portal help (`/portal/help`)
+
+| Topic | Rule |
+|-------|------|
+| Structure | `src/lib/portal/helpManifest.ts` — categories, topics, section types, glossary IDs |
+| i18n | `portalHelp` namespace — `src/i18n/messages/{en,de}/portalHelp.json` (~330 keys) |
+| Page UI | `HelpPanel` — sticky search, nested accordions, glossary, `?topic=` / `?section=` deep links |
+| Global search | `PortalHelpPalette` in portal layout — **Ctrl+K** (Cmd+K); disabled on `/portal/epk-builder` and `/portal/fan-page` (those editors keep their own command palettes) |
+| Search hook | `src/lib/portal/useHelpSearch.ts` — shared filter for panel + palette |
+| Offline | `/portal/help` is offline-readable after first visit (`portalRoutes.ts`) |
+
 ## EPK
 
 - **Legacy:** browser print via `printEpkDocument.ts` / `EPKPreview` (`forceMount` on EPK tab)
