@@ -103,7 +103,7 @@ export function usePortalProfileForm({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       bio: artist?.bio ?? '',
-      bio_short: initialProfile?.bioShort ?? '',
+      bio_short: initialProfile?.bioShort ?? artist?.bio ?? '',
       bio_medium: initialProfile?.bioMedium ?? '',
       bio_long: initialProfile?.bioLong ?? '',
       genres: (artist?.genres ?? []).join(', '),

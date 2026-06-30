@@ -12,7 +12,7 @@ import { CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
-import { EpkFontFaces } from './EpkFontFaces'
+import { EpkPublicFontLoader } from './EpkPublicFontLoader'
 
 const EpkCanvasPreview = dynamic(
   () => import('./EpkCanvasPreview').then((m) => m.EpkCanvasPreview),
@@ -66,7 +66,7 @@ export function EpkPublicViewer({
       className={cn('space-y-4', className)}
       aria-label={labels?.viewerLabel ?? `${artistName} press kit`}
     >
-      <EpkFontFaces fonts={document.fonts} styleId="epk-public-font-faces" />
+      <EpkPublicFontLoader epkDocument={document} />
       <div className="flex flex-col items-center gap-4">
         <EpkCanvasPreview document={pageDocument} scale={0.65} className="mx-auto" />
         {pageCount > 1 && (

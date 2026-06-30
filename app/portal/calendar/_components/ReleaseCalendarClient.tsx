@@ -21,8 +21,15 @@ import {
   CaretLeft,
   CaretRight,
   CalendarDots,
+  CheckCircle,
+  Clock,
+  Disc,
   Globe,
+  Info,
   MusicNote,
+  MusicNotes,
+  Sparkle,
+  Stack,
 } from '@phosphor-icons/react'
 import {
   Dialog,
@@ -33,7 +40,24 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import {
+  applyCalendarFilters,
+  formatReleaseCellLabel,
+  getReleaseArtistNames,
+  releaseIsInMonth,
+  type CalendarSortOption,
+  type CalendarTypeFilter,
+} from '@/lib/portal/calendarFilters'
 import { getSquareThumbnail } from '@/lib/imageUtils'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
 import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
@@ -62,6 +86,42 @@ function getReleaseStatus(releaseDate: string, today: string): ReleaseStatus {
   if (releaseDate < today) return 'past'
   if (releaseDate === today) return 'today'
   return 'upcoming'
+}
+
+function getStatusChipClasses(status: ReleaseStatus): string {
+  if (status === 'past') {
+    return 'bg-muted/60 text-muted-foreground/70 hover:bg-muted'
+  }
+  if (status === 'today') {
+    return 'bg-secondary/20 text-secondary hover:bg-secondary/30'
+  }
+  return 'bg-primary/20 text-primary hover:bg-primary/30'
+}
+
+function ReleaseTypeIcon({
+  type,
+  className,
+}: {
+  type: Release['type']
+  className?: string
+}) {
+  if (type === 'album') {
+    return <Disc size={10} weight="fill" className={className} aria-hidden="true" />
+  }
+  if (type === 'ep') {
+    return <Stack size={10} weight="fill" className={className} aria-hidden="true" />
+  }
+  return <MusicNotes size={10} weight="fill" className={className} aria-hidden="true" />
+}
+
+function StatusLegendIcon({ status }: { status: ReleaseStatus }) {
+  if (status === 'past') {
+    return <CheckCircle size={10} weight="fill" aria-hidden="true" />
+  }
+  if (status === 'today') {
+    return <Sparkle size={10} weight="fill" aria-hidden="true" />
+  }
+  return <Clock size={10} weight="fill" aria-hidden="true" />
 }
 
 /** Build a YYYY-MM-DD string from year + month (1-based) + day. */
@@ -155,10 +215,7 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
   if (!release) return null
 
   const status = getReleaseStatus(release.releaseDate, today)
-  const artistNames =
-    release.artists && release.artists.length > 0
-      ? release.artists.map((a) => a.name).join(', ')
-      : release.artistName
+  const artistNames = getReleaseArtistNames(release)
 
   const hasPresaveLink = status !== 'past' && !!release.smartlinkUrl
   const platformEntries =
@@ -288,6 +345,12 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
                 <p className="text-sm text-foreground whitespace-pre-wrap">{release.promoText}</p>
               </div>
             )}
+
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/releases/${release.id}`}>
+                {t('calendar_view_release_page')}
+              </Link>
+            </Button>
           </div>
         </div>
       </DialogContent>
@@ -338,28 +401,48 @@ function DayCell({ day, dateStr, releases, today, isCurrentMonth, onSelectReleas
         {day}
       </span>
 
-      {/* Release dots / titles */}
+      {/* Release chips */}
       <div className="flex flex-col gap-0.5 overflow-hidden">
         {releases.slice(0, 3).map((release) => {
           const status = getReleaseStatus(release.releaseDate, today)
+          const label = formatReleaseCellLabel(release)
+          const statusLabel =
+            status === 'today'
+              ? t('calendar_status_today')
+              : status === 'past'
+                ? t('calendar_status_released')
+                : t('calendar_status_presave')
+
           return (
-            <button
-              key={release.id}
-              onClick={() => onSelectRelease(release)}
-              className={cn(
-                'w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                status === 'past'
-                  ? 'bg-muted/60 text-muted-foreground/70 hover:bg-muted'
-                  : status === 'today'
-                  ? 'bg-secondary/20 text-secondary hover:bg-secondary/30'
-                  : 'bg-primary/20 text-primary hover:bg-primary/30',
-              )}
-              aria-label={`${release.title} — ${t('calendar_status_upcoming')}`}
-              title={release.title}
-            >
-              {release.title}
-            </button>
+            <div key={release.id} className="flex items-center gap-0.5 min-w-0">
+              <Link
+                href={`/releases/${release.id}`}
+                className={cn(
+                  'flex-1 min-w-0 truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  getStatusChipClasses(status),
+                )}
+                aria-label={`${label} — ${statusLabel}`}
+                title={label}
+              >
+                <span className="inline-flex items-center gap-0.5 min-w-0">
+                  <ReleaseTypeIcon type={release.type} className="shrink-0 opacity-80" />
+                  <span className="truncate">{label}</span>
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => onSelectRelease(release)}
+                className={cn(
+                  'shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  getStatusChipClasses(status),
+                )}
+                aria-label={`${t('calendar_release_details')} — ${label}`}
+              >
+                <Info size={10} weight="bold" aria-hidden="true" />
+              </button>
+            </div>
           )
         })}
         {releases.length > 3 && (
@@ -385,19 +468,27 @@ export function ReleaseCalendarClient({ releases,
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1) // 1-based
   const [filterMode, setFilterMode] = useState<'all' | 'mine'>('all')
+  const [typeFilter, setTypeFilter] = useState<CalendarTypeFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortOption, setSortOption] = useState<CalendarSortOption>('date-asc')
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null)
 
-  // Filtered releases
-  const filteredReleases = useMemo(() => {
-    if (filterMode === 'mine' && currentArtistId) {
-      return releases.filter((r) => {
-        const isLegacy = r.artistId === currentArtistId
-        const isJunction = r.artists?.some((a) => a.id === currentArtistId)
-        return isLegacy || isJunction
-      })
-    }
-    return releases
-  }, [releases, filterMode, currentArtistId])
+  const filteredReleases = useMemo(
+    () =>
+      applyCalendarFilters(releases, {
+        scope: filterMode,
+        type: typeFilter,
+        search: searchQuery,
+        sort: sortOption,
+        currentArtistId,
+      }),
+    [releases, filterMode, typeFilter, searchQuery, sortOption, currentArtistId],
+  )
+
+  const hasReleasesInViewMonth = useMemo(
+    () => filteredReleases.some((release) => releaseIsInMonth(release, viewYear, viewMonth)),
+    [filteredReleases, viewYear, viewMonth],
+  )
 
   // Group releases by date string for O(1) day lookup
   const releasesByDate = useMemo(() => {
@@ -522,6 +613,49 @@ export function ReleaseCalendarClient({ releases,
         )}
       </div>
 
+      {/* Advanced filters */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="calendar-type-filter">{t('calendar_filter_type')}</Label>
+          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as CalendarTypeFilter)}>
+            <SelectTrigger id="calendar-type-filter" className="min-h-[44px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('calendar_filter_type_all')}</SelectItem>
+              <SelectItem value="single">{t('calendar_filter_type_single')}</SelectItem>
+              <SelectItem value="ep">{t('calendar_filter_type_ep')}</SelectItem>
+              <SelectItem value="album">{t('calendar_filter_type_album')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="calendar-search-filter">{t('calendar_filter_search')}</Label>
+          <Input
+            id="calendar-search-filter"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('calendar_filter_search_placeholder')}
+            className="min-h-[44px]"
+          />
+        </div>
+
+        <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+          <Label htmlFor="calendar-sort-filter">{t('calendar_filter_sort')}</Label>
+          <Select value={sortOption} onValueChange={(value) => setSortOption(value as CalendarSortOption)}>
+            <SelectTrigger id="calendar-sort-filter" className="min-h-[44px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date-asc">{t('calendar_filter_sort_date_asc')}</SelectItem>
+              <SelectItem value="date-desc">{t('calendar_filter_sort_date_desc')}</SelectItem>
+              <SelectItem value="title-asc">{t('calendar_filter_sort_title_asc')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Month navigation */}
       <div className="flex items-center justify-between">
         <Button
@@ -586,22 +720,64 @@ export function ReleaseCalendarClient({ releases,
         })}
       </div>
 
+      {!hasReleasesInViewMonth && (
+        <p className="text-sm text-muted-foreground text-center py-2" role="status">
+          {t('calendar_no_releases_month')}
+        </p>
+      )}
+
       {/* Legend */}
       <div
-        className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-2 border-t border-border"
+        className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground pt-2 border-t border-border"
         aria-label="Calendar legend"
       >
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary/30" aria-hidden="true" />
+          <span
+            className={cn(
+              'inline-flex items-center justify-center rounded px-1 py-0.5',
+              getStatusChipClasses('upcoming'),
+            )}
+            aria-hidden="true"
+          >
+            <StatusLegendIcon status="upcoming" />
+          </span>
           {t('calendar_status_presave')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-secondary/30" aria-hidden="true" />
+          <span
+            className={cn(
+              'inline-flex items-center justify-center rounded px-1 py-0.5',
+              getStatusChipClasses('today'),
+            )}
+            aria-hidden="true"
+          >
+            <StatusLegendIcon status="today" />
+          </span>
           {t('calendar_status_today')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" aria-hidden="true" />
+          <span
+            className={cn(
+              'inline-flex items-center justify-center rounded px-1 py-0.5',
+              getStatusChipClasses('past'),
+            )}
+            aria-hidden="true"
+          >
+            <StatusLegendIcon status="past" />
+          </span>
           {t('calendar_status_released')}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ReleaseTypeIcon type="single" className="text-foreground/80" />
+          {t('calendar_legend_type_single')}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ReleaseTypeIcon type="ep" className="text-foreground/80" />
+          {t('calendar_legend_type_ep')}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ReleaseTypeIcon type="album" className="text-foreground/80" />
+          {t('calendar_legend_type_album')}
         </span>
       </div>
 

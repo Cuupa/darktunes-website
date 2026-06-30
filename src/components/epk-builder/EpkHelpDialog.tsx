@@ -45,6 +45,8 @@ export function EpkHelpDialog() {
           <li>{t('epk_help_tip_fonts')}</li>
           <li>{t('epk_help_tip_templates')}</li>
           <li>{t('epk_help_tip_shortcuts')}</li>
+          <li>{t('epk_help_tip_pdf')}</li>
+          <li>{t('epk_help_tip_catalog')}</li>
         </ul>
       </DialogContent>
     </Dialog>
