@@ -38,6 +38,7 @@ function makeBuilder(result: QueryResult) {
     in: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockReturnThis(),
     ...createThenable(result),
   }
 }
@@ -126,10 +127,23 @@ describe('getPressKitForArtist', () => {
         ],
         error: null,
       },
+      { data: { epk_gallery_photos: [] }, error: null },
     ])
     const result = await getPressKitForArtist(db, 'artist-1')
     expect(result).toHaveLength(1)
     expect(result[0].kitItemId).toBe('kit-item-1')
+  })
+
+  it('includes portal gallery photos from artist_epks', async () => {
+    const galleryUrl = 'https://cdn.example.com/profile-photos/artist-1/gallery.jpg'
+    const db = makeMockDb([
+      { data: [], error: null },
+      { data: { epk_gallery_photos: [galleryUrl] }, error: null },
+    ])
+    const result = await getPressKitForArtist(db, 'artist-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].publicUrl).toBe(galleryUrl)
+    expect(result[0].downloadableForPress).toBe(true)
   })
 })
 

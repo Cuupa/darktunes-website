@@ -194,6 +194,30 @@ export function usePortalProfileForm({
   // Gallery photo upload / remove
   // -------------------------------------------------------------------------
 
+  const persistGalleryPhotos = async (photos: string[]): Promise<boolean> => {
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error(tErrors('AUTH_TOKEN_INVALID'))
+        return false
+      }
+
+      await saveArtistProfile(
+        { artist_id: artistId, epk_gallery_photos: photos },
+        session.access_token,
+      )
+      return true
+    } catch (err) {
+      if (err instanceof PortalProfileSaveError) {
+        toast.error(getErrorMessage(err.body, tErrors))
+      } else {
+        toast.error(t('profile_error'))
+      }
+      return false
+    }
+  }
+
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.files?.[0]
     if (!raw) return
@@ -209,8 +233,15 @@ export function usePortalProfileForm({
       // Reuse the same upload endpoint — filename collision avoidance via timestamp
       const renamedFile = new File([file], `gallery-${Date.now()}-${file.name}`, { type: file.type })
       const url = await uploadArtistPhoto(artistId, renamedFile, session.access_token, () => {})
-      setGalleryPhotos((prev) => [...prev, url])
-      toast.success(t('profile_photoUploaded'))
+      let nextPhotos: string[] = []
+      setGalleryPhotos((prev) => {
+        nextPhotos = [...prev, url]
+        return nextPhotos
+      })
+      const saved = await persistGalleryPhotos(nextPhotos)
+      if (saved) {
+        toast.success(t('profile_photoUploaded'))
+      }
     } catch {
       toast.error(t('profile_photoError'))
     } finally {
@@ -219,8 +250,13 @@ export function usePortalProfileForm({
     }
   }
 
-  const handleGalleryRemove = (url: string) => {
-    setGalleryPhotos((prev) => prev.filter((u) => u !== url))
+  const handleGalleryRemove = async (url: string) => {
+    const nextPhotos = galleryPhotos.filter((u) => u !== url)
+    setGalleryPhotos(nextPhotos)
+    const saved = await persistGalleryPhotos(nextPhotos)
+    if (saved) {
+      toast.success(t('profile_saved'))
+    }
   }
 
   // -------------------------------------------------------------------------

@@ -48,10 +48,15 @@ async function uploadPhotoToR2(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const artistId = new URL(req.url).searchParams.get('artistId')
+  const formData = await req.formData()
+  const artistIdFromBody = formData.get('artistId')
+  const artistIdFromQuery = new URL(req.url).searchParams.get('artistId')
+  const artistId =
+    typeof artistIdFromBody === 'string' && artistIdFromBody.trim()
+      ? artistIdFromBody
+      : artistIdFromQuery
   const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
 
-  const formData = await req.formData()
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 

@@ -141,7 +141,7 @@ export function uploadArtistPhoto(
     })
 
     xhr.addEventListener('error', () => reject(new Error('Network error')))
-    xhr.open('POST', '/api/portal/upload-photo')
+    xhr.open('POST', `/api/portal/upload-photo?artistId=${encodeURIComponent(artistId)}`)
     xhr.setRequestHeader('Authorization', 'Bearer ' + token)
     xhr.send(body)
   })

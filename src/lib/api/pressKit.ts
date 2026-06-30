@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PressAsset, PressKitItem } from '@/types'
 import type { Database } from '@/types/database'
 import { rowToAsset } from './assets'
+import { mergePortalGalleryPhotos } from './portalGalleryPress'
 
 type DbClient = SupabaseClient<Database>
 type KitItemRow = Database['public']['Tables']['press_kit_items']['Row']
@@ -68,18 +69,28 @@ export async function getPressKitItemsByScope(
  * plus items scoped to the given artist.
  */
 export async function getPressKitForArtist(db: DbClient, artistId: string): Promise<PressAsset[]> {
-  const { data, error } = await db
-    .from('press_kit_items')
-    .select('*, assets(*)')
-    .or(`artist_id.is.null,artist_id.eq.${artistId}`)
-    .order('display_order', { ascending: true })
+  const [kitResult, profileResult] = await Promise.all([
+    db
+      .from('press_kit_items')
+      .select('*, assets(*)')
+      .or(`artist_id.is.null,artist_id.eq.${artistId}`)
+      .order('display_order', { ascending: true }),
+    db
+      .from('artist_epks')
+      .select('epk_gallery_photos')
+      .eq('artist_id', artistId)
+      .maybeSingle(),
+  ])
 
-  if (error) throw new Error(error.message)
+  if (kitResult.error) throw new Error(kitResult.error.message)
+  if (profileResult.error) throw new Error(profileResult.error.message)
 
-  return (data ?? [])
+  const kitPhotos = (kitResult.data ?? [])
     .map((row) => rowToPressAsset(row as KitItemWithAsset))
     .filter((item): item is PressAsset => item !== null)
     .filter((item) => item.isPressApproved && item.downloadableForPress)
+
+  return mergePortalGalleryPhotos(kitPhotos, profileResult.data?.epk_gallery_photos ?? [], artistId)
 }
 
 /** All press kit items (admin overview), optionally filtered by artist scope. */

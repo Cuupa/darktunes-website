@@ -14,6 +14,7 @@ import { revalidatePath } from 'next/cache'
 import { withErrorHandler, buildApiError } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { syncPortalGalleryToPressKit } from '@/lib/api/portalGalleryPress'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 import { z } from 'zod'
 import { scryptSync, randomBytes } from 'crypto'
@@ -163,6 +164,22 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   const profile = await upsertArtistProfile(supabase, profileData)
 
+  const serviceDb = await createServiceRoleSupabaseClient()
+
+  if (epk_gallery_photos !== undefined) {
+    try {
+      await syncPortalGalleryToPressKit(
+        serviceDb,
+        artist.id,
+        normalizedGalleryPhotos ?? [],
+        user.id,
+      )
+    } catch (syncErr) {
+      console.error('[portal/profile] gallery press sync failed:', syncErr)
+      throw buildApiError('SERVER_ERROR', 500)
+    }
+  }
+
   // 5. Sync shared fields back to the artists table (single source of truth)
   const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
   if (bio !== undefined) artistUpdate.bio = bio ?? ''
@@ -184,7 +201,6 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   // is already verified above; use the service-role client so band members who
   // are not `artists.user_id` can still persist portal edits when production
   // RLS predates the artist_members-based update policy.
-  const serviceDb = await createServiceRoleSupabaseClient()
   const { error: artistUpdateError } = await serviceDb
     .from('artists')
     .update(artistUpdate)
@@ -198,6 +214,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   // 6. Invalidate public-facing artist pages so changes are reflected immediately
   if (artist.slug) {
     revalidatePath(`/artists/${artist.slug}`)
+    revalidatePath(`/press/artists/${artist.slug}`)
   }
   revalidatePath('/artists')
 
