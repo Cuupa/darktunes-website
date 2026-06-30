@@ -16,7 +16,8 @@ const upsertSchema = z.object({
   id: z.string().optional(),
   form_type: z.enum(['release', 'video']),
   field_key: z.string().min(1),
-  field_labels: z.record(z.string(), z.string()).refine((labels) => Object.keys(labels).length > 0, 'At least one label required'),
+  field_label_en: z.string().min(1),
+  field_label_de: z.string().min(1),
   field_type: z.enum(SUBMISSION_FIELD_TYPES),
   field_scope: z.enum(SUBMISSION_FIELD_SCOPES).optional(),
   field_group: z.string().nullable().optional(),
@@ -26,7 +27,8 @@ const upsertSchema = z.object({
   is_required: z.boolean().optional(),
   is_visible: z.boolean().optional(),
   display_order: z.number().optional(),
-  placeholders: z.record(z.string(), z.string()).nullable().optional(),
+  placeholder_en: z.string().nullable().optional(),
+  placeholder_de: z.string().nullable().optional(),
 })
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -56,7 +58,8 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     field_options: body.field_options ?? null,
     visibility_condition: body.visibility_condition ?? null,
     validation: body.validation ?? null,
-    placeholders: body.placeholders ?? null,
+    placeholder_en: body.placeholder_en ?? null,
+    placeholder_de: body.placeholder_de ?? null,
   })
   return NextResponse.json(field)
 })
