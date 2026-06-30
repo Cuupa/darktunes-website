@@ -8,8 +8,7 @@
 
 import { useEffect, useMemo } from 'react'
 import { useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
-import { collectGoogleFontFamilies } from '@/lib/epk/collectGoogleFontFamilies'
-import { buildGoogleFontsCssUrl, parsePrimaryFontFamily } from '@/lib/epk/googleFonts'
+import { buildGoogleFontsCssUrl, isGoogleFontFamily } from '@/lib/epk/googleFonts'
 import { formatKonvaFontFamily } from '@/lib/epk/konvaFontFamily'
 
 export const EPK_FONTS_LOADED_EVENT = 'epk-fonts-loaded'
@@ -18,11 +17,20 @@ const STYLE_ID = 'epk-custom-font-faces'
 const GOOGLE_LINK_ID = 'epk-google-fonts'
 
 export function EpkFontLoader() {
-  const epkDocument = useEpkEditorStore((s) => s.document)
-  const fonts = epkDocument.fonts
-  const elements = epkDocument.elements
+  const fonts = useEpkEditorStore((s) => s.document.fonts)
+  const elements = useEpkEditorStore((s) => s.document.elements)
 
-  const googleFamilies = useMemo(() => collectGoogleFontFamilies(epkDocument), [epkDocument])
+  const googleFamilies = useMemo(() => {
+    const families = new Set<string>()
+    for (const font of fonts) {
+      if (isGoogleFontFamily(font.family)) families.add(font.family)
+    }
+    for (const el of elements) {
+      const family = el.style?.fontFamily
+      if (family && isGoogleFontFamily(family)) families.add(family)
+    }
+    return [...families]
+  }, [elements, fonts])
 
   useEffect(() => {
     const href = buildGoogleFontsCssUrl(googleFamilies)
@@ -65,9 +73,7 @@ export function EpkFontLoader() {
       if (font.family) families.add(font.family)
     }
     for (const el of elements) {
-      const family = el.style?.fontFamily
-      if (!family) continue
-      families.add(parsePrimaryFontFamily(family))
+      if (el.style?.fontFamily) families.add(el.style.fontFamily.split(',')[0].trim())
     }
     if (families.size === 0) return
 

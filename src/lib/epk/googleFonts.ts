@@ -44,9 +44,3 @@ export function buildGoogleFontFileUrl(family: string, weight = 400): string {
 export function isGoogleFontFamily(family: string): boolean {
   return EPK_GOOGLE_FONTS.some((f) => f.family === family)
 }
-
-/** First family name from a CSS font-family stack (e.g. `"Inter", sans-serif` → `Inter`). */
-export function parsePrimaryFontFamily(fontFamily: string): string {
-  const primary = fontFamily.split(',')[0]?.trim() ?? fontFamily
-  return primary.replace(/^['"]|['"]$/g, '')
-}

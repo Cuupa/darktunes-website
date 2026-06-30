@@ -8,7 +8,6 @@ import {
   getArtistsByUserId,
   resolvePortalArtist,
   isProfileComplete,
-  seedArtistProfileFromArtist,
   type ArtistProfile,
 } from './artistProfiles'
 import { rowToArtist } from './artistRowMapper'
@@ -369,63 +368,5 @@ describe('isProfileComplete', () => {
 
   it('returns false when no social or streaming link is set', () => {
     expect(isProfileComplete(baseProfile, baseArtist)).toBe(false)
-  })
-
-  it('returns true when label bio lives on artists.bio and EPK bios are empty', () => {
-    const profileWithoutEpkBio: ArtistProfile = {
-      ...baseProfile,
-      bioShort: undefined,
-      bioMedium: undefined,
-      bioLong: undefined,
-    }
-    const artist = rowToArtist({
-      ...mockArtistRow,
-      image_url: 'https://example.com/photo.jpg',
-      bio: 'Label-managed biography',
-      spotify_url: 'https://open.spotify.com/artist/1',
-    })
-    expect(isProfileComplete(profileWithoutEpkBio, artist)).toBe(true)
-  })
-})
-
-describe('seedArtistProfileFromArtist', () => {
-  it('creates artist_epks and copies artists.bio into bio_short', async () => {
-    const seededRow: ArtistProfileRow = {
-      ...mockProfileRow,
-      bio_short: 'Label bio from admin',
-      onboarding_completed: true,
-    }
-    const db = makeSequentialDb([
-      { data: null, error: { message: 'Not found', code: 'PGRST116' } },
-      { data: seededRow, error: null },
-    ])
-    const artist = rowToArtist({
-      ...mockArtistRow,
-      image_url: 'https://example.com/photo.jpg',
-      bio: 'Label bio from admin',
-      spotify_url: 'https://open.spotify.com/artist/1',
-    })
-
-    const result = await seedArtistProfileFromArtist(db, artist)
-
-    expect(result.bioShort).toBe('Label bio from admin')
-    expect(result.onboardingCompleted).toBe(true)
-  })
-
-  it('returns existing profile without upsert when EPK bios are already set', async () => {
-    const existingRow: ArtistProfileRow = {
-      ...mockProfileRow,
-      bio_short: 'Artist-edited bio',
-    }
-    const db = makeSequentialDb([{ data: existingRow, error: null }])
-    const artist = rowToArtist({
-      ...mockArtistRow,
-      bio: 'Different label bio',
-    })
-
-    const result = await seedArtistProfileFromArtist(db, artist)
-
-    expect(result.bioShort).toBe('Artist-edited bio')
-    expect(db.from).toHaveBeenCalledTimes(1)
   })
 })

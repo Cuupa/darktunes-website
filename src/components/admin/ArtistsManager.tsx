@@ -460,22 +460,24 @@ export function ArtistsManager() {
       </div>
 
       {isLoading ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Genres</TableHead>
-              <TableHead>Country</TableHead>
-              <TableHead>Visibility</TableHead>
-              <TableHead>Featured</TableHead>
-              <TableHead>Last Synced</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <ArtistSkeletonRows />
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Genres</TableHead>
+                <TableHead>Country</TableHead>
+                <TableHead>Visibility</TableHead>
+                <TableHead>Featured</TableHead>
+                <TableHead>Last Synced</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <ArtistSkeletonRows />
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <AdminDataTable table={table} emptyMessage={emptyMessage} />
       )}

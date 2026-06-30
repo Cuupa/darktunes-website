@@ -197,10 +197,7 @@ export function MessagesInbox({ initialMessages, initialRepliesByMessageId }: Me
                   </span>
                   <CaretDown size={16} className="text-muted-foreground" aria-hidden="true" />
                 </CollapsibleTrigger>
-                <CollapsibleContent
-                  className="space-y-3 border-t border-border p-3 overscroll-contain"
-                  data-lenis-prevent
-                >
+                <CollapsibleContent className="space-y-3 border-t border-border p-3">
                   <div className="space-y-2">
                     <label className="sr-only" htmlFor={`reply-${message.id}`}>
                       {t('messages_reply')}

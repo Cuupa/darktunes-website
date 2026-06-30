@@ -122,78 +122,8 @@ function hasAnySocialOrStreamingLink(artist: Artist): boolean {
 export function isProfileComplete(profile: ArtistProfile | null, artist?: Artist | null): boolean {
   if (!profile || !artist) return false
   const hasPhoto = Boolean(artist.imageUrl)
-  const hasBio = Boolean(
-    profile.bioShort || profile.bioMedium || profile.bioLong || artist.bio?.trim(),
-  )
+  const hasBio = Boolean(profile.bioShort || profile.bioMedium || profile.bioLong)
   return hasPhoto && hasBio && hasAnySocialOrStreamingLink(artist)
-}
-
-function profileHasEpkBio(profile: ArtistProfile): boolean {
-  return Boolean(profile.bioShort?.trim() || profile.bioMedium?.trim() || profile.bioLong?.trim())
-}
-
-/**
- * Ensures an `artist_epks` row exists and copies label-managed bio data from
- * `artists.bio` when EPK bios are still empty. Safe to call after admin saves
- * or on first portal load (idempotent — never overwrites artist-edited bios).
- */
-export async function seedArtistProfileFromArtist(
-  db: DbClient,
-  artist: Artist,
-): Promise<ArtistProfile> {
-  const existing = await getArtistProfileByArtistId(db, artist.id)
-  const labelBio = artist.bio?.trim() || null
-
-  const needsSeed = !existing || (labelBio !== null && !profileHasEpkBio(existing))
-
-  if (!needsSeed) {
-    return existing!
-  }
-
-  const bioShort = existing?.bioShort?.trim() || labelBio || null
-
-  const seededProfile: ArtistProfile = existing
-    ? { ...existing, bioShort: bioShort ?? undefined }
-    : {
-        id: '',
-        artistId: artist.id,
-        bioShort: bioShort ?? undefined,
-        bioMedium: undefined,
-        bioLong: undefined,
-        pressQuote: undefined,
-        bookingContact: undefined,
-        pressContact: undefined,
-        riderStagePlotUrl: undefined,
-        riderTechnicalUrl: undefined,
-        riderHospitalityUrl: undefined,
-        onboardingCompleted: false,
-        epkTheme: 'default',
-        epkLayout: 'classic',
-        epkOrientation: 'portrait',
-        epkBgImageUrl: undefined,
-        epkBgOpacity: 20,
-        epkSectionsOrder: [],
-        epkSectionsHidden: [],
-        epkPasswordHash: undefined,
-        epkPasswordSections: [],
-        epkGalleryPhotos: [],
-        epkCustomThemeTokens: {},
-        customLinks: [],
-        epkDocument: undefined,
-        epkDocumentVersion: 1,
-        epkEditorMode: 'legacy',
-        createdAt: '',
-        updatedAt: '',
-      }
-
-  const onboardingCompleted =
-    existing?.onboardingCompleted || isProfileComplete(seededProfile, artist)
-
-  return upsertArtistProfile(db, {
-    artist_id: artist.id,
-    ...(bioShort ? { bio_short: bioShort } : {}),
-    onboarding_completed: onboardingCompleted,
-  })
 }
 
 // ---------------------------------------------------------------------------

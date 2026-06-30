@@ -552,10 +552,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
 
             {/* Reply box — only for received messages */}
             {selectedMessage.toArtistId === artistId && (
-              <div
-                className="border-t border-border p-4 space-y-2 overscroll-contain"
-                data-lenis-prevent
-              >
+              <div className="border-t border-border p-4 space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reply</p>
                 <RichTextEditor
                   value={replyHtml}

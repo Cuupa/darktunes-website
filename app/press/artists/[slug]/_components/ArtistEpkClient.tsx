@@ -208,41 +208,37 @@ export function ArtistEpkClient({
           </section>
         )}
 
-        {!showCanvasEpk && (
-          <>
-            <section aria-labelledby="artist-bios" className="space-y-4">
-              <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">{t('biosHeading')}</h2>
-              <div className={`grid grid-cols-1 gap-4 ${bios.length === 2 ? 'lg:grid-cols-2' : bios.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
-                {bios.map((bio) => (
-                  <Card key={bio.label} className="border-border bg-card/70">
-                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-                      <CardTitle className="text-base">{bio.label}</CardTitle>
-                      <CopyButton text={bio.text} copyLabel={t('copyBio')} copiedLabel={t('bioCopied')} />
-                    </CardHeader>
-                    <CardContent>
-                      <div
-                        suppressHydrationWarning
-                        className="text-sm leading-relaxed text-muted-foreground [&_p]:mb-2 [&_p:last-child]:mb-0"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
-                      />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
+        <section aria-labelledby="artist-bios" className="space-y-4">
+          <h2 id="artist-bios" className="text-2xl font-bold tracking-tight">{t('biosHeading')}</h2>
+          <div className={`grid grid-cols-1 gap-4 ${bios.length === 2 ? 'lg:grid-cols-2' : bios.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
+            {bios.map((bio) => (
+              <Card key={bio.label} className="border-border bg-card/70">
+                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                  <CardTitle className="text-base">{bio.label}</CardTitle>
+                  <CopyButton text={bio.text} copyLabel={t('copyBio')} copiedLabel={t('bioCopied')} />
+                </CardHeader>
+                <CardContent>
+                  <div
+                    suppressHydrationWarning
+                    className="text-sm leading-relaxed text-muted-foreground [&_p]:mb-2 [&_p:last-child]:mb-0"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(bio.text) }}
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
 
-            {profile?.pressQuote && (
-              <section aria-labelledby="artist-quote" className="rounded-3xl border border-border bg-card/60 p-6">
-                <div className="flex items-start gap-4">
-                  <Quotes size={28} weight="fill" aria-hidden="true" className="mt-1 text-primary" />
-                  <div className="space-y-2">
-                    <h2 id="artist-quote" className="text-2xl font-bold tracking-tight">{t('pressQuoteHeading')}</h2>
-                    <blockquote className="text-lg italic leading-relaxed text-muted-foreground">{profile.pressQuote}</blockquote>
-                  </div>
-                </div>
-              </section>
-            )}
-          </>
+        {profile?.pressQuote && (
+          <section aria-labelledby="artist-quote" className="rounded-3xl border border-border bg-card/60 p-6">
+            <div className="flex items-start gap-4">
+              <Quotes size={28} weight="fill" aria-hidden="true" className="mt-1 text-primary" />
+              <div className="space-y-2">
+                <h2 id="artist-quote" className="text-2xl font-bold tracking-tight">{t('pressQuoteHeading')}</h2>
+                <blockquote className="text-lg italic leading-relaxed text-muted-foreground">{profile.pressQuote}</blockquote>
+              </div>
+            </div>
+          </section>
         )}
 
         <section aria-labelledby="artist-photos" className="space-y-4">

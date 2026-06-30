@@ -22,11 +22,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import {
-  getArtistsByUserId,
-  getArtistProfileByArtistId,
-  seedArtistProfileFromArtist,
-} from '@/lib/api/artistProfiles'
+import { getArtistsByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { shouldRedirectToOnboarding } from '@/lib/portal/onboardingGate'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { PortalSidebar } from './_components/PortalSidebar'
@@ -186,12 +182,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   ])
   const unreadMessages = unreadMessagesResult.count ?? 0
 
-  let resolvedArtistProfile = artistProfile
-  if (artist && !artistProfile) {
-    resolvedArtistProfile = await seedArtistProfileFromArtist(supabase, artist).catch(() => null)
-  }
-
-  if (shouldRedirectToOnboarding(artist, resolvedArtistProfile, currentPath)) {
+  if (shouldRedirectToOnboarding(artist, artistProfile, currentPath)) {
     const onboardingUrl = artist ? `/portal/onboarding?artistId=${artist.id}` : '/portal/onboarding'
     redirect(onboardingUrl)
   }

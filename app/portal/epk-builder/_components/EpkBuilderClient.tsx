@@ -12,7 +12,6 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { FilePdf, ArrowLeft } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { EpkEditorProvider, useEpkEditorStore } from '@/lib/epk/editor/EpkEditorProvider'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { useEpkAutosave } from '@/hooks/useEpkAutosave'
@@ -20,7 +19,7 @@ import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
 import type { EpkFontAsset } from '@/components/epk-builder/EpkFontManager'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
-import type { Artist, ArtistAsset, Release, Video } from '@/types'
+import type { Artist, ArtistAsset } from '@/types'
 import type { EpkPickerAsset } from '@/lib/epk/pickerAssets'
 import { toast } from 'sonner'
 
@@ -44,8 +43,6 @@ interface EpkBuilderClientProps {
   initialAssets: ArtistAsset[]
   pickerAssets: EpkPickerAsset[]
   initialFonts: EpkFontAsset[]
-  catalogReleases: Release[]
-  catalogVideos: Video[]
 }
 
 function EpkBuilderWorkspace({
@@ -57,8 +54,6 @@ function EpkBuilderWorkspace({
   initialAssets,
   pickerAssets,
   initialFonts,
-  catalogReleases,
-  catalogVideos,
 }: Omit<EpkBuilderClientProps, 'initialDocument'>) {
   const t = useTranslations('portal')
 
@@ -160,21 +155,14 @@ function EpkBuilderWorkspace({
             {isDirty ? ` · ${t('epk_editor_unsaved')}` : ''}
           </p>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={() => void handleServerPdfExport()}
-                disabled={exporting}
-                className="min-h-[44px] shrink-0"
-              >
-                <FilePdf className="mr-2 h-4 w-4" aria-hidden="true" />
-                {exporting ? t('epk_builder_exporting') : t('epk_builder_download_pdf')}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">{t('epk_builder_pdf_hint')}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          onClick={() => void handleServerPdfExport()}
+          disabled={exporting}
+          className="min-h-[44px] shrink-0"
+        >
+          <FilePdf className="mr-2 h-4 w-4" aria-hidden="true" />
+          {exporting ? t('epk_builder_exporting') : t('epk_builder_download_pdf')}
+        </Button>
       </div>
 
       <EpkBuilderShell
@@ -184,8 +172,6 @@ function EpkBuilderWorkspace({
         initialAssets={initialAssets}
         pickerAssets={pickerAssets}
         initialFonts={initialFonts}
-        catalogReleases={catalogReleases}
-        catalogVideos={catalogVideos}
         onSave={() => void handleSave()}
         onSaveSnapshot={() => void handleSaveSnapshot()}
         onVersionRestored={setDocumentVersion}
@@ -205,8 +191,6 @@ export function EpkBuilderClient({
   initialAssets,
   pickerAssets,
   initialFonts,
-  catalogReleases,
-  catalogVideos,
 }: EpkBuilderClientProps) {
   const hydratedDocument = hydrateDocumentFonts(initialDocument, initialFonts)
 
@@ -221,8 +205,6 @@ export function EpkBuilderClient({
         initialAssets={initialAssets}
         pickerAssets={pickerAssets}
         initialFonts={initialFonts}
-        catalogReleases={catalogReleases}
-        catalogVideos={catalogVideos}
       />
     </EpkEditorProvider>
   )

@@ -46,26 +46,11 @@ interface TiptapEditorProps {
   placeholder?: string
   /** Compact mode hides alignment, image, and color controls */
   compact?: boolean
-  /** Minimum editor content height in pixels */
-  minHeight?: number
-  /** Maximum editor content height in pixels */
-  maxHeight?: number
 }
 
 const HEADING_LEVELS = [1, 2, 3] as const
 
-export function TiptapEditor({
-  value,
-  onChange,
-  onChangeWithText,
-  disabled,
-  placeholder,
-  compact,
-  minHeight,
-  maxHeight,
-}: TiptapEditorProps) {
-  const editorMinHeight = minHeight ?? (compact ? 120 : 300)
-  const editorMaxHeight = maxHeight ?? (compact ? Math.max(editorMinHeight, 200) : 500)
+export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
 
@@ -93,8 +78,7 @@ export function TiptapEditor({
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none overflow-y-auto overscroll-contain p-4 focus:outline-none',
-        style: `min-height: ${editorMinHeight}px; max-height: ${editorMaxHeight}px`,
+        class: 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto overscroll-contain p-4 focus:outline-none',
         'data-lenis-prevent': '',
         ...(placeholder ? { 'data-placeholder': placeholder } : {}),
       },
@@ -169,11 +153,7 @@ export function TiptapEditor({
   )
 
   return (
-    <div
-      className="border rounded-md overflow-hidden overscroll-contain"
-      data-lenis-prevent
-      onWheel={(e) => e.stopPropagation()}
-    >
+    <div className="border rounded-md overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 p-1.5 border-b bg-muted/50">
         {/* Undo / Redo */}

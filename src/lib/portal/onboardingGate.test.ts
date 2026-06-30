@@ -21,14 +21,25 @@ const completeProfile = {
 } as ArtistProfile
 
 describe('shouldRedirectToOnboarding', () => {
-  it('is temporarily disabled and always returns false', () => {
+  it('returns false when artist is null', () => {
     expect(shouldRedirectToOnboarding(null, null, '/portal')).toBe(false)
-    expect(shouldRedirectToOnboarding(artist, null, '/portal/onboarding')).toBe(false)
-    expect(shouldRedirectToOnboarding(artist, null, '/portal')).toBe(false)
-    expect(shouldRedirectToOnboarding(artist, completeProfile, '/portal')).toBe(false)
+  })
 
+  it('returns false when already on onboarding route', () => {
+    expect(shouldRedirectToOnboarding(artist, null, '/portal/onboarding')).toBe(false)
+  })
+
+  it('returns true when profile row is missing', () => {
+    expect(shouldRedirectToOnboarding(artist, null, '/portal')).toBe(true)
+  })
+
+  it('returns false when onboarding is completed', () => {
+    expect(shouldRedirectToOnboarding(artist, completeProfile, '/portal')).toBe(false)
+  })
+
+  it('returns true when profile is incomplete and onboarding not completed', () => {
     const profile = { ...completeProfile, onboardingCompleted: false }
     const check = () => false
-    expect(shouldRedirectToOnboarding(artist, profile, '/portal', check)).toBe(false)
+    expect(shouldRedirectToOnboarding(artist, profile, '/portal', check)).toBe(true)
   })
 })

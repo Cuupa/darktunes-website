@@ -21,7 +21,6 @@ import {
   Database,
   FloppyDisk,
   Image as ImageIcon,
-  MegaphoneSimple,
   Plus,
   Trash,
 } from '@phosphor-icons/react'
@@ -35,7 +34,6 @@ import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 import { GenreTagPicker } from '@/components/ui/genre-tag-picker'
 import type { Genre } from '@/lib/api/genres'
-import { ArtistMarketingPanel } from './ArtistMarketingPanel'
 
 // ── Image Position Editor ────────────────────────────────────────────────────
 
@@ -535,12 +533,6 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
             Assets
           </TabsTrigger>
           {mode === 'admin' && (
-            <TabsTrigger value="marketing" className="gap-1.5">
-              <MegaphoneSimple size={14} aria-hidden="true" />
-              Marketing
-            </TabsTrigger>
-          )}
-          {mode === 'admin' && (
             <TabsTrigger value="business" className="gap-1.5">
               <Briefcase size={14} aria-hidden="true" />
               Business
@@ -925,13 +917,6 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
             </div>
           </div>
         </TabsContent>
-
-        {/* ── Tab: Marketing (admin only) ──────────────────────────────── */}
-        {mode === 'admin' && (
-          <TabsContent value="marketing" className="space-y-4 mt-0">
-            <ArtistMarketingPanel artistId={artistId} artistName={name} />
-          </TabsContent>
-        )}
 
         {/* ── Tab 4: Business (admin only) ─────────────────────────────── */}
         {mode === 'admin' && (

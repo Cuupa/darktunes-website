@@ -10,11 +10,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import {
-  getArtistProfileByArtistId,
-  resolvePortalArtist,
-  seedArtistProfileFromArtist,
-} from '@/lib/api/artistProfiles'
+import { getArtistProfileByArtistId, resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProfileForm } from './_components/ProfileForm'
 function ProfileSkeleton() {
@@ -47,13 +43,9 @@ async function ProfileContent({ searchParams }: { searchParams: Promise<{ artist
   if (!user) return null
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
-  let profile = artist
+  const profile = artist
     ? await getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
     : null
-
-  if (artist && !profile) {
-    profile = await seedArtistProfileFromArtist(supabase, artist).catch(() => null)
-  }
 
   return (
     <ProfileForm
