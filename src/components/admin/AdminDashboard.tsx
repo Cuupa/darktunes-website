@@ -320,7 +320,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               videos:          <VideosManager />,
               events:          <AdminConcertsManager />,
               genres:          <GenresManager />,
-              assets:          <AssetsManager />,
+              assets:          <AssetsManager variant="embedded" />,
               accreditations:  <AccreditationsManager />,
               press:           <PressManager />,
               statements:      <StatementsManager />,
@@ -336,6 +336,15 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               if (adminOnly && !canSeeTab(value)) return null
               const meta = TAB_PANEL_META[value]
               const content = tabPanelContent[value]
+              if (value === 'assets') {
+                return (
+                  <TabsContent key={value} value={value} className="min-h-0">
+                    <Suspense fallback={<TabFallback />}>
+                      {content}
+                    </Suspense>
+                  </TabsContent>
+                )
+              }
               return (
                 <TabsContent key={value} value={value} className="space-y-4">
                   <Card>

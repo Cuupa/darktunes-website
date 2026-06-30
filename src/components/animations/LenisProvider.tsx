@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { ReactLenis, useLenis } from 'lenis/react'
+import { shouldPreventLenis } from '@/lib/scroll/lenisPrevent'
 
 export { useLenis }
 
@@ -48,8 +49,7 @@ export function LenisProvider({ children }: LenisProviderProps) {
         touchMultiplier: 1.3,
 
         infinite: false,
-        prevent: (node: Element) =>
-          node.closest('[data-lenis-prevent]') !== null,
+        prevent: shouldPreventLenis,
       }}
     >
       <ScrollLockObserver />

@@ -96,7 +96,7 @@ export function ExplorerToolbar({
   }
 
   return (
-    <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
+    <div className="shrink-0 flex flex-col gap-3 border-b border-border px-4 py-3">
       {pressFilters && onPressFiltersChange && (
         <div className="flex flex-wrap items-center gap-2">
           <Button

@@ -16,7 +16,7 @@ export default async function AdminAssetsPage() {
   const t = await getTranslations('admin.pages')
 
   return (
-    <AdminPageShell title="Assets" description={t('assetsDescription')}>
+    <AdminPageShell fill title="Assets" description={t('assetsDescription')}>
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <AssetsManager />
       </Suspense>

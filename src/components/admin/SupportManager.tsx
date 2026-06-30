@@ -420,7 +420,7 @@ export function SupportManager() {
           {ticketLog.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('historyEmpty')}</p>
           ) : (
-            <div className="rounded-lg border border-border overflow-x-auto">
+            <div className="rounded-lg border border-border overflow-x-auto overscroll-contain" data-lenis-prevent>
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -168,7 +168,7 @@ export function EpkShareLinkPanel({ open, onClose, artistId }: EpkShareLinkPanel
         <DialogHeader className="p-6 pb-0">
           <DialogTitle id="epk-share-title">{t('epk_share_title')}</DialogTitle>
         </DialogHeader>
-        <div className="overflow-y-auto max-h-[70vh] p-6 space-y-6">
+        <div className="overflow-y-auto overscroll-contain max-h-[70vh] p-6 space-y-6" data-lenis-prevent>
           <div className="space-y-3 rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">{t('epk_share_description')}</p>
             <div className="space-y-2">
