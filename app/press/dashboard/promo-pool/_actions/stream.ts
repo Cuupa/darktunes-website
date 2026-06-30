@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedDownloadUrl } from '@/lib/portal/presignedUrl'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { isPressAudioPreviewEnabled, isPromoPoolEnabled } from '@/lib/pressAccess'
 
 export async function getPromoStreamUrl(r2Key: string): Promise<{ url: string | null }> {
@@ -14,8 +15,8 @@ export async function getPromoStreamUrl(r2Key: string): Promise<{ url: string | 
     } = await supabase.auth.getUser()
     if (!user) return { url: null }
 
-    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
-    if (!profile || !['journalist', 'admin'].includes(profile.role)) return { url: null }
+    const role = await getUserRoleWithClient(supabase, user.id)
+    if (!role || !['journalist', 'admin'].includes(role)) return { url: null }
 
     const [promoPoolEnabled, audioPreviewEnabled] = await Promise.all([
       isPromoPoolEnabled(supabase),

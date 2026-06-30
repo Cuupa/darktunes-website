@@ -15,6 +15,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { hasPressDashboardAccess, resolveEffectiveAccess } from '@/lib/rbac'
 import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { getJournalistApplicationByUserId } from '@/lib/api/journalistApplications'
 import { PromoPoolAccessGate } from './_components/PromoPoolAccessGate'
@@ -48,13 +49,8 @@ export default async function PromoPoolLayout({ children }: { children: ReactNod
     )
   }
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const hasAccess = profile?.role === 'journalist' || profile?.role === 'admin'
+  const access = await resolveEffectiveAccess(supabase, user.id)
+  const hasAccess = hasPressDashboardAccess(access)
 
   if (!hasAccess) {
     const application = await getJournalistApplicationByUserId(supabase, user.id).catch(

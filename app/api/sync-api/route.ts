@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
+import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { enqueueOdesliSyncJob, enqueueSpotifySyncJobs } from '@/lib/api/syncQueue'
 import { syncAll } from '@/lib/sync/syncAll'
@@ -32,16 +33,6 @@ import {
 
 // Odesli resolves every release — allow long runs on Vercel Pro.
 export const maxDuration = 300
-
-async function verifyToken(token: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) throw buildApiError('CONFIG_ERROR', 500)
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
-  const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
-}
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   // 1. Authenticate — accept Vercel cron, CRON_SECRET Bearer, or user ******
@@ -56,10 +47,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   } else if (cronSecret && isValidCronSecret(authHeader, cronSecret)) {
     // CRON_SECRET ****** allowed for Supabase Edge Functions and external schedulers
   } else {
-    if (!authHeader.startsWith('Bearer ')) {
-      throw buildApiError('AUTH_TOKEN_MISSING', 401)
-    }
-    await verifyToken(authHeader.slice(7))
+    const token = extractBearerToken(authHeader)
+    await verifySyncTrigger(token)
   }
 
   // 2. Parse body

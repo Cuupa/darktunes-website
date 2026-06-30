@@ -1,11 +1,12 @@
 import type { UserRole } from '@/types/users'
+import { normalizeRole } from '@/lib/rbac/normalizeRole'
 
 /**
  * Resolves the post-login destination based on the user's DB role.
  * Single source of truth for role-based routing after sign-in or password recovery.
  */
 export function resolveRedirectPath(role: UserRole | null | undefined): string {
-  switch (role) {
+  switch (normalizeRole(role)) {
     case 'admin':
     case 'editor':
       return '/admin'
