@@ -7,12 +7,24 @@ type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['submission_form_schema']['Row']
 type Insert = Database['public']['Tables']['submission_form_schema']['Insert']
 
+function labelsFromRow(row: Row): Record<string, string> {
+  return { en: row.field_label_en, de: row.field_label_de }
+}
+
+function placeholdersFromRow(row: Row): Record<string, string> | null {
+  if (row.placeholder_en == null && row.placeholder_de == null) return null
+  return {
+    en: row.placeholder_en ?? '',
+    de: row.placeholder_de ?? '',
+  }
+}
+
 function rowToField(row: Row): SubmissionFormField {
   return {
     id: row.id,
     formType: row.form_type,
     fieldKey: row.field_key,
-    fieldLabels: row.field_labels as Record<string, string>,
+    fieldLabels: labelsFromRow(row),
     fieldType: row.field_type as SubmissionFieldType,
     fieldScope: row.field_scope as SubmissionFieldScope,
     fieldGroup: row.field_group,
@@ -22,7 +34,7 @@ function rowToField(row: Row): SubmissionFormField {
     isRequired: row.is_required,
     isVisible: row.is_visible,
     displayOrder: row.display_order,
-    placeholders: row.placeholders as Record<string, string> | null,
+    placeholders: placeholdersFromRow(row),
   }
 }
 
@@ -78,11 +90,14 @@ export function fieldToApiPayload(
   field: Partial<SubmissionFormField>,
   formType: 'release' | 'video',
 ): Omit<Insert, 'id'> & { id?: string } {
+  const labels = field.fieldLabels ?? { en: '', de: '' }
+  const placeholders = field.placeholders
   return {
     id: field.id,
     form_type: formType,
     field_key: field.fieldKey!,
-    field_labels: field.fieldLabels!,
+    field_label_en: labels.en ?? labels.de ?? field.fieldKey!,
+    field_label_de: labels.de ?? labels.en ?? field.fieldKey!,
     field_type: field.fieldType!,
     field_scope: field.fieldScope ?? 'release',
     field_group: field.fieldGroup ?? null,
@@ -92,6 +107,7 @@ export function fieldToApiPayload(
     is_required: field.isRequired ?? false,
     is_visible: field.isVisible ?? true,
     display_order: field.displayOrder ?? 0,
-    placeholders: field.placeholders ?? null,
+    placeholder_en: placeholders?.en ?? null,
+    placeholder_de: placeholders?.de ?? null,
   }
 }

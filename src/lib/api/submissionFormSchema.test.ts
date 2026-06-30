@@ -37,7 +37,8 @@ const row = {
   id: 'field-1',
   form_type: 'release' as const,
   field_key: 'genre',
-  field_labels: { en: 'Genre', de: 'Genre' },
+  field_label_en: 'Genre',
+  field_label_de: 'Genre',
   field_type: 'text' as const,
   field_scope: 'release' as const,
   field_group: 'metadata',
@@ -47,7 +48,8 @@ const row = {
   is_required: false,
   is_visible: true,
   display_order: 5,
-  placeholders: { en: 'e.g. Techno', de: 'z.B. Techno' },
+  placeholder_en: 'e.g. Techno',
+  placeholder_de: 'z.B. Techno',
 }
 
 describe('submissionFormSchema DAL', () => {
@@ -86,7 +88,8 @@ describe('submissionFormSchema DAL', () => {
     const result = await upsertFormField(db, {
       form_type: 'release',
       field_key: 'genre',
-      field_labels: { en: 'Genre', de: 'Genre' },
+      field_label_en: 'Genre',
+      field_label_de: 'Genre',
       field_type: 'text',
     })
     expect(result.fieldKey).toBe('genre')
@@ -105,7 +108,7 @@ describe('submissionFormSchema DAL', () => {
       'release',
     )
     expect(payload.field_key).toBe('ean')
-    expect(payload.field_labels.en).toBe('EAN')
+    expect(payload.field_label_en).toBe('EAN')
     expect(payload.is_required).toBe(true)
   })
 
@@ -115,7 +118,8 @@ describe('submissionFormSchema DAL', () => {
       upsertFormField(db, {
         form_type: 'release',
         field_key: 'genre',
-        field_labels: { en: 'Genre', de: 'Genre' },
+        field_label_en: 'Genre',
+        field_label_de: 'Genre',
         field_type: 'text',
       }),
     ).rejects.toThrow('No data returned')
