@@ -1,11 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Bell } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { useAuthContext } from '@/contexts/AuthContext'
 import type { EditorNotification } from '@/types'
+import {
+  getEditorNotificationActionLabel,
+  getEditorNotificationHref,
+  getEditorNotificationSummary,
+} from '@/lib/admin/editorNotificationRouting'
 
 interface EditorNotificationBellProps {
   userId: string
@@ -38,22 +45,29 @@ function rowToNotification(
 }
 
 export function EditorNotificationBell({ userId }: EditorNotificationBellProps) {
+  const { profile } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<EditorNotification[]>([])
 
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from('editor_notifications')
-        .select('*')
-        .eq('recipient_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      setItems((data ?? []).map(rowToNotification))
-    }
-    void load()
+  const loadNotifications = useCallback(async () => {
+    const { data } = await supabase
+      .from('editor_notifications')
+      .select('*')
+      .eq('recipient_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    setItems((data ?? []).map(rowToNotification))
   }, [supabase, userId])
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [loadNotifications])
+
+  useEffect(() => {
+    if (!open) return
+    void loadNotifications()
+  }, [loadNotifications, open])
 
   useEffect(() => {
     if (!open) return
@@ -65,15 +79,24 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
   }, [items, open, supabase])
 
   const unreadCount = items.filter((item) => !item.read).length
+  const ariaLabel =
+    unreadCount > 0
+      ? `Open admin notifications, ${unreadCount} unread`
+      : 'Open admin notifications'
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="relative min-h-[44px] min-w-[44px]" aria-label="Open editor notifications">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative min-h-[44px] min-w-[44px]"
+          aria-label={ariaLabel}
+        >
           <Bell size={18} aria-hidden="true" />
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-              {unreadCount}
+              {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </Button>
@@ -84,14 +107,38 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
-            items.map((item) => (
-              <div key={item.id} className="rounded-md border border-border p-2 text-sm">
-                <p className="font-medium">{item.entityName ?? item.entityType}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(item.createdAt).toLocaleString()}
-                </p>
-              </div>
-            ))
+            items.map((item) => {
+              const href = getEditorNotificationHref(item, profile?.role)
+              const summary = getEditorNotificationSummary(item)
+              const actionLabel = getEditorNotificationActionLabel(item.type)
+
+              const content = (
+                <>
+                  <p className="font-medium">{summary}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(item.createdAt).toLocaleString()}
+                  </p>
+                  {href && (
+                    <p className="text-xs font-medium text-primary">{actionLabel}</p>
+                  )}
+                </>
+              )
+
+              return href ? (
+                <Link
+                  key={item.id}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-md border border-border p-2 text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div key={item.id} className="rounded-md border border-border p-2 text-sm">
+                  {content}
+                </div>
+              )
+            })
           )}
         </div>
       </PopoverContent>

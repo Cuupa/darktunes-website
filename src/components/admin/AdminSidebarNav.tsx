@@ -47,6 +47,7 @@ import {
   List,
   ChartLine,
   SlidersHorizontal,
+  Globe,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -98,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false },
       { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false },
+      { label: 'Fan Page Reviews',    href: '/admin/fan-page-reviews',    editorHref: getCmsTabPath('editor', 'fan-page-reviews'),    icon: Globe,        adminOnly: false },
       { label: 'Submission Form',     href: '/admin/submission-form',     icon: SlidersHorizontal,                              adminOnly: true  },
     ],
   },
@@ -139,6 +141,8 @@ export function AdminSidebarNav() {
   const tNav = useTranslations('admin.nav')
   const { isAdmin, user, profile, signOut } = useAuthContext()
   const isEditorRole = profile?.role === 'editor'
+  const notificationUserId = user?.id
+  const showNotificationBell = Boolean(notificationUserId && (isAdmin || isEditorRole))
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = useCallback(async () => {
@@ -247,7 +251,9 @@ export function AdminSidebarNav() {
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
         <div className="flex items-center gap-2">
-          {user?.id && isEditorRole && <EditorNotificationBell userId={user.id} />}
+          {showNotificationBell && notificationUserId && (
+            <EditorNotificationBell userId={notificationUserId} />
+          )}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
@@ -280,7 +286,9 @@ export function AdminSidebarNav() {
             <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
           </div>
-          {user?.id && isEditorRole && <EditorNotificationBell userId={user.id} />}
+          {showNotificationBell && notificationUserId && (
+            <EditorNotificationBell userId={notificationUserId} />
+          )}
         </div>
 
         {renderNavLinks()}

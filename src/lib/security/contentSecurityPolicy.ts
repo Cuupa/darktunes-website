@@ -13,6 +13,7 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: Record<string, readonly string[
     'https://www.youtube-nocookie.com',
   ],
   'frame-src': [
+    "'self'",
     'https://open.spotify.com',
     'https://www.youtube.com',
     'https://www.youtube-nocookie.com',
