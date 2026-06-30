@@ -7,17 +7,22 @@ import { useState } from 'react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
+import { NavCountBadge } from '@/components/nav/NavCountBadge'
+import { PressNotificationBell } from '@/components/press/PressNotificationBell'
+import { usePressNavBadges } from '@/hooks/usePressNavBadges'
 
 interface PressNavProps {
   email: string
-  links: Array<{ href: string; label: string }>
+  userId: string
+  links: Array<{ href: string; label: string; badgeKey?: 'interviews' | 'accreditation' }>
 }
 
-export function PressNav({ email, links }: PressNavProps) {
+export function PressNav({ email, userId, links }: PressNavProps) {
   const t = useTranslations('pressDashboard')
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const badges = usePressNavBadges(userId)
 
   const signOut = async () => {
     const supabase = createBrowserSupabaseClient()
@@ -33,14 +38,20 @@ export function PressNav({ email, links }: PressNavProps) {
           <p className="font-semibold">{t('navTitle')}</p>
           <p className="text-xs text-muted-foreground truncate">{email}</p>
         </div>
-        <Button variant="outline" size="icon" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="press-dashboard-nav" aria-label={t('navToggle')}>
-          <SidebarSimple size={18} weight="bold" aria-hidden="true" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <PressNotificationBell badges={badges} />
+          <Button variant="outline" size="icon" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="press-dashboard-nav" aria-label={t('navToggle')}>
+            <SidebarSimple size={18} weight="bold" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
       <aside className={["border-r border-border bg-card p-4 md:flex md:min-h-screen md:w-64 md:shrink-0 md:flex-col md:gap-4", open ? 'block' : 'hidden md:flex'].join(' ')}>
-        <div>
-          <p className="font-semibold">{t('navTitle')}</p>
-          <p className="text-xs text-muted-foreground truncate">{email}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-semibold">{t('navTitle')}</p>
+            <p className="text-xs text-muted-foreground truncate">{email}</p>
+          </div>
+          <PressNotificationBell badges={badges} />
         </div>
         <nav id="press-dashboard-nav" className="flex-1 space-y-1" aria-label="Press dashboard navigation">
           {links.map((link) => (
@@ -49,11 +60,12 @@ export function PressNav({ email, links }: PressNavProps) {
               href={link.href}
               onClick={() => setOpen(false)}
               className={[
-                'block rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                'flex items-center rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                 pathname === link.href ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               ].join(' ')}
             >
-              {link.label}
+              <span className="truncate">{link.label}</span>
+              {link.badgeKey ? <NavCountBadge count={badges[link.badgeKey]} /> : null}
             </Link>
           ))}
         </nav>

@@ -39,6 +39,8 @@ import { cn } from '@/lib/utils'
 import { portalKey } from '@/i18n/portalKey'
 import { toast } from 'sonner'
 import type { Artist } from '@/types'
+import { NavCountBadge } from '@/components/nav/NavCountBadge'
+import { PortalNotificationBell } from '@/components/portal/PortalNotificationBell'
 import { useUnreadMessages } from './PortalNotificationProvider'
 import { usePortalOffline } from './PortalOfflineProvider'
 
@@ -53,6 +55,7 @@ type NavItem = {
   label: string
   icon: React.ElementType
   flag?: string
+  badgeKey?: 'messages' | 'interviews' | 'statements'
 }
 
 type NavGroup = {
@@ -104,7 +107,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'nav_group_finance',
     items: [
-      { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements' },
+      { href: '/portal/statements', label: 'statements', icon: FileText, flag: 'artist.statements', badgeKey: 'statements' },
       { href: '/portal/invoices', label: 'invoices_heading', icon: Receipt, flag: 'artist.invoices' },
       { href: '/portal/billing', label: 'billing_heading', icon: Files },
     ],
@@ -112,8 +115,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'nav_group_communication',
     items: [
-      { href: '/portal/messages', label: 'messages', icon: ChatCircleText },
-      { href: '/portal/interviews', label: 'interviews', icon: Chats },
+      { href: '/portal/messages', label: 'messages', icon: ChatCircleText, badgeKey: 'messages' },
+      { href: '/portal/interviews', label: 'interviews', icon: Chats, badgeKey: 'interviews' },
     ],
   },
   {
@@ -138,7 +141,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { unreadCount } = useUnreadMessages()
+  const { badges } = useUnreadMessages()
   const { offline, canNavigateTo } = usePortalOffline()
 
   // Derive active artist directly from URL — no stale local state
@@ -202,9 +205,10 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
             {t(portalKey(groupKey))}
           </p>
           <div className="space-y-0.5">
-            {items.map(({ href, label, icon: Icon }) => {
+            {items.map(({ href, label, icon: Icon, badgeKey }) => {
               const isActive = activeNavHref === href
               const navAllowed = canNavigateTo(href)
+              const badgeCount = badgeKey ? badges[badgeKey] : 0
               return (
                 <Link
                   key={href}
@@ -225,11 +229,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
                 >
                   <Icon size={18} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
                   <span className="truncate">{t(portalKey(label))}</span>
-                  {href === '/portal/messages' && unreadCount > 0 && (
-                    <span className="ml-auto inline-flex min-w-[20px] justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
-                      {unreadCount}
-                    </span>
-                  )}
+                  <NavCountBadge count={badgeCount} />
                 </Link>
               )
             })}
@@ -288,7 +288,9 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
     <>
       <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <div className="font-bold tracking-widest text-primary">darkTunes</div>
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <div className="flex items-center gap-2">
+          <PortalNotificationBell />
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Open portal navigation" className="min-h-[44px] min-w-[44px]">
               <List size={20} aria-hidden="true" />
@@ -315,11 +317,13 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
             </div>
           </SheetContent>
         </Sheet>
+        </div>
       </header>
 
       <aside className="portal-sidebar hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
-        <div className="p-6">
+        <div className="flex items-center justify-between p-6">
           <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
+          <PortalNotificationBell />
         </div>
         <Separator className="bg-border" />
         {artistBlock}

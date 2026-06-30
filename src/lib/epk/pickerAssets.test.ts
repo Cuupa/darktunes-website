@@ -80,4 +80,46 @@ describe('buildEpkPickerAssets', () => {
       'https://cdn.example.com/gallery-1.jpg',
     ])
   })
+
+  it('includes release cover art and deduplicates by URL', () => {
+    const assets = buildEpkPickerAssets({
+      artist,
+      artistProfile: profile,
+      artistAssets: [],
+      releases: [
+        {
+          id: 'release-1',
+          title: 'Album One',
+          artistId: 'artist-1',
+          artistName: 'Test Artist',
+          coverArt: 'https://cdn.example.com/cover.jpg',
+          releaseDate: '2026-01-01',
+          type: 'album',
+          featured: false,
+          isVisible: true,
+          isPromo: false,
+          artists: [{ id: 'artist-1', name: 'Test Artist', slug: 'test-artist' }],
+        },
+        {
+          id: 'release-2',
+          title: 'Collab Single',
+          artistId: 'artist-1',
+          artistName: 'Test Artist',
+          coverArt: 'https://cdn.example.com/cover.jpg',
+          releaseDate: '2026-02-01',
+          type: 'single',
+          featured: false,
+          isVisible: true,
+          isPromo: false,
+          artists: [
+            { id: 'artist-1', name: 'Test Artist', slug: 'test-artist' },
+            { id: 'artist-2', name: 'Guest', slug: 'guest' },
+          ],
+        },
+      ],
+    })
+
+    expect(assets.filter((asset) => asset.source === 'release')).toHaveLength(1)
+    expect(assets.find((asset) => asset.source === 'release')?.originalFilename).toContain('Album One')
+  })
 })

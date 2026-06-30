@@ -47,7 +47,10 @@ import {
 import { FolderTree, type FolderSelection } from '@/components/messaging/FolderTree'
 import { RichTextEditor } from '@/components/messaging/RichTextEditor'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
-import type { PortalMessage, PortalMessageFolder, Artist } from '@/types'
+import { useUnreadMessages } from '@/contexts/PortalNotificationProvider'
+import { sendArtistReply } from '@/lib/api/artistReplies'
+import { markMessageRead } from '@/lib/api/labelMessages'
+import type { ArtistReply, LabelMessage, PortalMessage, PortalMessageFolder, Artist } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,14 +97,22 @@ function formatDate(dateStr: string): string {
 // Main component
 // ---------------------------------------------------------------------------
 
+type MailboxSelection =
+  | { kind: 'portal'; id: string }
+  | { kind: 'label'; id: string }
+  | null
+
 export function PortalMailbox({ artistId, artists, initialMessages = [], initialFolders = [] }: PortalMailboxProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const { setUnreadCount } = useUnreadMessages()
 
   // Folder + message state
   const [selectedFolder, setSelectedFolder] = useState<FolderSelection>('inbox')
   const [folders, setFolders] = useState<PortalMessageFolder[]>(initialFolders)
   const [messages, setMessages] = useState<PortalMessage[]>(initialMessages)
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [labelMessages, setLabelMessages] = useState<LabelMessage[]>([])
+  const [labelReplies, setLabelReplies] = useState<Record<string, ArtistReply[]>>({})
+  const [selection, setSelection] = useState<MailboxSelection>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -118,15 +129,20 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
   // Unread count per folder
   const unreadCounts = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {}
-    counts['inbox'] = messages.filter(
-      (m) => m.toArtistId === artistId && !m.readAt && !m.deletedAt,
-    ).length
+    counts['inbox'] =
+      messages.filter((m) => m.toArtistId === artistId && !m.readAt && !m.deletedAt).length +
+      labelMessages.filter((m) => !m.read && !m.deletedAt).length
     return counts
-  }, [messages, artistId])
+  }, [messages, labelMessages, artistId])
 
   const selectedMessage = useMemo(
-    () => messages.find((m) => m.id === selectedMessageId) ?? null,
-    [messages, selectedMessageId],
+    () => (selection?.kind === 'portal' ? messages.find((m) => m.id === selection.id) ?? null : null),
+    [messages, selection],
+  )
+
+  const selectedLabelMessage = useMemo(
+    () => (selection?.kind === 'label' ? labelMessages.find((m) => m.id === selection.id) ?? null : null),
+    [labelMessages, selection],
   )
 
   // ---------------------------------------------------------------------------
@@ -139,8 +155,19 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
       const params = new URLSearchParams({ artistId, folder: String(folder) })
       const res = await fetch(`/api/portal/messages/inbox?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load messages')
-      const data = (await res.json()) as { messages: PortalMessage[] }
+      const data = (await res.json()) as {
+        messages: PortalMessage[]
+        labelMessages?: LabelMessage[]
+        labelReplies?: Record<string, ArtistReply[]>
+      }
       setMessages(data.messages)
+      if (folder === 'inbox') {
+        setLabelMessages(data.labelMessages ?? [])
+        setLabelReplies(data.labelReplies ?? {})
+      } else {
+        setLabelMessages([])
+        setLabelReplies({})
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {
@@ -167,11 +194,11 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     void loadFolders()
   }, [loadFolders])
 
-  // Realtime subscription for incoming portal_messages
+  // Realtime subscriptions for incoming portal_messages and label_messages
   useEffect(() => {
     let isMounted = true
 
-    const channel = supabase
+    const portalChannel = supabase
       .channel(`portal_messages:${artistId}`)
       .on(
         'postgres_changes',
@@ -197,16 +224,47 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
           if (selectedFolder === 'inbox') {
             setMessages((prev) => [msg, ...prev])
           }
+          setUnreadCount((count) => count + 1)
           toast('New message received', { description: msg.subject })
+        },
+      )
+      .subscribe()
+
+    const labelChannel = supabase
+      .channel(`portal-label-messages:${artistId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'label_messages', filter: `artist_id=eq.${artistId}` },
+        (payload: RealtimePostgresInsertPayload<Record<string, unknown>>) => {
+          if (!isMounted) return
+          const row = payload.new
+          const msg: LabelMessage = {
+            id: row['id'] as string,
+            artistId: row['artist_id'] as string,
+            subject: row['subject'] as string,
+            body: row['body'] as string,
+            bodyHtml: row['body_html'] as string | null,
+            read: row['read'] as boolean,
+            readAt: row['read_at'] as string | null,
+            starred: row['starred'] as boolean,
+            deletedAt: row['deleted_at'] as string | null,
+            sentAt: row['sent_at'] as string,
+          }
+          if (selectedFolder === 'inbox') {
+            setLabelMessages((prev) => [msg, ...prev.filter((item) => item.id !== msg.id)])
+          }
+          setUnreadCount((count) => count + 1)
+          toast('New message from label', { description: msg.subject })
         },
       )
       .subscribe()
 
     return () => {
       isMounted = false
-      void supabase.removeChannel(channel)
+      void supabase.removeChannel(portalChannel)
+      void supabase.removeChannel(labelChannel)
     }
-  }, [supabase, artistId, selectedFolder])
+  }, [supabase, artistId, selectedFolder, setUnreadCount])
 
   // ---------------------------------------------------------------------------
   // Message actions
@@ -218,6 +276,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
         m.id === messageId ? { ...m, readAt: m.readAt ?? new Date().toISOString() } : m,
       ),
     )
+    setUnreadCount((count) => Math.max(0, count - 1))
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
@@ -227,7 +286,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     } catch {
       // non-fatal
     }
-  }, [])
+  }, [setUnreadCount, supabase])
 
   const toggleStar = useCallback(async (messageId: string, starred: boolean) => {
     setMessages((prev) =>
@@ -244,9 +303,21 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     }
   }, [])
 
+  const markLabelRead = useCallback(async (messageId: string) => {
+    setLabelMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, read: true, readAt: new Date().toISOString() } : m)),
+    )
+    setUnreadCount((count) => Math.max(0, count - 1))
+    try {
+      await markMessageRead(supabase, messageId)
+    } catch {
+      // non-fatal
+    }
+  }, [setUnreadCount, supabase])
+
   const softDelete = useCallback(async (messageId: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
-    if (selectedMessageId === messageId) setSelectedMessageId(null)
+    if (selection?.kind === 'portal' && selection.id === messageId) setSelection(null)
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
@@ -257,7 +328,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     } catch {
       toast.error('Failed to delete')
     }
-  }, [selectedMessageId])
+  }, [selection])
 
   const restore = useCallback(async (messageId: string) => {
     try {
@@ -361,6 +432,34 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     )
   }, [messages, searchQuery])
 
+  const filteredLabelMessages = useMemo(() => {
+    if (selectedFolder !== 'inbox') return []
+    if (!searchQuery.trim()) return labelMessages
+    const q = searchQuery.toLowerCase()
+    return labelMessages.filter(
+      (m) => m.subject.toLowerCase().includes(q) || m.body.toLowerCase().includes(q),
+    )
+  }, [labelMessages, searchQuery, selectedFolder])
+
+  const inboxItems = useMemo(() => {
+    if (selectedFolder !== 'inbox') return []
+    const portalItems = filteredMessages.map((message) => ({
+      kind: 'portal' as const,
+      id: message.id,
+      sentAt: message.sentAt,
+      message,
+    }))
+    const labelItems = filteredLabelMessages.map((message) => ({
+      kind: 'label' as const,
+      id: message.id,
+      sentAt: message.sentAt,
+      message,
+    }))
+    return [...portalItems, ...labelItems].sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
+    )
+  }, [filteredMessages, filteredLabelMessages, selectedFolder])
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -426,7 +525,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
             <div className="flex items-center justify-center h-24">
               <Spinner size={20} className="animate-spin text-muted-foreground" aria-label="Loading" />
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : (selectedFolder === 'inbox' ? inboxItems.length === 0 : filteredMessages.length === 0) ? (
             <PortalEmptyState
               icon={PaperPlaneTilt}
               heading="No messages"
@@ -434,23 +533,53 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
             />
           ) : (
             <ul>
-              {filteredMessages.map((msg) => {
+              {(selectedFolder === 'inbox' ? inboxItems : filteredMessages.map((message) => ({ kind: 'portal' as const, id: message.id, sentAt: message.sentAt, message }))).map((item) => {
+                if (item.kind === 'label') {
+                  const msg = item.message
+                  const isUnread = !msg.read
+                  const isSelected = selection?.kind === 'label' && selection.id === msg.id
+                  return (
+                    <li key={`label-${msg.id}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelection({ kind: 'label', id: msg.id })
+                          if (isUnread) void markLabelRead(msg.id)
+                        }}
+                        aria-label={`${isUnread ? 'Unread: ' : ''}${msg.subject}`}
+                        className={[
+                          'w-full min-h-[44px] text-left px-3 py-3 border-b border-border transition-colors',
+                          isSelected ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted',
+                          isUnread ? 'font-semibold' : '',
+                        ].join(' ')}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground truncate">darkTunes Label</span>
+                          <span className="text-xs text-muted-foreground shrink-0 ml-1">{formatDate(msg.sentAt)}</span>
+                        </div>
+                        <p className="text-sm truncate">{msg.subject}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{msg.body.slice(0, 80)}</p>
+                        {isUnread && <span className="h-2 w-2 rounded-full bg-primary inline-block mt-1" aria-label="Unread" />}
+                      </button>
+                    </li>
+                  )
+                }
+
+                const msg = item.message
                 const isUnread = !msg.readAt && msg.toArtistId === artistId
-                const isSelected = msg.id === selectedMessageId
+                const isSelected = selection?.kind === 'portal' && selection.id === msg.id
                 return (
                   <li key={msg.id}>
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedMessageId(msg.id)
+                        setSelection({ kind: 'portal', id: msg.id })
                         if (isUnread) void markRead(msg.id)
                       }}
                       aria-label={`${isUnread ? 'Unread: ' : ''}${msg.subject}`}
                       className={[
                         'w-full min-h-[44px] text-left px-3 py-3 border-b border-border transition-colors',
-                        isSelected
-                          ? 'bg-primary/10 border-l-2 border-l-primary'
-                          : 'hover:bg-muted',
+                        isSelected ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted',
                         isUnread ? 'font-semibold' : '',
                       ].join(' ')}
                     >
@@ -458,14 +587,10 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                         <span className="text-xs text-muted-foreground truncate">
                           {msg.toLabel ? 'Label' : msg.toArtistId === artistId ? msg.fromArtistName ?? 'Artist' : msg.toArtistName ?? 'Artist'}
                         </span>
-                        <span className="text-xs text-muted-foreground shrink-0 ml-1">
-                          {formatDate(msg.sentAt)}
-                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0 ml-1">{formatDate(msg.sentAt)}</span>
                       </div>
                       <p className="text-sm truncate">{msg.subject}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {msg.body.slice(0, 80)}
-                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{msg.body.slice(0, 80)}</p>
                       <div className="flex items-center gap-1 mt-1">
                         {isUnread && <span className="h-2 w-2 rounded-full bg-primary inline-block" aria-label="Unread" />}
                         {msg.starred && <StarFour size={11} className="text-amber-400" aria-hidden="true" />}
@@ -482,7 +607,85 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
 
       {/* Right panel — message detail */}
       <div className="flex-1 flex flex-col overflow-hidden bg-background">
-        {!selectedMessage ? (
+        {selectedLabelMessage ? (
+          <>
+            <div className="p-4 border-b border-border">
+              <h2 className="text-base font-semibold truncate">{selectedLabelMessage.subject}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                From darkTunes Label · {new Date(selectedLabelMessage.sentAt).toLocaleString()}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4" data-lenis-prevent>
+              {selectedLabelMessage.bodyHtml ? (
+                <div
+                  className="prose prose-sm dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedLabelMessage.bodyHtml) }}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{selectedLabelMessage.body}</p>
+              )}
+              {(labelReplies[selectedLabelMessage.id] ?? []).map((reply) => (
+                <div key={reply.id} className="rounded-lg border border-border bg-card/60 px-4 py-3">
+                  <p className="text-xs text-muted-foreground mb-1">{formatDate(reply.sentAt)}</p>
+                  {reply.bodyHtml ? (
+                    <div
+                      className="prose prose-sm dark:prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(reply.bodyHtml) }}
+                    />
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{reply.body}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-border p-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reply to Label</p>
+              <RichTextEditor
+                value={replyHtml}
+                onChange={(html, text) => {
+                  setReplyHtml(html)
+                  setReplyText(text)
+                }}
+                placeholder="Write a reply…"
+                minHeight={80}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={!replyText.trim() || isSendingReply}
+                  onClick={() => {
+                    void (async () => {
+                      setIsSendingReply(true)
+                      try {
+                        const reply = await sendArtistReply(
+                          supabase,
+                          selectedLabelMessage.id,
+                          artistId,
+                          replyText,
+                          replyHtml || undefined,
+                        )
+                        const replies = labelReplies[selectedLabelMessage.id] ?? []
+                        setLabelReplies({
+                          ...labelReplies,
+                          [selectedLabelMessage.id]: [...replies, reply],
+                        })
+                        setReplyHtml('')
+                        setReplyText('')
+                        toast.success('Reply sent')
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Failed to send reply')
+                      } finally {
+                        setIsSendingReply(false)
+                      }
+                    })()
+                  }}
+                >
+                  Send reply
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : !selectedMessage ? (
           <div className="flex-1 flex items-center justify-center">
             <PortalEmptyState
               icon={PaperPlaneTilt}

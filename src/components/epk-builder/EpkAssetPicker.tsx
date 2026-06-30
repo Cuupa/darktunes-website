@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import Image from 'next/image'
-import { Images, UploadSimple, UserCircle } from '@phosphor-icons/react'
+import { Images, MusicNotes, UploadSimple, UserCircle } from '@phosphor-icons/react'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ interface EpkAssetPickerProps {
   mode?: 'insert' | 'replace'
 }
 
-type PickerTab = 'all' | 'profile' | 'label'
+type PickerTab = 'all' | 'profile' | 'label' | 'releases'
 
 function normalizeUploadedAsset(asset: unknown): EpkPickerAsset | null {
   if (!asset || typeof asset !== 'object') return null
@@ -88,6 +88,9 @@ export function EpkAssetPicker({
     }
     if (tab === 'label') {
       return assets.filter((asset) => asset.source === 'label')
+    }
+    if (tab === 'releases') {
+      return assets.filter((asset) => asset.source === 'release')
     }
     return assets
   }, [assets, tab])
@@ -203,6 +206,16 @@ export function EpkAssetPicker({
             >
               <Images className="mr-2 h-4 w-4" aria-hidden="true" />
               {t('epk_assets_tab_library')}
+            </Button>
+            <Button
+              type="button"
+              variant={tab === 'releases' ? 'secondary' : 'outline'}
+              size="sm"
+              className="min-h-[44px]"
+              onClick={() => setTab('releases')}
+            >
+              <MusicNotes className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('epk_assets_tab_releases')}
             </Button>
           </div>
 

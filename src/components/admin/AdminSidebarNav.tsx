@@ -55,6 +55,8 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
+import { NavCountBadge } from '@/components/nav/NavCountBadge'
+import { useAdminNavBadges } from '@/hooks/useAdminNavBadges'
 import { useTranslations } from 'next-intl'
 import { getCmsPromoLogPath, getCmsTabPath, getCmsHomePath } from '@/lib/editor/cmsPaths'
 
@@ -67,6 +69,7 @@ interface NavItem {
   editorHref?: string
   icon: React.ElementType
   adminOnly: boolean
+  badgeKey?: 'messages' | 'releaseSubmissions' | 'videoSubmissions' | 'fanPageReviews'
 }
 
 interface NavGroup {
@@ -97,9 +100,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'SUBMISSIONS',
     items: [
-      { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false },
-      { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false },
-      { label: 'Fan Page Reviews',    href: '/admin/fan-page-reviews',    editorHref: getCmsTabPath('editor', 'fan-page-reviews'),    icon: Globe,        adminOnly: false },
+      { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false, badgeKey: 'releaseSubmissions' },
+      { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false, badgeKey: 'videoSubmissions' },
+      { label: 'Fan Page Reviews',    href: '/admin/fan-page-reviews',    editorHref: getCmsTabPath('editor', 'fan-page-reviews'),    icon: Globe,        adminOnly: false, badgeKey: 'fanPageReviews' },
       { label: 'Submission Form',     href: '/admin/submission-form',     icon: SlidersHorizontal,                              adminOnly: true  },
     ],
   },
@@ -117,7 +120,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
       { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
-      { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true  },
+      { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true, badgeKey: 'messages' },
       { label: 'Promo Log',   href: '/admin/promo-log',   editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
       { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
     ],
@@ -143,6 +146,7 @@ export function AdminSidebarNav() {
   const isEditorRole = profile?.role === 'editor'
   const notificationUserId = user?.id
   const showNotificationBell = Boolean(notificationUserId && (isAdmin || isEditorRole))
+  const badges = useAdminNavBadges(notificationUserId ?? null, isAdmin)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = useCallback(async () => {
@@ -200,7 +204,8 @@ export function AdminSidebarNav() {
           aria-current={active ? 'page' : undefined}
         >
           <Icon size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
-          {label}
+          <span className="truncate">{label}</span>
+          {item.badgeKey ? <NavCountBadge count={badges[item.badgeKey]} /> : null}
         </Link>
       </li>
     )

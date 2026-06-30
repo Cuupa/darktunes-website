@@ -4606,6 +4606,35 @@ CREATE TABLE IF NOT EXISTS public.submission_form_schema (
 CREATE INDEX IF NOT EXISTS idx_submission_form_schema_type  ON public.submission_form_schema (form_type);
 CREATE INDEX IF NOT EXISTS idx_submission_form_schema_order ON public.submission_form_schema (form_type, display_order);
 
+-- Migrate legacy JSONB columns (field_labels / placeholders) to per-locale TEXT columns.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'submission_form_schema' AND column_name = 'field_labels'
+  ) THEN
+    ALTER TABLE public.submission_form_schema
+      ADD COLUMN IF NOT EXISTS field_label_en TEXT,
+      ADD COLUMN IF NOT EXISTS field_label_de TEXT,
+      ADD COLUMN IF NOT EXISTS placeholder_en TEXT,
+      ADD COLUMN IF NOT EXISTS placeholder_de TEXT;
+
+    UPDATE public.submission_form_schema
+    SET field_label_en = COALESCE(field_label_en, field_labels->>'en', field_key),
+        field_label_de = COALESCE(field_label_de, field_labels->>'de', field_key),
+        placeholder_en = COALESCE(placeholder_en, placeholders->>'en'),
+        placeholder_de = COALESCE(placeholder_de, placeholders->>'de')
+    WHERE field_labels IS NOT NULL OR placeholders IS NOT NULL;
+
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS field_labels;
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS placeholders;
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS field_scope;
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS field_group;
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS visibility_condition;
+    ALTER TABLE public.submission_form_schema DROP COLUMN IF EXISTS validation;
+  END IF;
+END $$;
+
 -- Seed default schema for release form
 INSERT INTO public.submission_form_schema
   (form_type, field_key, field_labels, field_type, field_scope, field_group, field_options, is_required, is_visible, display_order, placeholders)

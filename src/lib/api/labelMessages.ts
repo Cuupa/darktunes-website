@@ -33,6 +33,18 @@ function rowToTemplate(row: TemplateRow): MessageTemplate {
   }
 }
 
+export async function getLabelUnreadCount(db: DbClient, artistId: string): Promise<number> {
+  const { count, error } = await db
+    .from('label_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('artist_id', artistId)
+    .eq('read', false)
+    .is('deleted_at', null)
+
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
 export async function getLabelMessages(db: DbClient, artistId: string): Promise<LabelMessage[]> {
   const { data, error } = await db
     .from('label_messages')

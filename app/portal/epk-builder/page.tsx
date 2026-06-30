@@ -14,6 +14,7 @@ import {
 import { ensureMigratedEpkDocument } from '@/lib/api/epkDocument'
 import { getArtistAssets } from '@/lib/api/artistAssets'
 import { getAssetsByArtist } from '@/lib/api/assets'
+import { getReleasesByArtistId } from '@/lib/api/releases'
 import { buildEpkPickerAssets } from '@/lib/epk/pickerAssets'
 import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
@@ -64,11 +65,12 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     )
   }
 
-  const [profile, siteSettings, assets, labelAssets, fontRecords] = await Promise.all([
+  const [profile, siteSettings, assets, labelAssets, releases, fontRecords] = await Promise.all([
     getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
     getCachedSiteSettings().catch(() => null),
     getArtistAssets(supabase, artist.id).catch(() => []),
     getAssetsByArtist(supabase, artist.id).catch(() => []),
+    getReleasesByArtistId(supabase, artist.id).catch(() => []),
     listEpkFonts(supabase, artist.id).catch(() => []),
   ])
 
@@ -77,6 +79,7 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     artistProfile: profile,
     artistAssets: assets,
     labelAssets,
+    releases,
   })
 
   const { serverEnv } = await import('@/lib/env.server')

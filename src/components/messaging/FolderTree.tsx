@@ -19,13 +19,14 @@ import {
   X,
   Check,
   Pencil,
+  Microphone,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { MessageFolder } from '@/types'
 
-export type SystemFolder = 'inbox' | 'starred' | 'sent' | 'trash'
+export type SystemFolder = 'inbox' | 'from-artists' | 'starred' | 'sent' | 'trash'
 export type FolderSelection = SystemFolder | string // string = custom folder id
 
 interface FolderTreeProps {
@@ -39,10 +40,11 @@ interface FolderTreeProps {
 }
 
 const SYSTEM_FOLDERS: Array<{ id: SystemFolder; label: string; Icon: React.ElementType }> = [
-  { id: 'inbox',   label: 'Inbox',   Icon: Tray },
-  { id: 'starred', label: 'Starred', Icon: Star  },
-  { id: 'sent',    label: 'Sent',    Icon: PaperPlaneTilt },
-  { id: 'trash',   label: 'Trash',   Icon: Trash },
+  { id: 'inbox',        label: 'Inbox',        Icon: Tray },
+  { id: 'from-artists', label: 'From Artists', Icon: Microphone },
+  { id: 'starred',      label: 'Starred',      Icon: Star },
+  { id: 'sent',         label: 'Sent',         Icon: PaperPlaneTilt },
+  { id: 'trash',        label: 'Trash',        Icon: Trash },
 ]
 
 export function FolderTree({

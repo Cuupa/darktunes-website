@@ -144,7 +144,7 @@ export async function getTrashedMessages(
 }
 
 /** Messages sent to the label (to_label = true) by an artist. */
-export async function getLabelMessages(
+export async function getSentToLabelMessages(
   db: DbClient,
   artistId: string,
 ): Promise<PortalMessage[]> {
@@ -180,8 +180,35 @@ export async function searchPortalMessages(
   return (data ?? []).map(rowToMessage)
 }
 
-/** Unread count for an artist's inbox. */
-export async function getUnreadCount(db: DbClient, artistId: string): Promise<number> {
+/** Messages sent by artists to the label (admin inbox). */
+export async function getIncomingToLabelMessages(db: DbClient): Promise<PortalMessage[]> {
+  const { data, error } = await db
+    .from('portal_messages')
+    .select('*')
+    .eq('to_label', true)
+    .is('deleted_at', null)
+    .order('sent_at', { ascending: false })
+    .limit(200)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToMessage)
+}
+
+/** Unread count for artist-to-label messages (admin inbox). */
+export async function getIncomingToLabelUnreadCount(db: DbClient): Promise<number> {
+  const { count, error } = await db
+    .from('portal_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('to_label', true)
+    .is('read_at', null)
+    .is('deleted_at', null)
+
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
+/** Unread count for an artist's peer inbox (portal_messages). */
+export async function getPortalPeerUnreadCount(db: DbClient, artistId: string): Promise<number> {
   const { count, error } = await db
     .from('portal_messages')
     .select('id', { count: 'exact', head: true })
@@ -192,6 +219,9 @@ export async function getUnreadCount(db: DbClient, artistId: string): Promise<nu
   if (error) throw new Error(error.message)
   return count ?? 0
 }
+
+/** @deprecated Use getSentToLabelMessages */
+export const getLabelMessages = getSentToLabelMessages
 
 // ---------------------------------------------------------------------------
 // Message mutations

@@ -5,10 +5,10 @@
  * for the EPK builder asset picker.
  */
 
-import type { Artist, ArtistAsset, Asset } from '@/types'
+import type { Artist, ArtistAsset, Asset, Release } from '@/types'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
 
-export type EpkPickerAssetSource = 'upload' | 'label' | 'profile' | 'gallery' | 'logo'
+export type EpkPickerAssetSource = 'upload' | 'label' | 'profile' | 'gallery' | 'logo' | 'release'
 
 export interface EpkPickerAsset {
   id: string
@@ -42,8 +42,9 @@ export function buildEpkPickerAssets(input: {
   artistProfile: ArtistProfile | null
   artistAssets: ArtistAsset[]
   labelAssets?: Asset[]
+  releases?: Release[]
 }): EpkPickerAsset[] {
-  const { artist, artistProfile, artistAssets, labelAssets = [] } = input
+  const { artist, artistProfile, artistAssets, labelAssets = [], releases = [] } = input
   const seen = new Set<string>()
   const result: EpkPickerAsset[] = []
 
@@ -90,6 +91,22 @@ export function buildEpkPickerAssets(input: {
 
   if (artistProfile?.epkBgImageUrl) {
     push(virtualAsset('epk-bg', artistProfile.epkBgImageUrl, 'EPK background', 'gallery'))
+  }
+
+  for (const release of releases) {
+    if (!release.coverArt) continue
+    const collabNames = (release.artists ?? [])
+      .filter((credit) => credit.id !== artist.id)
+      .map((credit) => credit.name)
+    const suffix = collabNames.length > 0 ? ` (${collabNames.join(', ')})` : ''
+    push(
+      virtualAsset(
+        `release-${release.id}`,
+        release.coverArt,
+        `${release.title} — cover${suffix}`,
+        'release',
+      ),
+    )
   }
 
   return result
