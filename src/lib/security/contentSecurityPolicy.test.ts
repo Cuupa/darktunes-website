@@ -24,6 +24,10 @@ describe('contentSecurityPolicy', () => {
     expect(CONTENT_SECURITY_POLICY_DIRECTIVES['font-src']).toContain('https://fonts.gstatic.com')
   })
 
+  it('allows same-origin iframes for admin fan page review preview', () => {
+    expect(CONTENT_SECURITY_POLICY_DIRECTIVES['frame-src']).toContain("'self'")
+  })
+
   it('allows YouTube privacy-enhanced embeds in frame-src and script-src', () => {
     expect(CONTENT_SECURITY_POLICY_DIRECTIVES['frame-src']).toContain(
       'https://www.youtube-nocookie.com',
