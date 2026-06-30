@@ -130,7 +130,7 @@ export default function NewsNewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
+    <div className="w-full bg-background text-foreground p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>

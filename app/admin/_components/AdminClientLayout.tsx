@@ -10,16 +10,10 @@
  *  - Main content area that renders {children}
  *
  * Scroll behaviour:
- *  Each panel scrolls independently when the cursor is inside it — the
- *  sidebar scrolls its nav links and the main area scrolls page content.
- *  CSS `overscroll-behavior: contain` prevents scroll from leaking to the
- *  parent once a panel reaches its boundary.
- *
- *  `data-lenis-prevent` on both overflow containers tells the global Lenis
- *  smooth-scroll instance (LenisProvider) to yield wheel/touch events that
- *  originate inside those elements to the browser's native scroll handler.
- *  Without this attribute Lenis intercepts all events at document level,
- *  and mouse-wheel scrolling is silently blocked inside the admin panels.
+ *  `ScrollableAppShell` owns vertical scroll for the main content pane.
+ *  `DashboardLenisGuard` stops Lenis on /admin/* so wheel events reach
+ *  native scroll. Nested panels (e.g. file explorer with `fill`) may scroll
+ *  internally; list managers must not add a root `overflow-y-auto` wrapper.
  *
  * Visual effects:
  *  VisualEffectsOverlay and ThemeEffectsClient are suppressed for
