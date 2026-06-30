@@ -9,6 +9,7 @@
   "since": "Since",
   "listenOn": "Listen on Spotify",
   "bandPhotos": "Band Photos",
+  "viewPhoto": "View photo {index} of {total}",
   "latestVideo": "Latest Video",
   "getTickets": "Tickets",
   "fullProfile": "Full Profile →",

@@ -28,7 +28,7 @@ import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
 import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
-import { getArtistAssets } from '@/lib/api/artistAssets'
+import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 import { buildMusicGroupSchema, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -72,15 +72,16 @@ function makeGetArtistData(slug: string) {
       // treats it as a server error (5xx) rather than caching it as a 404.
       const artist = await getArtistBySlug(client, slug)
       if (!artist) return null
-      const [releases, concerts, videos, news, assets, relatedArtists] = await Promise.all([
+      const [releases, concerts, videos, news, publicEpk, relatedArtists] = await Promise.all([
         getReleasesByArtistId(client, artist.id),
         getConcertsByArtistId(client, artist.id),
         getVideosByArtistId(client, artist.id),
         getPublicNewsPostsByArtistId(client, artist.id).then((posts) => posts.slice(0, 3)),
-        getArtistAssets(client, artist.id).catch(() => []),
+        getPublicArtistEpkByArtistId(client, artist.id).catch(() => null),
         getRelatedArtists(client, artist.id, artist.genres).catch(() => []),
       ])
-      return { artist, releases, concerts, videos, news, assets, relatedArtists }
+      const galleryPhotos = (publicEpk?.profile.epkGalleryPhotos ?? []).filter(Boolean)
+      return { artist, releases, concerts, videos, news, galleryPhotos, relatedArtists }
     },
     [`artist-${slug}`],
     // Granular tags: 'artists' invalidates all artist lists;
@@ -123,7 +124,7 @@ export default async function ArtistDetailPage({ params }: Props) {
   // Next.js returns a 500 (uncached) rather than caching a false 404 for 60s.
   const data = await makeGetArtistData(slug)()
   if (!data) notFound()
-  const { artist, releases, concerts, videos, news, assets, relatedArtists } = data
+  const { artist, releases, concerts, videos, news, galleryPhotos, relatedArtists } = data
   return (
     <>
       <script
@@ -138,7 +139,7 @@ export default async function ArtistDetailPage({ params }: Props) {
         concerts={concerts}
         videos={videos}
         news={news}
-        assets={assets}
+        galleryPhotos={galleryPhotos}
         relatedArtists={relatedArtists}
       />
     </>

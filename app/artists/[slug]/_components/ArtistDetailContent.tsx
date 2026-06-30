@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -35,11 +35,13 @@ import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Artist, Release, Concert, Video, NewsPost, ArtistAsset } from '@/types'
+import type { Artist, Release, Concert, Video, NewsPost } from '@/types'
 import { trackShopClick, trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
+import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
+import { galleryUrlToPressAsset } from '@/lib/api/portalGalleryPress'
 
 interface ArtistDetailContentProps {
   artist: Artist
@@ -47,7 +49,7 @@ interface ArtistDetailContentProps {
   concerts: Concert[]
   videos: Video[]
   news: NewsPost[]
-  assets: ArtistAsset[]
+  galleryPhotos: string[]
   relatedArtists?: Artist[]
 }
 
@@ -96,7 +98,7 @@ export function ArtistDetailContent({
   concerts,
   videos,
   news,
-  assets,
+  galleryPhotos,
   relatedArtists = [],
 }: ArtistDetailContentProps) {
   const t = useTranslations('artistDetail')
@@ -107,6 +109,13 @@ export function ArtistDetailContent({
   const youtubeId = artist.youtubeUrl ? extractYouTubeId(artist.youtubeUrl) : null
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+  const [galleryLightboxOpen, setGalleryLightboxOpen] = useState(false)
+  const [galleryLightboxIndex, setGalleryLightboxIndex] = useState(0)
+
+  const galleryPressPhotos = useMemo(
+    () => galleryPhotos.map((url, index) => galleryUrlToPressAsset(url, artist.id, index)),
+    [galleryPhotos, artist.id],
+  )
 
   // Collapsible state — all sections open by default
   const [openSections, setOpenSections] = useState({
@@ -468,36 +477,47 @@ export function ArtistDetailContent({
           </motion.section>
         )}
 
-        {/* Band Photos */}
-        {assets.length > 0 && (
+        {/* Band Photos (portal gallery) */}
+        {galleryPhotos.length > 0 && (
           <motion.section
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
+            aria-labelledby="artist-gallery-heading"
           >
-            <h2 className="text-3xl font-bold mb-6 tracking-tight text-foreground flex items-center gap-2">
+            <h2
+              id="artist-gallery-heading"
+              className="text-3xl font-bold mb-6 tracking-tight text-foreground flex items-center gap-2"
+            >
               <Images size={28} weight="duotone" aria-hidden="true" />
               {t('bandPhotos')}
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {assets.map((asset) => (
-                <motion.div
-                  key={asset.id}
-                  whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
-                  className="relative aspect-square rounded-lg overflow-hidden bg-card border border-border cursor-pointer group"
-                >
-                  <Image
-                    src={asset.publicUrl}
-                    alt={asset.filename ?? `${artist.name} photo`}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    unoptimized
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
-                </motion.div>
+            <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 list-none p-0">
+              {galleryPhotos.map((url, index) => (
+                <li key={url}>
+                  <motion.button
+                    type="button"
+                    whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
+                    onClick={() => {
+                      setGalleryLightboxIndex(index)
+                      setGalleryLightboxOpen(true)
+                    }}
+                    aria-label={t('viewPhoto', { index: index + 1, total: galleryPhotos.length })}
+                    className="relative aspect-square w-full rounded-lg overflow-hidden bg-card border border-border cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Image
+                      src={getOptimizedImageUrl(url, 600)}
+                      alt={`${artist.name} – ${t('bandPhotos')} ${index + 1}`}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      unoptimized
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" aria-hidden="true" />
+                  </motion.button>
+                </li>
               ))}
-            </div>
+            </ul>
           </motion.section>
         )}
 
@@ -818,6 +838,13 @@ export function ArtistDetailContent({
         open={isVideoModalOpen}
         onClose={() => setIsVideoModalOpen(false)}
         youtubeLabel={tConsent('loadYouTube')}
+      />
+      <PressPhotoLightbox
+        photos={galleryPressPhotos}
+        initialIndex={galleryLightboxIndex}
+        open={galleryLightboxOpen}
+        onClose={() => setGalleryLightboxOpen(false)}
+        artistName={artist.name}
       />
     </div>
   )
