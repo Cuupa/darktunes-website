@@ -18,6 +18,7 @@ import { EpkCommandPalette, EPK_OPEN_COMMAND_PALETTE_EVENT } from './EpkCommandP
 import type { EpkTemplate } from '@/lib/api/epkTemplates'
 import { EpkFontLoader } from './EpkFontLoader'
 import { EpkFontManager, type EpkFontAsset } from './EpkFontManager'
+import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
 import { hydrateTemplateWithArtistData } from '@/lib/epk/templates/hydrateArtistData'
 import { resolveEpkCanvasImageSrc } from '@/lib/epk/epkImageProxy'
 import { getProportionalElementSize } from '@/lib/epk/imageFit'
@@ -25,8 +26,10 @@ import {
   buildProfilePresetElement,
   type ProfilePresetId,
 } from '@/lib/epk/editor/profilePresets'
+import { EpkCatalogImportDialog } from './EpkCatalogImportDialog'
+import { buildCatalogImportElement } from '@/lib/epk/editor/catalogImport'
 import type { ArtistProfile } from '@/lib/api/artistProfiles'
-import type { Artist, ArtistAsset } from '@/types'
+import type { Artist, ArtistAsset, Release, Video } from '@/types'
 import type { EpkPickerAsset } from '@/lib/epk/pickerAssets'
 import type { EpkAssetPickerMode } from './EpkPropertiesPanel'
 import { cn } from '@/lib/utils'
@@ -45,6 +48,8 @@ interface EpkBuilderShellProps {
   initialAssets: ArtistAsset[]
   pickerAssets: EpkPickerAsset[]
   initialFonts: EpkFontAsset[]
+  catalogReleases: Release[]
+  catalogVideos: Video[]
   onSave: () => void
   onSaveSnapshot: () => void
   onVersionRestored: (documentVersion: number) => void
@@ -58,6 +63,8 @@ export function EpkBuilderShell({
   initialAssets,
   pickerAssets,
   initialFonts,
+  catalogReleases,
+  catalogVideos,
   onSave,
   onSaveSnapshot,
   onVersionRestored,
@@ -83,6 +90,7 @@ export function EpkBuilderShell({
   const [shareLinksOpen, setShareLinksOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [catalogImportOpen, setCatalogImportOpen] = useState(false)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('canvas')
 
   const openAssetPicker = (mode: EpkAssetPickerMode = 'insert') => {
@@ -114,16 +122,25 @@ export function EpkBuilderShell({
     setAssetPickerOpen(false)
   }
 
-  const handleInsertPreset = (presetId: ProfilePresetId) => {
-    if (!artistProfile) {
-      toast.error(t('epk_preset_no_profile'))
+  const handleCatalogImport = (selectedReleaseIds: string[], selectedVideoIds: string[]) => {
+    const releases = catalogReleases.filter((release) => selectedReleaseIds.includes(release.id))
+    const videos = catalogVideos.filter((video) => selectedVideoIds.includes(video.id))
+    const element = buildCatalogImportElement(activePageId, document, releases, videos)
+    if (!element) {
+      toast.error(t('epk_catalog_import_empty'))
       return
     }
+    addPresetElement(element)
+    toast.success(t('epk_catalog_import_success'))
+  }
+
+  const handleInsertPreset = (presetId: ProfilePresetId) => {
+    const profile = artistProfile ?? emptyArtistProfile(artistId)
     const element = buildProfilePresetElement(
       presetId,
       activePageId,
       document,
-      artistProfile,
+      profile,
       artist,
     )
     if (!element) {
@@ -204,6 +221,7 @@ export function EpkBuilderShell({
           onSave={onSave}
           onSaveSnapshot={onSaveSnapshot}
           onOpenAssetPicker={() => openAssetPicker('insert')}
+          onOpenCatalogImport={() => setCatalogImportOpen(true)}
           onOpenVersionHistory={() => setVersionHistoryOpen(true)}
           onOpenShareLinks={() => setShareLinksOpen(true)}
           onOpenAnalytics={() => setAnalyticsOpen(true)}
@@ -377,6 +395,14 @@ export function EpkBuilderShell({
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         onApply={handleApplyTemplate}
+      />
+
+      <EpkCatalogImportDialog
+        open={catalogImportOpen}
+        onClose={() => setCatalogImportOpen(false)}
+        releases={catalogReleases}
+        videos={catalogVideos}
+        onImport={handleCatalogImport}
       />
     </div>
   )

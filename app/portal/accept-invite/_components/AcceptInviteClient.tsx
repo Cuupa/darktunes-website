@@ -5,14 +5,14 @@ import { useTranslations } from 'next-intl'
  * app/portal/accept-invite/_components/AcceptInviteClient.tsx
  *
  * Handles the Supabase invite token from the URL hash, shows a branded
- * "set your password" form, then redirects to the onboarding wizard on success.
+ * "set your password" form, then redirects to the profile editor on success.
  *
  * Flow:
  *  1. Supabase SSR client automatically detects the #access_token hash and
  *     establishes a session (detectSessionInUrl = true by default).
  *  2. The artist enters and confirms their new password.
  *  3. supabase.auth.updateUser({ password }) persists the password.
- *  4. Redirect to /portal/onboarding.
+ *  4. Redirect to /portal/profile so label-prepped data is visible immediately.
  */
 
 import { useEffect, useState } from 'react'
@@ -88,7 +88,7 @@ export function AcceptInviteClient() {
         return
       }
       toast.success(t('acceptInvite_success'))
-      router.push('/portal/onboarding')
+      router.push('/portal/profile')
     } catch {
       setSessionError(t('acceptInvite_error'))
       toast.error(t('acceptInvite_error'))

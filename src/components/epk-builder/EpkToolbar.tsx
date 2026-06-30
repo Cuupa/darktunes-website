@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useEpkEditorStore, useEpkEditorStoreApi, useEpkEditorTemporal } from '@/lib/epk/editor/EpkEditorProvider'
 import { PROFILE_PRESETS, type ProfilePresetId } from '@/lib/epk/editor/profilePresets'
+import { EpkCatalogImportButton } from './EpkCatalogImportDialog'
 import { EpkColorThemePicker } from './EpkColorThemePicker'
 import { EpkHelpDialog } from './EpkHelpDialog'
 
@@ -45,6 +46,7 @@ interface EpkToolbarProps {
   onSave: () => void
   onSaveSnapshot: () => void
   onOpenAssetPicker: () => void
+  onOpenCatalogImport: () => void
   onOpenVersionHistory: () => void
   onOpenShareLinks: () => void
   onOpenAnalytics: () => void
@@ -58,6 +60,7 @@ export function EpkToolbar({
   onSave,
   onSaveSnapshot,
   onOpenAssetPicker,
+  onOpenCatalogImport,
   onOpenVersionHistory,
   onOpenShareLinks,
   onOpenAnalytics,
@@ -229,6 +232,8 @@ export function EpkToolbar({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <EpkCatalogImportButton onClick={onOpenCatalogImport} />
 
       <Button
         type="button"

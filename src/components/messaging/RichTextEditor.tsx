@@ -20,6 +20,7 @@ export function RichTextEditor({
   onChange,
   disabled = false,
   placeholder,
+  minHeight,
 }: RichTextEditorProps) {
   return (
     <TiptapEditor
@@ -31,6 +32,7 @@ export function RichTextEditor({
       disabled={disabled}
       placeholder={placeholder}
       compact
+      minHeight={minHeight}
     />
   )
 }

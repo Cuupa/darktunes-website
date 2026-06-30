@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
 import { sanitizeArtistWrite } from '@/lib/sanitizeTextContent'
+import { seedArtistProfileFromArtist } from './artistProfiles'
 import { rowToArtist } from './artistRowMapper'
 
 type DbClient = SupabaseClient<Database>
@@ -92,7 +93,13 @@ export async function createArtist(db: DbClient, artistData: ArtistInsert): Prom
   const { data, error } = await db.from('artists').insert(sanitizeArtistWrite(artistData)).select().single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from createArtist')
-  return rowToArtist(data)
+  const artist = rowToArtist(data)
+  try {
+    await seedArtistProfileFromArtist(db, artist)
+  } catch {
+    // Non-fatal: artist row saved; portal lazy-seed will retry on next login.
+  }
+  return artist
 }
 
 export async function updateArtist(
@@ -108,7 +115,13 @@ export async function updateArtist(
     .single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from updateArtist')
-  return rowToArtist(data)
+  const artist = rowToArtist(data)
+  try {
+    await seedArtistProfileFromArtist(db, artist)
+  } catch {
+    // Non-fatal: artist row saved; portal lazy-seed will retry on next login.
+  }
+  return artist
 }
 
 export async function deleteArtist(db: DbClient, id: string): Promise<void> {

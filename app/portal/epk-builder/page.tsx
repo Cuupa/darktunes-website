@@ -16,6 +16,8 @@ import { getArtistAssets } from '@/lib/api/artistAssets'
 import { getAssetsByArtist } from '@/lib/api/assets'
 import { buildEpkPickerAssets } from '@/lib/epk/pickerAssets'
 import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
+import { getReleasesByArtistId } from '@/lib/api/releases'
+import { getVideosByArtistId } from '@/lib/api/videos'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getTranslations } from 'next-intl/server'
@@ -64,13 +66,16 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     )
   }
 
-  const [profile, siteSettings, assets, labelAssets, fontRecords] = await Promise.all([
-    getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
-    getCachedSiteSettings().catch(() => null),
-    getArtistAssets(supabase, artist.id).catch(() => []),
-    getAssetsByArtist(supabase, artist.id).catch(() => []),
-    listEpkFonts(supabase, artist.id).catch(() => []),
-  ])
+  const [profile, siteSettings, assets, labelAssets, fontRecords, catalogReleases, catalogVideos] =
+    await Promise.all([
+      getArtistProfileByArtistId(supabase, artist.id).catch(() => null),
+      getCachedSiteSettings().catch(() => null),
+      getArtistAssets(supabase, artist.id).catch(() => []),
+      getAssetsByArtist(supabase, artist.id).catch(() => []),
+      listEpkFonts(supabase, artist.id).catch(() => []),
+      getReleasesByArtistId(supabase, artist.id).catch(() => []),
+      getVideosByArtistId(supabase, artist.id).catch(() => []),
+    ])
 
   const pickerAssets = buildEpkPickerAssets({
     artist,
@@ -109,6 +114,8 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
       initialAssets={assets}
       pickerAssets={pickerAssets}
       initialFonts={initialFonts}
+      catalogReleases={catalogReleases}
+      catalogVideos={catalogVideos}
     />
   )
 }
