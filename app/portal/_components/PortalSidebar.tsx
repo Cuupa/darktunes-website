@@ -23,6 +23,7 @@ import {
   SignOut,
   User,
   Gear,
+  Globe,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -85,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/portal/profile', label: 'profile', icon: User },
       { href: '/portal/epk-builder', label: 'epk_builder_nav', icon: FileText, flag: 'artist.epk_builder' },
+      { href: '/portal/fan-page', label: 'fan_page_nav', icon: Globe, flag: 'artist.fan_page' },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
       { href: '/portal/calendar', label: 'calendar', icon: CalendarDots, flag: 'artist.calendar' },
       { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },

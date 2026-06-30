@@ -60,6 +60,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [{ source: '/@:slug', destination: '/fan/:slug' }]
+  },
   async headers() {
     return [
       {

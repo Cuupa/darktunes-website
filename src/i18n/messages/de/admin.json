@@ -494,6 +494,7 @@
         "documents": "Privater Dokumententresor für Verträge und Rider.",
         "calendar": "Label-weiter Releasekalender mit persönlichem Filter.",
         "epk_builder": "Canvas-EPK-Builder und Share-Links.",
+        "fan_page": "Section-basierter Fan-Landing-Page-Builder (öffentlich /@slug).",
         "tour_planner": "TRACK-Tourplaner — Multi-Tour-Production, Day Sheets, Finance und Routing."
       },
       "journalist": {

@@ -36,6 +36,8 @@ export interface Artist {
   soundchartsId?: string
   lastSyncedAt?: string
   isVisible: boolean
+  /** When true, artist may publish Fan Pages without label review. */
+  landingPublishTrusted?: boolean
   /** Per-platform streaming URLs resolved via the Odesli API (Deezer, Tidal, Amazon Music, etc.) */
   platformLinks?: Record<string, string>
   /** Admin-configured storage quota in bytes. NULL = use system default (no limit). */

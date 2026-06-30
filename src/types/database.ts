@@ -611,6 +611,7 @@ export interface Database {
           image_position_x: number | null
           image_position_y: number | null
           image_scale: number | null
+          landing_publish_trusted: boolean
           created_at: string
           updated_at: string
         }
@@ -657,6 +658,7 @@ export interface Database {
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null
+          landing_publish_trusted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -703,6 +705,7 @@ export interface Database {
           image_position_x?: number | null
           image_position_y?: number | null
           image_scale?: number | null
+          landing_publish_trusted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1099,6 +1102,60 @@ export interface Database {
           payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference?: string | null
           settlement_period_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      artist_landing_pages: {
+        Row: {
+          id: string
+          artist_id: string
+          document: Record<string, unknown>
+          document_version: number
+          template_id: string | null
+          publish_status: 'draft' | 'pending_review' | 'published' | 'rejected'
+          seo_title: string | null
+          seo_description: string | null
+          og_image_asset_id: string | null
+          published_at: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_comment: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          document?: Record<string, unknown>
+          document_version?: number
+          template_id?: string | null
+          publish_status?: 'draft' | 'pending_review' | 'published' | 'rejected'
+          seo_title?: string | null
+          seo_description?: string | null
+          og_image_asset_id?: string | null
+          published_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_comment?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          document?: Record<string, unknown>
+          document_version?: number
+          template_id?: string | null
+          publish_status?: 'draft' | 'pending_review' | 'published' | 'rejected'
+          seo_title?: string | null
+          seo_description?: string | null
+          og_image_asset_id?: string | null
+          published_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_comment?: string | null
           created_at?: string
           updated_at?: string
         }
