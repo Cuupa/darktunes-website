@@ -17,7 +17,9 @@ Defined in `app/globals.css` `@theme {}`. `tailwind.config.js` is IDE-only — r
 
 ## Lenis smooth scroll
 
-Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-behavior: smooth`. Import `useLenis` from `LenisProvider.tsx`. Overflow containers in admin/portal/press layouts need `data-lenis-prevent`.
+Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-behavior: smooth`. Import `useLenis` from `LenisProvider.tsx`.
+
+**Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`. Do **not** put `overflow-y-auto` on a flex child whose parent is only `min-h-screen` — the pane never constrains height and Lenis blocks wheel events. Nested tables/panels may add their own `overflow-x-auto` + `data-lenis-prevent`.
 
 ## WCAG 2.1 AA (mandatory)
 
