@@ -58,14 +58,8 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     })),
   )
 
-  const riderAttachments: string[] = []
-  if (publicEpk.profile.riderStagePlotUrl) riderAttachments.push(publicEpk.profile.riderStagePlotUrl)
-  if (publicEpk.profile.riderTechnicalUrl) riderAttachments.push(publicEpk.profile.riderTechnicalUrl)
-  if (publicEpk.profile.riderHospitalityUrl) riderAttachments.push(publicEpk.profile.riderHospitalityUrl)
-
   const pdfBytes = await generateEpkPdfBytes({
     document,
-    attachmentUrls: riderAttachments,
   })
 
   recordEpkDownloadAsync({

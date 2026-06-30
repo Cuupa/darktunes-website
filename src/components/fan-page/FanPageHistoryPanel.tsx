@@ -56,6 +56,8 @@ export function FanPageHistoryPanel({ open, onClose }: FanPageHistoryPanelProps)
     return t(portalKey(label.key))
   }
 
+  if (!open) return null
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-md" aria-describedby={undefined}>

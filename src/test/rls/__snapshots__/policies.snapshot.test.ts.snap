@@ -46,6 +46,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "artist_territory_metrics: admin all",
   "artist_territory_metrics: artist read own",
   "artists: admin delete",
+  "artists: artist read own",
   "artists: can_manage_artists insert",
   "artists: can_manage_artists update",
   "artists: own artist update",
@@ -428,6 +429,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "artists": [
     "artists: admin delete",
+    "artists: artist read own",
     "artists: can_manage_artists insert",
     "artists: can_manage_artists update",
     "artists: own artist update",

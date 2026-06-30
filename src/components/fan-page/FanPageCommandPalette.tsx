@@ -72,6 +72,8 @@ export function FanPageCommandPalette({
     setOpen(false)
   }
 
+  if (!open) return null
+
   return (
     <CommandDialog
       open={open}

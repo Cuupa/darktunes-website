@@ -59,12 +59,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     document = state.document
   }
 
-  const profile = await getArtistProfileByArtistId(supabase, artist.id)
-  const riderAttachments: string[] = []
-  if (profile?.riderStagePlotUrl) riderAttachments.push(profile.riderStagePlotUrl)
-  if (profile?.riderTechnicalUrl) riderAttachments.push(profile.riderTechnicalUrl)
-  if (profile?.riderHospitalityUrl) riderAttachments.push(profile.riderHospitalityUrl)
-
   const { serverEnv } = await import('@/lib/env.server')
   const fontRecords = await listEpkFonts(supabase, artist.id).catch(() => [])
   const hydratedDocument = ensureDocumentFontsForExport(document, fontRecords.map((font) => ({
@@ -76,7 +70,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const pdfBytes = await generateEpkPdfBytes({
     document: hydratedDocument,
-    attachmentUrls: riderAttachments,
   })
 
   recordEpkDownloadAsync({

@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const createServerSupabaseClientMock = vi.fn()
+const createServiceRoleSupabaseClientMock = vi.fn()
 const resolvePortalArtistMock = vi.fn()
 const upsertArtistProfileMock = vi.fn()
 const revalidatePathMock = vi.fn()
-
-const createBearerAuthSupabaseClientMock = vi.fn()
+const authenticatePortalBearerMock = vi.fn()
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: createServerSupabaseClientMock,
-  createBearerAuthSupabaseClient: createBearerAuthSupabaseClientMock,
+  createServiceRoleSupabaseClient: createServiceRoleSupabaseClientMock,
+}))
+
+vi.mock('@/lib/portal/bearerAuth', () => ({
+  authenticatePortalBearer: authenticatePortalBearerMock,
 }))
 
 vi.mock('@/lib/api/artistProfiles', () => ({
@@ -35,18 +37,15 @@ describe('PUT /api/portal/profile', () => {
     const updateMock = vi.fn(() => ({ eq: eqMock }))
     const fromMock = vi.fn(() => ({ update: updateMock }))
 
-    const supabaseClient = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-          error: null,
-        }),
-      },
-      from: fromMock,
-    }
+    const bearerClient = { from: vi.fn() }
+    const serviceClient = { from: fromMock }
 
-    createServerSupabaseClientMock.mockResolvedValue(supabaseClient)
-    createBearerAuthSupabaseClientMock.mockResolvedValue(supabaseClient)
+    authenticatePortalBearerMock.mockResolvedValue({
+      token: 'tok',
+      user: { id: 'user-1' },
+      supabase: bearerClient,
+    })
+    createServiceRoleSupabaseClientMock.mockResolvedValue(serviceClient)
 
     resolvePortalArtistMock.mockResolvedValue({ id: artistId, slug: 'artist-slug' })
     upsertArtistProfileMock.mockResolvedValue({ id: 'profile-1' })
@@ -104,11 +103,10 @@ describe('PUT /api/portal/profile', () => {
       }),
     )
 
-    const supabase = createServerSupabaseClientMock.mock.results[0]?.value
-    const client = await supabase
-    const updateBuilder = client.from.mock.results[0]?.value
+    const serviceClient = await createServiceRoleSupabaseClientMock.mock.results[0]?.value
+    const updateBuilder = serviceClient.from.mock.results[0]?.value
 
-    expect(client.from).toHaveBeenCalledWith('artists')
+    expect(serviceClient.from).toHaveBeenCalledWith('artists')
     expect(updateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         image_url: 'https://cdn.example.com/photo.jpg',
