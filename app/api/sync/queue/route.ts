@@ -3,23 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
+import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { enqueueArtistSyncJobs } from '@/lib/api/syncQueue'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
-import type { ServerEnv } from '@/lib/env.server'
-
 // Route-segment config: allow up to 300 seconds on Vercel Pro.
 export const maxDuration = 300
-
-async function verifyToken(token: string, env: ServerEnv): Promise<void> {
-  const admin = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false } },
-  )
-  const { data, error } = await admin.auth.getUser(token)
-  if (error || !data.user) throw new ApiError(401, 'Unauthorized')
-}
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { serverEnv } = await import('@/lib/env.server')
@@ -33,7 +22,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const isCronAuthorized = Boolean(cronSecret && isValidCronSecret(authHeader, cronSecret))
 
   if (!isCronAuthorized) {
-    await verifyToken(authHeader.slice(7), serverEnv)
+    const token = extractBearerToken(authHeader)
+    await verifySyncTrigger(token)
   }
 
   // 2. Load all artist IDs

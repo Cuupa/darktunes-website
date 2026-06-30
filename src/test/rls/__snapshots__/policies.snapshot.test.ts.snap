@@ -82,8 +82,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "custom_permission_definitions: admin write",
   "custom_role_permissions: admin read",
   "custom_role_permissions: admin write",
+  "custom_role_permissions: assigned read",
   "custom_roles: admin read",
   "custom_roles: admin write",
+  "custom_roles: assigned read",
   "distributor_import_batches: admin all",
   "editor_activity_log: admin read",
   "editor_activity_log: editor insert own",
@@ -235,6 +237,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "tours: artist manage",
   "user_custom_roles: admin read",
   "user_custom_roles: admin write",
+  "user_custom_roles: own read",
   "user_roles: admin all",
   "user_roles: own read",
   "users: admin read all",
@@ -484,10 +487,12 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "custom_role_permissions": [
     "custom_role_permissions: admin read",
     "custom_role_permissions: admin write",
+    "custom_role_permissions: assigned read",
   ],
   "custom_roles": [
     "custom_roles: admin read",
     "custom_roles: admin write",
+    "custom_roles: assigned read",
   ],
   "distributor_import_batches": [
     "distributor_import_batches: admin all",
@@ -771,6 +776,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "user_custom_roles": [
     "user_custom_roles: admin read",
     "user_custom_roles: admin write",
+    "user_custom_roles: own read",
   ],
   "user_roles": [
     "user_roles: admin all",

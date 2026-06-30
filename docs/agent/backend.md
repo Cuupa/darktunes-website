@@ -1,8 +1,25 @@
 # Backend, Admin & Sync
 
+## RBAC (roles & permissions)
+
+**SSOT:** `src/lib/rbac/` — registry, `resolveEffectiveAccess`, guards, route registry.
+
+| Layer | Module |
+|-------|--------|
+| Edge routes | `proxy.ts` → `resolveEffectiveAccess` + capability guards |
+| API Bearer | `src/lib/adminAuth.ts` → `verifyAdmin`, `verifyAdminOrEditor`, `verifyPermission`, `verifySyncTrigger` |
+| Admin pages (defense-in-depth) | `requirePageCapability('admin.panel.full')` from `src/lib/rbac/requireAdminPage.ts` |
+| RLS | `has_permission()` in `supabase/reset.sql` — system `role_permissions` + `user_custom_roles` |
+
+**System roles:** `admin`, `editor`, `journalist`, `artist`, `user`. Deprecated `press` enum value is aliased to `journalist` at runtime (`normalizeRole`).
+
+**Custom roles:** Admin-defined in `/admin/settings` → `custom_roles` + `user_custom_roles`. Enforced in API (`resolveEffectiveAccess`) and RLS (`has_permission`).
+
+**Adding a system role:** enum in `reset.sql` → `role_permissions` seed → `src/lib/rbac/registry.ts` → `sync_primary_role` CASE → run `npx tsx scripts/validate-rbac.ts`.
+
 ## Admin route auth
 
-Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verifyAdmin`, `verifyPermission`. All admin routes wrap `withErrorHandler`.
+Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verifyAdmin`, `verifyPermission`, `verifySyncTrigger`. All admin routes wrap `withErrorHandler`.
 
 `RolePermissionKey`: `can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`.
 

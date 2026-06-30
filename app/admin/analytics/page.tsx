@@ -5,10 +5,9 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-import { getUserRoleWithClient } from '@/lib/getUserRole'
+import { requirePageCapability } from '@/lib/rbac'
 import { getTranslations } from 'next-intl/server'
 import { getLabelAnalyticsSnapshot } from '@/lib/api/labelAnalytics'
 import { getAllJournalistDownloads } from '@/lib/api/journalistDownloads'
@@ -35,14 +34,6 @@ function AnalyticsSkeleton() {
 
 async function AnalyticsContent() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login?returnTo=/admin/analytics')
-
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (role !== 'admin') redirect('/login?error=unauthorized')
 
   const [snapshot, pressDownloads, auditEvents, websiteEngagement] = await Promise.all([
     getLabelAnalyticsSnapshot(supabase).catch(() => ({
@@ -73,6 +64,7 @@ async function AnalyticsContent() {
 }
 
 export default async function AdminAnalyticsPage() {
+  await requirePageCapability('admin.panel.full')
   const t = await getTranslations('admin.labelIntelligence')
 
   return (

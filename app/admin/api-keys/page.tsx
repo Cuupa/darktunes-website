@@ -5,10 +5,12 @@
 export const dynamic = 'force-dynamic'
 
 import { getTranslations } from 'next-intl/server'
+import { requirePageCapability } from '@/lib/rbac'
 import { AdminPageShell } from '../_components/AdminPageShell'
 import { AdminApiKeysWrapper } from '../_components/AdminApiKeysWrapper'
 
 export default async function AdminApiKeysPage() {
+  await requirePageCapability('admin.panel.full')
   const t = await getTranslations('admin.apiKeys')
 
   return (

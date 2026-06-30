@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createR2Client } from '@/lib/r2Utils'
 import { generatePresignedDownloadUrl } from '@/lib/portal/presignedUrl'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { logDownload } from '@/lib/api/journalistDownloads'
 
 export async function getJournalistDownloadUrl(
@@ -18,12 +19,8 @@ export async function getJournalistDownloadUrl(
     } = await supabase.auth.getUser()
     if (!user) return { url: null }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    if (!profile || !['journalist', 'admin'].includes(profile.role)) return { url: null }
+    const role = await getUserRoleWithClient(supabase, user.id)
+    if (!role || !['journalist', 'admin'].includes(role)) return { url: null }
 
     let url = assetKey
     let isExternal = false

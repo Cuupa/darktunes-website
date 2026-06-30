@@ -71,7 +71,7 @@ BEGIN
   END IF;
 END $$;
 
--- Ensure 'press' exists (added for journalist/press dashboard access)
+-- Ensure 'press' exists (deprecated — migrated to journalist; kept for enum compatibility)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -125,6 +125,10 @@ VALUES
   ('user',       FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
 ON CONFLICT (role) DO NOTHING;
 
+-- Migrate deprecated press role to journalist (idempotent)
+UPDATE public.users SET role = 'journalist' WHERE role = 'press';
+UPDATE public.user_roles SET role = 'journalist' WHERE role = 'press';
+
 DROP TRIGGER IF EXISTS role_permissions_updated_at ON public.role_permissions;
 CREATE TRIGGER role_permissions_updated_at
   BEFORE UPDATE ON public.role_permissions
@@ -143,13 +147,29 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM public.users WHERE id = auth.uid()
+  SELECT role::TEXT FROM public.users WHERE id = auth.uid()
+$$;
+
+-- Maps deprecated `press` enum value to `journalist` for permission checks.
+CREATE OR REPLACE FUNCTION public.get_effective_role()
+RETURNS public.user_role
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE
+    WHEN role = 'press' THEN 'journalist'::public.user_role
+    ELSE role
+  END
+  FROM public.users
+  WHERE id = auth.uid()
+  LIMIT 1;
 $$;
 
 -- ---------------------------------------------------------------------------
--- HELPER: permission check — looks up the calling user's role in profiles,
--- joins role_permissions, and returns the boolean value for the given column.
--- SECURITY DEFINER bypasses RLS so this is safe to call from RLS policies.
+-- HELPER: permission check — system role_permissions + supplemental custom roles.
+-- Admin always passes. SECURITY DEFINER bypasses RLS recursion.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.has_permission(perm TEXT)
 RETURNS BOOLEAN
@@ -158,19 +178,35 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT CASE perm
-    WHEN 'can_publish_news'    THEN rp.can_publish_news
-    WHEN 'can_edit_news'       THEN rp.can_edit_news
-    WHEN 'can_manage_artists'  THEN rp.can_manage_artists
-    WHEN 'can_manage_releases' THEN rp.can_manage_releases
-    WHEN 'can_manage_videos'   THEN rp.can_manage_videos
-    WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
-    ELSE FALSE
-  END
-  FROM public.users p
-  JOIN public.role_permissions rp ON rp.role = p.role
-  WHERE p.id = auth.uid()
-  LIMIT 1;
+  SELECT
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid() AND u.role = 'admin'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.users p
+      JOIN public.role_permissions rp ON rp.role = (
+        CASE WHEN p.role = 'press' THEN 'journalist'::public.user_role ELSE p.role END
+      )
+      WHERE p.id = auth.uid()
+        AND CASE perm
+          WHEN 'can_publish_news'     THEN rp.can_publish_news
+          WHEN 'can_edit_news'        THEN rp.can_edit_news
+          WHEN 'can_manage_artists'   THEN rp.can_manage_artists
+          WHEN 'can_manage_releases'  THEN rp.can_manage_releases
+          WHEN 'can_manage_videos'    THEN rp.can_manage_videos
+          WHEN 'can_view_admin_panel' THEN rp.can_view_admin_panel
+          ELSE FALSE
+        END
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_custom_roles ucr
+      JOIN public.custom_role_permissions crp ON crp.role_id = ucr.role_id
+      WHERE ucr.user_id = auth.uid()
+        AND crp.permission_name = perm
+    );
 $$;
 
 -- =============================================================================
@@ -2855,7 +2891,7 @@ CREATE POLICY "news_posts: public read" ON public.news_posts
     )
     OR public.has_permission('can_edit_news')
     OR public.has_permission('can_publish_news')
-    OR public.get_my_role() IN ('admin', 'editor', 'journalist', 'press')
+    OR public.get_my_role() IN ('admin', 'editor', 'journalist')
   );
 
 -- Requires can_publish_news permission (admin always bypasses)
@@ -4228,6 +4264,16 @@ ALTER TABLE public.custom_roles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "custom_roles: admin read"  ON public.custom_roles;
 DROP POLICY IF EXISTS "custom_roles: admin write" ON public.custom_roles;
 
+DROP POLICY IF EXISTS "custom_roles: assigned read" ON public.custom_roles;
+CREATE POLICY "custom_roles: assigned read" ON public.custom_roles
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.user_custom_roles ucr
+      WHERE ucr.role_id = custom_roles.id
+        AND ucr.user_id = auth.uid()
+    )
+  );
+
 CREATE POLICY "custom_roles: admin read"  ON public.custom_roles
   FOR SELECT USING (public.get_my_role() = 'admin');
 CREATE POLICY "custom_roles: admin write" ON public.custom_roles
@@ -4246,6 +4292,16 @@ CREATE TABLE IF NOT EXISTS public.custom_role_permissions (
 ALTER TABLE public.custom_role_permissions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "custom_role_permissions: admin read"  ON public.custom_role_permissions;
 DROP POLICY IF EXISTS "custom_role_permissions: admin write" ON public.custom_role_permissions;
+
+DROP POLICY IF EXISTS "custom_role_permissions: assigned read" ON public.custom_role_permissions;
+CREATE POLICY "custom_role_permissions: assigned read" ON public.custom_role_permissions
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.user_custom_roles ucr
+      WHERE ucr.role_id = custom_role_permissions.role_id
+        AND ucr.user_id = auth.uid()
+    )
+  );
 
 CREATE POLICY "custom_role_permissions: admin read"  ON public.custom_role_permissions
   FOR SELECT USING (public.get_my_role() = 'admin');
@@ -4270,6 +4326,10 @@ CREATE INDEX IF NOT EXISTS idx_user_custom_roles_role_id ON public.user_custom_r
 ALTER TABLE public.user_custom_roles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "user_custom_roles: admin read"  ON public.user_custom_roles;
 DROP POLICY IF EXISTS "user_custom_roles: admin write" ON public.user_custom_roles;
+
+DROP POLICY IF EXISTS "user_custom_roles: own read" ON public.user_custom_roles;
+CREATE POLICY "user_custom_roles: own read" ON public.user_custom_roles
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "user_custom_roles: admin read"  ON public.user_custom_roles
   FOR SELECT USING (public.get_my_role() = 'admin');
@@ -4824,6 +4884,7 @@ BEGIN
       WHEN 'admin'      THEN 1
       WHEN 'editor'     THEN 2
       WHEN 'journalist' THEN 3
+      WHEN 'press'      THEN 3
       WHEN 'artist'     THEN 4
       ELSE                   5
     END

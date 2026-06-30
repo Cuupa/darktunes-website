@@ -22,10 +22,13 @@ import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
 import { isEditorAllowedAdminPath } from '@/lib/editor/editorAdminPaths'
 import { DEFAULT_FEATURE_TOGGLES, getFeatureToggles } from '@/lib/featureToggles'
 import { hasPortalArtistMembership } from '@/lib/portal/membership'
+import {
+  hasAdminPanelAccess,
+  hasPressDashboardAccess,
+  resolveEffectiveAccess,
+} from '@/lib/rbac'
 import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 import type { UserRole } from '@/types/users'
-
-const ADMIN_ROLES = new Set(['admin', 'editor'])
 
 function classifyRoute(pathname: string) {
   return {
@@ -141,21 +144,16 @@ export async function proxy(request: NextRequest) {
   const isPressDashboardRoute = route.isPressDashboardRoute
   const isProtectedRoute = protectedRoute
 
-  // Fetch the user's role once for all route sections that need it.
-  // This avoids repeated round-trips to the users table within the same
-  // proxy invocation when a request touches multiple guarded areas.
-  let profile: { role: string } | null = null
+  // Resolve role + effective capabilities once per protected request.
+  let profileRole: UserRole | null = null
+  let effectiveAccess: Awaited<ReturnType<typeof resolveEffectiveAccess>> | null = null
   if (user && (isProtectedRoute || isLoginPage)) {
-    const { data } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-    profile = data
+    effectiveAccess = await resolveEffectiveAccess(supabase, user.id)
+    profileRole = effectiveAccess.primaryRole
   }
 
   // Central Login Redirection Logic for Authenticated Users
-  if (isLoginPage && user && profile) {
+  if (isLoginPage && user && profileRole) {
     if (shouldStayOnLoginPage(request.nextUrl.searchParams)) {
       return supabaseResponse
     }
@@ -170,7 +168,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    url.pathname = resolveRedirectPath(profile.role as UserRole)
+    url.pathname = resolveRedirectPath(profileRole)
     url.search = ''
     return NextResponse.redirect(url)
   }
@@ -184,24 +182,24 @@ export async function proxy(request: NextRequest) {
   }
 
   // --- Admin/Editor route protection ---
-  if ((isAdminRoute || isEditorRoute) && user) {
-    const hasAdminAccess = profile ? ADMIN_ROLES.has(profile.role) : false
+  if ((isAdminRoute || isEditorRoute) && user && effectiveAccess) {
+    const hasAdminAccess = hasAdminPanelAccess(effectiveAccess)
 
-    if (isEditorRoute && profile?.role === 'admin') {
+    if (isEditorRoute && effectiveAccess.isAdmin) {
       const adminUrl = request.nextUrl.clone()
       adminUrl.pathname = '/admin'
       adminUrl.search = ''
       return NextResponse.redirect(adminUrl)
     }
 
-    if (isEditorRoute && profile && !ADMIN_ROLES.has(profile.role)) {
+    if (isEditorRoute && !hasAdminAccess) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/login'
       loginUrl.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(loginUrl)
     }
 
-    if (isEditorRoute && profile?.role === 'editor') {
+    if (isEditorRoute && profileRole === 'editor') {
       const toggles = await getFeatureToggles(supabase).catch(() => DEFAULT_FEATURE_TOGGLES)
       if (!toggles.editorTools) {
         const loginUrl = request.nextUrl.clone()
@@ -211,7 +209,7 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    if (isAdminRoute && profile?.role === 'editor' && !isEditorAllowedAdminPath(pathname)) {
+    if (isAdminRoute && profileRole === 'editor' && !isEditorAllowedAdminPath(pathname)) {
       const editorUrl = request.nextUrl.clone()
       editorUrl.pathname = '/editor'
       editorUrl.search = ''
@@ -227,8 +225,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // --- Portal route protection ---
-  if (isPortalRoute && !isPortalAcceptInvitePage && user) {
-    const isAdmin = profile?.role === 'admin'
+  if (isPortalRoute && !isPortalAcceptInvitePage && user && effectiveAccess) {
+    const isAdmin = effectiveAccess.isAdmin
 
     if (!isAdmin) {
       let hasMembership = false
@@ -245,8 +243,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // --- Press Dashboard protection ---
-  if (isPressDashboardRoute && user) {
-    if (!profile || !['journalist', 'admin'].includes(profile.role)) {
+  if (isPressDashboardRoute && user && effectiveAccess) {
+    if (!hasPressDashboardAccess(effectiveAccess)) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = '/login'
       loginUrl.searchParams.set('error', 'unauthorized')

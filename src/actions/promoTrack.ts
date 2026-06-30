@@ -14,6 +14,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { isPressAudioPreviewEnabled, isPromoPoolEnabled } from '@/lib/pressAccess'
 import { createR2Client } from '@/lib/r2Utils'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -30,13 +31,8 @@ export async function getPromoTrackStreamUrl(r2Key: string): Promise<{ url: stri
 
   if (!user) throw new Error('Unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !(['journalist', 'admin'] as string[]).includes(profile.role)) {
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (!role || !['journalist', 'admin'].includes(role)) {
     throw new Error('Forbidden')
   }
 

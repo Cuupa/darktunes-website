@@ -1,9 +1,7 @@
 /**
  * app/portal/_components/PortalAccessGate.tsx — Client Component
  *
- * Shown to authenticated users who do not have the 'artist' or 'admin' role.
- * Displays a clear explanation and instructions for requesting access.
- * The "Sign Out" button signs the user out before redirecting to the login page.
+ * Shown to authenticated users without artist portal membership.
  */
 
 'use client'
@@ -41,28 +39,25 @@ export function PortalAccessGate({ role }: PortalAccessGateProps) {
 
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Access Pending</h1>
-          {role === 'user' ? (
-            <p className="text-muted-foreground">
-              Your account has not been assigned an artist role yet. An administrator needs to
-              assign you the <strong>Artist</strong> role and link your account to an artist profile
-              before you can access the portal.
-            </p>
-          ) : (
-            <p className="text-muted-foreground">
-              Your account role (<strong>{role}</strong>) does not include access to the Artist
-              Portal. Please contact an administrator if you believe this is an error.
-            </p>
-          )}
+          <p className="text-muted-foreground">
+            Your account is not linked to an artist profile yet. Portal access is granted via{' '}
+            <strong>artist membership</strong> — an administrator must add you to an artist in
+            User Management before you can use the portal.
+          </p>
         </div>
 
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-left space-y-2">
           <p className="font-medium">What to do next:</p>
           <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
             <li>Contact the label administrator</li>
-            <li>Ask them to assign you the <strong>Artist</strong> role in User Management</li>
-            <li>Ask them to link your account to your artist profile</li>
+            <li>Ask them to link your account to your artist profile (artist membership)</li>
             <li>Sign out and sign back in once they&apos;ve made the changes</li>
           </ol>
+          {role !== 'user' && (
+            <p className="text-muted-foreground pt-1">
+              Current role: <strong>{role}</strong> — membership is required regardless of role.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

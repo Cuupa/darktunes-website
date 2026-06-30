@@ -5,6 +5,7 @@
  * These supplement the database types in src/types/database.ts.
  */
 
+/** `press` is deprecated — runtime maps it to `journalist` via `normalizeRole()`. */
 export type UserRole = 'admin' | 'editor' | 'journalist' | 'user' | 'artist' | 'press'
 
 /** Roles assignable via admin invite — plain `user` is reserved for organic signups. */
