@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { ReactLenis, useLenis } from 'lenis/react'
+import { isDashboardRoute } from '@/lib/scroll/dashboardRoutes'
 import { shouldPreventLenis } from '@/lib/scroll/lenisPrevent'
 
 export { useLenis }
@@ -10,15 +12,34 @@ interface LenisProviderProps {
   children: ReactNode
 }
 
+/** Stop Lenis on admin/portal so ScrollableAppShell uses native wheel scroll. */
+function DashboardLenisGuard() {
+  const lenis = useLenis()
+  const pathname = usePathname()
+  const onDashboard = isDashboardRoute(pathname)
+
+  useEffect(() => {
+    if (!lenis) return
+    if (onDashboard) {
+      lenis.stop()
+    } else if (document.body.dataset.scrollLocked !== '1') {
+      lenis.start()
+    }
+  }, [lenis, onDashboard])
+
+  return null
+}
+
 function ScrollLockObserver() {
   const lenis = useLenis()
+  const pathname = usePathname()
 
   useEffect(() => {
     if (!lenis) return
     const observer = new MutationObserver(() => {
       if (document.body.dataset.scrollLocked === '1') {
         lenis.stop()
-      } else {
+      } else if (!isDashboardRoute(pathname)) {
         lenis.start()
       }
     })
@@ -27,7 +48,7 @@ function ScrollLockObserver() {
       attributeFilter: ['data-scroll-locked'],
     })
     return () => observer.disconnect()
-  }, [lenis])
+  }, [lenis, pathname])
 
   return null
 }
@@ -52,6 +73,7 @@ export function LenisProvider({ children }: LenisProviderProps) {
         prevent: shouldPreventLenis,
       }}
     >
+      <DashboardLenisGuard />
       <ScrollLockObserver />
       {children}
     </ReactLenis>

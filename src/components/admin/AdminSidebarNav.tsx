@@ -277,7 +277,7 @@ export function AdminSidebarNav() {
 
       {/* Desktop sidebar — hidden below md */}
       <aside
-        className="hidden md:flex flex-col h-full w-56 shrink-0 border-r border-border bg-card"
+        className="hidden h-full min-h-0 w-56 shrink-0 flex-col border-r border-border bg-card md:flex"
         aria-label="Admin navigation"
       >
         {/* Brand header */}

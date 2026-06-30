@@ -19,7 +19,7 @@ interface AdminPageShellProps {
 
 export function AdminPageShell({ title, description, children, actions, fill }: AdminPageShellProps) {
   return (
-    <div className={fill ? 'flex flex-col h-full min-h-0' : 'flex flex-col min-h-full'}>
+    <div className={fill ? 'flex h-full min-h-0 w-full flex-col' : 'flex w-full flex-col'}>
       <header className="shrink-0 border-b border-border bg-card px-6 py-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">{title}</h1>

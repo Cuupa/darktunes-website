@@ -19,7 +19,17 @@ Defined in `app/globals.css` `@theme {}`. `tailwind.config.js` is IDE-only — r
 
 Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-behavior: smooth`. Import `useLenis` from `LenisProvider.tsx`.
 
-**Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`. Do **not** put `overflow-y-auto` on a flex child whose parent is only `min-h-screen` — the pane never constrains height and Lenis blocks wheel events. Nested tables/panels may add their own `overflow-x-auto` + `data-lenis-prevent`.
+**Dashboard routes:** `DashboardLenisGuard` in `LenisProvider.tsx` calls `lenis.stop()` on `/admin/*` and `/portal/*` (`src/lib/scroll/dashboardRoutes.ts`) so wheel events reach native scroll inside `ScrollableAppShell`. Public pages keep Lenis active.
+
+**Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`. That inner pane is the **sole vertical scroll owner** for list pages.
+
+| Do | Don't |
+|----|-------|
+| Let `ScrollableAppShell` scroll page content | Put `min-h-screen` on admin/portal content pages |
+| Use `overflow-x-auto` on wide tables | Add a root `overflow-y-auto` wrapper on list managers |
+| Use `AdminPageShell` `fill` only for full-bleed tools (e.g. `/admin/assets` file explorer) | Use `fill` + nested `overflow-y-auto` on standard CRUD lists |
+
+CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`). Fullscreen auth/loading gates (`items-center justify-center`) may still use `min-h-screen`.
 
 ## WCAG 2.1 AA (mandatory)
 
