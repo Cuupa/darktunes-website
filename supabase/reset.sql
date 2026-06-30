@@ -3281,6 +3281,14 @@ CREATE POLICY "artist_landing_pages: admin all" ON public.artist_landing_pages
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
+DROP POLICY IF EXISTS "artist_landing_pages: editor+ read all" ON public.artist_landing_pages;
+CREATE POLICY "artist_landing_pages: editor+ read all" ON public.artist_landing_pages
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "artist_landing_pages: editor+ update" ON public.artist_landing_pages;
+CREATE POLICY "artist_landing_pages: editor+ update" ON public.artist_landing_pages
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+
 CREATE POLICY "artist_landing_pages: public read published" ON public.artist_landing_pages
   FOR SELECT USING (
     publish_status = 'published'

@@ -206,6 +206,8 @@ export interface ArtistFormData {
   featured: boolean
   isEuNonGerman: boolean
   isVisible: boolean
+  /** When true, artist may publish fan pages without label review. Admin-only. */
+  landingPublishTrusted: boolean
   notes: string
   spotifyId: string
   discogsId: string
@@ -311,6 +313,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   const featured = watch('featured')
   const isEuNonGerman = watch('isEuNonGerman')
   const isVisible = watch('isVisible')
+  const landingPublishTrusted = watch('landingPublishTrusted')
   const spotifyId = watch('spotifyId')
   const spotifyUrl = watch('spotifyUrl')
   const appleMusicUrl = watch('appleMusicUrl')
@@ -709,6 +712,15 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   disabled={isLoading}
                 />
                 <Label htmlFor="isEuNonGerman">EU Non-German</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="landingPublishTrusted"
+                  checked={landingPublishTrusted}
+                  onCheckedChange={(val) => setValue('landingPublishTrusted', val)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="landingPublishTrusted">Trusted fan page publish</Label>
               </div>
             </div>
           )}

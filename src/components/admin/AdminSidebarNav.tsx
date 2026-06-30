@@ -47,6 +47,7 @@ import {
   List,
   ChartLine,
   SlidersHorizontal,
+  Globe,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -98,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false },
       { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false },
+      { label: 'Fan Page Reviews',    href: '/admin/fan-page-reviews',    editorHref: getCmsTabPath('editor', 'fan-page-reviews'),    icon: Globe,        adminOnly: false },
       { label: 'Submission Form',     href: '/admin/submission-form',     icon: SlidersHorizontal,                              adminOnly: true  },
     ],
   },

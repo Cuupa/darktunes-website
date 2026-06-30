@@ -32,7 +32,7 @@ export async function getDraftFanPageByArtistId(
     .maybeSingle()
 
   if (artistError) throw new Error(artistError.message)
-  if (!artist || !artist.is_visible) return null
+  if (!artist) return null
 
   const { data: page, error: pageError } = await db
     .from('artist_landing_pages')

@@ -27,6 +27,7 @@ const EMPTY_FORM: ArtistFormData = {
   featured: false,
   isEuNonGerman: false,
   isVisible: true,
+  landingPublishTrusted: false,
   notes: '',
   spotifyId: '',
   discogsId: '',

@@ -9,6 +9,7 @@ export type EditorDashboardTab =
   | 'assets'
   | 'release-submissions'
   | 'video-submissions'
+  | 'fan-page-reviews'
   | 'events'
   | 'genres'
   | 'promo-log'
