@@ -12,11 +12,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { withErrorHandler, buildApiError } from '@/lib/errors'
-import {
-  createBearerAuthSupabaseClient,
-  createServerSupabaseClient,
-} from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 import { z } from 'zod'
 import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
@@ -83,21 +81,8 @@ const profileBodySchema = z.object({
 const normalizeUrl = (v: NullableUrl): string | null => (v === '' ? null : v ?? null)
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  // 1. Authenticate
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw buildApiError('AUTH_TOKEN_MISSING', 401)
-
-  // Validate the Bearer token, then use a JWT-authenticated client so RLS
-  // policies see auth.uid() correctly (cookie session may be absent/stale).
-  const authClient = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await authClient.auth.getUser(token)
-
-  if (authError || !user) throw buildApiError('AUTH_TOKEN_INVALID', 401)
-
-  const supabase = await createBearerAuthSupabaseClient(token)
+  // 1. Authenticate (Bearer JWT + RLS-aware Supabase client)
+  const { supabase, user } = await authenticatePortalBearer(req)
 
   // 2. Validate body
   const body: unknown = await req.json()
@@ -195,13 +180,19 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
   if (image_url !== undefined) artistUpdate.image_url = normalizeUrl(image_url)
 
-  const { error: artistUpdateError } = await supabase
+  // Shared artist fields (bio, genres, URLs, image) live on `artists`. Membership
+  // is already verified above; use the service-role client so band members who
+  // are not `artists.user_id` can still persist portal edits when production
+  // RLS predates the artist_members-based update policy.
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const { error: artistUpdateError } = await serviceDb
     .from('artists')
     .update(artistUpdate)
     .eq('id', artist.id)
 
   if (artistUpdateError) {
-    throw buildApiError('FORBIDDEN', 403)
+    console.error('[portal/profile] artists update failed:', artistUpdateError)
+    throw buildApiError('SERVER_ERROR', 500)
   }
 
   // 6. Invalidate public-facing artist pages so changes are reflected immediately

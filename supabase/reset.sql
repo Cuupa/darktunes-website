@@ -2744,6 +2744,7 @@ DROP POLICY IF EXISTS "artists: editor+ insert"               ON public.artists;
 DROP POLICY IF EXISTS "artists: editor+ update"               ON public.artists;
 DROP POLICY IF EXISTS "artists: admin delete"                 ON public.artists;
 DROP POLICY IF EXISTS "artists: own artist update"            ON public.artists;
+DROP POLICY IF EXISTS "artists: artist read own"              ON public.artists;
 DROP POLICY IF EXISTS "artists: can_manage_artists insert"    ON public.artists;
 DROP POLICY IF EXISTS "artists: can_manage_artists update"    ON public.artists;
 
@@ -2752,6 +2753,13 @@ CREATE POLICY "artists: public read visible" ON public.artists
   FOR SELECT USING (
     is_visible = TRUE
     OR public.get_my_role() IN ('admin', 'editor')
+  );
+
+-- Portal members can read their own artist row even when is_visible = FALSE
+CREATE POLICY "artists: artist read own" ON public.artists
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am
+            WHERE am.artist_id = id AND am.user_id = auth.uid())
   );
 
 -- Requires can_manage_artists permission (admin always bypasses)
@@ -2770,7 +2778,7 @@ CREATE POLICY "artists: can_manage_artists update" ON public.artists
 CREATE POLICY "artists: admin delete" ON public.artists
   FOR DELETE USING (public.get_my_role() = 'admin');
 
--- Artists can update their own row via user_id (Artist Portal)
+-- Portal members can update shared artist fields (bio, genres, URLs, image)
 CREATE POLICY "artists: own artist update" ON public.artists
   FOR UPDATE
   USING (
