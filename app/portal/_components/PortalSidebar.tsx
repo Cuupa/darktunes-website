@@ -317,7 +317,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
         </Sheet>
       </header>
 
-      <aside className="portal-sidebar hidden md:flex flex-col min-h-screen w-64 shrink-0 border-r border-border bg-card">
+      <aside className="portal-sidebar hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
         <div className="p-6">
           <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
         </div>

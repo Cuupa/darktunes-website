@@ -31,6 +31,7 @@ import { PortalOfflineProvider } from './_components/PortalOfflineProvider'
 import { PortalOfflineBanner } from './_components/PortalOfflineBanner'
 import { PortalAccessGate } from './_components/PortalAccessGate'
 import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
+import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -45,7 +46,7 @@ function PortalLayoutSkeleton() {
 
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar skeleton */}
       <div className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -187,33 +188,32 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     redirect(onboardingUrl)
   }
 
+  const isEpkBuilder = currentPath.includes('/portal/epk-builder')
+
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-x-clip">
-      <PortalNotificationProvider
-        artistId={artist?.id ?? null}
-        initialUnreadCount={unreadMessages}
+    <PortalNotificationProvider
+      artistId={artist?.id ?? null}
+      initialUnreadCount={unreadMessages}
+    >
+      <ScrollableAppShell
+        lockScroll={isEpkBuilder}
+        mainClassName="border-t border-primary/10 md:border-t-0"
+        contentClassName={isEpkBuilder ? 'p-0' : 'p-4 sm:p-6 md:p-8'}
+        sidebar={(
+          <PortalSidebar
+            artists={artists}
+            userId={user?.id ?? null}
+            featureFlags={featureFlags}
+          />
+        )}
       >
-        <PortalSidebar
-          artists={artists}
-          userId={user?.id ?? null}
-          featureFlags={featureFlags}
-        />
-        <main
-          data-lenis-prevent=""
-          className={`flex-1 w-full min-w-0 border-t md:border-t-0 border-primary/10 overscroll-contain ${
-            currentPath.includes('/portal/epk-builder')
-              ? 'p-0 overflow-hidden'
-              : 'p-4 sm:p-6 md:p-8 max-w-none overflow-y-auto'
-          }`}
-        >
-          <PortalOfflineProvider>
-            <PortalQueryProvider>
-              <PortalOfflineBanner />
-              {children}
-            </PortalQueryProvider>
-          </PortalOfflineProvider>
-        </main>
-      </PortalNotificationProvider>
-    </div>
+        <PortalOfflineProvider>
+          <PortalQueryProvider>
+            <PortalOfflineBanner />
+            {children}
+          </PortalQueryProvider>
+        </PortalOfflineProvider>
+      </ScrollableAppShell>
+    </PortalNotificationProvider>
   )
 }

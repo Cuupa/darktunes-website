@@ -29,6 +29,7 @@
 import { Suspense } from 'react'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav'
+import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 
 interface AdminClientLayoutProps {
   children: React.ReactNode
@@ -40,30 +41,18 @@ export function AdminClientLayout({ children }: AdminClientLayoutProps) {
       {/* On mobile the sidebar renders as a sticky header + Sheet drawer;
           on ≥md it renders as a traditional left sidebar column.
           AdminSidebarNav handles both breakpoints internally. */}
-      <div className="flex flex-col h-dvh overflow-hidden md:flex-row bg-background">
-        <AdminSidebarNav />
-        <main className="flex-1 flex flex-col min-h-0">
-          <Suspense>
-            {/* data-lenis-prevent tells Lenis (global smooth-scroll) to yield
-                wheel/touch events that originate inside this overflow container
-                to the browser's native scroll handler. Without it Lenis
-                intercepts all events at document level and the overflow-y-auto
-                panel cannot be scrolled. */}
-            <div
-              className="flex flex-col flex-1 overflow-y-auto min-h-0"
-              style={{ overscrollBehavior: 'contain' }}
-              data-lenis-prevent
-            >
-              {children}
-            </div>
-          </Suspense>
+      <ScrollableAppShell
+        sidebar={<AdminSidebarNav />}
+        footer={(
           <div className="py-4 text-center">
             <p className="text-xs text-muted-foreground/30 select-none">
               Platform by Neuroklast &amp; Seifried.dev
             </p>
           </div>
-        </main>
-      </div>
+        )}
+      >
+        <Suspense>{children}</Suspense>
+      </ScrollableAppShell>
     </AuthProvider>
   )
 }
