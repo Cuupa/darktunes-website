@@ -26,15 +26,18 @@ export function FanPageOnboardingTour() {
   const t = useTranslations('portal')
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    try {
-      if (localStorage.getItem(STORAGE_KEY) !== '1') {
+    const frame = requestAnimationFrame(() => {
+      try {
+        setOpen(localStorage.getItem(STORAGE_KEY) !== '1')
+      } catch {
         setOpen(true)
       }
-    } catch {
-      setOpen(true)
-    }
+      setMounted(true)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [])
 
   const dismiss = () => {
@@ -57,6 +60,8 @@ export function FanPageOnboardingTour() {
   const handleBack = () => {
     setStep((prev) => Math.max(0, prev - 1))
   }
+
+  if (!mounted || !open) return null
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && dismiss()}>

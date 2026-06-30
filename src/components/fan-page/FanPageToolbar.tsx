@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,12 +61,11 @@ export function FanPageToolbar({
   const futureStates = useFanPageEditorTemporal((s) => s.futureStates)
 
   return (
-    <TooltipProvider>
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="toolbar"
-        aria-label={t('fanPage_toolbar_label')}
-      >
+    <div
+      className="flex flex-wrap items-center gap-2"
+      role="toolbar"
+      aria-label={t('fanPage_toolbar_label')}
+    >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -202,7 +201,6 @@ export function FanPageToolbar({
         <span className="text-xs text-muted-foreground capitalize">
           {publishStatus.replace(/_/g, ' ')}
         </span>
-      </div>
-    </TooltipProvider>
+    </div>
   )
 }

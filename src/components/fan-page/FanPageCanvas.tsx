@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   DndContext,
@@ -103,8 +104,10 @@ function SortableSectionRow({ section }: { section: FanPageSection }) {
 
 export function FanPageCanvas() {
   const t = useTranslations('portal')
-  const sections = useFanPageEditorStore((s) =>
-    [...s.document.sections].sort((a, b) => a.order - b.order),
+  const rawSections = useFanPageEditorStore((s) => s.document.sections)
+  const sections = useMemo(
+    () => [...rawSections].sort((a, b) => a.order - b.order),
+    [rawSections],
   )
   const reorderSection = useFanPageEditorStore((s) => s.reorderSection)
 
