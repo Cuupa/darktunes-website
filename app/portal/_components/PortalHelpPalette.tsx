@@ -16,7 +16,15 @@ import {
   GLOSSARY_ENTRIES,
   HELP_CATEGORIES,
   findHelpCategoryForTopic,
+  type HelpCategory,
+  type HelpTopic,
 } from '@/lib/portal/helpManifest'
+
+type PaletteTopicItem = {
+  topic: HelpTopic
+  category: HelpCategory
+  sectionId?: string
+}
 import { searchHelpContent } from '@/lib/portal/useHelpSearch'
 
 export const PORTAL_OPEN_HELP_PALETTE_EVENT = 'portal-open-help-palette'
@@ -86,10 +94,30 @@ export function PortalHelpPalette() {
     router.push(buildHelpHref('/portal/help', artistId, `glossary-${glossaryId}`))
   }
 
-  const topicMatches = searchResult.matches.filter((m) => m.kind === 'topic' || m.kind === 'section')
   const glossaryMatches = searchResult.matches.filter((m) => m.kind === 'glossary')
 
-  const showAllTopics = !query.trim()
+  const paletteTopics = useMemo((): PaletteTopicItem[] => {
+    if (!query.trim()) {
+      return HELP_CATEGORIES.flatMap((category) =>
+        category.topics.map((topic) => ({ topic, category })),
+      )
+    }
+    const seen = new Set<string>()
+    const items: PaletteTopicItem[] = []
+    for (const match of searchResult.matches) {
+      if (match.kind !== 'topic' && match.kind !== 'section') continue
+      if (!match.topicId) continue
+      const key = `${match.topicId}:${match.sectionId ?? ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const category = findHelpCategoryForTopic(match.topicId)
+      const topic = category?.topics.find((tp) => tp.id === match.topicId)
+      if (!topic || !category) continue
+      items.push({ topic, category, sectionId: match.sectionId })
+    }
+    return items
+  }, [query, searchResult.matches])
+
   const showAllGlossary = !query.trim()
 
   return (
@@ -108,21 +136,7 @@ export function PortalHelpPalette() {
         <CommandEmpty>{t('search_no_results')}</CommandEmpty>
 
         <CommandGroup heading={t('palette_group_topics')}>
-          {(showAllTopics
-            ? HELP_CATEGORIES.flatMap((c) =>
-                c.topics.map((topic) => ({ topic, category: c })),
-              )
-            : topicMatches
-                .filter((m) => m.topicId)
-                .map((m) => {
-                  const category = findHelpCategoryForTopic(m.topicId!)
-                  const topic = category?.topics.find((tp) => tp.id === m.topicId)
-                  return topic && category ? { topic, category, sectionId: m.sectionId } : null
-                })
-                .filter((x): x is NonNullable<typeof x> => x !== null)
-          ).map((item) => {
-            const { topic, category } = item
-            const sectionId = 'sectionId' in item ? item.sectionId : undefined
+          {paletteTopics.map(({ topic, category, sectionId }) => {
             const section = sectionId
               ? topic.sections.find((s) => s.id === sectionId)
               : undefined
