@@ -518,7 +518,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
                   ) : (
                     <PlusCircle size={16} className="mr-2" aria-hidden="true" />
                   )}
-                  {saving ? 'Saving…' : editingId ? 'Update Activity' : 'Log Activity'}
+                  {saving ? 'Saving…' : editingId ? 'Update Activity' : 'Save'}
                 </Button>
                 {editingId && (
                   <Button
