@@ -4731,20 +4731,20 @@ ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- Seed default schema for video form
 INSERT INTO public.submission_form_schema
-  (form_type, field_key, field_label_en, field_label_de, field_type, field_scope, field_options, is_required, is_visible, display_order, placeholder_en, placeholder_de)
+  (form_type, field_key, field_label_en, field_label_de, field_type, field_scope, field_group, field_options, is_required, is_visible, display_order, placeholder_en, placeholder_de)
 VALUES
-  ('video', 'title',               'Video Title',             'Video-Titel',                    'text',     'release', NULL, TRUE,  TRUE,  10, 'My Music Video', 'Mein Musikvideo'),
-  ('video', 'download_url',        'Video Download Link',     'Video-Download-Link',            'url',      'release', NULL, TRUE,  TRUE,  20, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('video', 'thumbnail_url',       'Thumbnail URL',           'Thumbnail-URL',                  'url',      'release', NULL, FALSE, TRUE,  30, NULL, NULL),
-  ('video', 'youtube_title',       'YouTube Title',           'YouTube-Titel',                  'text',     'release', NULL, FALSE, TRUE,  40, NULL, NULL),
-  ('video', 'youtube_description', 'YouTube Description',     'YouTube-Beschreibung',           'textarea', 'release', NULL, FALSE, TRUE,  50, NULL, NULL),
-  ('video', 'youtube_tags',        'YouTube Tags',            'YouTube-Tags',                   'text',     'release', NULL, FALSE, TRUE,  60, 'techno, club, dj', 'techno, club, dj'),
-  ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',              'select',   'release',
+  ('video', 'title',               'Video Title',             'Video-Titel',                    'text',     'release', 'metadata',NULL, TRUE,  TRUE,  10, 'My Music Video', 'Mein Musikvideo'),
+  ('video', 'download_url',        'Video Download Link',     'Video-Download-Link',            'url',      'release', 'metadata',NULL, TRUE,  TRUE,  20, 'https://drive.google.com/...', 'https://drive.google.com/...'),
+  ('video', 'thumbnail_url',       'Thumbnail URL',           'Thumbnail-URL',                  'url',      'release', 'metadata',NULL, FALSE, TRUE,  30, NULL, NULL),
+  ('video', 'youtube_title',       'YouTube Title',           'YouTube-Titel',                  'text',     'release', 'metadata',NULL, FALSE, TRUE,  40, NULL, NULL),
+  ('video', 'youtube_description', 'YouTube Description',     'YouTube-Beschreibung',           'textarea', 'release', 'metadata',NULL, FALSE, TRUE,  50, NULL, NULL),
+  ('video', 'youtube_tags',        'YouTube Tags',            'YouTube-Tags',                   'text',     'release', 'metadata',NULL, FALSE, TRUE,  60, 'techno, club, dj', 'techno, club, dj'),
+  ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',              'select',   'release', 'metadata',
     '{"options":[{"value":"10","labels":{"en":"Music","de":"Musik"}},{"value":"24","labels":{"en":"Entertainment","de":"Unterhaltung"}},{"value":"22","labels":{"en":"People & Blogs","de":"People & Blogs"}},{"value":"27","labels":{"en":"Education","de":"Bildung"}}]}',
     FALSE, TRUE, 70, NULL, NULL),
-  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', NULL, FALSE, TRUE,  80, NULL, NULL),
-  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', NULL, FALSE, TRUE,  90, NULL, NULL),
-  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', NULL, FALSE, TRUE, 100, NULL, NULL)
+  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', 'metadata', NULL, FALSE, TRUE,  80, NULL, NULL),
+  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', 'metadata',NULL, FALSE, TRUE,  90, NULL, NULL),
+  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', 'metadata',NULL, FALSE, TRUE, 100, NULL, NULL)
 ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
