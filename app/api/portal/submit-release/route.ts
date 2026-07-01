@@ -5,18 +5,15 @@ import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
 import { createReleaseSubmissionTracks } from '@/lib/api/releaseSubmissionTracks'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
+import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
 import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { buildTrackInsert } from '@/lib/submissions/trackFieldMapping'
-import {
-  coerceReleaseDate,
-  getReleaseFieldValue,
-  RELEASE_STANDARD_FIELD_TO_BODY_KEY,
-  validateSchemaFields,
-  validateStringField,
-} from '@/lib/submissions/submissionSchemaValidation'
+import { coerceReleaseDate } from '@/lib/submissions/submissionSchemaValidation'
+import { filterFieldsForType } from '@/lib/submissions/fieldTypeRules'
+import { validateReleaseSubmissionByType } from '@/lib/submissions/submissionTypeValidation'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
 
 const trackInputSchema = z.object({
@@ -41,6 +38,7 @@ const bodySchema = z.object({
   notes: z.string().nullable().optional(),
   formData: z.record(z.string(), z.unknown()).nullable().optional(),
   tracks: z.array(trackInputSchema).optional(),
+  trackCount: z.number().int().min(1).optional(),
   idempotencyKey: z.string().uuid().optional(),
 })
 
@@ -63,40 +61,30 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  const schemaFields = await getFormSchema(supabase, 'release')
-  const releaseFields = schemaFields.filter((f) => f.fieldScope === 'release')
-  const trackFields = schemaFields.filter((f) => f.fieldScope === 'track')
+  const [schemaFields, typeRules] = await Promise.all([
+    getFormSchema(supabase, 'release'),
+    getReleaseTypeRules(supabase),
+  ])
 
   const standardBody: Record<string, unknown> = { ...body, releaseDate: coerceReleaseDate(body.releaseDate) }
-
-  for (const field of releaseFields) {
-    const bodyKey = RELEASE_STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
-    const raw = bodyKey !== undefined
-      ? (body as Record<string, unknown>)[bodyKey]
-      : formData[field.fieldKey]
-    if (typeof raw === 'string') {
-      validateStringField(field.fieldType, raw, field.fieldKey)
-    }
-  }
-
-  validateSchemaFields(releaseFields, (field) =>
-    getReleaseFieldValue(field, standardBody, formData),
-  )
-
   const tracks = body.tracks ?? []
-  if (tracks.length > 0) {
-    for (const track of tracks) {
-      for (const field of trackFields) {
-        const raw = track.values[field.fieldKey] ?? ''
-        if (field.isRequired && !raw.trim()) {
-          throw new ApiError(400, `Required track field missing: ${field.fieldKey} (track ${track.trackNumber})`)
-        }
-        validateStringField(field.fieldType, raw, `${field.fieldKey} (track ${track.trackNumber})`)
-      }
-    }
-  } else if (trackFields.some((f) => f.isRequired)) {
-    throw new ApiError(400, 'At least one track is required')
-  }
+
+  validateReleaseSubmissionByType({
+    releaseType: body.type,
+    trackCount: body.trackCount,
+    tracks,
+    schemaFields,
+    typeRules,
+    standardBody,
+    formData,
+  })
+
+  const releaseType = body.type ?? 'single'
+  const trackFields = filterFieldsForType(
+    schemaFields.filter((f) => f.fieldScope === 'track'),
+    releaseType,
+    { type: releaseType },
+  )
 
   const submission = await createReleaseSubmission(supabase, {
     artist_id: artist.id,

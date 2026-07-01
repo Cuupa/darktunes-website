@@ -644,6 +644,8 @@
   "releases_submit_track_label": "Track {n}",
   "releases_submit_required": "Required",
   "releases_submit_validation_error": "Please fix the highlighted fields.",
+  "releases_submit_track_count": "Number of tracks",
+  "releases_submit_track_count_hint": "Enter between {min} and {max} tracks.",
   "releases_status_received": "Received",
   "releases_status_reviewed": "Reviewed",
   "releases_status_accepted": "Accepted",

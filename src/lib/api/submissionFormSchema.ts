@@ -1,7 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { SubmissionFormField } from '@/types'
-import type { SubmissionFieldScope, SubmissionFieldType, VisibilityCondition } from '@/lib/submissions/fieldTypes'
+import type {
+  FieldTypeRules,
+  SubmissionFieldScope,
+  SubmissionFieldType,
+  VisibilityCondition,
+} from '@/lib/submissions/fieldTypes'
 
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['submission_form_schema']['Row']
@@ -30,6 +35,7 @@ function rowToField(row: Row): SubmissionFormField {
     fieldGroup: row.field_group,
     fieldOptions: row.field_options as Record<string, unknown> | null,
     visibilityCondition: row.visibility_condition as VisibilityCondition | null,
+    typeRules: row.type_rules as FieldTypeRules | null,
     validation: row.validation as Record<string, unknown> | null,
     isRequired: row.is_required,
     isVisible: row.is_visible,
@@ -103,6 +109,7 @@ export function fieldToApiPayload(
     field_group: field.fieldGroup ?? null,
     field_options: field.fieldOptions ?? null,
     visibility_condition: (field.visibilityCondition ?? null) as Record<string, unknown> | null,
+    type_rules: (field.typeRules ?? null) as Record<string, unknown> | null,
     validation: field.validation ?? null,
     is_required: field.isRequired ?? false,
     is_visible: field.isVisible ?? true,

@@ -32,3 +32,16 @@ export interface SelectOption {
   value: string
   labels: Record<string, string>
 }
+
+export const SUBMISSION_RELEASE_TYPES = ['single', 'ep', 'album', 'compilation'] as const
+export type SubmissionReleaseType = (typeof SUBMISSION_RELEASE_TYPES)[number]
+
+export const TRACK_COUNT_MODES = ['fixed_1', 'user_specified'] as const
+export type TrackCountMode = (typeof TRACK_COUNT_MODES)[number]
+
+export interface TypeFieldRule {
+  visible: boolean
+  required: boolean
+}
+
+export type FieldTypeRules = Partial<Record<SubmissionReleaseType, TypeFieldRule>>

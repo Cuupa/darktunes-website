@@ -4007,6 +4007,7 @@ export interface Database {
           field_group: string | null
           field_options: Record<string, unknown> | null
           visibility_condition: Record<string, unknown> | null
+          type_rules: Record<string, unknown> | null
           validation: Record<string, unknown> | null
           is_required: boolean
           is_visible: boolean
@@ -4039,6 +4040,7 @@ export interface Database {
           field_group?: string | null
           field_options?: Record<string, unknown> | null
           visibility_condition?: Record<string, unknown> | null
+          type_rules?: Record<string, unknown> | null
           validation?: Record<string, unknown> | null
           is_required?: boolean
           is_visible?: boolean
@@ -4071,12 +4073,40 @@ export interface Database {
           field_group?: string | null
           field_options?: Record<string, unknown> | null
           visibility_condition?: Record<string, unknown> | null
+          type_rules?: Record<string, unknown> | null
           validation?: Record<string, unknown> | null
           is_required?: boolean
           is_visible?: boolean
           display_order?: number
           placeholder_en?: string | null
           placeholder_de?: string | null
+        }
+        Relationships: []
+      }
+      submission_release_type_rules: {
+        Row: {
+          id: string
+          release_type: 'single' | 'ep' | 'album' | 'compilation'
+          track_count_mode: 'fixed_1' | 'user_specified'
+          min_tracks: number
+          max_tracks: number
+          display_order: number
+        }
+        Insert: {
+          id?: string
+          release_type: 'single' | 'ep' | 'album' | 'compilation'
+          track_count_mode: 'fixed_1' | 'user_specified'
+          min_tracks?: number
+          max_tracks?: number
+          display_order?: number
+        }
+        Update: {
+          id?: string
+          release_type?: 'single' | 'ep' | 'album' | 'compilation'
+          track_count_mode?: 'fixed_1' | 'user_specified'
+          min_tracks?: number
+          max_tracks?: number
+          display_order?: number
         }
         Relationships: []
       }

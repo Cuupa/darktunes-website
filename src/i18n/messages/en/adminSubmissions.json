@@ -49,5 +49,20 @@
   "export_done": "Export downloaded",
   "export_error": "Export failed",
   "submission_tracks": "Tracks",
-  "submission_form_data": "Additional fields"
+  "submission_form_data": "Additional fields",
+  "release_subtab_fields": "Fields",
+  "release_subtab_track_rules": "Track rules",
+  "release_subtab_field_rules": "Rules per type",
+  "release_type": "Release type",
+  "track_count_mode": "Track count mode",
+  "min_tracks": "Min tracks",
+  "max_tracks": "Max tracks",
+  "track_count_fixed": "Fixed at 1 track",
+  "track_count_user": "Artist enters track count",
+  "type_rules_saved": "Track rules saved",
+  "type_rules_load_error": "Failed to load track rules",
+  "type_rules_save_error": "Failed to save track rules",
+  "field_visible_short": "Vis.",
+  "field_required_short": "Req.",
+  "field_rules_hint": "Per-type overrides fall back to the global Visible/Required settings when unset."
 }

@@ -1,25 +1,31 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
 import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { validateFieldValue } from '@/lib/submissions/fieldValidation'
+import {
+  filterFieldsForType,
+  getTypeRuleForRelease,
+  validateTrackCount,
+} from '@/lib/submissions/fieldTypeRules'
 import { RELEASE_STANDARD_FIELD_TO_BODY_KEY } from '@/lib/submissions/releaseFieldMapping'
-import { isFieldVisible } from '@/lib/submissions/visibilityCondition'
-import type { Artist, SubmissionFormField } from '@/types'
+import type { SubmissionReleaseType } from '@/lib/submissions/fieldTypes'
+import type { Artist, SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
 
 interface ReleaseSubmissionFormProps {
   artist: Artist | null
   formSchema: SubmissionFormField[]
+  typeRules: SubmissionReleaseTypeRule[]
 }
-
-type ReleaseType = 'album' | 'ep' | 'single' | 'compilation'
 
 interface TrackRow {
   id: string
@@ -34,17 +40,29 @@ function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, st
   return values
 }
 
-export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionFormProps) {
+function buildTrackRows(count: number, trackFields: SubmissionFormField[], existing: TrackRow[]): TrackRow[] {
+  const rows: TrackRow[] = []
+  for (let i = 0; i < count; i += 1) {
+    const prev = existing[i]
+    rows.push({
+      id: prev?.id ?? `track-${i + 1}`,
+      values: prev?.values ?? emptyTrackValues(trackFields),
+    })
+  }
+  return rows
+}
+
+export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: ReleaseSubmissionFormProps) {
   const t = useTranslations('portal')
   const locale = useLocale()
   const router = useRouter()
 
   const releaseFields = useMemo(
-    () => formSchema.filter((f) => f.isVisible && f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
+    () => formSchema.filter((f) => f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
     [formSchema],
   )
-  const trackFields = useMemo(
-    () => formSchema.filter((f) => f.isVisible && f.fieldScope === 'track').sort((a, b) => a.displayOrder - b.displayOrder),
+  const allTrackFields = useMemo(
+    () => formSchema.filter((f) => f.fieldScope === 'track').sort((a, b) => a.displayOrder - b.displayOrder),
     [formSchema],
   )
 
@@ -64,20 +82,37 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
     return init
   })
 
-  const [tracks, setTracks] = useState<TrackRow[]>([
-    { id: 'track-1', values: emptyTrackValues(trackFields) },
-  ])
+  const releaseType = (values.type || 'single') as SubmissionReleaseType
+  const activeTypeRule = getTypeRuleForRelease(typeRules, releaseType)
+  const userSpecifiedTracks = activeTypeRule?.trackCountMode === 'user_specified'
+
+  const [trackCount, setTrackCount] = useState(activeTypeRule?.minTracks ?? 1)
+  const visibleReleaseFields = useMemo(
+    () => filterFieldsForType(releaseFields, releaseType, values),
+    [releaseFields, releaseType, values],
+  )
+  const visibleTrackFields = useMemo(
+    () => filterFieldsForType(allTrackFields, releaseType, values),
+    [allTrackFields, releaseType, values],
+  )
+
+  const [tracks, setTracks] = useState<TrackRow[]>(() =>
+    buildTrackRows(1, filterFieldsForType(allTrackFields, 'single', { type: 'single' }), []),
+  )
   const [coverArtVerified, setCoverArtVerified] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
-  const releaseType = (values.type || 'single') as ReleaseType
-  const showMultiTracks = releaseType !== 'single'
+  useEffect(() => {
+    const rule = getTypeRuleForRelease(typeRules, releaseType)
+    const nextCount = rule?.trackCountMode === 'fixed_1' ? 1 : (rule?.minTracks ?? 2)
+    setTrackCount(nextCount)
+  }, [releaseType, typeRules])
 
-  const visibleReleaseFields = useMemo(
-    () => releaseFields.filter((f) => isFieldVisible(f.visibilityCondition, values)),
-    [releaseFields, values],
-  )
+  useEffect(() => {
+    const count = userSpecifiedTracks ? trackCount : 1
+    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev))
+  }, [trackCount, userSpecifiedTracks, visibleTrackFields])
 
   const setFieldValue = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -93,25 +128,20 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
     setCoverArtVerified(verified)
   }, [])
 
-  const addTrack = () => {
-    setTracks((prev) => [
-      ...prev,
-      { id: `track-${Date.now()}`, values: emptyTrackValues(trackFields) },
-    ])
-  }
-
-  const removeTrack = (id: string) => {
-    setTracks((prev) => (prev.length <= 1 ? prev : prev.filter((tr) => tr.id !== id)))
-  }
-
   const setTrackValue = (trackId: string, key: string, value: string) => {
     setTracks((prev) =>
       prev.map((tr) => (tr.id === trackId ? { ...tr, values: { ...tr.values, [key]: value } } : tr)),
     )
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[`${trackId}:${key}`]
+      return next
+    })
   }
 
   const validateBeforeSubmit = (): boolean => {
     const errors: Record<string, string> = {}
+
     for (const field of visibleReleaseFields) {
       const raw = values[field.fieldKey] ?? ''
       if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
@@ -121,9 +151,14 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
         if (err) errors[field.fieldKey] = err
       }
     }
-    const rows = showMultiTracks ? tracks : tracks.slice(0, 1)
-    for (const track of rows) {
-      for (const field of trackFields) {
+
+    const trackCountError = validateTrackCount(activeTypeRule, userSpecifiedTracks ? trackCount : 1, tracks.length)
+    if (trackCountError) {
+      errors.track_count = trackCountError
+    }
+
+    for (const track of tracks) {
+      for (const field of visibleTrackFields) {
         const raw = track.values[field.fieldKey] ?? ''
         const errKey = `${track.id}:${field.fieldKey}`
         if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
@@ -134,6 +169,7 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
         }
       }
     }
+
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -178,8 +214,7 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
         }
       }
 
-      const rows = showMultiTracks ? tracks : tracks.slice(0, 1)
-      const trackPayload = rows.map((track, index) => ({
+      const trackPayload = tracks.map((track, index) => ({
         trackNumber: Number(track.values.track_number) || index + 1,
         values: track.values,
       }))
@@ -194,6 +229,7 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
           ...standardBody,
           formData: Object.keys(formData).length > 0 ? formData : null,
           tracks: trackPayload,
+          trackCount: userSpecifiedTracks ? trackCount : 1,
         }),
       })
 
@@ -252,27 +288,48 @@ export function ReleaseSubmissionForm({ artist, formSchema }: ReleaseSubmissionF
               </div>
             ))}
 
-            {trackFields.length > 0 && (
+            {userSpecifiedTracks && visibleTrackFields.length > 0 && (
+              <div className="space-y-2 border-t border-border pt-4">
+                <Label htmlFor="track-count">{t('releases_submit_track_count')}</Label>
+                <Input
+                  id="track-count"
+                  type="number"
+                  min={activeTypeRule?.minTracks ?? 2}
+                  max={activeTypeRule?.maxTracks ?? 99}
+                  value={trackCount}
+                  onChange={(e) => {
+                    const next = Number(e.target.value)
+                    if (!Number.isNaN(next)) setTrackCount(next)
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev }
+                      delete copy.track_count
+                      return copy
+                    })
+                  }}
+                  aria-invalid={!!fieldErrors.track_count}
+                  aria-describedby={fieldErrors.track_count ? 'track-count-error' : undefined}
+                />
+                {fieldErrors.track_count && (
+                  <p id="track-count-error" className="text-sm text-destructive" role="alert">
+                    {fieldErrors.track_count}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {t('releases_submit_track_count_hint', {
+                    min: activeTypeRule?.minTracks ?? 2,
+                    max: activeTypeRule?.maxTracks ?? 99,
+                  })}
+                </p>
+              </div>
+            )}
+
+            {visibleTrackFields.length > 0 && (
               <div className="space-y-4 border-t border-border pt-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">{t('releases_submit_tracks_heading')}</h2>
-                  {showMultiTracks && (
-                    <Button type="button" variant="outline" size="sm" onClick={addTrack}>
-                      {t('releases_submit_add_track')}
-                    </Button>
-                  )}
-                </div>
-                {(showMultiTracks ? tracks : tracks.slice(0, 1)).map((track, index) => (
+                <h2 className="text-lg font-semibold">{t('releases_submit_tracks_heading')}</h2>
+                {tracks.map((track, index) => (
                   <div key={track.id} className="rounded-md border border-border p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">{t('releases_submit_track_label', { n: index + 1 })}</p>
-                      {showMultiTracks && tracks.length > 1 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeTrack(track.id)}>
-                          {t('releases_submit_remove_track')}
-                        </Button>
-                      )}
-                    </div>
-                    {trackFields.map((field) => (
+                    <p className="text-sm font-medium">{t('releases_submit_track_label', { n: index + 1 })}</p>
+                    {visibleTrackFields.map((field) => (
                       <SchemaDrivenField
                         key={`${track.id}-${field.id}`}
                         field={field}

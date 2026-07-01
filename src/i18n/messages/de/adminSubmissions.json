@@ -49,5 +49,20 @@
   "export_done": "Export heruntergeladen",
   "export_error": "Export fehlgeschlagen",
   "submission_tracks": "Tracks",
-  "submission_form_data": "Zusätzliche Felder"
+  "submission_form_data": "Zusätzliche Felder",
+  "release_subtab_fields": "Felder",
+  "release_subtab_track_rules": "Track-Regeln",
+  "release_subtab_field_rules": "Regeln pro Typ",
+  "release_type": "Release-Typ",
+  "track_count_mode": "Track-Anzahl-Modus",
+  "min_tracks": "Min. Tracks",
+  "max_tracks": "Max. Tracks",
+  "track_count_fixed": "Fest 1 Track",
+  "track_count_user": "Künstler gibt Track-Anzahl ein",
+  "type_rules_saved": "Track-Regeln gespeichert",
+  "type_rules_load_error": "Track-Regeln konnten nicht geladen werden",
+  "type_rules_save_error": "Track-Regeln konnten nicht gespeichert werden",
+  "field_visible_short": "Sichtb.",
+  "field_required_short": "Pflicht",
+  "field_rules_hint": "Typ-spezifische Einstellungen nutzen die globalen Sichtbar/Pflicht-Werte als Fallback."
 }

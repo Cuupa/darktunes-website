@@ -82,6 +82,20 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 `/portal/documents` — PDF/DOCX to `artist-documents/{artistId}/`. Upload `POST /api/portal/documents/upload` (20 MB). Download via presigned Server Action. Component: `DocumentVault.tsx`.
 
+## Release submission form
+
+`/portal/releases/new` — schema-driven form from `submission_form_schema` + per-type rules.
+
+| Piece | Location |
+|-------|----------|
+| Field schema | `submission_form_schema` (`field_scope`: `release` \| `track`; optional `type_rules` JSONB per release type) |
+| Track count rules | `submission_release_type_rules` (`fixed_1` for single; `user_specified` + min/max for album/ep/compilation) |
+| Rule resolution | `src/lib/submissions/fieldTypeRules.ts` — shared by portal UI + `POST /api/portal/submit-release` |
+| Admin UI | `SubmissionFormManager` — tabs: Fields, Track rules, Rules per type |
+| Admin APIs | `PUT /api/admin/submission-form-schema`, `PUT /api/admin/submission-release-type-rules` |
+
+Artists pick release type, enter track count for multi-track types, and see only fields marked visible/required for that type.
+
 ## Video submission
 
 `/portal/releases/videos/new` → `videos` row `is_visible=false`. Admin: `/admin/video-submissions`. APIs: `POST /api/portal/submit-video`, `PATCH /api/admin/video-submissions/[id]`.
