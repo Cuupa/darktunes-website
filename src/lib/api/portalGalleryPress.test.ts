@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   galleryUrlToPressAsset,
   mergePortalGalleryPhotos,
+  r2KeyFromPublicUrl,
 } from './portalGalleryPress'
 import type { PressAsset } from '@/types'
 
@@ -23,6 +24,19 @@ const kitPhoto: PressAsset = {
   kitDisplayOrder: 0,
   kitArtistId: 'artist-1',
 }
+
+describe('r2KeyFromPublicUrl', () => {
+  it('extracts the pathname without a leading slash', () => {
+    const url = 'https://cdn.darktunes.com/profile-photos/artist-1/abc.webp'
+    expect(r2KeyFromPublicUrl(url)).toBe('profile-photos/artist-1/abc.webp')
+  })
+
+  it('matches assets when only the CDN host changes', () => {
+    const oldUrl = 'https://old-cdn.example.com/profile-photos/artist-1/abc.webp'
+    const newUrl = 'https://cdn.example.com/profile-photos/artist-1/abc.webp'
+    expect(r2KeyFromPublicUrl(oldUrl)).toBe(r2KeyFromPublicUrl(newUrl))
+  })
+})
 
 describe('galleryUrlToPressAsset', () => {
   it('maps a profile gallery URL to a downloadable press asset', () => {

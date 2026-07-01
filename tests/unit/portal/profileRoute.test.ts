@@ -137,4 +137,25 @@ describe('PUT /api/portal/profile', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/press/artists/artist-slug')
     expect(revalidatePathMock).toHaveBeenCalledWith('/artists')
   })
+
+  it('still returns 200 when gallery press sync fails', async () => {
+    syncPortalGalleryToPressKitMock.mockRejectedValue(new Error('duplicate r2_key'))
+
+    const { PUT } = await loadRoute()
+    const request = new NextRequest('http://localhost/api/portal/profile', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer tok',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        artist_id: artistId,
+        epk_gallery_photos: ['https://images.example.com/gallery.jpg'],
+      }),
+    })
+
+    const response = await PUT(request)
+    expect(response.status).toBe(200)
+    expect(upsertArtistProfileMock).toHaveBeenCalled()
+  })
 })

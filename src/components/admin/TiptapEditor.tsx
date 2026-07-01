@@ -55,6 +55,7 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },

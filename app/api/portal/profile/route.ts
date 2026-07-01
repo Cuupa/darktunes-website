@@ -166,6 +166,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
   const serviceDb = await createServiceRoleSupabaseClient()
 
+  // Press-kit sync is best-effort — profile data must save even when asset sync fails.
   if (epk_gallery_photos !== undefined) {
     try {
       await syncPortalGalleryToPressKit(
@@ -175,8 +176,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
         user.id,
       )
     } catch (syncErr) {
-      console.error('[portal/profile] gallery press sync failed:', syncErr)
-      throw buildApiError('SERVER_ERROR', 500)
+      console.error('[portal/profile] gallery press sync failed (profile saved):', syncErr)
     }
   }
 
