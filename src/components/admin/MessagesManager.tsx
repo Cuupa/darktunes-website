@@ -441,6 +441,11 @@ export function MessagesManager() {
     async (id: string) => {
       try {
         await markPortalMessageRead(supabase, id)
+        void supabase
+          .from('editor_notifications')
+          .update({ read: true })
+          .eq('entity_id', id)
+          .eq('type', 'artist_portal_message')
         setFromArtistMessages((cur) =>
           cur.map((m) => (m.id === id ? { ...m, readAt: new Date().toISOString() } : m)),
         )
@@ -549,49 +554,16 @@ export function MessagesManager() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col md:flex-row w-full min-h-[400px] md:min-h-[600px] gap-0 rounded-lg border border-border overflow-hidden">
-
-      {/* ── Left: Folder Tree — hidden on mobile ──────────────────────────── */}
-      <aside
-        className="hidden md:flex flex-col md:w-48 shrink-0 border-r border-border bg-card/40"
-        style={{ overscrollBehavior: 'contain' }}
-      >
-        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mailbox</p>
-          {totalUnread > 0 && <Badge className="text-xs px-1.5 py-0">{totalUnread}</Badge>}
-        </div>
-        <div className="flex-1 overflow-y-auto px-1" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
-          <FolderTree
-            selected={selectedFolder}
-            onSelect={(id) => { setSelectedFolder(id); setSelectedMessageId(null) }}
-            customFolders={folders}
-            unreadCounts={unreadCounts}
-            onCreateFolder={handleCreateFolder}
-            onDeleteFolder={handleDeleteFolder}
-            onRenameFolder={handleRenameFolder}
-          />
-        </div>
-      </aside>
-
-      {/* ── Middle: Message List — full width on mobile (hidden when detail is open), fixed on md ── */}
-      <div className={cn(
-        "flex flex-col border-border",
-        selectedMessage || selectedFromArtistMessage
-          ? "hidden md:flex md:w-72 md:shrink-0 md:border-r"
-          : "flex-1 md:w-72 md:shrink-0 md:border-r",
-      )}>
-        {/* Toolbar */}
-        <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border bg-card/20">
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search…"
-            className="h-7 text-sm flex-1"
-          />
-        </div>
-
-        {/* Action row */}
-        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/20">
+    <div className="flex flex-col w-full min-h-[400px] md:min-h-[600px] gap-0 rounded-lg border border-border">
+      {/* ── Full-width toolbar ───────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-card/20 shrink-0">
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search…"
+          className="h-7 text-sm flex-1 min-w-[140px]"
+        />
+        <div className="flex flex-wrap items-center gap-1">
           <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="h-7 gap-1 text-xs">
@@ -621,9 +593,39 @@ export function MessagesManager() {
             onDelete={handleDeleteRule}
           />
         </div>
+      </div>
 
-        {/* Message list */}
-        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+      {/* ── Left: Folder Tree — hidden on mobile ──────────────────────────── */}
+      <aside
+        className="hidden md:flex flex-col md:w-48 shrink-0 border-r border-border bg-card/40"
+        style={{ overscrollBehavior: 'contain' }}
+      >
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mailbox</p>
+          {totalUnread > 0 && <Badge className="text-xs px-1.5 py-0">{totalUnread}</Badge>}
+        </div>
+        <div className="flex-1 overflow-y-auto px-1" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
+          <FolderTree
+            selected={selectedFolder}
+            onSelect={(id) => { setSelectedFolder(id); setSelectedMessageId(null) }}
+            customFolders={folders}
+            unreadCounts={unreadCounts}
+            onCreateFolder={handleCreateFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onRenameFolder={handleRenameFolder}
+          />
+        </div>
+      </aside>
+
+      {/* ── Middle: Message List — full width on mobile (hidden when detail is open), fixed on md ── */}
+      <div className={cn(
+        "flex flex-col border-border",
+        selectedMessage || selectedFromArtistMessage
+          ? "hidden md:flex md:w-72 md:shrink-0 md:border-r"
+          : "flex-1 md:w-72 md:shrink-0 md:border-r",
+      )}>
+        <div className="flex-1 overflow-y-auto min-h-0" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent>
           {isFromArtistsFolder ? (
             filteredFromArtistMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground text-sm gap-2">
@@ -957,6 +959,7 @@ export function MessagesManager() {
             <p>Select a message to read</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

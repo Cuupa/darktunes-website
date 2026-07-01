@@ -12,34 +12,15 @@ interface LenisProviderProps {
   children: ReactNode
 }
 
-/** Stop Lenis on admin/portal so ScrollableAppShell uses native wheel scroll. */
-function DashboardLenisGuard() {
-  const lenis = useLenis()
-  const pathname = usePathname()
-  const onDashboard = isDashboardRoute(pathname)
-
-  useEffect(() => {
-    if (!lenis) return
-    if (onDashboard) {
-      lenis.stop()
-    } else if (document.body.dataset.scrollLocked !== '1') {
-      lenis.start()
-    }
-  }, [lenis, onDashboard])
-
-  return null
-}
-
 function ScrollLockObserver() {
   const lenis = useLenis()
-  const pathname = usePathname()
 
   useEffect(() => {
     if (!lenis) return
     const observer = new MutationObserver(() => {
       if (document.body.dataset.scrollLocked === '1') {
         lenis.stop()
-      } else if (!isDashboardRoute(pathname)) {
+      } else {
         lenis.start()
       }
     })
@@ -48,32 +29,33 @@ function ScrollLockObserver() {
       attributeFilter: ['data-scroll-locked'],
     })
     return () => observer.disconnect()
-  }, [lenis, pathname])
+  }, [lenis])
 
   return null
 }
 
+const LENIS_OPTIONS = {
+  lerp: 0.08,
+  duration: 0.55,
+  easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+  syncTouch: true,
+  syncTouchLerp: 0.075,
+  wheelMultiplier: 0.9,
+  touchMultiplier: 1.3,
+  infinite: false,
+  prevent: shouldPreventLenis,
+} as const
+
 export function LenisProvider({ children }: LenisProviderProps) {
+  const pathname = usePathname()
+  const onDashboard = isDashboardRoute(pathname)
+
+  if (onDashboard) {
+    return <>{children}</>
+  }
+
   return (
-    <ReactLenis
-      root
-      options={{
-        // Optimierte Einstellungen für Mac Trackpad (besseres Momentum + weniger "Hängen")
-        lerp: 0.08,
-        duration: 0.55,
-        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-
-        // Wichtig für Mac Trackpads
-        syncTouch: true,
-        syncTouchLerp: 0.075,
-        wheelMultiplier: 0.9,
-        touchMultiplier: 1.3,
-
-        infinite: false,
-        prevent: shouldPreventLenis,
-      }}
-    >
-      <DashboardLenisGuard />
+    <ReactLenis root options={LENIS_OPTIONS}>
       <ScrollLockObserver />
       {children}
     </ReactLenis>

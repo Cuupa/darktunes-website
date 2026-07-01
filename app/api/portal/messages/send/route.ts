@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { sendPortalMessage } from '@/lib/api/portalMessages'
 
@@ -75,6 +75,29 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     body: msgBody,
     bodyHtml: bodyHtml ?? null,
   })
+
+  if (toLabel) {
+    const serviceRole = await createServiceRoleSupabaseClient()
+    const [{ data: artist }, { data: recipientProfiles }] = await Promise.all([
+      serviceRole.from('artists').select('name').eq('id', fromArtistId).maybeSingle(),
+      serviceRole.from('users').select('id').in('role', ['admin', 'editor']),
+    ])
+
+    const artistName = artist?.name ?? 'Artist'
+    const recipients = (recipientProfiles ?? []).map((profile) => ({
+      recipient_id: profile.id,
+      type: 'artist_portal_message',
+      entity_type: 'portal_message',
+      entity_id: message.id,
+      entity_name: `${artistName}: ${subject}`,
+      sender_id: user.id,
+      read: false,
+    }))
+
+    if (recipients.length > 0) {
+      await serviceRole.from('editor_notifications').insert(recipients)
+    }
+  }
 
   return NextResponse.json({ message }, { status: 201 })
 })

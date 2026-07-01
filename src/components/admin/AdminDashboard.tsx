@@ -25,7 +25,7 @@ import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useRolePermissions } from '@/hooks/useRolePermissions'
 import { editorCanAccessTab, type EditorDashboardTab } from '@/lib/editor/editorTabPermissions'
-import { EditorNotificationBell } from './EditorNotificationBell'
+import { DashboardNotificationBell } from './DashboardNotificationBell'
 import { EditorPromoLogPanel } from './EditorPromoLogPanel'
 
 // Heavy manager panels are lazy-loaded so each tab's JS bundle is fetched only
@@ -279,7 +279,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {contentOnly && user?.id && <EditorNotificationBell userId={user.id} />}
+              {contentOnly && user?.id && <DashboardNotificationBell userId={user.id} />}
               <div className="text-right">
                 <p className="text-sm font-medium">{user?.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>

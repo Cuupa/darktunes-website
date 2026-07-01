@@ -15,13 +15,12 @@ interface ScrollableAppShellProps {
 /**
  * Shared dashboard shell for admin, portal, and similar app layouts.
  *
- * Scroll contract (must stay in sync with LenisProvider):
+ * Scroll contract:
  * - Outer: `h-dvh overflow-hidden` constrains height to the viewport.
- * - Inner: `flex-1 min-h-0 overflow-y-auto` is the sole vertical scroll pane.
- * - `data-lenis-prevent` yields wheel/touch events to native scroll inside the pane.
+ * - Inner: `flex-1 min-h-0 overflow-y-auto` is the sole vertical scroll pane (unless lockScroll).
+ * - List pages use `lockScroll` so nested panels (AdminListShell) own wheel scroll.
  *
- * Without the height constraint, `overflow-y-auto` never activates and Lenis blocks
- * document scroll — the page appears frozen.
+ * Without the height constraint, `overflow-y-auto` never activates and the page appears frozen.
  */
 export function ScrollableAppShell({
   sidebar,

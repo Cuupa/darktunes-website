@@ -68,7 +68,7 @@ export function useAdminNavBadges(userId: string | null, enabled: boolean) {
       .channel('admin-nav-portal-messages')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'portal_messages', filter: 'to_label=eq.true' },
+        { event: '*', schema: 'public', table: 'portal_messages', filter: 'to_label=eq.true' },
         () => { void refresh() },
       )
       .subscribe()

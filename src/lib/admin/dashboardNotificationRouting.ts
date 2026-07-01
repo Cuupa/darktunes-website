@@ -1,8 +1,8 @@
-import type { EditorNotification } from '@/types'
+import type { DashboardNotification } from '@/types'
 import { getCmsTabPath } from '@/lib/editor/cmsPaths'
 
-export function getEditorNotificationHref(
-  notification: Pick<EditorNotification, 'type'>,
+export function getDashboardNotificationHref(
+  notification: Pick<DashboardNotification, 'type'>,
   role: 'admin' | 'editor' | string | undefined,
 ): string | null {
   const isEditor = role === 'editor'
@@ -18,13 +18,15 @@ export function getEditorNotificationHref(
       return isEditor ? getCmsTabPath('editor', 'video-submissions') : '/admin/video-submissions'
     case 'press_asset_suggestion':
       return isEditor ? getCmsTabPath('editor', 'assets') : '/admin/assets'
+    case 'artist_portal_message':
+      return '/admin/messages'
     default:
       return null
   }
 }
 
-export function getEditorNotificationSummary(
-  notification: Pick<EditorNotification, 'type' | 'entityName' | 'entityType'>,
+export function getDashboardNotificationSummary(
+  notification: Pick<DashboardNotification, 'type' | 'entityName' | 'entityType'>,
 ): string {
   switch (notification.type) {
     case 'landing_page_review':
@@ -35,12 +37,14 @@ export function getEditorNotificationSummary(
       return notification.entityName ?? 'Video submission'
     case 'press_asset_suggestion':
       return notification.entityName ?? 'Press asset suggestion'
+    case 'artist_portal_message':
+      return notification.entityName ?? 'New message from artist'
     default:
       return notification.entityName ?? notification.entityType
   }
 }
 
-export function getEditorNotificationActionLabel(type: string): string {
+export function getDashboardNotificationActionLabel(type: string): string {
   switch (type) {
     case 'landing_page_review':
       return 'Review fan page'
@@ -50,6 +54,8 @@ export function getEditorNotificationActionLabel(type: string): string {
       return 'Review video'
     case 'press_asset_suggestion':
       return 'Review asset'
+    case 'artist_portal_message':
+      return 'Open messages'
     default:
       return 'Open'
   }
