@@ -139,6 +139,8 @@ function makeMockSettlement(overrides?: Partial<SettlementCenterState>): Settlem
     correctionNotes: '',
     setCorrectionNotes: vi.fn(),
     correcting: false,
+    deletingDraft: false,
+    runDeleteDraft: vi.fn(),
     correctionDeltaEur: null,
     runCorrection: vi.fn(),
     paymentDialogOpen: false,

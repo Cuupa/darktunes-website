@@ -50,6 +50,23 @@ export class DuplicateDraftStatementError extends Error {
   }
 }
 
+export class StatementNotDeletableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'StatementNotDeletableError'
+  }
+}
+
+/** Statuses visible to portal artists (drafts and superseded are admin-only). */
+export const ARTIST_VISIBLE_STATEMENT_STATUSES: SalesStatementStatus[] = [
+  'label_approved',
+  'artist_notified',
+  'viewed',
+  'invoiced',
+  'paid',
+  'acknowledged',
+]
+
 async function assertNoDuplicateDraft(
   db: DbClient,
   artistId: string,
@@ -131,6 +148,7 @@ export async function getSalesStatementsByArtistId(
     .from('sales_statements')
     .select('*')
     .eq('artist_id', artistId)
+    .in('status', ARTIST_VISIBLE_STATEMENT_STATUSES)
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -247,10 +265,63 @@ export async function getSalesStatementsForPeriod(
     .eq('period_start', periodStart)
     .eq('period_end', periodEnd)
     .neq('document_type', 'storno')
+    .neq('status', 'superseded')
+    .neq('status', 'cancelled')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
   return (data ?? []) as SalesStatementRow[]
+}
+
+const DELETABLE_STATEMENT_STATUSES: SalesStatementStatus[] = ['draft', 'cancelled']
+
+export async function deleteSalesStatementDraft(
+  db: DbClient,
+  id: string,
+): Promise<SalesStatement> {
+  const { data: row, error: fetchError } = await db
+    .from('sales_statements')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError) throw new Error(fetchError.message)
+  if (!row) throw new StatementNotDeletableError('Statement not found')
+
+  const statement = row as SalesStatementRow
+  if (!DELETABLE_STATEMENT_STATUSES.includes(statement.status)) {
+    throw new StatementNotDeletableError(
+      `Only draft or cancelled statements can be deleted (current: "${statement.status}")`,
+    )
+  }
+  if (statement.document_type === 'correction') {
+    throw new StatementNotDeletableError('Correction statements cannot be deleted; use supersede flow')
+  }
+
+  const { data: ledgerRows, error: ledgerError } = await db
+    .from('artist_settlement_ledger')
+    .select('id')
+    .eq('reference_type', 'sales_statement')
+    .eq('reference_id', id)
+    .limit(1)
+
+  if (ledgerError) throw new Error(ledgerError.message)
+  if (ledgerRows && ledgerRows.length > 0) {
+    throw new StatementNotDeletableError('Statement has ledger entries and cannot be deleted')
+  }
+
+  const { error: lineItemsError } = await db
+    .from('sales_statement_line_items')
+    .delete()
+    .eq('statement_id', id)
+
+  if (lineItemsError) throw new Error(lineItemsError.message)
+
+  const { error: deleteError } = await db.from('sales_statements').delete().eq('id', id)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  return rowToSalesStatement(statement)
 }
 
 export async function linkApprovedStatementToSettlement(

@@ -1,5 +1,5 @@
 /**
- * Server-side Bronze CSV re-processing: R2 → parse → territory metrics.
+ * Server-side Bronze CSV re-processing: R2 → parse → full SOS pipeline → territory metrics.
  */
 
 import type { SalesTransaction } from './ingest/csv-parser'
@@ -8,26 +8,13 @@ import { parseShopifyCSV } from './ingest/shopify-parser'
 import { parseDarkmerchCSV } from './ingest/darkmerch-parser'
 import {
   aggregateTerritoryMetrics,
+  processTransactionsWithCompilations,
   type TerritoryMetricRow,
 } from './data-processor'
+import type { DataProcessorConfig } from './data-processor/types'
+import { normalizeAccountingConfig, type SosAccountingSettings } from './sosAccountingSettings'
 import type { BronzeDistributor } from './bronzeUpload'
-
-function groupTransactionsByArtist(
-  transactions: SalesTransaction[],
-): Array<{ artist: string; transactions: SalesTransaction[] }> {
-  const map = new Map<string, SalesTransaction[]>()
-  for (const t of transactions) {
-    const artist = t.main_artist?.trim() || t.original_artist?.trim() || 'Unknown'
-    const key = artist.toLowerCase()
-    const group = map.get(key) ?? []
-    group.push({ ...t, main_artist: artist })
-    map.set(key, group)
-  }
-  return Array.from(map.entries()).map(([, txs]) => ({
-    artist: txs[0]?.main_artist ?? 'Unknown',
-    transactions: txs,
-  }))
-}
+import type { LabelArtist } from './types'
 
 async function parseBronzeCsvContent(
   distributor: BronzeDistributor,
@@ -49,21 +36,51 @@ async function parseBronzeCsvContent(
   return result.transactions
 }
 
+export interface BronzeReprocessOptions {
+  workspaceConfig?: Partial<SosAccountingSettings>
+  labelArtists?: LabelArtist[]
+}
+
 export interface BronzeReprocessResult {
   rowCount: number
   territoryMetrics: TerritoryMetricRow[]
   uniqueArtists: string[]
 }
 
+function buildReprocessConfig(options: BronzeReprocessOptions): DataProcessorConfig {
+  const normalized = normalizeAccountingConfig(options.workspaceConfig)
+
+  return {
+    compilationFilters: normalized.compilationFilters,
+    artistMappings: normalized.artistMappings,
+    splitFees: normalized.splitFees,
+    manualRevenues: normalized.manualRevenues,
+    expenses: normalized.expenses,
+    ignoredEntries: normalized.ignoredEntries,
+    trackRevenueAssignments: normalized.trackRevenueAssignments,
+    labelArtists: options.labelArtists,
+    distributionFeePercentage: normalized.appDefaults.distributionFeePercentage,
+    distributionFeeDigital: normalized.appDefaults.distributionFeeDigital,
+    distributionFeePhysical: normalized.appDefaults.distributionFeePhysical,
+    defaultSplitPercentage: normalized.appDefaults.defaultSplitPercentage,
+    defaultSplitPercentageDigital: normalized.appDefaults.defaultSplitPercentageDigital,
+    defaultSplitPercentagePhysical: normalized.appDefaults.defaultSplitPercentagePhysical,
+    sourceSplits: normalized.appDefaults.sourceSplits,
+  }
+}
+
 /**
- * Parses archived Bronze CSV text and produces gold-layer territory metrics.
+ * Parses archived Bronze CSV text and produces gold-layer territory metrics
+ * using the same pipeline as the browser worker.
  */
 export async function reprocessBronzeCsvContent(
   distributor: BronzeDistributor,
   csvContent: string,
+  options: BronzeReprocessOptions = {},
 ): Promise<BronzeReprocessResult> {
   const transactions = await parseBronzeCsvContent(distributor, csvContent)
-  const artistData = groupTransactionsByArtist(transactions)
+  const config = buildReprocessConfig(options)
+  const { artistData } = processTransactionsWithCompilations(transactions, config)
   const territoryMetrics = aggregateTerritoryMetrics(artistData)
 
   return {

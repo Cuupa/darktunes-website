@@ -1,5 +1,5 @@
 import type { SalesTransaction } from '../ingest/csv-parser'
-import { convertToEur } from '../currency'
+import { normalizeRevenueToEur } from '../currency'
 import type { ReleaseSplitOverride, SplitFee, TransactionSource } from '../types'
 import {
   buildCountryBreakdown,
@@ -93,15 +93,16 @@ export function buildProcessedArtistData({
   const rates = config.exchangeRates ?? {}
   const historicalRates = config.historicalExchangeRates ?? {}
 
-  const eurTransactions = artistTransactions.map(t => {
-    const applicableRates = (t.sales_month && historicalRates[t.sales_month])
-      ? historicalRates[t.sales_month]
-      : rates
-    const revenueEur = t.source === 'bandcamp' && t.currency !== 'EUR'
-      ? convertToEur(t.net_revenue, t.currency, applicableRates)
-      : t.net_revenue
-    return { ...t, net_revenue: revenueEur }
-  })
+  const eurTransactions = artistTransactions.map(t => ({
+    ...t,
+    net_revenue: normalizeRevenueToEur(
+      t.net_revenue,
+      t.currency,
+      t.sales_month,
+      rates,
+      historicalRates,
+    ),
+  }))
 
   for (const t of eurTransactions) {
     totalQuantity += t.quantity

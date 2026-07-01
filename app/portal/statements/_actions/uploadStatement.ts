@@ -24,6 +24,7 @@ import {
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
 import {
   buildStatementR2Key,
+  deleteStatementPdfFromR2,
   uploadStatementPdfToR2,
 } from '@/lib/portal/statementPdfStorage'
 
@@ -100,62 +101,74 @@ export async function uploadStatement(
     const r2Key = buildStatementR2Key(input.artistId, input.filename)
     await uploadStatementPdfToR2(input.pdfBase64, r2Key)
 
-    // 4. Persist the DB record via service-role client (bypasses RLS)
-    const settlementPeriod =
-      periodStart && periodEnd
-        ? await getOrCreateSettlementPeriod(serviceSupabase, periodStart, periodEnd)
-        : null
+    let statementId: string | undefined
+    try {
+      // 4. Persist the DB record via service-role client (bypasses RLS)
+      const settlementPeriod =
+        periodStart && periodEnd
+          ? await getOrCreateSettlementPeriod(serviceSupabase, periodStart, periodEnd)
+          : null
 
-    const statement = await createSalesStatement(serviceSupabase, {
-      artistId: input.artistId,
-      filename: input.filename,
-      r2Key,
-      period: input.period,
-      amountEur: input.amountEur,
-      periodStart,
-      periodEnd,
-      totalStreams: input.totalStreams ?? 0,
-      batchId: input.batchId ?? null,
-    })
+      const statement = await createSalesStatement(serviceSupabase, {
+        artistId: input.artistId,
+        filename: input.filename,
+        r2Key,
+        period: input.period,
+        amountEur: input.amountEur,
+        periodStart,
+        periodEnd,
+        totalStreams: input.totalStreams ?? 0,
+        batchId: input.batchId ?? null,
+      })
+      statementId = statement.id
 
-    if (settlementPeriod) {
-      await serviceSupabase
-        .from('sales_statements')
-        .update({ settlement_period_id: settlementPeriod.id })
-        .eq('id', statement.id)
+      if (settlementPeriod) {
+        await serviceSupabase
+          .from('sales_statements')
+          .update({ settlement_period_id: settlementPeriod.id })
+          .eq('id', statement.id)
+      }
+
+      if (input.lineItems && input.lineItems.length > 0) {
+        await createSalesStatementLineItems(
+          serviceSupabase,
+          input.lineItems.map((item) => ({
+            statementId: statement.id,
+            releaseId: item.releaseId ?? null,
+            platform: item.platform ?? null,
+            country: item.country ?? null,
+            streams: item.streams ?? 0,
+            revenueEur: item.revenueEur ?? 0,
+            quantity: item.quantity ?? 0,
+          })),
+        )
+      }
+    } catch (dbErr) {
+      await deleteStatementPdfFromR2(r2Key)
+      throw dbErr
     }
 
-    if (input.lineItems && input.lineItems.length > 0) {
-      await createSalesStatementLineItems(
-        serviceSupabase,
-        input.lineItems.map((item) => ({
-          statementId: statement.id,
-          releaseId: item.releaseId ?? null,
-          platform: item.platform ?? null,
-          country: item.country ?? null,
-          streams: item.streams ?? 0,
-          revenueEur: item.revenueEur ?? 0,
-          quantity: item.quantity ?? 0,
-        })),
-      )
-    }
-
-    if (input.notifyArtist) {
+    if (input.notifyArtist && statementId) {
       try {
+        const { getSalesStatementById, updateSalesStatementStatus } = await import(
+          '@/lib/api/salesStatements'
+        )
         const { notifyStatementArtist } = await import('@/lib/sos/notifyStatementArtist')
-        const emailResult = await notifyStatementArtist(serviceSupabase, statement, fetch)
-        if (emailResult.success) {
-          const { updateSalesStatementStatus } = await import('@/lib/api/salesStatements')
-          await updateSalesStatementStatus(serviceSupabase, statement.id, 'artist_notified')
-        } else {
-          console.warn('[uploadStatement] Email notification skipped:', emailResult.error)
+        const statement = await getSalesStatementById(serviceSupabase, statementId)
+        if (statement) {
+          const emailResult = await notifyStatementArtist(serviceSupabase, statement, fetch)
+          if (emailResult.success) {
+            await updateSalesStatementStatus(serviceSupabase, statement.id, 'artist_notified')
+          } else {
+            console.warn('[uploadStatement] Email notification skipped:', emailResult.error)
+          }
         }
       } catch (emailErr) {
         console.error('[uploadStatement] Email notification failed:', emailErr)
       }
     }
 
-    return { success: true, statementId: statement.id }
+    return { success: true, statementId }
   } catch (err) {
     if (err instanceof SettlementPeriodNotWritableError || err instanceof DuplicateDraftStatementError) {
       return { success: false, error: err.message }

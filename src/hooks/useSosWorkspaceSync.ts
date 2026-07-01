@@ -62,6 +62,7 @@ export function useSosWorkspaceSync({
   const [isSettingsDirty, setIsSettingsDirty] = useState(false)
   const [isPeriodWorkspaceReady, setIsPeriodWorkspaceReady] = useState(false)
   const [isDefaultPresetReady, setIsDefaultPresetReady] = useState(false)
+  const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false)
 
   const lastSavedFingerprintRef = useRef<string | null>(null)
   const suppressAutoSaveRef = useRef(false)
@@ -238,24 +239,30 @@ export function useSosWorkspaceSync({
     [applySettings, clearSavedFingerprint, markSynced],
   )
 
+  const performLoadFromServer = useCallback(async (): Promise<void> => {
+    if (currentPeriodKey) {
+      await loadPeriodWorkspace(currentPeriodKey)
+      return
+    }
+    await loadDefaultPreset()
+  }, [currentPeriodKey, loadDefaultPreset, loadPeriodWorkspace])
+
   const loadFromServer = useCallback(
     async (options?: { force?: boolean }): Promise<void> => {
       if (isSettingsDirty && !options?.force) {
-        const confirmed = window.confirm(
-          'Reload from server? Unsaved changes in this browser will be replaced by the server copy.',
-        )
-        if (!confirmed) return
-      }
-
-      if (currentPeriodKey) {
-        await loadPeriodWorkspace(currentPeriodKey)
+        setReloadConfirmOpen(true)
         return
       }
 
-      await loadDefaultPreset()
+      setReloadConfirmOpen(false)
+      await performLoadFromServer()
     },
-    [currentPeriodKey, isSettingsDirty, loadDefaultPreset, loadPeriodWorkspace],
+    [isSettingsDirty, performLoadFromServer],
   )
+
+  const confirmReloadFromServer = useCallback(async (): Promise<void> => {
+    await loadFromServer({ force: true })
+  }, [loadFromServer])
 
   const saveCurrentWorkspace = useCallback(async (): Promise<boolean> => {
     if (!currentPeriodKey) {
@@ -383,6 +390,10 @@ export function useSosWorkspaceSync({
     isWorkspaceSaving,
     isSettingsDirty,
     loadFromServer,
+    confirmReloadFromServer,
+    reloadConfirmOpen,
+    setReloadConfirmOpen,
+    loadDefaultPreset,
     saveCurrentWorkspace,
   }
 }

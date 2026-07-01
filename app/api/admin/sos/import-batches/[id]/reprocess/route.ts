@@ -8,6 +8,7 @@ import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById, updateImportBatchStatus } from '@/lib/api/distributorImportBatches'
+import { getWorkspaceForPeriod } from '@/lib/api/sosAccountingWorkspaces'
 import { createR2Client, downloadObjectFromR2 } from '@/lib/r2Utils'
 import { reprocessBronzeCsvContent } from '@/lib/sos/bronzeReprocess'
 import type { BronzeDistributor } from '@/lib/sos/bronzeUpload'
@@ -56,7 +57,26 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   try {
     const csvContent = await downloadObjectFromR2(batch.r2Key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
-    const result = await reprocessBronzeCsvContent(batch.distributor as BronzeDistributor, csvContent)
+    const workspace = await getWorkspaceForPeriod(
+      serviceSupabase,
+      batch.periodStart,
+      batch.periodEnd,
+    )
+    const labelArtists =
+      label_artists?.map((artist) => ({
+        id: artist.artistId ?? artist.name,
+        name: artist.name,
+        artistId: artist.artistId,
+      })) ?? []
+
+    const result = await reprocessBronzeCsvContent(
+      batch.distributor as BronzeDistributor,
+      csvContent,
+      {
+        workspaceConfig: workspace?.config,
+        labelArtists,
+      },
+    )
 
     let persistResult = null
     if (persist && label_artists && label_artists.length > 0) {

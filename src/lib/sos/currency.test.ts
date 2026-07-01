@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { convertToEur } from './currency'
-import type { ExchangeRates } from './currency'
+import { convertToEur, normalizeRevenueToEur } from './currency'
+import type { ExchangeRates, HistoricalRates } from './currency'
 
 const RATES: ExchangeRates = {
   USD: 1.08,
@@ -41,5 +41,46 @@ describe('convertToEur', () => {
     // code becomes '' after trim+upper → early return with original amount
     // This is the existing "no currency" short-circuit and should stay safe.
     expect(convertToEur(100, '', RATES)).toBe(100)
+  })
+})
+
+describe('normalizeRevenueToEur', () => {
+  const spotRates: ExchangeRates = { USD: 1.08, GBP: 0.86 }
+  const historicalRates: HistoricalRates = {
+    '2024-03': { USD: 1.10, GBP: 0.88 },
+    '2024-04': { USD: 1.12 },
+  }
+
+  it('returns EUR amounts unchanged', () => {
+    expect(normalizeRevenueToEur(42.5, 'EUR', '2024-03', spotRates, historicalRates)).toBe(42.5)
+  })
+
+  it('prefers historical monthly rates over spot rates when salesMonth is known', () => {
+    // 110 USD / 1.10 = 100 EUR (historical), not 110/1.08 ≈ 101.85 (spot)
+    expect(
+      normalizeRevenueToEur(110, 'USD', '2024-03', spotRates, historicalRates),
+    ).toBeCloseTo(100, 5)
+  })
+
+  it('falls back to spot rates when salesMonth has no historical entry', () => {
+    expect(
+      normalizeRevenueToEur(108, 'USD', '2024-05', spotRates, historicalRates),
+    ).toBeCloseTo(100, 5)
+  })
+
+  it('falls back to spot rates when salesMonth is undefined', () => {
+    expect(normalizeRevenueToEur(86, 'GBP', undefined, spotRates, historicalRates)).toBeCloseTo(100, 5)
+  })
+
+  it('applies the same conversion path for non-Bandcamp sources', () => {
+    expect(
+      normalizeRevenueToEur(110, 'USD', '2024-03', spotRates, historicalRates),
+    ).toBeCloseTo(100, 5)
+  })
+
+  it('throws when neither historical nor spot rates contain the currency', () => {
+    expect(() =>
+      normalizeRevenueToEur(100, 'JPY', '2024-03', spotRates, historicalRates),
+    ).toThrowError(/JPY/)
   })
 })

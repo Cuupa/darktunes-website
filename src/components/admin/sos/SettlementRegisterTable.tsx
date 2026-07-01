@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
+import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -26,6 +28,7 @@ import {
   MagnifyingGlass,
   PaperPlaneTilt,
   PencilSimple,
+  Trash,
 } from '@phosphor-icons/react'
 
 function InvoiceStatusBadge({
@@ -60,6 +63,11 @@ interface SettlementRegisterTableProps {
 }
 
 export function SettlementRegisterTable({ settlement }: SettlementRegisterTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<{
+    statementId: string
+    artistName: string
+  } | null>(null)
+
   const {
     t,
     invoiceStatusLabels,
@@ -77,8 +85,10 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
     creatingDrafts,
     approving,
     correcting,
+    deletingDraft,
     runDraftCreation,
     runApproval,
+    runDeleteDraft,
     openCorrectionDialog,
   } = settlement
 
@@ -96,10 +106,27 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         </Button>
       )}
       {row.workflowStatus === 'draft' && row.statementId && periodWritable && (
-        <Button size="sm" disabled={approving} onClick={() => void runApproval([row.statementId!])}>
-          <PaperPlaneTilt size={14} />
-          {t.settlementApproveBtn}
-        </Button>
+        <>
+          <Button size="sm" disabled={approving} onClick={() => void runApproval([row.statementId!])}>
+            <PaperPlaneTilt size={14} />
+            {t.settlementApproveBtn}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deletingDraft}
+            onClick={() => {
+              setDeleteTarget({
+                statementId: row.statementId!,
+                artistName: row.artistName,
+              })
+            }}
+            aria-label={interpolate(t.settlementDeleteDraftBtn, { artist: row.artistName })}
+          >
+            <Trash size={14} />
+            {t.settlementDeleteDraftBtn}
+          </Button>
+        </>
       )}
       {canCorrectStatement(row) && periodWritable && (
         <Button
@@ -197,6 +224,35 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
           )}
         </div>
       ),
+    },
+    {
+      id: 'sessionPayout',
+      header: () => <span className="text-right block w-full">{t.settlementColSessionPayout}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="block text-right tabular-nums text-muted-foreground">
+          {row.original.payout != null ? fmtEur(row.original.payout) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'statementAmount',
+      header: () => <span className="text-right block w-full">{t.settlementColStatementAmount}</span>,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const delta =
+          row.original.payout != null &&
+          row.original.statementAmountEur != null &&
+          Math.abs(row.original.payout - row.original.statementAmountEur) >= 0.01
+        return (
+          <span
+            className={`block text-right tabular-nums ${delta ? 'text-amber-300' : ''}`}
+            title={delta ? 'Session payout differs from statement amount' : undefined}
+          >
+            {row.original.statementAmountEur != null ? fmtEur(row.original.statementAmountEur) : '—'}
+          </span>
+        )
+      },
     },
     {
       id: 'balance',
@@ -323,6 +379,27 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
           skeletonRowCount={6}
         />
       </div>
+
+      <SosConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title={t.settlementDeleteDraftBtn}
+        description={
+          deleteTarget
+            ? interpolate(t.settlementDeleteDraftConfirm, { artist: deleteTarget.artistName })
+            : ''
+        }
+        confirmLabel={t.settlementDeleteDraftBtn}
+        cancelLabel="Cancel"
+        destructive
+        loading={deletingDraft}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          void runDeleteDraft(deleteTarget.statementId, deleteTarget.artistName).finally(() => {
+            setDeleteTarget(null)
+          })
+        }}
+      />
     </>
   )
 }

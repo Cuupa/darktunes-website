@@ -3477,10 +3477,11 @@ CREATE POLICY "streaming_stats: admin all" ON public.streaming_stats
 DROP POLICY IF EXISTS "sales_statements: artist read own" ON public.sales_statements;
 DROP POLICY IF EXISTS "sales_statements: admin all"       ON public.sales_statements;
 
--- Allows artists to view their own sales statements
+-- Allows artists to view their own approved+ statements (drafts are admin-only)
 CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    AND status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
   );
 
 -- Allows admins full access to all sales statements
@@ -3541,7 +3542,9 @@ CREATE POLICY "sales_statement_line_items: artist read own" ON public.sales_stat
     EXISTS (
       SELECT 1 FROM public.sales_statements ss
       JOIN public.artist_members am ON am.artist_id = ss.artist_id
-      WHERE ss.id = statement_id AND am.user_id = auth.uid()
+      WHERE ss.id = statement_id
+        AND am.user_id = auth.uid()
+        AND ss.status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
     )
   );
 
@@ -4739,9 +4742,9 @@ VALUES
   ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',              'select',   'release',
     '{"options":[{"value":"10","labels":{"en":"Music","de":"Musik"}},{"value":"24","labels":{"en":"Entertainment","de":"Unterhaltung"}},{"value":"22","labels":{"en":"People & Blogs","de":"People & Blogs"}},{"value":"27","labels":{"en":"Education","de":"Bildung"}}]}',
     FALSE, TRUE, 70, NULL, NULL),
-  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', FALSE, TRUE,  80, NULL, NULL),
-  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', FALSE, TRUE,  90, NULL, NULL),
-  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', FALSE, TRUE, 100, NULL, NULL)
+  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', NULL, FALSE, TRUE,  80, NULL, NULL),
+  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', NULL, FALSE, TRUE,  90, NULL, NULL),
+  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', NULL, FALSE, TRUE, 100, NULL, NULL)
 ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

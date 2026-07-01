@@ -8,6 +8,7 @@ import {
   archiveSettlementPeriod,
   bulkApproveStatements,
   createStatementCorrection,
+  deleteSalesStatement,
   fetchSettlementRegister,
   lockSettlementPeriod,
   markInvoiceReceived,
@@ -80,6 +81,7 @@ export function useSettlementCenter({
   const [correctionAmountEur, setCorrectionAmountEur] = useState('')
   const [correctionNotes, setCorrectionNotes] = useState('')
   const [correcting, setCorrecting] = useState(false)
+  const [deletingDraft, setDeletingDraft] = useState(false)
   const [syncAnalyticsOnApprove, setSyncAnalyticsOnApprove] = useState(true)
 
   const canPersistAnalytics = territoryMetrics.length > 0
@@ -308,6 +310,26 @@ export function useSettlementCenter({
       else next.add(artistName)
       return next
     })
+  }
+
+  const runDeleteDraft = async (statementId: string, artistName: string) => {
+    setDeletingDraft(true)
+    try {
+      const token = await getAdminAccessToken()
+      if (!token) throw new Error(t.settlementSessionExpired)
+
+      await deleteSalesStatement(
+        token,
+        statementId,
+        interpolate(t.settlementDeleteDraftFailed, { artist: artistName }),
+      )
+      await refreshRegister()
+      toast.success(interpolate(t.settlementDeleteDraftSuccess, { artist: artistName }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.settlementDeleteDraftFailed)
+    } finally {
+      setDeletingDraft(false)
+    }
   }
 
   const runDraftCreation = async (targets: MasterRow[]) => {
@@ -644,6 +666,8 @@ export function useSettlementCenter({
     correctionNotes,
     setCorrectionNotes,
     correcting,
+    deletingDraft,
+    runDeleteDraft,
     correctionDeltaEur,
     runCorrection,
     paymentDialogOpen,
