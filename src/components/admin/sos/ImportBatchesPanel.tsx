@@ -5,6 +5,7 @@ import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { toast } from 'sonner'
 import { ArrowsClockwise, Database, Trash, DownloadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Badge } from '@/components/ui/badge'
 import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
 import type { LabelArtist } from '@/lib/sos/types'
@@ -159,7 +160,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
           {t.bronzeRefresh}
         </Button>
       </div>
-      <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+      <div className={horizontalScrollClass} data-lenis-prevent>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground border-b border-border">

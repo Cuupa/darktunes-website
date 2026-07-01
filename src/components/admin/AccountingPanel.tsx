@@ -14,6 +14,8 @@ import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
+import { cn } from '@/lib/utils'
 import { useArtists } from '@/hooks/useArtists'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useCSVProcessor } from '@/hooks/useSosCSVProcessor'
@@ -869,7 +871,7 @@ function SosGeneratorPanel() {
     <div className="space-y-0">
       {/* Sub-tab navigation */}
       <div
-        className="flex items-center gap-1 px-6 pt-4 border-b border-border overflow-x-auto overscroll-contain"
+        className={cn('flex items-center gap-1 px-6 pt-4 border-b border-border', horizontalScrollClass)}
         data-lenis-prevent
         role="tablist"
         aria-label={t.subTabListLabel}

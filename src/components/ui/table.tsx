@@ -1,5 +1,6 @@
 import { ComponentProps } from "react"
 
+import { horizontalScrollClass } from "@/components/ui/scroll-panel"
 import { cn } from "@/lib/utils"
 
 function Table({ className, ...props }: ComponentProps<"table">) {
@@ -7,7 +8,7 @@ function Table({ className, ...props }: ComponentProps<"table">) {
     <div
       data-slot="table-container"
       data-lenis-prevent
-      className="relative w-full overflow-x-auto overscroll-contain"
+      className={cn("relative w-full", horizontalScrollClass)}
     >
       <table
         data-slot="table"

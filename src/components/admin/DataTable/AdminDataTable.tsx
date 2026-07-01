@@ -37,8 +37,7 @@ export function AdminDataTable<TData>({
   const rows = table.getRowModel().rows
 
   return (
-    <div className={cn('overflow-x-auto overscroll-contain', className)} data-lenis-prevent>
-      <Table>
+    <Table className={className}>
         <TableHeader
           className={cn(
             stickyHeader && 'sticky top-0 z-10 border-b border-border bg-card',
@@ -91,7 +90,6 @@ export function AdminDataTable<TData>({
             ))
           )}
         </TableBody>
-      </Table>
-    </div>
+    </Table>
   )
 }

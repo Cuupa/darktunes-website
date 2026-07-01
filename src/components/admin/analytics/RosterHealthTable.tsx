@@ -2,6 +2,7 @@
 
 import type { RosterHealthRow } from '@/lib/api/labelAnalytics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 
 interface RosterHealthTableProps {
   rows: RosterHealthRow[]
@@ -32,7 +33,7 @@ export function RosterHealthTable({ rows }: RosterHealthTableProps) {
         <CardTitle className="text-sm font-medium">Roster health matrix</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">

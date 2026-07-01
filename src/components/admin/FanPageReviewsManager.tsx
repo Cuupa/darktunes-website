@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowSquareOut, Globe } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -286,7 +287,7 @@ export function FanPageReviewsManager() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">

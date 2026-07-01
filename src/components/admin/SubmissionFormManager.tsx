@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -101,20 +101,6 @@ async function parseApiError(res: Response): Promise<string> {
   } catch {
     return `HTTP ${res.status}`
   }
-}
-
-function SubmissionFormTableScroll({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        'overflow-x-auto overscroll-contain touch-pan-x touch-pan-y [-webkit-overflow-scrolling:touch]',
-        className,
-      )}
-      data-lenis-prevent
-    >
-      {children}
-    </div>
-  )
 }
 
 interface SubmissionFormManagerProps {
@@ -383,8 +369,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
 
     return (
       <div className="space-y-4 p-4">
-        <SubmissionFormTableScroll>
-          <Table className="min-w-max w-full">
+        <Table className="min-w-max w-full">
             <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
               <TableRow className="bg-card hover:bg-card">
                 <TableHead className="bg-card">{COPY.fieldLabel}</TableHead>
@@ -454,8 +439,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </SubmissionFormTableScroll>
+        </Table>
 
         {addingNew && (
           <div className="border border-border rounded-md p-4 space-y-4">
@@ -561,8 +545,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
 
     return (
       <div className="p-4">
-        <SubmissionFormTableScroll>
-          <Table className="min-w-max w-full">
+        <Table className="min-w-max w-full">
             <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
               <TableRow className="bg-card hover:bg-card">
                 <TableHead className="bg-card">{COPY.releaseType}</TableHead>
@@ -611,8 +594,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </SubmissionFormTableScroll>
+        </Table>
       </div>
     )
   }
@@ -623,8 +605,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
     return (
       <div className="space-y-2 p-4">
         <p className="text-xs text-muted-foreground md:hidden">{COPY.fieldRulesScrollHint}</p>
-        <SubmissionFormTableScroll>
-          <Table className="min-w-max w-full">
+        <Table className="min-w-max w-full">
             <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
               <TableRow className="bg-card hover:bg-card">
                 <TableHead className="sticky left-0 z-20 bg-card min-w-[10rem]">{COPY.fieldLabel}</TableHead>
@@ -666,14 +647,18 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </SubmissionFormTableScroll>
+        </Table>
       </div>
     )
   }
 
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col', variant === 'embedded' && 'min-h-[min(60dvh,32rem)]')}>
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        variant === 'embedded' && 'h-full min-h-[min(60dvh,32rem)]',
+      )}
+    >
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

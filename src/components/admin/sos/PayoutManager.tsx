@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -364,7 +366,7 @@ export function PayoutManager({
           </div>
         )}
 
-        <div className="overflow-x-auto overscroll-contain flex-1" data-lenis-prevent>
+        <div className={cn(horizontalScrollClass, 'flex-1')} data-lenis-prevent>
           {loadingRegister ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <CircleNotch size={32} className="animate-spin opacity-50" />

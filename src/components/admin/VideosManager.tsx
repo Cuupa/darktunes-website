@@ -6,6 +6,7 @@ import { useVideos } from '@/hooks/useVideos'
 import { useArtists } from '@/hooks/useArtists'
 import { VideoForm, type VideoFormData } from './forms/VideoForm'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -193,7 +194,7 @@ export function VideosManager() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+      <div className={horizontalScrollClass} data-lenis-prevent>
       <Table>
         <TableHeader>
           <TableRow>
