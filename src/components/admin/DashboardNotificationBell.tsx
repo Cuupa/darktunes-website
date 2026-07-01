@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { useAuthContext } from '@/contexts/AuthContext'
-import type { EditorNotification } from '@/types'
+import type { DashboardNotification } from '@/types'
 import {
-  getEditorNotificationActionLabel,
-  getEditorNotificationHref,
-  getEditorNotificationSummary,
-} from '@/lib/admin/editorNotificationRouting'
+  getDashboardNotificationActionLabel,
+  getDashboardNotificationHref,
+  getDashboardNotificationSummary,
+} from '@/lib/admin/dashboardNotificationRouting'
 
-interface EditorNotificationBellProps {
+interface DashboardNotificationBellProps {
   userId: string
 }
 
@@ -30,7 +30,7 @@ function rowToNotification(
     read: boolean
     created_at: string
   },
-): EditorNotification {
+): DashboardNotification {
   return {
     id: row.id,
     recipientId: row.recipient_id,
@@ -44,13 +44,12 @@ function rowToNotification(
   }
 }
 
-export function EditorNotificationBell({ userId }: EditorNotificationBellProps) {
+export function DashboardNotificationBell({ userId }: DashboardNotificationBellProps) {
   const { profile } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const channelInstanceId = useId().replace(/:/g, '')
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<EditorNotification[]>([])
-
+  const [items, setItems] = useState<DashboardNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
   const loadNotifications = useCallback(async () => {
@@ -80,11 +79,21 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
 
   useEffect(() => {
     const channel = supabase
-      .channel(`editor-notifications-${userId}-${channelInstanceId}`)
+      .channel(`dashboard-notifications-${userId}-${channelInstanceId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
+          schema: 'public',
+          table: 'editor_notifications',
+          filter: `recipient_id=eq.${userId}`,
+        },
+        () => { void loadNotificationsRef.current() },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'editor_notifications',
           filter: `recipient_id=eq.${userId}`,
@@ -110,12 +119,13 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
 
     void supabase.from('editor_notifications').update({ read: true }).in('id', unreadIds)
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
+    setUnreadCount(0)
   }, [items, open, supabase])
 
   const ariaLabel =
     unreadCount > 0
-      ? `Open admin notifications, ${unreadCount} unread`
-      : 'Open admin notifications'
+      ? `Open notifications, ${unreadCount} unread`
+      : 'Open notifications'
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -141,9 +151,9 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
             <p className="text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
             items.map((item) => {
-              const href = getEditorNotificationHref(item, profile?.role)
-              const summary = getEditorNotificationSummary(item)
-              const actionLabel = getEditorNotificationActionLabel(item.type)
+              const href = getDashboardNotificationHref(item, profile?.role)
+              const summary = getDashboardNotificationSummary(item)
+              const actionLabel = getDashboardNotificationActionLabel(item.type)
 
               const content = (
                 <>

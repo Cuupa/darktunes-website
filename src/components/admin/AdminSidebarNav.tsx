@@ -54,7 +54,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { EditorNotificationBell } from '@/components/admin/EditorNotificationBell'
+import { DashboardNotificationBell } from '@/components/admin/DashboardNotificationBell'
 import { NavCountBadge } from '@/components/nav/NavCountBadge'
 import { useAdminNavBadges } from '@/hooks/useAdminNavBadges'
 import { useTranslations } from 'next-intl'
@@ -145,7 +145,7 @@ export function AdminSidebarNav() {
   const { isAdmin, user, profile, signOut } = useAuthContext()
   const isEditorRole = profile?.role === 'editor'
   const notificationUserId = user?.id
-  const showNotificationBell = Boolean(notificationUserId && (isAdmin || isEditorRole))
+  const showNotificationBell = Boolean(notificationUserId)
   const badges = useAdminNavBadges(notificationUserId ?? null, isAdmin)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -257,7 +257,7 @@ export function AdminSidebarNav() {
         <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
         <div className="flex items-center gap-2">
           {showNotificationBell && notificationUserId && (
-            <EditorNotificationBell userId={notificationUserId} />
+            <DashboardNotificationBell userId={notificationUserId} />
           )}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -292,7 +292,7 @@ export function AdminSidebarNav() {
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
           </div>
           {showNotificationBell && notificationUserId && (
-            <EditorNotificationBell userId={notificationUserId} />
+            <DashboardNotificationBell userId={notificationUserId} />
           )}
         </div>
 

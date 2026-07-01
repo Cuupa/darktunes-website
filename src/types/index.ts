@@ -269,7 +269,7 @@ export interface EditorActivityLogEntry {
   createdAt: string
 }
 
-export interface EditorNotification {
+export interface DashboardNotification {
   id: string
   recipientId: string
   type: string
@@ -280,6 +280,9 @@ export interface EditorNotification {
   read: boolean
   createdAt: string
 }
+
+/** @deprecated Use DashboardNotification */
+export type EditorNotification = DashboardNotification
 
 export interface InterviewRequest {
   id: string

@@ -11,8 +11,8 @@
  *
  * Scroll behaviour:
  *  `ScrollableAppShell` owns vertical scroll for the main content pane.
- *  `DashboardLenisGuard` stops Lenis on /admin/* so wheel events reach
- *  native scroll. Nested panels (e.g. file explorer with `fill`) may scroll
+ *  Lenis is not mounted on /admin/* so wheel events reach native scroll.
+ *  Nested panels (e.g. file explorer with `fill`) may scroll
  *  internally; list managers must not add a root `overflow-y-auto` wrapper.
  *
  * Visual effects:
@@ -21,21 +21,27 @@
  */
 
 import { Suspense } from 'react'
+import { usePathname } from 'next/navigation'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav'
 import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
+import { isAdminListRoute } from '@/lib/scroll/dashboardRoutes'
 
 interface AdminClientLayoutProps {
   children: React.ReactNode
 }
 
 export function AdminClientLayout({ children }: AdminClientLayoutProps) {
+  const pathname = usePathname()
+  const lockScroll = isAdminListRoute(pathname)
+
   return (
     <AuthProvider>
       {/* On mobile the sidebar renders as a sticky header + Sheet drawer;
           on ≥md it renders as a traditional left sidebar column.
           AdminSidebarNav handles both breakpoints internally. */}
       <ScrollableAppShell
+        lockScroll={lockScroll}
         sidebar={<AdminSidebarNav />}
         footer={(
           <div className="py-4 text-center">
