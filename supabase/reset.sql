@@ -4644,6 +4644,20 @@ BEGIN
     ADD COLUMN IF NOT EXISTS validation JSONB;
 END $$;
 
+-- Expand field_type check to include date_dmy (DD/MM/YYYY release date input).
+ALTER TABLE public.submission_form_schema DROP CONSTRAINT IF EXISTS submission_form_schema_field_type_check;
+ALTER TABLE public.submission_form_schema ADD CONSTRAINT submission_form_schema_field_type_check
+  CHECK (field_type IN (
+    'text', 'url', 'date', 'date_dmy', 'select', 'textarea', 'boolean',
+    'number', 'year', 'ean', 'isrc', 'duration', 'seconds', 'email'
+  ));
+
+UPDATE public.submission_form_schema
+SET field_type = 'date_dmy',
+    placeholder_en = COALESCE(placeholder_en, 'DD/MM/YYYY'),
+    placeholder_de = COALESCE(placeholder_de, 'TT/MM/JJJJ')
+WHERE form_type = 'release' AND field_key = 'release_date' AND field_type = 'date';
+
 -- Seed default schema for release form
 INSERT INTO public.submission_form_schema
   (form_type, field_key, field_label_en, field_label_de, field_type, field_scope, field_group, field_options, is_required, is_visible, display_order, placeholder_en, placeholder_de)
