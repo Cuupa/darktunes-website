@@ -345,6 +345,23 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
                   </TabsContent>
                 )
               }
+              if (value === 'submission-form') {
+                return (
+                  <TabsContent key={value} value={value} className="flex min-h-0 flex-1 flex-col">
+                    <Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
+                      <CardHeader className="shrink-0 px-6 pt-6">
+                        <CardTitle>{meta.title}</CardTitle>
+                        <CardDescription>{meta.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                        <Suspense fallback={<TabFallback />}>
+                          {content}
+                        </Suspense>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                )
+              }
               return (
                 <TabsContent key={value} value={value} className="space-y-4">
                   <Card>

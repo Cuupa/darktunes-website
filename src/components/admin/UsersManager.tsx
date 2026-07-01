@@ -36,6 +36,7 @@ import { useUsers } from '@/hooks/useUsers'
 import { useArtists } from '@/hooks/useArtists'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -408,7 +409,7 @@ export function UsersManager() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
         <Table>
           <TableHeader>
             <TableRow>

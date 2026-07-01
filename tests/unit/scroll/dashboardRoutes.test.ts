@@ -6,6 +6,7 @@ describe('dashboardRoutes', () => {
     expect(isDashboardRoute('/admin')).toBe(true)
     expect(isDashboardRoute('/admin/news')).toBe(true)
     expect(isDashboardRoute('/portal/messages')).toBe(true)
+    expect(isDashboardRoute('/editor')).toBe(true)
     expect(isDashboardRoute('/news')).toBe(false)
   })
 
@@ -13,6 +14,7 @@ describe('dashboardRoutes', () => {
     expect(isAdminListRoute('/admin/news')).toBe(true)
     expect(isAdminListRoute('/admin/releases')).toBe(true)
     expect(isAdminListRoute('/admin/artists')).toBe(true)
+    expect(isAdminListRoute('/admin/submission-form')).toBe(true)
     expect(isAdminListRoute('/admin/messages')).toBe(false)
     expect(isAdminListRoute('/admin/news/edit/1')).toBe(true)
   })

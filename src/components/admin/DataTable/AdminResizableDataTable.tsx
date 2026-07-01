@@ -1,5 +1,6 @@
 import { type DragEvent, type MouseEvent, useCallback, useRef } from 'react'
 import { flexRender } from '@tanstack/react-table'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { cn } from '@/lib/utils'
 import type { Row, Table as TanStackTable } from './types'
 
@@ -80,7 +81,7 @@ export function AdminResizableDataTable<TData>({
   const minWidth = leafColumns.reduce((sum, col) => sum + col.getSize(), 0)
 
   return (
-    <div className={cn('overflow-x-auto overscroll-contain flex-1', className)} data-lenis-prevent>
+    <div className={cn(horizontalScrollClass, 'flex-1', className)} data-lenis-prevent>
       <table
         className="w-full text-sm"
         style={{ tableLayout: 'fixed', minWidth }}

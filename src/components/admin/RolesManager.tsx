@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -604,7 +605,7 @@ function CustomPermissionsTab() {
       ) : defs.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">No custom permissions yet.</p>
       ) : (
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
           <Table>
             <TableHeader>
               <TableRow>
@@ -788,7 +789,7 @@ function RbacAuditTab() {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">No RBAC audit entries found.</p>
       ) : (
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
           <Table>
             <TableHeader>
               <TableRow>

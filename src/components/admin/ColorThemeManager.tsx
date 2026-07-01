@@ -37,6 +37,7 @@ import {
   Trash,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
@@ -764,7 +765,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
           <p className="text-sm text-muted-foreground">
             WCAG 2.1 contrast ratios for all key color pairs. AA requires ≥ 4.5:1 for normal text, ≥ 3:1 for large text / UI components.
           </p>
-          <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+          <div className={horizontalScrollClass} data-lenis-prevent>
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">

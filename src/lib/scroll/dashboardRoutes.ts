@@ -2,6 +2,7 @@
 export function isDashboardRoute(pathname: string): boolean {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true
   if (pathname === '/portal' || pathname.startsWith('/portal/')) return true
+  if (pathname === '/editor' || pathname.startsWith('/editor/')) return true
   return false
 }
 

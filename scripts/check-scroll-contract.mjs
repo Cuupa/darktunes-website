@@ -6,6 +6,8 @@
  * 2. No min-h-screen on dashboard content pages (auth/loading gates exempt).
  * 3. List managers must use AdminListShell (not ad-hoc root overflow-y-auto).
  * 4. Standard list pages must use AdminPageShell layout="list".
+ * 5. Horizontal table wrappers must not use overscroll-contain without a vertical owner
+ *    (use horizontalScrollClass: overflow-x-auto overflow-y-clip overscroll-x-contain).
  */
 
 import fs from 'fs'
@@ -35,6 +37,20 @@ function isFullscreenGateLine(line) {
     line.includes('items-center') &&
     line.includes('justify-center')
   )
+}
+
+/** Blocks vertical wheel chaining when the wrapper has no vertical overflow. */
+function isHorizontalScrollAntiPattern(line) {
+  if (!line.includes('overflow-x-auto') || !line.includes('overscroll-contain')) return false
+  if (line.includes('overflow-y-auto') || line.includes('overflow-auto')) return false
+  if (
+    line.includes('overflow-y-clip') ||
+    line.includes('horizontalScrollClass') ||
+    line.includes('overscroll-x-contain')
+  ) {
+    return false
+  }
+  return true
 }
 
 // --- Layout contract ---
@@ -112,6 +128,25 @@ for (const page of listPages) {
   const content = fs.readFileSync(file, 'utf8')
   if (!/layout=["']list["']/.test(content)) {
     errors.push(`${page}: AdminPageShell must set layout="list"`)
+  }
+}
+
+// --- Horizontal-only scroll wrappers must not block wheel chaining ---
+const horizontalScrollScanDirs = [
+  path.join(root, 'src/components/admin'),
+  path.join(root, 'src/components/ui'),
+]
+
+for (const dir of horizontalScrollScanDirs) {
+  for (const file of walk(dir)) {
+    if (!file.endsWith('.tsx')) continue
+    const lines = fs.readFileSync(file, 'utf8').split('\n')
+    lines.forEach((line, index) => {
+      if (!isHorizontalScrollAntiPattern(line)) return
+      errors.push(
+        `${rel(file)}:${index + 1}: horizontal scroll wrapper must use horizontalScrollClass (overflow-y-clip + overscroll-x-contain), not overscroll-contain alone`,
+      )
+    })
   }
 }
 

@@ -22,6 +22,8 @@ import type { ApiErrorResponse } from '@/lib/errors'
 import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -420,7 +422,7 @@ export function SupportManager() {
           {ticketLog.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('historyEmpty')}</p>
           ) : (
-            <div className="rounded-lg border border-border overflow-x-auto overscroll-contain" data-lenis-prevent>
+            <div className={cn('rounded-lg border border-border', horizontalScrollClass)} data-lenis-prevent>
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { toast } from 'sonner'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { VideoSubmission, SubmissionStatus } from '@/types'
@@ -167,7 +168,7 @@ export function VideoSubmissionsManager() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+        <div className={horizontalScrollClass} data-lenis-prevent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
