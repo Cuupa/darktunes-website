@@ -72,6 +72,7 @@ const listManagers = [
   'ArtistsManager.tsx',
   'ReleasesManager.tsx',
   'NewsManager.tsx',
+  'SubmissionFormManager.tsx',
 ]
 
 for (const name of listManagers) {
@@ -103,6 +104,7 @@ const listPages = [
   'app/admin/artists/page.tsx',
   'app/admin/releases/page.tsx',
   'app/admin/news/page.tsx',
+  'app/admin/submission-form/page.tsx',
 ]
 
 for (const page of listPages) {

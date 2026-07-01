@@ -23,7 +23,7 @@ Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-be
 
 **Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`.
 
-**Admin list pages** (Artists, Releases, News, future CRUD lists): use `AdminPageShell layout="list"` + `AdminListShell` (`src/components/admin/AdminListShell.tsx`). The shell passes viewport height down the flex chain; `AdminListShell` keeps toolbar/pagination fixed and scrolls the table pane internally with sticky headers via `AdminDataTable stickyHeader`.
+**Admin list pages** (Artists, Releases, News, Submission Form, future CRUD lists): use `AdminPageShell layout="list"` + `AdminListShell` (`src/components/admin/AdminListShell.tsx`). The shell passes viewport height down the flex chain; `AdminListShell` keeps toolbar/pagination fixed and scrolls the table pane internally with sticky headers via `AdminDataTable stickyHeader`.
 
 | Do | Don't |
 |----|-------|

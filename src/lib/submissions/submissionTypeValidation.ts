@@ -9,6 +9,7 @@ import {
   validateSchemaFields,
   validateStringField,
 } from '@/lib/submissions/submissionSchemaValidation'
+import { filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
 import type { SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
 import type { SubmissionReleaseType } from '@/lib/submissions/fieldTypes'
 
@@ -35,10 +36,12 @@ export function validateReleaseSubmissionByType(input: {
     releaseType,
     values,
   )
-  const trackFields = filterFieldsForType(
-    input.schemaFields.filter((f) => f.fieldScope === 'track'),
-    releaseType,
-    values,
+  const trackFields = filterArtistTrackFields(
+    filterFieldsForType(
+      input.schemaFields.filter((f) => f.fieldScope === 'track'),
+      releaseType,
+      values,
+    ),
   )
 
   for (const field of releaseFields) {

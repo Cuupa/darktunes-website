@@ -5,7 +5,7 @@ export function isDashboardRoute(pathname: string): boolean {
   return false
 }
 
-const ADMIN_LIST_ROUTES = ['/admin/news', '/admin/releases', '/admin/artists'] as const
+const ADMIN_LIST_ROUTES = ['/admin/news', '/admin/releases', '/admin/artists', '/admin/submission-form'] as const
 
 /** Admin CRUD list pages: outer shell scroll is locked; AdminListShell scrolls internally. */
 export function isAdminListRoute(pathname: string): boolean {

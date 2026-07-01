@@ -328,7 +328,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               'video-submissions':   <VideoSubmissionsManager />,
               'fan-page-reviews':    <FanPageReviewsManager />,
               'promo-log':           <EditorPromoLogPanel />,
-              'submission-form':     <SubmissionFormManager />,
+              'submission-form':     <SubmissionFormManager variant="embedded" />,
               'maintenance':         <MaintenanceManager />,
             }
 

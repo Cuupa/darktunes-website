@@ -4713,7 +4713,7 @@ VALUES
   ('release', 'apple_music_url',    'Apple Music Link',    'Apple Music-Link',      'url',      'release', 'distribution', NULL, FALSE, TRUE, 110, NULL, NULL),
   ('release', 'youtube_url',        'YouTube Link',        'YouTube-Link',          'url',      'release', 'distribution', NULL, FALSE, TRUE, 120, NULL, NULL),
   ('release', 'notes',              'Additional Notes',    'Zusätzliche Hinweise',  'textarea', 'release', 'metadata',     NULL, FALSE, TRUE, 130, NULL, NULL),
-  ('release', 'track_number',       'Track Nr',            'Track-Nr.',             'number',   'track',   'track',        NULL, TRUE,  TRUE, 200, NULL, NULL),
+  ('release', 'track_number',       'Track Nr',            'Track-Nr.',             'number',   'track',   'track',        NULL, FALSE, FALSE, 200, NULL, NULL),
   ('release', 'song_title',         'Song Title',          'Songtitel',             'text',     'track',   'track',        NULL, TRUE,  TRUE, 210, NULL, NULL),
   ('release', 'track_isrc',         'ISRC',                'ISRC',                  'isrc',     'track',   'track',        NULL, FALSE, TRUE, 220, NULL, NULL),
   ('release', 'composer',           'Composer',            'Komponist',             'text',     'track',   'track',        NULL, FALSE, TRUE, 230, NULL, NULL),
