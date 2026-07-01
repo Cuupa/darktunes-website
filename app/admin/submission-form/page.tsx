@@ -14,6 +14,7 @@ const SubmissionFormManager = lazy(() =>
 export default function AdminSubmissionFormPage() {
   return (
     <AdminPageShell
+      layout="list"
       title="Submission Form"
       description="Configure which fields appear in the release and video submission forms."
     >

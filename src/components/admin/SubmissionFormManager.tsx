@@ -1,11 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useTranslations } from 'next-intl'
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { AdminListShell } from '@/components/admin/AdminListShell'
+import { SubmissionFieldToggles } from '@/components/admin/submission-form/SubmissionFieldToggles'
 import { toast } from 'sonner'
 import { routing } from '@/i18n/routing'
 import { fieldToApiPayload } from '@/lib/api/submissionFormSchema'
@@ -28,9 +38,59 @@ import {
 } from '@/lib/submissions/fieldTypes'
 import { mergeTypeRules } from '@/lib/submissions/fieldTypeRules'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import type { SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
 
 type FormType = 'release' | 'video'
+
+const COPY = {
+  releaseTab: 'Release Form',
+  videoTab: 'Video Form',
+  fieldsSubTab: 'Form Fields',
+  trackRulesSubTab: 'Track Limits',
+  fieldRulesSubTab: 'Per-Type Rules',
+  fieldsHint: 'Define which fields artists see when submitting a release or video. Click badges to toggle visibility and required status.',
+  trackRulesHint: 'Set minimum and maximum track counts per release type. Singles are always fixed at 1 track.',
+  fieldRulesHint: 'Override visibility and required status per release type. Unset values fall back to the global settings in Form Fields.',
+  fieldRulesScrollHint: 'Swipe to see all release types',
+  labelLanguage: 'Label language',
+  fieldKey: 'Field key',
+  fieldLabel: 'Label',
+  fieldType: 'Type',
+  fieldScope: 'Scope',
+  scopeRelease: 'Release',
+  scopeTrack: 'Track',
+  status: 'Status',
+  order: 'Order',
+  actions: 'Actions',
+  releaseType: 'Release type',
+  trackCountMode: 'Track count mode',
+  minTracks: 'Min tracks',
+  maxTracks: 'Max tracks',
+  trackCountFixed: 'Fixed at 1 track',
+  trackCountUser: 'Artist enters track count',
+  fieldAdd: 'Add Field',
+  fieldAddPreset: 'Add music preset…',
+  fieldNew: 'New Field',
+  fieldSave: 'Save',
+  fieldDelete: 'Delete',
+  fieldSaved: 'Field saved',
+  fieldDeleted: 'Field deleted',
+  fieldDeleteConfirmTitle: 'Delete Field',
+  fieldDeleteConfirmBody: 'Are you sure you want to delete this field? This action cannot be undone.',
+  loadError: 'Failed to load form schema',
+  saveError: 'Failed to save field',
+  deleteError: 'Failed to delete field',
+  labelRequired: 'Enter at least one label',
+  loading: 'Loading…',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
+  typeRulesSaved: 'Track rules saved',
+  typeRulesLoadError: 'Failed to load track rules',
+  typeRulesSaveError: 'Failed to save track rules',
+} as const
 
 const EMPTY_LABELS = Object.fromEntries(routing.locales.map((l) => [l, '']))
 
@@ -43,8 +103,25 @@ async function parseApiError(res: Response): Promise<string> {
   }
 }
 
-export function SubmissionFormManager() {
-  const t = useTranslations('adminSubmissions')
+function SubmissionFormTableScroll({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'overflow-x-auto overscroll-contain touch-pan-x touch-pan-y [-webkit-overflow-scrolling:touch]',
+        className,
+      )}
+      data-lenis-prevent
+    >
+      {children}
+    </div>
+  )
+}
+
+interface SubmissionFormManagerProps {
+  variant?: 'page' | 'embedded'
+}
+
+export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManagerProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
   const [formType, setFormType] = useState<FormType>('release')
@@ -56,7 +133,7 @@ export function SubmissionFormManager() {
   const [saving, setSaving] = useState<string | null>(null)
   const [addingNew, setAddingNew] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [labelLocale, setLabelLocale] = useState(routing.defaultLocale)
+  const [labelLocale, setLabelLocale] = useState('en')
   const [newField, setNewField] = useState<Partial<SubmissionFormField>>({
     fieldType: 'text',
     fieldScope: 'release',
@@ -66,6 +143,10 @@ export function SubmissionFormManager() {
   })
 
   const existingKeys = useMemo(() => new Set(fields.map((f) => f.fieldKey)), [fields])
+  const sortedFields = useMemo(
+    () => [...fields].sort((a, b) => a.displayOrder - b.displayOrder),
+    [fields],
+  )
 
   const getToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -84,11 +165,11 @@ export function SubmissionFormManager() {
       const data = (await res.json()) as SubmissionFormField[]
       setFields(data)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('load_error'))
+      toast.error(err instanceof Error ? err.message : COPY.loadError)
     } finally {
       setLoading(false)
     }
-  }, [getToken, t])
+  }, [getToken])
 
   const fetchTypeRules = useCallback(async () => {
     setLoadingTypeRules(true)
@@ -101,11 +182,11 @@ export function SubmissionFormManager() {
       const data = (await res.json()) as SubmissionReleaseTypeRule[]
       setTypeRules(data)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('type_rules_load_error'))
+      toast.error(err instanceof Error ? err.message : COPY.typeRulesLoadError)
     } finally {
       setLoadingTypeRules(false)
     }
-  }, [getToken, t])
+  }, [getToken])
 
   useEffect(() => {
     void fetchFields(formType)
@@ -132,10 +213,10 @@ export function SubmissionFormManager() {
         }),
       })
       if (!res.ok) throw new Error(await parseApiError(res))
-      toast.success(t('type_rules_saved'))
+      toast.success(COPY.typeRulesSaved)
       await fetchTypeRules()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('type_rules_save_error'))
+      toast.error(err instanceof Error ? err.message : COPY.typeRulesSaveError)
     } finally {
       setSaving(null)
     }
@@ -164,7 +245,7 @@ export function SubmissionFormManager() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(await parseApiError(res))
-      toast.success(t('field_saved'))
+      toast.success(COPY.fieldSaved)
       setAddingNew(false)
       setNewField({
         fieldType: 'text',
@@ -175,7 +256,7 @@ export function SubmissionFormManager() {
       })
       await fetchFields(formType)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('save_error'))
+      toast.error(err instanceof Error ? err.message : COPY.saveError)
     } finally {
       setSaving(null)
     }
@@ -193,10 +274,10 @@ export function SubmissionFormManager() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error(await parseApiError(res))
-      toast.success(t('field_deleted'))
+      toast.success(COPY.fieldDeleted)
       await fetchFields(formType)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('delete_error'))
+      toast.error(err instanceof Error ? err.message : COPY.deleteError)
     } finally {
       setSaving(null)
     }
@@ -242,391 +323,413 @@ export function SubmissionFormManager() {
     return uniqueFieldKey(fieldKeyFromLabel(label), existingKeys)
   }
 
+  const activeHint =
+    formType === 'release' && releaseSubTab === 'track_rules'
+      ? COPY.trackRulesHint
+      : formType === 'release' && releaseSubTab === 'field_rules'
+        ? COPY.fieldRulesHint
+        : COPY.fieldsHint
+
+  const showFieldsPanel = formType !== 'release' || releaseSubTab === 'fields'
+  const showTrackRulesPanel = formType === 'release' && releaseSubTab === 'track_rules'
+  const showFieldRulesPanel = formType === 'release' && releaseSubTab === 'field_rules'
+
+  const localeToolbar = showFieldsPanel && !loading ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-muted-foreground">{COPY.labelLanguage}:</span>
+      {routing.locales.map((loc) => (
+        <Button
+          key={loc}
+          type="button"
+          size="sm"
+          variant={labelLocale === loc ? 'default' : 'outline'}
+          className="h-8 min-h-[44px] text-xs uppercase"
+          onClick={() => setLabelLocale(loc)}
+        >
+          {loc}
+        </Button>
+      ))}
+    </div>
+  ) : null
+
+  const addFieldToolbar = showFieldsPanel && !addingNew && !loading ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setAddingNew(true)}>
+        {COPY.fieldAdd}
+      </Button>
+      {formType === 'release' && (
+        <select
+          className="h-9 min-h-[44px] rounded-md border border-input bg-background px-2 text-sm"
+          defaultValue=""
+          onChange={(e) => {
+            if (e.target.value) addPreset(e.target.value)
+            e.target.value = ''
+          }}
+          aria-label={COPY.fieldAddPreset}
+        >
+          <option value="">{COPY.fieldAddPreset}</option>
+          {MUSIC_FIELD_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.fieldLabels.en ?? p.id} ({p.fieldScope})
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  ) : null
+
+  const renderFieldsTable = () => {
+    if (loading) return <p className="text-muted-foreground p-4">{COPY.loading}</p>
+
+    return (
+      <div className="space-y-4 p-4">
+        <SubmissionFormTableScroll>
+          <Table className="min-w-max w-full">
+            <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
+              <TableRow className="bg-card hover:bg-card">
+                <TableHead className="bg-card">{COPY.fieldLabel}</TableHead>
+                <TableHead className="bg-card">{COPY.fieldType}</TableHead>
+                {formType === 'release' && <TableHead className="bg-card">{COPY.fieldScope}</TableHead>}
+                <TableHead className="bg-card">{COPY.status}</TableHead>
+                <TableHead className="bg-card">{COPY.order}</TableHead>
+                <TableHead className="bg-card">{COPY.actions}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedFields.map((field) => (
+                <TableRow key={field.id}>
+                  <TableCell>
+                    <div className="space-y-1 min-w-[10rem]">
+                      <Input
+                        className="h-8 text-sm"
+                        defaultValue={field.fieldLabels[labelLocale] ?? ''}
+                        onBlur={(e) => {
+                          const next = e.target.value
+                          if (next === (field.fieldLabels[labelLocale] ?? '')) return
+                          updateField(field, {
+                            fieldLabels: { ...field.fieldLabels, [labelLocale]: next },
+                          })
+                        }}
+                        aria-label={`${COPY.fieldLabel} ${field.fieldKey}`}
+                      />
+                      <p className="font-mono text-[10px] text-muted-foreground">{field.fieldKey}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{field.fieldType}</Badge>
+                  </TableCell>
+                  {formType === 'release' && (
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {field.fieldScope === 'track' ? COPY.scopeTrack : COPY.scopeRelease}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <SubmissionFieldToggles
+                      visible={field.isVisible}
+                      required={field.isRequired}
+                      onVisibleChange={(visible) => updateField(field, { isVisible: visible, ...(!visible ? { isRequired: false } : {}) })}
+                      onRequiredChange={(required) => updateField(field, { isRequired: required })}
+                      fieldKey={field.fieldKey}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => moveField(field, -1)} aria-label={COPY.moveUp}>↑</Button>
+                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => moveField(field, 1)} aria-label={COPY.moveDown}>↓</Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 min-h-[44px]"
+                      disabled={saving === field.id}
+                      onClick={() => setDeleteTarget(field.id)}
+                    >
+                      {COPY.fieldDelete}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SubmissionFormTableScroll>
+
+        {addingNew && (
+          <div className="border border-border rounded-md p-4 space-y-4">
+            <p className="text-sm font-medium">{COPY.fieldNew}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">{COPY.fieldKey}</Label>
+                <Input className="h-8 text-xs font-mono" readOnly value={newField.fieldKey ?? autoKeyForNew()} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{COPY.fieldType}</Label>
+                <select
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                  value={newField.fieldType ?? 'text'}
+                  onChange={(e) =>
+                    setNewField((p) => ({
+                      ...p,
+                      fieldType: e.target.value as SubmissionFormField['fieldType'],
+                    }))
+                  }
+                >
+                  {SUBMISSION_FIELD_TYPES.map((ft) => (
+                    <option key={ft} value={ft}>{ft}</option>
+                  ))}
+                </select>
+              </div>
+              {formType === 'release' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{COPY.fieldScope}</Label>
+                  <select
+                    className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    value={newField.fieldScope ?? 'release'}
+                    onChange={(e) =>
+                      setNewField((p) => ({
+                        ...p,
+                        fieldScope: e.target.value as SubmissionFormField['fieldScope'],
+                      }))
+                    }
+                  >
+                    <option value="release">{COPY.scopeRelease}</option>
+                    <option value="track">{COPY.scopeTrack}</option>
+                  </select>
+                </div>
+              )}
+              {routing.locales.map((loc) => (
+                <div key={loc} className="space-y-1">
+                  <Label className="text-xs">{COPY.fieldLabel} ({loc.toUpperCase()})</Label>
+                  <Input
+                    className="h-8 text-xs"
+                    value={newField.fieldLabels?.[loc] ?? ''}
+                    onChange={(e) =>
+                      setNewField((p) => ({
+                        ...p,
+                        fieldLabels: { ...(p.fieldLabels ?? EMPTY_LABELS), [loc]: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            <SubmissionFieldToggles
+              visible={newField.isVisible ?? true}
+              required={newField.isRequired ?? false}
+              onVisibleChange={(visible) =>
+                setNewField((p) => ({ ...p, isVisible: visible, ...(!visible ? { isRequired: false } : {}) }))
+              }
+              onRequiredChange={(required) => setNewField((p) => ({ ...p, isRequired: required }))}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="min-h-[44px]"
+                disabled={saving === 'new'}
+                onClick={() => {
+                  const labels = newField.fieldLabels ?? EMPTY_LABELS
+                  const key = newField.fieldKey ?? autoKeyForNew()
+                  if (!key || !primaryLabel(labels)) {
+                    toast.error(COPY.labelRequired)
+                    return
+                  }
+                  void saveField({
+                    ...newField,
+                    fieldKey: key,
+                    fieldLabels: labels,
+                    displayOrder: newField.displayOrder ?? (fields.length + 1) * 10,
+                  })
+                }}
+              >
+                {saving === 'new' ? COPY.saving : COPY.fieldSave}
+              </Button>
+              <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setAddingNew(false)}>
+                {COPY.cancel}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderTrackRulesTable = () => {
+    if (loadingTypeRules) return <p className="text-muted-foreground p-4">{COPY.loading}</p>
+
+    return (
+      <div className="p-4">
+        <SubmissionFormTableScroll>
+          <Table className="min-w-max w-full">
+            <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
+              <TableRow className="bg-card hover:bg-card">
+                <TableHead className="bg-card">{COPY.releaseType}</TableHead>
+                <TableHead className="bg-card">{COPY.trackCountMode}</TableHead>
+                <TableHead className="bg-card">{COPY.minTracks}</TableHead>
+                <TableHead className="bg-card">{COPY.maxTracks}</TableHead>
+                <TableHead className="bg-card">{COPY.actions}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {typeRules.map((rule) => (
+                <TableRow key={rule.id}>
+                  <TableCell className="font-mono text-xs capitalize">{rule.releaseType}</TableCell>
+                  <TableCell className="text-xs">{rule.trackCountMode}</TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8 text-xs w-20"
+                      type="number"
+                      min={1}
+                      defaultValue={rule.minTracks}
+                      disabled={rule.trackCountMode === 'fixed_1'}
+                      onBlur={(e) => {
+                        const minTracks = Number(e.target.value)
+                        if (Number.isNaN(minTracks) || minTracks === rule.minTracks) return
+                        void saveTypeRule({ ...rule, minTracks })
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8 text-xs w-20"
+                      type="number"
+                      min={rule.minTracks}
+                      defaultValue={rule.maxTracks}
+                      disabled={rule.trackCountMode === 'fixed_1'}
+                      onBlur={(e) => {
+                        const maxTracks = Number(e.target.value)
+                        if (Number.isNaN(maxTracks) || maxTracks === rule.maxTracks) return
+                        void saveTypeRule({ ...rule, maxTracks })
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {rule.trackCountMode === 'fixed_1' ? COPY.trackCountFixed : COPY.trackCountUser}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SubmissionFormTableScroll>
+      </div>
+    )
+  }
+
+  const renderFieldRulesTable = () => {
+    if (loading) return <p className="text-muted-foreground p-4">{COPY.loading}</p>
+
+    return (
+      <div className="space-y-2 p-4">
+        <p className="text-xs text-muted-foreground md:hidden">{COPY.fieldRulesScrollHint}</p>
+        <SubmissionFormTableScroll>
+          <Table className="min-w-max w-full">
+            <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
+              <TableRow className="bg-card hover:bg-card">
+                <TableHead className="sticky left-0 z-20 bg-card min-w-[10rem]">{COPY.fieldLabel}</TableHead>
+                <TableHead className="bg-card">{COPY.fieldScope}</TableHead>
+                {SUBMISSION_RELEASE_TYPES.map((rt) => (
+                  <TableHead key={rt} className="bg-card text-center capitalize min-w-[9rem]">{rt}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedFields.map((field) => (
+                <TableRow key={field.id}>
+                  <TableCell className="sticky left-0 z-10 bg-card">
+                    <div className="min-w-[10rem]">
+                      <p className="text-sm">{primaryLabel(field.fieldLabels)}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">{field.fieldKey}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="capitalize">{field.fieldScope}</Badge>
+                  </TableCell>
+                  {SUBMISSION_RELEASE_TYPES.map((rt) => {
+                    const rule = field.typeRules?.[rt]
+                    const visible = rule?.visible ?? field.isVisible
+                    const required = rule?.required ?? field.isRequired
+                    return (
+                      <TableCell key={rt}>
+                        <SubmissionFieldToggles
+                          visible={visible}
+                          required={required}
+                          onVisibleChange={(v) => updateFieldTypeRule(field, rt, { visible: v })}
+                          onRequiredChange={(r) => updateFieldTypeRule(field, rt, { required: r })}
+                          fieldKey={field.fieldKey}
+                          releaseType={rt}
+                        />
+                      </TableCell>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SubmissionFormTableScroll>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
+    <div className={cn('flex min-h-0 flex-1 flex-col', variant === 'embedded' && 'min-h-[min(60dvh,32rem)]')}>
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('field_delete_confirm_title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('field_delete_confirm_body')}</AlertDialogDescription>
+            <AlertDialogTitle>{COPY.fieldDeleteConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{COPY.fieldDeleteConfirmBody}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel>{COPY.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void confirmDelete()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {t('field_delete')}
+              {COPY.fieldDelete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs value={formType} onValueChange={(v) => setFormType(v as FormType)}>
-        <TabsList>
-          <TabsTrigger value="release">{t('submission_form_release_tab')}</TabsTrigger>
-          <TabsTrigger value="video">{t('submission_form_video_tab')}</TabsTrigger>
-        </TabsList>
-        <TabsContent value={formType} className="mt-4 space-y-4">
-          {formType === 'release' && (
-            <Tabs value={releaseSubTab} onValueChange={(v) => setReleaseSubTab(v as typeof releaseSubTab)}>
-              <TabsList>
-                <TabsTrigger value="fields">{t('release_subtab_fields')}</TabsTrigger>
-                <TabsTrigger value="track_rules">{t('release_subtab_track_rules')}</TabsTrigger>
-                <TabsTrigger value="field_rules">{t('release_subtab_field_rules')}</TabsTrigger>
+      <Tabs value={formType} onValueChange={(v) => setFormType(v as FormType)} className="flex min-h-0 flex-1 flex-col">
+        <AdminListShell
+          tableContainerClassName={variant === 'embedded' ? 'min-h-[min(50dvh,28rem)]' : undefined}
+          header={
+            <div className="space-y-3">
+              <TabsList className="flex flex-wrap h-auto gap-1">
+                <TabsTrigger value="release" className="min-h-[44px]">{COPY.releaseTab}</TabsTrigger>
+                <TabsTrigger value="video" className="min-h-[44px]">{COPY.videoTab}</TabsTrigger>
               </TabsList>
-            </Tabs>
-          )}
 
-          {formType === 'release' && releaseSubTab === 'track_rules' && (
-            <div className="space-y-4">
-              {loadingTypeRules ? (
-                <p className="text-muted-foreground">{t('loading')}</p>
-              ) : (
-                <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 pr-3">{t('release_type')}</th>
-                        <th className="text-left py-2 pr-3">{t('track_count_mode')}</th>
-                        <th className="text-left py-2 pr-3">{t('min_tracks')}</th>
-                        <th className="text-left py-2 pr-3">{t('max_tracks')}</th>
-                        <th className="text-left py-2">{t('actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {typeRules.map((rule) => (
-                        <tr key={rule.id} className="border-b border-border">
-                          <td className="py-2 pr-3 font-mono text-xs">{rule.releaseType}</td>
-                          <td className="py-2 pr-3 text-xs">{rule.trackCountMode}</td>
-                          <td className="py-2 pr-3">
-                            <Input
-                              className="h-7 text-xs w-20"
-                              type="number"
-                              min={1}
-                              defaultValue={rule.minTracks}
-                              disabled={rule.trackCountMode === 'fixed_1'}
-                              onBlur={(e) => {
-                                const minTracks = Number(e.target.value)
-                                if (Number.isNaN(minTracks) || minTracks === rule.minTracks) return
-                                void saveTypeRule({ ...rule, minTracks })
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 pr-3">
-                            <Input
-                              className="h-7 text-xs w-20"
-                              type="number"
-                              min={rule.minTracks}
-                              defaultValue={rule.maxTracks}
-                              disabled={rule.trackCountMode === 'fixed_1'}
-                              onBlur={(e) => {
-                                const maxTracks = Number(e.target.value)
-                                if (Number.isNaN(maxTracks) || maxTracks === rule.maxTracks) return
-                                void saveTypeRule({ ...rule, maxTracks })
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 text-xs text-muted-foreground">
-                            {rule.trackCountMode === 'fixed_1' ? t('track_count_fixed') : t('track_count_user')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+              <TabsContent value="release" className="mt-0 space-y-3">
+                <Tabs value={releaseSubTab} onValueChange={(v) => setReleaseSubTab(v as typeof releaseSubTab)}>
+                  <TabsList className="flex flex-wrap h-auto gap-1">
+                    <TabsTrigger value="fields" className="min-h-[44px]">{COPY.fieldsSubTab}</TabsTrigger>
+                    <TabsTrigger value="track_rules" className="min-h-[44px]">{COPY.trackRulesSubTab}</TabsTrigger>
+                    <TabsTrigger value="field_rules" className="min-h-[44px]">{COPY.fieldRulesSubTab}</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </TabsContent>
 
-          {formType === 'release' && releaseSubTab === 'field_rules' && (
-            <div className="space-y-4">
-              {loading ? (
-                <p className="text-muted-foreground">{t('loading')}</p>
-              ) : (
-                <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 pr-3">{t('field_key')}</th>
-                        <th className="text-left py-2 pr-3">{t('field_scope')}</th>
-                        {SUBMISSION_RELEASE_TYPES.map((rt) => (
-                          <th key={rt} className="text-center py-2 px-2 text-xs">{rt}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...fields].sort((a, b) => a.displayOrder - b.displayOrder).map((field) => (
-                        <tr key={field.id} className="border-b border-border">
-                          <td className="py-2 pr-3 font-mono text-xs">{field.fieldKey}</td>
-                          <td className="py-2 pr-3 text-xs">{field.fieldScope}</td>
-                          {SUBMISSION_RELEASE_TYPES.map((rt) => {
-                            const rule = field.typeRules?.[rt]
-                            const visible = rule?.visible ?? field.isVisible
-                            const required = rule?.required ?? field.isRequired
-                            return (
-                              <td key={rt} className="py-2 px-2">
-                                <div className="flex flex-col items-center gap-1">
-                                  <label className="flex items-center gap-1 text-[10px]">
-                                    <input
-                                      type="checkbox"
-                                      checked={visible}
-                                      onChange={(e) => updateFieldTypeRule(field, rt, { visible: e.target.checked })}
-                                      aria-label={`${field.fieldKey} ${rt} visible`}
-                                    />
-                                    {t('field_visible_short')}
-                                  </label>
-                                  <label className="flex items-center gap-1 text-[10px]">
-                                    <input
-                                      type="checkbox"
-                                      checked={required}
-                                      disabled={!visible}
-                                      onChange={(e) => updateFieldTypeRule(field, rt, { required: e.target.checked })}
-                                      aria-label={`${field.fieldKey} ${rt} required`}
-                                    />
-                                    {t('field_required_short')}
-                                  </label>
-                                </div>
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">{t('field_rules_hint')}</p>
-            </div>
-          )}
+              <p className="text-sm text-muted-foreground">{activeHint}</p>
 
-          {(formType !== 'release' || releaseSubTab === 'fields') && (
-          <>
-          <div className="flex flex-wrap gap-2 items-center">
-            <Label className="text-xs text-muted-foreground">{t('label_locale')}:</Label>
-            {routing.locales.map((loc) => (
-              <Button
-                key={loc}
-                type="button"
-                size="sm"
-                variant={labelLocale === loc ? 'default' : 'outline'}
-                className="h-7 text-xs uppercase"
-                onClick={() => setLabelLocale(loc)}
-              >
-                {loc}
-              </Button>
-            ))}
-          </div>
-
-          {loading ? (
-            <p className="text-muted-foreground">{t('loading')}</p>
-          ) : (
-            <div className="space-y-2">
-              <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 pr-3">{t('field_key')}</th>
-                      <th className="text-left py-2 pr-3">{t('field_label')}</th>
-                      <th className="text-left py-2 pr-3">{t('field_type')}</th>
-                      <th className="text-left py-2 pr-3">{t('field_scope')}</th>
-                      <th className="text-center py-2 pr-3">{t('field_required')}</th>
-                      <th className="text-center py-2 pr-3">{t('field_visible')}</th>
-                      <th className="text-left py-2">{t('actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...fields].sort((a, b) => a.displayOrder - b.displayOrder).map((field) => (
-                      <tr key={field.id} className="border-b border-border">
-                        <td className="py-2 pr-3 font-mono text-xs">{field.fieldKey}</td>
-                        <td className="py-2 pr-3">
-                          <Input
-                            className="h-7 text-xs"
-                            defaultValue={field.fieldLabels[labelLocale] ?? ''}
-                            onBlur={(e) => {
-                              const next = e.target.value
-                              if (next === (field.fieldLabels[labelLocale] ?? '')) return
-                              updateField(field, {
-                                fieldLabels: { ...field.fieldLabels, [labelLocale]: next },
-                              })
-                            }}
-                          />
-                        </td>
-                        <td className="py-2 pr-3 text-xs">{field.fieldType}</td>
-                        <td className="py-2 pr-3 text-xs">{field.fieldScope}</td>
-                        <td className="py-2 pr-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={field.isRequired}
-                            onChange={(e) => updateField(field, { isRequired: e.target.checked })}
-                            aria-label={t('field_required')}
-                          />
-                        </td>
-                        <td className="py-2 pr-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={field.isVisible}
-                            onChange={(e) => updateField(field, { isVisible: e.target.checked })}
-                            aria-label={t('field_visible')}
-                          />
-                        </td>
-                        <td className="py-2">
-                          <div className="flex gap-1">
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => moveField(field, -1)} aria-label={t('move_up')}>↑</Button>
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => moveField(field, 1)} aria-label={t('move_down')}>↓</Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="h-7 text-xs"
-                              disabled={saving === field.id}
-                              onClick={() => setDeleteTarget(field.id)}
-                            >
-                              {t('field_delete')}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-wrap items-center gap-3">
+                {localeToolbar}
+                {addFieldToolbar}
               </div>
-
-              {addingNew && (
-                <div className="border border-border rounded-md p-4 space-y-3">
-                  <p className="text-sm font-medium">{t('field_new')}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t('field_key')}</Label>
-                      <Input className="h-7 text-xs font-mono" readOnly value={newField.fieldKey ?? autoKeyForNew()} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t('field_type')}</Label>
-                      <select
-                        className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
-                        value={newField.fieldType ?? 'text'}
-                        onChange={(e) =>
-                          setNewField((p) => ({
-                            ...p,
-                            fieldType: e.target.value as SubmissionFormField['fieldType'],
-                          }))
-                        }
-                      >
-                        {SUBMISSION_FIELD_TYPES.map((ft) => (
-                          <option key={ft} value={ft}>{ft}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {formType === 'release' && (
-                      <div className="space-y-1">
-                        <Label className="text-xs">{t('field_scope')}</Label>
-                        <select
-                          className="flex h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
-                          value={newField.fieldScope ?? 'release'}
-                          onChange={(e) =>
-                            setNewField((p) => ({
-                              ...p,
-                              fieldScope: e.target.value as SubmissionFormField['fieldScope'],
-                            }))
-                          }
-                        >
-                          <option value="release">{t('scope_release')}</option>
-                          <option value="track">{t('scope_track')}</option>
-                        </select>
-                      </div>
-                    )}
-                    {routing.locales.map((loc) => (
-                      <div key={loc} className="space-y-1">
-                        <Label className="text-xs">{t('field_label')} ({loc.toUpperCase()})</Label>
-                        <Input
-                          className="h-7 text-xs"
-                          value={newField.fieldLabels?.[loc] ?? ''}
-                          onChange={(e) =>
-                            setNewField((p) => ({
-                              ...p,
-                              fieldLabels: { ...(p.fieldLabels ?? EMPTY_LABELS), [loc]: e.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-3 items-center flex-wrap">
-                    <label className="flex items-center gap-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={newField.isRequired ?? false}
-                        onChange={(e) => setNewField((p) => ({ ...p, isRequired: e.target.checked }))}
-                      />
-                      {t('field_required')}
-                    </label>
-                    <label className="flex items-center gap-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={newField.isVisible ?? true}
-                        onChange={(e) => setNewField((p) => ({ ...p, isVisible: e.target.checked }))}
-                      />
-                      {t('field_visible')}
-                    </label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs"
-                      disabled={saving === 'new'}
-                      onClick={() => {
-                        const labels = newField.fieldLabels ?? EMPTY_LABELS
-                        const key = newField.fieldKey ?? autoKeyForNew()
-                        if (!key || !primaryLabel(labels)) {
-                          toast.error(t('label_required'))
-                          return
-                        }
-                        void saveField({
-                          ...newField,
-                          fieldKey: key,
-                          fieldLabels: labels,
-                          displayOrder: newField.displayOrder ?? (fields.length + 1) * 10,
-                        })
-                      }}
-                    >
-                      {saving === 'new' ? t('saving') : t('field_save')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAddingNew(false)}>
-                      {t('cancel')}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {!addingNew && (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setAddingNew(true)}>
-                    {t('field_add')}
-                  </Button>
-                  {formType === 'release' && (
-                    <select
-                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) addPreset(e.target.value)
-                        e.target.value = ''
-                      }}
-                      aria-label={t('field_add_preset')}
-                    >
-                      <option value="">{t('field_add_preset')}</option>
-                      {MUSIC_FIELD_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.fieldLabels.en ?? p.id} ({p.fieldScope})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
             </div>
-          )}
-          </>
-          )}
-        </TabsContent>
+          }
+        >
+          <TabsContent value="release" className="mt-0 h-full">
+            {showFieldsPanel && renderFieldsTable()}
+            {showTrackRulesPanel && renderTrackRulesTable()}
+            {showFieldRulesPanel && renderFieldRulesTable()}
+          </TabsContent>
+          <TabsContent value="video" className="mt-0 h-full">
+            {renderFieldsTable()}
+          </TabsContent>
+        </AdminListShell>
       </Tabs>
     </div>
   )
