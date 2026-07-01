@@ -611,6 +611,7 @@ function SosGeneratorPanel() {
     isWorkspaceSaving,
     isSettingsDirty,
     loadFromServer,
+    loadDefaultPreset,
     saveCurrentWorkspace,
   } = useSosWorkspaceSync({
     currentPeriodKey,
@@ -667,7 +668,7 @@ function SosGeneratorPanel() {
       onAppDefaultsChange={setAppDefaults}
       labelInfo={labelInfo}
       onLabelInfoChange={setLabelBranding}
-      onLoadPreset={() => void loadFromServer()}
+      onLoadPreset={() => void loadDefaultPreset()}
       presetLoading={isWorkspaceLoading}
     />
   )

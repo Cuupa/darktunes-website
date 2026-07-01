@@ -383,6 +383,7 @@ export function useSosWorkspaceSync({
     isWorkspaceSaving,
     isSettingsDirty,
     loadFromServer,
+    loadDefaultPreset,
     saveCurrentWorkspace,
   }
 }
