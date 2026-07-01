@@ -4596,6 +4596,7 @@ CREATE TABLE IF NOT EXISTS public.submission_form_schema (
   field_group          TEXT,
   field_options        JSONB,
   visibility_condition JSONB,
+  type_rules           JSONB,
   validation           JSONB,
   is_required          BOOLEAN     NOT NULL DEFAULT FALSE,
   is_visible           BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -4641,8 +4642,35 @@ BEGIN
     ADD COLUMN IF NOT EXISTS field_scope TEXT NOT NULL DEFAULT 'release',
     ADD COLUMN IF NOT EXISTS field_group TEXT,
     ADD COLUMN IF NOT EXISTS visibility_condition JSONB,
+    ADD COLUMN IF NOT EXISTS type_rules JSONB,
     ADD COLUMN IF NOT EXISTS validation JSONB;
 END $$;
+
+ALTER TABLE public.submission_form_schema
+  ADD COLUMN IF NOT EXISTS type_rules JSONB;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: submission_release_type_rules
+-- Per release-type track count behaviour for the artist submission form.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.submission_release_type_rules (
+  id               UUID    PRIMARY KEY DEFAULT uuid_generate_v4(),
+  release_type     TEXT    NOT NULL UNIQUE CHECK (release_type IN ('single', 'ep', 'album', 'compilation')),
+  track_count_mode TEXT    NOT NULL CHECK (track_count_mode IN ('fixed_1', 'user_specified')),
+  min_tracks       INTEGER NOT NULL DEFAULT 1 CHECK (min_tracks >= 1),
+  max_tracks       INTEGER NOT NULL DEFAULT 99 CHECK (max_tracks >= 1),
+  display_order    INTEGER NOT NULL DEFAULT 0,
+  CHECK (max_tracks >= min_tracks)
+);
+
+INSERT INTO public.submission_release_type_rules
+  (release_type, track_count_mode, min_tracks, max_tracks, display_order)
+VALUES
+  ('single',      'fixed_1',        1,  1,  10),
+  ('ep',          'user_specified', 2,  6,  20),
+  ('album',       'user_specified', 2, 99,  30),
+  ('compilation', 'user_specified', 2, 99,  40)
+ON CONFLICT (release_type) DO NOTHING;
 
 -- Expand field_type check to include date_dmy (DD/MM/YYYY release date input).
 ALTER TABLE public.submission_form_schema DROP CONSTRAINT IF EXISTS submission_form_schema_field_type_check;
@@ -4722,7 +4750,8 @@ ON CONFLICT (form_type, field_key) DO NOTHING;
 ALTER TABLE public.release_submissions         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_submission_tracks   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.video_submissions           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.submission_form_schema      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submission_form_schema           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submission_release_type_rules    ENABLE ROW LEVEL SECURITY;
 
 -- release_submissions: artist can insert/read own rows
 DROP POLICY IF EXISTS "release_submissions: artist insert own" ON public.release_submissions;
@@ -4798,6 +4827,16 @@ CREATE POLICY "submission_form_schema: public read" ON public.submission_form_sc
 
 DROP POLICY IF EXISTS "submission_form_schema: editor+ write" ON public.submission_form_schema;
 CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_schema
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- submission_release_type_rules: public read, editor+ write
+DROP POLICY IF EXISTS "submission_release_type_rules: public read" ON public.submission_release_type_rules;
+CREATE POLICY "submission_release_type_rules: public read" ON public.submission_release_type_rules
+  FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "submission_release_type_rules: editor+ write" ON public.submission_release_type_rules;
+CREATE POLICY "submission_release_type_rules: editor+ write" ON public.submission_release_type_rules
   FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 

@@ -44,6 +44,7 @@ const row = {
   field_group: 'metadata',
   field_options: null,
   visibility_condition: null,
+  type_rules: null,
   validation: null,
   is_required: false,
   is_visible: true,

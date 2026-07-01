@@ -210,6 +210,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "streaming_stats: artist read own",
   "submission_form_schema: editor+ write",
   "submission_form_schema: public read",
+  "submission_release_type_rules: editor+ write",
+  "submission_release_type_rules: public read",
   "support_known_errors: admin read",
   "support_known_errors: admin write",
   "sync_logs: editor+ read",
@@ -339,6 +341,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "sos_rules_presets",
   "streaming_stats",
   "submission_form_schema",
+  "submission_release_type_rules",
   "support_known_errors",
   "sync_logs",
   "sync_queue",
@@ -725,6 +728,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "submission_form_schema": [
     "submission_form_schema: editor+ write",
     "submission_form_schema: public read",
+  ],
+  "submission_release_type_rules": [
+    "submission_release_type_rules: editor+ write",
+    "submission_release_type_rules: public read",
   ],
   "support_known_errors": [
     "support_known_errors: admin read",

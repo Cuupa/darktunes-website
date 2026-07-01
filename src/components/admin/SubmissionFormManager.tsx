@@ -21,9 +21,14 @@ import { routing } from '@/i18n/routing'
 import { fieldToApiPayload } from '@/lib/api/submissionFormSchema'
 import { fieldKeyFromLabel, uniqueFieldKey } from '@/lib/submissions/fieldKey'
 import { MUSIC_FIELD_PRESETS } from '@/lib/submissions/musicFieldPresets'
-import { SUBMISSION_FIELD_TYPES } from '@/lib/submissions/fieldTypes'
+import {
+  SUBMISSION_FIELD_TYPES,
+  SUBMISSION_RELEASE_TYPES,
+  type SubmissionReleaseType,
+} from '@/lib/submissions/fieldTypes'
+import { mergeTypeRules } from '@/lib/submissions/fieldTypeRules'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import type { SubmissionFormField } from '@/types'
+import type { SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
 
 type FormType = 'release' | 'video'
 
@@ -44,7 +49,10 @@ export function SubmissionFormManager() {
 
   const [formType, setFormType] = useState<FormType>('release')
   const [fields, setFields] = useState<SubmissionFormField[]>([])
+  const [typeRules, setTypeRules] = useState<SubmissionReleaseTypeRule[]>([])
+  const [releaseSubTab, setReleaseSubTab] = useState<'fields' | 'track_rules' | 'field_rules'>('fields')
   const [loading, setLoading] = useState(true)
+  const [loadingTypeRules, setLoadingTypeRules] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [addingNew, setAddingNew] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -82,9 +90,65 @@ export function SubmissionFormManager() {
     }
   }, [getToken, t])
 
+  const fetchTypeRules = useCallback(async () => {
+    setLoadingTypeRules(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/submission-release-type-rules', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(await parseApiError(res))
+      const data = (await res.json()) as SubmissionReleaseTypeRule[]
+      setTypeRules(data)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('type_rules_load_error'))
+    } finally {
+      setLoadingTypeRules(false)
+    }
+  }, [getToken, t])
+
   useEffect(() => {
     void fetchFields(formType)
-  }, [fetchFields, formType])
+    if (formType === 'release') void fetchTypeRules()
+  }, [fetchFields, fetchTypeRules, formType])
+
+  const saveTypeRule = async (rule: SubmissionReleaseTypeRule) => {
+    setSaving(rule.id)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/submission-release-type-rules', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: rule.id,
+          release_type: rule.releaseType,
+          track_count_mode: rule.trackCountMode,
+          min_tracks: rule.minTracks,
+          max_tracks: rule.maxTracks,
+          display_order: rule.displayOrder,
+        }),
+      })
+      if (!res.ok) throw new Error(await parseApiError(res))
+      toast.success(t('type_rules_saved'))
+      await fetchTypeRules()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('type_rules_save_error'))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const updateFieldTypeRule = (
+    field: SubmissionFormField,
+    releaseType: SubmissionReleaseType,
+    patch: { visible?: boolean; required?: boolean },
+  ) => {
+    const nextRules = mergeTypeRules(field.typeRules, releaseType, patch)
+    void saveField({ ...field, typeRules: nextRules })
+  }
 
   const saveField = async (field: Partial<SubmissionFormField>) => {
     setSaving(field.id ?? 'new')
@@ -204,6 +268,140 @@ export function SubmissionFormManager() {
           <TabsTrigger value="video">{t('submission_form_video_tab')}</TabsTrigger>
         </TabsList>
         <TabsContent value={formType} className="mt-4 space-y-4">
+          {formType === 'release' && (
+            <Tabs value={releaseSubTab} onValueChange={(v) => setReleaseSubTab(v as typeof releaseSubTab)}>
+              <TabsList>
+                <TabsTrigger value="fields">{t('release_subtab_fields')}</TabsTrigger>
+                <TabsTrigger value="track_rules">{t('release_subtab_track_rules')}</TabsTrigger>
+                <TabsTrigger value="field_rules">{t('release_subtab_field_rules')}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+
+          {formType === 'release' && releaseSubTab === 'track_rules' && (
+            <div className="space-y-4">
+              {loadingTypeRules ? (
+                <p className="text-muted-foreground">{t('loading')}</p>
+              ) : (
+                <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-3">{t('release_type')}</th>
+                        <th className="text-left py-2 pr-3">{t('track_count_mode')}</th>
+                        <th className="text-left py-2 pr-3">{t('min_tracks')}</th>
+                        <th className="text-left py-2 pr-3">{t('max_tracks')}</th>
+                        <th className="text-left py-2">{t('actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {typeRules.map((rule) => (
+                        <tr key={rule.id} className="border-b border-border">
+                          <td className="py-2 pr-3 font-mono text-xs">{rule.releaseType}</td>
+                          <td className="py-2 pr-3 text-xs">{rule.trackCountMode}</td>
+                          <td className="py-2 pr-3">
+                            <Input
+                              className="h-7 text-xs w-20"
+                              type="number"
+                              min={1}
+                              defaultValue={rule.minTracks}
+                              disabled={rule.trackCountMode === 'fixed_1'}
+                              onBlur={(e) => {
+                                const minTracks = Number(e.target.value)
+                                if (Number.isNaN(minTracks) || minTracks === rule.minTracks) return
+                                void saveTypeRule({ ...rule, minTracks })
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 pr-3">
+                            <Input
+                              className="h-7 text-xs w-20"
+                              type="number"
+                              min={rule.minTracks}
+                              defaultValue={rule.maxTracks}
+                              disabled={rule.trackCountMode === 'fixed_1'}
+                              onBlur={(e) => {
+                                const maxTracks = Number(e.target.value)
+                                if (Number.isNaN(maxTracks) || maxTracks === rule.maxTracks) return
+                                void saveTypeRule({ ...rule, maxTracks })
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 text-xs text-muted-foreground">
+                            {rule.trackCountMode === 'fixed_1' ? t('track_count_fixed') : t('track_count_user')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {formType === 'release' && releaseSubTab === 'field_rules' && (
+            <div className="space-y-4">
+              {loading ? (
+                <p className="text-muted-foreground">{t('loading')}</p>
+              ) : (
+                <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-3">{t('field_key')}</th>
+                        <th className="text-left py-2 pr-3">{t('field_scope')}</th>
+                        {SUBMISSION_RELEASE_TYPES.map((rt) => (
+                          <th key={rt} className="text-center py-2 px-2 text-xs">{rt}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...fields].sort((a, b) => a.displayOrder - b.displayOrder).map((field) => (
+                        <tr key={field.id} className="border-b border-border">
+                          <td className="py-2 pr-3 font-mono text-xs">{field.fieldKey}</td>
+                          <td className="py-2 pr-3 text-xs">{field.fieldScope}</td>
+                          {SUBMISSION_RELEASE_TYPES.map((rt) => {
+                            const rule = field.typeRules?.[rt]
+                            const visible = rule?.visible ?? field.isVisible
+                            const required = rule?.required ?? field.isRequired
+                            return (
+                              <td key={rt} className="py-2 px-2">
+                                <div className="flex flex-col items-center gap-1">
+                                  <label className="flex items-center gap-1 text-[10px]">
+                                    <input
+                                      type="checkbox"
+                                      checked={visible}
+                                      onChange={(e) => updateFieldTypeRule(field, rt, { visible: e.target.checked })}
+                                      aria-label={`${field.fieldKey} ${rt} visible`}
+                                    />
+                                    {t('field_visible_short')}
+                                  </label>
+                                  <label className="flex items-center gap-1 text-[10px]">
+                                    <input
+                                      type="checkbox"
+                                      checked={required}
+                                      disabled={!visible}
+                                      onChange={(e) => updateFieldTypeRule(field, rt, { required: e.target.checked })}
+                                      aria-label={`${field.fieldKey} ${rt} required`}
+                                    />
+                                    {t('field_required_short')}
+                                  </label>
+                                </div>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">{t('field_rules_hint')}</p>
+            </div>
+          )}
+
+          {(formType !== 'release' || releaseSubTab === 'fields') && (
+          <>
           <div className="flex flex-wrap gap-2 items-center">
             <Label className="text-xs text-muted-foreground">{t('label_locale')}:</Label>
             {routing.locales.map((loc) => (
@@ -425,6 +623,8 @@ export function SubmissionFormManager() {
                 </div>
               )}
             </div>
+          )}
+          </>
           )}
         </TabsContent>
       </Tabs>

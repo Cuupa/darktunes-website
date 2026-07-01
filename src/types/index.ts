@@ -920,6 +920,10 @@ export type {
   SubmissionFieldType,
   SubmissionFieldScope,
   VisibilityCondition,
+  SubmissionReleaseType,
+  TrackCountMode,
+  FieldTypeRules,
+  TypeFieldRule,
 } from '@/lib/submissions/fieldTypes'
 
 export interface SubmissionFormField {
@@ -932,11 +936,21 @@ export interface SubmissionFormField {
   fieldGroup: string | null
   fieldOptions: Record<string, unknown> | null
   visibilityCondition: import('@/lib/submissions/fieldTypes').VisibilityCondition | null
+  typeRules: import('@/lib/submissions/fieldTypes').FieldTypeRules | null
   validation: Record<string, unknown> | null
   isRequired: boolean
   isVisible: boolean
   displayOrder: number
   placeholders: Record<string, string> | null
+}
+
+export interface SubmissionReleaseTypeRule {
+  id: string
+  releaseType: import('@/lib/submissions/fieldTypes').SubmissionReleaseType
+  trackCountMode: import('@/lib/submissions/fieldTypes').TrackCountMode
+  minTracks: number
+  maxTracks: number
+  displayOrder: number
 }
 
 export interface ReleaseSubmissionTrack {
