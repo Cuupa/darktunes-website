@@ -10,7 +10,7 @@ import { checkAndClaimIdempotencyKey, updateIdempotencyKeyResourceId } from '@/l
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
-import { buildTrackInsert } from '@/lib/submissions/trackFieldMapping'
+import { buildTrackInsert, filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
 import { coerceReleaseDate } from '@/lib/submissions/submissionSchemaValidation'
 import { filterFieldsForType } from '@/lib/submissions/fieldTypeRules'
 import { validateReleaseSubmissionByType } from '@/lib/submissions/submissionTypeValidation'
@@ -80,10 +80,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   })
 
   const releaseType = body.type ?? 'single'
-  const trackFields = filterFieldsForType(
-    schemaFields.filter((f) => f.fieldScope === 'track'),
-    releaseType,
-    { type: releaseType },
+  const trackFields = filterArtistTrackFields(
+    filterFieldsForType(
+      schemaFields.filter((f) => f.fieldScope === 'track'),
+      releaseType,
+      { type: releaseType },
+    ),
   )
 
   const submission = await createReleaseSubmission(supabase, {

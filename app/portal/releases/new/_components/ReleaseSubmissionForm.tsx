@@ -18,6 +18,7 @@ import {
   validateTrackCount,
 } from '@/lib/submissions/fieldTypeRules'
 import { RELEASE_STANDARD_FIELD_TO_BODY_KEY } from '@/lib/submissions/releaseFieldMapping'
+import { filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
 import type { SubmissionReleaseType } from '@/lib/submissions/fieldTypes'
 import type { Artist, SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
 
@@ -92,7 +93,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [releaseFields, releaseType, values],
   )
   const visibleTrackFields = useMemo(
-    () => filterFieldsForType(allTrackFields, releaseType, values),
+    () => filterArtistTrackFields(filterFieldsForType(allTrackFields, releaseType, values)),
     [allTrackFields, releaseType, values],
   )
 
@@ -215,7 +216,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       }
 
       const trackPayload = tracks.map((track, index) => ({
-        trackNumber: Number(track.values.track_number) || index + 1,
+        trackNumber: index + 1,
         values: track.values,
       }))
 

@@ -41,7 +41,6 @@ export const MUSIC_FIELD_PRESETS: MusicFieldPreset[] = [
   preset('artist_name', { en: 'Artist Name', de: 'Künstlername' }, 'text', 'release', 'metadata'),
   preset('language', { en: 'Language', de: 'Sprache' }, 'text', 'release', 'metadata', { en: 'e.g. DE, EN', de: 'z.B. DE, EN' }),
   preset('gema_release', { en: 'GEMA', de: 'GEMA' }, 'boolean', 'release', 'rights'),
-  preset('track_number', { en: 'Track Nr', de: 'Track-Nr.' }, 'number', 'track', 'track', undefined, true),
   preset('song_title', { en: 'Song Title', de: 'Songtitel' }, 'text', 'track', 'track', undefined, true),
   preset('composer', { en: 'Composer', de: 'Komponist' }, 'text', 'track', 'track'),
   preset('author', { en: 'Author', de: 'Autor' }, 'text', 'track', 'track'),

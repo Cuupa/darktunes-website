@@ -1,8 +1,16 @@
 import type { Database } from '@/types/database'
 import { normalizeFieldValue } from '@/lib/submissions/fieldValidation'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
+import type { SubmissionFormField } from '@/types'
 
 type TrackInsert = Database['public']['Tables']['release_submission_tracks']['Insert']
+
+/** Assigned from track list position — never shown to artists. */
+export const SYSTEM_MANAGED_TRACK_FIELD_KEYS = new Set(['track_number'])
+
+export function filterArtistTrackFields(fields: SubmissionFormField[]): SubmissionFormField[] {
+  return fields.filter((f) => !SYSTEM_MANAGED_TRACK_FIELD_KEYS.has(f.fieldKey))
+}
 
 const TRACK_KEY_TO_COLUMN: Record<string, keyof TrackInsert> = {
   track_number: 'track_number',
@@ -41,6 +49,7 @@ export function buildTrackInsert(
   const extras: Record<string, unknown> = {}
 
   for (const [key, { value, fieldType }] of Object.entries(fieldValues)) {
+    if (SYSTEM_MANAGED_TRACK_FIELD_KEYS.has(key)) continue
     if (!value.trim()) continue
     const column = TRACK_KEY_TO_COLUMN[key]
     const normalized = normalizeFieldValue(fieldType, value)
