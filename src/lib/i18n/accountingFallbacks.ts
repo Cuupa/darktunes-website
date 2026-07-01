@@ -44,6 +44,10 @@ export const ACCOUNTING_FALLBACK = {
   workspaceNotSaved: 'not yet saved for this period',
   workspaceLastSaved: 'last saved',
   workspaceReload: 'Reload from server',
+  workspaceReloadConfirmTitle: 'Reload from server?',
+  workspaceReloadConfirmBody:
+    'Unsaved changes in this browser will be replaced by the server copy.',
+  workspaceReloadConfirm: 'Reload',
   workspaceSave: 'Save workspace to server',
   workspaceSharedHint: 'Shared across team • period-keyed',
   workspaceLoading: 'Loading…',

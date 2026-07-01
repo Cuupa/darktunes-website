@@ -614,6 +614,9 @@ function SosGeneratorPanel() {
     isWorkspaceSaving,
     isSettingsDirty,
     loadFromServer,
+    confirmReloadFromServer,
+    reloadConfirmOpen,
+    setReloadConfirmOpen,
     loadDefaultPreset,
     saveCurrentWorkspace,
   } = useSosWorkspaceSync({
@@ -640,7 +643,7 @@ function SosGeneratorPanel() {
       }
       toast.success('Workspace für diesen Zeitraum gelöscht')
       setWorkspaceDeleteOpen(false)
-      await loadFromServer()
+      await loadFromServer({ force: true })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Workspace delete failed')
     } finally {
@@ -1291,6 +1294,17 @@ function SosGeneratorPanel() {
           </div>
         )}
       </div>
+
+      <SosConfirmDialog
+        open={reloadConfirmOpen}
+        onOpenChange={setReloadConfirmOpen}
+        title={t.workspaceReloadConfirmTitle ?? 'Reload from server?'}
+        description={t.workspaceReloadConfirmBody ?? 'Unsaved changes in this browser will be replaced by the server copy.'}
+        confirmLabel={t.workspaceReloadConfirm ?? t.workspaceReload ?? 'Reload'}
+        cancelLabel="Cancel"
+        loading={isWorkspaceLoading}
+        onConfirm={() => void confirmReloadFromServer()}
+      />
 
       <SosConfirmDialog
         open={workspaceDeleteOpen}

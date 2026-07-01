@@ -4742,9 +4742,9 @@ VALUES
   ('video', 'youtube_category',    'YouTube Category',        'YouTube-Kategorie',              'select',   'release',
     '{"options":[{"value":"10","labels":{"en":"Music","de":"Musik"}},{"value":"24","labels":{"en":"Entertainment","de":"Unterhaltung"}},{"value":"22","labels":{"en":"People & Blogs","de":"People & Blogs"}},{"value":"27","labels":{"en":"Education","de":"Bildung"}}]}',
     FALSE, TRUE, 70, NULL, NULL),
-  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', FALSE, TRUE,  80, NULL, NULL),
-  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', FALSE, TRUE,  90, NULL, NULL),
-  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', FALSE, TRUE, 100, NULL, NULL)
+  ('video', 'target_publish_date', 'Target Publish Date',     'Geplantes Veröffentlichungsdatum','date',     'release', NULL, FALSE, TRUE,  80, NULL, NULL),
+  ('video', 'description',         'Video Description',       'Video-Beschreibung',             'textarea', 'release', NULL, FALSE, TRUE,  90, NULL, NULL),
+  ('video', 'notes',               'Additional Notes',        'Zusätzliche Hinweise',           'textarea', 'release', NULL, FALSE, TRUE, 100, NULL, NULL)
 ON CONFLICT (form_type, field_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
