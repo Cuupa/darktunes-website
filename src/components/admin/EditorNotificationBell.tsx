@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Bell } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ function rowToNotification(
 export function EditorNotificationBell({ userId }: EditorNotificationBellProps) {
   const { profile } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const channelInstanceId = useId().replace(/:/g, '')
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<EditorNotification[]>([])
 
@@ -70,13 +71,16 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
     setUnreadCount(count ?? 0)
   }, [supabase, userId])
 
+  const loadNotificationsRef = useRef(loadNotifications)
+  loadNotificationsRef.current = loadNotifications
+
   useEffect(() => {
     void loadNotifications()
   }, [loadNotifications])
 
   useEffect(() => {
     const channel = supabase
-      .channel(`editor-notifications-${userId}`)
+      .channel(`editor-notifications-${userId}-${channelInstanceId}`)
       .on(
         'postgres_changes',
         {
@@ -85,14 +89,14 @@ export function EditorNotificationBell({ userId }: EditorNotificationBellProps) 
           table: 'editor_notifications',
           filter: `recipient_id=eq.${userId}`,
         },
-        () => { void loadNotifications() },
+        () => { void loadNotificationsRef.current() },
       )
       .subscribe()
 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [loadNotifications, supabase, userId])
+  }, [channelInstanceId, supabase, userId])
 
   useEffect(() => {
     if (!open) return
