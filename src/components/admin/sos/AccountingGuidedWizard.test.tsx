@@ -10,6 +10,8 @@ vi.mock('@phosphor-icons/react', () => ({
   UploadSimple: () => <span data-testid="icon-upload" />,
   ChartBar: () => <span data-testid="icon-chart" />,
   SealCheck: () => <span data-testid="icon-seal" />,
+  Gear: () => <span data-testid="icon-gear" />,
+  ShieldCheck: () => <span data-testid="icon-shield" />,
 }))
 
 vi.mock('@/components/ui/button', () => ({
@@ -92,8 +94,9 @@ describe('AccountingGuidedWizard navigation', () => {
     expect(onActiveStepChange).toHaveBeenCalledWith('settle')
   })
 
-  it('auto-advances from upload to review when data becomes ready', () => {
-    const { rerender } = renderWizard({ hasData: false, activeStep: 'upload' })
+  it('notifies import ready without auto-advancing from upload', () => {
+    const onImportReady = vi.fn()
+    const { rerender } = renderWizard({ hasData: false, activeStep: 'upload', onImportReady })
 
     rerender(
       <AccountingGuidedWizard
@@ -102,12 +105,14 @@ describe('AccountingGuidedWizard navigation', () => {
         activeStep="upload"
         onActiveStepChange={onActiveStepChange}
         onSwitchToAdvanced={onSwitchToAdvanced}
+        onImportReady={onImportReady}
         uploadPanel={<div>upload-panel</div>}
         reviewPanel={<div>review-panel</div>}
         settlePanel={<div>settle-panel</div>}
       />,
     )
 
-    expect(onActiveStepChange).toHaveBeenCalledWith('review')
+    expect(onImportReady).toHaveBeenCalledTimes(1)
+    expect(onActiveStepChange).not.toHaveBeenCalledWith('review')
   })
 })

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ASSISTANT_WIZARD_STEP_IDS,
+  QUICK_WIZARD_STEP_IDS,
   canAdvanceGuidedStep,
   canNavigateToGuidedStep,
   deriveSuggestedGuidedStep,
@@ -22,10 +24,27 @@ describe('guidedWizard', () => {
     expect(canAdvanceGuidedStep('upload', { hasData: true, isProcessing: false })).toBe(true)
   })
 
-  it('orders steps upload → review → settle', () => {
-    expect(guidedStepIndex('upload')).toBe(0)
-    expect(guidedStepIndex('review')).toBe(1)
-    expect(guidedStepIndex('settle')).toBe(2)
+  it('blocks validate step when blocking validation issues exist', () => {
+    expect(
+      canAdvanceGuidedStep(
+        'validate',
+        { hasData: true, isProcessing: false, hasBlockingValidation: true },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+    expect(
+      canAdvanceGuidedStep(
+        'validate',
+        { hasData: true, isProcessing: false, hasBlockingValidation: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+  })
+
+  it('orders quick steps upload → review → settle', () => {
+    expect(guidedStepIndex('upload', QUICK_WIZARD_STEP_IDS)).toBe(0)
+    expect(guidedStepIndex('review', QUICK_WIZARD_STEP_IDS)).toBe(1)
+    expect(guidedStepIndex('settle', QUICK_WIZARD_STEP_IDS)).toBe(2)
   })
 
   it('gates stepper navigation by data readiness', () => {
@@ -38,7 +57,7 @@ describe('guidedWizard', () => {
     expect(canNavigateToGuidedStep('settle', idle)).toBe(false)
 
     expect(canNavigateToGuidedStep('review', processing)).toBe(false)
-    expect(canNavigateToGuidedStep('settle', processing)).toBe(true)
+    expect(canNavigateToGuidedStep('settle', processing)).toBe(false)
 
     expect(canNavigateToGuidedStep('review', ready)).toBe(true)
     expect(canNavigateToGuidedStep('settle', ready)).toBe(true)

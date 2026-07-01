@@ -98,3 +98,19 @@ export async function listAccountingWorkspaces(db: DbClient): Promise<SosAccount
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => rowToWorkspace(row as Row))
 }
+
+export async function deleteWorkspaceForPeriod(
+  db: DbClient,
+  periodStart: string,
+  periodEnd: string,
+): Promise<boolean> {
+  const { data, error } = await db
+    .from('sos_accounting_workspaces')
+    .delete()
+    .eq('period_start', periodStart)
+    .eq('period_end', periodEnd)
+    .select('id')
+
+  if (error) throw new Error(error.message)
+  return (data?.length ?? 0) > 0
+}

@@ -25,7 +25,8 @@ import {
   WorkflowStepper,
   WorkflowSummaryCard,
 } from '@/components/admin/sos/statementWorkflowUi'
-import { CircleNotch, PaperPlaneTilt, SealCheck } from '@phosphor-icons/react'
+import { CircleNotch, PaperPlaneTilt, SealCheck, Trash } from '@phosphor-icons/react'
+import { deleteSalesStatement } from '@/lib/api/settlementCenterApi'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
 
@@ -112,7 +113,7 @@ interface StatementsManagerProps {
 
 export function StatementsManager({
   readOnly = true,
-  settlementHref = '/admin/accounting?subTab=settlements',
+  settlementHref = '/admin/accounting?guidedStep=settle',
 }: StatementsManagerProps) {
   const t = useMergedAccountingLabels(STATEMENTS_FALLBACK)
 
@@ -120,6 +121,7 @@ export function StatementsManager({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approving, setApproving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
 
@@ -200,6 +202,29 @@ export function StatementsManager({
     filteredStatements.some((statement) => statement.id === id && statement.status === 'draft'),
   )
 
+  const handleDeleteDraft = async (statementId: string, artistName: string) => {
+    if (
+      !window.confirm(
+        `Draft für ${artistName} unwiderruflich löschen?`,
+      )
+    ) {
+      return
+    }
+
+    setDeletingId(statementId)
+    try {
+      const token = await getAdminAccessToken()
+      if (!token) throw new Error(t.historySessionExpired)
+      await deleteSalesStatement(token, statementId, 'Draft konnte nicht gelöscht werden')
+      await fetchStatements()
+      toast.success(`Draft für ${artistName} gelöscht`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Draft konnte nicht gelöscht werden')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const handleApprove = async (statementIds: string[]) => {
     if (readOnly || statementIds.length === 0) return
     setApproving(true)
@@ -258,9 +283,25 @@ export function StatementsManager({
       return (
         <div className="flex flex-wrap justify-end gap-2">
           {isDraft && (
-            <Button size="sm" variant="outline" className="gap-1" asChild>
-              <Link href={settlementHref}>{t.historyManageInSettlement}</Link>
-            </Button>
+            <>
+              <Button size="sm" variant="outline" className="gap-1" asChild>
+                <Link href={settlementHref}>{t.historyManageInSettlement}</Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-destructive border-destructive/40"
+                disabled={deletingId === statement.id}
+                onClick={() => void handleDeleteDraft(statement.id, statement.artists.name)}
+              >
+                {deletingId === statement.id ? (
+                  <CircleNotch size={14} className="animate-spin" />
+                ) : (
+                  <Trash size={14} />
+                )}
+                Löschen
+              </Button>
+            </>
           )}
           {workflowStatus === 'superseded' && (
             <span className="text-xs text-muted-foreground self-center">{t.historySuperseded}</span>

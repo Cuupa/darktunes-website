@@ -32,7 +32,19 @@ import {
   type SosAccountingSettings,
 } from '@/lib/sos/sosAccountingSettings'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
-import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
+import {
+  ASSISTANT_WIZARD_STEP_IDS,
+  QUICK_WIZARD_STEP_IDS,
+  type GuidedWizardStep,
+} from '@/lib/sos/guidedWizard'
+import { SosWizardModeChooser, type SosWizardMode } from '@/components/admin/sos/SosWizardModeChooser'
+import { SosSetupWizardStep } from '@/components/admin/sos/SosSetupWizardStep'
+import { SosValidationPanel } from '@/components/admin/sos/SosValidationPanel'
+import {
+  validateSosWizardState,
+  wizardHasBlockingIssues,
+  type WizardValidationIssue,
+} from '@/lib/sos/wizardValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
@@ -124,12 +136,36 @@ function SosGeneratorPanel() {
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('guided')
+  const [wizardMode, setWizardMode] = useState<SosWizardMode | null>(null)
   const [guidedStep, setGuidedStep] = useState<GuidedWizardStep>('upload')
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
+  const [manualPeriodStart, setManualPeriodStart] = useState('')
+  const [manualPeriodEnd, setManualPeriodEnd] = useState('')
 
   useEffect(() => {
     const subTab = searchParams.get('subTab')
-    if (isSubTab(subTab)) setActiveSubTab(subTab)
+    const guidedStepParam = searchParams.get('guidedStep')
+    if (subTab === 'settlements') {
+      setViewMode('guided')
+      setWizardMode('quick')
+      setGuidedStep('settle')
+      return
+    }
+    if (isSubTab(subTab)) {
+      setViewMode('advanced')
+      setActiveSubTab(subTab)
+    }
+    if (
+      guidedStepParam === 'upload' ||
+      guidedStepParam === 'review' ||
+      guidedStepParam === 'settle' ||
+      guidedStepParam === 'setup' ||
+      guidedStepParam === 'validate'
+    ) {
+      setViewMode('guided')
+      setWizardMode(guidedStepParam === 'setup' || guidedStepParam === 'validate' ? 'assistant' : 'quick')
+      setGuidedStep(guidedStepParam)
+    }
   }, [searchParams])
 
   // Rules state
@@ -432,6 +468,78 @@ function SosGeneratorPanel() {
 
   const hasData = revenues.length > 0
 
+  useEffect(() => {
+    if (detectedPeriodStart && !manualPeriodStart) {
+      setManualPeriodStart(detectedPeriodStart)
+      setManualPeriodEnd(detectedPeriodEnd || detectedPeriodStart)
+    }
+  }, [detectedPeriodStart, detectedPeriodEnd, manualPeriodStart])
+
+  const resetSession = useCallback(() => {
+    believeManager.clearAll()
+    bandcampManager.clearAll()
+    shopifyManager.clearAll()
+    printfulManager.clearAll()
+    darkmerchManager.clearAll()
+    setCarryForwardByArtist({})
+    setGuidedStep(wizardMode === 'assistant' ? 'setup' : 'upload')
+    toast.message('Session zurückgesetzt', {
+      description: 'Alle hochgeladenen Dateien und lokale Berechnungen wurden gelöscht.',
+    })
+  }, [
+    believeManager,
+    bandcampManager,
+    shopifyManager,
+    printfulManager,
+    darkmerchManager,
+    wizardMode,
+  ])
+
+  const wizardValidationIssues = useMemo(() => {
+    return validateSosWizardState({
+      revenues,
+      labelArtists,
+      splitFees,
+      periodStart: manualPeriodStart || detectedPeriodStart,
+      periodEnd: manualPeriodEnd || detectedPeriodEnd || manualPeriodStart,
+      hasBelieveFile: believeManager.files.length > 0,
+      hasBandcampFile: bandcampManager.files.length > 0,
+      hasShopifyFile: shopifyManager.files.length > 0,
+      hasPrintfulFile: printfulManager.files.length > 0,
+      hasDarkmerchFile: darkmerchManager.files.length > 0,
+    })
+  }, [
+    revenues,
+    labelArtists,
+    splitFees,
+    manualPeriodStart,
+    manualPeriodEnd,
+    detectedPeriodStart,
+    detectedPeriodEnd,
+    believeManager.files.length,
+    bandcampManager.files.length,
+    shopifyManager.files.length,
+    printfulManager.files.length,
+    darkmerchManager.files.length,
+  ])
+
+  const hasBlockingValidation = wizardHasBlockingIssues(wizardValidationIssues)
+
+  const handleValidationAction = useCallback((issue: WizardValidationIssue) => {
+    if (issue.actionTarget === 'rules-mappings' || issue.actionTarget === 'rules-splits' || issue.actionTarget === 'rules-defaults') {
+      setViewMode('advanced')
+      setActiveSubTab('rules')
+      return
+    }
+    if (issue.actionTarget === 'upload') {
+      setGuidedStep('upload')
+      return
+    }
+    if (issue.actionTarget === 'settlements') {
+      setGuidedStep('settle')
+    }
+  }, [])
+
   const bronzeBatchIds = useMemo(() => {
     const ids = new Set<string>()
     for (const file of [
@@ -549,8 +657,38 @@ function SosGeneratorPanel() {
     },
   ]
 
+  const setupPanel = (
+    <SosSetupWizardStep
+      periodStart={manualPeriodStart}
+      periodEnd={manualPeriodEnd}
+      onPeriodStartChange={setManualPeriodStart}
+      onPeriodEndChange={setManualPeriodEnd}
+      appDefaults={appDefaults}
+      onAppDefaultsChange={setAppDefaults}
+      labelInfo={labelInfo}
+      onLabelInfoChange={setLabelBranding}
+      onLoadPreset={() => void loadFromServer()}
+      presetLoading={isWorkspaceLoading}
+    />
+  )
+
+  const validatePanel = (
+    <SosValidationPanel issues={wizardValidationIssues} onIssueAction={handleValidationAction} />
+  )
+
   const uploadPanel = (
-    <div className="p-6">
+    <div className="p-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Zeitraum: {manualPeriodStart || detectedPeriodStart || '—'}
+          {(manualPeriodEnd || detectedPeriodEnd) &&
+            (manualPeriodEnd || detectedPeriodEnd) !== (manualPeriodStart || detectedPeriodStart) &&
+            ` – ${manualPeriodEnd || detectedPeriodEnd}`}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={resetSession}>
+          Neue Abrechnung starten
+        </Button>
+      </div>
       <UniversalFileUploadZone
         believeManager={believeManager}
         bandcampManager={bandcampManager}
@@ -575,6 +713,7 @@ function SosGeneratorPanel() {
       labelArtists={labelArtists}
       labelInfo={labelInfo}
       appDefaults={appDefaults}
+      emailConfig={emailConfig}
       periodStart={detectedPeriodStart}
       periodEnd={detectedPeriodEnd}
       onGoToSettlementCenter={() => setGuidedStep('settle')}
@@ -632,6 +771,22 @@ function SosGeneratorPanel() {
   ) : null
 
   if (viewMode === 'guided') {
+    if (wizardMode == null) {
+      return (
+        <div className="space-y-0">
+          {rulesStatusBanner}
+          <SosWizardModeChooser
+            onSelect={(mode) => {
+              setWizardMode(mode)
+              setGuidedStep(mode === 'assistant' ? 'setup' : 'upload')
+            }}
+          />
+        </div>
+      )
+    }
+
+    const stepIds = wizardMode === 'assistant' ? ASSISTANT_WIZARD_STEP_IDS : QUICK_WIZARD_STEP_IDS
+
     return (
       <div className="space-y-0">
         {rulesStatusBanner}
@@ -645,6 +800,15 @@ function SosGeneratorPanel() {
           activeStep={guidedStep}
           onActiveStepChange={setGuidedStep}
           onSwitchToAdvanced={() => setViewMode('advanced')}
+          onImportReady={() => {
+            toast.success('Import abgeschlossen', {
+              description: 'CSV-Daten wurden verarbeitet. Prüfen Sie die Auszahlungen und klicken Sie auf Weiter.',
+            })
+          }}
+          stepIds={stepIds}
+          hasBlockingValidation={hasBlockingValidation}
+          setupPanel={wizardMode === 'assistant' ? setupPanel : undefined}
+          validatePanel={wizardMode === 'assistant' ? validatePanel : undefined}
           uploadPanel={uploadPanel}
           reviewPanel={reviewPanel}
           settlePanel={settlePanel}
@@ -951,6 +1115,42 @@ function SosGeneratorPanel() {
                       ? (t.workspaceSave ?? 'Save workspace to server')
                       : (t.workspaceSaveDefault ?? 'Save default preset')}
                 </button>
+                {currentPeriodKey && (
+                  <button
+                    type="button"
+                    disabled={isWorkspaceLoading || isProcessing}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Workspace für ${currentPeriodKey.start} – ${currentPeriodKey.end} vom Server löschen?`,
+                        )
+                      ) {
+                        return
+                      }
+                      void (async () => {
+                        try {
+                          const res = await fetch(
+                            `/api/admin/sos/workspaces?periodStart=${encodeURIComponent(currentPeriodKey.start)}&periodEnd=${encodeURIComponent(currentPeriodKey.end)}`,
+                            { method: 'DELETE' },
+                          )
+                          if (!res.ok) {
+                            const data = await res.json().catch(() => ({}))
+                            throw new Error(
+                              typeof data?.error === 'string' ? data.error : 'Workspace delete failed',
+                            )
+                          }
+                          toast.success('Workspace für diesen Zeitraum gelöscht')
+                          await loadFromServer()
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : 'Workspace delete failed')
+                        }
+                      })()
+                    }}
+                    className="rounded border border-destructive/40 px-2 py-0.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  >
+                    Workspace löschen
+                  </button>
+                )}
                 <span className="text-[10px] text-muted-foreground">
                   {currentPeriodKey
                     ? (t.workspaceSharedHint ?? 'Shared across team · period-keyed')
@@ -1119,7 +1319,7 @@ export function AccountingPanel() {
 
       <TabsContent value="history" className="flex-1 mt-0 p-6">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
+          <StatementsManager readOnly settlementHref="/admin/accounting?guidedStep=settle" />
         </Suspense>
       </TabsContent>
     </Tabs>

@@ -26,6 +26,7 @@ import {
   MagnifyingGlass,
   PaperPlaneTilt,
   PencilSimple,
+  Trash,
 } from '@phosphor-icons/react'
 
 function InvoiceStatusBadge({
@@ -77,8 +78,10 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
     creatingDrafts,
     approving,
     correcting,
+    deletingDraft,
     runDraftCreation,
     runApproval,
+    runDeleteDraft,
     openCorrectionDialog,
   } = settlement
 
@@ -96,10 +99,30 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         </Button>
       )}
       {row.workflowStatus === 'draft' && row.statementId && periodWritable && (
-        <Button size="sm" disabled={approving} onClick={() => void runApproval([row.statementId!])}>
-          <PaperPlaneTilt size={14} />
-          {t.settlementApproveBtn}
-        </Button>
+        <>
+          <Button size="sm" disabled={approving} onClick={() => void runApproval([row.statementId!])}>
+            <PaperPlaneTilt size={14} />
+            {t.settlementApproveBtn}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deletingDraft}
+            onClick={() => {
+              if (
+                window.confirm(
+                  interpolate(t.settlementDeleteDraftConfirm, { artist: row.artistName }),
+                )
+              ) {
+                void runDeleteDraft(row.statementId!, row.artistName)
+              }
+            }}
+            aria-label={interpolate(t.settlementDeleteDraftBtn, { artist: row.artistName })}
+          >
+            <Trash size={14} />
+            {t.settlementDeleteDraftBtn}
+          </Button>
+        </>
       )}
       {canCorrectStatement(row) && periodWritable && (
         <Button
@@ -197,6 +220,35 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
           )}
         </div>
       ),
+    },
+    {
+      id: 'sessionPayout',
+      header: () => <span className="text-right block w-full">{t.settlementColSessionPayout}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="block text-right tabular-nums text-muted-foreground">
+          {row.original.payout != null ? fmtEur(row.original.payout) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'statementAmount',
+      header: () => <span className="text-right block w-full">{t.settlementColStatementAmount}</span>,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const delta =
+          row.original.payout != null &&
+          row.original.statementAmountEur != null &&
+          Math.abs(row.original.payout - row.original.statementAmountEur) >= 0.01
+        return (
+          <span
+            className={`block text-right tabular-nums ${delta ? 'text-amber-300' : ''}`}
+            title={delta ? 'Session payout differs from statement amount' : undefined}
+          >
+            {row.original.statementAmountEur != null ? fmtEur(row.original.statementAmountEur) : '—'}
+          </span>
+        )
+      },
     },
     {
       id: 'balance',

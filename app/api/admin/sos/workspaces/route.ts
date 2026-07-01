@@ -10,6 +10,7 @@ import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
+  deleteWorkspaceForPeriod,
   getWorkspaceForPeriod,
   upsertWorkspaceForPeriod,
   type AccountingWorkspaceConfig,
@@ -82,4 +83,22 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   })
 
   return NextResponse.json({ workspace }, { status: 200 })
+})
+
+export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAccountingRole()
+
+  const periodStart = req.nextUrl.searchParams.get('periodStart')
+  const periodEnd = req.nextUrl.searchParams.get('periodEnd')
+
+  if (!periodStart || !periodEnd) {
+    throw new ApiError(400, 'periodStart and periodEnd are required')
+  }
+
+  const serviceSupabase = await createServiceRoleSupabaseClient()
+  await assertSettlementPeriodWritable(serviceSupabase, periodStart, periodEnd)
+
+  const deleted = await deleteWorkspaceForPeriod(serviceSupabase, periodStart, periodEnd)
+
+  return NextResponse.json({ deleted })
 })

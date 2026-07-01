@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { ArtistPayoutBreakdown } from '@/components/admin/sos/ArtistPayoutBreakdown'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -85,6 +86,7 @@ export function ReportingPanel({
   const [filter, setFilter] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('payout')
   const [sorting, setSorting] = useState<SortingState>(sortModeToSorting('payout'))
+  const [breakdownArtist, setBreakdownArtist] = useState<ArtistRevenue | null>(null)
 
   const period = useMemo(() => {
     if (periodStart && periodEnd) return `${periodStart} – ${periodEnd}`
@@ -188,13 +190,15 @@ export function ReportingPanel({
       meta: { align: 'left' as const },
       cell: ({ row, column }) => (
         <div className="flex items-center gap-1.5 min-w-0">
-          <span
-            className="truncate block font-medium"
+          <button
+            type="button"
+            className="truncate block font-medium text-left hover:text-primary hover:underline"
             style={{ maxWidth: column.getSize() - ARTIST_CELL_RESERVED_PX }}
-            title={row.original.artist}
+            title={`${row.original.artist} — payout breakdown`}
+            onClick={() => setBreakdownArtist(row.original)}
           >
             {row.original.artist}
-          </span>
+          </button>
         </div>
       ),
     },
@@ -384,6 +388,14 @@ export function ReportingPanel({
           emptyMessage="No artists match your filter."
         />
       )}
+
+      <ArtistPayoutBreakdown
+        revenue={breakdownArtist}
+        open={breakdownArtist != null}
+        onOpenChange={(open) => {
+          if (!open) setBreakdownArtist(null)
+        }}
+      />
     </div>
   )
 }

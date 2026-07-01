@@ -40,6 +40,21 @@ export async function fetchSettlementRegister(
   return json as SettlementRegister
 }
 
+export async function deleteSalesStatement(
+  token: string,
+  statementId: string,
+  fallbackError: string,
+): Promise<void> {
+  const response = await fetch(`/api/admin/sales-statements/${statementId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  const json = await readJson(response)
+  if (!response.ok) {
+    throw new Error(readApiError(json, fallbackError))
+  }
+}
+
 export async function bulkApproveStatements(
   token: string,
   ids: string[],

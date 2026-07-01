@@ -50,6 +50,10 @@ export async function getStatementPresignedUrl(statementId: string): Promise<Pre
       return { url: null, error: 'Statement not found or access denied' }
     }
 
+    if (statement.status === 'draft' || statement.status === 'superseded' || statement.status === 'cancelled') {
+      return { url: null, error: 'This statement is not yet available for download' }
+    }
+
     try {
       await recordStatementView(supabase, statementId, artist.id)
     } catch (viewErr) {

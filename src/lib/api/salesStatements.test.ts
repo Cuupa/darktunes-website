@@ -5,6 +5,8 @@ import {
   getSalesStatementsByArtistId,
   createSalesStatement,
   DuplicateDraftStatementError,
+  deleteSalesStatementDraft,
+  StatementNotDeletableError,
   getSalesStatementById,
   approveSalesStatement,
   approveAndNotifySalesStatement,
@@ -53,6 +55,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
@@ -506,6 +509,42 @@ describe('linkApprovedStatementToSettlement', () => {
         amountEur: 120,
         referenceId: 'stmt-correction',
       }),
+    )
+  })
+})
+
+describe('deleteSalesStatementDraft', () => {
+  it('deletes a draft statement and its line items', async () => {
+    const statementBuilder = makeBuilder(mockStatementRow)
+    const emptyLedgerBuilder = makeBuilder([])
+    const lineItemsBuilder = makeBuilder(null)
+    const deleteBuilder = makeBuilder(null)
+
+    let callCount = 0
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'sales_statements') {
+          callCount += 1
+          if (callCount === 1) return statementBuilder
+          return deleteBuilder
+        }
+        if (table === 'artist_settlement_ledger') return emptyLedgerBuilder
+        if (table === 'sales_statement_line_items') return lineItemsBuilder
+        return makeBuilder()
+      }),
+    } as unknown as DbClient
+
+    const result = await deleteSalesStatementDraft(db, 'stmt-uuid-1')
+    expect(result.id).toBe('stmt-uuid-1')
+    expect(lineItemsBuilder.delete).toHaveBeenCalled()
+    expect(deleteBuilder.delete).toHaveBeenCalled()
+  })
+
+  it('rejects deletion of approved statements', async () => {
+    const approvedRow = { ...mockStatementRow, status: 'label_approved' as const }
+    const db = makeMockDb(approvedRow)
+    await expect(deleteSalesStatementDraft(db, 'stmt-uuid-1')).rejects.toBeInstanceOf(
+      StatementNotDeletableError,
     )
   })
 })
