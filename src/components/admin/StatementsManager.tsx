@@ -25,6 +25,7 @@ import {
   WorkflowStepper,
   WorkflowSummaryCard,
 } from '@/components/admin/sos/statementWorkflowUi'
+import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { CircleNotch, PaperPlaneTilt, SealCheck, Trash } from '@phosphor-icons/react'
 import { deleteSalesStatement } from '@/lib/api/settlementCenterApi'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
@@ -122,6 +123,10 @@ export function StatementsManager({
   const [error, setError] = useState<string | null>(null)
   const [approving, setApproving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    artistName: string
+  } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
 
@@ -203,14 +208,6 @@ export function StatementsManager({
   )
 
   const handleDeleteDraft = async (statementId: string, artistName: string) => {
-    if (
-      !window.confirm(
-        `Draft für ${artistName} unwiderruflich löschen?`,
-      )
-    ) {
-      return
-    }
-
     setDeletingId(statementId)
     try {
       const token = await getAdminAccessToken()
@@ -292,7 +289,7 @@ export function StatementsManager({
                 variant="outline"
                 className="gap-1 text-destructive border-destructive/40"
                 disabled={deletingId === statement.id}
-                onClick={() => void handleDeleteDraft(statement.id, statement.artists.name)}
+                onClick={() => setDeleteTarget({ id: statement.id, artistName: statement.artists.name })}
               >
                 {deletingId === statement.id ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -590,6 +587,27 @@ export function StatementsManager({
       <div className="hidden md:block rounded-xl border border-border overflow-hidden">
         <AdminDataTable table={table} emptyMessage={t.historyEmpty} />
       </div>
+
+      <SosConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Draft löschen"
+        description={
+          deleteTarget
+            ? `Draft für ${deleteTarget.artistName} unwiderruflich löschen?`
+            : ''
+        }
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        destructive
+        loading={deletingId != null}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          void handleDeleteDraft(deleteTarget.id, deleteTarget.artistName).finally(() => {
+            setDeleteTarget(null)
+          })
+        }}
+      />
     </div>
   )
 }

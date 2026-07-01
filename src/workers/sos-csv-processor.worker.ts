@@ -32,7 +32,7 @@
  *    are self-fulfilled and have no Printful cost entry).
  */
 
-import { convertToEur } from '../lib/sos/currency'
+import { normalizeRevenueToEur } from '../lib/sos/currency'
 import { parseCSVContentStreaming } from '../lib/sos/ingest/streaming-csv-parser'
 import { parseShopifyRaw, reconcileMerchTransactions } from '../lib/sos/ingest/ecommerce-merger'
 import type { ShopifyRawOrder } from '../lib/sos/ingest/ecommerce-merger'
@@ -284,13 +284,18 @@ function runProcess(config: WorkerProcessConfig): void {
     const workingAllTransactions = config.excludePhysical
       ? allTransactions.filter(t => !t.is_physical)
       : allTransactions
-    const totalGrossAllData = workingAllTransactions.reduce((sum, t) => {
-      const revenueEur =
-        t.source === 'bandcamp' && t.currency !== 'EUR'
-          ? convertToEur(t.net_revenue, t.currency, config.exchangeRates)
-          : t.net_revenue
-      return sum + revenueEur
-    }, 0)
+    const totalGrossAllData = workingAllTransactions.reduce(
+      (sum, t) =>
+        sum +
+        normalizeRevenueToEur(
+          t.net_revenue,
+          t.currency,
+          t.sales_month,
+          config.exchangeRates ?? {},
+          config.historicalExchangeRates ?? {},
+        ),
+      0,
+    )
 
     // Core processing — financial math runs unchanged (no modifications to data-processor.ts)
     const { artistData, filteredCompilations } = processTransactionsWithCompilations(

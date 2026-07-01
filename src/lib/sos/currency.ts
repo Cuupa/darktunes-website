@@ -169,6 +169,28 @@ export async function fetchHistoricalExchangeRates(
 }
 
 /**
+ * Converts transaction net revenue to EUR using historical monthly rates when
+ * available, otherwise spot rates. All distributor sources share this path.
+ */
+export function normalizeRevenueToEur(
+  netRevenue: number,
+  currency: string,
+  salesMonth: string | undefined,
+  exchangeRates: ExchangeRates = {},
+  historicalExchangeRates: HistoricalRates = {},
+): number {
+  const code = currency.trim().toUpperCase()
+  if (!code || code === 'EUR') return netRevenue
+
+  const applicableRates =
+    salesMonth && historicalExchangeRates[salesMonth]
+      ? historicalExchangeRates[salesMonth]
+      : exchangeRates
+
+  return convertToEur(netRevenue, currency, applicableRates)
+}
+
+/**
  * Converts an amount in a foreign currency to EUR.
  *
  * @param amount   - Amount in the source currency.

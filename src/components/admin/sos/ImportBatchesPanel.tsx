@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
+import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { toast } from 'sonner'
 import { ArrowsClockwise, Database, Trash, DownloadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
   const t = useMergedAccountingLabels(BRONZE_FALLBACK)
   const [batches, setBatches] = useState<DistributorImportBatch[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const loadBatches = useCallback(async () => {
@@ -78,7 +80,12 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
   }
 
   const handleDelete = (batchId: string) => {
-    if (!window.confirm(t.bronzeDeleteConfirm)) return
+    setDeleteTargetId(batchId)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTargetId) return
+    const batchId = deleteTargetId
     startTransition(async () => {
       try {
         const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, { method: 'DELETE' })
@@ -87,6 +94,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
           throw new Error(typeof data?.error === 'string' ? data.error : t.bronzeDeleteError)
         }
         toast.success(t.bronzeDeleteSuccess)
+        setDeleteTargetId(null)
         await loadBatches()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t.bronzeDeleteError)
@@ -140,6 +148,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
   }
 
   return (
+    <>
     <div className="border border-border rounded-lg overflow-hidden">
       <div className="px-4 py-3 border-b border-border bg-card/50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -224,5 +233,17 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
         </table>
       </div>
     </div>
+    <SosConfirmDialog
+      open={deleteTargetId != null}
+      onOpenChange={(open) => { if (!open) setDeleteTargetId(null) }}
+      title={t.bronzeDelete}
+      description={t.bronzeDeleteConfirm}
+      confirmLabel={t.bronzeDelete}
+      cancelLabel="Cancel"
+      destructive
+      loading={isPending}
+      onConfirm={confirmDelete}
+    />
+    </>
   )
 }

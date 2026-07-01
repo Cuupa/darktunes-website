@@ -55,6 +55,7 @@ import { RulesPanel } from '@/components/admin/sos/RulesPanel'
 import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
 import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
+import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
 import dynamic from 'next/dynamic'
 const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
@@ -141,6 +142,8 @@ function SosGeneratorPanel() {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
   const [manualPeriodStart, setManualPeriodStart] = useState('')
   const [manualPeriodEnd, setManualPeriodEnd] = useState('')
+  const [workspaceDeleteOpen, setWorkspaceDeleteOpen] = useState(false)
+  const [workspaceDeleting, setWorkspaceDeleting] = useState(false)
 
   useEffect(() => {
     const subTab = searchParams.get('subTab')
@@ -620,6 +623,30 @@ function SosGeneratorPanel() {
     bronzeBatchIds,
     disabled: isProcessing,
   })
+
+  const confirmWorkspaceDelete = useCallback(async () => {
+    if (!currentPeriodKey) return
+    setWorkspaceDeleting(true)
+    try {
+      const res = await fetch(
+        `/api/admin/sos/workspaces?periodStart=${encodeURIComponent(currentPeriodKey.start)}&periodEnd=${encodeURIComponent(currentPeriodKey.end)}`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(
+          typeof data?.error === 'string' ? data.error : 'Workspace delete failed',
+        )
+      }
+      toast.success('Workspace für diesen Zeitraum gelöscht')
+      setWorkspaceDeleteOpen(false)
+      await loadFromServer()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Workspace delete failed')
+    } finally {
+      setWorkspaceDeleting(false)
+    }
+  }, [currentPeriodKey, loadFromServer])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -1119,34 +1146,8 @@ function SosGeneratorPanel() {
                 {currentPeriodKey && (
                   <button
                     type="button"
-                    disabled={isWorkspaceLoading || isProcessing}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          `Workspace für ${currentPeriodKey.start} – ${currentPeriodKey.end} vom Server löschen?`,
-                        )
-                      ) {
-                        return
-                      }
-                      void (async () => {
-                        try {
-                          const res = await fetch(
-                            `/api/admin/sos/workspaces?periodStart=${encodeURIComponent(currentPeriodKey.start)}&periodEnd=${encodeURIComponent(currentPeriodKey.end)}`,
-                            { method: 'DELETE' },
-                          )
-                          if (!res.ok) {
-                            const data = await res.json().catch(() => ({}))
-                            throw new Error(
-                              typeof data?.error === 'string' ? data.error : 'Workspace delete failed',
-                            )
-                          }
-                          toast.success('Workspace für diesen Zeitraum gelöscht')
-                          await loadFromServer()
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : 'Workspace delete failed')
-                        }
-                      })()
-                    }}
+                    disabled={isWorkspaceLoading || isProcessing || workspaceDeleting}
+                    onClick={() => setWorkspaceDeleteOpen(true)}
                     className="rounded border border-destructive/40 px-2 py-0.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   >
                     Workspace löschen
@@ -1290,6 +1291,22 @@ function SosGeneratorPanel() {
           </div>
         )}
       </div>
+
+      <SosConfirmDialog
+        open={workspaceDeleteOpen}
+        onOpenChange={setWorkspaceDeleteOpen}
+        title="Workspace löschen"
+        description={
+          currentPeriodKey
+            ? `Workspace für ${currentPeriodKey.start} – ${currentPeriodKey.end} vom Server löschen?`
+            : ''
+        }
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        destructive
+        loading={workspaceDeleting}
+        onConfirm={confirmWorkspaceDelete}
+      />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
+import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -61,6 +63,11 @@ interface SettlementRegisterTableProps {
 }
 
 export function SettlementRegisterTable({ settlement }: SettlementRegisterTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<{
+    statementId: string
+    artistName: string
+  } | null>(null)
+
   const {
     t,
     invoiceStatusLabels,
@@ -109,13 +116,10 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
             variant="outline"
             disabled={deletingDraft}
             onClick={() => {
-              if (
-                window.confirm(
-                  interpolate(t.settlementDeleteDraftConfirm, { artist: row.artistName }),
-                )
-              ) {
-                void runDeleteDraft(row.statementId!, row.artistName)
-              }
+              setDeleteTarget({
+                statementId: row.statementId!,
+                artistName: row.artistName,
+              })
             }}
             aria-label={interpolate(t.settlementDeleteDraftBtn, { artist: row.artistName })}
           >
@@ -375,6 +379,27 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
           skeletonRowCount={6}
         />
       </div>
+
+      <SosConfirmDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title={t.settlementDeleteDraftBtn}
+        description={
+          deleteTarget
+            ? interpolate(t.settlementDeleteDraftConfirm, { artist: deleteTarget.artistName })
+            : ''
+        }
+        confirmLabel={t.settlementDeleteDraftBtn}
+        cancelLabel="Cancel"
+        destructive
+        loading={deletingDraft}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          void runDeleteDraft(deleteTarget.statementId, deleteTarget.artistName).finally(() => {
+            setDeleteTarget(null)
+          })
+        }}
+      />
     </>
   )
 }

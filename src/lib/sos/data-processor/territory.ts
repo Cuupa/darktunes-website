@@ -1,4 +1,4 @@
-import { convertToEur } from '../currency'
+import { normalizeRevenueToEur } from '../currency'
 import type { ExchangeRates, HistoricalRates } from '../currency'
 import type { ProcessedArtistData, TerritoryMetricRow } from './types'
 
@@ -18,14 +18,13 @@ export function aggregateTerritoryMetrics(
     for (const t of transactions) {
       if (!t.country || !VALID_TERRITORY_MONTH_RE.test(t.sales_month)) continue
 
-      const applicableRates =
-        t.sales_month && historicalExchangeRates[t.sales_month]
-          ? historicalExchangeRates[t.sales_month]
-          : exchangeRates
-      const revenueEur =
-        t.source === 'bandcamp' && t.currency !== 'EUR'
-          ? convertToEur(t.net_revenue, t.currency, applicableRates)
-          : t.net_revenue
+      const revenueEur = normalizeRevenueToEur(
+        t.net_revenue,
+        t.currency,
+        t.sales_month,
+        exchangeRates,
+        historicalExchangeRates,
+      )
 
       const streams =
         !t.is_physical && t.is_download === false ? t.quantity : 0
