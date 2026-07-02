@@ -57,7 +57,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   if (file.size > MAX_BRONZE_CSV_SERVER_BYTES) {
     throw new ApiError(
       413,
-      `CSV too large for server upload (max ${MAX_BRONZE_CSV_SERVER_BYTES} bytes). Use presigned upload instead.`,
+      `CSV too large for server upload (max ${MAX_BRONZE_CSV_SERVER_BYTES} bytes). Use multipart upload instead.`,
     )
   }
 

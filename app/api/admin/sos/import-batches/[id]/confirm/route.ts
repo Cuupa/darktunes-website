@@ -2,14 +2,14 @@
  * PATCH /api/admin/sos/import-batches/[id]/confirm — verify R2 content and store file hash
  */
 
-import { createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
+import { writeAppLog } from '@/lib/appLog'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { createR2Client, downloadObjectBufferFromR2 } from '@/lib/r2Utils'
+import { createR2Client, sha256HexFromR2Object } from '@/lib/r2Utils'
 
 async function requireAdminOrEditor() {
   const supabase = await createServerSupabaseClient()
@@ -53,13 +53,18 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
 
-  const objectBytes = await downloadObjectBufferFromR2(
+  const computedHash = await sha256HexFromR2Object(
     batch.r2Key,
     s3,
     serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
   )
-  const computedHash = createHash('sha256').update(objectBytes).digest('hex')
   if (computedHash !== normalizedHash) {
+    await writeAppLog({
+      source: 'sos.bronze.confirm',
+      level: 'error',
+      message: 'Bronze confirm hash mismatch',
+      details: { batchId: id, r2Key: batch.r2Key },
+    })
     throw new ApiError(400, 'file_hash does not match R2 object content')
   }
 

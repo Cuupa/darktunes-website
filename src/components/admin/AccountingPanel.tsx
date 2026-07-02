@@ -348,13 +348,11 @@ function SosGeneratorPanel() {
   const [carryForwardByArtist, setCarryForwardByArtist] = useState<Record<string, number>>({})
 
   // Load a bronze archive into the appropriate in-memory file manager for processing.
-  // CSV is proxied server-side (never fetch presigned R2 URLs from the browser — no bucket CORS).
-  // Bronze re-archive on load will dedupe via hash.
+  // CSV is fetched via presigned R2 GET (bypasses Vercel response size limit).
   const loadBronzeBatch = useCallback(async (batch: { id: string; distributor: string; periodStart: string }) => {
     try {
-      const res = await fetch(`/api/admin/sos/import-batches/${batch.id}/download`)
-      if (!res.ok) throw new Error('Failed to download bronze batch')
-      const csvText = await res.text()
+      const { downloadBronzeCsvText } = await import('@/lib/sos/bronzeDownload')
+      const csvText = await downloadBronzeCsvText(batch.id)
       const fileName = `${batch.distributor}-${batch.periodStart || 'archive'}.csv`
       const blob = new Blob([csvText], { type: 'text/csv; charset=utf-8' })
       const file = new File([blob], fileName, { type: 'text/csv; charset=utf-8' })
@@ -366,7 +364,7 @@ function SosGeneratorPanel() {
       else if (dist === 'darkmerch') await darkmerchManager.addFiles([file])
       else throw new Error(`Unsupported distributor: ${dist}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load bronze archive'
+      const msg = err instanceof Error ? err.message : t.bronzeArchiveLoadError
       toast.error(msg)
       throw err
     }
@@ -376,6 +374,7 @@ function SosGeneratorPanel() {
     shopifyManager,
     printfulManager,
     darkmerchManager,
+    t.bronzeArchiveLoadError,
   ])
 
   // CSV processing — all config fields now wired

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { computeAutoMappings } from '@/lib/sos/auto-mapping'
+import { logClientAppEvent } from '@/lib/sos/clientAppLog'
 import { fetchExchangeRates, fetchHistoricalExchangeRates } from '@/lib/sos/currency'
 import type { ExchangeRates, HistoricalRates } from '@/lib/sos/currency'
 import type {
@@ -114,24 +116,34 @@ export function useCSVProcessor(
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({})
   const [exchangeRatesLoading, setExchangeRatesLoading] = useState(true)
   const [historicalRates, setHistoricalRates] = useState<HistoricalRates | null>(null)
+  const t = useTranslations('admin.accounting')
+
+  const notifyCurrencyFallback = useCallback(
+    (period?: string) => {
+      const title = t('currencyFallbackTitle')
+      const description = t('currencyFallbackDescription')
+      toast.warning(title, { description })
+      void logClientAppEvent('sos.currency', title, 'warn', { period, description })
+    },
+    [t],
+  )
 
   // ── Fetch ECB exchange rates once on mount ────────────────────────────────────
 
   useEffect(() => {
     fetchExchangeRates()
-      .then(rates => {
-        setExchangeRates(rates)
+      .then((result) => {
+        setExchangeRates(result.rates)
+        if (result.source === 'fallback') notifyCurrencyFallback()
       })
-      .catch(err => {
+      .catch((err) => {
         console.warn('[useCSVProcessor] Exchange rate fetch failed unexpectedly:', err)
-        toast.warning('Wechselkurse konnten nicht geladen werden', {
-          description: 'Es werden Fallback-Kurse verwendet. Währungsumrechnungen können ungenau sein.',
-        })
+        notifyCurrencyFallback()
       })
       .finally(() => {
         setExchangeRatesLoading(false)
       })
-  }, [])
+  }, [notifyCurrencyFallback])
 
   // ── Fetch historical monthly rates when the detected period is known ──────────
   // Triggered whenever the worker detects a new billing period from the CSV data.
@@ -144,38 +156,50 @@ export function useCSVProcessor(
 
     setExchangeRatesLoading(true)
     fetchHistoricalExchangeRates(detectedStart, detectedEnd)
-      .then(rates => {
-        setHistoricalRates(rates)
+      .then((result) => {
+        setHistoricalRates(result.rates)
+        if (result.source === 'fallback') {
+          notifyCurrencyFallback(`${detectedStart}–${detectedEnd}`)
+        }
       })
-      .catch(err => {
+      .catch((err) => {
         console.warn('[useCSVProcessor] Historical exchange rate fetch failed:', err)
+        notifyCurrencyFallback(`${detectedStart}–${detectedEnd}`)
       })
       .finally(() => {
         setExchangeRatesLoading(false)
       })
-  }, [detectedStart, detectedEnd])
+  }, [detectedStart, detectedEnd, notifyCurrencyFallback])
 
   // ── Manual refresh of exchange rates ─────────────────────────────────────────
 
   const refreshExchangeRates = useCallback(async () => {
     setExchangeRatesLoading(true)
     try {
-      const [rates, historical] = await Promise.all([
+      const [spot, historical] = await Promise.all([
         fetchExchangeRates(),
         detectedStart && detectedEnd
           ? fetchHistoricalExchangeRates(detectedStart, detectedEnd)
           : Promise.resolve(null),
       ])
-      setExchangeRates(rates)
-      if (historical !== null) setHistoricalRates(historical)
-      toast.success('Exchange rates updated successfully')
+      setExchangeRates(spot.rates)
+      if (historical !== null) setHistoricalRates(historical.rates)
+      if (spot.source === 'fallback' || historical?.source === 'fallback') {
+        notifyCurrencyFallback(
+          detectedStart && detectedEnd ? `${detectedStart}–${detectedEnd}` : undefined,
+        )
+      } else {
+        toast.success(t('currencyRefreshSuccess'))
+      }
     } catch (err) {
       console.warn('[useCSVProcessor] Exchange rate refresh failed:', err)
-      toast.warning('Failed to fetch exchange rates. Using fallback rates.')
+      notifyCurrencyFallback(
+        detectedStart && detectedEnd ? `${detectedStart}–${detectedEnd}` : undefined,
+      )
     } finally {
       setExchangeRatesLoading(false)
     }
-  }, [detectedStart, detectedEnd])
+  }, [detectedStart, detectedEnd, notifyCurrencyFallback, t])
 
   // ── Build stable derivative keys ─────────────────────────────────────────────
 

@@ -1,10 +1,13 @@
 /**
  * Client-side Bronze layer upload: raw distributor CSV → R2.
- * Files ≤45 MB use a single server-side upload; larger files are sent in 20 MB chunks
- * via R2 multipart upload (no browser-to-R2 CORS required).
+ * Primary: presigned direct browser → R2 (requires bucket CORS).
+ * Fallback: server-proxy upload in 4 MB chunks (Vercel body limit).
  */
 
+import { logClientAppEvent } from '@/lib/sos/clientAppLog'
 import {
+  BRONZE_DIRECT_UPLOAD_PART_BYTES,
+  BRONZE_SINGLE_PUT_MAX_BYTES,
   BRONZE_UPLOAD_CHUNK_BYTES,
   MAX_BRONZE_CSV_BYTES,
   MAX_BRONZE_CSV_SERVER_BYTES,
@@ -31,6 +34,10 @@ export interface BronzeUploadResult {
   r2Key: string
 }
 
+export function isBronzeDirectUploadEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD !== 'false'
+}
+
 export function extractPeriodBounds(months: string[]): { periodStart: string; periodEnd: string } {
   const valid = months.filter((m) => MONTH_RE.test(m)).sort()
   const fallback = new Date().toISOString().slice(0, 7)
@@ -47,7 +54,6 @@ function toUploadBlob(body: Blob | ArrayBuffer | string, contentType: string): B
 }
 
 export async function sha256HexFromBuffer(buffer: ArrayBuffer): Promise<string> {
-  // Copy bytes so jsdom Blob.arrayBuffer() buffers work with Node Web Crypto in tests/CI.
   const bytes = new Uint8Array(buffer.byteLength)
   bytes.set(new Uint8Array(buffer))
   const hash = await crypto.subtle.digest('SHA-256', bytes)
@@ -68,14 +74,22 @@ export async function sha256Hex(text: string): Promise<string> {
 const CONFIRM_MAX_ATTEMPTS = 3
 const CONFIRM_RETRY_DELAY_MS = 500
 
+async function logBronzeError(message: string, details?: Record<string, unknown>): Promise<void> {
+  console.error('[bronzeUpload]', message, details ?? '')
+  await logClientAppEvent('sos.bronze.upload', message, 'error', details)
+}
+
 async function abandonBronzeImportBatch(batchId: string): Promise<void> {
   try {
     const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, { method: 'DELETE' })
     if (!res.ok) {
-      console.error('[bronzeUpload] failed to abandon orphan batch:', batchId, res.status)
+      await logBronzeError('failed to abandon orphan batch', { batchId, status: res.status })
     }
   } catch (err) {
-    console.error('[bronzeUpload] abandon orphan batch error:', err)
+    await logBronzeError('abandon orphan batch error', {
+      batchId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -87,18 +101,24 @@ async function markBronzeUploadFailed(batchId: string): Promise<void> {
       body: JSON.stringify({ status: 'failed' }),
     })
     if (!res.ok) {
-      console.error('[bronzeUpload] failed to mark batch as failed:', batchId, res.status)
+      await logBronzeError('failed to mark batch as failed', { batchId, status: res.status })
     }
   } catch (err) {
-    console.error('[bronzeUpload] mark batch failed error:', err)
+    await logBronzeError('mark batch failed error', {
+      batchId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
 async function readApiErrorMessage(res: Response): Promise<string> {
+  if (res.status === 413) {
+    return 'Upload too large for server proxy (max 4 MB per request)'
+  }
   const errBody = await res.json().catch(() => ({}))
   return typeof errBody === 'object' && errBody && 'error' in errBody
     ? String((errBody as { error: unknown }).error)
-    : res.statusText
+    : res.statusText || `HTTP ${res.status}`
 }
 
 async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Promise<void> {
@@ -113,7 +133,118 @@ async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Pr
   }
 }
 
-async function uploadBronzeCsvMultipart(
+function normalizeEtag(etag: string | null): string {
+  if (!etag) throw new Error('Missing ETag from R2 upload')
+  return etag.replace(/"/g, '')
+}
+
+async function putToPresignedUrl(url: string, body: Blob, contentType: string): Promise<string> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    body,
+    headers: { 'Content-Type': contentType },
+  })
+  if (!res.ok) {
+    throw new Error(`R2 PUT failed (${res.status})`)
+  }
+  return normalizeEtag(res.headers.get('ETag') ?? res.headers.get('etag'))
+}
+
+async function uploadBronzeCsvDirectSingle(
+  batchId: string,
+  uploadBlob: Blob,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const presignRes = await fetch(`/api/admin/sos/import-batches/${batchId}/presign-upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
+  })
+  if (!presignRes.ok) {
+    return { ok: false, message: await readApiErrorMessage(presignRes) }
+  }
+
+  const presignJson = (await presignRes.json()) as { uploadUrl?: string }
+  if (!presignJson.uploadUrl) return { ok: false, message: 'Missing presigned upload URL' }
+
+  try {
+    await putToPresignedUrl(presignJson.uploadUrl, uploadBlob, contentType)
+    return { ok: true }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'Direct R2 upload failed',
+    }
+  }
+}
+
+async function uploadBronzeCsvDirectMultipart(
+  batchId: string,
+  uploadBlob: Blob,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  let uploadId: string | undefined
+
+  try {
+    const initRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
+    })
+    if (!initRes.ok) {
+      return { ok: false, message: await readApiErrorMessage(initRes) }
+    }
+
+    const initJson = (await initRes.json()) as { uploadId?: string }
+    uploadId = initJson.uploadId
+    if (!uploadId) return { ok: false, message: 'Missing multipart upload ID' }
+
+    const parts: { partNumber: number; etag: string }[] = []
+    const totalParts = Math.ceil(uploadBlob.size / BRONZE_DIRECT_UPLOAD_PART_BYTES)
+
+    for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+      const start = (partNumber - 1) * BRONZE_DIRECT_UPLOAD_PART_BYTES
+      const end = Math.min(start + BRONZE_DIRECT_UPLOAD_PART_BYTES, uploadBlob.size)
+      const chunk = uploadBlob.slice(start, end)
+
+      const presignRes = await fetch(
+        `/api/admin/sos/import-batches/${batchId}/multipart/presign-part`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ upload_id: uploadId, part_number: partNumber }),
+        },
+      )
+      if (!presignRes.ok) {
+        return { ok: false, message: await readApiErrorMessage(presignRes) }
+      }
+
+      const presignJson = (await presignRes.json()) as { uploadUrl?: string }
+      if (!presignJson.uploadUrl) {
+        return { ok: false, message: 'Missing presigned part URL' }
+      }
+
+      const etag = await putToPresignedUrl(presignJson.uploadUrl, chunk, contentType)
+      parts.push({ partNumber, etag })
+    }
+
+    const completeRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, parts }),
+    })
+    if (!completeRes.ok) {
+      return { ok: false, message: await readApiErrorMessage(completeRes) }
+    }
+
+    return { ok: true }
+  } catch (err) {
+    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
+    throw err
+  }
+}
+
+async function uploadBronzeCsvProxyMultipart(
   batchId: string,
   uploadBlob: Blob,
   uploadFilename: string,
@@ -127,7 +258,6 @@ async function uploadBronzeCsvMultipart(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
     })
-
     if (!initRes.ok) {
       return { ok: false, message: await readApiErrorMessage(initRes) }
     }
@@ -153,7 +283,6 @@ async function uploadBronzeCsvMultipart(
         method: 'POST',
         body: partForm,
       })
-
       if (!partRes.ok) {
         return { ok: false, message: await readApiErrorMessage(partRes) }
       }
@@ -162,7 +291,6 @@ async function uploadBronzeCsvMultipart(
       if (!partJson.etag || partJson.partNumber !== partNumber) {
         return { ok: false, message: 'Invalid multipart part response' }
       }
-
       parts.push({ partNumber, etag: partJson.etag })
     }
 
@@ -171,7 +299,6 @@ async function uploadBronzeCsvMultipart(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ upload_id: uploadId, parts }),
     })
-
     if (!completeRes.ok) {
       return { ok: false, message: await readApiErrorMessage(completeRes) }
     }
@@ -183,29 +310,51 @@ async function uploadBronzeCsvMultipart(
   }
 }
 
-async function uploadBronzeCsvToR2(
+async function uploadBronzeCsvDirect(
+  batchId: string,
+  uploadBlob: Blob,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (uploadBlob.size <= BRONZE_SINGLE_PUT_MAX_BYTES) {
+    return uploadBronzeCsvDirectSingle(batchId, uploadBlob, contentType)
+  }
+  return uploadBronzeCsvDirectMultipart(batchId, uploadBlob, contentType)
+}
+
+async function uploadBronzeCsvProxy(
   batchId: string,
   uploadBlob: Blob,
   uploadFilename: string,
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
-    return uploadBronzeCsvMultipart(batchId, uploadBlob, uploadFilename, contentType)
+    return uploadBronzeCsvProxyMultipart(batchId, uploadBlob, uploadFilename, contentType)
   }
 
   const uploadForm = new FormData()
   uploadForm.append('file', uploadBlob, uploadFilename)
-
   const uploadRes = await fetch(`/api/admin/sos/import-batches/${batchId}/upload`, {
     method: 'POST',
     body: uploadForm,
   })
-
   if (!uploadRes.ok) {
     return { ok: false, message: await readApiErrorMessage(uploadRes) }
   }
-
   return { ok: true }
+}
+
+async function uploadBronzeCsvToR2(
+  batchId: string,
+  uploadBlob: Blob,
+  uploadFilename: string,
+  contentType: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (isBronzeDirectUploadEnabled()) {
+    const direct = await uploadBronzeCsvDirect(batchId, uploadBlob, contentType)
+    if (direct.ok) return direct
+    console.warn('[bronzeUpload] direct upload failed, trying server proxy:', direct.message)
+  }
+  return uploadBronzeCsvProxy(batchId, uploadBlob, uploadFilename, contentType)
 }
 
 async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<boolean> {
@@ -255,7 +404,7 @@ export async function uploadBronzeDistributorCsv(
     })
 
     if (registerPayload.length > MAX_REGISTRATION_JSON_BYTES) {
-      console.error('[bronzeUpload] registration metadata too large — file data must not be sent to the API')
+      await logBronzeError('registration metadata too large')
       return null
     }
 
@@ -266,12 +415,8 @@ export async function uploadBronzeDistributorCsv(
     })
 
     if (!registerRes.ok) {
-      const errBody = await registerRes.json().catch(() => ({}))
-      const message =
-        typeof errBody === 'object' && errBody && 'error' in errBody
-          ? String((errBody as { error: unknown }).error)
-          : registerRes.statusText
-      console.error('[bronzeUpload] batch registration failed:', message)
+      const message = await readApiErrorMessage(registerRes)
+      await logBronzeError('batch registration failed', { message })
       return null
     }
 
@@ -290,39 +435,38 @@ export async function uploadBronzeDistributorCsv(
 
     const { batch, r2Key } = registerJson
     if (!batch?.id || !r2Key) {
-      console.error('[bronzeUpload] invalid register response')
+      await logBronzeError('invalid register response')
       return null
     }
 
     if (uploadBlob.size > MAX_BRONZE_CSV_BYTES) {
-      console.error(
-        '[bronzeUpload] CSV exceeds upload limit:',
-        uploadBlob.size,
-        'bytes (max',
-        MAX_BRONZE_CSV_BYTES,
-        ')',
-      )
+      await logBronzeError('CSV exceeds upload limit', {
+        size: uploadBlob.size,
+        max: MAX_BRONZE_CSV_BYTES,
+      })
       await abandonBronzeImportBatch(batch.id)
       return null
     }
 
     const uploadResult = await uploadBronzeCsvToR2(batch.id, uploadBlob, uploadFilename, contentType)
     if (!uploadResult.ok) {
-      console.error('[bronzeUpload] upload failed:', uploadResult.message)
+      await logBronzeError('upload failed', { message: uploadResult.message, batchId: batch.id })
       await abandonBronzeImportBatch(batch.id)
       return null
     }
 
     const confirmed = await confirmBronzeUpload(batch.id, fileHash)
     if (!confirmed) {
-      console.error('[bronzeUpload] hash confirm failed after R2 PUT for batch:', batch.id)
+      await logBronzeError('hash confirm failed after R2 upload', { batchId: batch.id })
       await markBronzeUploadFailed(batch.id)
       return null
     }
 
     return { batchId: batch.id, r2Key }
   } catch (err) {
-    console.error('[bronzeUpload] unexpected error:', err)
+    await logBronzeError('unexpected error', {
+      error: err instanceof Error ? err.message : String(err),
+    })
     return null
   }
 }

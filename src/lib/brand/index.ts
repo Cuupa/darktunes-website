@@ -31,7 +31,7 @@ export function resolveBrandFromSettings(
   siteUrl?: string,
 ): BrandContext {
   const labelShortName =
-    settings.labelShortName.trim() || deriveShortName(settings.labelName)
+    settings.labelShortName?.trim() || deriveShortName(settings.labelName)
 
   return {
     labelName: settings.labelName,

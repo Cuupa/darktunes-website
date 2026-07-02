@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { persistSosAnalyticsCore } from './persistSosAnalyticsCore'
+import { computeEventImpactForArtist } from '@/lib/analytics/eventImpact'
 
 vi.mock('@/lib/api/artistTerritoryMetrics', () => ({
   upsertTerritoryMetrics: vi.fn(async () => 2),
@@ -29,7 +30,19 @@ vi.mock('@/lib/api/merchOrders', () => ({
   upsertMerchOrders: vi.fn(async (_db: unknown, rows: unknown[]) => rows.length),
 }))
 
+const { writeAppLogMock } = vi.hoisted(() => ({
+  writeAppLogMock: vi.fn(async () => undefined),
+}))
+
+vi.mock('@/lib/appLog', () => ({
+  writeAppLog: writeAppLogMock,
+}))
+
 describe('persistSosAnalyticsCore', () => {
+  beforeEach(() => {
+    writeAppLogMock.mockClear()
+  })
+
   it('returns event impact row count on success', async () => {
     const result = await persistSosAnalyticsCore({} as never, {
       periodStart: '2024-01',
@@ -99,5 +112,41 @@ describe('persistSosAnalyticsCore', () => {
     })
 
     expect(result.success).toBe(false)
+    expect(writeAppLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'persistSosAnalyticsCore',
+        level: 'warn',
+        message: 'No metrics matched portal-linked artists',
+      }),
+    )
+  })
+
+  it('logs event impact failures and returns warnings', async () => {
+    vi.mocked(computeEventImpactForArtist).mockRejectedValueOnce(new Error('event db error'))
+
+    const result = await persistSosAnalyticsCore({} as never, {
+      periodStart: '2024-01',
+      periodEnd: '2024-01',
+      territoryMetrics: [{
+        artistName: 'Band A',
+        period: '2024-01',
+        platform: 'Spotify',
+        country: 'DE',
+        streams: 100,
+        revenueEur: 10,
+        quantity: 0,
+      }],
+      labelArtists: [{ name: 'Band A', artistId: 'artist-1' }],
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.eventImpactWarnings).toEqual(['event db error'])
+    expect(writeAppLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'persistSosAnalyticsCore',
+        level: 'warn',
+        message: 'Event impact computation failed',
+      }),
+    )
   })
 })
