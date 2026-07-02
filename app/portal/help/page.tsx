@@ -1,11 +1,11 @@
 /**
  * app/portal/help/page.tsx — Help & FAQ (Server Component)
- *
- * Fully static page — no API calls needed.
  */
 
+import { getCachedPortalFaq } from '@/lib/portal/getCachedPortalFaq'
 import { HelpPanel } from './_components/HelpPanel'
 
 export default async function HelpPage() {
-  return <HelpPanel />
+  const faqTree = await getCachedPortalFaq()
+  return <HelpPanel faqTree={faqTree} />
 }

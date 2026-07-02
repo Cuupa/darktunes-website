@@ -4845,6 +4845,205 @@ CREATE POLICY "submission_release_type_rules: editor+ write" ON public.submissio
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
+-- TABLE: portal_faq_categories / portal_faq_items
+-- Admin-managed FAQ for the Artist Portal (/portal/help, shown above static help).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_faq_categories (
+  id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug         TEXT        NOT NULL UNIQUE,
+  title_en     TEXT        NOT NULL,
+  title_de     TEXT,
+  sort_order   INTEGER     NOT NULL DEFAULT 0,
+  is_published BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.portal_faq_items (
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id     UUID        NOT NULL REFERENCES public.portal_faq_categories (id) ON DELETE CASCADE,
+  slug            TEXT        NOT NULL UNIQUE,
+  question_en     TEXT        NOT NULL,
+  question_de     TEXT,
+  answer_html_en  TEXT        NOT NULL,
+  answer_html_de  TEXT,
+  keywords        TEXT[]      NOT NULL DEFAULT '{}',
+  portal_route    TEXT,
+  sort_order      INTEGER     NOT NULL DEFAULT 0,
+  is_published    BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_faq_categories_order ON public.portal_faq_categories (sort_order);
+CREATE INDEX IF NOT EXISTS idx_portal_faq_items_category_order ON public.portal_faq_items (category_id, sort_order);
+
+DROP TRIGGER IF EXISTS trg_portal_faq_categories_updated_at ON public.portal_faq_categories;
+CREATE TRIGGER trg_portal_faq_categories_updated_at
+  BEFORE UPDATE ON public.portal_faq_categories
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_portal_faq_items_updated_at ON public.portal_faq_items;
+CREATE TRIGGER trg_portal_faq_items_updated_at
+  BEFORE UPDATE ON public.portal_faq_items
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.portal_faq_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.portal_faq_items       ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "portal_faq_categories: published read" ON public.portal_faq_categories;
+CREATE POLICY "portal_faq_categories: published read" ON public.portal_faq_categories
+  FOR SELECT USING (is_published = TRUE);
+
+DROP POLICY IF EXISTS "portal_faq_categories: editor+ write" ON public.portal_faq_categories;
+CREATE POLICY "portal_faq_categories: editor+ write" ON public.portal_faq_categories
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "portal_faq_items: published read" ON public.portal_faq_items;
+CREATE POLICY "portal_faq_items: published read" ON public.portal_faq_items
+  FOR SELECT USING (
+    is_published = TRUE
+    AND EXISTS (
+      SELECT 1 FROM public.portal_faq_categories c
+      WHERE c.id = portal_faq_items.category_id AND c.is_published = TRUE
+    )
+  );
+
+DROP POLICY IF EXISTS "portal_faq_items: editor+ write" ON public.portal_faq_items;
+CREATE POLICY "portal_faq_items: editor+ write" ON public.portal_faq_items
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- Curated seed: 7 categories, 2–4 FAQ items each (EN required, DE on ~50%).
+INSERT INTO public.portal_faq_categories (id, slug, title_en, title_de, sort_order)
+VALUES
+  ('a1000001-0001-4000-8000-000000000001', 'dashboard',     'Dashboard & Analytics', 'Dashboard & Analytics', 10),
+  ('a1000001-0001-4000-8000-000000000002', 'music',         'Music & Presence',      'Musik & Präsenz',       20),
+  ('a1000001-0001-4000-8000-000000000003', 'live',          'Live & Touring',        'Live & Touring',        30),
+  ('a1000001-0001-4000-8000-000000000004', 'finance',       'Finance',               'Finanzen',              40),
+  ('a1000001-0001-4000-8000-000000000005', 'communication', 'Communication',         'Kommunikation',         50),
+  ('a1000001-0001-4000-8000-000000000006', 'files',         'Files & Documents',     'Dateien & Dokumente',   60),
+  ('a1000001-0001-4000-8000-000000000007', 'account',       'Account & Access',      'Konto & Zugang',        70)
+ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO public.portal_faq_items
+  (category_id, slug, question_en, question_de, answer_html_en, answer_html_de, keywords, portal_route, sort_order)
+VALUES
+  ('a1000001-0001-4000-8000-000000000001', 'what-dashboard-shows',
+   'What does the portal dashboard show?',
+   'Was zeigt das Portal-Dashboard?',
+   '<p>The dashboard is your home screen after sign-in. It summarizes KPIs, profile completion, intelligence insights, and shortcuts to the most important tasks for the active artist.</p>',
+   '<p>Das Dashboard ist dein Startbildschirm nach dem Login. Es fasst KPIs, Profil-Vervollständigung, Intelligence-Hinweise und Shortcuts zu den wichtigsten Aufgaben für den aktiven Artist zusammen.</p>',
+   ARRAY['dashboard', 'overview', 'kpi', 'übersicht'], '/portal', 10),
+
+  ('a1000001-0001-4000-8000-000000000001', 'switch-between-artists',
+   'How do I switch between multiple artists?',
+   NULL,
+   '<p>Use the artist switcher in the portal header. Each roster act has its own data scope—analytics, messages, and documents always reflect the currently selected artist.</p>',
+   NULL,
+   ARRAY['multi artist', 'roster', 'artistId', 'wechseln'], NULL, 20),
+
+  ('a1000001-0001-4000-8000-000000000001', 'analytics-empty',
+   'Why is my analytics data empty?',
+   'Warum sind meine Analytics-Daten leer?',
+   '<p>Empty charts usually mean data has not synced yet, filters are too narrow, or the analytics module is disabled for your act. Try widening the date range and confirm the correct artist is selected.</p>',
+   '<p>Leere Charts bedeuten meist, dass Daten noch nicht synchronisiert wurden, Filter zu eng sind oder Analytics für deinen Act deaktiviert ist. Erweitere den Datumsbereich und prüfe den Artist-Switcher.</p>',
+   ARRAY['analytics', 'no data', 'keine daten'], '/portal/analytics', 30),
+
+  ('a1000001-0001-4000-8000-000000000002', 'submit-release',
+   'How do I submit a new release?',
+   'Wie reiche ich ein neues Release ein?',
+   '<p>Open <strong>Releases → New submission</strong>, complete the schema-driven form, attach required assets, and submit. Your label reviews the request and may request changes via Messages.</p>',
+   '<p>Öffne <strong>Releases → Neue Einreichung</strong>, fülle das Formular aus, hänge erforderliche Assets an und sende ab. Das Label prüft die Anfrage und kann Rückfragen per Messages stellen.</p>',
+   ARRAY['release', 'submission', 'einreichung'], '/portal/releases/new', 10),
+
+  ('a1000001-0001-4000-8000-000000000002', 'what-is-epk-builder',
+   'What is the EPK Builder?',
+   NULL,
+   '<p>The EPK Builder lets you assemble a press-ready electronic press kit with bio, photos, streaming links, and downloadable assets. Changes can be previewed before sharing the public EPK URL.</p>',
+   NULL,
+   ARRAY['epk', 'press kit', 'press'], '/portal/epk-builder', 20),
+
+  ('a1000001-0001-4000-8000-000000000002', 'fan-page-basics',
+   'How does the fan page work?',
+   'Wie funktioniert die Fan Page?',
+   '<p>The fan page is your customizable landing page for fans. Edit blocks in the builder, request review from the label, and publish when approved. Preview links respect draft vs. published state.</p>',
+   '<p>Die Fan Page ist deine anpassbare Landing Page für Fans. Bearbeite Blöcke im Builder, fordere ein Label-Review an und veröffentliche nach Freigabe.</p>',
+   ARRAY['fan page', 'landing'], '/portal/fan-page', 30),
+
+  ('a1000001-0001-4000-8000-000000000003', 'create-event',
+   'How do I add a concert or event?',
+   'Wie lege ich ein Konzert oder Event an?',
+   '<p>Go to <strong>Events</strong> and create a new entry with date, venue, and ticketing links. Events can feed tour planning and analytics event overlays.</p>',
+   '<p>Gehe zu <strong>Events</strong> und erstelle einen Eintrag mit Datum, Venue und Ticket-Links. Events können Tour-Planung und Analytics-Overlays speisen.</p>',
+   ARRAY['event', 'concert', 'konzert'], '/portal/events', 10),
+
+  ('a1000001-0001-4000-8000-000000000003', 'tour-planner-intro',
+   'What is the Tour Planner?',
+   NULL,
+   '<p>The Tour Planner helps you map routes, stops, crew, merch, and tech documents for a tour. It works offline once loaded and syncs when you are back online.</p>',
+   NULL,
+   ARRAY['tour', 'routing', 'offline'], '/portal/tour-planner', 20),
+
+  ('a1000001-0001-4000-8000-000000000004', 'what-is-sos',
+   'What is a Statement of Sales (SOS)?',
+   'Was ist ein Statement of Sales (SOS)?',
+   '<p>An SOS is an official royalty statement from your label for a sales period. Use <strong>Statements</strong> to download PDFs and reconcile amounts with analytics earnings trends.</p>',
+   '<p>Ein SOS ist ein offizielles Royalty-Statement des Labels für einen Abrechnungszeitraum. Unter <strong>Statements</strong> findest du PDFs zur Abstimmung mit Analytics.</p>',
+   ARRAY['sos', 'statement', 'royalty', 'abrechnung'], '/portal/statements', 10),
+
+  ('a1000001-0001-4000-8000-000000000004', 'find-invoices',
+   'Where do I find my invoices?',
+   NULL,
+   '<p>Portal invoices live under <strong>Finance → Invoices</strong>. You can create draft invoices, track status, and download PDFs when issued.</p>',
+   NULL,
+   ARRAY['invoice', 'billing', 'rechnung'], '/portal/invoices', 20),
+
+  ('a1000001-0001-4000-8000-000000000005', 'contact-label',
+   'How do I contact the label?',
+   'Wie kontaktiere ich das Label?',
+   '<p>Use <strong>Messages</strong> for structured communication with the label team. For urgent matters, check your label contact details in profile or onboarding materials.</p>',
+   '<p>Nutze <strong>Messages</strong> für strukturierte Kommunikation mit dem Label-Team. Dringende Fälle: Kontaktdaten im Profil oder Onboarding prüfen.</p>',
+   ARRAY['messages', 'support', 'label'], '/portal/messages', 10),
+
+  ('a1000001-0001-4000-8000-000000000005', 'interview-requests',
+   'What are interview requests?',
+   NULL,
+   '<p>Interview requests are inbound press opportunities routed through the portal. Review details, accept or decline, and coordinate responses without leaving your artist workspace.</p>',
+   NULL,
+   ARRAY['interview', 'press', 'presse'], '/portal/interviews', 20),
+
+  ('a1000001-0001-4000-8000-000000000006', 'upload-documents',
+   'How do I upload documents?',
+   'Wie lade ich Dokumente hoch?',
+   '<p>Open <strong>Documents</strong>, choose a folder, and upload PDFs, riders, contracts, or images. Files are scoped to the active artist and can be downloaded later from the same view.</p>',
+   '<p>Öffne <strong>Dokumente</strong>, wähle einen Ordner und lade PDFs, Rider, Verträge oder Bilder hoch. Dateien sind dem aktiven Artist zugeordnet.</p>',
+   ARRAY['documents', 'upload', 'pdf', 'dokumente'], '/portal/documents', 10),
+
+  ('a1000001-0001-4000-8000-000000000006', 'accepted-file-formats',
+   'Which file formats are accepted?',
+   NULL,
+   '<p>Common formats include PDF, PNG, JPEG, and ZIP archives. Very large files may be rejected—check the upload error message or ask the label if you need an exception.</p>',
+   NULL,
+   ARRAY['file format', 'pdf', 'upload limit'], '/portal/documents', 20),
+
+  ('a1000001-0001-4000-8000-000000000007', 'change-language',
+   'How do I change the portal language?',
+   'Wie ändere ich die Portal-Sprache?',
+   '<p>Go to <strong>Settings</strong> and switch the language toggle. The portal stores your preference in a cookie and refreshes UI labels. FAQ answers fall back to English when no German translation exists.</p>',
+   '<p>Gehe zu <strong>Einstellungen</strong> und wechsle die Sprache. FAQ-Antworten fallen auf Englisch zurück, wenn keine deutsche Übersetzung vorhanden ist.</p>',
+   ARRAY['language', 'locale', 'sprache'], '/portal/settings', 10),
+
+  ('a1000001-0001-4000-8000-000000000007', 'no-artist-linked',
+   'What if my account shows no artist linked?',
+   NULL,
+   '<p>Complete onboarding or accept a label invite via <strong>Accept invite</strong>. If you still see no artist, contact the label so they can link your user to the correct roster profile.</p>',
+   NULL,
+   ARRAY['onboarding', 'invite', 'no artist', 'kein künstler'], '/portal/onboarding', 20)
+ON CONFLICT (slug) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
 -- TABLE: artist_invoices  (performance fee / remix invoices, portal-managed)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artist_invoices (

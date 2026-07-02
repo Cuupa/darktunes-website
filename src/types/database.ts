@@ -4083,6 +4083,95 @@ export interface Database {
         }
         Relationships: []
       }
+      portal_faq_categories: {
+        Row: {
+          id: string
+          slug: string
+          title_en: string
+          title_de: string | null
+          sort_order: number
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          title_en: string
+          title_de?: string | null
+          sort_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          title_en?: string
+          title_de?: string | null
+          sort_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      portal_faq_items: {
+        Row: {
+          id: string
+          category_id: string
+          slug: string
+          question_en: string
+          question_de: string | null
+          answer_html_en: string
+          answer_html_de: string | null
+          keywords: string[]
+          portal_route: string | null
+          sort_order: number
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          slug: string
+          question_en: string
+          question_de?: string | null
+          answer_html_en: string
+          answer_html_de?: string | null
+          keywords?: string[]
+          portal_route?: string | null
+          sort_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          slug?: string
+          question_en?: string
+          question_de?: string | null
+          answer_html_en?: string
+          answer_html_de?: string | null
+          keywords?: string[]
+          portal_route?: string | null
+          sort_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_faq_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "portal_faq_categories"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       submission_release_type_rules: {
         Row: {
           id: string

@@ -16,6 +16,7 @@ import {
   TextStrikethrough,
   Code,
   Image as ImageIcon,
+  File as FileIcon,
   YoutubeLogo,
   ListBullets,
   ListNumbers,
@@ -35,6 +36,7 @@ import { ImageBubbleMenu } from '@/components/admin/tiptap/ImageBubbleMenu'
 import { LinkPopover } from '@/components/admin/tiptap/LinkPopover'
 import { YouTubeEmbedExtension } from '@/components/admin/tiptap/YouTubeEmbedExtension'
 import { VideoInsertDialog } from '@/components/admin/tiptap/VideoInsertDialog'
+import { FileInsertDialog } from '@/components/admin/tiptap/FileInsertDialog'
 import { containsEmojis, stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
 
 interface TiptapEditorProps {
@@ -53,6 +55,7 @@ const HEADING_LEVELS = [1, 2, 3] as const
 export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
+  const [fileDialogOpen, setFileDialogOpen] = useState(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -361,6 +364,21 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
             <span aria-hidden="true"><YoutubeLogo className="w-3.5 h-3.5" /></span>
           </Button>
         )}
+        {/* File link — hidden in compact mode */}
+        {!compact && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setFileDialogOpen(true)}
+            title="Insert File Link"
+            aria-label="Insert File Link"
+            disabled={disabled}
+          >
+            <span aria-hidden="true"><FileIcon className="w-3.5 h-3.5" /></span>
+          </Button>
+        )}
       </div>
 
       {/* Editor area */}
@@ -384,6 +402,15 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
           editor={editor}
           open={videoDialogOpen}
           onClose={() => setVideoDialogOpen(false)}
+        />
+      )}
+
+      {/* File insert dialog */}
+      {!compact && (
+        <FileInsertDialog
+          editor={editor}
+          open={fileDialogOpen}
+          onClose={() => setFileDialogOpen(false)}
         />
       )}
     </div>

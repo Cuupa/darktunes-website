@@ -931,6 +931,38 @@ export type {
   TypeFieldRule,
 } from '@/lib/submissions/fieldTypes'
 
+export interface PortalFaqCategory {
+  id: string
+  slug: string
+  titleEn: string
+  titleDe: string | null
+  sortOrder: number
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PortalFaqItem {
+  id: string
+  categoryId: string
+  slug: string
+  questionEn: string
+  questionDe: string | null
+  answerHtmlEn: string
+  answerHtmlDe: string | null
+  keywords: string[]
+  portalRoute: string | null
+  sortOrder: number
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PortalFaqTree {
+  category: PortalFaqCategory
+  items: PortalFaqItem[]
+}
+
 export interface SubmissionFormField {
   id: string
   formType: 'release' | 'video'

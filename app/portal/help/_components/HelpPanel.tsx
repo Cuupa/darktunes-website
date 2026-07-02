@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CaretDown, CaretUp, MagnifyingGlass, X } from '@phosphor-icons/react'
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
-  GLOSSARY_ENTRIES,
   HELP_CATEGORIES,
   HELP_SECTION_TYPE_LABEL_KEYS,
   type HelpSection,
@@ -21,8 +20,11 @@ import {
   getTotalMatchCount,
   searchHelpContent,
 } from '@/lib/portal/useHelpSearch'
+import { countPortalFaqMatches, searchPortalFaq } from '@/lib/portal/faqSearch'
+import { PortalFaqSection } from './PortalFaqSection'
+import type { PortalFaqTree } from '@/types'
 
-function SectionTypeBadge({ type, label }: { type: HelpSectionType; label: string }) {
+function SectionTypeBadge({ label }: { type: HelpSectionType; label: string }) {
   return (
     <Badge variant="outline" className="shrink-0 text-[10px] font-normal uppercase tracking-wide">
       {label}
@@ -143,11 +145,17 @@ function TopicAccordion({
   )
 }
 
-export function HelpPanel() {
+interface HelpPanelProps {
+  faqTree: PortalFaqTree[]
+}
+
+export function HelpPanel({ faqTree }: HelpPanelProps) {
   const t = useTranslations('portalHelp')
+  const locale = useLocale()
   const searchParams = useSearchParams()
   const topicParam = searchParams.get('topic')
   const sectionParam = searchParams.get('section')
+  const faqParam = searchParams.get('faq')
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -178,10 +186,16 @@ export function HelpPanel() {
     [query, translate],
   )
 
+  const faqMatches = useMemo(
+    () => searchPortalFaq(faqTree, query, locale),
+    [faqTree, query, locale],
+  )
+
   const hasQuery = query.trim().length > 0
-  const totalMatches = getTotalMatchCount(searchResult)
+  const totalMatches = getTotalMatchCount(searchResult) + countPortalFaqMatches(faqMatches)
 
   useEffect(() => {
+    if (faqParam) return
     if (!topicParam) return
     const targetId = topicParam.startsWith('glossary-')
       ? `help-glossary-${topicParam.slice('glossary-'.length)}`
@@ -189,7 +203,7 @@ export function HelpPanel() {
         ? `help-section-${sectionParam}`
         : `help-topic-${topicParam}`
     document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [topicParam, sectionParam])
+  }, [topicParam, sectionParam, faqParam])
 
   return (
     <div className="space-y-8">
@@ -244,6 +258,8 @@ export function HelpPanel() {
         )}
       </div>
 
+      <PortalFaqSection tree={faqTree} searchQuery={query} highlightSlug={faqParam} />
+
       {filteredCategories.map((category) => (
         <section key={category.id} aria-labelledby={`help-cat-${category.id}`}>
           <h2
@@ -269,7 +285,7 @@ export function HelpPanel() {
         </section>
       ))}
 
-      {hasQuery && filteredCategories.length === 0 && (
+      {hasQuery && filteredCategories.length === 0 && faqMatches.length === 0 && (
         <p className="text-sm text-muted-foreground">{t('search_no_results')}</p>
       )}
 

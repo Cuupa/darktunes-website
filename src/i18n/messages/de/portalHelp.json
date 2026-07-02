@@ -1,7 +1,12 @@
 {
   "heading": "Artist-Portal Hilfe",
   "intro": "Schritt-für-Schritt-Anleitungen, Feature-Erklärungen und Troubleshooting für jeden Bereich des {labelShortName} Artist-Portals. Nutze die Suche oder stöbere in den Kategorien, um direkt zum passenden Thema zu springen. Drücke Strg+K (Cmd+K auf dem Mac), um die Hilfe von überall im Portal zu öffnen.",
-  "search_placeholder": "Hilfe durchsuchen: Features, Workflows, Troubleshooting, Glossar…",
+  "faq_heading": "Häufig gestellte Fragen",
+  "faq_intro": "Kurze Antworten auf häufige Fragen zum Artist-Portal. Dein Label-Team kann diese Einträge jederzeit aktualisieren.",
+  "faq_no_results": "Keine FAQ-Einträge passen zu deiner Suche.",
+  "faq_open_portal_page": "Zugehörige Portal-Seite öffnen",
+  "palette_group_faq": "FAQ",
+  "search_placeholder": "FAQ, Hilfe, Features, Workflows, Troubleshooting, Glossar…",
   "search_no_results": "Keine passenden Hilfe-Artikel. Probiere andere Suchbegriffe oder stöbere in den Kategorien unten.",
   "search_results_count": "{count} Treffer",
   "search_clear": "Suche löschen",
