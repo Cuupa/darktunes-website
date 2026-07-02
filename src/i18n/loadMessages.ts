@@ -40,6 +40,72 @@ const NAMESPACES = [
 
 type Namespace = (typeof NAMESPACES)[number]
 
+/**
+ * Per-route namespace bundles.
+ *
+ * Each entry is a prefix string mapped to the minimal set of namespaces that
+ * routes under that prefix consume.  resolveBundle() picks the longest
+ * matching prefix so more-specific entries always win.
+ *
+ * When adding a new namespace, extend the appropriate bundle (or add a new one)
+ * so it is not silently dropped for the relevant route group.
+ */
+export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
+  '/portal': ['portal', 'portalHelp', 'errors', 'pwa'],
+  '/admin': ['admin', 'adminSubmissions', 'errors', 'pwa'],
+  '/press': [
+    'press',
+    'pressLanding',
+    'pressLogin',
+    'apply',
+    'pressContact',
+    'pressDashboard',
+    'pressReleases',
+    'pressKit',
+    'pressProfile',
+    'promoPool',
+    'errors',
+    'pwa',
+  ],
+  '/promo-pool': ['promoPool', 'navigation', 'errors', 'pwa'],
+  // Default public bundle used for every other route
+  '*': [
+    'navigation',
+    'hero',
+    'artists',
+    'releases',
+    'news',
+    'videos',
+    'concerts',
+    'spotify',
+    'footer',
+    'newsletter',
+    'consent',
+    'releaseDetail',
+    'artistDetail',
+    'pages',
+    'newsPage',
+    'about',
+    'datenschutz',
+    'impressum',
+    'contact',
+    'errors',
+    'pwa',
+  ],
+}
+
+/**
+ * Returns the namespace bundle for a given pathname.
+ * Longest-prefix match wins; falls back to the * (public) bundle.
+ */
+export function resolveBundle(pathname: string): readonly Namespace[] {
+  const prefixes = Object.keys(ROUTE_BUNDLES).filter((p) => p !== '*')
+  const match = prefixes
+    .filter((p) => pathname === p || pathname.startsWith(p + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+  return ROUTE_BUNDLES[match ?? '*'] ?? ROUTE_BUNDLES['*']!
+}
+
 const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
   en: {
     navigation: () => import('./messages/en/navigation.json').then((m) => m.default),
@@ -117,10 +183,21 @@ const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
   },
 }
 
-export async function loadMessages(locale: Locale): Promise<Dictionary> {
+/**
+ * Load i18n messages for the given locale.
+ *
+ * Pass an optional filter array (a subset of Namespace keys) to load only
+ * the namespaces needed for the current route.  When omitted, all namespaces
+ * are loaded (useful for tests and build-time paths that need the full dictionary).
+ */
+export async function loadMessages(
+  locale: Locale,
+  filter?: readonly Namespace[],
+): Promise<Dictionary> {
   const localeLoaders = loaders[locale] ?? loaders.en
+  const namespaces: readonly Namespace[] = filter ?? NAMESPACES
   const entries = await Promise.all(
-    NAMESPACES.map(async (namespace) => [namespace, await localeLoaders[namespace]()] as const),
+    namespaces.map(async (namespace) => [namespace, await localeLoaders[namespace]()] as const),
   )
   return Object.fromEntries(entries) as Dictionary
 }

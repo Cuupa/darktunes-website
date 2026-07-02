@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { appendLedgerEntry } from '@/lib/api/settlementLedger'
 import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
+import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
@@ -150,6 +151,7 @@ export async function getSalesStatementsByArtistId(
     .eq('artist_id', artistId)
     .in('status', ARTIST_VISIBLE_STATEMENT_STATUSES)
     .order('created_at', { ascending: false })
+    .limit(PUBLIC_QUERY_LIMITS.statementsByArtist)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => rowToSalesStatement(row as SalesStatementRow))

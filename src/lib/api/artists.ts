@@ -3,6 +3,7 @@ import type { Database } from '@/types/database'
 import type { Artist } from '@/types'
 import { sanitizeArtistWrite } from '@/lib/sanitizeTextContent'
 import { rowToArtist } from './artistRowMapper'
+import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
 export type ArtistInsert = Database['public']['Tables']['artists']['Insert']
@@ -57,6 +58,7 @@ export async function getPublicArtists(db: DbClient): Promise<Artist[]> {
     .eq('is_visible', true)
     .order('featured', { ascending: false })
     .order('name', { ascending: true })
+    .limit(PUBLIC_QUERY_LIMITS.artists)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToArtist)
 }

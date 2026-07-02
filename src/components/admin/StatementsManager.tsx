@@ -30,6 +30,7 @@ import { CircleNotch, PaperPlaneTilt, SealCheck, Trash } from '@phosphor-icons/r
 import { deleteSalesStatement } from '@/lib/api/settlementCenterApi'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { PUBLIC_QUERY_LIMITS } from '@/lib/api/queryLimits'
 
 type StatementRow = {
   id: string
@@ -110,11 +111,17 @@ interface StatementsManagerProps {
   readOnly?: boolean
   /** Deep link to Settlement Center tab in Accounting. */
   settlementHref?: string
+  /**
+   * When true, suppresses the internal read-only banner (use when the parent
+   * page already provides its own CTA, e.g. app/admin/statements/page.tsx).
+   */
+  hideReadOnlyBanner?: boolean
 }
 
 export function StatementsManager({
   readOnly = true,
   settlementHref = '/admin/accounting?guidedStep=settle',
+  hideReadOnlyBanner = false,
 }: StatementsManagerProps) {
   const t = useMergedAccountingLabels(STATEMENTS_FALLBACK)
 
@@ -149,6 +156,7 @@ export function StatementsManager({
         artists!inner(name)
       `)
       .order('created_at', { ascending: false })
+      .limit(PUBLIC_QUERY_LIMITS.statementsAdmin)
 
     if (fetchError) {
       setError(fetchError.message)
@@ -448,7 +456,7 @@ export function StatementsManager({
 
   return (
     <div className="space-y-6">
-      {readOnly && (
+      {readOnly && !hideReadOnlyBanner && (
         <Alert className="border-primary/30 bg-primary/5">
           <SealCheck size={16} className="text-primary" />
           <AlertTitle className="text-sm">{t.historyReadOnlyTitle}</AlertTitle>

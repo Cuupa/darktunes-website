@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Concert } from '@/types'
+import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
 type ConcertRow = Database['public']['Tables']['concerts']['Row']
@@ -151,6 +152,7 @@ export async function getPublicConcerts(db: DbClient): Promise<Concert[]> {
     .select('*, artists(name)')
     .gte('concert_date', today)
     .order('concert_date', { ascending: true })
+    .limit(PUBLIC_QUERY_LIMITS.concerts)
 
   if (hiddenIds.length > 0) {
     builder = builder.or(`artist_id.is.null,artist_id.not.in.(${hiddenIds.join(',')})`)

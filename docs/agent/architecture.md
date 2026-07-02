@@ -82,6 +82,20 @@ No global state library. Server state → RSC/ISR. Shared UI → `Providers.tsx`
 
 `dangerouslySetInnerHTML` requires DOMPurify in client components. Applies to `label_messages.body_html`, `artist_replies.body_html`, CMS rich text.
 
+## i18n message splitting
+
+Messages are split into per-route bundles in `src/i18n/loadMessages.ts`.  `request.ts` calls `resolveBundle(pathname)` to load only the namespaces the current route tree needs.
+
+| Bundle prefix | Namespaces loaded |
+|---|---|
+| `/portal` | `portal`, `portalHelp`, `errors`, `pwa` |
+| `/admin` | `admin`, `adminSubmissions`, `errors`, `pwa` |
+| `/press` | `press`, `pressLanding`, `pressLogin`, `apply`, `pressContact`, `pressDashboard`, `pressReleases`, `pressKit`, `pressProfile`, `promoPool`, `errors`, `pwa` |
+| `/promo-pool` | `promoPool`, `navigation`, `errors`, `pwa` |
+| `*` (public) | `navigation`, `hero`, `artists`, `releases`, `news`, `videos`, `concerts`, `spotify`, `footer`, `newsletter`, `consent`, `releaseDetail`, `artistDetail`, `pages`, `newsPage`, `about`, `datenschutz`, `impressum`, `contact`, `errors`, `pwa` |
+
+**Rule:** When adding a new namespace file, add it to `NAMESPACES` in `loadMessages.ts` **and** to each bundle that contains routes using that namespace.
+
 ## Cross-references
 
 - ISR tags, R2 keys, schema rules → [data-and-schema.md](data-and-schema.md)
