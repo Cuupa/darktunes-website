@@ -1,10 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { Bell } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useLocale, useTranslations } from 'next-intl'
+import { Popover, PopoverContent } from '@/components/ui/popover'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { useAuthContext } from '@/contexts/AuthContext'
 import type { DashboardNotification } from '@/types'
@@ -13,61 +11,39 @@ import {
   getDashboardNotificationHref,
   getDashboardNotificationSummary,
 } from '@/lib/admin/dashboardNotificationRouting'
+import {
+  getEditorNotifications,
+  getEditorUnreadCount,
+  markAllEditorNotificationsRead,
+  markEditorNotificationRead,
+} from '@/lib/api/editorNotifications'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
+import { NotificationBellTrigger } from '@/components/notifications/NotificationBellTrigger'
+import { NotificationPanel } from '@/components/notifications/NotificationPanel'
+import { NotificationListItem } from '@/components/notifications/NotificationListItem'
 
 interface DashboardNotificationBellProps {
   userId: string
 }
 
-function rowToNotification(
-  row: {
-    id: string
-    recipient_id: string
-    type: string
-    entity_type: string
-    entity_id: string
-    entity_name: string | null
-    sender_id: string | null
-    read: boolean
-    created_at: string
-  },
-): DashboardNotification {
-  return {
-    id: row.id,
-    recipientId: row.recipient_id,
-    type: row.type,
-    entityType: row.entity_type,
-    entityId: row.entity_id,
-    entityName: row.entity_name ?? undefined,
-    senderId: row.sender_id,
-    read: row.read,
-    createdAt: row.created_at,
-  }
-}
-
 export function DashboardNotificationBell({ userId }: DashboardNotificationBellProps) {
+  const t = useTranslations('admin.notifications')
+  const locale = useLocale()
   const { profile } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const channelInstanceId = useId().replace(/:/g, '')
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<DashboardNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [markingAll, setMarkingAll] = useState(false)
 
   const loadNotifications = useCallback(async () => {
-    const [{ data }, { count }] = await Promise.all([
-      supabase
-        .from('editor_notifications')
-        .select('*')
-        .eq('recipient_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      supabase
-        .from('editor_notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('recipient_id', userId)
-        .eq('read', false),
+    const [notifications, count] = await Promise.all([
+      getEditorNotifications(supabase, userId),
+      getEditorUnreadCount(supabase, userId),
     ])
-    setItems((data ?? []).map(rowToNotification))
-    setUnreadCount(count ?? 0)
+    setItems(notifications)
+    setUnreadCount(count)
   }, [supabase, userId])
 
   const loadNotificationsRef = useRef(loadNotifications)
@@ -112,78 +88,81 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
     void loadNotifications()
   }, [loadNotifications, open])
 
-  useEffect(() => {
-    if (!open) return
-    const unreadIds = items.filter((item) => !item.read).map((item) => item.id)
-    if (unreadIds.length === 0) return
+  const handleItemClick = useCallback(async (item: DashboardNotification) => {
+    if (item.read) return
 
-    void supabase.from('editor_notifications').update({ read: true }).in('id', unreadIds)
+    setItems((prev) =>
+      prev.map((entry) => (entry.id === item.id ? { ...entry, read: true } : entry)),
+    )
+    setUnreadCount((count) => Math.max(0, count - 1))
+
+    try {
+      await markEditorNotificationRead(supabase, item.id)
+      const count = await getEditorUnreadCount(supabase, userId)
+      setUnreadCount(count)
+    } catch {
+      void loadNotifications()
+    }
+  }, [loadNotifications, supabase, userId])
+
+  const handleMarkAll = useCallback(async () => {
+    if (unreadCount === 0 || markingAll) return
+
+    setMarkingAll(true)
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
     setUnreadCount(0)
-  }, [items, open, supabase])
+
+    try {
+      await markAllEditorNotificationsRead(supabase, userId)
+      const count = await getEditorUnreadCount(supabase, userId)
+      setUnreadCount(count)
+      await loadNotifications()
+    } catch {
+      void loadNotifications()
+    } finally {
+      setMarkingAll(false)
+    }
+  }, [loadNotifications, markingAll, supabase, unreadCount, userId])
 
   const ariaLabel =
     unreadCount > 0
-      ? `Open notifications, ${unreadCount} unread`
-      : 'Open notifications'
+      ? t('unreadAria', { count: unreadCount })
+      : t('openAria')
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="relative min-h-[44px] min-w-[44px]"
-          aria-label={ariaLabel}
-        >
-          <Bell size={18} aria-hidden="true" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <NotificationBellTrigger unreadCount={unreadCount} ariaLabel={ariaLabel} />
       <PopoverContent align="end" className="w-80 p-2">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold">Notifications</p>
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notifications yet.</p>
-          ) : (
-            items.map((item) => {
-              const href = getDashboardNotificationHref(item, profile?.role)
-              const summary = getDashboardNotificationSummary(item)
-              const actionLabel = getDashboardNotificationActionLabel(item.type)
+        <NotificationPanel
+          title={t('title')}
+          emptyLabel={t('empty')}
+          markAllLabel={t('markAll')}
+          markAllAriaLabel={t('markAllAria')}
+          onMarkAll={handleMarkAll}
+          markAllDisabled={unreadCount === 0 || markingAll}
+          isEmpty={items.length === 0}
+        >
+          {items.map((item) => {
+            const href = getDashboardNotificationHref(item, profile?.role)
+            const summary = getDashboardNotificationSummary(item)
+            const actionLabel = getDashboardNotificationActionLabel(item.type)
 
-              const content = (
-                <>
-                  <p className="font-medium">{summary}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </p>
-                  {href && (
-                    <p className="text-xs font-medium text-primary">{actionLabel}</p>
-                  )}
-                </>
-              )
-
-              return href ? (
-                <Link
-                  key={item.id}
-                  href={href}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-md border border-border p-2 text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div key={item.id} className="rounded-md border border-border p-2 text-sm">
-                  {content}
-                </div>
-              )
-            })
-          )}
-        </div>
+            return (
+              <NotificationListItem
+                key={item.id}
+                href={href}
+                title={summary}
+                timeLabel={formatRelativeTime(item.createdAt, locale)}
+                actionLabel={href ? actionLabel : undefined}
+                isUnread={!item.read}
+                onClick={() => {
+                  void handleItemClick(item)
+                  setOpen(false)
+                }}
+              />
+            )
+          })}
+        </NotificationPanel>
       </PopoverContent>
     </Popover>
   )

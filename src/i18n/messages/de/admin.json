@@ -583,5 +583,13 @@
     "statusBlockedKnown": "Ignoriert",
     "statusBlockedDuplicate": "Duplikat",
     "statusBlockedUnconfigured": "Nicht gesendet"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "empty": "Noch keine Benachrichtigungen.",
+    "markAll": "Alle gelesen",
+    "markAllAria": "Alle Benachrichtigungen als gelesen markieren",
+    "openAria": "Benachrichtigungen öffnen",
+    "unreadAria": "Benachrichtigungen öffnen, {count} ungelesen"
   }
 }

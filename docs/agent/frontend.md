@@ -87,3 +87,13 @@ Typography tokens in `themeConfig.ts`; `--font-serif` wired in `ThemeStyleInject
 ## Class names
 
 Always `cn()` from `@/lib/utils` — never template literal class merging.
+
+## Notification bells (admin + portal)
+
+Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`, `NotificationPanel`, `NotificationListItem`). Relative timestamps via `src/lib/formatRelativeTime.ts`.
+
+**Read semantics:** Opening the popover does **not** mark items read. A click marks the item read in the DB, then navigates. Header button runs bulk read (`markAllEditorNotificationsRead` / `markAllPortalMessagesRead`). Badge counts always reconcile from the DB after mutations — never hard-set to zero when more unread rows may exist.
+
+**Admin:** `DashboardNotificationBell` + `editor_notifications` DAL (`src/lib/api/editorNotifications.ts`).
+
+**Portal:** `PortalNotificationBell` + `portalNotifications` feed DAL. Messages are markable; interviews/statements are workflow items (badge clears on status change). `PortalNotificationProvider` refreshes badge counts on realtime updates for messages, interviews, and statements.

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { getPortalBadgeCounts } from '@/lib/api/portalBadgeCounts'
 import type { Database } from '@/types/database'
 
 type LabelMessageRow = Database['public']['Tables']['label_messages']['Row']
@@ -70,6 +71,16 @@ export function PortalNotificationProvider({
 
     let isMounted = true
 
+    const refreshBadges = () => {
+      void getPortalBadgeCounts(supabase, artistId)
+        .then((counts) => {
+          if (isMounted) setBadges(counts)
+        })
+        .catch(() => {
+          // non-fatal
+        })
+    }
+
     const channel = supabase
       .channel(`portal-notifications-${artistId}`)
       .on(
@@ -115,6 +126,46 @@ export function PortalNotificationProvider({
             duration: 8000,
           })
         },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'label_messages',
+          filter: `artist_id=eq.${artistId}`,
+        },
+        () => refreshBadges(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'portal_messages',
+          filter: `to_artist_id=eq.${artistId}`,
+        },
+        () => refreshBadges(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'interview_requests',
+          filter: `artist_id=eq.${artistId}`,
+        },
+        () => refreshBadges(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sales_statements',
+          filter: `artist_id=eq.${artistId}`,
+        },
+        () => refreshBadges(),
       )
       .subscribe()
 

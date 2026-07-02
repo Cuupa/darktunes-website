@@ -289,7 +289,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <div className="font-bold tracking-widest text-primary">darkTunes</div>
         <div className="flex items-center gap-2">
-          <PortalNotificationBell />
+          <PortalNotificationBell artistId={activeArtist?.id ?? null} />
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Open portal navigation" className="min-h-[44px] min-w-[44px]">
@@ -323,7 +323,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       <aside className="portal-sidebar hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
         <div className="flex items-center justify-between p-6">
           <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
-          <PortalNotificationBell />
+          <PortalNotificationBell artistId={activeArtist?.id ?? null} />
         </div>
         <Separator className="bg-border" />
         {artistBlock}
