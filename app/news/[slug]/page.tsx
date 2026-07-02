@@ -13,7 +13,7 @@ import { getPublicNewsPostBySlug } from '@/lib/api/news'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
-import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
+import { getMetadataContext, pageTitle } from '@/lib/seo/metadata'
 
 import { ShareButton } from '@/components/ShareButton'
 import { NewsBodyClient } from './_components/NewsBodyClient'
@@ -50,12 +50,21 @@ function makeGetNewsPost(slug: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = await makeGetNewsPost(slug)().catch(() => null)
-  const { labelName } = await getMetadataBrand()
+  const [post, { settings, brand }] = await Promise.all([
+    makeGetNewsPost(slug)().catch(() => null),
+    getMetadataContext(),
+  ])
   if (!post) return { title: 'Not Found' }
+  const ogImage = post.imageUrl || settings.logoUrl?.trim()
   return {
-    title: pageTitle(post.title, labelName),
+    title: pageTitle(post.title, brand.labelName),
     description: post.excerpt,
+    openGraph: {
+      title: pageTitle(post.title, brand.labelName),
+      description: post.excerpt,
+      type: 'article',
+      ...(ogImage ? { images: [{ url: ogImage, alt: post.title }] } : {}),
+    },
   }
 }
 
@@ -71,10 +80,10 @@ export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params
   const locale = await getLocale()
 
-  const [post, tNewsPage, brand] = await Promise.all([
+  const [post, tNewsPage, { settings, brand }] = await Promise.all([
     makeGetNewsPost(slug)().catch(() => null),
     getTranslations('newsPage'),
-    getMetadataBrand(),
+    getMetadataContext(),
   ])
 
   if (!post) notFound()
@@ -85,7 +94,11 @@ export default async function NewsDetailPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: serializeJsonLd(
-            buildNewsArticleSchema({ post, publisherName: brand.labelName }),
+            buildNewsArticleSchema({
+              post,
+              publisherName: brand.labelName,
+              publisherLogoUrl: settings.logoUrl?.trim(),
+            }),
           ),
         }}
       />

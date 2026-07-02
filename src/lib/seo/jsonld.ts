@@ -19,6 +19,7 @@
 import type { Artist, Release, NewsPost, SiteSettings } from '@/types'
 import { resolveSiteUrl } from '@/lib/brand'
 import { NEUTRAL_LABEL_NAME } from '@/lib/brand/tenantDefaults'
+import { collectLabelSocialUrls } from '@/lib/seo/metadata'
 
 /** Canonical site origin (no trailing slash). Empty when NEXT_PUBLIC_SITE_URL is unset. */
 export function getSiteUrl(): string {
@@ -51,10 +52,13 @@ function compact(items: (string | undefined | null)[]): string[] {
 // ---------------------------------------------------------------------------
 
 export interface OrganizationSchemaInput {
-  siteSettings: Pick<SiteSettings, 'labelName' | 'contactEmail'> &
-    Partial<Pick<SiteSettings, 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl'>> & {
-      logoUrl?: string
-    }
+  siteSettings: Pick<
+    SiteSettings,
+    'labelName' | 'contactEmail' | 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl'
+  > & {
+    logoUrl?: string
+    customSocialLinks?: SiteSettings['customSocialLinks']
+  }
 }
 
 export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInput) {
@@ -73,11 +77,7 @@ export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInpu
           },
         }
       : {}),
-    sameAs: compact([
-      siteSettings.instagramUrl,
-      siteSettings.youtubeUrl,
-      siteSettings.spotifyUrl,
-    ]),
+    sameAs: collectLabelSocialUrls(siteSettings),
     contactPoint: siteSettings.contactEmail
       ? {
           '@type': 'ContactPoint',

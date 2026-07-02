@@ -160,10 +160,22 @@ describe('buildOrganizationSchema', () => {
 
   it('filters null/undefined sameAs entries', () => {
     const schema = buildOrganizationSchema({
-      siteSettings: { ...siteSettings, instagramUrl: undefined, youtubeUrl: undefined },
+      siteSettings: { ...siteSettings, instagramUrl: '', youtubeUrl: '' },
     })
     expect(schema.sameAs).not.toContain(undefined)
     expect(schema.sameAs.length).toBe(1)
+  })
+
+  it('includes customSocialLinks in sameAs', () => {
+    const schema = buildOrganizationSchema({
+      siteSettings: {
+        ...siteSettings,
+        customSocialLinks: [
+          { id: 'bc', label: 'Bandcamp', url: 'https://bandcamp.com/label', icon: 'bandcamp' },
+        ],
+      },
+    })
+    expect(schema.sameAs).toContain('https://bandcamp.com/label')
   })
 
   it('includes contactPoint when contactEmail is provided', () => {

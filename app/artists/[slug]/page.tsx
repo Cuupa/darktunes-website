@@ -110,7 +110,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { artist } = data
   return {
     title: pageTitlePipe(artist.name, labelName),
-    description: artist.bio ? artist.bio.slice(0, 160) : pageTitlePipe(artist.name, labelName),
+    description: artist.bio
+      ? artist.bio.slice(0, 160)
+      : `${artist.name} — ${labelName}`,
     openGraph: {
       title: pageTitle(artist.name, labelName),
       description: artist.bio ? artist.bio.slice(0, 160) : undefined,

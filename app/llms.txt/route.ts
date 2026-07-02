@@ -54,7 +54,7 @@ function buildLlmsTxt(
   const tagline = settings?.labelTagline ?? SITE_SETTINGS_DEFAULTS.labelTagline
   const seoDescription =
     settings?.seoDescription ?? buildDefaultSeoDescription(labelName)
-  const contactEmail = settings?.contactEmail ?? ''
+  const contactEmail = settings?.contactEmail ?? SITE_SETTINGS_DEFAULTS.contactEmail
 
   // Group releases by artist for compact representation
   const releasesByArtist = new Map<string, Release[]>()
@@ -78,6 +78,9 @@ function buildLlmsTxt(
   if (settings?.instagramUrl) lines.push(`Instagram: ${settings.instagramUrl}`)
   if (settings?.youtubeUrl) lines.push(`YouTube: ${settings.youtubeUrl}`)
   if (settings?.spotifyUrl) lines.push(`Spotify: ${settings.spotifyUrl}`)
+  for (const link of settings?.customSocialLinks ?? []) {
+    if (link.url?.trim()) lines.push(`${link.label}: ${link.url}`)
+  }
   if (contactEmail) lines.push(`Contact: ${contactEmail}`)
   lines.push(``)
 

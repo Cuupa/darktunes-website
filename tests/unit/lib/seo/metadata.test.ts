@@ -6,7 +6,10 @@ import {
   portalPageTitle,
   portalBuilderTitle,
   rootMetadataFallbacks,
+  collectLabelSocialUrls,
+  buildRootLayoutMetadata,
 } from '@/lib/seo/metadata'
+import type { SiteSettings } from '@/types'
 import { NEUTRAL_LABEL_NAME } from '@/lib/brand/tenantDefaults'
 
 describe('seo/metadata helpers', () => {
@@ -39,6 +42,49 @@ describe('seo/metadata helpers', () => {
     expect(portalBuilderTitle('EPK Builder', brand.labelShortName)).toBe(
       'EPK Builder | Test Artist Portal',
     )
+  })
+
+  it('collectLabelSocialUrls merges CMS social links', () => {
+    const urls = collectLabelSocialUrls({
+      instagramUrl: 'https://instagram.com/label',
+      youtubeUrl: '',
+      spotifyUrl: 'https://open.spotify.com/label',
+      customSocialLinks: [
+        { id: '1', label: 'Bandcamp', url: 'https://bandcamp.com/label', icon: 'bandcamp' },
+      ],
+    })
+    expect(urls).toEqual([
+      'https://instagram.com/label',
+      'https://open.spotify.com/label',
+      'https://bandcamp.com/label',
+    ])
+  })
+
+  it('buildRootLayoutMetadata reads seo and og fields from site_settings', () => {
+    const settings = {
+      labelName: 'CMS Label',
+      labelShortName: 'CMS',
+      seoTitle: 'CMS SEO Title',
+      seoDescription: 'CMS SEO Description',
+      ogTitle: 'CMS OG Title',
+      ogDescription: 'CMS OG Description',
+      logoUrl: 'https://cdn.example/logo.png',
+      faviconUrl: 'https://cdn.example/favicon.ico',
+      contactEmail: 'hello@cms.local',
+      instagramUrl: '',
+      youtubeUrl: '',
+      spotifyUrl: '',
+    } as SiteSettings
+
+    const meta = buildRootLayoutMetadata(settings)
+    expect(meta.title).toBe('CMS SEO Title')
+    expect(meta.description).toBe('CMS SEO Description')
+    expect(meta.openGraph).toMatchObject({
+      title: 'CMS OG Title',
+      description: 'CMS OG Description',
+      siteName: 'CMS Label',
+      images: [{ url: 'https://cdn.example/logo.png', alt: 'CMS Label' }],
+    })
   })
 
   it('rootMetadataFallbacks uses neutral brand fields', () => {

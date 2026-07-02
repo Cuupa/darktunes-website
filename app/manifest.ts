@@ -46,7 +46,9 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name: brand.labelName,
     short_name: brand.labelShortName,
-    description: buildDefaultSeoDescription(brand.labelName),
+    description:
+      settings?.seoDescription?.trim() ||
+      buildDefaultSeoDescription(brand.labelName),
     start_url: '/',
     scope: '/',
     display: 'standalone',

@@ -6,13 +6,16 @@ import { getPublicArtists } from '@/lib/api/artists'
 import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
 import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import { PressLandingClient } from './_components/PressLandingClient'
-import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
+import { buildDefaultSeoDescription } from '@/lib/brand/tenantDefaults'
+import { getMetadataContext, pageTitle } from '@/lib/seo/metadata'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { labelName } = await getMetadataBrand()
+  const { settings, brand } = await getMetadataContext()
   return {
-    title: pageTitle('Press & Media', labelName),
-    description: 'Label press portal with artist press kits, media contacts, and exclusive press releases.',
+    title: pageTitle('Press & Media', brand.labelName),
+    description:
+      settings.seoDescription?.trim() ||
+      buildDefaultSeoDescription(brand.labelName),
   }
 }
 

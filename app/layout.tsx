@@ -10,7 +10,7 @@ import { ThemeEffectsClient } from './_components/ThemeEffectsClient'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import { resolveBrandFromSettings } from '@/lib/brand'
-import { getMetadataBrand, rootMetadataFallbacks } from '@/lib/seo/metadata'
+import { buildRootLayoutMetadata } from '@/lib/seo/metadata'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import type { Locale } from '@/i18n/types'
@@ -22,44 +22,10 @@ const fontVariables: CSSProperties = {
   ['--font-mono' as string]: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
 }
 
-function getFaviconMimeType(url: string): string {
-  if (url.endsWith('.svg')) return 'image/svg+xml'
-  if (url.endsWith('.ico')) return 'image/x-icon'
-  if (url.endsWith('.webp')) return 'image/webp'
-  return 'image/png'
-}
-
 export async function generateMetadata(): Promise<Metadata> {
-  const [settings, brand] = await Promise.all([
-    getCachedSiteSettings().catch(() => null),
-    getMetadataBrand(),
-  ])
-  const fallbacks = rootMetadataFallbacks(brand)
-  const title = settings?.seoTitle?.trim() || (fallbacks.title as string)
-  const description = settings?.seoDescription?.trim() || (fallbacks.description as string)
-  const ogTitle = settings?.ogTitle?.trim() || title
-  const ogDescription = settings?.ogDescription?.trim() || (fallbacks.openGraph?.description as string)
-  const customFaviconUrl = settings?.faviconUrl || ''
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title: ogTitle,
-      description: ogDescription,
-      type: 'website',
-    },
-    icons: {
-      icon: customFaviconUrl
-        ? [{ url: customFaviconUrl, type: getFaviconMimeType(customFaviconUrl) }]
-        : [
-            { url: '/favicon.svg', type: 'image/svg+xml' },
-            { url: '/favicon.ico', sizes: '32x32' },
-          ],
-      shortcut: customFaviconUrl || '/favicon.ico',
-      apple: { url: customFaviconUrl || '/icons/icon-192.png', sizes: '192x192' },
-    },
-  }
+  const settings =
+    (await getCachedSiteSettings().catch(() => null)) ?? SITE_SETTINGS_DEFAULTS
+  return buildRootLayoutMetadata(settings)
 }
 
 /**
