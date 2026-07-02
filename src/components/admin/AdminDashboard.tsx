@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useRolePermissions } from '@/hooks/useRolePermissions'
 import { editorCanAccessTab, type EditorDashboardTab } from '@/lib/editor/editorTabPermissions'
+import { useTranslations } from 'next-intl'
 import { DashboardNotificationBell } from './DashboardNotificationBell'
 import { EditorPromoLogPanel } from './EditorPromoLogPanel'
 
@@ -137,6 +138,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
+  const t = useTranslations('admin')
   const { user, profile, signOut, loading: authLoading } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -273,9 +275,9 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
         <header className="border-b border-border bg-card sticky top-0 z-40">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">{contentOnly ? 'darkTunes Editor' : 'darkTunes Admin'}</h1>
+              <h1 className="text-2xl font-bold">{contentOnly ? t('brand_editor') : t('brand_admin')}</h1>
               <p className="text-sm text-muted-foreground">
-                {contentOnly ? 'Editor Dashboard' : 'Content Management System'}
+                {contentOnly ? t('brand_editor_dashboard') : t('brand_admin_dashboard')}
               </p>
             </div>
             <div className="flex items-center gap-4">

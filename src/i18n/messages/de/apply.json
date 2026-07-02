@@ -1,6 +1,6 @@
 {
   "heading": "Pressezugang beantragen",
-  "subheading": "Beantrage Zugang zum darkTunes Press Dashboard — Promo-Tracks, Presse-Kits und exklusive Releases.",
+  "subheading": "Beantrage Zugang zum {labelShortName} Press Dashboard — Promo-Tracks, Presse-Kits und exklusive Releases.",
   "fields": {
     "name": "Vollständiger Name",
     "email": "E-Mail-Adresse",

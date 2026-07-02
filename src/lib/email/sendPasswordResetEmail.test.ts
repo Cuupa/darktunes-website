@@ -64,7 +64,7 @@ describe('sendPasswordResetEmail', () => {
 
     expect(body.to).toEqual(['user@example.com'])
     expect(body.subject).toBe(PASSWORD_RESET_EMAIL_SUBJECT)
-    expect(body.from).toContain('darkTunes Music Group')
+    expect(body.from).toContain(SITE_SETTINGS_DEFAULTS.labelName)
     expect(body.html).toContain('Reset password')
     expect(body.html).toContain('type=recovery&amp;code=abc123&amp;token=xyz')
     expect(body.html).not.toMatch(/href="[^"]*&code=/)

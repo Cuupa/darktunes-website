@@ -5,7 +5,7 @@
     "contact": "Kontakt"
   },
   "heroBadge": "Presse & Medien",
-  "heroDescription": "Redaktionelle Anfragen, Interviews, Rezensionsexemplare und hochauflösende Materialien für den darkTunes Roster.",
+  "heroDescription": "Redaktionelle Anfragen, Interviews, Rezensionsexemplare und hochauflösende Materialien für den {labelShortName} Roster.",
   "rosterSearch": "Künstler suchen…",
   "rosterSort": {
     "label": "Sortieren nach",

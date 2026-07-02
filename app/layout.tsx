@@ -103,7 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </NavHidingWrapper>
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>
+          <Providers brand={resolveBrandFromSettings(settings ?? SITE_SETTINGS_DEFAULTS)}>
             <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
             {children}
             <NavHidingWrapper><SiteFooter /></NavHidingWrapper>

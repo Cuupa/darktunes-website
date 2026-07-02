@@ -52,6 +52,21 @@ const scopedPaths = strict
       'app/portal/epk-builder',
       'app/portal/fan-page',
       'app/portal/accept-invite',
+      'app/portal/_components',
+      'app/_components/Providers.tsx',
+      'app/_components/SiteHeader.tsx',
+      'app/login/_components/CentralLoginForm.tsx',
+      'src/components/Header.tsx',
+      'src/components/Footer.tsx',
+      'src/components/brand',
+      'src/components/PWAInstallPrompt.tsx',
+      'src/components/admin/AdminSidebarNav.tsx',
+      'src/components/admin/AdminDashboard.tsx',
+      'src/components/portal/PortalMailbox.tsx',
+      'src/i18n/messages',
+      'src/i18n/resolveBrandPlaceholders.ts',
+      'src/i18n/request.ts',
+      'src/lib/brand/i18nValues.ts',
     ]
 
 /** Paths that may reference legacy darktunes_* identifiers during migration. */

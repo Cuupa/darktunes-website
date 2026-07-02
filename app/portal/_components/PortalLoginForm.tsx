@@ -138,7 +138,7 @@ export function PortalLoginForm() {
               <Input
                 id="email"
                 type="email"
-                placeholder="artist@darktunes.com"
+                placeholder={t('login_email_placeholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

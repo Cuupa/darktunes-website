@@ -15,6 +15,7 @@ export async function SiteHeader() {
   return (
     <Header
       logoUrl={settings?.logoUrl}
+      labelName={settings?.labelName}
       sectionOrder={settings?.homepageSectionOrder}
       showAbout={settings?.showAboutInHeader ?? true}
       aboutNavLabel={settings?.aboutNavLabel || undefined}
