@@ -33,6 +33,10 @@ const PERSIST_FALLBACK = {
   persistSaving: 'Saving…',
   persistSuccess: 'Analytics saved: {metrics} metrics for {artists} artists{extras}',
   persistFailed: 'Failed to persist analytics',
+  persistEventImpactNote: ' · {count} event-impact rows',
+  persistMerchNote: ' · {count} merch orders',
+  persistEventImpactWarning: 'Event impact partially failed',
+  persistPromoImpactWarning: 'Promo impact partially failed',
 } as const
 
 export function SosAnalyticsPersistPanel({
@@ -68,11 +72,11 @@ export function SosAnalyticsPersistPanel({
       if (result.success) {
         const impactNote =
           result.eventImpactRows != null && result.eventImpactRows > 0
-            ? ` · ${result.eventImpactRows} event-impact rows`
+            ? interpolate(t.persistEventImpactNote, { count: result.eventImpactRows })
             : ''
         const merchNote =
           result.merchOrdersUpserted != null && result.merchOrdersUpserted > 0
-            ? ` · ${result.merchOrdersUpserted} merch orders`
+            ? interpolate(t.persistMerchNote, { count: result.merchOrdersUpserted })
             : ''
         toast.success(
           interpolate(t.persistSuccess, {
@@ -82,12 +86,12 @@ export function SosAnalyticsPersistPanel({
           }),
         )
         if (result.eventImpactWarnings?.length) {
-          toast.warning('Event impact partially failed', {
+          toast.warning(t.persistEventImpactWarning, {
             description: result.eventImpactWarnings.join('; '),
           })
         }
         if (result.promoImpactWarnings?.length) {
-          toast.warning('Promo impact partially failed', {
+          toast.warning(t.persistPromoImpactWarning, {
             description: result.promoImpactWarnings.join('; '),
           })
         }

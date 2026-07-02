@@ -33,6 +33,7 @@ const BRONZE_FALLBACK = {
   bronzeDelete: 'Delete',
   bronzeDeleteConfirm: 'Delete this bronze archive (raw CSV in R2) permanently?',
   bronzeLoadError: 'Failed to load import batches',
+  bronzeLoadUnavailable: 'Load is not available in this context',
   bronzeLoadSuccess: 'Loaded {distributor} archive into workspace',
   bronzeDeleteError: 'Delete failed',
   bronzeDeleteSuccess: 'Bronze archive deleted',
@@ -68,13 +69,13 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
 
   const handleLoad = async (batch: DistributorImportBatch) => {
     if (!onLoadBatch) {
-      toast.info('Load not available in this context')
+      toast.info(t.bronzeLoadUnavailable)
       return
     }
     try {
       await onLoadBatch(batch)
       const dist = batch.distributor
-      toast.success(t.bronzeLoadSuccess.replace('{distributor}', dist))
+      toast.success(interpolate(t.bronzeLoadSuccess, { distributor: dist }))
     } catch {
       // error already reported by load implementation
     }
@@ -240,7 +241,7 @@ export function ImportBatchesPanel({ labelArtists, onLoadBatch }: ImportBatchesP
       title={t.bronzeDelete}
       description={t.bronzeDeleteConfirm}
       confirmLabel={t.bronzeDelete}
-      cancelLabel="Cancel"
+      cancelLabel={t.presetDeleteCancel}
       destructive
       loading={isPending}
       onConfirm={confirmDelete}

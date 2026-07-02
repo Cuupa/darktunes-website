@@ -14,6 +14,7 @@ import { upsertSosPeriodSummary, type UpsertSosPeriodSummaryInput } from '@/lib/
 import { upsertMerchOrders } from '@/lib/api/merchOrders'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
+import { writeAppLog } from '@/lib/appLog'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -58,6 +59,12 @@ export async function persistSosAnalyticsCore(
 ): Promise<PersistSosAnalyticsResult> {
   try {
     if (input.territoryMetrics.length === 0) {
+      await writeAppLog({
+        source: 'persistSosAnalyticsCore',
+        level: 'warn',
+        message: 'No territory metrics to persist',
+        details: { periodStart: input.periodStart, periodEnd: input.periodEnd },
+      })
       return { success: false, error: 'No territory metrics to persist' }
     }
 
@@ -88,6 +95,16 @@ export async function persistSosAnalyticsCore(
     }
 
     if (upsertRows.length === 0) {
+      await writeAppLog({
+        source: 'persistSosAnalyticsCore',
+        level: 'warn',
+        message: 'No metrics matched portal-linked artists',
+        details: {
+          periodStart: input.periodStart,
+          periodEnd: input.periodEnd,
+          metricRows: input.territoryMetrics.length,
+        },
+      })
       return {
         success: false,
         error: 'No metrics matched portal-linked artists. Link artists in the Rules roster first.',
@@ -122,6 +139,12 @@ export async function persistSosAnalyticsCore(
         const message = err instanceof Error ? err.message : 'Unknown event impact error'
         eventImpactWarnings.push(message)
         console.error('[persistSosAnalyticsCore] event impact failed:', err)
+        await writeAppLog({
+          source: 'persistSosAnalyticsCore',
+          level: 'warn',
+          message: 'Event impact computation failed',
+          details: { artistId, error: message },
+        })
       }
       try {
         promoImpactRows += await computePromoImpactForArtist(serviceSupabase, artistId)
@@ -129,6 +152,12 @@ export async function persistSosAnalyticsCore(
         const message = err instanceof Error ? err.message : 'Unknown promo impact error'
         promoImpactWarnings.push(message)
         console.error('[persistSosAnalyticsCore] promo impact failed:', err)
+        await writeAppLog({
+          source: 'persistSosAnalyticsCore',
+          level: 'warn',
+          message: 'Promo impact computation failed',
+          details: { artistId, error: message },
+        })
       }
     }
 
@@ -176,10 +205,21 @@ export async function persistSosAnalyticsCore(
       merchOrdersUpserted: merchOrdersUpserted > 0 ? merchOrdersUpserted : undefined,
     }
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[persistSosAnalyticsCore] Error:', err)
+    await writeAppLog({
+      source: 'persistSosAnalyticsCore',
+      level: 'error',
+      message: 'SOS analytics persistence failed',
+      details: {
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        error: message,
+      },
+    })
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
+      error: message,
     }
   }
 }

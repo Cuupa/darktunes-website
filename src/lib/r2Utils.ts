@@ -182,3 +182,30 @@ export async function downloadObjectBufferFromR2(
 
   return response.Body.transformToByteArray()
 }
+
+/**
+ * Computes SHA-256 hex digest of an R2 object by streaming chunks (safe for large bronze CSVs).
+ */
+export async function sha256HexFromR2Object(
+  r2Key: string,
+  s3: S3Client,
+  bucket: string,
+): Promise<string> {
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: r2Key,
+    }),
+  )
+
+  if (!response.Body) {
+    throw new Error(`R2 object body empty: ${r2Key}`)
+  }
+
+  const hash = createHash('sha256')
+  const stream = response.Body as AsyncIterable<Uint8Array>
+  for await (const chunk of stream) {
+    hash.update(chunk)
+  }
+  return hash.digest('hex')
+}

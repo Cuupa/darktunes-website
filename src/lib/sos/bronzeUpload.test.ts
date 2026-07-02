@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { extractPeriodBounds, uploadBronzeDistributorCsv } from './bronzeUpload'
 
+vi.mock('@/lib/sos/clientAppLog', () => ({
+  logClientAppEvent: vi.fn(async () => undefined),
+}))
+
 describe('extractPeriodBounds', () => {
   it('returns min and max valid YYYY-MM months', () => {
     expect(extractPeriodBounds(['2024-03', '2024-01', 'invalid', '2024-06'])).toEqual({
@@ -24,10 +28,12 @@ describe('uploadBronzeDistributorCsv', () => {
   beforeEach(() => {
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'false')
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('abandons the batch when server upload fails', async () => {
@@ -95,11 +101,15 @@ describe('uploadBronzeDistributorCsv', () => {
 
   it('uses chunked multipart upload when CSV exceeds the server proxy limit', async () => {
     vi.resetModules()
-    vi.doMock('./bronzeUploadLimits', () => ({
-      MAX_BRONZE_CSV_SERVER_BYTES: 4,
-      MAX_BRONZE_CSV_BYTES: 200,
-      BRONZE_UPLOAD_CHUNK_BYTES: 3,
-    }))
+    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
+      return {
+        ...actual,
+        MAX_BRONZE_CSV_SERVER_BYTES: 4,
+        MAX_BRONZE_CSV_BYTES: 200,
+        BRONZE_UPLOAD_CHUNK_BYTES: 3,
+      }
+    })
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
 
     fetchMock
@@ -173,5 +183,46 @@ describe('uploadBronzeDistributorCsv', () => {
       (call) => call[0] === '/api/admin/sos/import-batches/batch-3' && call[1]?.method === 'PATCH',
     )
     expect(failCall?.[1]?.body).toBe(JSON.stringify({ status: 'failed' }))
+  })
+
+  it('uses presigned direct upload when enabled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-direct' },
+          r2Key: 'sos-imports/batch-direct/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ uploadUrl: 'https://r2.example/presigned-put' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => '"etag-direct"' },
+      })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadBronzeDistributorCsv({
+      distributor: 'believe',
+      filename: 'direct.csv',
+      uploadBody: 'a,b\n1,2',
+      rowCount: 1,
+      periodStart: '2024-05',
+      periodEnd: '2024-05',
+    })
+
+    expect(result).toEqual({
+      batchId: 'batch-direct',
+      r2Key: 'sos-imports/batch-direct/file.csv',
+    })
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      '/api/admin/sos/import-batches/batch-direct/presign-upload',
+    )
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://r2.example/presigned-put')
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'PUT' })
   })
 })

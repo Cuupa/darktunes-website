@@ -15,6 +15,8 @@ import {
   mergeKvIntoSettings,
   readLegacyKvSettings,
 } from '@/lib/sos/migrateKvToDb'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
+import { logClientAppEvent } from '@/lib/sos/clientAppLog'
 
 const AUTO_SAVE_DEBOUNCE_MS = 2_000
 
@@ -64,6 +66,7 @@ export function useSosWorkspaceSync({
   const [isDefaultPresetReady, setIsDefaultPresetReady] = useState(false)
   const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false)
 
+  const t = useAccountingLabels()
   const lastSavedFingerprintRef = useRef<string | null>(null)
   const suppressAutoSaveRef = useRef(false)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -113,7 +116,7 @@ export function useSosWorkspaceSync({
 
         if (!res.ok) {
           const err = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(err?.error || 'Failed to save workspace')
+          throw new Error(err?.error || t.workspaceSaveError)
         }
 
         const json = (await res.json()) as WorkspaceApiResponse
@@ -125,14 +128,19 @@ export function useSosWorkspaceSync({
         )
         return true
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Save failed'
+        const msg = e instanceof Error ? e.message : t.workspaceSaveFailed
         toast.error(msg)
+        void logClientAppEvent('useSosWorkspaceSync', msg, 'error', {
+          action: 'saveWorkspace',
+          periodStart: periodKey.start,
+          periodEnd: periodKey.end,
+        })
         return false
       } finally {
         setIsWorkspaceSaving(false)
       }
     },
-    [bronzeBatchIds, markSynced],
+    [bronzeBatchIds, markSynced, t.workspaceSaveError, t.workspaceSaveFailed],
   )
 
   const saveDefaultPreset = useCallback(
@@ -147,7 +155,7 @@ export function useSosWorkspaceSync({
 
         if (!res.ok) {
           const err = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(err?.error || 'Failed to save default preset')
+          throw new Error(err?.error || t.workspaceDefaultSaveError)
         }
 
         const json = (await res.json()) as DefaultPresetApiResponse
@@ -157,14 +165,15 @@ export function useSosWorkspaceSync({
         )
         return true
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Save failed'
+        const msg = e instanceof Error ? e.message : t.workspaceSaveFailed
         toast.error(msg)
+        void logClientAppEvent('useSosWorkspaceSync', msg, 'error', { action: 'saveDefaultPreset' })
         return false
       } finally {
         setIsWorkspaceSaving(false)
       }
     },
-    [markDefaultSynced],
+    [markDefaultSynced, t.workspaceDefaultSaveError, t.workspaceSaveFailed],
   )
 
   const loadDefaultPreset = useCallback(async (): Promise<void> => {
@@ -184,7 +193,9 @@ export function useSosWorkspaceSync({
         )
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : t.workspaceLoadFailed
       console.warn('[useSosWorkspaceSync] default preset load failed', e)
+      void logClientAppEvent('useSosWorkspaceSync', msg, 'warn', { action: 'loadDefaultPreset' })
     } finally {
       setIsWorkspaceLoading(false)
       setIsDefaultPresetReady(true)
@@ -192,7 +203,7 @@ export function useSosWorkspaceSync({
         suppressAutoSaveRef.current = false
       }, 0)
     }
-  }, [applySettings, markDefaultSynced])
+  }, [applySettings, markDefaultSynced, t.workspaceLoadFailed])
 
   const loadPeriodWorkspace = useCallback(
     async (periodKey: PeriodKey): Promise<void> => {
@@ -226,7 +237,13 @@ export function useSosWorkspaceSync({
           clearSavedFingerprint()
         }
       } catch (e) {
+        const msg = e instanceof Error ? e.message : t.workspaceLoadFailed
         console.warn('[useSosWorkspaceSync] period load failed', e)
+        void logClientAppEvent('useSosWorkspaceSync', msg, 'warn', {
+          action: 'loadPeriodWorkspace',
+          periodStart: periodKey.start,
+          periodEnd: periodKey.end,
+        })
         clearSavedFingerprint()
       } finally {
         setIsWorkspaceLoading(false)
@@ -236,7 +253,7 @@ export function useSosWorkspaceSync({
         }, 0)
       }
     },
-    [applySettings, clearSavedFingerprint, markSynced],
+    [applySettings, clearSavedFingerprint, markSynced, t.workspaceLoadFailed],
   )
 
   const performLoadFromServer = useCallback(async (): Promise<void> => {
@@ -267,13 +284,13 @@ export function useSosWorkspaceSync({
   const saveCurrentWorkspace = useCallback(async (): Promise<boolean> => {
     if (!currentPeriodKey) {
       const ok = await saveDefaultPreset(settings)
-      if (ok) toast.success('Default accounting settings saved to server')
+      if (ok) toast.success(t.workspaceDefaultSaveSuccess)
       return ok
     }
     const ok = await saveWorkspace(settings, currentPeriodKey)
-    if (ok) toast.success('Accounting workspace saved to server')
+    if (ok) toast.success(t.workspaceSaveSuccess)
     return ok
-  }, [currentPeriodKey, settings, saveDefaultPreset, saveWorkspace])
+  }, [currentPeriodKey, settings, saveDefaultPreset, saveWorkspace, t.workspaceDefaultSaveSuccess, t.workspaceSaveSuccess])
 
   // One-time KV migration + default preset bootstrap.
   useEffect(() => {
