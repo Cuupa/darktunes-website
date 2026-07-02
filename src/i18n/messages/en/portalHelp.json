@@ -1,7 +1,12 @@
 {
   "heading": "Artist Portal Help",
   "intro": "Find step-by-step guides, feature explanations, and troubleshooting for every area of the {labelShortName} Artist Portal. Use search or browse by category to jump directly to the topic you need.",
-  "search_placeholder": "Search help topics, features, and glossary…",
+  "faq_heading": "Frequently asked questions",
+  "faq_intro": "Quick answers to common questions about the Artist Portal. Your label team can update these entries at any time.",
+  "faq_no_results": "No FAQ entries match your search.",
+  "faq_open_portal_page": "Open related portal page",
+  "palette_group_faq": "FAQ",
+  "search_placeholder": "Search FAQ, help topics, features, and glossary…",
   "search_no_results": "No matching help articles. Try different keywords or browse categories below.",
   "search_results_count": "{count} result(s) found",
   "search_clear": "Clear search",

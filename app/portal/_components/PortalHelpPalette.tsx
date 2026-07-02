@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -19,13 +19,16 @@ import {
   type HelpCategory,
   type HelpTopic,
 } from '@/lib/portal/helpManifest'
+import { searchHelpContent } from '@/lib/portal/useHelpSearch'
+import { searchPortalFaq } from '@/lib/portal/faqSearch'
+import { resolveFaqLocaleField } from '@/lib/portal/faqLocale'
+import type { PortalFaqTree } from '@/types'
 
 type PaletteTopicItem = {
   topic: HelpTopic
   category: HelpCategory
   sectionId?: string
 }
-import { searchHelpContent } from '@/lib/portal/useHelpSearch'
 
 export const PORTAL_OPEN_HELP_PALETTE_EVENT = 'portal-open-help-palette'
 
@@ -43,10 +46,23 @@ function buildHelpHref(
   return qs ? `${basePath}?${qs}` : basePath
 }
 
+function buildFaqHref(basePath: string, artistId: string | null, faqSlug: string): string {
+  const params = new URLSearchParams()
+  if (artistId) params.set('artistId', artistId)
+  params.set('faq', faqSlug)
+  const qs = params.toString()
+  return qs ? `${basePath}?${qs}` : basePath
+}
+
 const EDITOR_ROUTES_WITH_OWN_PALETTE = ['/portal/epk-builder', '/portal/fan-page']
 
-export function PortalHelpPalette() {
+interface PortalHelpPaletteProps {
+  faqTree: PortalFaqTree[]
+}
+
+export function PortalHelpPalette({ faqTree }: PortalHelpPaletteProps) {
   const t = useTranslations('portalHelp')
+  const locale = useLocale()
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -82,10 +98,21 @@ export function PortalHelpPalette() {
     [query, translate],
   )
 
+  const faqMatches = useMemo(
+    () => searchPortalFaq(faqTree, query, locale),
+    [faqTree, query, locale],
+  )
+
   const navigateToHelp = (topicId: string, sectionId?: string) => {
     setOpen(false)
     setQuery('')
     router.push(buildHelpHref('/portal/help', artistId, topicId, sectionId))
+  }
+
+  const navigateToFaq = (faqSlug: string) => {
+    setOpen(false)
+    setQuery('')
+    router.push(buildFaqHref('/portal/help', artistId, faqSlug))
   }
 
   const navigateToGlossary = (glossaryId: string) => {
@@ -118,6 +145,26 @@ export function PortalHelpPalette() {
     return items
   }, [query, searchResult.matches])
 
+  const paletteFaqItems = useMemo(() => {
+    if (!query.trim()) {
+      return faqTree.flatMap((group) =>
+        group.items.map((item) => ({
+          item,
+          categoryTitle: resolveFaqLocaleField(locale, group.category.titleEn, group.category.titleDe),
+        })),
+      )
+    }
+    const slugSet = new Set(faqMatches.map((m) => m.itemSlug))
+    return faqTree.flatMap((group) =>
+      group.items
+        .filter((item) => slugSet.has(item.slug))
+        .map((item) => ({
+          item,
+          categoryTitle: resolveFaqLocaleField(locale, group.category.titleEn, group.category.titleDe),
+        })),
+    )
+  }, [faqTree, faqMatches, locale, query])
+
   const showAllGlossary = !query.trim()
 
   return (
@@ -134,6 +181,27 @@ export function PortalHelpPalette() {
       />
       <CommandList>
         <CommandEmpty>{t('search_no_results')}</CommandEmpty>
+
+        {paletteFaqItems.length > 0 && (
+          <CommandGroup heading={t('palette_group_faq')}>
+            {paletteFaqItems.map(({ item, categoryTitle }) => {
+              const question = resolveFaqLocaleField(locale, item.questionEn, item.questionDe)
+              return (
+                <CommandItem
+                  key={item.id}
+                  value={`${categoryTitle} ${question}`}
+                  onSelect={() => navigateToFaq(item.slug)}
+                >
+                  <span className="flex flex-col gap-0.5">
+                    <span>{question}</span>
+                    <span className="text-xs text-muted-foreground">{categoryTitle}</span>
+                  </span>
+                  <CommandShortcut>FAQ</CommandShortcut>
+                </CommandItem>
+              )
+            })}
+          </CommandGroup>
+        )}
 
         <CommandGroup heading={t('palette_group_topics')}>
           {paletteTopics.map(({ topic, category, sectionId }) => {

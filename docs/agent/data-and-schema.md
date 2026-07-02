@@ -26,7 +26,7 @@ Hooks in `src/hooks/` wrap DAL; short-circuit when `isSupabaseConfigured` is fal
 
 ## ISR cache tags
 
-List-level: `artists`, `releases`, `news`, `videos`, `concerts`, `site-settings`, `artist-profiles`, `sync-logs`.
+List-level: `artists`, `releases`, `news`, `videos`, `concerts`, `site-settings`, `artist-profiles`, `sync-logs`, `portal-faq`.
 
 Entity-level (combine with list tag): `artist-${slug}`, `release-${id}`, `news-${slug}`.
 

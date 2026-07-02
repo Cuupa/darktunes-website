@@ -108,12 +108,13 @@ Artists pick release type, enter track count for multi-track types, and see only
 
 | Topic | Rule |
 |-------|------|
-| Structure | `src/lib/portal/helpManifest.ts` — categories, topics, section types, glossary IDs |
-| i18n | `portalHelp` namespace — `src/i18n/messages/{en,de}/portalHelp.json` (~330 keys) |
-| Page UI | `HelpPanel` — sticky search, nested accordions, glossary, `?topic=` / `?section=` deep links |
-| Global search | `PortalHelpPalette` in portal layout — **Ctrl+K** (Cmd+K); disabled on `/portal/epk-builder` and `/portal/fan-page` (those editors keep their own command palettes) |
-| Search hook | `src/lib/portal/useHelpSearch.ts` — shared filter for panel + palette |
-| Offline | `/portal/help` is offline-readable after first visit (`portalRoutes.ts`) |
+| **Admin FAQ (top block)** | `/admin/portal-faq` — `portal_faq_categories` + `portal_faq_items`; EN required, DE optional; TipTap HTML answers; ISR tag `portal-faq` |
+| Structure | `src/lib/portal/helpManifest.ts` — categories, topics, section types, glossary IDs (static help below FAQ) |
+| i18n | `portalHelp` namespace — UI chrome in `src/i18n/messages/{en,de}/portalHelp.json`; FAQ copy lives in DB |
+| Page UI | `PortalFaqSection` (DB) + `HelpPanel` — sticky search, nested accordions, glossary, `?faq=` / `?topic=` / `?section=` deep links |
+| Global search | `PortalHelpPalette` in portal layout — **Ctrl+K** (Cmd+K); FAQ group first; disabled on `/portal/epk-builder` and `/portal/fan-page` |
+| Search hook | `src/lib/portal/useHelpSearch.ts` + `src/lib/portal/faqSearch.ts` |
+| Offline | `/portal/help` is offline-readable after first visit (`portalRoutes.ts`; FAQ SSR-cached via `getCachedPortalFaq`) |
 
 ## EPK
 

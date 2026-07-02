@@ -10,7 +10,7 @@
  *
  * Body:
  *   {
- *     tags: Array<'artists' | 'releases' | 'news' | 'videos' | 'concerts'>,
+ *     tags: Array<'artists' | 'releases' | 'news' | 'videos' | 'concerts' | 'portal-faq'>,
  *     // Optional entity-specific tags for granular invalidation
  *     entityTags?: string[]   // e.g. ['artist-some-slug', 'release-uuid-here']
  *   }
@@ -28,7 +28,7 @@ import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-const CONTENT_TAGS = ['artists', 'releases', 'news', 'videos', 'concerts'] as const
+const CONTENT_TAGS = ['artists', 'releases', 'news', 'videos', 'concerts', 'portal-faq'] as const
 type ContentTag = (typeof CONTENT_TAGS)[number]
 
 const bodySchema = z.object({

@@ -151,6 +151,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "page_events: artist read own",
   "portal_attach: admin all",
   "portal_attach: via message sender",
+  "portal_faq_categories: editor+ write",
+  "portal_faq_categories: published read",
+  "portal_faq_items: editor+ write",
+  "portal_faq_items: published read",
   "portal_feature_flags: admin write",
   "portal_feature_flags: authenticated read",
   "portal_messages: admin all",
@@ -315,6 +319,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "news_posts",
   "page_events",
   "period_carry_forwards",
+  "portal_faq_categories",
+  "portal_faq_items",
   "portal_feature_flags",
   "portal_message_attachments",
   "portal_message_folders",
@@ -617,6 +623,14 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "period_carry_forwards": [
     "carry_forwards: admin all",
     "carry_forwards: artist read own",
+  ],
+  "portal_faq_categories": [
+    "portal_faq_categories: editor+ write",
+    "portal_faq_categories: published read",
+  ],
+  "portal_faq_items": [
+    "portal_faq_items: editor+ write",
+    "portal_faq_items: published read",
   ],
   "portal_feature_flags": [
     "portal_feature_flags: admin write",

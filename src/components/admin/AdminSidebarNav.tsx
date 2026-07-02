@@ -48,6 +48,7 @@ import {
   ChartLine,
   SlidersHorizontal,
   Globe,
+  Question,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -129,6 +130,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'SYSTEM',
     items: [
+      { label: 'Portal FAQ', href: '/admin/portal-faq', icon: Question, adminOnly: true },
       { label: 'Feature Flags', href: '/admin/features', icon: ToggleRight, adminOnly: true },
       { label: 'Colors',        href: '/admin/colors',   icon: Palette,     adminOnly: true },
       { label: 'Settings',      href: '/admin/settings', icon: Gear,        adminOnly: true },
