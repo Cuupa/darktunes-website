@@ -17,10 +17,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   if (!id) throw new ApiError(400, 'Missing interview request id')
   const { data: existing, error: existingError } = await supabase
     .from('interview_requests')
-    .select('id, artist_id')
+    .select('id')
     .eq('id', id)
+    .eq('artist_id', artist.id)
     .maybeSingle()
-  if (existingError || !existing || existing.artist_id !== artist.id) {
+  if (existingError || !existing) {
     throw new ApiError(404, 'Interview request not found')
   }
 
