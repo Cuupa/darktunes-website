@@ -459,6 +459,8 @@ export type HomepageSection = 'releases' | 'spotify' | 'videos' | 'concerts' | '
 
 export interface SiteSettings {
   labelName: string
+  /** Compact brand name for PWA, sidebars, and email From-prefix. Falls back to derived short name. */
+  labelShortName: string
   labelTagline: string
   contactEmail: string
   privacyPolicyUrl: string

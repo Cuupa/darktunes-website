@@ -1,0 +1,85 @@
+/**
+ * CI guard: no hardcoded tenant brand strings in brand foundation paths.
+ *
+ * Scope expands as migration PRs land. Run with --strict to scan app/ + src/.
+ */
+
+import fs from 'fs'
+import path from 'path'
+import { spawnSync } from 'child_process'
+
+const root = process.cwd()
+const pattern = String.raw`darktunes|darkTunes|DarkTunes`
+const strict = process.argv.includes('--strict')
+
+const scopedPaths = strict
+  ? ['app', 'src', 'supabase/reset.sql', 'supabase/functions', 'tests']
+  : [
+      'src/lib/brand',
+      'src/lib/api/siteSettings.ts',
+      'src/hooks/useSiteSettings.ts',
+      'supabase/reset.sql',
+      'tests/unit/lib/brand.test.ts',
+    ]
+
+/** Paths that may reference legacy darktunes_* identifiers during migration. */
+const lineAllowPatterns = [
+  /LEGACY_/,
+  /legacy/i,
+  /darktunes_\*/,
+  /Migration/,
+]
+
+function rel(filePath) {
+  return path.relative(root, filePath).replace(/\\/g, '/')
+}
+
+function isAllowedLine(line) {
+  return lineAllowPatterns.some((re) => re.test(line))
+}
+
+function scanFile(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8')
+  const violations = []
+  for (const [index, line] of content.split('\n').entries()) {
+    if (!new RegExp(pattern, 'i').test(line)) continue
+    if (isAllowedLine(line)) continue
+    violations.push({ file: rel(filePath), line: index + 1, text: line.trim() })
+  }
+  return violations
+}
+
+function collectFiles(target) {
+  const abs = path.join(root, target)
+  if (!fs.existsSync(abs)) return []
+  const stat = fs.statSync(abs)
+  if (stat.isFile()) return [abs]
+  const files = []
+  for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
+    const full = path.join(abs, entry.name)
+    if (entry.isDirectory()) files.push(...collectFiles(rel(full)))
+    else if (/\.(ts|tsx|js|mjs|sql)$/.test(entry.name)) files.push(full)
+  }
+  return files
+}
+
+const violations = []
+for (const target of scopedPaths) {
+  for (const file of collectFiles(target)) {
+    violations.push(...scanFile(file))
+  }
+}
+
+if (violations.length > 0) {
+  console.error(`\nBrand contract violations (${violations.length}):\n`)
+  for (const v of violations) {
+    console.error(`  ${v.file}:${v.line}: ${v.text}`)
+  }
+  console.error(`\nScoped paths: ${scopedPaths.join(', ')}`)
+  console.error('Use site_settings / getBrandContext() instead of hardcoded brand strings.\n')
+  process.exit(1)
+}
+
+console.log(
+  `Brand contract OK (${scopedPaths.length} scope${scopedPaths.length === 1 ? '' : 's'}, 0 violations)`,
+)

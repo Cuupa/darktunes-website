@@ -7,31 +7,41 @@ import type { ThemeConfig } from '@/config/themeConfig'
 import { sanitizeSiteSettingsWrite } from '@/lib/sanitizeTextContent'
 import { stripEmojis } from '@/lib/stripEmojis'
 import { DEFAULT_FEATURE_TOGGLES, parseFeatureTogglesJson } from '@/lib/featureToggles'
+import { deriveShortName } from '@/lib/brand/deriveShortName'
+import {
+  buildDefaultOgDescription,
+  buildDefaultSeoDescription,
+  readTenantBootstrap,
+} from '@/lib/brand/tenantDefaults'
 
 type DbClient = SupabaseClient<Database>
 
-/** Default values used when a key is missing from the database. */
-export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
-  labelName: 'darkTunes Music Group',
+function createSiteSettingsDefaults(): SiteSettings {
+  const tenant = readTenantBootstrap()
+  const labelName = tenant.labelName
+  const labelShortName = tenant.labelShortName || deriveShortName(labelName)
+
+  return {
+  labelName,
+  labelShortName,
   labelTagline: "We don't follow trends—we create them.",
-  contactEmail: 'info@darktunes.com',
+  contactEmail: tenant.contactEmail,
   privacyPolicyUrl: '/datenschutz',
   termsUrl: '/impressum',
-  instagramUrl: 'https://instagram.com/darktunes',
-  youtubeUrl: 'https://youtube.com/@darktunes',
-  spotifyUrl: 'https://open.spotify.com/user/darktunes',
+  instagramUrl: '',
+  youtubeUrl: '',
+  spotifyUrl: '',
   spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
   spotifyPlaylists: [],
   heroBadge: '⚡ New Release',
   heroNewsBadge: '📰 News',
   heroDescription:
     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
-  seoTitle: 'darkTunes Music Group',
-  seoDescription:
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
-  ogTitle: 'darkTunes Music Group',
-  ogDescription: 'Alternative music label — artists, releases, news, and videos.',
-  impressumCompanyName: 'darkTunes Music Group',
+  seoTitle: labelName,
+  seoDescription: buildDefaultSeoDescription(labelName),
+  ogTitle: labelName,
+  ogDescription: buildDefaultOgDescription(),
+  impressumCompanyName: labelName,
   impressumLegalForm: '',
   impressumRepresentative: '',
   impressumAddress: '',
@@ -39,7 +49,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   impressumRegisterCourt: '',
   impressumRegisterNumber: '',
   impressumPhone: '',
-  impressumEmail: 'info@darktunes.com',
+  impressumEmail: tenant.contactEmail,
   datenschutzContent: '',
   consentPlaceholderUrl: '',
   noiseOpacity: 0.04,
@@ -100,7 +110,11 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   themeGradientAccentFrom: '',
   themeGradientAccentTo: '',
   themeGradientAccentDir: '135deg',
+  }
 }
+
+/** Default values used when a key is missing from the database (tenant env + neutral fallbacks). */
+export const SITE_SETTINGS_DEFAULTS: SiteSettings = createSiteSettingsDefaults()
 
 /** Maps flat DB key-value rows into the typed SiteSettings domain object. */
 function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
@@ -145,8 +159,18 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     contactTopics = []
   }
 
+  const hasLabelName = map['label_name'] !== undefined
+  const labelName = map['label_name'] ?? SITE_SETTINGS_DEFAULTS.labelName
+  const explicitShortName = map['label_short_name']?.trim()
+  const labelShortName =
+    explicitShortName ||
+    (hasLabelName
+      ? deriveShortName(labelName)
+      : SITE_SETTINGS_DEFAULTS.labelShortName || deriveShortName(labelName))
+
   return {
-    labelName: map['label_name'] ?? SITE_SETTINGS_DEFAULTS.labelName,
+    labelName,
+    labelShortName,
     labelTagline: stripEmojis(map['label_tagline'] ?? SITE_SETTINGS_DEFAULTS.labelTagline),
     contactEmail: map['contact_email'] ?? SITE_SETTINGS_DEFAULTS.contactEmail,
     privacyPolicyUrl: map['privacy_policy_url'] ?? SITE_SETTINGS_DEFAULTS.privacyPolicyUrl,

@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import { PressLandingClient } from './_components/PressLandingClient'
 
 export const metadata: Metadata = {
@@ -26,13 +26,7 @@ export default async function PressPage() {
     }),
     getSiteSettings(supabase).catch((err: unknown) => {
       console.error('[press/page] Failed to fetch site settings:', err)
-      return {
-        labelName: 'darkTunes Music Group',
-        labelTagline: '',
-        contactEmail: 'info@darktunes.com',
-        impressumPhone: '',
-        impressumEmail: 'info@darktunes.com',
-      }
+      return SITE_SETTINGS_DEFAULTS
     }),
   ])
 

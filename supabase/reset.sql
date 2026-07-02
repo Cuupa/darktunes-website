@@ -1,5 +1,5 @@
 -- =============================================================================
--- darkTunes Music Group — Complete Idempotent Database Reset
+-- Music Label Platform — Complete Idempotent Database Reset
 -- =============================================================================
 -- This single script REPLACES all incremental migration files.
 -- It is FULLY IDEMPOTENT: safe to run on a fresh database AND on an existing
@@ -3859,21 +3859,22 @@ CREATE POLICY "accreditation_requests: admin all" ON public.accreditation_reques
 
 -- Default CMS site settings
 INSERT INTO public.site_settings (key, value) VALUES
-  ('label_name',           'darkTunes Music Group'),
+  ('label_name',           'Music Label'),
+  ('label_short_name',     ''),
   ('label_tagline',        'We don''t follow trends—we create them.'),
-  ('contact_email',        'info@darktunes.com'),
-  ('privacy_policy_url',   'https://darktunes.com/privacy'),
-  ('terms_url',            'https://darktunes.com/terms'),
-  ('instagram_url',        'https://instagram.com/darktunes'),
-  ('youtube_url',          'https://youtube.com/@darktunes'),
-  ('spotify_url',          'https://open.spotify.com/user/darktunes'),
+  ('contact_email',        'label@localhost'),
+  ('privacy_policy_url',   '/datenschutz'),
+  ('terms_url',            '/impressum'),
+  ('instagram_url',        ''),
+  ('youtube_url',          ''),
+  ('spotify_url',          ''),
   ('spotify_playlist_uri', '37i9dQZF1DWWqNV5cS50j6'),
   ('hero_badge',           '⚡ New Release'),
   ('hero_description',     'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.'),
-  ('seo_title',            'darkTunes Music Group'),
-  ('seo_description',      'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'),
-  ('og_title',             'darkTunes Music Group'),
-  ('og_description',       'Alternative music label — artists, releases, news, and videos.'),
+  ('seo_title',            'Music Label'),
+  ('seo_description',      'Official website for Music Label — discover artists, releases, news, and videos.'),
+  ('og_title',             'Music Label'),
+  ('og_description',       'Music label — artists, releases, news, and videos.'),
   -- Visual overlay defaults
   ('noise_opacity',         '0.04'),
   ('crt_scanlines_enabled', 'true'),

@@ -52,6 +52,7 @@ const HOMEPAGE_SECTION_LABELS: Record<HomepageSection, string> = {
 
 const schema = z.object({
   labelName: z.string().min(1, 'Label name is required'),
+  labelShortName: z.string().optional().default(''),
   labelTagline: z.string().min(1, 'Tagline is required'),
   contactEmail: z.string().email('Must be a valid email'),
   privacyPolicyUrl: z.string().min(1, 'Privacy policy URL or path is required'),
@@ -343,6 +344,12 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
             <CardContent className="space-y-4">
               <Field id="labelName" label="Label Name *" error={errors.labelName?.message}>
                 <Input id="labelName" {...register('labelName')} disabled={isSubmitting} />
+              </Field>
+              <Field id="labelShortName" label="Short Name (optional)" error={errors.labelShortName?.message}>
+                <Input id="labelShortName" {...register('labelShortName')} disabled={isSubmitting} />
+                <p className="text-xs text-muted-foreground">
+                  Sidebars, PWA, and compact UI. Empty derives from label name.
+                </p>
               </Field>
 
               <Field id="labelTagline" label="Label Tagline *" error={errors.labelTagline?.message}>

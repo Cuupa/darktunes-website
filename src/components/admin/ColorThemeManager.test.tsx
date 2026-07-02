@@ -71,6 +71,7 @@ vi.mock('@phosphor-icons/react', async (importOriginal) => {
 function makeSettings(overrides: Partial<SiteSettings> = {}): SiteSettings {
   return {
     labelName: 'Test Label',
+    labelShortName: 'Test',
     labelTagline: 'Tagline',
     contactEmail: 'a@b.com',
     privacyPolicyUrl: '/privacy',

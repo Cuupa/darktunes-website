@@ -4,6 +4,8 @@
 
 UI data originates from Supabase. After writes, invalidate ISR via the relevant revalidate endpoint. Client components reconcile with server responses after mutations.
 
+**Tenant brand:** `site_settings.label_name` + `label_short_name` (CMS). Code reads via `getBrandContext()` / `resolveBrandFromSettings()` in `src/lib/brand/`. Bootstrap when DB is empty: `TENANT_*` env vars → `SITE_SETTINGS_DEFAULTS` (neutral fallbacks only in TypeScript). No hardcoded tenant names in `app/` or `src/` — enforced by `npm run check:brand`.
+
 `unstable_cache` callbacks must use a **cookie-free** anon client — never `createServerSupabaseClient()` (calls `cookies()`). See `AGENTS.md`.
 
 ## Data access layer (`src/lib/api/`)
