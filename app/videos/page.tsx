@@ -7,15 +7,15 @@
 
 import type { Metadata } from 'next'
 import { getCachedPublicVideos, getCachedSiteSettings } from '@/lib/cache/publicQueries'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 import { VideosPageContent } from './_components/VideosPageContent'
 
 export const revalidate = 60
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getCachedSiteSettings().catch(() => null)
-  const labelName = settings?.labelName ?? 'darkTunes Music Group'
+  const { labelName } = await getMetadataBrand()
   return {
-    title: `Videos — ${labelName}`,
+    title: pageTitle('Videos', labelName),
     description: `Watch all music videos from ${labelName}`,
   }
 }

@@ -7,6 +7,7 @@ import { getSiteSettings } from '@/lib/api/siteSettings'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { AboutContent } from './_components/AboutContent'
+import { getMetadataBrand, pageTitlePipe } from '@/lib/seo/metadata'
 
 function createPublicSupabaseClient() {
   return createClient<Database>(
@@ -30,9 +31,12 @@ const getCachedAboutData = unstable_cache(
 )
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('about')
+  const [t, { labelName }] = await Promise.all([
+    getTranslations('about'),
+    getMetadataBrand(),
+  ])
   return {
-    title: `${t('heading')} | darkTunes Music Group`,
+    title: pageTitlePipe(t('heading'), labelName),
     description: t('subheading'),
   }
 }

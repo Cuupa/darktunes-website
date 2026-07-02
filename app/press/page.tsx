@@ -6,10 +6,14 @@ import { getPublicArtists } from '@/lib/api/artists'
 import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
 import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import { PressLandingClient } from './_components/PressLandingClient'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Press & Media — darkTunes Music Group',
-  description: 'Label press portal with artist press kits, media contacts, and exclusive press releases.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Press & Media', labelName),
+    description: 'Label press portal with artist press kits, media contacts, and exclusive press releases.',
+  }
 }
 
 export default async function PressPage() {

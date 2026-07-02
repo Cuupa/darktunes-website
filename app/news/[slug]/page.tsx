@@ -13,6 +13,8 @@ import { getPublicNewsPostBySlug } from '@/lib/api/news'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
+
 import { ShareButton } from '@/components/ShareButton'
 import { NewsBodyClient } from './_components/NewsBodyClient'
 
@@ -49,9 +51,10 @@ function makeGetNewsPost(slug: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const post = await makeGetNewsPost(slug)().catch(() => null)
+  const { labelName } = await getMetadataBrand()
   if (!post) return { title: 'Not Found' }
   return {
-    title: `${post.title} — darkTunes Music Group`,
+    title: pageTitle(post.title, labelName),
     description: post.excerpt,
   }
 }
@@ -68,9 +71,10 @@ export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params
   const locale = await getLocale()
 
-  const [post, tNewsPage] = await Promise.all([
+  const [post, tNewsPage, brand] = await Promise.all([
     makeGetNewsPost(slug)().catch(() => null),
     getTranslations('newsPage'),
+    getMetadataBrand(),
   ])
 
   if (!post) notFound()
@@ -79,7 +83,11 @@ export default async function NewsDetailPage({ params }: Props) {
     <div className="min-h-screen bg-background text-foreground">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildNewsArticleSchema({ post })) }}
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            buildNewsArticleSchema({ post, publisherName: brand.labelName }),
+          ),
+        }}
       />
       <div className="container mx-auto px-4 lg:px-8 pt-36 pb-24 max-w-3xl">
         <Link

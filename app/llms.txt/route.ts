@@ -25,7 +25,9 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicReleases } from '@/lib/api/releases'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
+import { buildDefaultSeoDescription } from '@/lib/brand/tenantDefaults'
+import { resolveSiteUrl } from '@/lib/brand'
 import type { Artist, Release, SiteSettings } from '@/types'
 
 // ISR: regenerate at most once every 5 minutes
@@ -48,11 +50,10 @@ function buildLlmsTxt(
   releases: Release[],
   baseUrl: string,
 ): string {
-  const labelName = settings?.labelName ?? 'darkTunes Music Group'
-  const tagline = settings?.labelTagline ?? 'Independent alternative music label'
+  const labelName = settings?.labelName ?? SITE_SETTINGS_DEFAULTS.labelName
+  const tagline = settings?.labelTagline ?? SITE_SETTINGS_DEFAULTS.labelTagline
   const seoDescription =
-    settings?.seoDescription ??
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
+    settings?.seoDescription ?? buildDefaultSeoDescription(labelName)
   const contactEmail = settings?.contactEmail ?? ''
 
   // Group releases by artist for compact representation
@@ -143,7 +144,7 @@ function buildLlmsTxt(
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function GET() {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+  const baseUrl = resolveSiteUrl()
   const db = createPublicClient()
 
   // Fetch all public data in parallel; gracefully degrade on errors

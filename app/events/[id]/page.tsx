@@ -11,6 +11,7 @@ import { getLocale } from 'next-intl/server'
 import { getCachedPublicConcerts } from '@/lib/cache/publicQueries'
 
 import { EventDetailContent } from './_components/EventDetailContent'
+import { entityTitle, getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 export const revalidate = 60
 
@@ -22,7 +23,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const concerts = await getCachedPublicConcerts()
   const concert = concerts.find((c) => c.id === id)
-  if (!concert) return { title: 'Event not found — darkTunes' }
+  const { labelName } = await getMetadataBrand()
+  if (!concert) return { title: pageTitle('Event not found', labelName) }
 
   const locale = await getLocale()
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
@@ -32,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     day: 'numeric',
   })
 
-  const title = `${concert.eventName} – ${concert.artistName} | darkTunes Music Group`
+  const title = entityTitle(concert.eventName, concert.artistName, labelName)
   const description = `${concert.artistName} live ${locale === 'de' ? 'am' : 'on'} ${formattedDate}${concert.venueCity ? ` in ${concert.venueCity}` : ''}`
 
   return {

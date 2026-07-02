@@ -11,10 +11,14 @@ import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatementsTable } from './_components/StatementsTable'
 import { getTranslations } from 'next-intl/server'
+import { getMetadataBrand, portalPageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Statements | darkTunes Portal',
-  description: 'Review royalty statements and create linked invoices.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: portalPageTitle('Statements', labelShortName),
+    description: 'Review royalty statements and create linked invoices.',
+  }
 }
 
 function StatementsSkeleton() {

@@ -10,12 +10,16 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { getCachedPublicReleases } from '@/lib/cache/publicQueries'
 import { ReleasesPageContent } from './_components/ReleasesPageContent'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 export const revalidate = 60
 
-export const metadata: Metadata = {
-  title: 'Releases — darkTunes Music Group',
-  description: 'Browse all releases from darkTunes Music Group artists.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Releases', labelName),
+    description: `Browse all releases from ${labelName} artists.`,
+  }
 }
 
 export default async function ReleasesPage() {

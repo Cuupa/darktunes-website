@@ -11,13 +11,15 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { getCachedPublicArtists } from '@/lib/cache/publicQueries'
 import { ArtistsGridContent } from './_components/ArtistsGridContent'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Artists — darkTunes Music Group',
-  openGraph: {
-    title: 'Artists — darkTunes Music Group',
-    type: 'website',
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  const title = pageTitle('Artists', labelName)
+  return {
+    title,
+    openGraph: { title, type: 'website' },
+  }
 }
 
 export default async function ArtistsPage() {

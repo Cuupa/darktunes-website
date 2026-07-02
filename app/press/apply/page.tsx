@@ -3,10 +3,14 @@ import { getTranslations } from 'next-intl/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { ApplyForm } from './_components/ApplyForm'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Apply for Press Access — darkTunes Music Group',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Apply for Press Access', labelName),
+    robots: { index: false, follow: false },
+  }
 }
 
 export default async function PressApplyPage() {

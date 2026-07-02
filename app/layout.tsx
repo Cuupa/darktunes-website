@@ -8,6 +8,9 @@ import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
 import { ThemeEffectsClient } from './_components/ThemeEffectsClient'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
+import { resolveBrandFromSettings } from '@/lib/brand'
+import { getMetadataBrand, rootMetadataFallbacks } from '@/lib/seo/metadata'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import type { Locale } from '@/i18n/types'
@@ -27,13 +30,15 @@ function getFaviconMimeType(url: string): string {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getCachedSiteSettings().catch(() => null)
-  const title = settings?.seoTitle ?? 'darkTunes Music Group'
-  const description =
-    settings?.seoDescription ??
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
-  const ogTitle = settings?.ogTitle ?? title
-  const ogDescription = settings?.ogDescription ?? description
+  const [settings, brand] = await Promise.all([
+    getCachedSiteSettings().catch(() => null),
+    getMetadataBrand(),
+  ])
+  const fallbacks = rootMetadataFallbacks(brand)
+  const title = settings?.seoTitle?.trim() || (fallbacks.title as string)
+  const description = settings?.seoDescription?.trim() || (fallbacks.description as string)
+  const ogTitle = settings?.ogTitle?.trim() || title
+  const ogDescription = settings?.ogDescription?.trim() || (fallbacks.openGraph?.description as string)
   const customFaviconUrl = settings?.faviconUrl || ''
 
   return {
@@ -79,6 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = (await getLocale()) as Locale
   const messages = await getMessages()
   const settings = await getCachedSiteSettings().catch(() => null)
+  const { labelShortName } = resolveBrandFromSettings(settings ?? SITE_SETTINGS_DEFAULTS)
 
   return (
     <html lang={locale} style={fontVariables} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
@@ -87,7 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="darkTunes" />
+        <meta name="apple-mobile-web-app-title" content={labelShortName} />
         <link rel="apple-touch-icon" href={settings?.faviconUrl || '/icons/icon-192.png'} />
         {/* Software platform identity — readable by crawlers and Wappalyzer */}
         <meta name="generator" content="Neuroklast & Seifried.dev" />

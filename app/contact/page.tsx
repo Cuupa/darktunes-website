@@ -8,13 +8,15 @@ import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr'
 import { getTranslations } from 'next-intl/server'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { ContactForm } from './_components/ContactForm'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Contact — darkTunes Music Group',
-  description: 'Get in touch with darkTunes Music Group.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Contact', labelName),
+    description: `Get in touch with ${labelName}.`,
+  }
 }
-
-const SUBMITHUB_URL_FALLBACK = 'https://www.submithub.com/playlister/darktunes-music-group'
 
 export default async function ContactPage() {
   const [tPages, tContact, settings] = await Promise.all([
@@ -22,7 +24,7 @@ export default async function ContactPage() {
     getTranslations('contact'),
     getCachedSiteSettings().catch(() => null),
   ])
-  const submitHubUrl = settings?.submitHubUrl || SUBMITHUB_URL_FALLBACK
+  const submitHubUrl = settings?.submitHubUrl || ''
   const submitHubHeading = settings?.submitHubSectionHeading || tContact('submitMusicHeading')
   const submitHubDescription = settings?.submitHubDescription || tContact('submitMusicDescription')
   const submitHubButtonLabel = settings?.submitHubLabel || tContact('submitMusicButton')

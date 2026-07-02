@@ -18,6 +18,7 @@ import type { Database } from '@/types/database'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { getPublicReleases } from '@/lib/api/releases'
+import { resolveSiteUrl } from '@/lib/brand'
 
 export const revalidate = 3600 // 1 hour ISR
 
@@ -29,7 +30,7 @@ function createPublicSupabaseClient() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+  const baseUrl = resolveSiteUrl()
   const db = createPublicSupabaseClient()
   const now = new Date()
 

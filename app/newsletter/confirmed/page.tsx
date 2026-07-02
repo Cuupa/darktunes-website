@@ -11,10 +11,14 @@ import Link from 'next/link'
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr'
 import { getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
+import { getMetadataBrand, pageTitlePipe } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Newsletter | darkTunes',
-  robots: 'noindex, nofollow',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: pageTitlePipe('Newsletter', labelShortName),
+    robots: 'noindex, nofollow',
+  }
 }
 
 interface PageProps {

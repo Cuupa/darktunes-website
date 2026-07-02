@@ -7,10 +7,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { PressNav } from './_components/PressNav'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Press Dashboard — darkTunes Music Group',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Press Dashboard', labelName),
+    robots: { index: false, follow: false },
+  }
 }
 
 export default async function PressDashboardLayout({ children }: { children: ReactNode }) {

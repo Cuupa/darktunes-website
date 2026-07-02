@@ -37,11 +37,14 @@ import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-
-export const metadata: Metadata = {
-  title: 'Artist Portal — darkTunes Music Group',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Artist Portal', labelName),
+    robots: { index: false, follow: false },
+  }
 }
 
 function PortalLayoutSkeleton() {

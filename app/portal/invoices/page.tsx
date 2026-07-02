@@ -11,10 +11,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getTranslations } from 'next-intl/server'
 import { InvoicesClient } from './_components/InvoicesClient'
+import { getMetadataBrand, portalPageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Invoices | darkTunes Portal',
-  description: 'Create and manage invoices, including SOS-linked invoices.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: portalPageTitle('Invoices', labelShortName),
+    description: 'Create and manage invoices, including SOS-linked invoices.',
+  }
 }
 
 function InvoicesSkeleton() {
