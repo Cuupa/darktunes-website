@@ -6,8 +6,6 @@
 
 import fs from 'fs'
 import path from 'path'
-import { spawnSync } from 'child_process'
-
 const root = process.cwd()
 const pattern = String.raw`darktunes|darkTunes|DarkTunes`
 const strict = process.argv.includes('--strict')

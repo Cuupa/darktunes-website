@@ -30,7 +30,7 @@ test.describe('Shrinking Logo Header', () => {
     await page.waitForLoadState('domcontentloaded')
 
     // Measure the logo before any scroll.
-    const logo = page.locator('header img[alt="darkTunes Music Group"]')
+    const logo = page.locator('header img[alt$=" logo"]')
     await logo.waitFor({ state: 'visible' })
     const initialBox = await logo.boundingBox()
     expect(initialBox).not.toBeNull()
@@ -58,7 +58,7 @@ test.describe('Shrinking Logo Header', () => {
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
 
-    const logo = page.locator('header img[alt="darkTunes Music Group"]')
+    const logo = page.locator('header img[alt$=" logo"]')
     await logo.waitFor({ state: 'visible' })
     const initialBox = await logo.boundingBox()
     expect(initialBox).not.toBeNull()
