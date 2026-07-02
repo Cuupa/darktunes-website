@@ -17,6 +17,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     delete: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),

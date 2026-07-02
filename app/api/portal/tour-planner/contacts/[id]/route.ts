@@ -25,8 +25,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = contactId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
-  const { data, error } = await supabase.from('tour_contacts').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Contact not found')
+  const { data, error } = await supabase.from('tour_contacts').select('id').eq('id', id).eq('artist_id', artist.id).maybeSingle()
+  if (error || !data) throw new ApiError(404, 'Contact not found')
 
   const contact = await updateTourContact(supabase, id, {
     name: body.name,
@@ -44,8 +44,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = contactId(req.nextUrl.pathname)
 
-  const { data, error } = await supabase.from('tour_contacts').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Contact not found')
+  const { data, error } = await supabase.from('tour_contacts').select('id').eq('id', id).eq('artist_id', artist.id).maybeSingle()
+  if (error || !data) throw new ApiError(404, 'Contact not found')
 
   await deleteTourContact(supabase, id)
   return NextResponse.json({ ok: true })

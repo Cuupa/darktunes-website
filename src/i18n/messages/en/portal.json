@@ -271,8 +271,8 @@
   "tour_osm_loading": "Looking up…",
   "tour_osm_found": "Venue found on map",
   "tour_osm_not_found": "Venue not found — try a more specific address.",
-  "tour_planner_nav": "Tour Planner",
-  "tour_planner_heading": "Tour Planner",
+  "tour_planner_nav": "Tour Production",
+  "tour_planner_heading": "Tour Production",
   "tour_planner_subheading": "Professional tour production for {artist}",
   "tour_planner_intro": "Plan multi-stop tours with day sheets, finance, routing, and crew logistics. Your public events stay in Events — import them here when you need full production planning.",
   "tour_planner_disabled": "Tour Planner is currently disabled for your account.",
@@ -577,7 +577,6 @@
   "tour_planner_import_csv_heading": "Import stops from CSV",
   "tour_planner_import_csv_desc": "Upload a CSV with venue and hotel columns to bulk-add stops.",
   "tour_planner_import_none": "All portal events are already linked to stops on this tour.",
-
   "releases_heading": "Release Management",
   "releases_noReleases": "No releases found for your artist profile.",
   "releases_noData": "No releases linked to your artist profile yet.",
@@ -1275,7 +1274,6 @@
   "documents_file_too_large": "File exceeds the 20 MB limit.",
   "documents_invalid_type": "Only PDF and DOCX files are accepted.",
   "help": "Help",
-
   "nav_group_dashboard": "Dashboard",
   "nav_group_music": "Music",
   "nav_group_live": "Live & Promo",

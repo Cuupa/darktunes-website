@@ -4,7 +4,7 @@
   "brand_admin_dashboard": "Content Management System",
   "brand_editor_dashboard": "Editor Dashboard",
   "nav": {
-    "labelIntelligence": "Label Intelligence"
+    "labelIntelligence": "Analytics"
   },
   "tour_planner_page_title": "Tour Planner",
   "tour_planner_page_desc": "Read-only overview of artist tour production data.",
@@ -33,7 +33,7 @@
   "tour_planner_show_status_deposit_paid": "Deposit paid",
   "tour_planner_show_status_cancelled": "Cancelled",
   "labelIntelligence": {
-    "pageTitle": "Label Intelligence",
+    "pageTitle": "Analytics",
     "pageDescription": "Persisted label-wide revenue trends, roster health, press engagement, and financial audit trail.",
     "emptyTrendsHint": "No saved period summaries yet.",
     "playbookTitle": "How to populate this hub",
@@ -140,7 +140,7 @@
     "playbookTitle": "Operator playbook",
     "playbookStep1": "Upload CSV files and approve statements in Settlement Center.",
     "playbookStep2": "Use Save to Portal in Settlement Center so artists see analytics with their statements.",
-    "playbookStep3": "Review saved trends and roster health in Label Intelligence.",
+    "playbookStep3": "Return to Analytics to review trends, roster health, and audit history.",
     "historyReadOnlyTitle": "Read-only history",
     "historyReadOnlyBody": "Approve statements, record payments, and manage invoices in Settlement Center — not here.",
     "historyManageInSettlement": "Manage in Settlement Center",
@@ -225,7 +225,7 @@
     },
     "historyTitle": "Statement History",
     "historyDescriptionReadOnly": "All uploaded statements with approval status. Approvals and payments happen in Settlement Center.",
-    "historyDescriptionEditable": "All uploaded statements with approval status. For the full settlement workflow, use Settlement Center in the SOS generator.",
+    "historyDescriptionEditable": "All uploaded statements with approval status. For the full settlement workflow, use Settlement Center in Accounting.",
     "historyLoadingAria": "Loading statements",
     "historyLoadError": "Could not load statements",
     "historyEmpty": "No statements uploaded yet.",

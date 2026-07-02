@@ -3,6 +3,7 @@ import type { Database } from '@/types/database'
 import type { NewsPost } from '@/types'
 import { parseJunctionRows } from '@/lib/types/jsonColumns'
 import { stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
+import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 import { sanitizeNewsWrite } from '@/lib/sanitizeTextContent'
 
 type DbClient = SupabaseClient<Database>
@@ -125,6 +126,7 @@ export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
     .in('status', ['published', 'scheduled'])
     .lte('published_at', now)
     .order('published_at', { ascending: false })
+    .limit(PUBLIC_QUERY_LIMITS.news)
   if (error) throw new Error(error.message)
   const posts = (data ?? []).map(rowToNewsPost)
   return attachNewsArtists(db, posts)
@@ -145,6 +147,7 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
     .in('status', ['published', 'scheduled'])
     .lte('published_at', now)
     .order('published_at', { ascending: false })
+    .limit(PUBLIC_QUERY_LIMITS.newsByArtist)
   if (error) throw new Error(error.message)
 
   const legacyPosts = (data ?? []).map(rowToNewsPost)
@@ -173,7 +176,9 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
       const merged = [
         ...legacyPosts,
         ...extra.map(rowToNewsPost),
-      ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      ]
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        .slice(0, PUBLIC_QUERY_LIMITS.newsByArtist)
       return attachNewsArtists(db, merged)
     }
   }
@@ -189,6 +194,7 @@ export async function getPressOnlyNewsPosts(db: DbClient): Promise<NewsPost[]> {
     .eq('is_press_only', true)
     .or(`embargo_until.is.null,embargo_until.lte.${now}`)
     .order('published_at', { ascending: false })
+    .limit(PUBLIC_QUERY_LIMITS.news)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToNewsPost)
 }

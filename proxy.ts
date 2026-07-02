@@ -262,7 +262,7 @@ export async function proxy(request: NextRequest) {
   if (!cookieLocale || (cookieLocale !== 'en' && cookieLocale !== 'de')) {
     const acceptLanguage = request.headers.get('accept-language') ?? ''
     const primary = acceptLanguage.split(',')[0]?.split(';')[0]?.trim().split('-')[0]?.toLowerCase()
-    const detectedLocale = primary === 'en' ? 'en' : 'de'
+    const detectedLocale = primary === 'en' ? 'en' : primary === 'de' ? 'de' : 'en'
     supabaseResponse.cookies.set('NEXT_LOCALE', detectedLocale, {
       path: '/',
       maxAge: 60 * 60 * 24 * 365, // 1 year
@@ -285,7 +285,7 @@ export const config = {
     '/admin/:path*',
     '/editor/:path*',
     '/portal/:path*',
-    '/press/:path*',
+    '/press/dashboard/:path*',
     '/promo-pool/:path*',
     '/account/:path*',
     '/login',

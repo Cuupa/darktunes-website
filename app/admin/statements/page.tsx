@@ -36,7 +36,7 @@ export default async function AdminStatementsPage() {
       </Alert>
 
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">{t('historyLoadingAria')}</div>}>
-        <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
+        <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" hideReadOnlyBanner />
       </Suspense>
     </AdminPageShell>
   )

@@ -96,7 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'News',     href: '/admin/news',     editorHref: getCmsTabPath('editor', 'news'),     icon: Newspaper,     adminOnly: false },
       { label: 'Videos',   href: '/admin/videos',   editorHref: getCmsTabPath('editor', 'videos'),   icon: FilmStrip,     adminOnly: false },
       { label: 'Events',   href: '/admin/events',   editorHref: getCmsTabPath('editor', 'events'),   icon: CalendarBlank, adminOnly: false },
-      { label: 'Tour Planner', href: '/admin/tour-planner', icon: MapTrifold, adminOnly: true },
+      { label: 'Tour Production', href: '/admin/tour-planner', icon: MapTrifold, adminOnly: true },
     ],
   },
   {
@@ -111,7 +111,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'PRESS',
     items: [
-      { label: 'Accreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
+      { label: 'Press Accreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
       { label: 'Press Portal',   href: '/admin/press',          icon: Briefcase,          adminOnly: true },
     ],
   },
@@ -123,7 +123,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
       { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true, badgeKey: 'messages' },
-      { label: 'Promo Log',   href: '/admin/promo-log',   editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
+      { label: 'Promotion Activity',   href: '/admin/promo-log',   editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
       { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
     ],
   },

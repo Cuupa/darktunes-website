@@ -13,7 +13,7 @@ const AccreditationsManager = lazy(() =>
 
 export default function AdminAccreditationsPage() {
   return (
-    <AdminPageShell title="Accreditations" description="Review and manage journalist accreditation requests.">
+    <AdminPageShell title="Press Accreditations" description="Review and manage journalist accreditation requests.">
       <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
         <AccreditationsManager />
       </Suspense>

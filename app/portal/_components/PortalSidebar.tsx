@@ -286,6 +286,25 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
     </div>
   ) : null
 
+  /** Shared nav body used by both the mobile Sheet and the desktop aside. */
+  const PortalNavShell = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <>
+      {artistBlock}
+      {renderNav(onNavigate)}
+      <Separator className="bg-border" />
+      <div className="p-4">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+          onClick={handleSignOut}
+        >
+          <SignOut size={18} aria-hidden="true" />
+          {t('signOut')}
+        </Button>
+      </div>
+    </>
+  )
+
   return (
     <>
       <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
@@ -303,19 +322,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
             <div className="flex h-full flex-col bg-card">
               <div className="px-6 py-4 font-bold tracking-widest text-primary">{labelShortName}</div>
               <Separator className="bg-border" />
-              {artistBlock}
-              {renderNav(() => setMobileOpen(false))}
-              <Separator className="bg-border" />
-              <div className="p-4">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-                  onClick={handleSignOut}
-                >
-                  <SignOut size={18} aria-hidden="true" />
-                  {t('signOut')}
-                </Button>
-              </div>
+              <PortalNavShell onNavigate={() => setMobileOpen(false)} />
             </div>
           </SheetContent>
         </Sheet>
@@ -328,19 +335,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
           <PortalNotificationBell artistId={activeArtist?.id ?? null} />
         </div>
         <Separator className="bg-border" />
-        {artistBlock}
-        {renderNav()}
-        <Separator className="bg-border" />
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-            onClick={handleSignOut}
-          >
-            <SignOut size={18} aria-hidden="true" />
-            {t('signOut')}
-          </Button>
-        </div>
+        <PortalNavShell />
       </aside>
     </>
   )

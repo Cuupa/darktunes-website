@@ -55,7 +55,7 @@ export const ACCOUNTING_FALLBACK = {
   playbookTitle: 'Operator playbook',
   playbookStep1: 'Upload CSV files and approve statements in Settlement Center.',
   playbookStep2: 'Use Save to Portal in Settlement Center so artists see analytics with their statements.',
-  playbookStep3: 'Review saved trends and roster health in Label Intelligence.',
+  playbookStep3: 'Review saved trends and roster health in Analytics.',
   subTabListLabel: 'Accounting workflow sections',
   rulesWorkspaceSynced: 'Rules synced to server workspace',
   rulesWorkspaceDirty: 'Unsaved rule changes — saving to server…',

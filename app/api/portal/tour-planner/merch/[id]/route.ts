@@ -31,8 +31,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = merchId(req.nextUrl.pathname)
   const body = patchSchema.parse(await req.json())
 
-  const { data, error } = await supabase.from('tour_merch_items').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Merch item not found')
+  const { data, error } = await supabase.from('tour_merch_items').select('id').eq('id', id).eq('artist_id', artist.id).maybeSingle()
+  if (error || !data) throw new ApiError(404, 'Merch item not found')
 
   const item = await updateTourMerchItem(supabase, id, {
     sku: body.sku,
@@ -50,8 +50,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
   const id = merchId(req.nextUrl.pathname)
 
-  const { data, error } = await supabase.from('tour_merch_items').select('artist_id').eq('id', id).single()
-  if (error || !data || data.artist_id !== artist.id) throw new ApiError(404, 'Merch item not found')
+  const { data, error } = await supabase.from('tour_merch_items').select('id').eq('id', id).eq('artist_id', artist.id).maybeSingle()
+  if (error || !data) throw new ApiError(404, 'Merch item not found')
 
   await deleteTourMerchItem(supabase, id)
   return NextResponse.json({ ok: true })

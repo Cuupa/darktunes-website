@@ -10,6 +10,7 @@ import {
   type CrossSourceReleaseRow,
   type ExternalReleaseSource,
 } from '@/lib/sync/deduplication'
+import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
 type ReleaseRow = Database['public']['Tables']['releases']['Row']
@@ -227,6 +228,7 @@ export async function getPublicReleases(db: DbClient): Promise<Release[]> {
     .eq('is_visible', true)
     .eq('is_promo', false)
     .order('release_date', { ascending: false })
+    .limit(PUBLIC_QUERY_LIMITS.releases)
 
   if (hiddenIds.length > 0) {
     // Keep releases with no artist OR whose artist is not hidden

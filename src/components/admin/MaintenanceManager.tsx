@@ -515,7 +515,7 @@ export function MaintenanceManager() {
             className="gap-2"
           >
             <Spinner active={loading === 'clear-sos-summaries'} />
-            Clear SOS Period Summaries
+            Clear Sales Statement Period Summaries
           </Button>
         </CardContent>
       </Card>
@@ -944,14 +944,14 @@ export function MaintenanceManager() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Clear SOS Period Summaries */}
+      {/* Clear Sales Statement Period Summaries */}
       <AlertDialog
         open={confirmDialog === 'clear-sos-summaries'}
         onOpenChange={(open) => !open && setConfirmDialog(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear SOS Period Summaries?</AlertDialogTitle>
+            <AlertDialogTitle>Clear Sales Statement Period Summaries?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete all rows from{' '}
               <code className="font-mono text-xs">sos_period_summaries</code>.
@@ -965,12 +965,12 @@ export function MaintenanceManager() {
                 void handleClearStats(
                   'sos_period_summaries',
                   'clear-sos-summaries',
-                  'SOS period summary',
+                  'sales statement period summary',
                 )
               }
               className="bg-destructive hover:bg-destructive/90"
             >
-              Delete All SOS Summaries
+              Delete All Sales Statement Period Summaries
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

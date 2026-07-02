@@ -22,6 +22,8 @@ export default getRequestConfig(async () => {
   const cookieLocale = cookieStore.get('NEXT_LOCALE')?.value
   let locale: Locale = routing.defaultLocale
 
+  const pathname = headerStore.get('x-pathname') ?? ''
+
   if (cookieLocale && (routing.locales as readonly string[]).includes(cookieLocale)) {
     locale = cookieLocale as Locale
   } else {
@@ -29,13 +31,13 @@ export default getRequestConfig(async () => {
     if (fromHeader) {
       locale = fromHeader
     } else {
-      const pathname = headerStore.get('x-pathname') ?? ''
       locale = pathname.startsWith('/portal') ? 'en' : routing.defaultLocale
     }
   }
 
-  const { loadMessages } = await import('./loadMessages')
-  const rawMessages = await loadMessages(locale)
+  const { loadMessages, resolveBundle } = await import('./loadMessages')
+  const bundle = resolveBundle(pathname)
+  const rawMessages = await loadMessages(locale, bundle)
   const settings =
     (await getCachedSiteSettings().catch(() => null)) ?? SITE_SETTINGS_DEFAULTS
   const brand = brandI18nValues(resolveBrandFromSettings(settings))
