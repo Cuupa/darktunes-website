@@ -53,7 +53,7 @@ const STATEMENTS_FALLBACK = {
   historyDescriptionReadOnly:
     'All uploaded statements with approval status. Approvals and payments happen in Settlement Center.',
   historyDescriptionEditable:
-    'All uploaded statements with approval status. For the full settlement workflow, use Settlement Center in the SOS generator.',
+    'All uploaded statements with approval status. For the full settlement workflow, use Settlement Center in Accounting.',
   historyLoadingAria: 'Loading statements',
   historyLoadError: 'Could not load statements',
   historyEmpty: 'No statements uploaded yet.',

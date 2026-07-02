@@ -17,31 +17,30 @@ import { cache } from 'react'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicReleases } from '@/lib/api/releases'
 import { getPublicNewsPosts } from '@/lib/api/news'
-import { runPublicContentMaintenance } from '@/lib/publicContentMaintenance'
 import { getPublicVideos } from '@/lib/api/videos'
 import { getPublicConcerts } from '@/lib/api/concerts'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getSiteSettings } from '@/lib/api/siteSettings'
 import type { Release, NewsPost, Video, Concert, Artist, SiteSettings } from '@/types'
 
-const TTL = 60 // seconds
+// Rely on on-demand revalidateTag() webhooks (/api/revalidate-content) rather than
+// short-lived TTLs. A 1-hour TTL caps staleness when webhooks miss; content
+// maintenance (scheduled publish, hero enforcement, emoji cleanup) now runs via
+// the Supabase Cron → Edge Function pipeline to keep the read path read-only.
+const TTL = 3600 // seconds
 
 /** All public releases, cache-keyed to the `releases` tag. */
 export const getCachedPublicReleases = cache(unstable_cache(
-  async (): Promise<Release[]> => {
-    await runPublicContentMaintenance()
-    return getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[])
-  },
+  async (): Promise<Release[]> =>
+    getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[]),
   ['public-releases'],
   { revalidate: TTL, tags: ['releases'] },
 ))
 
 /** All public news posts, cache-keyed to the `news` tag. */
 export const getCachedPublicNews = cache(unstable_cache(
-  async (): Promise<NewsPost[]> => {
-    await runPublicContentMaintenance()
-    return getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[])
-  },
+  async (): Promise<NewsPost[]> =>
+    getPublicNewsPosts(createPublicSupabaseClient()).catch(() => [] as NewsPost[]),
   ['public-news'],
   { revalidate: TTL, tags: ['news'] },
 ))

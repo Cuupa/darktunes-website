@@ -13,19 +13,19 @@
  *   → Returns { base: "EUR", rates: { "YYYY-MM": { USD: 1.08, … }, … } }
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const FRANKFURTER_BASE = 'https://api.frankfurter.app'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { searchParams } = new URL(request.url)
   const start = searchParams.get('start')
   const end = searchParams.get('end')
 
-  try {
-    if (start && end) {
+  if (start && end) {
       // Historical time-series: aggregate daily rates into monthly averages.
       // Frankfurter returns one rate per trading day; we group by YYYY-MM and
       // compute the mean of all daily rates within each calendar month.
@@ -42,12 +42,9 @@ export async function GET(request: Request): Promise<Response> {
         { next: { revalidate: 3600 } },
       )
 
-      if (!upstreamRes.ok) {
-        return NextResponse.json(
-          { error: `Frankfurter API error: ${upstreamRes.status}` },
-          { status: upstreamRes.status },
-        )
-      }
+    if (!upstreamRes.ok) {
+      throw new ApiError(502, `Frankfurter API error: ${upstreamRes.status}`)
+    }
 
       const data = await upstreamRes.json() as {
         base: string
@@ -85,29 +82,20 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ base: data.base, rates: monthly })
     }
 
-    // Current rates (no date range).
-    const upstreamRes = await fetch(`${FRANKFURTER_BASE}/latest?from=EUR`, {
-      next: { revalidate: 3600 },
-    })
+  // Current rates (no date range).
+  const upstreamRes = await fetch(`${FRANKFURTER_BASE}/latest?from=EUR`, {
+    next: { revalidate: 3600 },
+  })
 
-    if (!upstreamRes.ok) {
-      return NextResponse.json(
-        { error: `Frankfurter API error: ${upstreamRes.status}` },
-        { status: upstreamRes.status },
-      )
-    }
-
-    const data = await upstreamRes.json() as {
-      base: string
-      date: string
-      rates: Record<string, number>
-    }
-
-    return NextResponse.json({ base: data.base, rates: data.rates })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Exchange rate fetch failed' },
-      { status: 502 },
-    )
+  if (!upstreamRes.ok) {
+    throw new ApiError(502, `Frankfurter API error: ${upstreamRes.status}`)
   }
-}
+
+  const data = await upstreamRes.json() as {
+    base: string
+    date: string
+    rates: Record<string, number>
+  }
+
+  return NextResponse.json({ base: data.base, rates: data.rates })
+})

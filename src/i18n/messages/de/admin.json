@@ -4,7 +4,7 @@
   "brand_admin_dashboard": "Content-Management-System",
   "brand_editor_dashboard": "Editor-Dashboard",
   "nav": {
-    "labelIntelligence": "Label Intelligence"
+    "labelIntelligence": "Analytics"
   },
   "tour_planner_page_title": "Tourplaner",
   "tour_planner_page_desc": "Nur-Lese-Übersicht der Tour-Production-Daten der Künstler.",
@@ -33,13 +33,13 @@
   "tour_planner_show_status_deposit_paid": "Anzahlung bezahlt",
   "tour_planner_show_status_cancelled": "Abgesagt",
   "labelIntelligence": {
-    "pageTitle": "Label Intelligence",
+    "pageTitle": "Analytics",
     "pageDescription": "Persistierte Label-weite Umsatztrends, Roster-Gesundheit, Press-Engagement und Finanz-Audit-Trail.",
     "emptyTrendsHint": "Noch keine gespeicherten Perioden-Zusammenfassungen.",
     "playbookTitle": "So füllen Sie diesen Hub",
     "playbookStep1": "Distributor-CSVs in Accounting hochladen und Statements in der Abrechnungszentrale freigeben.",
     "playbookStep2": "In Accounting → Portal-Daten auf „Save to Portal“ klicken, um Territory-Metriken zu speichern.",
-    "playbookStep3": "Hier Trends, Roster-Gesundheit und Audit-Historie prüfen."
+    "playbookStep3": "Hier Trends, Roster-Gesundheit und Audit-Verlauf einsehen."
   },
   "accreditations": {
     "whatIsHeading": "Was sind Akkreditierungen?",
@@ -140,7 +140,7 @@
     "playbookTitle": "Operator-Playbook",
     "playbookStep1": "CSV-Dateien hochladen und Statements in der Abrechnungszentrale freigeben.",
     "playbookStep2": "In der Abrechnungszentrale „Auf Portal speichern“ nutzen, damit Künstler Analytics mit ihren Statements sehen.",
-    "playbookStep3": "Gespeicherte Trends und Roster-Gesundheit in Label Intelligence prüfen.",
+    "playbookStep3": "Gespeicherte Trends und Roster-Gesundheit in Analytics prüfen.",
     "historyReadOnlyTitle": "Nur-Lese-Historie",
     "historyReadOnlyBody": "Statements freigeben, Zahlungen erfassen und Rechnungen verwalten — in der Abrechnungszentrale, nicht hier.",
     "historyManageInSettlement": "In Abrechnungszentrale verwalten",
@@ -225,7 +225,7 @@
     },
     "historyTitle": "Statement-Historie",
     "historyDescriptionReadOnly": "Alle hochgeladenen Statements mit Freigabe-Status. Freigaben und Zahlungen erfolgen in der Abrechnungszentrale.",
-    "historyDescriptionEditable": "Alle hochgeladenen Statements mit Freigabe-Status. Für den vollständigen Abrechnungsworkflow nutzen Sie die Abrechnungszentrale im SOS-Generator.",
+    "historyDescriptionEditable": "Alle hochgeladenen Statements mit Freigabe-Status. Für den vollständigen Abrechnungsworkflow nutzen Sie die Abrechnungszentrale unter Accounting.",
     "historyLoadingAria": "Statements werden geladen",
     "historyLoadError": "Statements konnten nicht geladen werden",
     "historyEmpty": "Noch keine Statements hochgeladen.",

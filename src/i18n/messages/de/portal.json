@@ -271,8 +271,8 @@
   "tour_osm_loading": "Suche läuft…",
   "tour_osm_found": "Venue auf Karte gefunden",
   "tour_osm_not_found": "Venue nicht gefunden — bitte genauere Adresse eingeben.",
-  "tour_planner_nav": "Tourplaner",
-  "tour_planner_heading": "Tourplaner",
+  "tour_planner_nav": "Tourproduktion",
+  "tour_planner_heading": "Tourproduktion",
   "tour_planner_subheading": "Professionelle Tour-Planung für {artist}",
   "tour_planner_intro": "Plane Multi-Stop-Touren mit Day Sheets, Finance, Routing und Crew-Logistik. Öffentliche Events bleiben unter Events — importiere sie hier, wenn du volle Production-Planung brauchst.",
   "tour_planner_disabled": "Der Tourplaner ist für dein Konto derzeit deaktiviert.",
@@ -577,7 +577,6 @@
   "tour_planner_import_csv_heading": "Stops aus CSV importieren",
   "tour_planner_import_csv_desc": "CSV mit Venue- und Hotel-Spalten hochladen, um Stops in Bulk hinzuzufügen.",
   "tour_planner_import_none": "Alle Portal-Events sind bereits mit Stops auf dieser Tour verknüpft.",
-
   "releases_heading": "Release-Management",
   "releases_noReleases": "Keine Releases für dein Künstlerprofil gefunden.",
   "releases_noData": "Noch keine Releases mit deinem Künstlerprofil verknüpft.",
@@ -1275,7 +1274,6 @@
   "documents_file_too_large": "Datei überschreitet das 20-MB-Limit.",
   "documents_invalid_type": "Nur PDF- und DOCX-Dateien werden akzeptiert.",
   "help": "Hilfe",
-
   "nav_group_dashboard": "Dashboard",
   "nav_group_music": "Musik",
   "nav_group_live": "Live & Promotion",

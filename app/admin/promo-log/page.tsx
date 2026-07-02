@@ -51,7 +51,7 @@ export default function PromoLogPage({
 }) {
   return (
     <AdminPageShell
-      title="Promo Log"
+      title="Promotion Activity"
       description="Document label marketing work per artist and keep the portal timeline up to date."
     >
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
