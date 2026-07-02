@@ -25,6 +25,7 @@ import {
   Gear,
   Globe,
 } from '@phosphor-icons/react'
+import { useBrand } from '@/components/brand/BrandProvider'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -136,6 +137,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   const t = useTranslations('portal')
+  const { labelShortName } = useBrand()
 
   const pathname = usePathname()
   const router = useRouter()
@@ -287,7 +289,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   return (
     <>
       <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-        <div className="font-bold tracking-widest text-primary">darkTunes</div>
+        <div className="font-bold tracking-widest text-primary">{labelShortName}</div>
         <div className="flex items-center gap-2">
           <PortalNotificationBell artistId={activeArtist?.id ?? null} />
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -299,7 +301,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
           <SheetContent side="left" className="w-64 p-0">
             <SheetTitle className="sr-only">Portal Navigation</SheetTitle>
             <div className="flex h-full flex-col bg-card">
-              <div className="px-6 py-4 font-bold tracking-widest text-primary">darkTunes</div>
+              <div className="px-6 py-4 font-bold tracking-widest text-primary">{labelShortName}</div>
               <Separator className="bg-border" />
               {artistBlock}
               {renderNav(() => setMobileOpen(false))}
@@ -322,7 +324,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
 
       <aside className="portal-sidebar hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
         <div className="flex items-center justify-between p-6">
-          <span className="font-bold text-lg tracking-widest text-primary">darkTunes</span>
+          <span className="font-bold text-lg tracking-widest text-primary">{labelShortName}</span>
           <PortalNotificationBell artistId={activeArtist?.id ?? null} />
         </div>
         <Separator className="bg-border" />

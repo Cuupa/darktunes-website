@@ -10,6 +10,7 @@ import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
 import { verifyFanPagePreviewToken } from '@/lib/fan-page/previewToken'
 import { FanPagePublicView } from './_components/FanPagePublicView'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -77,11 +78,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   }
 
   const data = await makeGetFanPageData(slug)().catch(() => null)
-  if (!data) return { title: 'Fan Page — darkTunes' }
+  const { labelShortName } = await getMetadataBrand()
+  if (!data) return { title: pageTitle('Fan Page', labelShortName) }
 
   const title = data.page.seoTitle ?? `${data.page.artistName} — Fan Page`
   const description =
-    data.page.seoDescription ?? `Official fan page for ${data.page.artistName} on darkTunes.`
+    data.page.seoDescription ??
+    `Official fan page for ${data.page.artistName} on ${labelShortName}.`
 
   return { title, description }
 }

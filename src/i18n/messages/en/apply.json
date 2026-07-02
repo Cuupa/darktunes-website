@@ -1,6 +1,6 @@
 {
   "heading": "Apply for Press Access",
-  "subheading": "Request access to the darkTunes press dashboard — promo tracks, press kits, and exclusive releases.",
+  "subheading": "Request access to the {labelShortName} press dashboard — promo tracks, press kits, and exclusive releases.",
   "fields": {
     "name": "Full Name",
     "email": "Email Address",

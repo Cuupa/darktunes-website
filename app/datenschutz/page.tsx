@@ -11,7 +11,7 @@ import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
 import type { Database } from '@/types/database'
 import { DatenschutzContent } from './_components/DatenschutzContent'
@@ -177,49 +177,7 @@ This website uses web fonts for uniform font rendering. Depending on the theme c
 
 export default async function DatenschutzPage() {
   const [settings, locale] = await Promise.all([
-    getCachedSettings().catch(
-      (): SiteSettings => ({
-        labelName: 'darkTunes Music Group',
-        labelTagline: '',
-        contactEmail: 'info@darktunes.com',
-        privacyPolicyUrl: '/datenschutz',
-        termsUrl: '/impressum',
-        instagramUrl: '',
-        youtubeUrl: '',
-        spotifyUrl: '',
-        spotifyPlaylistUri: '',
-        spotifyPlaylists: [],
-        heroBadge: '',
-        heroNewsBadge: '📰 News',
-        heroDescription: '',
-        seoTitle: '',
-        seoDescription: '',
-        ogTitle: '',
-        ogDescription: '',
-        impressumCompanyName: 'darkTunes Music Group',
-        impressumLegalForm: '',
-        impressumRepresentative: '',
-        impressumAddress: '',
-        impressumVatId: '',
-        impressumRegisterCourt: '',
-        impressumRegisterNumber: '',
-        impressumPhone: '',
-        impressumEmail: 'info@darktunes.com',
-        datenschutzContent: '',
-        consentPlaceholderUrl: '',
-        noiseOpacity: 0.04,
-        crtScanlinesEnabled: true,
-        vignetteIntensity: 0.5,
-        shopifyStoreUrl: '',
-        youtubeChannelId: '',
-        carouselAutoplayMs: 0,
-        videosPerPage: 9,
-        videosLinkToPage: false,
-        concertsPerPage: 8,
-        concertsLinkToPage: false,
-        featureToggles: { promoPool: true, editorTools: true },
-      }),
-    ),
+    getCachedSettings().catch((): SiteSettings => SITE_SETTINGS_DEFAULTS),
     getLocale(),
   ])
   const [tDatenschutz, tPages] = await Promise.all([

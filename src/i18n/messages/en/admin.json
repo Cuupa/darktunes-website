@@ -1,4 +1,8 @@
 {
+  "brand_admin": "{labelShortName} Admin",
+  "brand_editor": "{labelShortName} Editor",
+  "brand_admin_dashboard": "Content Management System",
+  "brand_editor_dashboard": "Editor Dashboard",
   "nav": {
     "labelIntelligence": "Label Intelligence"
   },

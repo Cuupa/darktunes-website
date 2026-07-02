@@ -94,9 +94,10 @@ export function Footer({ siteSettings }: FooterProps) {
                     {t('contactLink')}
                   </Link>
                 </li>
+                {siteSettings.submitHubUrl ? (
                 <li>
                   <a
-                    href={siteSettings.submitHubUrl || 'https://www.submithub.com/playlister/darktunes-music-group'}
+                    href={siteSettings.submitHubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
@@ -104,6 +105,7 @@ export function Footer({ siteSettings }: FooterProps) {
                     {t('submitMusicLink')}
                   </a>
                 </li>
+                ) : null}
                 {siteSettings.shopifyStoreUrl && (
                   <li>
                     <a
@@ -129,7 +131,7 @@ export function Footer({ siteSettings }: FooterProps) {
                   href={siteSettings.instagramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="darkTunes on Instagram"
+                  aria-label={`${siteSettings.labelName} on Instagram`}
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
                   <InstagramLogo size={24} weight="fill" aria-hidden="true" />
@@ -140,7 +142,7 @@ export function Footer({ siteSettings }: FooterProps) {
                   href={siteSettings.youtubeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="darkTunes on YouTube"
+                  aria-label={`${siteSettings.labelName} on YouTube`}
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
                   <YoutubeLogo size={24} weight="fill" aria-hidden="true" />
@@ -151,7 +153,7 @@ export function Footer({ siteSettings }: FooterProps) {
                   href={siteSettings.spotifyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="darkTunes on Spotify"
+                  aria-label={`${siteSettings.labelName} on Spotify`}
                   className="p-3 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-all hover:scale-110"
                 >
                   <SpotifyLogo size={24} weight="fill" aria-hidden="true" />

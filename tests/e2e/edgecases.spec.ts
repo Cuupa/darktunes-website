@@ -212,7 +212,7 @@ test.describe('Slow Network — Graceful Degradation', () => {
 
   test('page title is correct', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle(/darkTunes|Dark Tunes/i)
+    await expect(page).toHaveTitle(/Music Label|darkTunes|Dark Tunes/i)
   })
 
   test('press page is accessible without authentication', async ({ page }) => {

@@ -5,7 +5,7 @@
     "contact": "Contact"
   },
   "heroBadge": "Press & Media",
-  "heroDescription": "Editorial requests, interviews, review copies, and high-resolution assets for the darkTunes roster.",
+  "heroDescription": "Editorial requests, interviews, review copies, and high-resolution assets for the {labelShortName} roster.",
   "rosterSearch": "Search artists…",
   "rosterSort": {
     "label": "Sort by",

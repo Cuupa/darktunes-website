@@ -19,10 +19,14 @@ import { hasPressDashboardAccess, resolveEffectiveAccess } from '@/lib/rbac'
 import { isPromoPoolEnabled } from '@/lib/pressAccess'
 import { getJournalistApplicationByUserId } from '@/lib/api/journalistApplications'
 import { PromoPoolAccessGate } from './_components/PromoPoolAccessGate'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Promo Pool — darkTunes Music Group',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Promo Pool', labelName),
+    robots: { index: false, follow: false },
+  }
 }
 
 export default async function PromoPoolLayout({ children }: { children: ReactNode }) {

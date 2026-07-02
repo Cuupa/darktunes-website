@@ -15,10 +15,15 @@ import { getVideosByArtistId } from '@/lib/api/videos'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FanPageBuilderClient } from './_components/FanPageBuilderClient'
+import type { Metadata } from 'next'
+import { getMetadataBrand, portalBuilderTitle } from '@/lib/seo/metadata'
 
-export const metadata = {
-  title: 'Fan Page Builder | darkTunes Artist Portal',
-  description: 'Build and publish your artist fan page',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: portalBuilderTitle('Fan Page Builder', labelShortName),
+    description: 'Build and publish your artist fan page',
+  }
 }
 
 function FanPageBuilderSkeleton() {

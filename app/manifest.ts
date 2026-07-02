@@ -1,4 +1,6 @@
 import type { MetadataRoute } from 'next'
+import { getMetadataBrand } from '@/lib/seo/metadata'
+import { buildDefaultSeoDescription } from '@/lib/brand/tenantDefaults'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 
 /**
@@ -14,7 +16,10 @@ import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
  * the installed PWA always shows the same logo as the browser tab.
  */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  const settings = await getCachedSiteSettings().catch(() => null)
+  const [settings, brand] = await Promise.all([
+    getCachedSiteSettings().catch(() => null),
+    getMetadataBrand(),
+  ])
   const customFaviconUrl = settings?.faviconUrl || ''
 
   // Determine the MIME type of the custom favicon
@@ -39,10 +44,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   ]
 
   return {
-    name: 'darkTunes Music Group',
-    short_name: 'darkTunes',
+    name: brand.labelName,
+    short_name: brand.labelShortName,
     description:
-      'Official website for darkTunes Music Group — discover artists, releases, news, and videos.',
+      settings?.seoDescription?.trim() ||
+      buildDefaultSeoDescription(brand.labelName),
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -59,13 +65,13 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         src: '/icons/screenshot-desktop.png',
         sizes: '1280x720',
         type: 'image/png',
-        label: 'darkTunes Music Group – desktop',
+        label: `${brand.labelName} – desktop`,
       },
       {
         src: '/icons/screenshot-mobile.png',
         sizes: '390x844',
         type: 'image/png',
-        label: 'darkTunes Music Group – mobile',
+        label: `${brand.labelName} – mobile`,
       },
     ],
   }

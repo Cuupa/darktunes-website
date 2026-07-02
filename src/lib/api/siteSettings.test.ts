@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { NEUTRAL_CONTACT_EMAIL, NEUTRAL_LABEL_NAME } from '@/lib/brand/tenantDefaults'
 import { getSiteSettings, upsertSiteSetting, upsertSiteSettings } from './siteSettings'
 
 type DbClient = SupabaseClient<Database>
@@ -57,6 +58,7 @@ describe('getSiteSettings', () => {
     const db = makeMockDb(mockRows)
     const result = await getSiteSettings(db)
     expect(result.labelName).toBe('Test Label')
+    expect(result.labelShortName).toBe('Test')
     expect(result.labelTagline).toBe('Test tagline.')
     expect(result.contactEmail).toBe('test@example.com')
     expect(result.instagramUrl).toBe('https://instagram.com/test')
@@ -69,21 +71,31 @@ describe('getSiteSettings', () => {
     expect(result.seoTitle).toBe('Test SEO Title')
   })
 
+  it('maps label_short_name from DB row', async () => {
+    const db = makeMockDb([
+      { key: 'label_name', value: 'Acme Music Group' },
+      { key: 'label_short_name', value: 'ACME' },
+    ])
+    const result = await getSiteSettings(db)
+    expect(result.labelShortName).toBe('ACME')
+  })
+
   it('returns defaults when rows are empty', async () => {
     const db = makeMockDb([])
     const result = await getSiteSettings(db)
-    expect(result.labelName).toBe('darkTunes Music Group')
+    expect(result.labelName).toBe(NEUTRAL_LABEL_NAME)
+    expect(result.labelShortName).toBe('Music')
     expect(result.spotifyPlaylistUri).toBe('37i9dQZF1DWWqNV5cS50j6')
     expect(result.spotifyPlaylists).toEqual([])
-    expect(result.instagramUrl).toBe('https://instagram.com/darktunes')
+    expect(result.instagramUrl).toBe('')
   })
 
   it('returns defaults for missing keys', async () => {
     const db = makeMockDb([{ key: 'label_name', value: 'Partial Label' }])
     const result = await getSiteSettings(db)
     expect(result.labelName).toBe('Partial Label')
-    expect(result.contactEmail).toBe('info@darktunes.com')
-    expect(result.youtubeUrl).toBe('https://youtube.com/@darktunes')
+    expect(result.contactEmail).toBe(NEUTRAL_CONTACT_EMAIL)
+    expect(result.youtubeUrl).toBe('')
     expect(result.spotifyPlaylists).toEqual([])
   })
 
@@ -120,7 +132,7 @@ describe('getSiteSettings', () => {
   it('returns empty string defaults for new legal fields when not in DB', async () => {
     const db = makeMockDb([])
     const result = await getSiteSettings(db)
-    expect(result.impressumCompanyName).toBe('darkTunes Music Group')
+    expect(result.impressumCompanyName).toBe(NEUTRAL_LABEL_NAME)
     expect(result.impressumLegalForm).toBe('')
     expect(result.impressumVatId).toBe('')
     expect(result.datenschutzContent).toBe('')

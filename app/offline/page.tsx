@@ -1,15 +1,21 @@
 import type { Metadata } from 'next'
 import { OfflineRetryButton } from './_components/OfflineRetryButton'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Offline – darkTunes Music Group',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Offline', labelName),
+  }
 }
 
 /**
  * Offline fallback page — served by the service worker when the network is
  * unavailable and the requested document is not in the precache.
  */
-export default function OfflinePage() {
+export default async function OfflinePage() {
+  const { labelName } = await getMetadataBrand()
+
   return (
     <main
       id="main-content"
@@ -28,7 +34,7 @@ export default function OfflinePage() {
       <div className="relative z-10 max-w-md space-y-6">
         {/* Logo wordmark */}
         <p className="text-xs font-mono uppercase tracking-[0.3em] text-muted-foreground">
-          darkTunes Music Group
+          {labelName}
         </p>
 
         {/* Signal icon */}

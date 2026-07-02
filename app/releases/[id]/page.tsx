@@ -29,6 +29,7 @@ import { getArtistById } from '@/lib/api/artists'
 
 import { ReleaseDetailContent } from './_components/ReleaseDetailContent'
 import { buildMusicAlbumSchema, serializeJsonLd } from '@/lib/seo/jsonld'
+import { entityTitle, getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -75,9 +76,10 @@ function makeGetArtist(artistId: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const release = await makeGetRelease(id)().catch(() => null)
-  if (!release) return { title: 'Release not found — darkTunes' }
+  const { labelName } = await getMetadataBrand()
+  if (!release) return { title: pageTitle('Release not found', labelName) }
   return {
-    title: `${release.title} — ${release.artistName} | darkTunes`,
+    title: entityTitle(release.title, release.artistName, labelName),
     description: `${release.type.toUpperCase()} by ${release.artistName}, released ${release.releaseDate}`,
     openGraph: {
       title: `${release.title} — ${release.artistName}`,

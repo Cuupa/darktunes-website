@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
@@ -103,6 +104,7 @@ type MailboxSelection =
   | null
 
 export function PortalMailbox({ artistId, artists, initialMessages = [], initialFolders = [] }: PortalMailboxProps) {
+  const t = useTranslations('portal')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { setUnreadCount } = useUnreadMessages()
 
@@ -554,7 +556,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground truncate">darkTunes Label</span>
+                          <span className="text-xs text-muted-foreground truncate">{t('messages_label_sender')}</span>
                           <span className="text-xs text-muted-foreground shrink-0 ml-1">{formatDate(msg.sentAt)}</span>
                         </div>
                         <p className="text-sm truncate">{msg.subject}</p>
@@ -612,7 +614,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
             <div className="p-4 border-b border-border">
               <h2 className="text-base font-semibold truncate">{selectedLabelMessage.subject}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                From darkTunes Label · {new Date(selectedLabelMessage.sentAt).toLocaleString()}
+                {t('messages_from_label')} · {new Date(selectedLabelMessage.sentAt).toLocaleString()}
               </p>
             </div>
             <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4" data-lenis-prevent>
@@ -837,7 +839,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                     <SelectValue placeholder="Select recipient…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__label__">Label (darkTunes)</SelectItem>
+                    <SelectItem value="__label__">{t('messages_compose_label_recipient')}</SelectItem>
                     {otherArtists.map((a) => (
                       <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                     ))}

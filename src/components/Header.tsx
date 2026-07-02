@@ -15,12 +15,14 @@ import type { HomepageSection } from '@/types'
 
 interface HeaderProps {
   logoUrl?: string
+  labelName?: string
   sectionOrder?: HomepageSection[]
   showAbout?: boolean
   aboutNavLabel?: string
 }
 
-export function Header({ logoUrl, sectionOrder, showAbout, aboutNavLabel }: HeaderProps) {
+export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLabel }: HeaderProps) {
+  const logoAlt = labelName?.trim() ? `${labelName} logo` : 'Label logo'
   const t = useTranslations('navigation')
   const locale = useLocale()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -70,7 +72,7 @@ export function Header({ logoUrl, sectionOrder, showAbout, aboutNavLabel }: Head
               <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
                 <Image
                   src={logoUrl || logoImage.src}
-                  alt="darkTunes Music Group"
+                  alt={logoAlt}
                   width={200}
                   height={80}
                   className="h-full w-auto"
@@ -85,7 +87,7 @@ export function Header({ logoUrl, sectionOrder, showAbout, aboutNavLabel }: Head
               <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
                 <Image
                   src={logoUrl || logoImage.src}
-                  alt="darkTunes Music Group"
+                  alt={logoAlt}
                   width={200}
                   height={80}
                   className="h-full w-auto"

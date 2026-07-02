@@ -2,88 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
-import { getSiteSettings, upsertSiteSettings } from '@/lib/api/siteSettings'
+import { getSiteSettings, SITE_SETTINGS_DEFAULTS, upsertSiteSettings } from '@/lib/api/siteSettings'
 import type { SiteSettings, ContactTopicConfig } from '@/types'
-
-const DEFAULT_SETTINGS: SiteSettings = {
-  labelName: 'darkTunes Music Group',
-  labelTagline: "We don't follow trends—we create them.",
-  contactEmail: 'info@darktunes.com',
-  privacyPolicyUrl: '/datenschutz',
-  termsUrl: '/impressum',
-  instagramUrl: 'https://instagram.com/darktunes',
-  youtubeUrl: 'https://youtube.com/@darktunes',
-  spotifyUrl: 'https://open.spotify.com/user/darktunes',
-  spotifyPlaylistUri: '37i9dQZF1DWWqNV5cS50j6',
-  spotifyPlaylists: [],
-  heroBadge: '⚡ New Release',
-  heroNewsBadge: '📰 News',
-  heroDescription:
-    'Experience the latest evolution in alternative music. A sonic journey that pushes boundaries and defies expectations.',
-  seoTitle: 'darkTunes Music Group',
-  seoDescription:
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.',
-  ogTitle: 'darkTunes Music Group',
-  ogDescription: 'Alternative music label — artists, releases, news, and videos.',
-  impressumCompanyName: 'darkTunes Music Group',
-  impressumLegalForm: '',
-  impressumRepresentative: '',
-  impressumAddress: '',
-  impressumVatId: '',
-  impressumRegisterCourt: '',
-  impressumRegisterNumber: '',
-  impressumPhone: '',
-  impressumEmail: 'info@darktunes.com',
-  datenschutzContent: '',
-  consentPlaceholderUrl: '',
-  noiseOpacity: 0.04,
-  crtScanlinesEnabled: true,
-  vignetteIntensity: 0.5,
-  shopifyStoreUrl: '',
-  submitHubUrl: '',
-  submitHubLabel: '',
-  submitHubDescription: '',
-  showAboutInHeader: true,
-  showAboutInFooter: true,
-  aboutNavLabel: 'About',
-  youtubeChannelId: '',
-  carouselAutoplayMs: 0,
-  videosPerPage: 9,
-  videosLinkToPage: false,
-  concertsPerPage: 8,
-  concertsLinkToPage: false,
-  featureToggles: { promoPool: true, editorTools: true },
-  logoUrl: '',
-  faviconUrl: '',
-  aboutHeadline: '',
-  aboutSubheading: '',
-  aboutBody: '',
-  homepageSectionOrder: DEFAULT_SECTION_ORDER,
-  heroDefaultPrimaryBtnLabel: '',
-  heroDefaultSecondaryBtnLabel: '',
-  homepageNewsCount: 3,
-  contactTopics: [],
-  customSocialLinks: [],
-  themePrimary: '',
-  themeSecondary: '',
-  themeBackground: '',
-  themeForeground: '',
-  themeCard: '',
-  themeMuted: '',
-  themeAccent: '',
-  themeBorder: '',
-  themeGradientHeroFrom: '',
-  themeGradientHeroTo: '',
-  themeGradientHeroDir: '135deg',
-  themeGradientAccentFrom: '',
-  themeGradientAccentTo: '',
-  themeGradientAccentDir: '135deg',
-}
 
 /** Maps a SiteSettings domain object back to DB key-value pairs. */
 function settingsToRecord(s: SiteSettings): Record<string, string> {
   return {
     label_name: s.labelName,
+    label_short_name: s.labelShortName ?? '',
     label_tagline: s.labelTagline,
     contact_email: s.contactEmail,
     privacy_policy_url: s.privacyPolicyUrl,
@@ -160,7 +86,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
 }
 
 export function useSiteSettings() {
-  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<SiteSettings>(SITE_SETTINGS_DEFAULTS)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])

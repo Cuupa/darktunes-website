@@ -7,10 +7,14 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { getCachedPublicNews } from '@/lib/cache/publicQueries'
 import { NewsList } from './_components/NewsList'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'News — darkTunes Music Group',
-  description: 'Latest news and updates from darkTunes Music Group.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('News', labelName),
+    description: `Latest news and updates from ${labelName}.`,
+  }
 }
 
 export default async function NewsPage() {

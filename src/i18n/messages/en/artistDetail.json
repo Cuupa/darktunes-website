@@ -20,5 +20,5 @@
   "shareSuccess": "Shared!",
   "shareLinkCopied": "Link copied!",
   "shareError": "Could not share",
-  "relatedArtists": "More from darkTunes"
+  "relatedArtists": "More from {labelShortName}"
 }

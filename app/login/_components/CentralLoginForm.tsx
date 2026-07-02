@@ -344,7 +344,7 @@ export function CentralLoginForm() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="artist@darktunes.com"
+                  placeholder={t('login_email_placeholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -389,7 +389,7 @@ export function CentralLoginForm() {
                 <Input
                   id="forgot-email"
                   type="email"
-                  placeholder="artist@darktunes.com"
+                  placeholder={t('login_email_placeholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

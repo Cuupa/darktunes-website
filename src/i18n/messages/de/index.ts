@@ -28,6 +28,7 @@ import pressLogin from './pressLogin.json'
 import pressProfile from './pressProfile.json'
 import pressReleases from './pressReleases.json'
 import promoPool from './promoPool.json'
+import pwa from './pwa.json'
 import releaseDetail from './releaseDetail.json'
 import releases from './releases.json'
 import spotify from './spotify.json'
@@ -64,6 +65,7 @@ export default {
   pressProfile,
   pressReleases,
   promoPool,
+  pwa,
   releaseDetail,
   releases,
   spotify,

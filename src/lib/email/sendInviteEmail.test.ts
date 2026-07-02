@@ -62,7 +62,7 @@ describe('sendInviteEmail', () => {
 
     expect(body.to).toEqual(['artist@example.com'])
     expect(body.subject).toBe(INVITE_EMAIL_SUBJECT)
-    expect(body.from).toContain('darkTunes Music Group')
+    expect(body.from).toContain(SITE_SETTINGS_DEFAULTS.labelName)
     expect(body.html).toContain('Accept invitation')
     expect(body.html).toContain('Artist')
     expect(body.html).toContain('darkTunes Music Group GmbH')

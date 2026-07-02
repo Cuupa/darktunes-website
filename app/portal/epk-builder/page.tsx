@@ -23,10 +23,15 @@ import { getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EpkBuilderClient } from './_components/EpkBuilderClient'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
+import type { Metadata } from 'next'
+import { getMetadataBrand, portalBuilderTitle } from '@/lib/seo/metadata'
 
-export const metadata = {
-  title: 'EPK Builder | darkTunes Artist Portal',
-  description: 'Build and export your Electronic Press Kit',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: portalBuilderTitle('EPK Builder', labelShortName),
+    description: 'Build and export your Electronic Press Kit',
+  }
 }
 
 function EpkBuilderSkeleton() {

@@ -8,6 +8,9 @@ import { VisualEffectsOverlay } from '@/components/VisualEffectsOverlay'
 import { ThemeStyleInjector } from './_components/ThemeStyleInjector'
 import { ThemeEffectsClient } from './_components/ThemeEffectsClient'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
+import { resolveBrandFromSettings } from '@/lib/brand'
+import { buildRootLayoutMetadata } from '@/lib/seo/metadata'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import type { Locale } from '@/i18n/types'
@@ -19,42 +22,10 @@ const fontVariables: CSSProperties = {
   ['--font-mono' as string]: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
 }
 
-function getFaviconMimeType(url: string): string {
-  if (url.endsWith('.svg')) return 'image/svg+xml'
-  if (url.endsWith('.ico')) return 'image/x-icon'
-  if (url.endsWith('.webp')) return 'image/webp'
-  return 'image/png'
-}
-
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getCachedSiteSettings().catch(() => null)
-  const title = settings?.seoTitle ?? 'darkTunes Music Group'
-  const description =
-    settings?.seoDescription ??
-    'Official website for darkTunes Music Group — an alternative music label. Discover artists, releases, news, and videos.'
-  const ogTitle = settings?.ogTitle ?? title
-  const ogDescription = settings?.ogDescription ?? description
-  const customFaviconUrl = settings?.faviconUrl || ''
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title: ogTitle,
-      description: ogDescription,
-      type: 'website',
-    },
-    icons: {
-      icon: customFaviconUrl
-        ? [{ url: customFaviconUrl, type: getFaviconMimeType(customFaviconUrl) }]
-        : [
-            { url: '/favicon.svg', type: 'image/svg+xml' },
-            { url: '/favicon.ico', sizes: '32x32' },
-          ],
-      shortcut: customFaviconUrl || '/favicon.ico',
-      apple: { url: customFaviconUrl || '/icons/icon-192.png', sizes: '192x192' },
-    },
-  }
+  const settings =
+    (await getCachedSiteSettings().catch(() => null)) ?? SITE_SETTINGS_DEFAULTS
+  return buildRootLayoutMetadata(settings)
 }
 
 /**
@@ -79,6 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = (await getLocale()) as Locale
   const messages = await getMessages()
   const settings = await getCachedSiteSettings().catch(() => null)
+  const { labelShortName } = resolveBrandFromSettings(settings ?? SITE_SETTINGS_DEFAULTS)
 
   return (
     <html lang={locale} style={fontVariables} suppressHydrationWarning data-animation-preset={settings?.themeConfig?.animation?.preset ?? 'slide-up'}>
@@ -87,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="darkTunes" />
+        <meta name="apple-mobile-web-app-title" content={labelShortName} />
         <link rel="apple-touch-icon" href={settings?.faviconUrl || '/icons/icon-192.png'} />
         {/* Software platform identity — readable by crawlers and Wappalyzer */}
         <meta name="generator" content="Neuroklast & Seifried.dev" />
@@ -131,7 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </NavHidingWrapper>
         {process.env.NODE_ENV === 'production' ? <WebVitals /> : null}
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>
+          <Providers brand={resolveBrandFromSettings(settings ?? SITE_SETTINGS_DEFAULTS)}>
             <NavHidingWrapper><SiteHeader /></NavHidingWrapper>
             {children}
             <NavHidingWrapper><SiteFooter /></NavHidingWrapper>

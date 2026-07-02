@@ -1,5 +1,10 @@
 import { getRequestConfig } from 'next-intl/server'
 import { cookies, headers } from 'next/headers'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
+import { resolveBrandFromSettings } from '@/lib/brand'
+import { brandI18nValues } from '@/lib/brand/i18nValues'
+import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
+import { resolveBrandPlaceholders } from '@/i18n/resolveBrandPlaceholders'
 import type { Locale } from './types'
 import { routing } from './routing'
 
@@ -30,8 +35,13 @@ export default getRequestConfig(async () => {
   }
 
   const { loadMessages } = await import('./loadMessages')
+  const rawMessages = await loadMessages(locale)
+  const settings =
+    (await getCachedSiteSettings().catch(() => null)) ?? SITE_SETTINGS_DEFAULTS
+  const brand = brandI18nValues(resolveBrandFromSettings(settings))
+
   return {
     locale,
-    messages: await loadMessages(locale),
+    messages: resolveBrandPlaceholders(rawMessages, brand),
   }
 })

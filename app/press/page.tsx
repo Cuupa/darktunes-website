@@ -4,12 +4,19 @@ import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPressOnlyNewsPosts } from '@/lib/api/pressReleases'
-import { getSiteSettings } from '@/lib/api/siteSettings'
+import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import { PressLandingClient } from './_components/PressLandingClient'
+import { buildDefaultSeoDescription } from '@/lib/brand/tenantDefaults'
+import { getMetadataContext, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Press & Media — darkTunes Music Group',
-  description: 'Label press portal with artist press kits, media contacts, and exclusive press releases.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { settings, brand } = await getMetadataContext()
+  return {
+    title: pageTitle('Press & Media', brand.labelName),
+    description:
+      settings.seoDescription?.trim() ||
+      buildDefaultSeoDescription(brand.labelName),
+  }
 }
 
 export default async function PressPage() {
@@ -26,13 +33,7 @@ export default async function PressPage() {
     }),
     getSiteSettings(supabase).catch((err: unknown) => {
       console.error('[press/page] Failed to fetch site settings:', err)
-      return {
-        labelName: 'darkTunes Music Group',
-        labelTagline: '',
-        contactEmail: 'info@darktunes.com',
-        impressumPhone: '',
-        impressumEmail: 'info@darktunes.com',
-      }
+      return SITE_SETTINGS_DEFAULTS
     }),
   ])
 

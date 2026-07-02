@@ -11,10 +11,14 @@
 
 import type { Metadata } from 'next'
 import { AdminClientLayout } from './_components/AdminClientLayout'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Admin — darkTunes Music Group',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Admin', labelName),
+    robots: { index: false, follow: false },
+  }
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

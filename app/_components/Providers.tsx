@@ -9,9 +9,12 @@ import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { ThemeBroadcastListener } from '@/components/ThemeBroadcastListener'
 import { ErrorFallback } from '@/ErrorFallback'
 import { PageTracker } from '@/components/PageTracker'
+import { BrandProvider } from '@/components/brand/BrandProvider'
+import type { BrandContext } from '@/lib/brand'
 
 interface ProvidersProps {
   children: ReactNode
+  brand: BrandContext
 }
 
 /**
@@ -26,17 +29,19 @@ interface ProvidersProps {
  * - Toaster: global toast notifications
  * - ErrorBoundary: catches client-side render errors
  */
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, brand }: ProvidersProps) {
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <LenisProvider>
-        <PageTracker />
-        {children}
-        <ConsentBanner />
-        <PWAInstallPrompt />
-        <ThemeBroadcastListener />
-        <Toaster position="bottom-right" theme="dark" />
-      </LenisProvider>
+      <BrandProvider brand={brand}>
+        <LenisProvider>
+          <PageTracker />
+          {children}
+          <ConsentBanner />
+          <PWAInstallPrompt />
+          <ThemeBroadcastListener />
+          <Toaster position="bottom-right" theme="dark" />
+        </LenisProvider>
+      </BrandProvider>
     </ErrorBoundary>
   )
 }

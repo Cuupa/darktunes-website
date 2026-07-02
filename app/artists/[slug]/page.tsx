@@ -32,6 +32,7 @@ import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 
 import { ArtistDetailContent } from './_components/ArtistDetailContent'
 import { buildMusicGroupSchema, serializeJsonLd } from '@/lib/seo/jsonld'
+import { getMetadataBrand, pageTitle, pageTitlePipe } from '@/lib/seo/metadata'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -104,13 +105,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Silently swallow errors only in metadata generation — a missing artist
   // just returns a generic title; the page itself will show the proper 404.
   const data = await makeGetArtistData(slug)().catch(() => null)
-  if (!data) return { title: 'Artist not found — darkTunes' }
+  const { labelName } = await getMetadataBrand()
+  if (!data) return { title: pageTitle('Artist not found', labelName) }
   const { artist } = data
   return {
-    title: `${artist.name} | darkTunes Music Group`,
-    description: artist.bio ? artist.bio.slice(0, 160) : `${artist.name} on darkTunes Music Group`,
+    title: pageTitlePipe(artist.name, labelName),
+    description: artist.bio
+      ? artist.bio.slice(0, 160)
+      : `${artist.name} — ${labelName}`,
     openGraph: {
-      title: `${artist.name} — darkTunes Music Group`,
+      title: pageTitle(artist.name, labelName),
       description: artist.bio ? artist.bio.slice(0, 160) : undefined,
       images: artist.imageUrl ? [{ url: artist.imageUrl }] : [],
       type: 'profile',

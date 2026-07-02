@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { X, DeviceMobile, ArrowSquareOut } from '@phosphor-icons/react'
+import { useTranslations } from 'next-intl'
 
 /**
  * PWAInstallPrompt — custom in-app install banner.
@@ -30,6 +31,7 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY = 'pwa-install-dismissed'
 
 export function PWAInstallPrompt() {
+  const t = useTranslations('pwa')
   const prefersReducedMotion = useReducedMotion()
 
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -49,8 +51,8 @@ export function PWAInstallPrompt() {
 
     if (ios) {
       // Delay slightly so the page has fully loaded
-      const t = setTimeout(() => setIsIOS(true), 3000)
-      return () => clearTimeout(t)
+      const timer = setTimeout(() => setIsIOS(true), 3000)
+      return () => clearTimeout(timer)
     }
 
     const handler = (e: Event) => {
@@ -64,8 +66,8 @@ export function PWAInstallPrompt() {
   // Show the Android/Chrome banner once we have a deferred prompt
   useEffect(() => {
     if (deferredPrompt) {
-      const t = setTimeout(() => setShowBanner(true), 3000)
-      return () => clearTimeout(t)
+      const timer = setTimeout(() => setShowBanner(true), 3000)
+      return () => clearTimeout(timer)
     }
   }, [deferredPrompt])
 
@@ -98,7 +100,7 @@ export function PWAInstallPrompt() {
         <motion.div
           role="dialog"
           aria-modal="false"
-          aria-label="Install darkTunes as an app"
+          aria-label={t('install_aria_label')}
           initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 80 }}
           animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
           exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 80 }}
@@ -115,29 +117,29 @@ export function PWAInstallPrompt() {
 
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground leading-tight">
-              darkTunes als App installieren
+              {t('install_title')}
             </p>
             {isIOS ? (
               <p className="mt-1 text-xs text-muted-foreground leading-snug">
-                Tippe auf{' '}
+                {t('install_ios_hint_prefix')}{' '}
                 <ArrowSquareOut
                   size={12}
                   weight="bold"
                   className="inline align-middle"
                   aria-hidden="true"
                 />{' '}
-                und dann &ldquo;Zum Home-Bildschirm&rdquo;.
+                {t('install_ios_hint_suffix')}
               </p>
             ) : (
               <>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Schneller Zugriff · Tourplaner offline nutzbar
+                  {t('install_subtitle')}
                 </p>
                 <button
                   onClick={handleInstall}
                   className="mt-2 px-4 py-1.5 rounded-full bg-accent text-white text-xs font-mono uppercase tracking-widest hover:bg-accent/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
-                  Installieren
+                  {t('install_button')}
                 </button>
               </>
             )}
@@ -146,7 +148,7 @@ export function PWAInstallPrompt() {
           {/* Close / dismiss */}
           <button
             onClick={handleDismiss}
-            aria-label="Install-Banner schließen"
+            aria-label={t('dismiss_aria_label')}
             className="flex-none p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={16} weight="bold" aria-hidden="true" />

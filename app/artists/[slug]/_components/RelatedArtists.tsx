@@ -1,5 +1,5 @@
 /**
- * RelatedArtists — "More from darkTunes" strip at the bottom of an artist detail page.
+ * RelatedArtists — "More from the label" strip at the bottom of an artist detail page.
  *
  * Renders a horizontal scroll strip of artist cards, linking to their profile pages.
  * Displayed only when at least one related artist exists (genre-overlap).

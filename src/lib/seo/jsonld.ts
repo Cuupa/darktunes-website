@@ -13,14 +13,18 @@
  * It replaces `<`, `>`, and `&` with their Unicode escape sequences so that a
  * `</script>` inside a string value cannot prematurely close the script tag.
  *
- * All URLs must be absolute; pass NEXT_PUBLIC_SITE_URL as the `siteUrl` arg.
+ * All URLs must be absolute; configure NEXT_PUBLIC_SITE_URL for production.
  */
 
 import type { Artist, Release, NewsPost, SiteSettings } from '@/types'
+import { resolveSiteUrl } from '@/lib/brand'
+import { NEUTRAL_LABEL_NAME } from '@/lib/brand/tenantDefaults'
+import { collectLabelSocialUrls } from '@/lib/seo/metadata'
 
-/** Canonical site origin, e.g. "https://darktunes.com" (no trailing slash). */
-export const SITE_URL =
-  (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+/** Canonical site origin (no trailing slash). Empty when NEXT_PUBLIC_SITE_URL is unset. */
+export function getSiteUrl(): string {
+  return resolveSiteUrl()
+}
 
 /**
  * Serialize a JSON-LD schema object to a string that is safe to embed inside a
@@ -48,18 +52,23 @@ function compact(items: (string | undefined | null)[]): string[] {
 // ---------------------------------------------------------------------------
 
 export interface OrganizationSchemaInput {
-  siteSettings: Pick<SiteSettings, 'labelName' | 'contactEmail'> &
-    Partial<Pick<SiteSettings, 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl'>> & {
-      logoUrl?: string
-    }
+  siteSettings: Pick<
+    SiteSettings,
+    'labelName' | 'contactEmail' | 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl'
+  > & {
+    logoUrl?: string
+    customSocialLinks?: SiteSettings['customSocialLinks']
+  }
 }
 
 export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInput) {
+  const labelName = siteSettings.labelName || NEUTRAL_LABEL_NAME
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: siteSettings.labelName || 'darkTunes Music Group',
-    url: SITE_URL,
+    name: labelName,
+    url: getSiteUrl() || undefined,
     ...(siteSettings.logoUrl
       ? {
           logo: {
@@ -68,11 +77,7 @@ export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInpu
           },
         }
       : {}),
-    sameAs: compact([
-      siteSettings.instagramUrl,
-      siteSettings.youtubeUrl,
-      siteSettings.spotifyUrl,
-    ]),
+    sameAs: collectLabelSocialUrls(siteSettings),
     contactPoint: siteSettings.contactEmail
       ? {
           '@type': 'ContactPoint',
@@ -88,19 +93,23 @@ export function buildOrganizationSchema({ siteSettings }: OrganizationSchemaInpu
 // ---------------------------------------------------------------------------
 
 export function buildWebSiteSchema(labelName: string) {
+  const name = labelName || NEUTRAL_LABEL_NAME
+
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: labelName || 'darkTunes Music Group',
-    url: SITE_URL,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${SITE_URL}/artists?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
+    name,
+    url: getSiteUrl() || undefined,
+    potentialAction: getSiteUrl()
+      ? {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${getSiteUrl()}/artists?q={search_term_string}`,
+          },
+          'query-input': 'required name=search_term_string',
+        }
+      : undefined,
   }
 }
 
@@ -138,7 +147,7 @@ export function buildMusicGroupSchema({ artist, releases }: MusicGroupSchemaInpu
     description: artist.bio || undefined,
     image: artist.imageUrl || undefined,
     genre: artist.genres?.length ? artist.genres : undefined,
-    url: `${SITE_URL}/artists/${artist.slug}`,
+    url: getSiteUrl() ? `${getSiteUrl()}/artists/${artist.slug}` : undefined,
     ...(artist.country
       ? {
           foundingLocation: {
@@ -162,7 +171,7 @@ export function buildMusicGroupSchema({ artist, releases }: MusicGroupSchemaInpu
       '@type': 'MusicAlbum',
       name: r.title,
       datePublished: r.releaseDate,
-      url: `${SITE_URL}/releases/${r.id}`,
+      url: getSiteUrl() ? `${getSiteUrl()}/releases/${r.id}` : undefined,
     })),
   }
 }
@@ -197,11 +206,13 @@ export function buildMusicAlbumSchema({ release, artistSlug }: MusicAlbumSchemaI
     byArtist: {
       '@type': 'MusicGroup',
       name: release.artistName,
-      ...(artistSlug ? { url: `${SITE_URL}/artists/${artistSlug}` } : {}),
+      ...(artistSlug && getSiteUrl()
+        ? { url: `${getSiteUrl()}/artists/${artistSlug}` }
+        : {}),
     },
     image: release.coverArt || undefined,
     datePublished: release.releaseDate,
-    url: `${SITE_URL}/releases/${release.id}`,
+    url: getSiteUrl() ? `${getSiteUrl()}/releases/${release.id}` : undefined,
     ...(release.type === 'ep'
       ? { albumProductionType: 'EPRelease' }
       : release.type === 'single'
@@ -217,10 +228,17 @@ export function buildMusicAlbumSchema({ release, artistSlug }: MusicAlbumSchemaI
 
 export interface NewsArticleSchemaInput {
   post: Pick<NewsPost, 'title' | 'excerpt' | 'imageUrl' | 'publishedAt' | 'slug'>
+  publisherName: string
   publisherLogoUrl?: string
 }
 
-export function buildNewsArticleSchema({ post, publisherLogoUrl }: NewsArticleSchemaInput) {
+export function buildNewsArticleSchema({
+  post,
+  publisherName,
+  publisherLogoUrl,
+}: NewsArticleSchemaInput) {
+  const publisher = publisherName || NEUTRAL_LABEL_NAME
+
   return {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
@@ -229,11 +247,11 @@ export function buildNewsArticleSchema({ post, publisherLogoUrl }: NewsArticleSc
     image: post.imageUrl || undefined,
     datePublished: post.publishedAt,
     dateModified: post.publishedAt,
-    url: `${SITE_URL}/news/${post.slug}`,
+    url: getSiteUrl() ? `${getSiteUrl()}/news/${post.slug}` : undefined,
     publisher: {
       '@type': 'Organization',
-      name: 'darkTunes Music Group',
-      url: SITE_URL,
+      name: publisher,
+      url: getSiteUrl() || undefined,
       ...(publisherLogoUrl
         ? {
             logo: {
@@ -252,19 +270,25 @@ export function buildNewsArticleSchema({ post, publisherLogoUrl }: NewsArticleSc
 
 export interface PressArticleSchemaInput {
   post: Pick<NewsPost, 'title' | 'publishedAt' | 'slug'>
+  publisherName: string
 }
 
-export function buildPressArticleSchema({ post }: PressArticleSchemaInput) {
+export function buildPressArticleSchema({
+  post,
+  publisherName,
+}: PressArticleSchemaInput) {
+  const publisher = publisherName || NEUTRAL_LABEL_NAME
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: post.title,
     datePublished: post.publishedAt,
-    url: `${SITE_URL}/press/releases/${post.slug}`,
+    url: getSiteUrl() ? `${getSiteUrl()}/press/releases/${post.slug}` : undefined,
     publisher: {
       '@type': 'Organization',
-      name: 'darkTunes Music Group',
-      url: SITE_URL,
+      name: publisher,
+      url: getSiteUrl() || undefined,
     },
   }
 }

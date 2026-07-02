@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
 import {
   buildOrganizationSchema,
   buildWebSiteSchema,
@@ -7,7 +7,7 @@ import {
   buildNewsArticleSchema,
   buildPressArticleSchema,
   serializeJsonLd,
-  SITE_URL,
+  getSiteUrl,
 } from './jsonld'
 import type { Artist, Release, NewsPost, SiteSettings } from '@/types'
 
@@ -15,17 +15,25 @@ import type { Artist, Release, NewsPost, SiteSettings } from '@/types'
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const TEST_SITE_URL = 'https://example.label'
+const TEST_LABEL = 'Example Music Group'
+const TEST_PUBLISHER = TEST_LABEL
+
 const siteSettings: Pick<
   SiteSettings,
   'labelName' | 'instagramUrl' | 'youtubeUrl' | 'spotifyUrl' | 'contactEmail'
 > & { logoUrl?: string } = {
-  labelName: 'darkTunes Music Group',
-  instagramUrl: 'https://instagram.com/darktunes',
-  youtubeUrl: 'https://youtube.com/@darktunes',
-  spotifyUrl: 'https://open.spotify.com/user/darktunes',
-  contactEmail: 'info@darktunes.com',
-  logoUrl: 'https://darktunes.com/logo.png',
+  labelName: TEST_LABEL,
+  instagramUrl: 'https://instagram.com/examplelabel',
+  youtubeUrl: 'https://youtube.com/@examplelabel',
+  spotifyUrl: 'https://open.spotify.com/user/examplelabel',
+  contactEmail: 'contact@example.label',
+  logoUrl: `${TEST_SITE_URL}/logo.png`,
 }
+
+beforeAll(() => {
+  process.env.NEXT_PUBLIC_SITE_URL = TEST_SITE_URL
+})
 
 const artist: Pick<
   Artist,
@@ -110,9 +118,13 @@ const pressPost: Pick<NewsPost, 'title' | 'publishedAt' | 'slug'> = {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('SITE_URL', () => {
+describe('getSiteUrl', () => {
   it('has no trailing slash', () => {
-    expect(SITE_URL).not.toMatch(/\/$/)
+    expect(getSiteUrl()).not.toMatch(/\/$/)
+  })
+
+  it('reads NEXT_PUBLIC_SITE_URL', () => {
+    expect(getSiteUrl()).toBe(TEST_SITE_URL)
   })
 })
 
@@ -125,8 +137,8 @@ describe('buildOrganizationSchema', () => {
 
   it('sets name and url', () => {
     const schema = buildOrganizationSchema({ siteSettings })
-    expect(schema.name).toBe('darkTunes Music Group')
-    expect(schema.url).toBe(SITE_URL)
+    expect(schema.name).toBe(TEST_LABEL)
+    expect(schema.url).toBe(TEST_SITE_URL)
   })
 
   it('includes logo when logoUrl is provided', () => {
@@ -148,32 +160,45 @@ describe('buildOrganizationSchema', () => {
 
   it('filters null/undefined sameAs entries', () => {
     const schema = buildOrganizationSchema({
-      siteSettings: { ...siteSettings, instagramUrl: undefined, youtubeUrl: undefined },
+      siteSettings: { ...siteSettings, instagramUrl: '', youtubeUrl: '' },
     })
     expect(schema.sameAs).not.toContain(undefined)
     expect(schema.sameAs.length).toBe(1)
+  })
+
+  it('includes customSocialLinks in sameAs', () => {
+    const schema = buildOrganizationSchema({
+      siteSettings: {
+        ...siteSettings,
+        customSocialLinks: [
+          { id: 'bc', label: 'Bandcamp', url: 'https://bandcamp.com/label', icon: 'bandcamp' },
+        ],
+      },
+    })
+    expect(schema.sameAs).toContain('https://bandcamp.com/label')
   })
 
   it('includes contactPoint when contactEmail is provided', () => {
     const schema = buildOrganizationSchema({ siteSettings })
     expect(schema.contactPoint).toMatchObject({
       '@type': 'ContactPoint',
-      email: 'info@darktunes.com',
+      email: 'contact@example.label',
     })
   })
 })
 
 describe('buildWebSiteSchema', () => {
   it('outputs correct @type', () => {
-    const schema = buildWebSiteSchema('darkTunes Music Group')
+    const schema = buildWebSiteSchema(TEST_LABEL)
     expect(schema['@type']).toBe('WebSite')
   })
 
   it('has potentialAction SearchAction with urlTemplate', () => {
-    const schema = buildWebSiteSchema('darkTunes Music Group')
-    expect(schema.potentialAction['@type']).toBe('SearchAction')
-    expect(schema.potentialAction.target.urlTemplate).toContain('/artists?q=')
-    expect(schema.potentialAction.target.urlTemplate).toContain('{search_term_string}')
+    const schema = buildWebSiteSchema(TEST_LABEL)
+    expect(schema.potentialAction).toBeDefined()
+    expect(schema.potentialAction!['@type']).toBe('SearchAction')
+    expect(schema.potentialAction!.target.urlTemplate).toContain('/artists?q=')
+    expect(schema.potentialAction!.target.urlTemplate).toContain('{search_term_string}')
   })
 
   it('uses provided label name', () => {
@@ -190,7 +215,7 @@ describe('buildMusicGroupSchema', () => {
 
   it('builds artist URL from slug', () => {
     const schema = buildMusicGroupSchema({ artist, releases })
-    expect(schema.url).toBe(`${SITE_URL}/artists/test-artist`)
+    expect(schema.url).toBe(`${TEST_SITE_URL}/artists/test-artist`)
   })
 
   it('includes genres array', () => {
@@ -219,7 +244,7 @@ describe('buildMusicGroupSchema', () => {
     expect(schema.album[0]).toMatchObject({
       '@type': 'MusicAlbum',
       name: 'Debut Album',
-      url: `${SITE_URL}/releases/rel-1`,
+      url: `${TEST_SITE_URL}/releases/rel-1`,
     })
   })
 
@@ -243,7 +268,7 @@ describe('buildMusicAlbumSchema', () => {
 
   it('includes artist URL when artistSlug provided', () => {
     const schema = buildMusicAlbumSchema({ release, artistSlug: 'test-artist' })
-    expect(schema.byArtist.url).toBe(`${SITE_URL}/artists/test-artist`)
+    expect(schema.byArtist.url).toBe(`${TEST_SITE_URL}/artists/test-artist`)
   })
 
   it('omits artist URL when artistSlug not provided', () => {
@@ -268,7 +293,7 @@ describe('buildMusicAlbumSchema', () => {
 
   it('builds release URL from id', () => {
     const schema = buildMusicAlbumSchema({ release })
-    expect(schema.url).toBe(`${SITE_URL}/releases/rel-1`)
+    expect(schema.url).toBe(`${TEST_SITE_URL}/releases/rel-1`)
   })
 
   it('filters null sameAs entries', () => {
@@ -280,73 +305,74 @@ describe('buildMusicAlbumSchema', () => {
 
 describe('buildNewsArticleSchema', () => {
   it('outputs correct @type', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
     expect(schema['@type']).toBe('NewsArticle')
   })
 
   it('sets headline and description', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
     expect(schema.headline).toBe('Big News')
     expect(schema.description).toBe('Something happened.')
   })
 
   it('builds news URL from slug', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
-    expect(schema.url).toBe(`${SITE_URL}/news/big-news`)
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
+    expect(schema.url).toBe(`${TEST_SITE_URL}/news/big-news`)
   })
 
   it('sets datePublished and dateModified', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
     expect(schema.datePublished).toBe('2024-03-01T12:00:00Z')
     expect(schema.dateModified).toBe('2024-03-01T12:00:00Z')
   })
 
   it('includes publisher Organization', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
     expect(schema.publisher).toMatchObject({
       '@type': 'Organization',
-      name: 'darkTunes Music Group',
+      name: TEST_PUBLISHER,
     })
   })
 
   it('includes publisher logo when provided', () => {
     const schema = buildNewsArticleSchema({
       post: newsPost,
-      publisherLogoUrl: 'https://darktunes.com/logo.png',
+      publisherName: TEST_PUBLISHER,
+      publisherLogoUrl: `${TEST_SITE_URL}/logo.png`,
     })
     expect(schema.publisher.logo).toEqual({
       '@type': 'ImageObject',
-      url: 'https://darktunes.com/logo.png',
+      url: `${TEST_SITE_URL}/logo.png`,
     })
   })
 
   it('omits publisher logo when not provided', () => {
-    const schema = buildNewsArticleSchema({ post: newsPost })
+    const schema = buildNewsArticleSchema({ post: newsPost, publisherName: TEST_PUBLISHER })
     expect((schema.publisher as Record<string, unknown>).logo).toBeUndefined()
   })
 })
 
 describe('buildPressArticleSchema', () => {
   it('outputs correct @type', () => {
-    const schema = buildPressArticleSchema({ post: pressPost })
+    const schema = buildPressArticleSchema({ post: pressPost, publisherName: TEST_PUBLISHER })
     expect(schema['@type']).toBe('Article')
   })
 
   it('sets headline', () => {
-    const schema = buildPressArticleSchema({ post: pressPost })
+    const schema = buildPressArticleSchema({ post: pressPost, publisherName: TEST_PUBLISHER })
     expect(schema.headline).toBe('Press Release: New Album')
   })
 
   it('builds press release URL from slug', () => {
-    const schema = buildPressArticleSchema({ post: pressPost })
-    expect(schema.url).toBe(`${SITE_URL}/press/releases/press-new-album`)
+    const schema = buildPressArticleSchema({ post: pressPost, publisherName: TEST_PUBLISHER })
+    expect(schema.url).toBe(`${TEST_SITE_URL}/press/releases/press-new-album`)
   })
 
   it('includes publisher', () => {
-    const schema = buildPressArticleSchema({ post: pressPost })
+    const schema = buildPressArticleSchema({ post: pressPost, publisherName: TEST_PUBLISHER })
     expect(schema.publisher).toMatchObject({
       '@type': 'Organization',
-      name: 'darkTunes Music Group',
+      name: TEST_PUBLISHER,
     })
   })
 })
@@ -355,6 +381,7 @@ describe('serializeJsonLd — XSS safety', () => {
   it('escapes angle brackets so </script> cannot break out of the script tag', () => {
     const schema = buildNewsArticleSchema({
       post: { ...newsPost, title: '</script><script>alert(1)</script>' },
+      publisherName: TEST_PUBLISHER,
     })
     const serialised = serializeJsonLd(schema)
     expect(serialised).not.toContain('</script>')
@@ -364,6 +391,7 @@ describe('serializeJsonLd — XSS safety', () => {
   it('escapes ampersands', () => {
     const schema = buildNewsArticleSchema({
       post: { ...newsPost, title: 'Rock & Roll' },
+      publisherName: TEST_PUBLISHER,
     })
     const serialised = serializeJsonLd(schema)
     expect(serialised).not.toContain('Rock & Roll')
@@ -373,6 +401,7 @@ describe('serializeJsonLd — XSS safety', () => {
   it('produces valid parseable JSON after escaping', () => {
     const schema = buildNewsArticleSchema({
       post: { ...newsPost, title: '<b>Rock & Roll</b>' },
+      publisherName: TEST_PUBLISHER,
     })
     const serialised = serializeJsonLd(schema)
     const parsed = JSON.parse(serialised)

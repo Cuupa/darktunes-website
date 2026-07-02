@@ -10,12 +10,16 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { getCachedPublicConcerts } from '@/lib/cache/publicQueries'
 import { EventsPageContent } from './_components/EventsPageContent'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 export const revalidate = 60
 
-export const metadata: Metadata = {
-  title: 'Events — darkTunes Music Group',
-  description: 'Browse all upcoming live events from darkTunes Music Group artists.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Events', labelName),
+    description: `Browse all upcoming live events from ${labelName} artists.`,
+  }
 }
 
 export default async function EventsPage() {

@@ -5,10 +5,14 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { BillingProfileForm } from './_components/BillingProfileForm'
+import { getMetadataBrand, portalPageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Billing Profile | darkTunes Portal',
-  description: 'Manage artist billing master data for SOS-linked invoices.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelShortName } = await getMetadataBrand()
+  return {
+    title: portalPageTitle('Billing Profile', labelShortName),
+    description: 'Manage artist billing master data for SOS-linked invoices.',
+  }
 }
 
 export default async function BillingPage({

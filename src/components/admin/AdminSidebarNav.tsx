@@ -58,6 +58,7 @@ import { DashboardNotificationBell } from '@/components/admin/DashboardNotificat
 import { NavCountBadge } from '@/components/nav/NavCountBadge'
 import { useAdminNavBadges } from '@/hooks/useAdminNavBadges'
 import { useTranslations } from 'next-intl'
+
 import { getCmsPromoLogPath, getCmsTabPath, getCmsHomePath } from '@/lib/editor/cmsPaths'
 
 interface NavItem {
@@ -142,8 +143,10 @@ export function AdminSidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
   const tNav = useTranslations('admin.nav')
+  const t = useTranslations('admin')
   const { isAdmin, user, profile, signOut } = useAuthContext()
   const isEditorRole = profile?.role === 'editor'
+  const brandTitle = isEditorRole ? t('brand_editor') : t('brand_admin')
   const notificationUserId = user?.id
   const showNotificationBell = Boolean(notificationUserId)
   const badges = useAdminNavBadges(notificationUserId ?? null, isAdmin)
@@ -254,7 +257,7 @@ export function AdminSidebarNav() {
     <>
       {/* Mobile header — only visible below md breakpoint */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-        <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+        <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
         <div className="flex items-center gap-2">
           {showNotificationBell && notificationUserId && (
             <DashboardNotificationBell userId={notificationUserId} />
@@ -269,7 +272,7 @@ export function AdminSidebarNav() {
               <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
               <div className="flex h-full flex-col bg-card">
                 <div className="px-4 py-5 border-b border-border">
-                  <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+                  <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
                 </div>
                 {renderNavLinks(() => setMobileOpen(false))}
@@ -288,7 +291,7 @@ export function AdminSidebarNav() {
         {/* Brand header */}
         <div className="px-4 py-5 border-b border-border flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold tracking-wide">{isEditorRole ? 'darkTunes Editor' : 'darkTunes Admin'}</p>
+            <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
           </div>
           {showNotificationBell && notificationUserId && (

@@ -10,11 +10,14 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { NewsletterSection } from '@/components/NewsletterSection'
 import Link from 'next/link'
+import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Newsletter – darkTunes Music Group',
-  description:
-    'Subscribe to the darkTunes newsletter and stay in the loop — new releases, tour dates, and exclusive content delivered to your inbox.',
+export async function generateMetadata(): Promise<Metadata> {
+  const { labelName, labelShortName } = await getMetadataBrand()
+  return {
+    title: pageTitle('Newsletter', labelName),
+    description: `Subscribe to the ${labelShortName} newsletter and stay in the loop — new releases, tour dates, and exclusive content delivered to your inbox.`,
+  }
 }
 
 export default async function NewsletterPage() {
