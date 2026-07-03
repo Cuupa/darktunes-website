@@ -275,7 +275,7 @@ export function useSettlementCenter({
     selectableRows.length > 0 && selectableRows.every((row) => selectedArtists.has(row.artistName))
 
   const selectedDraftTargets = rows.filter(
-    (row) => selectedArtists.has(row.artistName) && row.workflowStatus === 'not_uploaded' && row.artistId,
+    (row) => selectedArtists.has(row.artistName) && row.workflowStatus === 'not_uploaded' && row.artistId && row.payout != null,
   )
   const selectedApproveTargets = rows.filter(
     (row) => selectedArtists.has(row.artistName) && row.workflowStatus === 'draft' && row.statementId,

@@ -640,6 +640,7 @@
   "releases_submit_cover_check_wrong_size": "❌ Falsche Größe: erwartet 3000×3000 px, erhalten {{width}}×{{height}} px",
   "releases_submit_cover_check_wrong_format": "❌ Falsches Format: JPEG/JPG erforderlich",
   "releases_submit_cover_check_blocked": "⚠️ Cover-Art konnte nicht geprüft werden (URL blockiert). Bitte URL prüfen und erneut versuchen.",
+  "releases_submit_cover_check_verified_with_warning": "⚠️ Dateibytes konnten wegen CORS nicht vollständig geprüft werden, aber Größe und JPG-Endung wirken gültig.",
   "releases_submit_cover_check_required": "Bitte Cover-Art vor dem Einreichen prüfen.",
   "releases_submit_tracks_heading": "Tracks",
   "releases_submit_add_track": "Track hinzufügen",

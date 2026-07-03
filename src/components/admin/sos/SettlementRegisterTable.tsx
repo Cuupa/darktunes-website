@@ -94,7 +94,7 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
 
   const renderRowActions = (row: MasterRow, isBusy: boolean) => (
     <div className="flex flex-wrap gap-2">
-      {row.workflowStatus === 'not_uploaded' && row.artistId && periodWritable && (
+      {row.workflowStatus === 'not_uploaded' && row.artistId && row.payout != null && periodWritable && (
         <Button
           size="sm"
           variant="outline"
@@ -371,7 +371,7 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         )}
       </div>
 
-      <div className="hidden lg:block">
+      <div className="hidden lg:block" data-lenis-prevent>
         <AdminDataTable
           table={table}
           loading={loading}

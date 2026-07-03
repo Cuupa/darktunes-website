@@ -147,7 +147,7 @@ export function registerToMasterRow(row: SettlementRegisterRow): MasterRow {
 
 export function rowIsSelectable(row: MasterRow) {
   return (
-    (row.workflowStatus === 'not_uploaded' && !!row.artistId) ||
+    (row.workflowStatus === 'not_uploaded' && !!row.artistId && row.payout != null) ||
     (row.workflowStatus === 'draft' && !!row.statementId) ||
     (!!row.invoiceId && !row.receivedAt && row.invoiceStatus === 'sent') ||
     (!!row.invoiceId && row.invoiceStatus !== 'paid' && row.invoiceStatus !== 'cancelled')
