@@ -1313,9 +1313,9 @@ function SosGeneratorPanel() {
         title={t.workspaceDeleteTitle}
         description={
           currentPeriodKey
-            ? t.workspaceDeleteDesc
-                .replace('{start}', currentPeriodKey.start)
-                .replace('{end}', currentPeriodKey.end)
+? t.workspaceDeleteDesc
+    .replaceAll('{start}', currentPeriodKey.start)
+    .replaceAll('{end}', currentPeriodKey.end)
             : ''
         }
         confirmLabel={t.workspaceDeleteConfirm}
