@@ -112,6 +112,21 @@ export const ACCOUNTING_FALLBACK = {
   presetDeleteButton: 'Delete',
   presetMigratedToast: 'Migrated {count} preset(s) from local storage to the server',
   sourceMixSubtitle: 'SOS session — distributor view (in-memory CSV data)',
+  wizardModeTitle: 'How would you like to bill?',
+  wizardModeSubtitle:
+    'Choose Quick Start for experienced operators or the Assistant with setup and error checking.',
+  wizardModeQuickTitle: 'Quick Start',
+  wizardModeQuickDesc: 'Upload → Review → Publish. For recurring monthly billing.',
+  wizardModeQuickButton: 'Choose Quick Start',
+  wizardModeAssistantTitle: 'Assistant',
+  wizardModeAssistantDesc: 'Setup with all parameters, automatic validation and help with errors.',
+  wizardModeAssistantButton: 'Start Assistant',
+  uploadPeriodLabel: 'Period:',
+  resetSessionLabel: 'New billing session',
+  workspaceDeletedSuccess: 'Workspace deleted for this period',
+  workspaceDeleteTitle: 'Delete workspace',
+  workspaceDeleteDesc: 'Delete workspace for {start}\u2013{end} from server?',
+  workspaceDeleteConfirm: 'Delete',
 } as const
 
 export const SETTLEMENT_FALLBACK = {

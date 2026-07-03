@@ -475,7 +475,21 @@
     "trendsEmptyHint": "CSV-Dateien hochladen und „Periode speichern“ klicken (oder Save to Portal in Analytics), um Trends zu verfolgen.",
     "trendsChartTitle": "Umsatz & Auszahlung im Zeitverlauf",
     "trendsOnePeriodHint": "1 Periode gespeichert. Mindestens eine weitere speichern, um ein Trend-Chart zu sehen.",
-    "trendsSaveFailed": "Perioden-Zusammenfassung konnte nicht gespeichert werden"
+    "trendsSaveFailed": "Perioden-Zusammenfassung konnte nicht gespeichert werden",
+    "wizardModeTitle": "Wie möchten Sie abrechnen?",
+    "wizardModeSubtitle": "Wählen Sie den Schnellstart für erfahrene Operatoren oder den Assistenten mit Setup und Fehlerprüfung.",
+    "wizardModeQuickTitle": "Schnellstart",
+    "wizardModeQuickDesc": "Upload → Review → Publish. Für wiederkehrende monatliche Abrechnungen.",
+    "wizardModeQuickButton": "Schnellstart wählen",
+    "wizardModeAssistantTitle": "Assistent",
+    "wizardModeAssistantDesc": "Setup mit allen Parametern, automatische Prüfung und Hilfe bei Fehlern.",
+    "wizardModeAssistantButton": "Assistent starten",
+    "uploadPeriodLabel": "Zeitraum:",
+    "resetSessionLabel": "Neue Abrechnung starten",
+    "workspaceDeletedSuccess": "Workspace für diesen Zeitraum gelöscht",
+    "workspaceDeleteTitle": "Workspace löschen",
+    "workspaceDeleteDesc": "Workspace für {start}–{end} vom Server löschen?",
+    "workspaceDeleteConfirm": "Löschen"
   },
   "features": {
     "globalSectionTitle": "Globale Site-Schalter",
