@@ -44,6 +44,7 @@ import { NavCountBadge } from '@/components/nav/NavCountBadge'
 import { PortalNotificationBell } from '@/components/portal/PortalNotificationBell'
 import { useUnreadMessages } from './PortalNotificationProvider'
 import { usePortalOffline } from './PortalOfflineProvider'
+import { resolveActiveNavHref } from '@/lib/portal/resolveActiveNavHref'
 
 interface PortalSidebarProps {
   artists: Artist[]
@@ -65,17 +66,7 @@ type NavGroup = {
 }
 
 /** Longest-prefix wins so sibling routes (e.g. profile vs epk-builder) highlight exactly one item. */
-function resolveActiveNavHref(pathname: string, hrefs: string[]): string | null {
-  const sorted = [...hrefs].sort((a, b) => b.length - a.length)
-  for (const href of sorted) {
-    if (href === '/portal') {
-      if (pathname === '/portal') return href
-      continue
-    }
-    if (pathname === href || pathname.startsWith(`${href}/`)) return href
-  }
-  return null
-}
+// resolveActiveNavHref is imported from @/lib/portal/resolveActiveNavHref
 
 const NAV_GROUPS: NavGroup[] = [
   {
