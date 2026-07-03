@@ -159,6 +159,7 @@ export function NewsForm({ value, onChange, isLoading }: Props) {
           onChange={setHtmlContent}
           disabled={isLoading}
           placeholder="Write your news post here…"
+          grow
         />
       </div>
 
