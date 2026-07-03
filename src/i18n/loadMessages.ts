@@ -51,6 +51,9 @@ type Namespace = (typeof NAMESPACES)[number]
  * so it is not silently dropped for the relevant route group.
  */
 export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
+  // Standalone centralized login page — needs portal strings for the form
+  // plus the public shell (header, footer, consent, PWA prompt).
+  '/login': ['portal', 'navigation', 'footer', 'consent', 'errors', 'pwa'],
   '/portal': ['portal', 'portalHelp', 'errors', 'pwa'],
   '/admin': ['admin', 'adminSubmissions', 'errors', 'pwa'],
   '/press': [
