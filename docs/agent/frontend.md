@@ -36,6 +36,10 @@ Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-be
 
 CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`). Fullscreen auth/loading gates (`items-center justify-center`) may still use `min-h-screen`.
 
+**CI scroll guard coverage:** `npm run check:scroll` dynamically scans `app/admin/`, `app/portal/`, `app/press/dashboard/`, `app/editor/`, all `*Manager.tsx` in `src/components/admin/` and `src/components/portal/`, and all `src/components/` public files for `overflow-y-auto` without `data-lenis-prevent`. New pages and managers are covered automatically — no manual registration needed.
+
+**Scrollable containers:** Always use `<ScrollPanel>` (`src/components/ui/scroll-panel.tsx`) for scrollable content areas — it applies `overflow-y-auto overscroll-contain min-h-0` and `data-lenis-prevent` automatically. For inline usage, the `scrollPanelClass` constant is available.
+
 ## WCAG 2.1 AA (mandatory)
 
 - Skip link → `#main-content` in `app/layout.tsx`

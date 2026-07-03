@@ -192,7 +192,7 @@ export function InvoicesClient({
                 <CardHeader>
                   <CardTitle className="text-base">{t('invoices_heading')}</CardTitle>
                 </CardHeader>
-                <CardContent className="overflow-x-auto overscroll-contain p-0" data-lenis-prevent>
+                <CardContent className="overflow-x-auto overflow-y-clip overscroll-x-contain p-0" data-lenis-prevent>
                   <Table>
                     <TableHeader>
                       <TableRow>

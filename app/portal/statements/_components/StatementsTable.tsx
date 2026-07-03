@@ -218,7 +218,7 @@ export function StatementsTable({
               )
             })}
           </CardContent>
-          <CardContent className="hidden md:block overflow-x-auto overscroll-contain p-0" data-lenis-prevent>
+          <CardContent className="hidden md:block overflow-x-auto overflow-y-clip overscroll-x-contain p-0" data-lenis-prevent>
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
