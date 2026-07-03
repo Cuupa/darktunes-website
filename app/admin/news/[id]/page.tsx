@@ -162,7 +162,7 @@ export default function NewsEditPage() {
 
   return (
     <div
-      className="h-full w-full overflow-y-auto overscroll-contain bg-background p-6 text-foreground"
+      className="h-full w-full bg-background p-6 text-foreground"
       data-lenis-prevent
     >
       <div className="max-w-4xl mx-auto space-y-6">
