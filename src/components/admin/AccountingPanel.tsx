@@ -642,7 +642,7 @@ function SosGeneratorPanel() {
           typeof data?.error === 'string' ? data.error : 'Workspace delete failed',
         )
       }
-      toast.success('Workspace für diesen Zeitraum gelöscht')
+      toast.success(t.workspaceDeletedSuccess)
       setWorkspaceDeleteOpen(false)
       await loadFromServer({ force: true })
     } catch (err) {
@@ -712,13 +712,13 @@ function SosGeneratorPanel() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Zeitraum: {manualPeriodStart || detectedPeriodStart || '—'}
+          {t.uploadPeriodLabel} {manualPeriodStart || detectedPeriodStart || '—'}
           {(manualPeriodEnd || detectedPeriodEnd) &&
             (manualPeriodEnd || detectedPeriodEnd) !== (manualPeriodStart || detectedPeriodStart) &&
             ` – ${manualPeriodEnd || detectedPeriodEnd}`}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={resetSession}>
-          Neue Abrechnung starten
+          {t.resetSessionLabel}
         </Button>
       </div>
       <UniversalFileUploadZone
@@ -1310,14 +1310,16 @@ function SosGeneratorPanel() {
       <SosConfirmDialog
         open={workspaceDeleteOpen}
         onOpenChange={setWorkspaceDeleteOpen}
-        title="Workspace löschen"
+        title={t.workspaceDeleteTitle}
         description={
           currentPeriodKey
-            ? `Workspace für ${currentPeriodKey.start} – ${currentPeriodKey.end} vom Server löschen?`
+            ? t.workspaceDeleteDesc
+                .replace('{start}', currentPeriodKey.start)
+                .replace('{end}', currentPeriodKey.end)
             : ''
         }
-        confirmLabel="Löschen"
-        cancelLabel="Abbrechen"
+        confirmLabel={t.workspaceDeleteConfirm}
+        cancelLabel={t.settlementCancel}
         destructive
         loading={workspaceDeleting}
         onConfirm={confirmWorkspaceDelete}

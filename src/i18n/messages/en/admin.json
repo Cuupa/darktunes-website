@@ -475,7 +475,21 @@
     "trendsEmptyHint": "Upload CSV files and click \"Save period\" (or use Save to Portal in Analytics) to start tracking trends.",
     "trendsChartTitle": "Revenue & Payout Over Time",
     "trendsOnePeriodHint": "1 period saved. Save at least one more to see a trend chart.",
-    "trendsSaveFailed": "Failed to save period summary"
+    "trendsSaveFailed": "Failed to save period summary",
+    "wizardModeTitle": "How would you like to bill?",
+    "wizardModeSubtitle": "Choose Quick Start for experienced operators or the Assistant with setup and error checking.",
+    "wizardModeQuickTitle": "Quick Start",
+    "wizardModeQuickDesc": "Upload → Review → Publish. For recurring monthly billing.",
+    "wizardModeQuickButton": "Choose Quick Start",
+    "wizardModeAssistantTitle": "Assistant",
+    "wizardModeAssistantDesc": "Setup with all parameters, automatic validation and help with errors.",
+    "wizardModeAssistantButton": "Start Assistant",
+    "uploadPeriodLabel": "Period:",
+    "resetSessionLabel": "New billing session",
+    "workspaceDeletedSuccess": "Workspace deleted for this period",
+    "workspaceDeleteTitle": "Delete workspace",
+    "workspaceDeleteDesc": "Delete workspace for {start}–{end} from server?",
+    "workspaceDeleteConfirm": "Delete"
   },
   "features": {
     "globalSectionTitle": "Global site toggles",
