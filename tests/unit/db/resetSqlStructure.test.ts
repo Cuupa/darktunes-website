@@ -40,7 +40,7 @@ describe('reset.sql — column presence', () => {
   it('artists table has an id column of type uuid', () => {
     // Find the CREATE TABLE artists block and confirm id uuid is there
     const artistsBlock = sql.match(
-      /CREATE TABLE IF NOT EXISTS public\.artists[\s\S]+?(?=CREATE TABLE|CREATE INDEX|\Z)/,
+      /CREATE TABLE IF NOT EXISTS public\.artists[\s\S]+?(?=CREATE TABLE|CREATE INDEX|$)/,
     )
     expect(artistsBlock).toBeTruthy()
     expect(artistsBlock![0]).toMatch(/\bid\s+UUID/i)
