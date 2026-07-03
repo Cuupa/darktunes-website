@@ -18,9 +18,10 @@ const {
   mockToastError: vi.fn(),
 }))
 
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}))
+vi.mock('next-intl', () => {
+  const t = (key: string) => key
+  return { useTranslations: () => t }
+})
 
 vi.mock('sonner', () => ({
   toast: {
@@ -133,6 +134,10 @@ describe('useCSVProcessor', () => {
     }
 
     const { result } = renderHook(() => useCSVProcessor([file], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(result.current.isProcessing).toBe(true)
+    })
 
     const worker = workerInstances[0]
     const payload = {

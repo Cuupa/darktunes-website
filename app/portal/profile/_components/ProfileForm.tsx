@@ -159,7 +159,6 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors min-h-[44px]"
-              aria-label="Preview your public artist profile in a new tab"
             >
               <Eye size={15} aria-hidden="true" />
               {t('profile_preview_public')}

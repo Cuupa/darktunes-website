@@ -12,7 +12,10 @@ vi.mock('@/lib/api/safeCount', () => ({ safeCount }))
 vi.mock('@/lib/supabase/client', () => ({
   createBrowserSupabaseClient: () => ({
     from: () => ({ select: () => ({ eq: () => ({}) }) }),
-    channel: () => ({ on: () => ({ on: () => ({ on: () => ({ subscribe: () => ({}) }) }) }) }),
+    channel: () => {
+      const ch: { on: () => typeof ch; subscribe: () => Record<string, never> } = { on: () => ch, subscribe: () => ({}) }
+      return ch
+    },
     removeChannel: vi.fn(),
   }),
 }))
