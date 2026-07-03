@@ -42,7 +42,7 @@ export default async function PressDashboardLayout({ children }: { children: Rea
   ].filter((item) => item.enabled).map(({ href, label, badgeKey }) => ({ href, label, badgeKey }))
 
   return (
-    <div className="min-h-screen bg-background md:flex">
+    <div className="min-h-dvh bg-background md:flex">
       <PressNav email={user.email ?? ''} userId={user.id} links={links} />
       <main className="mx-auto w-full max-w-5xl flex-1 p-6 md:p-8">{children}</main>
     </div>

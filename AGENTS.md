@@ -27,6 +27,17 @@ No PR with failing checks. No `as any`, `@ts-ignore`, or `eslint-disable` to sil
 - **Minimal changes:** Smallest diff that fully solves the task
 - **Bronze CSV (SOS):** Never browser `fetch()` to presigned R2 URLs — use `/api/admin/sos/import-batches/*` routes; limits in `src/lib/sos/bronzeUploadLimits.ts`
 
+## Scroll — decision tree (read before touching any layout)
+
+1. **Public route** (`/`, `/artists`, `/news`, …) → Lenis owns scroll. Do NOT add `overflow-y-auto` to page-level wrappers. Scrollable panels within the page → `<ScrollPanel>` (`src/components/ui/scroll-panel.tsx`).
+2. **Dashboard route** (`/admin/*`, `/portal/*`, `/editor/*`) → Native scroll via `ScrollableAppShell`. Never add `min-h-screen` or a root `overflow-y-auto` on content pages.
+3. **New admin CRUD list** → `AdminPageShell layout="list"` + `AdminListShell`. Register route in `src/lib/scroll/dashboardRoutes.ts` (`isAdminListRoute`).
+4. **Full-bleed tool page** (e.g. file explorer) → `AdminPageShell fill`.
+5. **Wide table** → `horizontalScrollClass` from `scroll-panel.tsx`. Never `overflow-x-auto overscroll-contain` without `overflow-y-clip`.
+6. **Swiper / carousel / any 3rd-party scroll widget** → wrap with `data-lenis-prevent`.
+7. **Modal body** → `overflow-y-auto max-h-[70vh]` + `data-lenis-prevent`.
+8. **After any scroll change** → run `npm run check:scroll` locally before pushing.
+
 ## Detailed guidelines
 
 Read the relevant file before working in that area:

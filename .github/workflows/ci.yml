@@ -27,6 +27,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Scroll contract
+        run: npm run check:scroll
+
       - name: Build
         # Secrets optional for CI build — placeholders allow prerender without a live DB.
         # See DEPLOYMENT.md for production secret configuration.

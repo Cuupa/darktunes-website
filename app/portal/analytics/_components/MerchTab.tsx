@@ -43,7 +43,7 @@ export function MerchTab({ stats }: MerchTabProps) {
             <CardTitle className="text-sm font-medium">{t('analytics_merch_products_title')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto overscroll-contain" data-lenis-prevent>
+            <div className="overflow-x-auto overflow-y-clip overscroll-x-contain" data-lenis-prevent>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">

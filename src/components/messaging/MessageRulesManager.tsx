@@ -99,7 +99,7 @@ export function MessageRulesManager({
           Rules
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+      <DialogContent data-lenis-prevent className="max-w-2xl max-h-[80vh] overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
         <DialogHeader>
           <DialogTitle>Inbox Rules</DialogTitle>
         </DialogHeader>

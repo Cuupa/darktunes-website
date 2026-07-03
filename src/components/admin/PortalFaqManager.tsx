@@ -452,7 +452,7 @@ export function PortalFaqManager() {
       </Tabs>
 
       <Sheet open={categorySheetOpen} onOpenChange={setCategorySheetOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-lg">
+        <SheetContent data-lenis-prevent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>{editingCategory ? t('editCategory') : t('addCategory')}</SheetTitle>
             <SheetDescription>{t('categoryHint')}</SheetDescription>
@@ -501,7 +501,7 @@ export function PortalFaqManager() {
       </Sheet>
 
       <Sheet open={itemSheetOpen} onOpenChange={setItemSheetOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-2xl w-full">
+        <SheetContent data-lenis-prevent className="overflow-y-auto sm:max-w-2xl w-full">
           <SheetHeader>
             <SheetTitle>{editingItem ? t('editItem') : t('addItem')}</SheetTitle>
             <SheetDescription>{t('itemHint')}</SheetDescription>

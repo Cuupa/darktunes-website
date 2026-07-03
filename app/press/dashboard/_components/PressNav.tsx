@@ -45,7 +45,7 @@ export function PressNav({ email, userId, links }: PressNavProps) {
           </Button>
         </div>
       </div>
-      <aside className={["border-r border-border bg-card p-4 md:flex md:min-h-screen md:w-64 md:shrink-0 md:flex-col md:gap-4", open ? 'block' : 'hidden md:flex'].join(' ')}>
+      <aside className={["border-r border-border bg-card p-4 md:flex md:min-h-dvh md:w-64 md:shrink-0 md:flex-col md:gap-4", open ? 'block' : 'hidden md:flex'].join(' ')}>
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="font-semibold">{t('navTitle')}</p>
