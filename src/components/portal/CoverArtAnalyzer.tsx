@@ -85,8 +85,10 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
           setState('wrong_format')
           return
         }
-        // If CORS blocks but dimensions look right and extension is JPEG, warn
+        // CORS prevents byte-level check but dimensions are correct and extension is JPEG —
+        // treat as verified so the artist can submit.
         setState('blocked')
+        onVerified(true)
         return
       }
 

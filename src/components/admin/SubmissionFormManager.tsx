@@ -273,13 +273,17 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
     void saveField({ ...field, ...patch })
   }
 
-  const moveField = (field: SubmissionFormField, direction: -1 | 1) => {
+  const moveField = async (field: SubmissionFormField, direction: -1 | 1) => {
     const sorted = [...fields].sort((a, b) => a.displayOrder - b.displayOrder)
     const idx = sorted.findIndex((f) => f.id === field.id)
-    const swap = sorted[idx + direction]
+    const swapIdx = idx + direction
+    const swap = sorted[swapIdx]
     if (!swap) return
-    void saveField({ ...field, displayOrder: swap.displayOrder })
-    void saveField({ ...swap, displayOrder: field.displayOrder })
+    // Use stable position-based orders to handle duplicate displayOrder values.
+    const fieldNewOrder = (swapIdx + 1) * 10
+    const swapNewOrder = (idx + 1) * 10
+    await saveField({ ...field, displayOrder: fieldNewOrder })
+    await saveField({ ...swap, displayOrder: swapNewOrder })
   }
 
   const addPreset = (presetId: string) => {
@@ -421,8 +425,8 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => moveField(field, -1)} aria-label={COPY.moveUp}>↑</Button>
-                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => moveField(field, 1)} aria-label={COPY.moveDown}>↓</Button>
+                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => void moveField(field, -1)} aria-label={COPY.moveUp}>↑</Button>
+                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => void moveField(field, 1)} aria-label={COPY.moveDown}>↓</Button>
                     </div>
                   </TableCell>
                   <TableCell>
