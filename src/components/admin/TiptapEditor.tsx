@@ -48,6 +48,14 @@ interface TiptapEditorProps {
   placeholder?: string
   /** Compact mode hides alignment, image, and color controls */
   compact?: boolean
+  /**
+   * When true the editor grows with its content and relies on the surrounding
+   * shell for scrolling (no internal scrollbar). Use on full-page forms inside
+   * ScrollableAppShell (e.g. NewsForm, ArtistForm).
+   * Default false → legacy max-h-[500px] + overflow-y-auto behaviour, suitable
+   * for modals and compact panels.
+   */
+  grow?: boolean
 }
 
 const HEADING_LEVELS = [1, 2, 3] as const
@@ -58,7 +66,7 @@ export function getSanitizedPlainTextPaste(pastedText: string, pastedHtml: strin
   return stripEmojis(pastedText)
 }
 
-export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
+export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact, grow = false }: TiptapEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
   const [fileDialogOpen, setFileDialogOpen] = useState(false)
@@ -88,8 +96,10 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto overscroll-contain p-4 focus:outline-none',
-        'data-lenis-prevent': '',
+        class: grow
+          ? 'prose prose-invert max-w-none min-h-[300px] p-4 focus:outline-none'
+          : 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto overscroll-contain p-4 focus:outline-none',
+        ...(grow ? {} : { 'data-lenis-prevent': '' }),
         ...(placeholder ? { 'data-placeholder': placeholder } : {}),
       },
       handlePaste: (_view, event) => {

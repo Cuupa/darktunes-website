@@ -581,6 +581,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                       onChange={field.onChange}
                       disabled={isSubmitting}
                       placeholder="Tell the story of the label — history, mission, team…"
+                      grow
                     />
                   )}
                 />
@@ -1540,6 +1541,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                         onChange={field.onChange}
                         disabled={isSubmitting}
                         placeholder="Hier den deutschen Datenschutztext einfügen…"
+                        grow
                       />
                     )}
                   />
@@ -1559,6 +1561,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                         onChange={field.onChange}
                         disabled={isSubmitting}
                         placeholder="Enter the English privacy policy text here…"
+                        grow
                       />
                     )}
                   />

@@ -606,6 +606,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
                   onChange={field.onChange}
                   disabled={isLoading}
                   placeholder="Describe this artist…"
+                  grow
                 />
               )}
             />

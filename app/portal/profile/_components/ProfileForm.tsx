@@ -336,6 +336,7 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
                         value={field.value ?? ''}
                         onChange={field.onChange}
                         placeholder={t('profile_bio_short')}
+                        grow
                       />
                     )}
                   />
@@ -352,6 +353,7 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
                         value={field.value ?? ''}
                         onChange={field.onChange}
                         placeholder={t('profile_bio_medium')}
+                        grow
                       />
                     )}
                   />
@@ -368,6 +370,7 @@ function ProfileFormInner({ artistId, artistName, artistSlug, initialProfile, ar
                         value={field.value ?? ''}
                         onChange={field.onChange}
                         placeholder={t('profile_bio_long')}
+                        grow
                       />
                     )}
                   />
