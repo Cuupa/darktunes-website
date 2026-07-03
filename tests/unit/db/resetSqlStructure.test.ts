@@ -5,7 +5,7 @@ import { describe, expect, it, beforeAll } from 'vitest'
 let sql: string
 
 beforeAll(() => {
-  // resolve from the repo root (two levels up from tests/unit/db/)
+  // resolve from the repo root (three levels up from tests/unit/db/)
   const resetPath = resolve(__dirname, '../../../supabase/reset.sql')
   sql = readFileSync(resetPath, 'utf-8')
 })
