@@ -48,7 +48,7 @@ describe('reset.sql — column presence', () => {
 
   it('site_settings table has a key column', () => {
     const block = sql.match(
-      /CREATE TABLE IF NOT EXISTS public\.site_settings[\s\S]+?(?=CREATE TABLE|CREATE INDEX|\Z)/,
+      /CREATE TABLE IF NOT EXISTS public\.site_settings[\s\S]+?(?=CREATE TABLE|CREATE INDEX|$)/,
     )
     expect(block).toBeTruthy()
     expect(block![0]).toMatch(/\bkey\b/)
