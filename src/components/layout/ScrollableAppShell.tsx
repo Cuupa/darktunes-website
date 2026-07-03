@@ -33,7 +33,7 @@ export function ScrollableAppShell({
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {sidebar}
-      <main className={cn('flex min-h-0 min-w-0 flex-1 flex-col', mainClassName)}>
+      <main className={cn('flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden', mainClassName)}>
         <div
           data-lenis-prevent
           className={cn(
