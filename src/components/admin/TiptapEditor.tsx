@@ -52,6 +52,12 @@ interface TiptapEditorProps {
 
 const HEADING_LEVELS = [1, 2, 3] as const
 
+export function getSanitizedPlainTextPaste(pastedText: string, pastedHtml: string): string | null {
+  if (pastedHtml) return null
+  if (!containsEmojis(pastedText)) return null
+  return stripEmojis(pastedText)
+}
+
 export function TiptapEditor({ value, onChange, onChangeWithText, disabled, placeholder, compact }: TiptapEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [videoDialogOpen, setVideoDialogOpen] = useState(false)
@@ -89,14 +95,10 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
       handlePaste: (_view, event) => {
         const pastedText = event.clipboardData?.getData('text/plain') ?? ''
         const pastedHtml = event.clipboardData?.getData('text/html') ?? ''
-        if (!containsEmojis(pastedText) && !containsEmojis(pastedHtml)) {
-          return false
-        }
+        const cleaned = getSanitizedPlainTextPaste(pastedText, pastedHtml)
+        if (cleaned === null) return false
 
         event.preventDefault()
-        const cleaned = pastedHtml
-          ? stripEmojisFromHtml(pastedHtml)
-          : stripEmojis(pastedText)
         _view.dispatch(_view.state.tr.insertText(cleaned))
         return true
       },
