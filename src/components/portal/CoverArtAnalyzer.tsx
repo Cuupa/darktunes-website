@@ -10,7 +10,7 @@ interface CoverArtAnalyzerProps {
   onVerified: (verified: boolean) => void
 }
 
-type CheckState = 'idle' | 'verifying' | 'ok' | 'wrong_size' | 'wrong_format' | 'blocked'
+type CheckState = 'idle' | 'verifying' | 'ok' | 'wrong_size' | 'wrong_format' | 'blocked' | 'verified_with_warning'
 
 interface SizeInfo {
   width: number
@@ -87,7 +87,7 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
         }
         // CORS prevents byte-level check but dimensions are correct and extension is JPEG —
         // treat as verified so the artist can submit.
-        setState('blocked')
+        setState('verified_with_warning')
         onVerified(true)
         return
       }
@@ -113,6 +113,8 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
         return t('releases_submit_cover_check_wrong_format')
       case 'blocked':
         return t('releases_submit_cover_check_blocked')
+      case 'verified_with_warning':
+        return t('releases_submit_cover_check_verified_with_warning')
       case 'verifying':
         return t('releases_submit_cover_check_verifying')
       default:
@@ -123,7 +125,7 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
   const badgeVariant =
     state === 'ok'
       ? 'default'
-      : state === 'verifying'
+      : state === 'verifying' || state === 'verified_with_warning'
         ? 'secondary'
         : state === 'idle'
           ? 'outline'

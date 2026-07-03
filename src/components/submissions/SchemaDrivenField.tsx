@@ -112,7 +112,17 @@ export function SchemaDrivenField({
   }
 
   if (field.fieldType === 'date') {
-    return <DateField id={id} labelEl={labelEl} value={value} onChange={onChange} required={field.isRequired} error={error ?? null} />
+    return (
+      <DateField
+        id={id}
+        labelEl={labelEl}
+        value={value}
+        onChange={onChange}
+        required={field.isRequired}
+        error={error ?? null}
+        placeholder={placeholder}
+      />
+    )
   }
 
   const inputType =
@@ -155,9 +165,10 @@ interface DateFieldProps {
   onChange: (v: string) => void
   required: boolean
   error: string | null
+  placeholder: string
 }
 
-function DateField({ id, labelEl, value, onChange, required, error }: DateFieldProps) {
+function DateField({ id, labelEl, value, onChange, required, error, placeholder }: DateFieldProps) {
   const [open, setOpen] = useState(false)
   const selected = parseYmd(value)
 
@@ -187,7 +198,7 @@ function DateField({ id, labelEl, value, onChange, required, error }: DateFieldP
             aria-haspopup="dialog"
           >
             <CalendarIcon size={16} className="mr-2 shrink-0 opacity-70" />
-            {selected ? format(selected, 'dd.MM.yyyy') : <span>Datum wählen</span>}
+            {selected ? format(selected, 'dd.MM.yyyy') : <span>{placeholder}</span>}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
@@ -195,7 +206,6 @@ function DateField({ id, labelEl, value, onChange, required, error }: DateFieldP
             mode="single"
             selected={selected}
             onSelect={handleSelect}
-            initialFocus
           />
         </PopoverContent>
       </Popover>

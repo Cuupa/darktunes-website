@@ -640,6 +640,7 @@
   "releases_submit_cover_check_wrong_size": "❌ Wrong size: expected 3000×3000 px, got {{width}}×{{height}} px",
   "releases_submit_cover_check_wrong_format": "❌ Wrong format: must be JPEG/JPG",
   "releases_submit_cover_check_blocked": "⚠️ Could not verify cover art (URL blocked). Check the URL and try again.",
+  "releases_submit_cover_check_verified_with_warning": "⚠️ Could not fully verify file bytes due to CORS, but dimensions and JPG extension look valid.",
   "releases_submit_cover_check_required": "Please verify your cover art before submitting.",
   "releases_submit_tracks_heading": "Tracks",
   "releases_submit_add_track": "Add track",
