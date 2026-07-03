@@ -20,11 +20,12 @@ import {
   Tag,
   MegaphoneSimple,
   Globe,
+  ShieldStar,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useRolePermissions } from '@/hooks/useRolePermissions'
-import { editorCanAccessTab, type EditorDashboardTab } from '@/lib/editor/editorTabPermissions'
+import { isValidTab, canSeeTab as canSeeTabFn, type TabValue } from '@/lib/admin/tabPermissions'
 import { useTranslations } from 'next-intl'
 import { DashboardNotificationBell } from './DashboardNotificationBell'
 import { EditorPromoLogPanel } from './EditorPromoLogPanel'
@@ -46,6 +47,7 @@ const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then(
 const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
 const MaintenanceManager = lazy(() => import('./MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })))
 const GenresManager = lazy(() => import('./GenresManager').then((m) => ({ default: m.GenresManager })))
+const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
 
 function TabFallback() {
   return (
@@ -62,11 +64,7 @@ function TabFallback() {
 // Tab definitions — single source of truth for labels, icons, and metadata
 // ---------------------------------------------------------------------------
 
-type TabValue =
-  | 'artists' | 'releases' | 'news' | 'videos' | 'assets'
-  | 'accreditations' | 'press' | 'statements'
-  | 'release-submissions' | 'video-submissions' | 'fan-page-reviews' | 'submission-form'
-  | 'events' | 'genres' | 'maintenance' | 'promo-log'
+// TabValue is re-exported from @/lib/admin/tabPermissions
 
 interface TabDef {
   value: TabValue
@@ -92,10 +90,9 @@ const TAB_DEFS: TabDef[] = [
   { value: 'fan-page-reviews',    label: 'Fan Page Reviews',    adminOnly: false, icon: Globe },
   { value: 'promo-log',           label: 'Promo Log',           adminOnly: false, icon: MegaphoneSimple },
   { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
+  { value: 'roles',               label: 'Roles & Permissions', adminOnly: true,  icon: ShieldStar },
   { value: 'maintenance',         label: 'Maintenance',         adminOnly: true,  icon: Wrench },
 ]
-
-const ALL_TAB_VALUES = TAB_DEFS.map((t) => t.value)
 
 // Static card titles and descriptions for each tab panel
 const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> = {
@@ -114,12 +111,11 @@ const TAB_PANEL_META: Record<TabValue, { title: string; description: string }> =
   'fan-page-reviews':    { title: 'Fan Page Reviews',             description: 'Review artist fan pages submitted from the portal and approve or reject publication.' },
   'promo-log':           { title: 'Promo Log',                    description: 'Document label marketing work per artist and keep the portal timeline up to date.' },
   'submission-form':     { title: 'Submission Form',              description: 'Configure which fields appear in the release and video submission forms.' },
+  'roles':               { title: 'Roles & Permissions',          description: 'Manage system role permissions and create custom roles with granular capabilities.' },
   'maintenance':         { title: 'Maintenance',                  description: 'System maintenance: clear logs, purge data, reset states, revalidate caches.' },
 }
 
-function isValidTab(value: string | null): value is TabValue {
-  return ALL_TAB_VALUES.includes(value as TabValue)
-}
+// isValidTab is imported from @/lib/admin/tabPermissions
 
 // ---------------------------------------------------------------------------
 // Component
@@ -148,15 +144,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   const isEditor = profile?.role === 'editor'
 
   const canSeeTab = useCallback((tab: TabValue) => {
-    const def = TAB_DEFS.find((t) => t.value === tab)
-    if (!def) return false
-    if (isAdmin) return true
-    if (def.adminOnly) return false
-    if (isEditor) {
-      return editorCanAccessTab(tab as EditorDashboardTab, permissions)
-    }
-    if (contentOnly) return !def.adminOnly
-    return false
+    return canSeeTabFn(tab, { isAdmin, isEditor, contentOnly, permissions })
   }, [contentOnly, isAdmin, isEditor, permissions])
 
   const getDefaultTab = useCallback((): TabValue => {
@@ -331,6 +319,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               'fan-page-reviews':    <FanPageReviewsManager />,
               'promo-log':           <EditorPromoLogPanel />,
               'submission-form':     <SubmissionFormManager variant="embedded" />,
+              'roles':               <RolesManager />,
               'maintenance':         <MaintenanceManager />,
             }
 
