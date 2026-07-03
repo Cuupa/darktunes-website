@@ -1,6 +1,24 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { DotsSixVertical } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -87,6 +105,12 @@ const COPY = {
   cancel: 'Cancel',
   moveUp: 'Move up',
   moveDown: 'Move down',
+  dragHandle: 'Drag to reorder',
+  saveOrder: 'Save Order',
+  discardOrder: 'Discard',
+  orderSaved: 'Order saved',
+  orderSaveError: 'Failed to save order',
+  savingOrder: 'Saving…',
   typeRulesSaved: 'Track rules saved',
   typeRulesLoadError: 'Failed to load track rules',
   typeRulesSaveError: 'Failed to save track rules',
@@ -103,6 +127,100 @@ async function parseApiError(res: Response): Promise<string> {
   }
 }
 
+interface SortableFieldRowProps {
+  field: SubmissionFormField
+  formType: 'release' | 'video'
+  labelLocale: string
+  saving: string | null
+  dragHandleLabel: string
+  onLabelBlur: (field: SubmissionFormField, locale: string, value: string) => void
+  onVisibleChange: (field: SubmissionFormField, visible: boolean) => void
+  onRequiredChange: (field: SubmissionFormField, required: boolean) => void
+  onDelete: (id: string) => void
+}
+
+function SortableFieldRow({
+  field,
+  formType,
+  labelLocale,
+  saving,
+  dragHandleLabel,
+  onLabelBlur,
+  onVisibleChange,
+  onRequiredChange,
+  onDelete,
+}: SortableFieldRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: field.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? 'opacity-60 shadow-md' : undefined}
+    >
+      <TableCell className="w-10 px-2">
+        <button
+          type="button"
+          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing"
+          aria-label={dragHandleLabel}
+          {...attributes}
+          {...listeners}
+        >
+          <DotsSixVertical size={18} aria-hidden />
+        </button>
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1 min-w-[10rem]">
+          <Input
+            className="h-8 text-sm"
+            defaultValue={field.fieldLabels[labelLocale] ?? ''}
+            onBlur={(e) => onLabelBlur(field, labelLocale, e.target.value)}
+            aria-label={`Label ${field.fieldKey}`}
+          />
+          <p className="font-mono text-[10px] text-muted-foreground">{field.fieldKey}</p>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline">{field.fieldType}</Badge>
+      </TableCell>
+      {formType === 'release' && (
+        <TableCell>
+          <Badge variant="secondary">
+            {field.fieldScope === 'track' ? 'Track' : 'Release'}
+          </Badge>
+        </TableCell>
+      )}
+      <TableCell>
+        <SubmissionFieldToggles
+          visible={field.isVisible}
+          required={field.isRequired}
+          onVisibleChange={(visible) => onVisibleChange(field, visible)}
+          onRequiredChange={(required) => onRequiredChange(field, required)}
+          fieldKey={field.fieldKey}
+        />
+      </TableCell>
+      <TableCell>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="h-8 min-h-[44px]"
+          disabled={saving === field.id}
+          onClick={() => onDelete(field.id)}
+        >
+          Delete
+        </Button>
+      </TableCell>
+    </TableRow>
+  )
+}
+
 interface SubmissionFormManagerProps {
   variant?: 'page' | 'embedded'
 }
@@ -117,9 +235,11 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
   const [loading, setLoading] = useState(true)
   const [loadingTypeRules, setLoadingTypeRules] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
+  const [savingOrder, setSavingOrder] = useState(false)
   const [addingNew, setAddingNew] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [labelLocale, setLabelLocale] = useState('en')
+  const [draftOrder, setDraftOrder] = useState<string[] | null>(null)
   const [newField, setNewField] = useState<Partial<SubmissionFormField>>({
     fieldType: 'text',
     fieldScope: 'release',
@@ -129,9 +249,20 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
   })
 
   const existingKeys = useMemo(() => new Set(fields.map((f) => f.fieldKey)), [fields])
-  const sortedFields = useMemo(
+  const serverSortedFields = useMemo(
     () => [...fields].sort((a, b) => a.displayOrder - b.displayOrder),
     [fields],
+  )
+  const sortedFields = useMemo(() => {
+    if (!draftOrder) return serverSortedFields
+    return draftOrder
+      .map((id) => serverSortedFields.find((f) => f.id === id))
+      .filter((f): f is SubmissionFormField => f !== undefined)
+  }, [draftOrder, serverSortedFields])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
   const getToken = useCallback(async () => {
@@ -150,6 +281,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
       if (!res.ok) throw new Error(await parseApiError(res))
       const data = (await res.json()) as SubmissionFormField[]
       setFields(data)
+      setDraftOrder(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : COPY.loadError)
     } finally {
@@ -273,17 +405,44 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
     void saveField({ ...field, ...patch })
   }
 
-  const moveField = async (field: SubmissionFormField, direction: -1 | 1) => {
-    const sorted = [...fields].sort((a, b) => a.displayOrder - b.displayOrder)
-    const idx = sorted.findIndex((f) => f.id === field.id)
-    const swapIdx = idx + direction
-    const swap = sorted[swapIdx]
-    if (!swap) return
-    // Use stable position-based orders to handle duplicate displayOrder values.
-    const fieldNewOrder = (swapIdx + 1) * 10
-    const swapNewOrder = (idx + 1) * 10
-    await saveField({ ...field, displayOrder: fieldNewOrder })
-    await saveField({ ...swap, displayOrder: swapNewOrder })
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const currentOrder = sortedFields.map((f) => f.id)
+    const oldIndex = currentOrder.indexOf(active.id as string)
+    const newIndex = currentOrder.indexOf(over.id as string)
+    if (oldIndex === -1 || newIndex === -1) return
+    setDraftOrder(arrayMove(currentOrder, oldIndex, newIndex))
+  }
+
+  const saveOrderChanges = async () => {
+    if (!draftOrder) return
+    setSavingOrder(true)
+    try {
+      const token = await getToken()
+      for (let i = 0; i < draftOrder.length; i++) {
+        const field = fields.find((f) => f.id === draftOrder[i])
+        if (!field) continue
+        const newOrder = (i + 1) * 10
+        if (field.displayOrder === newOrder) continue
+        const payload = fieldToApiPayload({ ...field, displayOrder: newOrder }, formType)
+        const res = await fetch('/api/admin/submission-form-schema', {
+          method: 'PUT',
+          headers: {
+            Authorization: `******`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error(await parseApiError(res))
+      }
+      toast.success(COPY.orderSaved)
+      await fetchFields(formType)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : COPY.orderSaveError)
+    } finally {
+      setSavingOrder(false)
+    }
   }
 
   const addPreset = (presetId: string) => {
@@ -342,6 +501,28 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
     </div>
   ) : null
 
+  const orderToolbar = showFieldsPanel && !loading && draftOrder ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        className="min-h-[44px]"
+        disabled={savingOrder}
+        onClick={() => void saveOrderChanges()}
+      >
+        {savingOrder ? COPY.savingOrder : COPY.saveOrder}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="min-h-[44px]"
+        disabled={savingOrder}
+        onClick={() => setDraftOrder(null)}
+      >
+        {COPY.discardOrder}
+      </Button>
+    </div>
+  ) : null
+
   const addFieldToolbar = showFieldsPanel && !addingNew && !loading ? (
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setAddingNew(true)}>
@@ -373,77 +554,43 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
 
     return (
       <div className="space-y-4 p-4">
-        <Table className="min-w-max w-full">
-            <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
-              <TableRow className="bg-card hover:bg-card">
-                <TableHead className="bg-card">{COPY.fieldLabel}</TableHead>
-                <TableHead className="bg-card">{COPY.fieldType}</TableHead>
-                {formType === 'release' && <TableHead className="bg-card">{COPY.fieldScope}</TableHead>}
-                <TableHead className="bg-card">{COPY.status}</TableHead>
-                <TableHead className="bg-card">{COPY.order}</TableHead>
-                <TableHead className="bg-card">{COPY.actions}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedFields.map((field) => (
-                <TableRow key={field.id}>
-                  <TableCell>
-                    <div className="space-y-1 min-w-[10rem]">
-                      <Input
-                        className="h-8 text-sm"
-                        defaultValue={field.fieldLabels[labelLocale] ?? ''}
-                        onBlur={(e) => {
-                          const next = e.target.value
-                          if (next === (field.fieldLabels[labelLocale] ?? '')) return
-                          updateField(field, {
-                            fieldLabels: { ...field.fieldLabels, [labelLocale]: next },
-                          })
-                        }}
-                        aria-label={`${COPY.fieldLabel} ${field.fieldKey}`}
-                      />
-                      <p className="font-mono text-[10px] text-muted-foreground">{field.fieldKey}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{field.fieldType}</Badge>
-                  </TableCell>
-                  {formType === 'release' && (
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {field.fieldScope === 'track' ? COPY.scopeTrack : COPY.scopeRelease}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <SubmissionFieldToggles
-                      visible={field.isVisible}
-                      required={field.isRequired}
-                      onVisibleChange={(visible) => updateField(field, { isVisible: visible, ...(!visible ? { isRequired: false } : {}) })}
-                      onRequiredChange={(required) => updateField(field, { isRequired: required })}
-                      fieldKey={field.fieldKey}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => void moveField(field, -1)} aria-label={COPY.moveUp}>↑</Button>
-                      <Button variant="outline" size="sm" className="h-8 min-h-[44px] min-w-[44px] px-2" onClick={() => void moveField(field, 1)} aria-label={COPY.moveDown}>↓</Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="h-8 min-h-[44px]"
-                      disabled={saving === field.id}
-                      onClick={() => setDeleteTarget(field.id)}
-                    >
-                      {COPY.fieldDelete}
-                    </Button>
-                  </TableCell>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <Table className="min-w-max w-full">
+              <TableHeader className="sticky top-0 z-10 border-b border-border bg-card">
+                <TableRow className="bg-card hover:bg-card">
+                  <TableHead className="bg-card w-10" />
+                  <TableHead className="bg-card">{COPY.fieldLabel}</TableHead>
+                  <TableHead className="bg-card">{COPY.fieldType}</TableHead>
+                  {formType === 'release' && <TableHead className="bg-card">{COPY.fieldScope}</TableHead>}
+                  <TableHead className="bg-card">{COPY.status}</TableHead>
+                  <TableHead className="bg-card">{COPY.actions}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-        </Table>
+              </TableHeader>
+              <SortableContext items={sortedFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+                <TableBody>
+                  {sortedFields.map((field) => (
+                    <SortableFieldRow
+                      key={field.id}
+                      field={field}
+                      formType={formType}
+                      labelLocale={labelLocale}
+                      saving={saving}
+                      dragHandleLabel={COPY.dragHandle}
+                      onLabelBlur={(f, locale, next) => {
+                        if (next === (f.fieldLabels[locale] ?? '')) return
+                        updateField(f, { fieldLabels: { ...f.fieldLabels, [locale]: next } })
+                      }}
+                      onVisibleChange={(f, visible) =>
+                        updateField(f, { isVisible: visible, ...(!visible ? { isRequired: false } : {}) })
+                      }
+                      onRequiredChange={(f, required) => updateField(f, { isRequired: required })}
+                      onDelete={(id) => setDeleteTarget(id)}
+                    />
+                  ))}
+                </TableBody>
+              </SortableContext>
+          </Table>
+        </DndContext>
 
         {addingNew && (
           <div className="border border-border rounded-md p-4 space-y-4">
@@ -705,6 +852,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
 
               <div className="flex flex-wrap items-center gap-3">
                 {localeToolbar}
+                {orderToolbar}
                 {addFieldToolbar}
               </div>
             </div>
