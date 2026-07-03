@@ -10,5 +10,5 @@ const ADMIN_LIST_ROUTES = ['/admin/news', '/admin/releases', '/admin/artists', '
 
 /** Admin CRUD list pages: outer shell scroll is locked; AdminListShell scrolls internally. */
 export function isAdminListRoute(pathname: string): boolean {
-  return ADMIN_LIST_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+  return ADMIN_LIST_ROUTES.some((route) => pathname === route)
 }
