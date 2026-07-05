@@ -3,13 +3,15 @@
  *
  * Release deduplication utility.
  *
- * Merges digital (Spotify) and physical (Discogs) releases using ISRC or
- * barcode/UPC as the canonical deduplication key.
+ * Merges digital (Spotify) and physical (Discogs) releases using barcode/UPC
+ * as the canonical deduplication key.
  *
  * Matching strategy (in order of precedence):
- *   1. ISRC match (exact)
- *   2. Barcode/UPC match (exact)
- *   3. Normalized title + approximate year match (fuzzy fallback)
+ *   1. Barcode/UPC match (exact, digits only)
+ *   2. Normalized title + approximate year match (fuzzy fallback)
+ *
+ * Note: Discogs does not provide ISRCs, so ISRC-based matching is not possible
+ * here. ISRC matching is available in findCrossSourceMergeTarget for DB rows.
  *
  * The result is a merged release record ready for UPSERT into Supabase.
  */
@@ -130,10 +132,13 @@ export function registerSyncedRelease(
   })
 }
 
-/** Normalise a title for fuzzy comparison: lowercase, strip punctuation */
+/** Normalise a title for fuzzy comparison: strip streaming suffixes, lowercase, strip punctuation */
 export function normTitle(title: string): string {
   return title
     .toLowerCase()
+    // Strip common streaming/iTunes suffixes like " - EP", " - Single", " - Album", " - LP"
+    // so that "Nocturnal - EP" (iTunes) matches "Nocturnal" (manually entered).
+    .replace(/\s+-\s+(ep|single|album|lp|maxi single|maxi)\s*$/, '')
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -167,20 +172,15 @@ export function deduplicateReleases(
   for (const spotify of spotifyReleases) {
     let bestDiscogs: DiscogsReleaseInput | null = null
 
-    // 1. ISRC match
-    if (spotify.isrc) {
-      bestDiscogs = discogsReleases.find((d) => d.barcode === spotify.isrc) ?? null
-    }
-
-    // 2. Barcode match
-    if (!bestDiscogs && spotify.barcode) {
+    // 1. Barcode match
+    if (spotify.barcode) {
       bestDiscogs =
         discogsReleases.find(
           (d) => d.barcode && d.barcode.replace(/\D/g, '') === spotify.barcode!.replace(/\D/g, ''),
         ) ?? null
     }
 
-    // 3. Fuzzy title + year match
+    // 2. Fuzzy title + year match
     if (!bestDiscogs) {
       const spotifyYear = extractYear(spotify.releaseDate)
       const spotifyNorm = normTitle(spotify.title)

@@ -23,7 +23,7 @@ import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { getYouTubeCredentials } from '@/lib/secrets/getExternalCredentials'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
-// Fetching and upserting up to 200 YouTube videos can take longer than the default timeout.
+// Fetching all videos from a large channel can take longer than the default timeout.
 export const maxDuration = 300
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
@@ -65,7 +65,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   // 3. Fetch from YouTube
   let videos
   try {
-    videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 200)
+    videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, Number.POSITIVE_INFINITY)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     // Surface quota / key issues as 502 with a helpful message
