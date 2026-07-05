@@ -80,13 +80,23 @@ export async function proxy(request: NextRequest) {
   const route = classifyRoute(pathname)
   const protectedRoute = routeIsProtected(route)
 
+  // Public routes (not protected, not login): inject x-pathname and return immediately
+  // to avoid unnecessary auth overhead on every public page request.
+  if (!protectedRoute && !route.isLoginPage) {
+    const res = NextResponse.next({ request })
+    res.headers.set('x-pathname', pathname)
+    return res
+  }
+
   // CI placeholder credentials: enforce route redirects without calling Supabase
   // (avoids slow/hanging auth against fake hosts while keeping protected routes gated).
   if (!isSupabaseEnvConfigured()) {
     if (protectedRoute && !route.isLoginPage && !route.isPortalAcceptInvitePage) {
       return redirectUnauthenticatedToLogin(request)
     }
-    return NextResponse.next({ request })
+    const res = NextResponse.next({ request })
+    res.headers.set('x-pathname', pathname)
+    return res
   }
 
   let supabaseResponse = NextResponse.next({ request })
@@ -282,12 +292,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/editor/:path*',
-    '/portal/:path*',
-    '/press/dashboard/:path*',
-    '/promo-pool/:path*',
-    '/account/:path*',
-    '/login',
+    /*
+     * Match every path except Next.js internals and static assets.
+     * Auth and i18n header injection must cover all routes, including public ones.
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico).*)',
   ],
 }
