@@ -36,6 +36,7 @@ const ADMIN_SIDEBAR_LINKS = [
   'API Keys',
   'Support',
   'System',
+  'Genres',
 ]
 
 test.describe('Feature completeness', () => {
