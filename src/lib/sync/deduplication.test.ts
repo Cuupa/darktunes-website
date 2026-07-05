@@ -93,8 +93,23 @@ describe('deduplicateReleases', () => {
     expect(result[0].merged).toBe(false)
   })
 
-  it('returns empty array when both inputs are empty', () => {
-    expect(deduplicateReleases([], [])).toHaveLength(0)
+  it('merges Spotify and Discogs release by normalised title when iTunes EP suffix differs', () => {
+    const spotify: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      title: 'Nocturnal',
+      barcode: null,
+      isrc: null,
+      releaseDate: '2023-01-01',
+    }
+    const discogs: DiscogsReleaseInput = {
+      ...DISCOGS_BASE,
+      title: 'Nocturnal - EP',
+      barcode: null,
+      releaseDate: '2023-01-01',
+    }
+    const result = deduplicateReleases([spotify], [discogs])
+    expect(result).toHaveLength(1)
+    expect(result[0].merged).toBe(true)
   })
 
   it('handles multiple Spotify releases matched to different Discogs releases', () => {
@@ -144,6 +159,34 @@ describe('deduplicateReleases', () => {
 describe('normTitle / extractYear', () => {
   it('normalises punctuation and casing', () => {
     expect(normTitle('Dark Matter (Deluxe)')).toBe('dark matter deluxe')
+  })
+
+  it('strips iTunes " - EP" suffix', () => {
+    expect(normTitle('Nocturnal - EP')).toBe('nocturnal')
+  })
+
+  it('strips iTunes " - Single" suffix', () => {
+    expect(normTitle('Death Wish - Single')).toBe('death wish')
+  })
+
+  it('strips iTunes " - Album" suffix', () => {
+    expect(normTitle('Dark Matter - Album')).toBe('dark matter')
+  })
+
+  it('strips iTunes " - LP" suffix', () => {
+    expect(normTitle('Void - LP')).toBe('void')
+  })
+
+  it('makes " - EP" (iTunes) match the bare title (manual entry)', () => {
+    expect(normTitle('Nocturnal - EP')).toBe(normTitle('Nocturnal'))
+  })
+
+  it('is case-insensitive for suffix stripping', () => {
+    expect(normTitle('Nocturnal - ep')).toBe('nocturnal')
+  })
+
+  it('does not strip mid-title dashes', () => {
+    expect(normTitle('Fire - Ice - EP')).toBe('fire ice')
   })
 
   it('extracts year from ISO date strings', () => {
@@ -254,6 +297,22 @@ describe('findCrossSourceMergeTarget', () => {
       'spotify',
     )
     expect(target?.id).toBe('rel-isrc')
+  })
+
+  it('merges iTunes " - EP" title into manual row with bare title', () => {
+    const manualRow: CrossSourceReleaseRow = {
+      id: 'rel-manual-ep',
+      title: 'Nocturnal',
+      release_date: '2022-06-01',
+      spotify_id: null,
+      itunes_id: null,
+    }
+    const target = findCrossSourceMergeTarget(
+      [manualRow],
+      { title: 'Nocturnal - EP', releaseDate: '2022-06-15' },
+      'itunes',
+    )
+    expect(target?.id).toBe('rel-manual-ep')
   })
 
   it('returns null when years differ by more than one year', () => {
