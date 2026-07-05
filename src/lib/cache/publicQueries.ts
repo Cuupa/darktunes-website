@@ -45,13 +45,29 @@ export const getCachedPublicNews = cache(unstable_cache(
   { revalidate: TTL, tags: ['news'] },
 ))
 
-/** All public videos, cache-keyed to the `videos` tag. */
-export const getCachedPublicVideos = cache(unstable_cache(
+/** All public videos (full catalogue), cache-keyed to the `videos` tag. */
+const _getCachedPublicVideosAll = cache(unstable_cache(
   async (): Promise<Video[]> =>
     getPublicVideos(createPublicSupabaseClient()).catch(() => [] as Video[]),
-  ['public-videos'],
+  ['public-videos', 'all'],
   { revalidate: TTL, tags: ['videos'] },
 ))
+
+/** Public videos with Shorts excluded, cache-keyed to the `videos` tag. */
+const _getCachedPublicVideosNoShorts = cache(unstable_cache(
+  async (): Promise<Video[]> =>
+    getPublicVideos(createPublicSupabaseClient(), { excludeShorts: true }).catch(() => [] as Video[]),
+  ['public-videos', 'no-shorts'],
+  { revalidate: TTL, tags: ['videos'] },
+))
+
+/**
+ * Returns public videos, optionally excluding YouTube Shorts.
+ * Two separate cache entries are used so each variant has a stable cache key.
+ */
+export function getCachedPublicVideos(options: { excludeShorts?: boolean } = {}): Promise<Video[]> {
+  return options.excludeShorts ? _getCachedPublicVideosNoShorts() : _getCachedPublicVideosAll()
+}
 
 /** All public concerts, cache-keyed to the `concerts` tag. */
 export const getCachedPublicConcerts = cache(unstable_cache(

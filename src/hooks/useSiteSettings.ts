@@ -57,6 +57,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     carousel_autoplay_ms: String(s.carouselAutoplayMs ?? 0),
     videos_per_page: String(s.videosPerPage ?? 9),
     videos_link_to_page: String(s.videosLinkToPage ?? false),
+    exclude_shorts_from_public: String(s.excludeShortsFromPublic ?? false),
     feature_toggles: JSON.stringify(s.featureToggles ?? { promoPool: true, editorTools: true }),
     logo_url: s.logoUrl ?? '',
     favicon_url: s.faviconUrl ?? '',

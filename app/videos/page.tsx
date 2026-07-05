@@ -21,10 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function VideosPage() {
-  const [videos, settings] = await Promise.all([
-    getCachedPublicVideos(),
+  const [settings] = await Promise.all([
     getCachedSiteSettings(),
   ])
+
+  const videos = await getCachedPublicVideos({
+    excludeShorts: settings?.excludeShortsFromPublic ?? false,
+  })
 
   return (
     <VideosPageContent

@@ -17,7 +17,7 @@ import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { isValidCronSecret } from '@/lib/cronAuth'
-import { fetchYouTubeChannelVideos } from '@/lib/api/youtubeApi'
+import { fetchYouTubeChannelVideos, isYouTubeShort } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { getYouTubeCredentials } from '@/lib/secrets/getExternalCredentials'
@@ -99,6 +99,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       title: v.title,
       thumbnail_url: v.thumbnailUrl,
       published_at: v.publishedAt,
+      is_short: isYouTubeShort(v.durationSeconds, v.title),
       // is_visible intentionally excluded so that admin-hidden videos are not
       // re-shown on every sync; new videos default to TRUE via the DB column default.
     }

@@ -508,6 +508,8 @@ export interface SiteSettings {
   videosPerPage: number
   /** When true, the Videos section on the homepage shows only the first page and links to /videos for all videos. */
   videosLinkToPage: boolean
+  /** When true, YouTube Shorts (≤180 s or #shorts tag) are hidden from the public /videos page. Default: false. */
+  excludeShortsFromPublic: boolean
   /** Number of concerts shown per page in the Events section. Default: 8. */
   concertsPerPage: number
   /** When true, the Events section on the homepage shows only the first page and links to /events for all events. */
