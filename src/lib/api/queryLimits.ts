@@ -13,8 +13,6 @@ export const PUBLIC_QUERY_LIMITS = {
   news: 100,
   /** Maximum news posts returned by getPublicNewsPostsByArtistId. */
   newsByArtist: 50,
-  /** Maximum videos returned by getPublicVideos. */
-  videos: 100,
   /** Maximum concerts returned by getPublicConcerts. */
   concerts: 500,
   /** Maximum statements per artist returned by getSalesStatementsByArtistId. */

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { Video } from '@/types'
-import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
 type VideoRow = Database['public']['Tables']['videos']['Row']
@@ -34,13 +33,19 @@ export async function getVideos(db: DbClient): Promise<Video[]> {
 }
 
 /** Public-facing: only returns visible videos. */
-export async function getPublicVideos(db: DbClient): Promise<Video[]> {
-  const { data, error } = await db
+export async function getPublicVideos(
+  db: DbClient,
+  options: { excludeShorts?: boolean } = {},
+): Promise<Video[]> {
+  let query = db
     .from('videos')
     .select('*, artists(name)')
     .eq('is_visible', true)
     .order('published_at', { ascending: false })
-    .limit(PUBLIC_QUERY_LIMITS.videos)
+  if (options.excludeShorts) {
+    query = query.eq('is_short', false)
+  }
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToVideo)
 }

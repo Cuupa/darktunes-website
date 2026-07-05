@@ -99,6 +99,7 @@ const schema = z.object({
   carouselAutoplayMs: z.number().int().min(0).default(0),
   videosPerPage: z.number().int().min(1).max(50).default(9),
   videosLinkToPage: z.boolean().default(false),
+  excludeShortsFromPublic: z.boolean().default(false),
   homepageNewsCount: z.number().int().min(1).max(12).default(3),
   logoUrl: z.string().optional().default(''),
   faviconUrl: z.string().optional().default(''),
@@ -1033,6 +1034,27 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
                   render={({ field }) => (
                     <Switch
                       id="videosLinkToPage"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="excludeShortsFromPublic">Exclude Shorts from /videos page</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Hide YouTube Shorts (≤&nbsp;180&nbsp;s or #shorts tag) from the public videos page. Shorts are still visible in the admin.
+                  </p>
+                </div>
+                <Controller
+                  name="excludeShortsFromPublic"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="excludeShortsFromPublic"
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       disabled={isSubmitting}
