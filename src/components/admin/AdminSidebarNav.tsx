@@ -33,6 +33,7 @@ import {
   Briefcase,
   Receipt,
   FolderOpen,
+  Tag,
   Wallet,
   ChatCircle,
   MegaphoneSimple,
@@ -119,6 +120,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'MANAGEMENT',
     items: [
       { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
+      { label: 'Genres',      href: '/admin/genres',      icon: Tag,             adminOnly: true  },
       { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
       { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
       { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
