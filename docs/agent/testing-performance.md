@@ -31,10 +31,10 @@ Baseline after Phase 0 foundation (main @ 14da8b1):
 
 | Metric | Count |
 |--------|------:|
-| Vitest files (`**/*.{test,spec}.{ts,tsx}`) | 167 |
-| Vitest tests | 1302 |
+| Vitest files (`**/*.{test,spec}.{ts,tsx}`) | 307 |
+| Vitest tests | 1812 |
 | Playwright E2E specs (`tests/e2e/`) | 12 |
-| `eslint-disable` in production TS | 14 files |
+| `eslint-disable` in production TS | 5 files (6 suppressions reduced from 14 — remaining are `@next/next/no-img-element` for DOM APIs needing naturalWidth/naturalHeight or canvas crop, and `@typescript-eslint/no-require-imports` removed via async dynamic import) |
 | `as unknown as` in production DAL | 0 (Phase 2) |
 
 ### Module matrix (target: co-located test per module >100 lines)
@@ -46,14 +46,14 @@ Baseline after Phase 0 foundation (main @ 14da8b1):
 | `src/lib/api/settlementRegister.ts` | **Done** (register + carry-forward tests) | — |
 | `src/components/admin/sos/SettlementCenter*` | **Done** (panel smoke test + `settlementCenterApi`) | — |
 | `app/api/admin/settlements/*` | **Done** (register, periods, lock, archive route tests) | — |
-| `src/hooks/useSosCSVProcessor.ts` | No tests | Phase 1.4 |
+| `src/hooks/useSosCSVProcessor.ts` | **Done** (194-line test file) | — |
 | `src/lib/api/epkDocument.ts` | **Done** (`toSupabaseJson`) | — |
 | `src/lib/types/jsonColumns.ts` | **Done** (adopted in DAL Phase 2) | — |
 | `src/lib/api/settlementCenterApi.ts` | **Done** (fetch helper tests) | — |
 | `src/lib/i18n/accountingFallbacks.ts` | **Done** (Phase 0) | — |
 | `src/components/admin/forms/ArtistForm.tsx` | **Done** (admin/artist tabs, slug, save smoke tests) | — |
 | `app/portal/profile/_components/EPKPreview.tsx` | No tests | Phase 4.1 |
-| `src/components/epk-builder/` | No component tests | Phase 7 |
-| `src/hooks/` (21 files) | 2 tests | Phase 6.1 |
+| `src/components/epk-builder/` | Partial (EpkCanvas, EpkCanvasElementNode, EpkFontLoader, EpkGroupNode, EpkPageBackgroundPanel, EpkTemplatePicker, EpkGoogleFontPicker, EpkImageCropDialog, EpkAssetPicker, EpkPagesPanel, EpkToolbar) | Phase 7 (EpkTextEditor, EpkPropertyPanel, EpkSidebar) |
+| `src/hooks/` (30 files) | **All 30 have tests** ✅ | — |
 
-Re-run `npm test 2>&1 | Select-String "Tests "` after each phase to update the Vitest count.
+Re-run `npm test 2>&1 | grep "Tests "` after each phase to update the Vitest count.
