@@ -68,7 +68,7 @@ function ImagePositionEditor({
 }: ImagePositionEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
-  const updatePositionRef = useRef<(e: React.MouseEvent | MouseEvent) => void>()
+  const updatePositionRef = useRef<((e: React.MouseEvent | MouseEvent) => void) | undefined>(undefined)
 
   const updatePosition = (e: React.MouseEvent | MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect()

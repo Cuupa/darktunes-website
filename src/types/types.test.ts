@@ -116,6 +116,7 @@ describe('SiteSettings interface', () => {
     youtubeChannelId: '',
     videosPerPage: 9,
     videosLinkToPage: false,
+    excludeShortsFromPublic: false,
     concertsPerPage: 8,
     concertsLinkToPage: false,
     carouselAutoplayMs: 0,
