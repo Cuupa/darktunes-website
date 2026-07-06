@@ -13,6 +13,7 @@ import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getLabelMessages } from '@/lib/api/labelMessages'
 import { getRepliesForMessage } from '@/lib/api/artistReplies'
 import {
+  getFromArtistMessages,
   getInboxMessages,
   getSentMessages,
   getStarredMessages,
@@ -53,6 +54,9 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
     messages = await getTrashedMessages(supabase, artistId)
   } else if (folder === 'inbox') {
     messages = await getInboxMessages(supabase, artistId)
+  } else if (folder === 'from-artists') {
+    // peer-to-peer messages received from other artists (not from label)
+    messages = await getFromArtistMessages(supabase, artistId)
   } else {
     // Custom folder by ID
     messages = await getInboxMessages(supabase, artistId, folder)
