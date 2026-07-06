@@ -840,8 +840,40 @@ CREATE INDEX IF NOT EXISTS idx_releases_featured     ON public.releases (feature
 CREATE INDEX IF NOT EXISTS idx_releases_itunes_id    ON public.releases (itunes_id);
 CREATE INDEX IF NOT EXISTS idx_releases_visible      ON public.releases (is_visible);
 -- Full UNIQUE constraints (required for PostgREST upsert — partial indexes are unsupported).
--- Before applying on a live DB, dedupe: SELECT spotify_id, COUNT(*) FROM releases
--- WHERE spotify_id IS NOT NULL GROUP BY 1 HAVING COUNT(*) > 1;
+-- Pre-flight deduplication: if any spotify_id / discogs_id value appears more than once,
+-- nullify the duplicates (keeping the row with the earliest created_at) so the UNIQUE
+-- constraint can always be applied safely on a live database.  On a clean database this
+-- is a no-op.
+WITH dupes AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY spotify_id
+           ORDER BY created_at, id
+         ) AS rn
+  FROM   public.releases
+  WHERE  spotify_id IS NOT NULL
+)
+UPDATE public.releases
+SET    spotify_id = NULL
+FROM   dupes
+WHERE  releases.id = dupes.id
+  AND  dupes.rn > 1;
+
+WITH dupes AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY discogs_id
+           ORDER BY created_at, id
+         ) AS rn
+  FROM   public.releases
+  WHERE  discogs_id IS NOT NULL
+)
+UPDATE public.releases
+SET    discogs_id = NULL
+FROM   dupes
+WHERE  releases.id = dupes.id
+  AND  dupes.rn > 1;
+
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_spotify_id_key;
 DO $$ BEGIN
   DROP INDEX IF EXISTS public.releases_spotify_id_key;

@@ -573,6 +573,29 @@ export async function syncReleaseFromExternalSource(
   }
 
   if (source === 'spotify' && sanitized.spotify_id) {
+    // Prefer the row that already owns this Spotify ID — avoids setting spotify_id on a
+    // fuzzy-matched row when another release row already has the same unique key.
+    const existingBySpotifyId = await findReleaseByExternalId(
+      db,
+      'spotify_id',
+      sanitized.spotify_id,
+    )
+
+    if (existingBySpotifyId) {
+      const patch = pickSyncWritableFields(sanitized)
+      const { data, error } = await db
+        .from('releases')
+        .update(patch)
+        .eq('id', existingBySpotifyId.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('No data returned from Spotify ID merge update')
+
+      return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+    }
+
     const mergeTarget = findCrossSourceMergeTarget(
       existingReleases,
       {
@@ -604,6 +627,29 @@ export async function syncReleaseFromExternalSource(
   }
 
   if (source === 'discogs' && sanitized.discogs_id) {
+    // Prefer the row that already owns this Discogs ID — avoids setting discogs_id on a
+    // fuzzy-matched row when another release row already has the same unique key.
+    const existingByDiscogsId = await findReleaseByExternalId(
+      db,
+      'discogs_id',
+      sanitized.discogs_id,
+    )
+
+    if (existingByDiscogsId) {
+      const patch = pickSyncWritableFields(sanitized)
+      const { data, error } = await db
+        .from('releases')
+        .update(patch)
+        .eq('id', existingByDiscogsId.id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error('No data returned from Discogs ID merge update')
+
+      return finishSyncRelease(existingReleases, rowToRelease(data), sanitized, true)
+    }
+
     const mergeTarget = findCrossSourceMergeTarget(
       existingReleases,
       {
