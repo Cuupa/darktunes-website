@@ -170,6 +170,42 @@ describe('fetchSpotifyArtistReleases', () => {
       fetchSpotifyArtistReleases('a', 'id', 'secret', mockFetch),
     ).rejects.toThrow('429')
   })
+
+  it('deduplicates albums with the same spotifyId across pages', async () => {
+    // Simulates Spotify returning the same album ID in two consecutive pages
+    // (different markets / release groups) — the result should contain it once.
+    const duplicateAlbum = ALBUM_RESPONSE.items[0] // id: 'album1'
+    let albumsCall = 0
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (new URL(url).hostname === 'accounts.spotify.com') {
+        return { ok: true, json: async () => TOKEN_RESPONSE } as Response
+      }
+      albumsCall++
+      if (albumsCall === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [duplicateAlbum],
+            next: 'https://api.spotify.com/v1/artists/a/albums?offset=10',
+          }),
+        } as Response
+      }
+      // Second page contains the same album again plus a unique one
+      return {
+        ok: true,
+        json: async () => ({
+          items: [duplicateAlbum, ALBUM_RESPONSE.items[1]],
+          next: null,
+        }),
+      } as Response
+    })
+
+    const releases = await fetchSpotifyArtistReleases('artist123', 'id', 'secret', mockFetch)
+    // Should contain 'album1' once + 'single1' once = 2 total
+    expect(releases).toHaveLength(2)
+    const ids = releases.map((r) => r.spotifyId)
+    expect(ids.filter((id) => id === 'album1')).toHaveLength(1)
+  })
 })
 
 describe('fetchSpotifyArtistProfile', () => {

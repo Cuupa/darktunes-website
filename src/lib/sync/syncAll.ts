@@ -86,18 +86,20 @@ export interface SyncAllResult {
  * Runs a full synchronisation across all artists and all configured APIs.
  * Returns a consolidated result — never throws.
  */
-async function loadArtistExistingReleases(
-  db: SupabaseClient<Database>,
-  artistId: string,
-): Promise<CrossSourceReleaseRow[]> {
-  const { data, error } = await db
-    .from('releases')
-    .select('id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode')
-    .eq('artist_id', artistId)
+const EXISTING_RELEASES_SELECT =
+  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode' as const
 
-  if (error) throw new Error(error.message)
-
-  return (data ?? []).map((row) => ({
+function mapExistingReleaseRow(row: {
+  id: string
+  title: string
+  release_date: string
+  spotify_id: string | null
+  itunes_id: string | null
+  discogs_id: string | null
+  isrc: string | null
+  barcode: string | null
+}): CrossSourceReleaseRow {
+  return {
     id: row.id,
     title: row.title,
     release_date: row.release_date,
@@ -106,7 +108,60 @@ async function loadArtistExistingReleases(
     discogs_id: row.discogs_id,
     isrc: row.isrc,
     barcode: row.barcode,
-  }))
+  }
+}
+
+/**
+ * Loads all releases that should be considered when de-duplicating incoming
+ * sync data for a given artist:
+ *   1. Releases whose legacy `artist_id` column points to this artist.
+ *   2. Releases linked via the many-to-many `release_artists` junction table
+ *      (featurings / collaborations created through the admin UI).
+ *
+ * Including junction-table releases lets `findCrossSourceMergeTarget` detect
+ * cross-artist duplicates on the fuzzy-match path without an extra per-release
+ * DB round-trip.
+ */
+async function loadArtistExistingReleases(
+  db: SupabaseClient<Database>,
+  artistId: string,
+): Promise<CrossSourceReleaseRow[]> {
+  const { data, error } = await db
+    .from('releases')
+    .select(EXISTING_RELEASES_SELECT)
+    .eq('artist_id', artistId)
+
+  if (error) throw new Error(error.message)
+
+  const rows = (data ?? []).map(mapExistingReleaseRow)
+  const seenIds = new Set(rows.map((r) => r.id))
+
+  // Include releases linked via the release_artists junction table (credited
+  // featurings / collaborations) so the in-memory list is complete.
+  const { data: junctionRows } = await (db as SupabaseClient<Database>)
+    .from('release_artists' as never)
+    .select('release_id')
+    .eq('artist_id', artistId)
+
+  const extraIds = ((junctionRows ?? []) as { release_id: string }[])
+    .map((r) => r.release_id)
+    .filter((id) => id && !seenIds.has(id))
+
+  if (extraIds.length > 0) {
+    const { data: extra } = await db
+      .from('releases')
+      .select(EXISTING_RELEASES_SELECT)
+      .in('id', extraIds)
+
+    for (const row of extra ?? []) {
+      if (!seenIds.has(row.id)) {
+        rows.push(mapExistingReleaseRow(row))
+        seenIds.add(row.id)
+      }
+    }
+  }
+
+  return rows
 }
 
 export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {

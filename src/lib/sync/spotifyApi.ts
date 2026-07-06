@@ -163,17 +163,27 @@ export async function fetchSpotifyArtistReleases(
     offset += SPOTIFY_ALBUMS_PAGE_LIMIT
   }
 
-  return albums.map((album) => ({
-    spotifyId: album.id,
-    title: album.name,
-    type: deriveReleaseType(album.total_tracks, album.album_type),
-    releaseDate: normaliseDate(album.release_date),
-    coverUrl: album.images[0]?.url ?? null,
-    spotifyUrl: album.external_urls.spotify,
-    popularity: album.popularity ?? null,
-    barcode: album.external_ids?.upc ?? null,
-    isrc: null, // ISRC is per-track, not per-album; populated separately
-  }))
+  // Spotify's paginated results can return the same album ID more than once
+  // (different markets / release groups). Deduplicate by ID before mapping
+  // so that each unique release is processed exactly once per sync run.
+  const seenIds = new Set<string>()
+  return albums
+    .filter((album) => {
+      if (seenIds.has(album.id)) return false
+      seenIds.add(album.id)
+      return true
+    })
+    .map((album) => ({
+      spotifyId: album.id,
+      title: album.name,
+      type: deriveReleaseType(album.total_tracks, album.album_type),
+      releaseDate: normaliseDate(album.release_date),
+      coverUrl: album.images[0]?.url ?? null,
+      spotifyUrl: album.external_urls.spotify,
+      popularity: album.popularity ?? null,
+      barcode: album.external_ids?.upc ?? null,
+      isrc: null, // ISRC is per-track, not per-album; populated separately
+    }))
 }
 
 export async function fetchSpotifyArtistProfile(

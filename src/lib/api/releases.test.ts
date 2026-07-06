@@ -11,6 +11,7 @@ import {
   upsertReleaseBySpotifyId,
   upsertReleaseByDiscogsId,
   getReleaseById,
+  syncReleaseFromExternalSource,
 } from './releases'
 
 type DbClient = SupabaseClient<Database>
@@ -377,5 +378,125 @@ describe('upsertReleaseByDiscogsId', () => {
       expect.objectContaining({ discogs_id: 'dc-1' }),
       { onConflict: 'discogs_id' },
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncReleaseFromExternalSource — exact-ID guards (Fixes 1 & 2)
+// ---------------------------------------------------------------------------
+
+describe('syncReleaseFromExternalSource — spotify exact-ID guard', () => {
+  it('updates the row that already owns the spotify_id instead of fuzzy-matching', async () => {
+    // Row that already owns spotify_id = 'sp-1'
+    const existingByIdBuilder = makeBuilder({
+      id: 'rel-existing',
+      title: 'My Enemy',
+      release_date: '2022-01-01',
+      spotify_id: 'sp-1',
+      itunes_id: null,
+      discogs_id: null,
+      isrc: null,
+      barcode: null,
+    })
+    // UPDATE response (returned as the updated row)
+    const updateBuilder = makeBuilder({ ...mockReleaseRow, id: 'rel-existing', spotify_id: 'sp-1' })
+
+    const db = {
+      from: vi.fn()
+        .mockReturnValueOnce(existingByIdBuilder) // findReleaseByExternalId
+        .mockReturnValueOnce(updateBuilder),       // UPDATE .eq('id', ...)
+    } as unknown as DbClient
+
+    const result = await syncReleaseFromExternalSource(
+      db,
+      'spotify',
+      {
+        title: 'My Enemy',
+        release_date: '2022-01-01',
+        type: 'single',
+        spotify_id: 'sp-1',
+      },
+      [],
+    )
+
+    expect(result.release.id).toBe('rel-existing')
+    expect(result.merged).toBe(true)
+    // The UPDATE must target the row that owns the ID, not an unrelated row
+    expect(updateBuilder.eq).toHaveBeenCalledWith('id', 'rel-existing')
+    // No upsert should have been called (guard short-circuits)
+    expect(updateBuilder.upsert).not.toHaveBeenCalled()
+  })
+
+  it('falls through to upsert when no row owns the spotify_id yet', async () => {
+    // findReleaseByExternalId returns null (no existing row with this ID)
+    const noExistingBuilder = makeBuilder(null)
+    // preserveFeaturedByColumn check (maybeSingle)
+    const featuredBuilder = makeBuilder(null)
+    // upsertReleaseBySpotifyId response
+    const upsertBuilder = makeBuilder({ ...mockReleaseRow, spotify_id: 'sp-new' })
+
+    const db = {
+      from: vi.fn()
+        .mockReturnValueOnce(noExistingBuilder) // findReleaseByExternalId
+        .mockReturnValueOnce(featuredBuilder)   // preserveFeaturedByColumn
+        .mockReturnValueOnce(upsertBuilder),    // upsert
+    } as unknown as DbClient
+
+    const result = await syncReleaseFromExternalSource(
+      db,
+      'spotify',
+      {
+        title: 'New Release',
+        release_date: '2024-01-01',
+        type: 'single',
+        spotify_id: 'sp-new',
+      },
+      [],
+    )
+
+    expect(result.merged).toBe(false)
+    expect(upsertBuilder.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ spotify_id: 'sp-new' }),
+      { onConflict: 'spotify_id' },
+    )
+  })
+})
+
+describe('syncReleaseFromExternalSource — discogs exact-ID guard', () => {
+  it('updates the row that already owns the discogs_id instead of fuzzy-matching', async () => {
+    const existingByIdBuilder = makeBuilder({
+      id: 'rel-dc',
+      title: 'Vinyl Release',
+      release_date: '2021-06-01',
+      spotify_id: null,
+      itunes_id: null,
+      discogs_id: 'dc-1',
+      isrc: null,
+      barcode: null,
+    })
+    const updateBuilder = makeBuilder({ ...mockReleaseRow, id: 'rel-dc', discogs_id: 'dc-1' })
+
+    const db = {
+      from: vi.fn()
+        .mockReturnValueOnce(existingByIdBuilder) // findReleaseByExternalId
+        .mockReturnValueOnce(updateBuilder),       // UPDATE
+    } as unknown as DbClient
+
+    const result = await syncReleaseFromExternalSource(
+      db,
+      'discogs',
+      {
+        title: 'Vinyl Release',
+        release_date: '2021-06-01',
+        type: 'album',
+        discogs_id: 'dc-1',
+      },
+      [],
+    )
+
+    expect(result.release.id).toBe('rel-dc')
+    expect(result.merged).toBe(true)
+    expect(updateBuilder.eq).toHaveBeenCalledWith('id', 'rel-dc')
+    expect(updateBuilder.upsert).not.toHaveBeenCalled()
   })
 })
