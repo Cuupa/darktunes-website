@@ -46,6 +46,7 @@ export function FileExplorer({
   const { releases } = useReleases()
   const uploadRef = useRef<UploadDropZoneRef>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const urlSeededRef = useRef(false)
   const [renaming, setRenaming] = useState<RenamingState | null>(null)
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
   const [tagsAsset, setTagsAsset] = useState<Asset | null>(null)
@@ -67,6 +68,8 @@ export function FileExplorer({
   )
 
   useEffect(() => {
+    if (urlSeededRef.current) return
+    urlSeededRef.current = true
     if (searchParams.get('pressOnly') === '1') {
       explorer.setPressFilters({
         pressOnly: true,
@@ -75,9 +78,7 @@ export function FileExplorer({
         artistId: null,
       })
     }
-    // URL seed runs once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [explorer, searchParams])
 
   const handlePressFiltersChange = useCallback((filters: PressFilters) => {
     explorer.setPressFilters(filters)

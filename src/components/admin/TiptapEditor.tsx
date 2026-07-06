@@ -131,8 +131,7 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     if (current !== value) {
       editor.commands.setContent(value ?? '', { emitUpdate: false })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
+  }, [editor, value])
 
   // Sync disabled state
   useEffect(() => {

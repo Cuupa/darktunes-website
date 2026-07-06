@@ -68,6 +68,7 @@ function ImagePositionEditor({
 }: ImagePositionEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
+  const updatePositionRef = useRef<(e: React.MouseEvent | MouseEvent) => void>()
 
   const updatePosition = (e: React.MouseEvent | MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -76,6 +77,8 @@ function ImagePositionEditor({
     const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)))
     onPositionChange(x, y)
   }
+  // Keep ref in sync so window listeners always call the latest version
+  updatePositionRef.current = updatePosition
 
   const handleMouseDown = (e: React.MouseEvent) => {
     isDragging.current = true
@@ -83,7 +86,7 @@ function ImagePositionEditor({
   }
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => { if (isDragging.current) updatePosition(e) }
+    const onMove = (e: MouseEvent) => { if (isDragging.current) updatePositionRef.current?.(e) }
     const onUp = () => { isDragging.current = false }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -91,7 +94,6 @@ function ImagePositionEditor({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!imageUrl) return null

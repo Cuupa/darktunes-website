@@ -80,7 +80,7 @@ export async function generateFreePdf(
   }
 
   try {
-    const pdfBytes = generateInvoicePdf({
+    const pdfBytes = await generateInvoicePdf({
       invoiceNumber: data.invoiceNumber,
       issuedDate: data.issuedDate,
       dueDate: data.dueDate,

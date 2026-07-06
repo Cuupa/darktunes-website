@@ -124,37 +124,9 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   }, [loadEntries])
 
   // ---------------------------------------------------------------------------
-  // Clipboard paste — extract image and upload to R2
-  // ---------------------------------------------------------------------------
-  const handlePaste = useCallback(
-    async (e: ClipboardEvent) => {
-      const items = Array.from(e.clipboardData?.items ?? [])
-      const imageItem = items.find((item) => item.type.startsWith('image/'))
-      if (!imageItem) return
-
-      e.preventDefault()
-
-      const file = imageItem.getAsFile()
-      if (!file) return
-
-      await uploadProofFile(file)
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [artistId],
-  )
-
-  useEffect(() => {
-    const el = formRef.current
-    if (!el) return
-    const listener = (e: Event) => void handlePaste(e as ClipboardEvent)
-    el.addEventListener('paste', listener)
-    return () => el.removeEventListener('paste', listener)
-  }, [handlePaste])
-
-  // ---------------------------------------------------------------------------
   // Upload proof image
   // ---------------------------------------------------------------------------
-  async function uploadProofFile(file: File) {
+  const uploadProofFile = useCallback(async (file: File) => {
     setUploadingProof(true)
     // Show immediate local preview so the admin sees feedback right away
     const localPreview = URL.createObjectURL(file)
@@ -195,7 +167,34 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
     } finally {
       setUploadingProof(false)
     }
-  }
+  }, [artistId])
+
+  // ---------------------------------------------------------------------------
+  // Clipboard paste — extract image and upload to R2
+  // ---------------------------------------------------------------------------
+  const handlePaste = useCallback(
+    async (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const imageItem = items.find((item) => item.type.startsWith('image/'))
+      if (!imageItem) return
+
+      e.preventDefault()
+
+      const file = imageItem.getAsFile()
+      if (!file) return
+
+      await uploadProofFile(file)
+    },
+    [uploadProofFile],
+  )
+
+  useEffect(() => {
+    const el = formRef.current
+    if (!el) return
+    const listener = (e: Event) => void handlePaste(e as ClipboardEvent)
+    el.addEventListener('paste', listener)
+    return () => el.removeEventListener('paste', listener)
+  }, [handlePaste])
 
   function removeProof() {
     setProofUrl(null)
