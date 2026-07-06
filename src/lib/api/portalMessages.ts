@@ -180,6 +180,25 @@ export async function searchPortalMessages(
   return (data ?? []).map(rowToMessage)
 }
 
+/** Messages received from other artists (peer inbox, not label-originated). */
+export async function getFromArtistMessages(
+  db: DbClient,
+  artistId: string,
+): Promise<PortalMessage[]> {
+  const { data, error } = await db
+    .from('portal_messages')
+    .select('*')
+    .eq('to_artist_id', artistId)
+    .eq('to_label', false)
+    .not('from_artist_id', 'is', null)
+    .is('deleted_at', null)
+    .order('sent_at', { ascending: false })
+    .limit(100)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(rowToMessage)
+}
+
 /** Messages sent by artists to the label (admin inbox). */
 export async function getIncomingToLabelMessages(db: DbClient): Promise<PortalMessage[]> {
   const { data, error } = await db

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  getFromArtistMessages,
   getIncomingToLabelMessages,
   getIncomingToLabelUnreadCount,
   getSentToLabelMessages,
@@ -10,6 +11,7 @@ function createMockDb(rows: Record<string, unknown>[] = [], count = rows.length)
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     is: vi.fn().mockReturnThis(),
+    not: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue({ data: rows, error: null }),
   }
@@ -99,5 +101,31 @@ describe('portalMessages admin inbox helpers', () => {
 
     expect(messages).toHaveLength(1)
     expect(messages[0]?.subject).toBe('Sent')
+  })
+
+  it('loads peer-to-peer messages received from other artists', async () => {
+    const row = {
+      id: 'msg-3',
+      from_artist_id: 'artist-2',
+      to_artist_id: 'artist-1',
+      to_label: false,
+      subject: 'Hey',
+      body: 'Body',
+      body_html: null,
+      sent_at: '2026-01-03T00:00:00Z',
+      read_at: null,
+      starred: false,
+      deleted_at: null,
+      folder_id: null,
+      has_attachments: false,
+    }
+
+    const db = createMockDb([row])
+    const messages = await getFromArtistMessages(db, 'artist-1')
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.fromArtistId).toBe('artist-2')
+    expect(messages[0]?.toArtistId).toBe('artist-1')
+    expect(messages[0]?.toLabel).toBe(false)
   })
 })
