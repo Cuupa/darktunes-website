@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ISR pre-rendering**: `releases/[id]` and `news/[slug]` now export `generateStaticParams()` + `dynamicParams = true`, pre-rendering all visible entries at build time so ISR starts warm rather than cold on-demand.
+- **Loading skeletons** (zero CLS): added `loading.tsx` for all previously uncovered async routes — `/artists`, `/events`, `/events/[id]`, `/news/[slug]`, `/fan/[slug]`, `/datenschutz`, `/impressum`, `/login`, `/promo-pool`, `/epk/share/[token]`, `/newsletter`, `/newsletter/confirmed`, `/offline`, `/account/privacy`, `/account/delete`, `/press/releases/[slug]`, `/press/artists/[slug]`, and all 12 admin sub-pages (`/admin/features`, `/admin/settings`, `/admin/analytics`, `/admin/assets`, `/admin/users`, `/admin/statements`, `/admin/videos`, `/admin/tour-planner`, `/admin/portal-faq`, `/admin/api-keys`, `/admin/support`, `/admin/promo-log`).
+- **Metadata exports**: `/promo-pool` and `/editor` now export `generateMetadata()` with `robots: noindex`.
+
+### Changed
+- **`generateInvoicePdf`** converted from synchronous with `require()` to `async` with `await import()` — eliminates `@typescript-eslint/no-require-imports` suppressions.
+- **ESLint `react-hooks/exhaustive-deps` suppressions removed** from `TiptapEditor.tsx`, `FileExplorer.tsx`, `PromoLogManager.tsx`, `AdminDashboard.tsx`, `ArtistForm.tsx`, and `useSosCSVProcessor.ts` by fixing root causes: ref-based stable callbacks, functional `setState` updaters, and a `sendProcessRef` to decouple worker lifecycle from `sendProcess` identity.
+
 - **Enterprise Analytics — Portal** (`/portal/analytics`): 11 tabs — Streaming, Listeners, Territories, Events (concert + promo impact), Earnings, Releases, Revenue Mix, EPK & Press, Settlement, Website engagement, Merch. Overview intelligence panel on `/portal` with deep links. Authenticated Supabase reads for correct RLS.
 - **Enterprise Analytics — Admin** (`/admin/analytics`): Label Intelligence Hub — roster health, period trends, press CRM, website engagement, financial audit viewer. Sidebar entry under MANAGEMENT.
 - **Gold-layer tables**: `promo_impact`, `page_events`, `merch_orders` in `supabase/reset.sql` + `src/types/database.ts`.

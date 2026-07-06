@@ -429,7 +429,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
         const res = await fetch('/api/admin/submission-form-schema', {
           method: 'PUT',
           headers: {
-            Authorization: `******`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),

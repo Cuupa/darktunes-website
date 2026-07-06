@@ -157,17 +157,17 @@ describe('getPublicVideos', () => {
 
   it('applies is_short=false filter when excludeShorts is true', async () => {
     const db = makeMockDb([])
-    const builder = (db.from as ReturnType<typeof vi.fn>)()
+    const builder = (db.from as unknown as () => ReturnType<typeof makeBuilder>)()
     await getPublicVideos(db, { excludeShorts: true })
     expect(builder.eq).toHaveBeenCalledWith('is_short', false)
   })
 
   it('does not apply is_short filter when excludeShorts is false', async () => {
     const db = makeMockDb([])
-    const builder = (db.from as ReturnType<typeof vi.fn>)()
+    const builder = (db.from as unknown as () => ReturnType<typeof makeBuilder>)()
     await getPublicVideos(db, { excludeShorts: false })
     const eqCalls = (builder.eq as ReturnType<typeof vi.fn>).mock.calls
-    expect(eqCalls.some(([col]: [string]) => col === 'is_short')).toBe(false)
+    expect(eqCalls.some((call: unknown[]) => call[0] === 'is_short')).toBe(false)
   })
 })
 

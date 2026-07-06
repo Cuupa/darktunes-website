@@ -120,6 +120,18 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **Debloat removed the triggers, not the files:** `LESSONS_LEARNED.md` pointed at `workflow.md`, but `workflow.md` never listed `CHANGELOG`, `LESSONS_LEARNED`, or `QA_CHECKLIST`. Agents followed the slim `AGENTS.md` review list and stopped updating living docs. Rule tables are SSOT for recurring anti-patterns; session additions and changelog/QA updates still belong in their respective files — wire all three back into `workflow.md` and `AGENTS.md`.
 
+### 2026-07-06 — ISR pre-rendering, loading skeletons, eslint-disable root-cause fixes
+
+**`generateStaticParams` is not optional for ISR detail pages:** `releases/[id]` and `news/[slug]` had `revalidate: 60` in `unstable_cache` but no `generateStaticParams()`, so the first hit after a cold deploy was always a slow on-demand render. Always pair `revalidate` with `generateStaticParams` + `dynamicParams = true` on dynamic segments.
+
+**`useCallback` before usage — lexical order matters:** Moving `uploadProofFile` from a plain `async function` to `useCallback` meant it became a `const` (block-scoped variable). `handlePaste` defined above it in source order referenced it in its dependency array, causing a TypeScript `used before declaration` error. Always define `useCallback`-wrapped helpers before the callbacks that depend on them.
+
+**Functional `setState` updaters eliminate loop-causing deps:** When a `useEffect` sets state and reads that state to decide whether to set it again, adding the state value to deps creates an infinite loop. The fix — `setActiveTab((current) => ...)` — reads the latest state inside the updater, removing the need for `activeTab` in the dependency array.
+
+**Stable-ref pattern for single-init effects:** Worker init (`useSosCSVProcessor`) and DOM event listener registration (`ArtistForm`, `FileExplorer`) legitimately run once. The clean pattern: store the latest callback in `someRef.current = callback` (updated on every render) and call `someRef.current()` from inside the effect, keeping the dep array empty without any suppression.
+
+**`generateInvoicePdf` sync → async:** CJS `require()` was needed because the function was synchronous. Converting to `async` with `await import('jspdf')` / `await import('jspdf-autotable')` eliminates the `@typescript-eslint/no-require-imports` suppressions. Both callers (route handler + server action) are already async.
+
 ---
 
-*Last updated: 2026-07-03*
+*Last updated: 2026-07-06*

@@ -9,7 +9,7 @@ import Image from 'next/image'
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getPublicNewsPostBySlug } from '@/lib/api/news'
+import { getPublicNewsPostBySlug, getPublicNewsPosts } from '@/lib/api/news'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { buildNewsArticleSchema, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -28,6 +28,28 @@ function createPublicSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
   )
+}
+
+/** Opt-in ISR: revalidate every 60 s at the route-segment level. */
+export const revalidate = 60
+
+/**
+ * Allow slugs not returned by generateStaticParams to render on-demand
+ * (ISR fallback). Explicit export prevents accidental regressions in Next.js 15.
+ */
+export const dynamicParams = true
+
+/**
+ * Pre-render all currently-published news posts at build time so ISR starts
+ * from a warm page rather than a cold on-demand render.
+ */
+export async function generateStaticParams() {
+  const client = createPublicSupabaseClient()
+  const posts = await getPublicNewsPosts(client).catch((error) => {
+    console.error('generateStaticParams(/news/[slug]) failed:', error)
+    return []
+  })
+  return posts.map((post) => ({ slug: post.slug }))
 }
 
 /**

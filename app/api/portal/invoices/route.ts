@@ -151,7 +151,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       })
     : await createArtistInvoice(supabase, invoicePayload)
 
-  const pdfBytes = generateInvoicePdf({
+  const pdfBytes = await generateInvoicePdf({
     invoiceNumber: input.artist_invoice_number,
     issuedDate,
     dueDate: input.due_date,

@@ -43,15 +43,6 @@ type JsPdfConstructor = new (options: {
   format: 'a4'
 }) => JsPdfDocument
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { jsPDF } = require('jspdf') as { jsPDF: JsPdfConstructor }
-// jspdf-autotable v5 does not patch the jsPDF prototype in Node.js (no window),
-// so we use the standalone autoTable(doc, options) function instead of doc.autoTable().
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { autoTable: autoTableFn } = require('jspdf-autotable') as {
-  autoTable: (doc: JsPdfDocument, options: AutoTableOptions) => void
-}
-
 export interface InvoiceLineItem {
   description: string
   qty: number
@@ -134,7 +125,16 @@ function drawTextLines(
   return y
 }
 
-export function generateInvoicePdf(options: InvoicePdfOptions): Uint8Array {
+export async function generateInvoicePdf(options: InvoicePdfOptions): Promise<Uint8Array> {
+  // Dynamic imports avoid CJS require() while keeping the function usable in
+  // both Route Handlers and Server Actions (both are async Node.js contexts).
+  // jspdf-autotable v5 does not patch the jsPDF prototype in Node.js (no
+  // window), so we use the standalone autoTable(doc, …) function.
+  const { jsPDF } = await import('jspdf') as unknown as { jsPDF: JsPdfConstructor }
+  const { autoTable: autoTableFn } = await import('jspdf-autotable') as unknown as {
+    autoTable: (doc: JsPdfDocument, options: AutoTableOptions) => void
+  }
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const pageWidth = 210

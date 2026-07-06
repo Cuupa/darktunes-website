@@ -165,19 +165,18 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     setActiveTab(getInitialTab())
   }, [authLoading, permissionsLoading, getInitialTab])
 
-  // Sync tab from URL on mount and when search params change
+  // Sync tab from URL on mount and when search params change.
+  // Using functional updates avoids reading `activeTab` from the closure,
+  // which would create a dependency that causes loops (set tab → effect re-runs
+  // → set tab → …). The functional form reads the latest state inside the updater.
   useEffect(() => {
     if (authLoading || permissionsLoading) return
     const tabParam = searchParams.get('tab')
-    if (isValidTab(tabParam) && canSeeTab(tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam)
+    if (isValidTab(tabParam) && canSeeTab(tabParam)) {
+      setActiveTab((current: TabValue) => (tabParam !== current ? tabParam : current))
       return
     }
-    if (!canSeeTab(activeTab)) {
-      setActiveTab(getDefaultTab())
-    }
-    // intentionally exclude activeTab to avoid loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setActiveTab((current: TabValue) => (!canSeeTab(current) ? getDefaultTab() : current))
   }, [searchParams, authLoading, permissionsLoading, canSeeTab, getDefaultTab])
 
   const handleTabChange = useCallback((value: string) => {

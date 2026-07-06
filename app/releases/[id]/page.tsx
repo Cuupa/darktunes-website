@@ -24,7 +24,7 @@ import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getReleaseById } from '@/lib/api/releases'
+import { getReleaseById, getPublicReleases } from '@/lib/api/releases'
 import { getArtistById } from '@/lib/api/artists'
 
 import { ReleaseDetailContent } from './_components/ReleaseDetailContent'
@@ -87,6 +87,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'music.album',
     },
   }
+}
+
+/** Opt-in ISR: revalidate every 60 s at the route-segment level. */
+export const revalidate = 60
+
+/**
+ * Allow release IDs not returned by generateStaticParams to render on-demand
+ * (ISR fallback). Explicit export prevents accidental regressions in Next.js 15.
+ */
+export const dynamicParams = true
+
+/**
+ * Pre-render all currently-visible releases at build time so ISR starts from
+ * a warm page rather than a cold on-demand render.
+ */
+export async function generateStaticParams() {
+  const client = createPublicSupabaseClient()
+  const releases = await getPublicReleases(client).catch((error) => {
+    console.error('generateStaticParams(/releases/[id]) failed:', error)
+    return []
+  })
+  return releases.map((release) => ({ id: release.id }))
 }
 
 export default async function ReleaseDetailPage({ params }: Props) {

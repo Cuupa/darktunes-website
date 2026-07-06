@@ -271,6 +271,11 @@ export function useCSVProcessor(
     setIsProcessing(true)
   }, [buildConfig])
 
+  // Stable ref so worker-lifecycle effects can call the latest sendProcess
+  // without taking it as a dependency (worker must only be created once).
+  const sendProcessRef = useRef(sendProcess)
+  sendProcessRef.current = sendProcess
+
   // ── Worker lifecycle ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -291,7 +296,7 @@ export function useCSVProcessor(
         case 'parse-done':
           pendingParsesRef.current = Math.max(0, pendingParsesRef.current - 1)
           if (pendingParsesRef.current === 0) {
-            sendProcess()
+            sendProcessRef.current()
           }
           break
 
@@ -321,7 +326,6 @@ export function useCSVProcessor(
       knownFileIds.clear()
       pendingParsesRef.current = 0
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Effect: sync files with worker ────────────────────────────────────────────
@@ -383,10 +387,9 @@ export function useCSVProcessor(
         setWorkerResult(EMPTY_RESULT)
         setIsProcessing(false)
       } else {
-        sendProcess()
+        sendProcessRef.current()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [believeKey, bandcampKey, shopifyKey, printfulKey, darkmerchKey, aliasKey])
 
   // ── Effect: re-process when config changes (no re-parse needed) ───────────────
@@ -395,10 +398,9 @@ export function useCSVProcessor(
     const cfg = buildConfig()
     latestConfigRef.current = cfg
     if (workerRef.current && pendingParsesRef.current === 0 && knownFileIdsRef.current.size > 0) {
-      sendProcess()
+      sendProcessRef.current()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configKey])
+  }, [configKey, buildConfig])
 
   // ── Derived values ─────────────────────────────────────────────────────────────
 
