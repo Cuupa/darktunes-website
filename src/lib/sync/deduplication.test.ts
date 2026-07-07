@@ -4,6 +4,7 @@ import {
   findCrossSourceMergeTarget,
   registerSyncedRelease,
   normTitle,
+  stripReleaseSuffix,
   extractYear,
   isManualRow,
   pruneOrphanedDuplicates,
@@ -307,6 +308,18 @@ describe('deduplicateReleases', () => {
 })
 
 describe('normTitle / extractYear', () => {
+  it('strips known release suffixes without lowercasing', () => {
+    expect(stripReleaseSuffix('Darkwalker - Single')).toBe('Darkwalker')
+    expect(stripReleaseSuffix('Otherside - EP')).toBe('Otherside')
+    expect(stripReleaseSuffix('Halo - Album')).toBe('Halo')
+  })
+
+  it('strips suffix case-insensitively and leaves non-suffix titles untouched', () => {
+    expect(stripReleaseSuffix('Nocturnal - ep')).toBe('Nocturnal')
+    expect(stripReleaseSuffix('Fire - Ice - EP')).toBe('Fire - Ice')
+    expect(stripReleaseSuffix('No Suffix Title')).toBe('No Suffix Title')
+  })
+
   it('normalises punctuation and casing', () => {
     expect(normTitle('Dark Matter (Deluxe)')).toBe('dark matter deluxe')
   })
