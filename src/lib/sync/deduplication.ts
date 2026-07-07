@@ -233,7 +233,56 @@ export function deduplicateReleases(
     })
   }
 
-  return merged
+  const spotifyGroups = new Map<string, MergedRelease[]>()
+  for (const release of merged) {
+    if (!release.spotifyId) continue
+    const releaseYear = extractYear(release.releaseDate)
+    if (releaseYear === null) continue
+
+    const key = `${normTitle(release.title)}::${releaseYear}`
+    const group = spotifyGroups.get(key)
+    if (group) {
+      group.push(release)
+    } else {
+      spotifyGroups.set(key, [release])
+    }
+  }
+
+  const primaryBySpotifyId = new Map<string, MergedRelease>()
+  const discardedSpotifyIds = new Set<string>()
+
+  for (const group of spotifyGroups.values()) {
+    if (group.length <= 1) continue
+
+    const primary = group.reduce((best, candidate) => {
+      const bestPopularity = best.popularity ?? -1
+      const candidatePopularity = candidate.popularity ?? -1
+      if (candidatePopularity !== bestPopularity) {
+        return candidatePopularity > bestPopularity ? candidate : best
+      }
+
+      return candidate.title.length < best.title.length ? candidate : best
+    })
+
+    const mergedPrimary = { ...primary, merged: true }
+
+    for (const candidate of group) {
+      if (candidate.spotifyId === primary.spotifyId) continue
+
+      discardedSpotifyIds.add(candidate.spotifyId!)
+      mergedPrimary.discogsId ??= candidate.discogsId
+      mergedPrimary.barcode ??= candidate.barcode
+      mergedPrimary.catalogNumber ??= candidate.catalogNumber
+    }
+
+    primaryBySpotifyId.set(primary.spotifyId!, mergedPrimary)
+  }
+
+  return merged.flatMap((release) => {
+    if (!release.spotifyId) return [release]
+    if (discardedSpotifyIds.has(release.spotifyId)) return []
+    return [primaryBySpotifyId.get(release.spotifyId) ?? release]
+  })
 }
 
 function normalizeBarcode(value: string | null | undefined): string | null {
@@ -277,7 +326,20 @@ export function findCrossSourceMergeTarget(
     if (titleMatch && yearMatch) return row
   }
 
+  if (source !== 'spotify') return null
+
+  for (const row of existingReleases) {
+    const sameSourceId =
+      row.spotify_id
+
+    if (!sameSourceId) continue
+
+    const rowYear = extractYear(row.release_date)
+    if (incomingYear === null || rowYear === null || incomingYear !== rowYear) continue
+    if (normTitle(row.title) !== incomingNorm) continue
+
+    return row
+  }
+
   return null
 }
-
-

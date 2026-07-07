@@ -139,7 +139,12 @@ describe('deduplicateReleases', () => {
 
   it('does not double-match a Discogs release to two Spotify releases', () => {
     const spotify1: SpotifyReleaseInput = { ...SPOTIFY_BASE, spotifyId: 'sp1', barcode: null }
-    const spotify2: SpotifyReleaseInput = { ...SPOTIFY_BASE, spotifyId: 'sp2', barcode: null }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      barcode: null,
+      releaseDate: '2024-03-15',
+    }
     const discogs: DiscogsReleaseInput = { ...DISCOGS_BASE, barcode: null }
 
     const result = deduplicateReleases([spotify1, spotify2], [discogs])
@@ -153,6 +158,147 @@ describe('deduplicateReleases', () => {
   it('uses Spotify cover art over Discogs when available', () => {
     const result = deduplicateReleases([SPOTIFY_BASE], [DISCOGS_BASE])
     expect(result[0].coverUrl).toBe(SPOTIFY_BASE.coverUrl)
+  })
+
+  it('merges "Cut - Single" into "Cut" when both have same normTitle + year', () => {
+    const spotify1: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp1',
+      title: 'Cut',
+      type: 'single',
+      releaseDate: '2023-01-01',
+      popularity: 80,
+      barcode: null,
+    }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      title: 'Cut - Single',
+      type: 'single',
+      releaseDate: '2023-03-01',
+      popularity: 65,
+      barcode: null,
+    }
+
+    const result = deduplicateReleases([spotify1, spotify2], [])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].spotifyId).toBe('sp1')
+    expect(result[0].title).toBe('Cut')
+    expect(result[0].merged).toBe(true)
+  })
+
+  it('keeps the entry with higher popularity as the intra-Spotify primary', () => {
+    const spotify1: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp1',
+      title: 'Cut',
+      type: 'single',
+      releaseDate: '2023-01-01',
+      popularity: 95,
+      barcode: null,
+    }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      title: 'Cut - Single',
+      type: 'single',
+      releaseDate: '2023-03-01',
+      popularity: 20,
+      barcode: null,
+    }
+
+    const result = deduplicateReleases([spotify2, spotify1], [])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].spotifyId).toBe('sp1')
+    expect(result[0].popularity).toBe(95)
+  })
+
+  it('carries over discogs metadata from the merged-away Spotify entry', () => {
+    const spotify1: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp1',
+      title: 'Cut',
+      type: 'single',
+      releaseDate: '2023-01-01',
+      popularity: 90,
+      barcode: null,
+    }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      title: 'Cut - Single',
+      type: 'single',
+      releaseDate: '2023-03-01',
+      popularity: 40,
+      barcode: null,
+      isrc: null,
+    }
+    const discogs: DiscogsReleaseInput = {
+      ...DISCOGS_BASE,
+      discogsId: 'dc-cut',
+      title: 'Cut - Single',
+      releaseDate: '2023-02-01',
+      barcode: '999888777666',
+      catalogNumber: 'CUT-001',
+    }
+
+    const result = deduplicateReleases([spotify2, spotify1], [discogs])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].spotifyId).toBe('sp1')
+    expect(result[0].discogsId).toBe('dc-cut')
+    expect(result[0].barcode).toBe('999888777666')
+    expect(result[0].catalogNumber).toBe('CUT-001')
+    expect(result[0].merged).toBe(true)
+  })
+
+  it('does not merge intra-Spotify duplicates when years differ by more than 1', () => {
+    const spotify1: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp1',
+      title: 'Cut',
+      type: 'single',
+      releaseDate: '2023-01-01',
+      barcode: null,
+    }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      title: 'Cut - Single',
+      type: 'single',
+      releaseDate: '2025-01-01',
+      barcode: null,
+    }
+
+    const result = deduplicateReleases([spotify1, spotify2], [])
+
+    expect(result).toHaveLength(2)
+    expect(result.every((release) => release.merged === false)).toBe(true)
+  })
+
+  it('does not merge intra-Spotify duplicates when normTitles differ', () => {
+    const spotify1: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp1',
+      title: 'Cut',
+      type: 'single',
+      releaseDate: '2023-01-01',
+      barcode: null,
+    }
+    const spotify2: SpotifyReleaseInput = {
+      ...SPOTIFY_BASE,
+      spotifyId: 'sp2',
+      title: 'Different Cut - Single',
+      type: 'single',
+      releaseDate: '2023-03-01',
+      barcode: null,
+    }
+
+    const result = deduplicateReleases([spotify1, spotify2], [])
+
+    expect(result).toHaveLength(2)
   })
 })
 
@@ -333,5 +479,84 @@ describe('findCrossSourceMergeTarget', () => {
         'itunes',
       ),
     ).toBeNull()
+  })
+
+  it('returns same-source spotify row when normTitle + exact year match', () => {
+    const target = findCrossSourceMergeTarget(
+      [
+        {
+          id: 'rel-cut',
+          title: 'Cut',
+          release_date: '2023-01-01',
+          spotify_id: 'sp1',
+          itunes_id: null,
+        },
+      ],
+      { title: 'Cut - Single', releaseDate: '2023-09-09' },
+      'spotify',
+    )
+
+    expect(target?.id).toBe('rel-cut')
+  })
+
+  it('does not return same-source spotify row when years differ', () => {
+    expect(
+      findCrossSourceMergeTarget(
+        [
+          {
+            id: 'rel-cut',
+            title: 'Cut',
+            release_date: '2022-01-01',
+            spotify_id: 'sp1',
+            itunes_id: null,
+          },
+        ],
+        { title: 'Cut - Single', releaseDate: '2023-09-09' },
+        'spotify',
+      ),
+    ).toBeNull()
+  })
+
+  it('does not return same-source spotify row when titles differ', () => {
+    expect(
+      findCrossSourceMergeTarget(
+        [
+          {
+            id: 'rel-cut',
+            title: 'Different Release',
+            release_date: '2023-01-01',
+            spotify_id: 'sp1',
+            itunes_id: null,
+          },
+        ],
+        { title: 'Cut - Single', releaseDate: '2023-09-09' },
+        'spotify',
+      ),
+    ).toBeNull()
+  })
+
+  it('prefers cross-source match over same-source self-healing match when both exist', () => {
+    const target = findCrossSourceMergeTarget(
+      [
+        {
+          id: 'rel-same-source',
+          title: 'Cut',
+          release_date: '2023-01-01',
+          spotify_id: 'sp1',
+          itunes_id: null,
+        },
+        {
+          id: 'rel-cross-source',
+          title: 'Cut',
+          release_date: '2024-01-01',
+          spotify_id: null,
+          itunes_id: null,
+        },
+      ],
+      { title: 'Cut - Single', releaseDate: '2023-09-09' },
+      'spotify',
+    )
+
+    expect(target?.id).toBe('rel-cross-source')
   })
 })
