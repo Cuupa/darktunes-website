@@ -16,6 +16,9 @@
  * The result is a merged release record ready for UPSERT into Supabase.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
 // ---------------------------------------------------------------------------
 // Input types (from API integration modules)
 // ---------------------------------------------------------------------------
@@ -285,6 +288,15 @@ export function deduplicateReleases(
   })
 }
 
+/**
+ * Returns `true` when a release row carries no external IDs — i.e. it was
+ * created manually (e.g. as a pre-release placeholder) and has never been
+ * enriched by any sync source.
+ */
+export function isManualRow(row: CrossSourceReleaseRow): boolean {
+  return !row.spotify_id && !row.itunes_id && !row.discogs_id
+}
+
 function normalizeBarcode(value: string | null | undefined): string | null {
   if (!value) return null
   const digits = value.replace(/\D/g, '')
@@ -342,4 +354,122 @@ export function findCrossSourceMergeTarget(
   }
 
   return null
+}
+
+// ---------------------------------------------------------------------------
+// DB-level deduplication (prune existing duplicates)
+// ---------------------------------------------------------------------------
+
+type PruneExtraRow = {
+  id: string
+  popularity: number | null
+  catalog_number: string | null
+  featured: boolean | null
+}
+
+/**
+ * Collapses duplicate DB rows for one artist that share the same normalised
+ * title and release year.
+ *
+ * For each duplicate group the canonical row is elected with this priority:
+ *   1. Row with a `spotify_id` beats rows without one.
+ *   2. Among rows with `spotify_id`, higher `popularity` wins.
+ *   3. Tie-breaker: shorter title (simpler title = manually entered base entry).
+ *
+ * Non-canonical rows are merged into the canonical row (filling only `null`
+ * fields) and then deleted from the database. Rows with `featured = true`
+ * are never deleted.
+ *
+ * @returns Counts of rows merged and deleted.
+ */
+export async function pruneOrphanedDuplicates(
+  db: SupabaseClient<Database>,
+  _artistId: string,
+  existingReleases: CrossSourceReleaseRow[],
+): Promise<{ merged: number; deleted: number }> {
+  let mergedCount = 0
+  let deletedCount = 0
+
+  // Group by normalised title + release year (same key used in deduplicateReleases)
+  const groups = new Map<string, CrossSourceReleaseRow[]>()
+  for (const row of existingReleases) {
+    const year = extractYear(row.release_date)
+    if (year === null) continue
+    const key = `${normTitle(row.title)}::${year}`
+    const group = groups.get(key)
+    if (group) {
+      group.push(row)
+    } else {
+      groups.set(key, [row])
+    }
+  }
+
+  for (const group of groups.values()) {
+    if (group.length <= 1) continue
+
+    const groupIds = group.map((r) => r.id)
+
+    // Fetch popularity, catalog_number, and featured flag in one round-trip.
+    // popularity  → canonical election
+    // catalog_number → enrichment merge
+    // featured    → deletion guard
+    const { data: extraRows } = await db
+      .from('releases')
+      .select('id, popularity, catalog_number, featured')
+      .in('id', groupIds)
+
+    const extraMap = new Map<string, PruneExtraRow>(
+      ((extraRows ?? []) as PruneExtraRow[]).map((r) => [r.id, r]),
+    )
+
+    // Elect the canonical row
+    const withSpotify = group.filter((r) => r.spotify_id)
+    const candidatePool = withSpotify.length > 0 ? withSpotify : group
+
+    const canonical = candidatePool.reduce((best, candidate) => {
+      const bestPop = extraMap.get(best.id)?.popularity ?? -1
+      const candidatePop = extraMap.get(candidate.id)?.popularity ?? -1
+      if (candidatePop !== bestPop) return candidatePop > bestPop ? candidate : best
+      return candidate.title.length < best.title.length ? candidate : best
+    })
+
+    const nonCanonical = group.filter((r) => r.id !== canonical.id)
+    const canonicalExtra = extraMap.get(canonical.id)
+
+    // Build a patch for the canonical row by filling null fields from non-canonical rows
+    const patch: Database['public']['Tables']['releases']['Update'] = {}
+    for (const nc of nonCanonical) {
+      const ncExtra = extraMap.get(nc.id)
+      if (ncExtra?.featured) continue // featured rows are skipped entirely
+
+      if (!canonical.discogs_id && nc.discogs_id) patch.discogs_id ??= nc.discogs_id
+      if (!canonical.itunes_id && nc.itunes_id) patch.itunes_id ??= nc.itunes_id
+      if (!canonical.isrc && nc.isrc) patch.isrc ??= nc.isrc
+      if (!canonical.barcode && nc.barcode) patch.barcode ??= nc.barcode
+      if (!canonicalExtra?.catalog_number && ncExtra?.catalog_number) {
+        patch.catalog_number ??= ncExtra.catalog_number
+      }
+    }
+
+    // Apply the merged patch to the canonical row (best-effort)
+    if (Object.keys(patch).length > 0) {
+      await db.from('releases').update(patch).eq('id', canonical.id)
+      mergedCount++
+    }
+
+    // Delete non-canonical rows, skipping any that are featured
+    const toDelete = nonCanonical.filter((r) => !extraMap.get(r.id)?.featured)
+    if (toDelete.length > 0) {
+      await db
+        .from('releases')
+        .delete()
+        .in(
+          'id',
+          toDelete.map((r) => r.id),
+        )
+      deletedCount += toDelete.length
+    }
+  }
+
+  return { merged: mergedCount, deleted: deletedCount }
 }

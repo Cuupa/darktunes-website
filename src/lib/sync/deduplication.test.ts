@@ -1,14 +1,18 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   deduplicateReleases,
   findCrossSourceMergeTarget,
   registerSyncedRelease,
   normTitle,
   extractYear,
+  isManualRow,
+  pruneOrphanedDuplicates,
   type SpotifyReleaseInput,
   type DiscogsReleaseInput,
   type CrossSourceReleaseRow,
 } from './deduplication'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 
 const SPOTIFY_BASE: SpotifyReleaseInput = {
   spotifyId: 'sp1',
@@ -558,5 +562,255 @@ describe('findCrossSourceMergeTarget', () => {
     )
 
     expect(target?.id).toBe('rel-cross-source')
+  })
+
+  it('matches a manual row (no external IDs) with ±1 year difference', () => {
+    const manualRow: CrossSourceReleaseRow = {
+      id: 'rel-prerelease',
+      title: 'Void',
+      release_date: '2024-06-01',
+      spotify_id: null,
+      itunes_id: null,
+      discogs_id: null,
+    }
+    // Spotify release arrives in the next year — still within the ±1 tolerance
+    const target = findCrossSourceMergeTarget(
+      [manualRow],
+      { title: 'Void', releaseDate: '2025-01-15' },
+      'spotify',
+    )
+    expect(target?.id).toBe('rel-prerelease')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isManualRow
+// ---------------------------------------------------------------------------
+
+describe('isManualRow', () => {
+  it('returns true when all external IDs are null', () => {
+    expect(
+      isManualRow({ id: 'r1', title: 'T', release_date: '2024-01-01', spotify_id: null, itunes_id: null, discogs_id: null }),
+    ).toBe(true)
+  })
+
+  it('returns false when spotify_id is set', () => {
+    expect(
+      isManualRow({ id: 'r1', title: 'T', release_date: '2024-01-01', spotify_id: 'sp1', itunes_id: null }),
+    ).toBe(false)
+  })
+
+  it('returns false when itunes_id is set', () => {
+    expect(
+      isManualRow({ id: 'r1', title: 'T', release_date: '2024-01-01', spotify_id: null, itunes_id: 'it1' }),
+    ).toBe(false)
+  })
+
+  it('returns false when discogs_id is set', () => {
+    expect(
+      isManualRow({ id: 'r1', title: 'T', release_date: '2024-01-01', spotify_id: null, itunes_id: null, discogs_id: 'dc1' }),
+    ).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// pruneOrphanedDuplicates
+// ---------------------------------------------------------------------------
+
+type DbClient = SupabaseClient<Database>
+
+/** Creates a flexible mock Supabase client for pruneOrphanedDuplicates tests. */
+function makePruneMockDb(options: {
+  /** Data returned by the .select('id, popularity, catalog_number, featured').in() query */
+  extraRows?: { id: string; popularity: number | null; catalog_number: string | null; featured: boolean | null }[]
+  /** Spy on update calls */
+  onUpdate?: (patch: Record<string, unknown>, id: string) => void
+  /** Spy on delete calls */
+  onDelete?: (ids: string[]) => void
+}): DbClient {
+  const { extraRows = [], onUpdate, onDelete } = options
+
+  const deletedIds: string[] = []
+
+  // Tracks which `eq` id was used in the last update chain
+  let lastUpdatePatch: Record<string, unknown> = {}
+  let lastUpdateId = ''
+
+  function makeBuilder(data: unknown) {
+    const inIds: string[] = []
+
+    const builder = {
+      select: vi.fn().mockReturnThis(),
+      update: vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+        lastUpdatePatch = patch
+        return builder
+      }),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockImplementation((_col: string, id: string) => {
+        lastUpdateId = id
+        return builder
+      }),
+      in: vi.fn().mockImplementation((_col: string, ids: string[]) => {
+        inIds.push(...ids)
+        return builder
+      }),
+      then: (resolve: (value: { data: unknown; error: null }) => void) => {
+        // Determine what to return based on what was called
+        if (builder.delete.mock.calls.length > 0) {
+          onDelete?.(inIds)
+          deletedIds.push(...inIds)
+        } else if (builder.update.mock.calls.length > 0) {
+          onUpdate?.(lastUpdatePatch, lastUpdateId)
+        }
+        return Promise.resolve({ data, error: null }).then(resolve)
+      },
+      catch: (reject: (reason: unknown) => void) =>
+        Promise.resolve({ data, error: null }).catch(reject),
+      finally: (cb: () => void) =>
+        Promise.resolve({ data, error: null }).finally(cb),
+    }
+    return builder
+  }
+
+  return {
+    from: vi.fn().mockImplementation(() => makeBuilder(extraRows)),
+  } as unknown as DbClient
+}
+
+describe('pruneOrphanedDuplicates', () => {
+  it('merges and deletes a manual pre-release row when the Spotify version arrives', async () => {
+    // Manual pre-release row (no external IDs)
+    const manualRow: CrossSourceReleaseRow = {
+      id: 'rel-manual',
+      title: 'Void',
+      release_date: '2024-06-01',
+      spotify_id: null,
+      itunes_id: null,
+      discogs_id: null,
+      barcode: '123456789',
+    }
+    // Spotify row for the same release
+    const spotifyRow: CrossSourceReleaseRow = {
+      id: 'rel-spotify',
+      title: 'Void',
+      release_date: '2024-09-15',
+      spotify_id: 'sp-void',
+      itunes_id: null,
+      discogs_id: null,
+      barcode: null,
+    }
+
+    const deletedIds: string[] = []
+    const updatedPatches: Record<string, unknown>[] = []
+
+    const db = makePruneMockDb({
+      extraRows: [
+        { id: 'rel-manual', popularity: null, catalog_number: null, featured: false },
+        { id: 'rel-spotify', popularity: 72, catalog_number: null, featured: false },
+      ],
+      onUpdate: (patch) => updatedPatches.push(patch),
+      onDelete: (ids) => deletedIds.push(...ids),
+    })
+
+    const result = await pruneOrphanedDuplicates(db, 'artist-1', [manualRow, spotifyRow])
+
+    // Spotify row is canonical; manual row is deleted
+    expect(deletedIds).toContain('rel-manual')
+    // Barcode from manual row was merged into spotify row
+    expect(updatedPatches.some((p) => p.barcode === '123456789')).toBe(true)
+    expect(result.deleted).toBe(1)
+    expect(result.merged).toBe(1)
+  })
+
+  it('deletes the lower-popularity Spotify row when two rows share normTitle + year', async () => {
+    const highPop: CrossSourceReleaseRow = {
+      id: 'rel-cut',
+      title: 'Cut',
+      release_date: '2023-01-01',
+      spotify_id: 'sp-cut',
+      itunes_id: null,
+    }
+    const lowPop: CrossSourceReleaseRow = {
+      id: 'rel-cut-single',
+      title: 'Cut - Single',
+      release_date: '2023-03-01',
+      spotify_id: 'sp-cut-single',
+      itunes_id: null,
+    }
+
+    const deletedIds: string[] = []
+
+    const db = makePruneMockDb({
+      extraRows: [
+        { id: 'rel-cut', popularity: 80, catalog_number: null, featured: false },
+        { id: 'rel-cut-single', popularity: 30, catalog_number: null, featured: false },
+      ],
+      onDelete: (ids) => deletedIds.push(...ids),
+    })
+
+    const result = await pruneOrphanedDuplicates(db, 'artist-1', [highPop, lowPop])
+
+    expect(deletedIds).toContain('rel-cut-single')
+    expect(deletedIds).not.toContain('rel-cut')
+    expect(result.deleted).toBe(1)
+  })
+
+  it('does nothing when there are no duplicate groups', async () => {
+    const row1: CrossSourceReleaseRow = {
+      id: 'rel-1',
+      title: 'Album A',
+      release_date: '2023-01-01',
+      spotify_id: 'sp-1',
+      itunes_id: null,
+    }
+    const row2: CrossSourceReleaseRow = {
+      id: 'rel-2',
+      title: 'Album B',
+      release_date: '2024-01-01',
+      spotify_id: 'sp-2',
+      itunes_id: null,
+    }
+
+    const deletedIds: string[] = []
+    const db = makePruneMockDb({ onDelete: (ids) => deletedIds.push(...ids) })
+
+    const result = await pruneOrphanedDuplicates(db, 'artist-1', [row1, row2])
+
+    expect(deletedIds).toHaveLength(0)
+    expect(result.deleted).toBe(0)
+    expect(result.merged).toBe(0)
+  })
+
+  it('never deletes a featured row', async () => {
+    const canonical: CrossSourceReleaseRow = {
+      id: 'rel-featured',
+      title: 'Cut',
+      release_date: '2023-01-01',
+      spotify_id: null,
+      itunes_id: null,
+    }
+    const duplicate: CrossSourceReleaseRow = {
+      id: 'rel-dup',
+      title: 'Cut - Single',
+      release_date: '2023-03-01',
+      spotify_id: null,
+      itunes_id: null,
+    }
+
+    const deletedIds: string[] = []
+
+    const db = makePruneMockDb({
+      extraRows: [
+        { id: 'rel-featured', popularity: null, catalog_number: null, featured: true },
+        { id: 'rel-dup', popularity: null, catalog_number: null, featured: false },
+      ],
+      onDelete: (ids) => deletedIds.push(...ids),
+    })
+
+    await pruneOrphanedDuplicates(db, 'artist-1', [canonical, duplicate])
+
+    // 'rel-featured' is canonical by virtue of being the only non-featured candidate
+    // 'rel-dup' is deleted since it's not featured
+    expect(deletedIds).not.toContain('rel-featured')
   })
 })

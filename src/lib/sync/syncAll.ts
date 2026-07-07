@@ -28,7 +28,7 @@ import { fetchSongkickArtistCalendar } from './songkickApi'
 import { fetchBandsintownArtistEvents } from './bandsintownApi'
 import { isSkippableOdesliError, pickOdesliMusicUrl } from './odesliApi'
 import { resolveOdesliSmartLinkThrottled } from './odesliThrottle'
-import { deduplicateReleases, type CrossSourceReleaseRow } from './deduplication'
+import { deduplicateReleases, pruneOrphanedDuplicates, type CrossSourceReleaseRow } from './deduplication'
 import { isRateLimitedSyncError, withApiRetry } from './retryPolicy'
 import { syncArtist } from './syncArtist'
 import type { SyncDeps } from './syncArtist'
@@ -322,6 +322,13 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             )
           }
         }
+
+        // Best-effort: collapse any pre-existing DB duplicates for this artist.
+        try {
+          await pruneOrphanedDuplicates(db, artist.id, existingReleases)
+        } catch (e) {
+          spotifyResult.errors.push(`Prune duplicates for ${artist.name}: ${String(e)}`)
+        }
       } catch (e) {
         const msg = String(e)
         if (isRateLimitedSyncError(e)) spotifyResult.rateLimited = true
@@ -407,6 +414,13 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
               `Failed to upsert Discogs release "${release.title}" for ${artist.name}: ${String(e)}`,
             )
           }
+        }
+
+        // Best-effort: collapse any pre-existing DB duplicates for this artist.
+        try {
+          await pruneOrphanedDuplicates(db, artist.id, existingReleases)
+        } catch (e) {
+          discogsResult.errors.push(`Prune duplicates for ${artist.name}: ${String(e)}`)
         }
       } catch (e) {
         const msg = String(e)
