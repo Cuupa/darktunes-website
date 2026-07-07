@@ -7,8 +7,26 @@
 
 export const dynamic = 'force-dynamic'
 
-import { AdminOverviewWrapper } from './_components/AdminOverviewWrapper'
+import { AdminOverview } from '@/components/admin/AdminOverview'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-export default function AdminPage() {
-  return <AdminOverviewWrapper />
+export default async function AdminPage() {
+  const supabase = await createServerSupabaseClient()
+  const [artists, releases, news, videos] = await Promise.all([
+    supabase.from('artists').select('id', { count: 'exact', head: true }),
+    supabase.from('releases').select('id', { count: 'exact', head: true }),
+    supabase.from('news_posts').select('id', { count: 'exact', head: true }),
+    supabase.from('videos').select('id', { count: 'exact', head: true }),
+  ])
+
+  return (
+    <AdminOverview
+      counts={{
+        artists: artists.count ?? 0,
+        releases: releases.count ?? 0,
+        news: news.count ?? 0,
+        videos: videos.count ?? 0,
+      }}
+    />
+  )
 }

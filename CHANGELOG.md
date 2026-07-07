@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isValidArtistId` and `isValidPeriod` moved from the deleted `src/lib/sos/sosWebhook.ts` into the new `src/lib/sos/validation.ts`.
 
 ### Fixed
+- **Admin overview counts**: `/admin` now loads artists, releases, news, and videos counts server-side, eliminating client-side Supabase CORS failures and the perpetual loading dashes in “Content at a glance”.
+- **Service worker admin navigation warning**: disabled navigation preload in `app/sw.ts` so admin/portal/press navigations excluded from the service worker no longer log cancelled `preloadResponse` warnings.
 - **ESLint 0 warnings**: Added `argsIgnorePattern: '^_'`, `varsIgnorePattern: '^_'`, `caughtErrorsIgnorePattern: '^_'` to the `@typescript-eslint/no-unused-vars` rule in `eslint.config.js`. Removed stale `eslint-disable-next-line` directives in `heroItems.ts` and `sos-csv-processor.worker.ts`.
 - **`ArtistsManager.tsx` dead state**: Removed vestigial `editingArtist` / `setEditingArtist` state and `artistToFormData()` — editing now navigates to `/admin/artists/[id]/edit`; the inline dialog is create-only.
 - **`ColorThemeManager.tsx` useEffect deps**: Added `draft.typography` to the dependency array alongside the individual font-family properties.
