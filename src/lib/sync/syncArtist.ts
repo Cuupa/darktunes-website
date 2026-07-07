@@ -20,7 +20,7 @@ import { searchItunesArtist } from '@/lib/itunesApi'
 import { syncReleaseFromExternalSource } from '@/lib/api/releases'
 import { mapWithConcurrency } from '@/lib/mapWithConcurrency'
 import { withApiRetry } from '@/lib/sync/retryPolicy'
-import type { CrossSourceReleaseRow } from '@/lib/sync/deduplication'
+import { stripReleaseSuffix, type CrossSourceReleaseRow } from '@/lib/sync/deduplication'
 
 const RELEASE_SYNC_CONCURRENCY = 5
 
@@ -119,7 +119,7 @@ async function processItunesRelease(
         db,
         'itunes',
         {
-          title: release.collectionName,
+          title: stripReleaseSuffix(release.collectionName),
           artist_id: artistId,
           release_date: releaseDate,
           cover_art: artworkUrl ?? null,

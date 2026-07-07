@@ -1,5 +1,6 @@
 import type { Database } from '@/types/database'
 import { stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
+import { stripReleaseSuffix } from '@/lib/sync/deduplication'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
@@ -20,7 +21,7 @@ function cleanHtml(value: string | null | undefined): string | null | undefined 
 
 export function sanitizeReleaseWrite<T extends ReleaseInsert | ReleaseUpdate>(data: T): T {
   const next = { ...data }
-  if (typeof next.title === 'string') next.title = stripEmojis(next.title)
+  if (typeof next.title === 'string') next.title = stripReleaseSuffix(stripEmojis(next.title))
   if (typeof next.promo_text === 'string') next.promo_text = cleanText(next.promo_text) ?? null
   if (typeof next.guest_artists === 'string') next.guest_artists = cleanText(next.guest_artists) ?? null
   return next

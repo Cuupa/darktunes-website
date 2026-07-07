@@ -135,13 +135,20 @@ export function registerSyncedRelease(
   })
 }
 
+/**
+ * Strips iTunes/streaming type suffixes from a release title.
+ * e.g. "Darkwalker - Single" → "Darkwalker"
+ *      "Otherside - EP"      → "Otherside"
+ * Case-insensitive. Does NOT lowercase or strip punctuation (use normTitle for comparisons).
+ */
+export function stripReleaseSuffix(title: string): string {
+  return title.replace(/\s+-\s+(ep|single|album|lp|maxi single|maxi)\s*$/i, '').trim()
+}
+
 /** Normalise a title for fuzzy comparison: strip streaming suffixes, lowercase, strip punctuation */
 export function normTitle(title: string): string {
-  return title
+  return stripReleaseSuffix(title)
     .toLowerCase()
-    // Strip common streaming/iTunes suffixes like " - EP", " - Single", " - Album", " - LP"
-    // so that "Nocturnal - EP" (iTunes) matches "Nocturnal" (manually entered).
-    .replace(/\s+-\s+(ep|single|album|lp|maxi single|maxi)\s*$/, '')
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()

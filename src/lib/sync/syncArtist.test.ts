@@ -237,6 +237,47 @@ describe('syncArtist', () => {
     )
   })
 
+  it('stores iTunes titles without streaming suffixes', async () => {
+    const itunesWithSuffix = {
+      ...ITUNES_RELEASE,
+      collectionName: 'Test Album - Single',
+      trackCount: 1,
+    }
+    const itunesResponseWithSuffix = {
+      resultCount: 1,
+      results: [itunesWithSuffix],
+    }
+
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/search') ? ITUNES_ARTIST_SEARCH_RESPONSE : itunesResponseWithSuffix,
+    } as Response))
+
+    const releaseUpsert = vi.fn().mockImplementation(() => makeReleasesTableBuilder())
+    const fromFn = vi.fn((table: string) => {
+      if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
+      if (table === 'releases') {
+        const builder = makeReleasesTableBuilder()
+        builder.upsert = releaseUpsert
+        return builder
+      }
+      return makeGenericBuilder()
+    })
+    const db = { from: fromFn } as unknown as DbClient
+
+    await syncArtist(ARTIST_ID, {
+      db,
+      fetch: mockFetch,
+      uploadToR2: vi.fn().mockResolvedValue('https://cdn.darktunes.com/cover-art/123.jpg'),
+    })
+
+    expect(releaseUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Test Album' }),
+      expect.any(Object),
+    )
+  })
+
   it('gracefully handles R2 upload failure and falls back to original URL', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
