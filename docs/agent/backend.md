@@ -35,7 +35,7 @@ Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll
 
 **Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube`, `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (50s budget). Odesli batches (`ODESLI_BATCH_SIZE`) reschedule on rate limit (15 min cooldown).
 
-**Release writes:** `syncReleaseFromExternalSource()` in `releases.ts` — cross-source merge before insert; `upsertReleaseBySpotifyId` / `upsertReleaseByDiscogsId` require full UNIQUE constraints on `spotify_id` / `discogs_id` in `reset.sql`.
+**Release writes:** `syncReleaseFromExternalSource()` in `releases.ts` — cross-source merge before insert, plus same-source self-healing for exact `normTitle(title)` + year matches (for example Spotify `Cut` vs `Cut - Single`). `deduplicateReleases()` also performs an intra-Spotify dedup pass before DB writes so discogs metadata is preserved on the canonical entry. `upsertReleaseBySpotifyId` / `upsertReleaseByDiscogsId` require full UNIQUE constraints on `spotify_id` / `discogs_id` in `reset.sql`.
 
 ## API credentials
 
