@@ -23,7 +23,7 @@ const serwist = new Serwist({
   },
   skipWaiting: true,
   clientsClaim: true,
-  navigationPreload: true,
+  navigationPreload: false,
   // Return the custom offline page when the network is unavailable
   fallbacks: {
     entries: [

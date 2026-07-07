@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * src/components/admin/AdminOverview.tsx
  *
@@ -8,7 +6,6 @@
  * quick-access links to each admin section.
  */
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   MusicNotes,
@@ -23,10 +20,8 @@ import {
   Cpu,
   ArrowRight,
 } from '@phosphor-icons/react'
-import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { isSupabaseConfigured } from '@/env'
 
-interface StatCounts {
+export interface StatCounts {
   artists: number
   releases: number
   news: number
@@ -77,33 +72,7 @@ const SECTION_LINKS = [
   { label: 'System',        href: '/admin/system',     icon: Cpu,          description: 'Health, logs, media' },
 ]
 
-export function AdminOverview() {
-  const [counts, setCounts] = useState<StatCounts | null>(null)
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-
-    let cancelled = false
-    async function load() {
-      const supabase = createBrowserSupabaseClient()
-      const [artists, releases, news, videos] = await Promise.all([
-        supabase.from('artists').select('id', { count: 'exact', head: true }),
-        supabase.from('releases').select('id', { count: 'exact', head: true }),
-        supabase.from('news_posts').select('id', { count: 'exact', head: true }),
-        supabase.from('videos').select('id', { count: 'exact', head: true }),
-      ])
-      if (cancelled) return
-      setCounts({
-        artists: artists.count ?? 0,
-        releases: releases.count ?? 0,
-        news: news.count ?? 0,
-        videos: videos.count ?? 0,
-      })
-    }
-    void load()
-    return () => { cancelled = true }
-  }, [])
-
+export function AdminOverview({ counts }: { counts: StatCounts }) {
   return (
     <div className="p-6 space-y-8">
       {/* Stats row */}
@@ -112,10 +81,10 @@ export function AdminOverview() {
           Content at a glance
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard label="Artists"  value={counts?.artists  ?? null} icon={User}        href="/admin/content?tab=artists"  />
-          <StatCard label="Releases" value={counts?.releases ?? null} icon={MusicNotes}  href="/admin/content?tab=releases" />
-          <StatCard label="News"     value={counts?.news     ?? null} icon={Newspaper}   href="/admin/content?tab=news"     />
-          <StatCard label="Videos"   value={counts?.videos   ?? null} icon={VideoCamera} href="/admin/content?tab=videos"   />
+          <StatCard label="Artists"  value={counts.artists}  icon={User}        href="/admin/content?tab=artists"  />
+          <StatCard label="Releases" value={counts.releases} icon={MusicNotes}  href="/admin/content?tab=releases" />
+          <StatCard label="News"     value={counts.news}     icon={Newspaper}   href="/admin/content?tab=news"     />
+          <StatCard label="Videos"   value={counts.videos}   icon={VideoCamera} href="/admin/content?tab=videos"   />
         </div>
       </section>
 
