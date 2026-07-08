@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NewsPost, Release } from '@/types'
-import { selectHeroItems } from './heroItems'
+import { selectHeroItems } from './heroFeatured'
 
 const releaseA = { id: 'rel-a', title: 'A', featured: true, isVisible: true, isPromo: false, releaseDate: '2024-06-01' } as Release
 const releaseB = { id: 'rel-b', title: 'B', featured: true, isVisible: true, isPromo: false, releaseDate: '2024-05-01' } as Release

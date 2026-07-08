@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { eventBus } from '@/domain/events/eventBus'
 import { deleteAssetRecord, updateAsset } from '@/lib/api/assets'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -71,8 +70,6 @@ export const DELETE = withErrorHandler(async (request: NextRequest): Promise<Nex
 
   await deleteR2Objects([asset])
   await deleteAssetRecord(supabase, id)
-
-  eventBus.emit({ type: 'asset.deleted', assetId: id })
 
   return NextResponse.json({ success: true })
 })

@@ -9,7 +9,7 @@ type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
 type ArtistInsert = Database['public']['Tables']['artists']['Insert']
 type ArtistUpdate = Database['public']['Tables']['artists']['Update']
 
-function cleanText(value: string | null | undefined): string | null | undefined {
+export function cleanText(value: string | null | undefined): string | null | undefined {
   if (value == null) return value
   return stripEmojis(value)
 }

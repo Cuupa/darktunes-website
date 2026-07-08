@@ -5,8 +5,7 @@ import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, MagnifyingGlass, Archive, Star, Copy } from '@phosphor-icons/react'
 import { useNews } from '@/hooks/useNews'
 import { useReleases } from '@/hooks/useReleases'
-import { previewFeaturedBump, type HeroFeaturedItem } from '@/lib/heroFeatured'
-import { buildHeroBumpUpdate, buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { previewFeaturedBump, HERO_BUMP_UPDATE, buildHeroFeatureUpdate, type HeroFeaturedItem } from '@/lib/heroFeatured'
 import { FeaturedRemovedBadge } from '@/components/admin/FeaturedRemovedBadge'
 import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
@@ -110,10 +109,10 @@ export function NewsManager() {
 
   const bumpHeroItem = async (bumpTarget: HeroFeaturedItem) => {
     if (bumpTarget.kind === 'release') {
-      await updateRelease(bumpTarget.id, buildHeroBumpUpdate())
+      await updateRelease(bumpTarget.id, HERO_BUMP_UPDATE)
       return
     }
-    await updateNewsPost(bumpTarget.id, buildHeroBumpUpdate())
+    await updateNewsPost(bumpTarget.id, HERO_BUMP_UPDATE)
   }
 
   const applyFeaturedToggle = async (post: NewsPost, bumpTarget?: HeroFeaturedItem) => {

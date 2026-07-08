@@ -1,4 +1,3 @@
-import type { RolePermissionKey } from '@/lib/adminAuth'
 import type { Capability, EffectiveAccess, SystemCapability } from './types'
 import { hasPermissionKey } from './resolveAccess'
 
@@ -31,14 +30,6 @@ export function hasPressDashboardAccess(access: EffectiveAccess): boolean {
 
 export function hasSyncTriggerAccess(access: EffectiveAccess): boolean {
   return hasCapability(access, 'sync.trigger')
-}
-
-export function requireCapability(access: EffectiveAccess, capability: Capability): boolean {
-  return hasCapability(access, capability)
-}
-
-export function requirePermission(access: EffectiveAccess, permission: RolePermissionKey): boolean {
-  return hasPermissionKey(access, permission)
 }
 
 export type { SystemCapability }

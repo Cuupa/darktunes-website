@@ -1,4 +1,6 @@
-import type { NewsPost, Release } from '@/types'
+import type { NewsPost, Release, SiteSettings } from '@/types'
+import type { Database } from '@/types/database'
+import { MS_PER_DAY } from '@/lib/datetime/constants'
 
 export const MAX_HERO_FEATURES = 10
 
@@ -172,11 +174,63 @@ export function resolveFeaturedUntilInput(options: {
   if (options.durationMode === 'days') {
     const days = options.durationDays ?? 0
     if (days <= 0) return null
-    return new Date(Date.now() + days * 86_400_000).toISOString()
+    return new Date(Date.now() + days * MS_PER_DAY).toISOString()
   }
 
   if (!options.untilLocal) return null
   const parsed = new Date(options.untilLocal)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed.toISOString()
+}
+
+// ---------------------------------------------------------------------------
+// Hero bump DB patch builders (merged from heroFeaturedBump.ts)
+// ---------------------------------------------------------------------------
+
+type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
+type NewsUpdate = Database['public']['Tables']['news_posts']['Update']
+
+/** DB patch fields used when a hero item is bumped out due to capacity. */
+export const HERO_BUMP_UPDATE: ReleaseUpdate & NewsUpdate = {
+  featured: false,
+  featured_removed_reason: 'capacity',
+  featured_until: null,
+}
+
+export function buildHeroFeatureUpdate(options: {
+  featured: boolean
+  featuredUntil: string | null
+}): ReleaseUpdate & NewsUpdate {
+  if (!options.featured) {
+    return {
+      featured: false,
+      featured_until: null,
+      featured_removed_reason: null,
+    }
+  }
+
+  return {
+    featured: true,
+    featured_until: options.featuredUntil,
+    featured_removed_reason: null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hero item selection (merged from heroItems.ts)
+// ---------------------------------------------------------------------------
+
+export function selectHeroItems(
+  releases: Release[],
+  news: NewsPost[],
+  _siteSettings?: Pick<SiteSettings, 'heroContentType' | 'heroFeaturedId'>,
+): (Release | NewsPost)[] {
+  const byId = new Map<string, Release | NewsPost>()
+  for (const release of releases) byId.set(release.id, release)
+  for (const post of news) byId.set(post.id, post)
+
+  return collectHeroCandidates(releases, news)
+    .slice(0, MAX_HERO_FEATURES)
+    .map((item) => byId.get(item.id))
+    .filter((item): item is Release | NewsPost => item != null)
 }

@@ -1,4 +1,5 @@
 import { defineRouting } from 'next-intl/routing'
+import { SECONDS_PER_YEAR } from '@/lib/datetime/constants'
 
 export const routing = defineRouting({
   locales: ['en', 'de'],
@@ -6,6 +7,6 @@ export const routing = defineRouting({
   localePrefix: 'never',
   localeCookie: {
     name: 'NEXT_LOCALE',
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: SECONDS_PER_YEAR,
   },
 })

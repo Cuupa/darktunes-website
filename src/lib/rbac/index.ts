@@ -24,8 +24,6 @@ export {
   hasFullAdminAccess,
   hasPressDashboardAccess,
   hasSyncTriggerAccess,
-  requireCapability,
-  requirePermission,
 } from './guards'
 export {
   ROUTE_ACCESS_RULES,

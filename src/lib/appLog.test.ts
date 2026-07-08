@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { writeAppLog } from './appLog'
+import { writeAppLog, _resetLogClientForTests } from './appLog'
 
-const mockInsert = vi.fn().mockResolvedValue({ error: null })
-const mockFrom = vi.fn(() => ({ insert: mockInsert }))
-const mockCreateClient = vi.fn(() => ({ from: mockFrom }))
+const { mockInsert, mockFrom, mockCreateClient } = vi.hoisted(() => {
+  const mockInsert = vi.fn().mockResolvedValue({ error: null })
+  const mockFrom = vi.fn(() => ({ insert: mockInsert }))
+  const mockCreateClient = vi.fn(() => ({ from: mockFrom }))
+  return { mockInsert, mockFrom, mockCreateClient }
+})
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: mockCreateClient,
@@ -12,6 +15,7 @@ vi.mock('@supabase/supabase-js', () => ({
 describe('writeAppLog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    _resetLogClientForTests()
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
   })

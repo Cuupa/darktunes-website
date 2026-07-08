@@ -1,26 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { containsEmojis, stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
+import { cleanText, SITE_SETTINGS_TEXT_KEYS } from '@/lib/sanitizeTextContent'
 
 type DbClient = SupabaseClient<Database>
-
-const SITE_SETTINGS_TEXT_KEYS = new Set([
-  'label_tagline',
-  'about_headline',
-  'about_subheading',
-  'about_body',
-  'about_nav_label',
-  'contact_intro',
-  'newsletter_heading',
-  'newsletter_subheading',
-  'footer_tagline',
-])
-
-function cleanOptionalText(value: string | null | undefined): string | null | undefined {
-  if (value == null) return value
-  const cleaned = stripEmojis(value)
-  return cleaned === value ? value : cleaned
-}
 
 /**
  * Persists emoji cleanup for existing rows that still contain emojis.
@@ -41,13 +24,13 @@ export async function persistEmojiCleanup(db: DbClient): Promise<number> {
       guest_artists?: string | null
     } = {}
 
-    const title = cleanOptionalText(row.title)
+    const title = cleanText(row.title)
     if (title !== row.title && typeof title === 'string') patch.title = title
 
-    const promoText = cleanOptionalText(row.promo_text)
+    const promoText = cleanText(row.promo_text)
     if (promoText !== row.promo_text) patch.promo_text = promoText ?? null
 
-    const guestArtists = cleanOptionalText(row.guest_artists)
+    const guestArtists = cleanText(row.guest_artists)
     if (guestArtists !== row.guest_artists) patch.guest_artists = guestArtists ?? null
 
     if (Object.keys(patch).length === 0) continue
@@ -70,13 +53,13 @@ export async function persistEmojiCleanup(db: DbClient): Promise<number> {
       content?: string
     } = {}
 
-    const title = cleanOptionalText(row.title)
+    const title = cleanText(row.title)
     if (title !== row.title && typeof title === 'string') patch.title = title
 
-    const slug = cleanOptionalText(row.slug)
+    const slug = cleanText(row.slug)
     if (slug !== row.slug && typeof slug === 'string') patch.slug = slug
 
-    const excerpt = cleanOptionalText(row.excerpt)
+    const excerpt = cleanText(row.excerpt)
     if (excerpt !== row.excerpt) patch.excerpt = excerpt ?? null
 
     if (row.content && containsEmojis(row.content)) {
@@ -104,19 +87,19 @@ export async function persistEmojiCleanup(db: DbClient): Promise<number> {
       country?: string | null
     } = {}
 
-    const name = cleanOptionalText(row.name)
+    const name = cleanText(row.name)
     if (name !== row.name && typeof name === 'string') patch.name = name
 
-    const bio = cleanOptionalText(row.bio)
+    const bio = cleanText(row.bio)
     if (bio !== row.bio) patch.bio = bio ?? null
 
-    const notes = cleanOptionalText(row.notes)
+    const notes = cleanText(row.notes)
     if (notes !== row.notes) patch.notes = notes ?? null
 
-    const hometown = cleanOptionalText(row.hometown)
+    const hometown = cleanText(row.hometown)
     if (hometown !== row.hometown) patch.hometown = hometown ?? null
 
-    const country = cleanOptionalText(row.country)
+    const country = cleanText(row.country)
     if (country !== row.country) patch.country = country ?? null
 
     if (Object.keys(patch).length === 0) continue

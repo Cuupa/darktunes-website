@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useNews } from '@/hooks/useNews'
 import { useReleases } from '@/hooks/useReleases'
 import { previewFeaturedBump, type HeroFeaturedItem, type HeroFeaturedKind } from '@/lib/heroFeatured'
-import { buildHeroBumpUpdate } from '@/lib/heroFeaturedBump'
+import { HERO_BUMP_UPDATE } from '@/lib/heroFeatured'
 
 type PendingAction = {
   bumpTarget: HeroFeaturedItem
@@ -19,10 +19,10 @@ export function useHeroFeaturedBump() {
 
   const bumpHeroItem = async (bumpTarget: HeroFeaturedItem) => {
     if (bumpTarget.kind === 'release') {
-      await updateRelease(bumpTarget.id, buildHeroBumpUpdate())
+      await updateRelease(bumpTarget.id, HERO_BUMP_UPDATE)
       return
     }
-    await updateNewsPost(bumpTarget.id, buildHeroBumpUpdate())
+    await updateNewsPost(bumpTarget.id, HERO_BUMP_UPDATE)
   }
 
   const runWithOptionalBump = async (options: {
