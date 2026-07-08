@@ -16,7 +16,9 @@
 
 const COOKIE_NAME = 'darktunes_consent'
 const LEGACY_STORAGE_KEY = 'darktunes_consent_external'
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year in seconds
+import { SECONDS_PER_YEAR } from '@/lib/datetime/constants'
+
+const COOKIE_MAX_AGE = SECONDS_PER_YEAR
 
 export type ConsentState = 'accepted' | 'rejected' | null
 

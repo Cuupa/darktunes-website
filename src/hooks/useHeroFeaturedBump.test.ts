@@ -2,19 +2,19 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useHeroFeaturedBump } from './useHeroFeaturedBump'
 
-const { updateRelease, updateNewsPost, previewFeaturedBump, buildHeroBumpUpdate } = vi.hoisted(() => ({
+const { updateRelease, updateNewsPost, previewFeaturedBump, HERO_BUMP_UPDATE } = vi.hoisted(() => ({
   updateRelease: vi.fn(),
   updateNewsPost: vi.fn(),
   previewFeaturedBump: vi.fn(),
-  buildHeroBumpUpdate: vi.fn(() => ({ hero_featured: false })),
+  HERO_BUMP_UPDATE: { hero_featured: false },
 }))
 
 vi.mock('@/hooks/useReleases', () => ({ useReleases: () => ({ releases: [], updateRelease }) }))
 vi.mock('@/hooks/useNews', () => ({ useNews: () => ({ news: [], updateNewsPost }) }))
 vi.mock('@/lib/heroFeatured', () => ({
   previewFeaturedBump,
+  HERO_BUMP_UPDATE,
 }))
-vi.mock('@/lib/heroFeaturedBump', () => ({ buildHeroBumpUpdate }))
 
 describe('useHeroFeaturedBump', () => {
   it('creates pending action and confirms bump flow', async () => {

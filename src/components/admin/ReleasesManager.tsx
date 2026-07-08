@@ -5,8 +5,7 @@ import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, Magnif
 import type { ColumnDef } from '@tanstack/react-table'
 import { useReleases } from '@/hooks/useReleases'
 import { useNews } from '@/hooks/useNews'
-import { previewFeaturedBump, type HeroFeaturedItem } from '@/lib/heroFeatured'
-import { buildHeroBumpUpdate, buildHeroFeatureUpdate } from '@/lib/heroFeaturedBump'
+import { previewFeaturedBump, HERO_BUMP_UPDATE, buildHeroFeatureUpdate, type HeroFeaturedItem } from '@/lib/heroFeatured'
 import { featuredDurationFromUntil, featuredUntilFromDuration } from '@/lib/featuredDurationForm'
 import { FeaturedRemovedBadge } from '@/components/admin/FeaturedRemovedBadge'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -413,10 +412,10 @@ export function ReleasesManager() {
 
   const bumpHeroItem = async (bumpTarget: HeroFeaturedItem) => {
     if (bumpTarget.kind === 'release') {
-      await updateRelease(bumpTarget.id, buildHeroBumpUpdate())
+      await updateRelease(bumpTarget.id, HERO_BUMP_UPDATE)
       return
     }
-    await updateNewsPost(bumpTarget.id, buildHeroBumpUpdate())
+    await updateNewsPost(bumpTarget.id, HERO_BUMP_UPDATE)
   }
 
   const applyFeaturedToggle = async (release: Release, bumpTarget?: HeroFeaturedItem) => {

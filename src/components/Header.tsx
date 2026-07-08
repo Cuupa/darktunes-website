@@ -12,6 +12,7 @@ import logoImage from '@/assets/images/logo_(1).png'
 import { buildNavItems } from '@/config/sections'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { HomepageSection } from '@/types'
+import { SECONDS_PER_YEAR } from '@/lib/datetime/constants'
 
 interface HeaderProps {
   logoUrl?: string
@@ -54,7 +55,7 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
 
   const handleLocaleSwitch = () => {
     const next = locale === 'de' ? 'en' : 'de'
-    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${SECONDS_PER_YEAR}; samesite=lax`
     router.refresh()
   }
 

@@ -27,7 +27,7 @@ import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection, Artist } from '@/types'
-import { selectHeroItems } from '@/lib/heroItems'
+import { selectHeroItems } from '@/lib/heroFeatured'
 
 interface HomePageContentProps {
   releases: Release[]

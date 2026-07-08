@@ -18,7 +18,6 @@ import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { extname } from 'path'
-import { eventBus } from '@/domain/events/eventBus'
 import { createAssetRecord, getAssetByHash } from '@/lib/api/assets'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -123,8 +122,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     tags: [],
     sha256_hash: sha256Hash,
   })
-
-  eventBus.emit({ type: 'asset.uploaded', r2Key, publicUrl, mimeType, sizeBytes: file.size })
 
   return NextResponse.json({
     duplicate: false,

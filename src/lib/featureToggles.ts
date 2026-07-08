@@ -12,24 +12,14 @@ export const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
 /** Parse the `feature_toggles` JSON value from site_settings. */
 export function parseFeatureTogglesJson(raw: string | null | undefined): FeatureToggles {
   try {
-    const parsed = JSON.parse(raw ?? '{}') as unknown
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const candidate = parsed as Record<string, unknown>
-      return {
-        promoPool:
-          typeof candidate.promoPool === 'boolean'
-            ? candidate.promoPool
-            : DEFAULT_FEATURE_TOGGLES.promoPool,
-        editorTools:
-          typeof candidate.editorTools === 'boolean'
-            ? candidate.editorTools
-            : DEFAULT_FEATURE_TOGGLES.editorTools,
-      }
+    const parsed = JSON.parse(raw ?? '{}')
+    return {
+      promoPool: typeof parsed?.promoPool === 'boolean' ? parsed.promoPool : DEFAULT_FEATURE_TOGGLES.promoPool,
+      editorTools: typeof parsed?.editorTools === 'boolean' ? parsed.editorTools : DEFAULT_FEATURE_TOGGLES.editorTools,
     }
   } catch {
-    // fall through to defaults
+    return { ...DEFAULT_FEATURE_TOGGLES }
   }
-  return { ...DEFAULT_FEATURE_TOGGLES }
 }
 
 export async function getFeatureToggles(db: DbClient): Promise<FeatureToggles> {

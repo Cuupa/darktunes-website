@@ -5,6 +5,8 @@
  * Server-only — never import from client components.
  */
 
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+
 export type AppLogLevel = 'error' | 'warn' | 'info'
 
 export interface WriteAppLogOptions {
@@ -15,15 +17,30 @@ export interface WriteAppLogOptions {
   userId?: string | null
 }
 
+let _logClient: SupabaseClient | null = null
+let _logClientKey = ''
+
+function getLogClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  const cacheKey = `${url}|${key}`
+  if (_logClient && _logClientKey === cacheKey) return _logClient
+  _logClient = createClient(url, key, { auth: { persistSession: false } })
+  _logClientKey = cacheKey
+  return _logClient
+}
+
+/** For test isolation only — resets the cached Supabase client. */
+export function _resetLogClientForTests(): void {
+  _logClient = null
+  _logClientKey = ''
+}
+
 export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceKey) return
-
-    const { createClient } = await import('@supabase/supabase-js')
-    const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+    const db = getLogClient()
+    if (!db) return
 
     const row: {
       source: string

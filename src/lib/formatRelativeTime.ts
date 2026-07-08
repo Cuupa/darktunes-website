@@ -1,10 +1,19 @@
+import {
+  SECONDS_PER_YEAR,
+  SECONDS_PER_MONTH,
+  SECONDS_PER_WEEK,
+  SECONDS_PER_DAY,
+  SECONDS_PER_HOUR,
+  SECONDS_PER_MINUTE,
+} from '@/lib/datetime/constants'
+
 const UNITS: Array<{ unit: Intl.RelativeTimeFormatUnit; seconds: number }> = [
-  { unit: 'year', seconds: 60 * 60 * 24 * 365 },
-  { unit: 'month', seconds: 60 * 60 * 24 * 30 },
-  { unit: 'week', seconds: 60 * 60 * 24 * 7 },
-  { unit: 'day', seconds: 60 * 60 * 24 },
-  { unit: 'hour', seconds: 60 * 60 },
-  { unit: 'minute', seconds: 60 },
+  { unit: 'year', seconds: SECONDS_PER_YEAR },
+  { unit: 'month', seconds: SECONDS_PER_MONTH },
+  { unit: 'week', seconds: SECONDS_PER_WEEK },
+  { unit: 'day', seconds: SECONDS_PER_DAY },
+  { unit: 'hour', seconds: SECONDS_PER_HOUR },
+  { unit: 'minute', seconds: SECONDS_PER_MINUTE },
   { unit: 'second', seconds: 1 },
 ]
 
