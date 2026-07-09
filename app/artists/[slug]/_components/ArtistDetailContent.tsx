@@ -29,7 +29,6 @@ import {
 } from '@phosphor-icons/react'
 import { ConsentGate } from '@/components/ConsentGate'
 import { VideoModal } from '@/components/VideoModal'
-import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
 import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -165,12 +164,11 @@ export function ArtistDetailContent({
           aria-hidden
         >
           <Image
-            src={getOptimizedImageUrl(artist.imageUrl, 1400)}
+            src={artist.imageUrl}
             alt=""
             aria-hidden="true"
             fill
             className="object-cover opacity-20 blur-2xl scale-110"
-            unoptimized
             onError={(e) => {
               e.currentTarget.style.display = 'none'
             }}
@@ -197,9 +195,9 @@ export function ArtistDetailContent({
               transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
               className="w-full rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
-              {getSquareThumbnail(artist.imageUrl, 600) ? (
+              {artist.imageUrl ? (
                 <Image
-                  src={getSquareThumbnail(artist.imageUrl, 600)}
+                  src={artist.imageUrl}
                   alt={`${artist.name} – artist photo`}
                   width={480}
                   height={480}
@@ -207,7 +205,6 @@ export function ArtistDetailContent({
                   style={{
                     objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
                   }}
-                  unoptimized
                   onError={(e) => {
                     e.currentTarget.style.display = 'none'
                     const placeholder = e.currentTarget.nextElementSibling as HTMLElement | null
@@ -217,7 +214,7 @@ export function ArtistDetailContent({
               ) : null}
               <div
                 className="w-full aspect-square bg-gradient-to-br from-card to-background flex items-center justify-center"
-                style={{ display: getSquareThumbnail(artist.imageUrl, 600) ? 'none' : 'flex' }}
+                style={{ display: artist.imageUrl ? 'none' : 'flex' }}
               >
                 <span className="text-8xl font-bold text-muted-foreground/40 select-none uppercase">
                   {artist.name.slice(0, 2)}
@@ -229,12 +226,11 @@ export function ArtistDetailContent({
             {artist.logoUrl && (
               <div className="flex items-center justify-center px-4 py-3 rounded-xl bg-card/60 border border-border/40">
                 <Image
-                  src={getOptimizedImageUrl(artist.logoUrl, 480)}
+                  src={artist.logoUrl}
                   alt={`${artist.name} – logo`}
                   width={320}
                   height={120}
                   className="h-20 w-auto max-w-full object-contain brightness-0 invert opacity-90"
-                  unoptimized
                   onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
                 />
               </div>
@@ -507,7 +503,7 @@ export function ArtistDetailContent({
                     className="relative aspect-square w-full rounded-lg overflow-hidden bg-card border border-border cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Image
-                      src={getOptimizedImageUrl(url, 600)}
+                      src={url}
                       alt={`${artist.name} – ${t('bandPhotos')} ${index + 1}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -568,11 +564,10 @@ export function ArtistDetailContent({
                               aria-label={`Play ${video.title}`}
                             >
                               <Image
-                                src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
+                                src={video.thumbnailUrl}
                                 alt={`${video.title} – video thumbnail`}
                                 fill
                                 className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                unoptimized
                               />
                               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
                                 <div
@@ -659,11 +654,10 @@ export function ArtistDetailContent({
                           <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
                             <div className="relative aspect-square overflow-hidden">
                               <Image
-                                src={getOptimizedImageUrl(release.coverArt, 400)}
+                                src={release.coverArt}
                                 alt={`${release.title} by ${artist.name} – cover art`}
                                 fill
                                 className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                unoptimized
                               />
                               <Badge
                                 variant="outline"
@@ -729,12 +723,11 @@ export function ArtistDetailContent({
                         >
                           {post.imageUrl && (
                             <Image
-                              src={getOptimizedImageUrl(post.imageUrl, 120)}
+                              src={post.imageUrl}
                               alt={`${post.title} – news thumbnail`}
                               width={80}
                               height={80}
                               className="w-20 h-20 object-cover rounded-lg shrink-0"
-                              unoptimized
                             />
                           )}
                           <div className="min-w-0">

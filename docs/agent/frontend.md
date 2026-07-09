@@ -53,7 +53,7 @@ CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`
 
 ## Images
 
-Public images via `getOptimizedImageUrl` / `getSquareThumbnail` (`imageUtils.ts`). Use `next/image`; wsrv.nl URLs get `unoptimized`. Icon name clash: import Phosphor `Image` as `ImageIcon`.
+R2 URLs passed directly to `next/image` — no wsrv.nl wrapper for `<Image>` components. Next.js handles resize, WebP conversion, and CDN caching automatically. `wsrv.nl` is only used inside `processHtmlImages()` (`imageUtils.ts`) for raw HTML rich-text content where `next/image` cannot be used. Icon name clash: import Phosphor `Image` as `ImageIcon`.
 
 ## i18n
 
@@ -86,7 +86,7 @@ Typography tokens in `themeConfig.ts`; `--font-serif` wired in `ThemeStyleInject
 
 ## Hero & gallery
 
-`Hero.tsx`: `heroItem?: Release | NewsPost`; carousel every 6s; Explore → `#releases` or `#news`. `ReleasesCoverflow`: Swiper coverflow; wsrv thumbnails; no Virtual module; iOS `pagehide` stops autoplay.
+`Hero.tsx`: `heroItem?: Release | NewsPost`; carousel every 6s; Explore → `#releases` or `#news`. `ReleasesCoverflow`: Swiper coverflow; direct R2 thumbnails; no Virtual module; iOS `pagehide` stops autoplay.
 
 ## Class names
 

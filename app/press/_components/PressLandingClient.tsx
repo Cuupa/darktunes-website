@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTranslations } from 'next-intl'
 import { ObfuscatedText } from '@/components/press/ObfuscatedText'
-import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist, NewsPost, SiteSettings } from '@/types'
 
 interface PressLandingClientProps {
@@ -148,11 +147,10 @@ export function PressLandingClient({
                       >
                         <div className="relative aspect-[4/3] overflow-hidden">
                           <Image
-                            src={getSquareThumbnail(artist.imageUrl, 800)}
+                            src={artist.imageUrl}
                             alt={`${artist.name} – artist photo`}
                             fill
                             className="object-cover transition-transform duration-300 group-hover:scale-105"
-                            unoptimized
                           />
                         </div>
                         <div className="flex flex-1 items-center justify-between gap-3 p-4">
@@ -198,11 +196,10 @@ export function PressLandingClient({
                       {post.imageUrl && (
                         <div className="relative aspect-[16/10] overflow-hidden rounded-t-xl">
                           <Image
-                            src={getOptimizedImageUrl(post.imageUrl, 1200)}
+                            src={post.imageUrl}
                             alt={`${post.title} – press release cover`}
                             fill
                             className="object-cover"
-                            unoptimized
                           />
                         </div>
                       )}

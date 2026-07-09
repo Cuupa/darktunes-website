@@ -44,7 +44,8 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 | Anti-pattern | Rule |
 |--------------|------|
-| Bare `<img>` | `next/image`; wsrv URLs → `unoptimized` |
+| Bare `<img>` | `next/image`; pass raw R2 URL directly — no `unoptimized` |
+| wsrv.nl in `<Image>` for R2 URLs | Pass raw URL; `wsrv.nl` only inside `processHtmlImages()` for rich-text HTML |
 | Double-proxy wsrv.nl URLs | Proxy only raw origin URLs |
 | Phosphor `Image` + `next/image` clash | `import { Image as ImageIcon }` |
 
