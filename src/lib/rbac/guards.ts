@@ -1,5 +1,4 @@
 import type { Capability, EffectiveAccess, SystemCapability } from './types'
-import { hasPermissionKey } from './resolveAccess'
 
 export function hasCapability(access: EffectiveAccess, capability: Capability): boolean {
   if (access.isAdmin) return true
