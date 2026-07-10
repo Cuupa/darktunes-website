@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTranslations } from 'next-intl'
 import { ObfuscatedText } from '@/components/press/ObfuscatedText'
 import type { Artist, NewsPost, SiteSettings } from '@/types'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface PressLandingClientProps {
   artists: Artist[]
@@ -147,9 +148,10 @@ export function PressLandingClient({
                       >
                         <div className="relative aspect-[4/3] overflow-hidden">
                           <Image
-                            src={artist.imageUrl}
+                            src={getOptimizedImageUrl(artist.imageUrl, 600)}
                             alt={`${artist.name} – artist photo`}
                             fill
+                            unoptimized
                             className="object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                         </div>
@@ -196,9 +198,10 @@ export function PressLandingClient({
                       {post.imageUrl && (
                         <div className="relative aspect-[16/10] overflow-hidden rounded-t-xl">
                           <Image
-                            src={post.imageUrl}
+                            src={getOptimizedImageUrl(post.imageUrl, 600)}
                             alt={`${post.title} – press release cover`}
                             fill
+                            unoptimized
                             className="object-cover"
                           />
                         </div>

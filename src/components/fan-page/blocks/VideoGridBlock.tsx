@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { Play } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Video } from '@/types'
 import { resolveThemeColors } from '@/lib/fan-page/theme/resolveThemeColors'
 import type { FanPageTheme } from '@/lib/fan-page/schema/documentV1'
@@ -39,9 +40,10 @@ export function VideoGridBlock({ videos = [], theme, title, limit = 3 }: VideoGr
           >
             <div className="relative aspect-video">
               <Image
-                src={video.thumbnailUrl}
+                src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
                 alt={video.title}
                 fill
+                unoptimized
                 className="object-cover transition group-hover:scale-105"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />

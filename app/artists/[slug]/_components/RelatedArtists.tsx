@@ -8,6 +8,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { Artist } from '@/types'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 
 interface RelatedArtistsProps {
   artists: Artist[]
@@ -33,9 +34,10 @@ export function RelatedArtists({ artists, heading }: RelatedArtistsProps) {
           >
             {artist.imageUrl ? (
               <Image
-                src={artist.imageUrl}
+                src={getSquareThumbnail(artist.imageUrl, 300)}
                 alt={`${artist.name} – artist photo`}
                 fill
+                unoptimized
                 className="object-cover object-center transition-transform duration-500 group-hover:scale-110"
                 sizes="(max-width: 640px) 144px, 176px"
               />

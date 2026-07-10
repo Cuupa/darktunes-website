@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { useTranslations } from 'next-intl'
 import type { NewsPost } from '@/types'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 const ITEMS_PER_PAGE = 6
 
@@ -57,9 +58,10 @@ export function NewsList({ posts }: NewsListProps) {
                   className="group relative block min-h-[320px] overflow-hidden aspect-[21/9] lg:min-h-[420px] lg:aspect-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <Image
-                    src={featuredPost.imageUrl}
+                    src={getOptimizedImageUrl(featuredPost.imageUrl, 1200)}
                     alt={featuredPost.title}
                     fill
+                    unoptimized
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     sizes="(min-width: 1024px) 55vw, 100vw"
                   />
@@ -110,9 +112,10 @@ export function NewsList({ posts }: NewsListProps) {
                   className="relative block aspect-video overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <Image
-                    src={post.imageUrl}
+                    src={getOptimizedImageUrl(post.imageUrl, 600)}
                     alt={post.title}
                     fill
+                    unoptimized
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                   />

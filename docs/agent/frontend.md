@@ -53,7 +53,7 @@ CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`
 
 ## Images
 
-R2 URLs passed directly to `next/image` — no wsrv.nl wrapper for `<Image>` components. Next.js handles resize, WebP conversion, and CDN caching automatically. `wsrv.nl` is only used inside `processHtmlImages()` (`imageUtils.ts`) for raw HTML rich-text content where `next/image` cannot be used. Icon name clash: import Phosphor `Image` as `ImageIcon`.
+Public images via `getOptimizedImageUrl` / `getSquareThumbnail` (`imageUtils.ts`). Use `next/image` with `unoptimized` — wsrv.nl handles resize/WebP; `next.config.ts` sets `images.unoptimized: true` so Vercel Image Optimization never runs (Hobby limit → HTTP 402). Rich-text HTML: `processHtmlImages()`. Icon name clash: import Phosphor `Image` as `ImageIcon`.
 
 ## i18n
 

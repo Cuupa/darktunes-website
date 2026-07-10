@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Video } from '@/types'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 const VideoModal = lazy(() =>
   import('@/components/VideoModal').then((m) => ({ default: m.VideoModal }))
@@ -139,9 +140,10 @@ export function VideosPageContent({
                   >
                     <div className="relative aspect-video overflow-hidden shrink-0">
                       <Image
-                        src={video.thumbnailUrl ?? ''}
+                        src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
                         alt={`${video.title} – video thumbnail`}
                         fill
+                        unoptimized
                         className="object-cover transform-gpu group-hover:scale-110 transition-transform duration-500"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       />

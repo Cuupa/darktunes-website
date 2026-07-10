@@ -21,6 +21,7 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import type { Release } from '@/types'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ReleaseChecklistPanelProps {
   releases: Release[]
@@ -106,9 +107,10 @@ function ReleaseCard({
           <div className="relative w-14 h-14 shrink-0 rounded overflow-hidden bg-muted">
             {release.coverArt ? (
               <Image
-                src={release.coverArt}
+                src={getSquareThumbnail(release.coverArt, 112)}
                 alt={release.title}
                 fill
+                unoptimized
                 className="object-cover"
                 sizes="56px"
               />
@@ -240,10 +242,11 @@ export function ReleaseChecklistPanel({ releases,
                         <div className="flex items-center gap-3">
                           {r.coverArt ? (
                             <Image
-                              src={r.coverArt}
+                              src={getSquareThumbnail(r.coverArt, 80)}
                               alt={r.title}
                               width={40}
                               height={40}
+                              unoptimized
                               className="rounded shrink-0 object-cover"
                             />
                           ) : (

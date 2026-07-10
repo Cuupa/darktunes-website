@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { useTranslations } from 'next-intl'
 import type { Release } from '@/types'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ReleasesPageContentProps {
   releases: Release[]
@@ -121,9 +122,10 @@ export function ReleasesPageContent({ releases }: ReleasesPageContentProps) {
                   <div className="relative aspect-square overflow-hidden">
                     {release.coverArt ? (
                       <Image
-                        src={release.coverArt}
+                        src={getSquareThumbnail(release.coverArt, 400)}
                         alt={`${release.title} – cover art`}
                         fill
+                        unoptimized
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       />

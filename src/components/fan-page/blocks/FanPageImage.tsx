@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { FanPageImageProps } from '@/lib/fan-page/schema/documentV1'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +25,7 @@ export function FanPageImage({ image, alt, className, width = 1200, fill }: FanP
     )
   }
 
-  const src = image.src
+  const src = getOptimizedImageUrl(image.src, width)
   const style = {
     objectFit: (image.objectFit ?? 'cover') as React.CSSProperties['objectFit'],
     objectPosition: `${image.focalX ?? 50}% ${image.focalY ?? 50}%`,
@@ -37,6 +38,7 @@ export function FanPageImage({ image, alt, className, width = 1200, fill }: FanP
         src={src}
         alt={image.alt ?? alt}
         fill
+        unoptimized
         className={cn('h-full w-full', className)}
         style={style}
       />
@@ -49,6 +51,7 @@ export function FanPageImage({ image, alt, className, width = 1200, fill }: FanP
       alt={image.alt ?? alt}
       width={width}
       height={Math.round(width * 0.6)}
+      unoptimized
       className={className}
       style={style}
     />

@@ -29,6 +29,7 @@ import { ShareButton } from '@/components/ShareButton'
 import { trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Release, Artist } from '@/types'
+import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ReleaseDetailContentProps {
   release: Release
@@ -90,9 +91,10 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
           aria-hidden
         >
           <Image
-            src={heroBackgroundUrl}
+            src={getOptimizedImageUrl(heroBackgroundUrl, 1200)}
             alt=""
             fill
+            unoptimized
             className="object-cover opacity-20 blur-2xl scale-110"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
@@ -114,10 +116,11 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
               className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               <Image
-                src={release.coverArt}
+                src={getSquareThumbnail(release.coverArt, 480)}
                 alt={`${release.title} cover`}
                 width={480}
                 height={480}
+                unoptimized
                 className="w-full aspect-square object-cover"
               />
             </motion.div>

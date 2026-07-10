@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Video } from '@/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -64,9 +65,10 @@ function VideoCard({
           <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
         )}
         <Image
-          src={video.thumbnailUrl ?? ''}
+          src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
           alt={`${video.title} – video thumbnail`}
           fill
+          unoptimized
           className={`object-cover transform-gpu group-hover:scale-110 transition-[transform,opacity] duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           sizes="(max-width: 768px) 82vw, (max-width: 1024px) 50vw, 33vw"
           onLoad={() => setImgLoaded(true)}

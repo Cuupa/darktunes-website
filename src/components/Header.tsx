@@ -13,6 +13,7 @@ import { buildNavItems } from '@/config/sections'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import type { HomepageSection } from '@/types'
 import { SECONDS_PER_YEAR } from '@/lib/datetime/constants'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface HeaderProps {
   logoUrl?: string
@@ -33,6 +34,7 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
   const handleSmoothScroll = useSmoothScrollToAnchor()
   const prefersReducedMotion = useReducedMotion()
   const isHomePage = pathname === '/'
+  const logoSrc = logoUrl ? getOptimizedImageUrl(logoUrl, 200) : logoImage.src
 
   useEffect(() => {
     const handleScroll = () => {
@@ -72,10 +74,11 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
               {/* Wrapper div controls the height; Image fills it while preserving aspect ratio */}
               <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
                 <Image
-                  src={logoUrl || logoImage.src}
+                  src={logoSrc}
                   alt={logoAlt}
                   width={200}
                   height={80}
+                  unoptimized={!!logoUrl}
                   className="h-full w-auto"
                   style={{ width: 'auto', height: '100%' }}
                 />
@@ -86,10 +89,11 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
               {/* Wrapper div controls the height; Image fills it while preserving aspect ratio */}
               <div className={`transition-all duration-300 ${scrolled ? 'h-12 md:h-14' : 'h-16 md:h-20'}`}>
                 <Image
-                  src={logoUrl || logoImage.src}
+                  src={logoSrc}
                   alt={logoAlt}
                   width={200}
                   height={80}
+                  unoptimized={!!logoUrl}
                   className="h-full w-auto"
                   style={{ width: 'auto', height: '100%' }}
                 />

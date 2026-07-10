@@ -13,6 +13,7 @@ import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import type { Artist } from '@/types'
+import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ArtistsGridContentProps {
   artists: Artist[]
@@ -93,10 +94,11 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                     }}
                   >
                     <Image
-                      src={artist.imageUrl}
+                      src={getSquareThumbnail(artist.imageUrl, 400)}
                       alt={`${artist.name} – artist photo`}
                       fill
                       priority={index < 6}
+                      unoptimized
                       className="object-cover"
                       style={{
                         objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
@@ -118,10 +120,11 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
                   {artist.logoUrl ? (
                     <Image
-                      src={artist.logoUrl}
+                      src={getOptimizedImageUrl(artist.logoUrl, 300)}
                       alt={`${artist.name} – logo`}
                       width={200}
                       height={200}
+                      unoptimized
                       className="max-w-full max-h-full object-contain"
                     />
                   ) : (

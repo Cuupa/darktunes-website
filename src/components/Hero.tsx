@@ -9,6 +9,7 @@ import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import logoImage from '@/assets/images/logo_(1).png'
 import { useTranslations } from 'next-intl'
 import type { Release, NewsPost, SiteSettings } from '@/types'
@@ -38,7 +39,9 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
 
   // ── Logo-only fallback when nothing is featured ──────────────────────────
   if (!heroItem) {
-    const logoSrc = siteSettings.logoUrl || logoImage.src
+    const logoSrc = siteSettings.logoUrl
+      ? getOptimizedImageUrl(siteSettings.logoUrl, 320)
+      : logoImage.src
     return (
       <section
         id="hero"
@@ -79,13 +82,13 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
    */
   let bgUrl: string | undefined
   if (heroItem.heroBgUrl) {
-    bgUrl = heroItem.heroBgUrl
+    bgUrl = getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
   } else if (siteSettings.heroCustomBgUrl) {
-    bgUrl = siteSettings.heroCustomBgUrl
+    bgUrl = getOptimizedImageUrl(siteSettings.heroCustomBgUrl, 1200)
   } else if (itemIsRelease) {
-    bgUrl = heroItem.coverArt
+    bgUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
   } else if (heroItem.imageUrl) {
-    bgUrl = heroItem.imageUrl
+    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
   }
 
   // Title / subtitle / description
@@ -102,9 +105,9 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
     ? `/releases/${heroItem.id}`
     : `/news/${heroItem.slug}`
   const coverImageUrl = itemIsRelease
-    ? heroItem.coverArt
+    ? getOptimizedImageUrl(heroItem.coverArt, 800)
     : heroItem.imageUrl
-    ? heroItem.imageUrl
+    ? getOptimizedImageUrl(heroItem.imageUrl, 800)
     : undefined
 
   // ── Hero button resolution ──────────────────────────────────────────────
@@ -147,6 +150,7 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
             sizes="100vw"
             priority
             fetchPriority="high"
+            unoptimized
           />
         )}
         <div
@@ -251,6 +255,7 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
                   fill
                   className="object-cover"
                   sizes="50vw"
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
               </div>

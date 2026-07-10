@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Release } from '@/types'
 import { resolveThemeColors } from '@/lib/fan-page/theme/resolveThemeColors'
 import type { FanPageTheme } from '@/lib/fan-page/schema/documentV1'
@@ -30,7 +31,7 @@ export function ReleaseGridBlock({ limit = 6, releases = [], theme, title }: Rel
       ) : null}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
         {items.map((release) => {
-          const thumb = release.coverArt
+          const thumb = getSquareThumbnail(release.coverArt, 400)
           return (
             <Link
               key={release.id}
@@ -39,7 +40,7 @@ export function ReleaseGridBlock({ limit = 6, releases = [], theme, title }: Rel
             >
               <div className="relative aspect-square">
                 {thumb ? (
-                  <Image src={thumb} alt={release.title} fill className="object-cover transition group-hover:scale-105" sizes="(max-width: 640px) 50vw, 33vw" />
+                  <Image src={thumb} alt={release.title} fill unoptimized className="object-cover transition group-hover:scale-105" sizes="(max-width: 640px) 50vw, 33vw" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-xs opacity-50">—</div>
                 )}

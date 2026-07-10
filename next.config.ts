@@ -30,8 +30,10 @@ const withBundleAnalyzer = withBundleAnalyzerInit({
 })
 
 const nextConfig: NextConfig = {
-  // Allow images from Cloudflare R2 CDN and other external domains
+  // Allow images from Cloudflare R2 CDN and other external domains.
+  // unoptimized: wsrv.nl handles resize/WebP — avoids Vercel Image Optimization (402 on Hobby limit).
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

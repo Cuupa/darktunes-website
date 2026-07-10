@@ -26,6 +26,7 @@ import type { Artist, Concert, PressAsset } from '@/types'
 import type { PublicArtistEpk } from '@/lib/api/publicArtistEpk'
 import type { EpkDocumentV2 } from '@/lib/epk/schema/documentV2'
 import { EpkPublicViewer } from '@/components/epk-builder/EpkPublicViewer'
+import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ArtistEpkClientProps {
   artist: Artist
@@ -161,10 +162,11 @@ export function ArtistEpkClient({
                 <div className="flex flex-col items-start gap-2">
                   <div className="relative h-20 w-auto">
                     <Image
-                      src={artist.logoUrl}
+                      src={getOptimizedImageUrl(artist.logoUrl, 300)}
                       alt={`${artist.name} logo`}
                       width={200}
                       height={80}
+                      unoptimized
                       className="h-20 w-auto object-contain"
                     />
                   </div>
@@ -180,9 +182,10 @@ export function ArtistEpkClient({
           </div>
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-background/50">
             <Image
-              src={artist.imageUrl}
+              src={getOptimizedImageUrl(artist.imageUrl, 800)}
               alt={`${artist.name} – artist photo`}
               fill
+              unoptimized
               className="object-cover"
               priority
               sizes="(max-width: 768px) 100vw, 768px"
@@ -309,9 +312,10 @@ export function ArtistEpkClient({
                       aria-label={`View ${pressAssetTitle(photo)}`}
                     >
                       <Image
-                        src={photo.publicUrl}
+                        src={getSquareThumbnail(photo.publicUrl, 400)}
                         alt={photo.altText ?? `${artist.name} – press photo`}
                         fill
+                        unoptimized
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       />
