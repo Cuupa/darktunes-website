@@ -6,6 +6,7 @@ import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@ph
 import { useTranslations } from 'next-intl'
 import type { SiteSettings } from '@/types'
 import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface FooterProps {
   siteSettings: SiteSettings
@@ -22,10 +23,11 @@ export function Footer({ siteSettings }: FooterProps) {
             <div className="flex items-center mb-4">
               {siteSettings.logoUrl || siteSettings.faviconUrl ? (
                 <Image
-                  src={siteSettings.logoUrl || siteSettings.faviconUrl!}
+                  src={getOptimizedImageUrl(siteSettings.logoUrl || siteSettings.faviconUrl!, 200)}
                   alt={`${siteSettings.labelName} logo`}
                   width={160}
                   height={40}
+                  unoptimized
                   className="h-10 w-auto object-contain"
                   style={{ width: 'auto' }}
                 />

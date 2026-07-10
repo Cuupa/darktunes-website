@@ -11,6 +11,7 @@ import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
 import type { PressAsset } from '@/types'
 import { getJournalistDownloadUrl } from '../../_actions/download'
 import { getPressKitUrls } from '../_actions/downloadZip'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 
 interface PressKitListProps {
   assets: PressAsset[]
@@ -112,9 +113,10 @@ export function PressKitList({ assets, zipDownloadEnabled = true }: PressKitList
                     aria-label={`View ${assetTitle(asset)}`}
                   >
                     <Image
-                      src={asset.publicUrl}
+                      src={getSquareThumbnail(asset.publicUrl, 400)}
                       alt={asset.altText ?? `${assetTitle(asset)} – press asset`}
                       fill
+                      unoptimized
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   </button>

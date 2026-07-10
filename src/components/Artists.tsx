@@ -19,6 +19,7 @@ import {
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { trackShopClick } from '@/lib/analytics/trackPageEvent'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { useTranslations } from 'next-intl'
 import type { Artist } from '@/types'
@@ -121,7 +122,7 @@ export function Artists({ artists }: ArtistsProps) {
             animate={prefersReducedMotion ? { opacity: 1 } : isListInView ? 'visible' : 'hidden'}
           >
             {filteredArtists.map((artist) => {
-              const thumbUrl = artist.imageUrl ?? ''
+              const thumbUrl = getSquareThumbnail(artist.imageUrl ?? '', 400)
               return (
               <motion.li
                 key={artist.id}
@@ -143,6 +144,7 @@ export function Artists({ artists }: ArtistsProps) {
                         src={thumbUrl}
                         alt={`${artist.name} – artist photo`}
                         fill
+                        unoptimized
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                         style={{ transformOrigin: 'center' }}
                         sizes="(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw"

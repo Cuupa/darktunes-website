@@ -16,6 +16,7 @@ import { getMetadataContext, pageTitle } from '@/lib/seo/metadata'
 
 import { ShareButton } from '@/components/ShareButton'
 import { NewsBodyClient } from './_components/NewsBodyClient'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -126,10 +127,11 @@ export default async function NewsDetailPage({ params }: Props) {
         {post.imageUrl && (
           <div className="relative aspect-video overflow-hidden rounded-lg mb-8">
             <Image
-              src={post.imageUrl}
+              src={getOptimizedImageUrl(post.imageUrl, 1200)}
               alt={post.title}
               fill
               priority
+              unoptimized
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 768px"
             />

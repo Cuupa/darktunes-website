@@ -45,6 +45,7 @@ import {
   type ReleaseTypeFilter,
 } from '@/lib/portal/releaseCalendarFilters'
 import type { Release } from '@/types'
+import { getSquareThumbnail } from '@/lib/imageUtils'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,9 +190,10 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
           {release.coverArt ? (
             <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
               <Image
-                src={release.coverArt}
+                src={getSquareThumbnail(release.coverArt, 512)}
                 alt={`${release.title} — ${t('calendar_cover_alt')}`}
                 fill
+                unoptimized
                 className="object-cover"
                 sizes="(max-width: 640px) calc(100vw - 2rem), 512px"
               />

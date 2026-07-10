@@ -7,6 +7,7 @@ import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Calendar } from '@phosphor-icons/react'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useLocale, useTranslations } from 'next-intl'
 import type { NewsPost } from '@/types'
 import type { SectionProps } from '@/lib/component-contracts'
@@ -56,10 +57,11 @@ export function News({ news, heading, subheading, sneakPeekCount }: NewsProps) {
                 {post.imageUrl && (
                   <div className="relative aspect-[16/9] overflow-hidden flex-shrink-0">
                     <Image
-                      src={post.imageUrl}
+                      src={getOptimizedImageUrl(post.imageUrl, 800)}
                       alt={post.title}
                       fill
                       priority={index === 0}
+                      unoptimized
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />

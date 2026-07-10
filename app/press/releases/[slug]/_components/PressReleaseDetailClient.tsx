@@ -7,6 +7,7 @@ import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import type { NewsPost } from '@/types'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface PressReleaseDetailClientProps {
   post: NewsPost
@@ -40,10 +41,11 @@ export function PressReleaseDetailClient({ post }: PressReleaseDetailClientProps
         {post.imageUrl && (
           <div className="relative aspect-[16/9] overflow-hidden rounded-3xl border border-border">
             <Image
-              src={post.imageUrl}
+              src={getOptimizedImageUrl(post.imageUrl, 1200)}
               alt={`${post.title} – press release cover`}
               fill
               priority
+              unoptimized
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1280px) 896px, 1024px"
             />

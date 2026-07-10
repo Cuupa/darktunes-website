@@ -14,6 +14,24 @@
 
 const WSRV_BASE = 'https://wsrv.nl/'
 
+const WSRV_DEFAULTS = {
+  output: 'webp',
+  q: '75',
+  n: '-1',
+  maxage: '31d',
+} as const
+
+function buildWsrvUrl(url: string, params: Record<string, string | number>): string {
+  const parts = [`url=${encodeURIComponent(url)}`]
+  for (const [key, value] of Object.entries(WSRV_DEFAULTS)) {
+    parts.push(`${key}=${value}`)
+  }
+  for (const [key, value] of Object.entries(params)) {
+    parts.push(`${key}=${value}`)
+  }
+  return `${WSRV_BASE}?${parts.join('&')}`
+}
+
 /**
  * Returns a wsrv.nl-proxied URL that serves the image at `width` pixels wide,
  * converted to WebP format.
@@ -24,7 +42,7 @@ const WSRV_BASE = 'https://wsrv.nl/'
  */
 export function getOptimizedImageUrl(url: string, width: number): string {
   if (!url) return ''
-  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${width}&output=webp&maxage=31d`
+  return buildWsrvUrl(url, { w: width })
 }
 
 /**
@@ -37,7 +55,7 @@ export function getOptimizedImageUrl(url: string, width: number): string {
  */
 export function getSquareThumbnail(url: string, size: number): string {
   if (!url) return ''
-  return `${WSRV_BASE}?url=${encodeURIComponent(url)}&w=${size}&h=${size}&fit=cover&output=webp&maxage=31d`
+  return buildWsrvUrl(url, { w: size, h: size, fit: 'cover' })
 }
 
 /**

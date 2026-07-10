@@ -44,8 +44,8 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 | Anti-pattern | Rule |
 |--------------|------|
-| Bare `<img>` | `next/image`; pass raw R2 URL directly — no `unoptimized` |
-| wsrv.nl in `<Image>` for R2 URLs | Pass raw URL; `wsrv.nl` only inside `processHtmlImages()` for rich-text HTML |
+| Bare `<img>` | `next/image`; wsrv URLs via `getOptimizedImageUrl` / `getSquareThumbnail` |
+| Raw R2 URL on `<Image>` without wsrv | Vercel `/_next/image` → Hobby limit → HTTP 402; use `imageUtils` + `unoptimized` |
 | Double-proxy wsrv.nl URLs | Proxy only raw origin URLs |
 | `<Image fill>` without `sizes` | Always add accurate `sizes` per layout breakpoint — prevents over-downloading near-viewport images |
 | `<Image>` above the fold without `priority` | Add `priority` to hero, first-card, and other LCP-candidate images |

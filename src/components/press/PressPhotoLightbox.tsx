@@ -6,6 +6,7 @@ import { CaretLeft, CaretRight, DownloadSimple, X } from '@phosphor-icons/react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { cn } from '@/lib/utils'
 import type { PressAsset } from '@/types'
 import type { DialogProps } from '@/lib/component-contracts'
@@ -122,9 +123,10 @@ export function PressPhotoLightbox({
 
                 <div className="relative aspect-[4/3] w-full max-w-5xl overflow-hidden rounded-lg">
                   <Image
-                    src={photo.publicUrl}
+                    src={getOptimizedImageUrl(photo.publicUrl, 1600)}
                     alt={alt}
                     fill
+                    unoptimized
                     className="object-contain"
                     priority
                   />

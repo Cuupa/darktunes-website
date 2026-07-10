@@ -15,6 +15,7 @@ import { CalendarBlank, CurrencyEur, MegaphoneSimple } from '@phosphor-icons/rea
 import { Card, CardContent } from '@/components/ui/card'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import type { PromoLogEntry } from '@/types'
+import { getOptimizedImageUrl } from '@/lib/imageUtils'
 
 interface PromoTimelineProps {
   entries: PromoLogEntry[]
@@ -103,10 +104,11 @@ export function PromoTimeline({ entries }: PromoTimelineProps) {
                   aria-label={`${t('promo_log_view_proof')} — ${entry.description}`}
                 >
                   <Image
-                    src={entry.proofUrl}
+                    src={getOptimizedImageUrl(entry.proofUrl, 640)}
                     alt={`${t('promo_log_proof_alt')} — ${entry.description}`}
                     width={640}
                     height={360}
+                    unoptimized
                     className="w-full h-auto object-cover max-h-64"
                   />
                 </a>

@@ -41,6 +41,7 @@ import { RelatedArtists } from './RelatedArtists'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
 import { galleryUrlToPressAsset } from '@/lib/api/portalGalleryPress'
+import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ArtistDetailContentProps {
   artist: Artist
@@ -164,10 +165,11 @@ export function ArtistDetailContent({
           aria-hidden
         >
           <Image
-            src={artist.imageUrl}
+            src={getOptimizedImageUrl(artist.imageUrl, 1200)}
             alt=""
             aria-hidden="true"
             fill
+            unoptimized
             className="object-cover opacity-20 blur-2xl scale-110"
             onError={(e) => {
               e.currentTarget.style.display = 'none'
@@ -197,11 +199,12 @@ export function ArtistDetailContent({
             >
               {artist.imageUrl ? (
                 <Image
-                  src={artist.imageUrl}
+                  src={getSquareThumbnail(artist.imageUrl, 480)}
                   alt={`${artist.name} – artist photo`}
                   width={480}
                   height={480}
                   priority
+                  unoptimized
                   className="w-full aspect-square object-cover"
                   style={{
                     objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
@@ -227,10 +230,11 @@ export function ArtistDetailContent({
             {artist.logoUrl && (
               <div className="flex items-center justify-center px-4 py-3 rounded-xl bg-card/60 border border-border/40">
                 <Image
-                  src={artist.logoUrl}
+                  src={getOptimizedImageUrl(artist.logoUrl, 320)}
                   alt={`${artist.name} – logo`}
                   width={320}
                   height={120}
+                  unoptimized
                   className="h-20 w-auto max-w-full object-contain brightness-0 invert opacity-90"
                   onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
                 />
@@ -504,9 +508,10 @@ export function ArtistDetailContent({
                     className="relative aspect-square w-full rounded-lg overflow-hidden bg-card border border-border cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Image
-                      src={url}
+                      src={getSquareThumbnail(url, 300)}
                       alt={`${artist.name} – ${t('bandPhotos')} ${index + 1}`}
                       fill
+                      unoptimized
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                     />
@@ -565,9 +570,10 @@ export function ArtistDetailContent({
                               aria-label={`Play ${video.title}`}
                             >
                               <Image
-                                src={video.thumbnailUrl}
+                                src={getOptimizedImageUrl(video.thumbnailUrl, 600)}
                                 alt={`${video.title} – video thumbnail`}
                                 fill
+                                unoptimized
                                 className="object-cover group-hover:scale-105 transition-transform duration-500"
                               />
                               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 transition-colors flex items-center justify-center">
@@ -655,9 +661,10 @@ export function ArtistDetailContent({
                           <div className="group bg-card border border-border rounded-xl overflow-hidden hover:border-accent/50 transition-all duration-300 cursor-pointer">
                             <div className="relative aspect-square overflow-hidden">
                               <Image
-                                src={release.coverArt}
+                                src={getSquareThumbnail(release.coverArt, 400)}
                                 alt={`${release.title} by ${artist.name} – cover art`}
                                 fill
+                                unoptimized
                                 className="object-cover group-hover:scale-105 transition-transform duration-500"
                               />
                               <Badge
@@ -724,10 +731,11 @@ export function ArtistDetailContent({
                         >
                           {post.imageUrl && (
                             <Image
-                              src={post.imageUrl}
+                              src={getOptimizedImageUrl(post.imageUrl, 160)}
                               alt={`${post.title} – news thumbnail`}
                               width={80}
                               height={80}
+                              unoptimized
                               className="w-20 h-20 object-cover rounded-lg shrink-0"
                             />
                           )}
