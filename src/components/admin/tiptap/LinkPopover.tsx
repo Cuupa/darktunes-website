@@ -2,11 +2,11 @@
 
 /**
  * LinkPopover — replaces window.prompt() for inserting/editing links in the editor.
- * Renders as a toolbar button that opens a Popover with URL input.
+ * Renders as a toolbar button that opens a Popover with URL and display-text inputs.
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
-import type { Editor } from '@tiptap/core'
+import { getMarkRange, type Editor } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,9 +19,102 @@ interface Props {
   disabled?: boolean
 }
 
+function getSelectedText(editor: Editor): string {
+  const { from, to, empty } = editor.state.selection
+  if (empty) return ''
+  return editor.state.doc.textBetween(from, to, ' ')
+}
+
+function getActiveLinkText(editor: Editor): string {
+  if (!editor.isActive('link')) return ''
+  const linkType = editor.schema.marks.link
+  if (!linkType) return ''
+  const $pos = editor.state.doc.resolve(editor.state.selection.from)
+  const range = getMarkRange($pos, linkType)
+  if (!range) return ''
+  return editor.state.doc.textBetween(range.from, range.to, ' ')
+}
+
+export function applyLinkPopover({
+  editor,
+  url,
+  linkText,
+  newTab,
+  linkColor,
+}: {
+  editor: Editor
+  url: string
+  linkText: string
+  newTab: boolean
+  linkColor: string
+}): void {
+  const href = url.trim()
+  if (!href) {
+    editor.chain().focus().extendMarkRange('link').unsetLink().run()
+    return
+  }
+
+  const displayText = linkText.trim() || href
+  const target = newTab ? '_blank' : '_self'
+  const linkAttrs = { href, target, rel: 'noopener noreferrer' }
+
+  if (editor.isActive('link')) {
+    const chain = editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .deleteSelection()
+      .insertContent({
+        type: 'text',
+        text: displayText,
+        marks: [{ type: 'link', attrs: linkAttrs }],
+      })
+
+    if (linkColor) {
+      chain.setColor(linkColor).run()
+    } else {
+      chain.run()
+    }
+    return
+  }
+
+  const { empty } = editor.state.selection
+  if (!empty) {
+    const chain = editor
+      .chain()
+      .focus()
+      .deleteSelection()
+      .insertContent({
+        type: 'text',
+        text: displayText,
+        marks: [{ type: 'link', attrs: linkAttrs }],
+      })
+
+    if (linkColor) {
+      chain.setColor(linkColor).run()
+    } else {
+      chain.run()
+    }
+    return
+  }
+
+  const chain = editor.chain().focus().insertContent({
+    type: 'text',
+    text: displayText,
+    marks: [{ type: 'link', attrs: linkAttrs }],
+  })
+
+  if (linkColor) {
+    chain.setColor(linkColor).run()
+  } else {
+    chain.run()
+  }
+}
+
 export function LinkPopover({ editor, disabled }: Props) {
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
+  const [linkText, setLinkText] = useState('')
   const [newTab, setNewTab] = useState(true)
   const [linkColor, setLinkColor] = useState('')
 
@@ -32,24 +125,18 @@ export function LinkPopover({ editor, disabled }: Props) {
     setUrl((attrs.href as string | undefined) ?? '')
     setNewTab((attrs.target as string | undefined) !== '_self')
     setLinkColor((editor.getAttributes('textStyle').color as string | undefined) ?? '')
+
+    if (editor.isActive('link')) {
+      setLinkText(getActiveLinkText(editor))
+    } else {
+      setLinkText(getSelectedText(editor))
+    }
   }, [open, editor])
 
   const handleApply = useCallback(() => {
-    if (!url.trim()) {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-    } else {
-      const chain = editor.chain().focus().extendMarkRange('link').setLink({
-        href: url.trim(),
-        target: newTab ? '_blank' : '_self',
-      })
-      if (linkColor) {
-        chain.setColor(linkColor).run()
-      } else {
-        chain.run()
-      }
-    }
+    applyLinkPopover({ editor, url, linkText, newTab, linkColor })
     setOpen(false)
-  }, [editor, url, newTab, linkColor])
+  }, [editor, url, linkText, newTab, linkColor])
 
   const handleRemove = useCallback(() => {
     editor.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -76,6 +163,16 @@ export function LinkPopover({ editor, disabled }: Props) {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3 space-y-3" align="start">
         <div className="space-y-1.5">
+          <Label htmlFor="link-popover-text">Link text</Label>
+          <Input
+            id="link-popover-text"
+            value={linkText}
+            onChange={(e) => setLinkText(e.target.value)}
+            placeholder="HERE"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
+          />
+        </div>
+        <div className="space-y-1.5">
           <Label htmlFor="link-popover-url">URL</Label>
           <Input
             id="link-popover-url"
@@ -83,7 +180,6 @@ export function LinkPopover({ editor, disabled }: Props) {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://…"
             onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
-            autoFocus
           />
         </div>
         <div className="flex items-center gap-2">

@@ -20,4 +20,14 @@ describe('RichFaqContent', () => {
     expect(container.querySelector('script')).toBeNull()
     expect(screen.getByText('Safe')).toBeInTheDocument()
   })
+
+  it('renders bullet lists with clip-safe list-inside classes', () => {
+    const { container } = render(
+      <RichFaqContent content="<ul><li>First item</li><li>Second item</li></ul>" />,
+    )
+    expect(screen.getByText('First item')).toBeInTheDocument()
+    expect(screen.getByText('Second item')).toBeInTheDocument()
+    expect(container.firstChild).toHaveClass('[&_ul]:list-inside')
+    expect(container.querySelectorAll('li')).toHaveLength(2)
+  })
 })

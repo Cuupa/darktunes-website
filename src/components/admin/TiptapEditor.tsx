@@ -37,6 +37,7 @@ import { LinkPopover } from '@/components/admin/tiptap/LinkPopover'
 import { YouTubeEmbedExtension } from '@/components/admin/tiptap/YouTubeEmbedExtension'
 import { VideoInsertDialog } from '@/components/admin/tiptap/VideoInsertDialog'
 import { FileInsertDialog } from '@/components/admin/tiptap/FileInsertDialog'
+import { TIPTAP_EDITOR_CONTENT_CLASS } from '@/lib/richTextContent'
 import { containsEmojis, stripEmojis, stripEmojisFromHtml } from '@/lib/stripEmojis'
 
 interface TiptapEditorProps {
@@ -97,8 +98,8 @@ export function TiptapEditor({ value, onChange, onChangeWithText, disabled, plac
     editorProps: {
       attributes: {
         class: grow
-          ? 'prose prose-invert max-w-none min-h-[300px] p-4 focus:outline-none'
-          : 'prose prose-invert max-w-none min-h-[300px] max-h-[500px] overflow-y-auto overscroll-contain p-4 focus:outline-none',
+          ? TIPTAP_EDITOR_CONTENT_CLASS
+          : `${TIPTAP_EDITOR_CONTENT_CLASS} max-h-[500px] overflow-y-auto overscroll-contain`,
         ...(grow ? {} : { 'data-lenis-prevent': '' }),
         ...(placeholder ? { 'data-placeholder': placeholder } : {}),
       },

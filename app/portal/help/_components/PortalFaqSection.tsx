@@ -36,7 +36,7 @@ function FaqItemAccordion({
   return (
     <div
       id={`portal-faq-${item.slug}`}
-      className="rounded-md border border-border/60 bg-muted/20 overflow-hidden scroll-mt-24"
+      className="rounded-md border border-border/60 bg-muted/20 scroll-mt-24"
     >
       <button
         type="button"
