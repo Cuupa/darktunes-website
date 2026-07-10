@@ -47,6 +47,10 @@ Distilled anti-patterns from project history. **Append session findings before o
 | Bare `<img>` | `next/image`; pass raw R2 URL directly — no `unoptimized` |
 | wsrv.nl in `<Image>` for R2 URLs | Pass raw URL; `wsrv.nl` only inside `processHtmlImages()` for rich-text HTML |
 | Double-proxy wsrv.nl URLs | Proxy only raw origin URLs |
+| `<Image fill>` without `sizes` | Always add accurate `sizes` per layout breakpoint — prevents over-downloading near-viewport images |
+| `<Image>` above the fold without `priority` | Add `priority` to hero, first-card, and other LCP-candidate images |
+| `createPublicSupabaseClient` copied into page files | Import from `@/lib/supabase/publicClient` — the single SSOT |
+| `generateMetadata` + page fetching same row | Wrap with `React.cache()` to deduplicate within the same request |
 | Phosphor `Image` + `next/image` clash | `import { Image as ImageIcon }` |
 
 ## Security
