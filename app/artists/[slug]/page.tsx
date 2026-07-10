@@ -21,8 +21,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getArtistBySlug, getPublicArtists, getRelatedArtists } from '@/lib/api/artists'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
@@ -47,17 +46,6 @@ export const revalidate = 60
  * dynamicParams = true, but being explicit prevents accidental regressions.
  */
 export const dynamicParams = true
-
-/**
- * Cookie-free Supabase client — safe inside RSC / ISR.
- * Uses the public anon key; RLS governs row visibility.
- */
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-  )
-}
 
 /**
  * Wrap artist data fetch in unstable_cache to attach granular cache tags.

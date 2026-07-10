@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownContent } from '@/components/MarkdownContent'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { NewsPost } from '@/types'
 
 interface PressReleaseDetailClientProps {
@@ -41,12 +40,12 @@ export function PressReleaseDetailClient({ post }: PressReleaseDetailClientProps
         {post.imageUrl && (
           <div className="relative aspect-[16/9] overflow-hidden rounded-3xl border border-border">
             <Image
-              src={getOptimizedImageUrl(post.imageUrl, 1400)}
+              src={post.imageUrl}
               alt={`${post.title} – press release cover`}
               fill
               priority
               className="object-cover"
-              unoptimized
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 896px, 1024px"
             />
           </div>
         )}

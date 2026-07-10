@@ -18,7 +18,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import type { Release } from '@/types'
 import type { ReleaseChecklist } from '@/lib/api/releaseChecklists'
@@ -107,7 +106,7 @@ function ReleaseCard({
           <div className="relative w-14 h-14 shrink-0 rounded overflow-hidden bg-muted">
             {release.coverArt ? (
               <Image
-                src={getOptimizedImageUrl(release.coverArt, 56)}
+                src={release.coverArt}
                 alt={release.title}
                 fill
                 className="object-cover"
@@ -241,7 +240,7 @@ export function ReleaseChecklistPanel({ releases,
                         <div className="flex items-center gap-3">
                           {r.coverArt ? (
                             <Image
-                              src={getOptimizedImageUrl(r.coverArt, 48)}
+                              src={r.coverArt}
                               alt={r.title}
                               width={40}
                               height={40}

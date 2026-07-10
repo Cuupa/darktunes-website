@@ -10,22 +10,11 @@
 import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 import type { SiteSettings } from '@/types'
-import type { Database } from '@/types/database'
 import { DatenschutzContent } from './_components/DatenschutzContent'
 import { getLocale, getTranslations } from 'next-intl/server'
-
-// Cookie-free public client — safe inside unstable_cache callbacks where
-// Next.js Dynamic APIs (cookies, headers) are unavailable. site_settings has
-// a public-read RLS policy (FOR SELECT USING (TRUE)), so the anon key works.
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-  )
-}
 
 const getCachedSettings = unstable_cache(
   async (): Promise<SiteSettings> => {

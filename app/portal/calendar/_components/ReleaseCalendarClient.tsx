@@ -34,7 +34,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { getSquareThumbnail } from '@/lib/imageUtils'
 import { Input } from '@/components/ui/input'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
 import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
@@ -190,11 +189,10 @@ function ReleaseDetailDialog({ release, today, onClose }: ReleaseDetailDialogPro
           {release.coverArt ? (
             <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
               <Image
-                src={getSquareThumbnail(release.coverArt, 600)}
+                src={release.coverArt}
                 alt={`${release.title} — ${t('calendar_cover_alt')}`}
                 fill
                 className="object-cover"
-                unoptimized
                 sizes="(max-width: 640px) calc(100vw - 2rem), 512px"
               />
               {/* Status badge over cover */}

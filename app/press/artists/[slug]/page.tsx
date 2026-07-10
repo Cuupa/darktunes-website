@@ -1,22 +1,26 @@
 export const dynamic = 'force-dynamic'
 
+import { cache } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getArtistBySlug } from '@/lib/api/artists'
 import { getPressKitForArtist } from '@/lib/api/pressKit'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
 import { listEpkFonts, buildEpkFontPublicUrl } from '@/lib/api/epkFonts'
 import { hydrateDocumentFonts } from '@/lib/epk/editor/hydrateDocumentFonts'
-import type { Database } from '@/types/database'
 import { ArtistEpkClient } from './_components/ArtistEpkClient'
+
+const getArtist = cache(async (slug: string) => {
+  const supabase = await createServerSupabaseClient()
+  return getArtistBySlug(supabase, slug).catch(() => null)
+})
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
-  const supabase = await createServerSupabaseClient()
-  const artist = await getArtistBySlug(supabase, slug).catch(() => null)
+  const artist = await getArtist(slug)
   return {
     title: artist ? `${artist.name} — Press Kit` : 'Artist Press Kit',
   }
@@ -24,15 +28,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ArtistEpkPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const supabase = await createServerSupabaseClient()
-  const artist = await getArtistBySlug(supabase, slug).catch(() => null)
+  const artist = await getArtist(slug)
   if (!artist) notFound()
 
   const { serverEnv } = await import('@/lib/env.server')
-  const publicClient = createClient<Database>(
-    serverEnv.NEXT_PUBLIC_SUPABASE_URL,
-    serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  )
+  const supabase = await createServerSupabaseClient()
+  const publicClient = createPublicSupabaseClient()
 
   const [publicEpk, photos, concerts, fonts] = await Promise.all([
     getPublicArtistEpkByArtistId(publicClient, artist.id).catch(() => null),

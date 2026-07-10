@@ -22,8 +22,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getReleaseById, getPublicReleases } from '@/lib/api/releases'
 import { getArtistById } from '@/lib/api/artists'
 
@@ -33,20 +32,6 @@ import { entityTitle, getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
 
 interface Props {
   params: Promise<{ id: string }>
-}
-
-/**
- * Cookie-free Supabase client — safe to use inside unstable_cache.
- *
- * In Next.js 15, dynamic APIs like cookies() cannot be called inside
- * unstable_cache callbacks.  For public read operations the anon key with
- * RLS is sufficient; no session cookie is required.
- */
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-  )
 }
 
 function makeGetRelease(id: string) {

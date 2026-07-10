@@ -18,7 +18,6 @@ import {
   ShoppingBag,
   MagnifyingGlass,
 } from '@phosphor-icons/react'
-import { getSquareThumbnail } from '@/lib/imageUtils'
 import { trackShopClick } from '@/lib/analytics/trackPageEvent'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { useTranslations } from 'next-intl'
@@ -122,7 +121,7 @@ export function Artists({ artists }: ArtistsProps) {
             animate={prefersReducedMotion ? { opacity: 1 } : isListInView ? 'visible' : 'hidden'}
           >
             {filteredArtists.map((artist) => {
-              const thumbUrl = getSquareThumbnail(artist.imageUrl ?? '', 800)
+              const thumbUrl = artist.imageUrl ?? ''
               return (
               <motion.li
                 key={artist.id}

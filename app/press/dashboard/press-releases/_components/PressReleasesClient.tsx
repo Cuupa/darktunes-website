@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { NewsPost } from '@/types'
 
 interface PressReleasesClientProps {
@@ -87,11 +86,11 @@ export function PressReleasesClient({ posts }: PressReleasesClientProps) {
                 {post.imageUrl && (
                   <div className="relative aspect-[16/9] overflow-hidden">
                     <Image
-                      src={getOptimizedImageUrl(post.imageUrl, 1200)}
+                      src={post.imageUrl}
                       alt={`${post.title} – press release cover`}
                       fill
                       className="object-cover"
-                      unoptimized
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                   </div>
                 )}

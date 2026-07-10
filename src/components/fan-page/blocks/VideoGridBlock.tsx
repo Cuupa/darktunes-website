@@ -42,8 +42,8 @@ export function VideoGridBlock({ videos = [], theme, title, limit = 3 }: VideoGr
                 src={video.thumbnailUrl}
                 alt={video.title}
                 fill
-                unoptimized
                 className="object-cover transition group-hover:scale-105"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
                 <Play size={40} weight="fill" style={{ color: colors.accent }} aria-hidden />

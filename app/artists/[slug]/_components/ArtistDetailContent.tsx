@@ -201,6 +201,7 @@ export function ArtistDetailContent({
                   alt={`${artist.name} – artist photo`}
                   width={480}
                   height={480}
+                  priority
                   className="w-full aspect-square object-cover"
                   style={{
                     objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
@@ -507,7 +508,7 @@ export function ArtistDetailContent({
                       alt={`${artist.name} – ${t('bandPhotos')} ${index + 1}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      unoptimized
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" aria-hidden="true" />
                   </motion.button>

@@ -13,21 +13,13 @@
  */
 
 import type { MetadataRoute } from 'next'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicArtists } from '@/lib/api/artists'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { getPublicReleases } from '@/lib/api/releases'
 import { resolveSiteUrl } from '@/lib/brand'
 
 export const revalidate = 3600 // 1 hour ISR
-
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-  )
-}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = resolveSiteUrl()

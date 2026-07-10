@@ -78,7 +78,6 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
                   height={80}
                   className="h-full w-auto"
                   style={{ width: 'auto', height: '100%' }}
-                  unoptimized
                 />
               </div>
             </motion.a>
@@ -93,7 +92,6 @@ export function Header({ logoUrl, labelName, sectionOrder, showAbout, aboutNavLa
                   height={80}
                   className="h-full w-auto"
                   style={{ width: 'auto', height: '100%' }}
-                  unoptimized
                 />
               </div>
             </Link>

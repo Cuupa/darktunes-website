@@ -58,7 +58,6 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
             height={120}
             className="h-24 w-auto object-contain md:h-36"
             priority
-            unoptimized
           />
           {siteSettings.labelTagline && (
             <p className="text-lg md:text-xl text-muted-foreground font-serif max-w-md leading-relaxed">
