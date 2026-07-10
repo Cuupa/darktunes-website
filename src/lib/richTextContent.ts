@@ -5,6 +5,20 @@
  * have no effect. These arbitrary selectors mirror the pattern used on About
  * and Datenschutz pages.
  */
+/** Tailwind classes for TipTap editor surfaces (admin CMS). */
+export const TIPTAP_EDITOR_CONTENT_CLASS =
+  'prose prose-invert max-w-none min-h-[300px] p-4 focus:outline-none ' +
+  '[&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2 ' +
+  '[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 ' +
+  '[&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 ' +
+  '[&_p]:mb-3 ' +
+  '[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 ' +
+  '[&_strong]:text-foreground [&_strong]:font-semibold ' +
+  '[&_ul]:list-disc [&_ul]:list-inside [&_ul]:pl-1 [&_ul]:my-2 [&_ul]:space-y-1 ' +
+  '[&_ol]:list-decimal [&_ol]:list-inside [&_ol]:pl-1 [&_ol]:my-2 [&_ol]:space-y-1 ' +
+  '[&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3 ' +
+  '[&_hr]:my-4 [&_hr]:border-border'
+
 export const RICH_TEXT_CONTENT_CLASS =
   'max-w-none text-foreground/90 leading-relaxed font-serif ' +
   '[&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:tracking-tight ' +
