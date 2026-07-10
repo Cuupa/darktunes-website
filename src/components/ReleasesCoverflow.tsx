@@ -10,7 +10,6 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay, EffectCoverflow, Keyboard, Virtual } from 'swiper/modules'
 import type { Swiper as SwiperType } from 'swiper/types'
 import { Badge } from '@/components/ui/badge'
-import { getSquareThumbnail } from '@/lib/imageUtils'
 import { cn } from '@/lib/utils'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Release } from '@/types'
@@ -59,7 +58,7 @@ function SlideContent({
           </div>
         )}
         <Image
-          src={getSquareThumbnail(release.coverArt, 600)}
+          src={release.coverArt}
           alt={`${release.title} by ${release.artistName} – cover art`}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 40vw, 30vw"

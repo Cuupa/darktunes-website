@@ -87,7 +87,7 @@ vi.mock('@/components/ui/genre-tag-picker', () => ({
 
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  AvatarImage: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt ?? ''} />,
+  AvatarImage: (props: React.ImgHTMLAttributes<HTMLImageElement>) => React.createElement('img', { ...props, alt: props.alt ?? '' }),
   AvatarFallback: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }))
 

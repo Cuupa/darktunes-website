@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
-import { getSquareThumbnail } from '@/lib/imageUtils'
 import { useTranslations } from 'next-intl'
 import type { Release } from '@/types'
 
@@ -122,12 +121,11 @@ export function ReleasesPageContent({ releases }: ReleasesPageContentProps) {
                   <div className="relative aspect-square overflow-hidden">
                     {release.coverArt ? (
                       <Image
-                        src={getSquareThumbnail(release.coverArt, 400)}
+                        src={release.coverArt}
                         alt={`${release.title} – cover art`}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        unoptimized
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">

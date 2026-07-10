@@ -7,7 +7,6 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { getSquareThumbnail } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 
 interface RelatedArtistsProps {
@@ -34,12 +33,11 @@ export function RelatedArtists({ artists, heading }: RelatedArtistsProps) {
           >
             {artist.imageUrl ? (
               <Image
-                src={getSquareThumbnail(artist.imageUrl, 300)}
+                src={artist.imageUrl}
                 alt={`${artist.name} – artist photo`}
                 fill
                 className="object-cover object-center transition-transform duration-500 group-hover:scale-110"
                 sizes="(max-width: 640px) 144px, 176px"
-                unoptimized
               />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-card to-background flex items-center justify-center">

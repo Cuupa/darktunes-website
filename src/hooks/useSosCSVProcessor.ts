@@ -110,6 +110,19 @@ export function useCSVProcessor(
   const latestConfigRef = useRef<WorkerProcessConfig | null>(null)
   /** The alias key that was in effect the last time files were synced with the worker. */
   const prevAliasKeyRef = useRef<string | undefined>(undefined)
+  /** Latest file arrays — updated every render so the file-sync effect reads current data. */
+  const believeFilesRef = useRef(believeFiles)
+  believeFilesRef.current = believeFiles
+  const bandcampFilesRef = useRef(bandcampFiles)
+  bandcampFilesRef.current = bandcampFiles
+  const shopifyFilesRef = useRef(shopifyFiles)
+  shopifyFilesRef.current = shopifyFiles
+  const printfulFilesRef = useRef(printfulFiles)
+  printfulFilesRef.current = printfulFiles
+  const darkmerchFilesRef = useRef(darkmerchFiles)
+  darkmerchFilesRef.current = darkmerchFiles
+  /** Latest customAliases map — updated every render so the file-sync effect reads current data. */
+  const customAliasesRef = useRef<Record<string, string[]>>({})
 
   const [workerResult, setWorkerResult] = useState<WorkerResult>(EMPTY_RESULT)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -211,6 +224,7 @@ export function useCSVProcessor(
     }
     return map
   }, [config.csvAliases])
+  customAliasesRef.current = customAliases
 
   const aliasKey = config.csvAliases.map(a => `${a.fieldName}:${a.synonym}`).join(',')
   const believeKey = believeFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
@@ -335,7 +349,13 @@ export function useCSVProcessor(
     const worker = workerRef.current
     if (!worker) return
 
-    const allFiles = [...believeFiles, ...bandcampFiles, ...shopifyFiles, ...printfulFiles, ...darkmerchFiles]
+    const allFiles = [
+      ...believeFilesRef.current,
+      ...bandcampFilesRef.current,
+      ...shopifyFilesRef.current,
+      ...printfulFilesRef.current,
+      ...darkmerchFilesRef.current,
+    ]
     const currentFileMap = new Map(
       allFiles.filter(f => f.data).map(f => [f.id, f])
     )
@@ -373,7 +393,7 @@ export function useCSVProcessor(
           fileId: id,
           content: file.data,
           source: file.type,
-          customAliases,
+          customAliases: customAliasesRef.current,
         } satisfies WorkerRequest)
         setIsProcessing(true)
       }

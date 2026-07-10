@@ -48,7 +48,7 @@ export function News({ news, heading, subheading, sneakPeekCount }: NewsProps) {
         </ScrollReveal>
 
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none">
-          {sneakPeek.map((post) => (
+          {sneakPeek.map((post, index) => (
             <li key={post.id} className="h-full">
               <ScrollReveal className="h-full">
                 <Link href={`/news/${post.slug}`} className="block h-full">
@@ -59,7 +59,9 @@ export function News({ news, heading, subheading, sneakPeekCount }: NewsProps) {
                       src={post.imageUrl}
                       alt={post.title}
                       fill
+                      priority={index === 0}
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
                   </div>

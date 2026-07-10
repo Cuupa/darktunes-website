@@ -650,7 +650,7 @@ function SosGeneratorPanel() {
     } finally {
       setWorkspaceDeleting(false)
     }
-  }, [currentPeriodKey, loadFromServer])
+  }, [currentPeriodKey, loadFromServer, t])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +

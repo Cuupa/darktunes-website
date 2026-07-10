@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- **Image optimization cleanup**: removed all `unoptimized` props and `wsrv.nl` helper wrappers (`getOptimizedImageUrl`, `getSquareThumbnail`) from every public-facing `<Image>` component (11 files). All images now flow through Next.js's built-in optimizer and Cloudflare CDN.
+- **`sizes` prop** added to every `fill` image that was missing it (PressReleaseDetailClient, ArtistEpkClient, PressReleasesClient, News.tsx, VideoGridBlock, ReleaseGridBlock) — prevents browsers from over-downloading near-viewport-width images.
+- **`priority` prop** added to above-the-fold images: first news card in `News.tsx`, artist hero in `ArtistDetailContent.tsx`, artist hero in `ArtistEpkClient`.
+
+### Refactored
+- **Centralized `createPublicSupabaseClient`**: removed 6 in-file duplicates (releases/[id]/page, artists/[slug]/page, news/[slug]/page, about/page, sitemap, datenschutz/page) in favour of the shared `@/lib/supabase/publicClient` module.
+- **Deduplicated data fetches** in `press/releases/[slug]/page` and `press/artists/[slug]/page` using `React.cache()` — `getPressReleaseBySlug` and `getArtistBySlug` are now called once per request across `generateMetadata` and the page component.
+
 ### Added
 - **ISR pre-rendering**: `releases/[id]` and `news/[slug]` now export `generateStaticParams()` + `dynamicParams = true`, pre-rendering all visible entries at build time so ISR starts warm rather than cold on-demand.
 - **Loading skeletons** (zero CLS): added `loading.tsx` for all previously uncovered async routes — `/artists`, `/events`, `/events/[id]`, `/news/[slug]`, `/fan/[slug]`, `/datenschutz`, `/impressum`, `/login`, `/promo-pool`, `/epk/share/[token]`, `/newsletter`, `/newsletter/confirmed`, `/offline`, `/account/privacy`, `/account/delete`, `/press/releases/[slug]`, `/press/artists/[slug]`, and all 12 admin sub-pages (`/admin/features`, `/admin/settings`, `/admin/analytics`, `/admin/assets`, `/admin/users`, `/admin/statements`, `/admin/videos`, `/admin/tour-planner`, `/admin/portal-faq`, `/admin/api-keys`, `/admin/support`, `/admin/promo-log`).

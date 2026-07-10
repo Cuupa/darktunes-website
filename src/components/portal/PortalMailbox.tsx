@@ -288,7 +288,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
     } catch {
       // non-fatal
     }
-  }, [setUnreadCount, supabase])
+  }, [setUnreadCount])
 
   const toggleStar = useCallback(async (messageId: string, starred: boolean) => {
     setMessages((prev) =>

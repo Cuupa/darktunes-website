@@ -7,8 +7,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { unstable_cache } from 'next/cache'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
+import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
 import { getPublicNewsPostBySlug, getPublicNewsPosts } from '@/lib/api/news'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { MarkdownContent } from '@/components/MarkdownContent'
@@ -20,14 +19,6 @@ import { NewsBodyClient } from './_components/NewsBodyClient'
 
 interface Props {
   params: Promise<{ slug: string }>
-}
-
-/** Cookie-free public Supabase client — safe for public read operations. */
-function createPublicSupabaseClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-  )
 }
 
 /** Opt-in ISR: revalidate every 60 s at the route-segment level. */
@@ -140,7 +131,7 @@ export default async function NewsDetailPage({ params }: Props) {
               fill
               priority
               className="object-cover"
-              unoptimized
+              sizes="(max-width: 768px) 100vw, 768px"
             />
           </div>
         )}

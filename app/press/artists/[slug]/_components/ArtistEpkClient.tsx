@@ -21,7 +21,6 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
 import type { Artist, Concert, PressAsset } from '@/types'
 import type { PublicArtistEpk } from '@/lib/api/publicArtistEpk'
@@ -167,7 +166,6 @@ export function ArtistEpkClient({
                       width={200}
                       height={80}
                       className="h-20 w-auto object-contain"
-                      unoptimized
                     />
                   </div>
                   <Button asChild size="sm" variant="outline">
@@ -182,12 +180,12 @@ export function ArtistEpkClient({
           </div>
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-background/50">
             <Image
-              src={getOptimizedImageUrl(artist.imageUrl, 1200)}
+              src={artist.imageUrl}
               alt={`${artist.name} – artist photo`}
               fill
               className="object-cover"
               priority
-              unoptimized
+              sizes="(max-width: 768px) 100vw, 768px"
             />
           </div>
         </section>
@@ -311,11 +309,11 @@ export function ArtistEpkClient({
                       aria-label={`View ${pressAssetTitle(photo)}`}
                     >
                       <Image
-                        src={getOptimizedImageUrl(photo.publicUrl, 1000)}
+                        src={photo.publicUrl}
                         alt={photo.altText ?? `${artist.name} – press photo`}
                         fill
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        unoptimized
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       />
                     </button>
                   ) : (

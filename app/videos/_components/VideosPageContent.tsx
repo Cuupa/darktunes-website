@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Play, ArrowLeft, ArrowRight, MagnifyingGlass } from '@phosphor-icons/react'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Video } from '@/types'
 
@@ -140,12 +139,11 @@ export function VideosPageContent({
                   >
                     <div className="relative aspect-video overflow-hidden shrink-0">
                       <Image
-                        src={getOptimizedImageUrl(video.thumbnailUrl ?? '', 600)}
+                        src={video.thumbnailUrl ?? ''}
                         alt={`${video.title} – video thumbnail`}
                         fill
                         className="object-cover transform-gpu group-hover:scale-110 transition-transform duration-500"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        unoptimized
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
                         <Button

@@ -18,7 +18,6 @@ import {
   MusicNote,
   LinkSimple,
 } from '@phosphor-icons/react'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
 import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import {
@@ -58,7 +57,7 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
     day: 'numeric',
   })
 
-  const heroBackgroundUrl = getOptimizedImageUrl(release.heroBgUrl ?? release.coverArt, 1200)
+  const heroBackgroundUrl = release.heroBgUrl ?? release.coverArt
   const hubLinkUrl = resolveReleaseHubLink({
     smartlinkUrl: release.smartlinkUrl,
     smartUrl: release.smartUrl,
@@ -115,7 +114,7 @@ export function ReleaseDetailContent({ release, artist }: ReleaseDetailContentPr
               className="w-full max-w-xs lg:max-w-sm shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/60"
             >
               <Image
-                src={getOptimizedImageUrl(release.coverArt, 600)}
+                src={release.coverArt}
                 alt={`${release.title} cover`}
                 width={480}
                 height={480}
