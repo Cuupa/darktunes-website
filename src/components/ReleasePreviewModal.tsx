@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ConsentGate } from '@/components/ConsentGate'
 import { getSpotifyEmbedPath } from '@/lib/spotifyEmbedPath'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useTranslations } from 'next-intl'
 import type { Release } from '@/types'
 
@@ -75,10 +74,9 @@ export function ReleasePreviewModal({ release, open, onClose }: ReleasePreviewMo
           {/* Cover art */}
           <div className="relative w-full sm:w-48 shrink-0 aspect-square sm:aspect-auto">
             <Image
-              src={getOptimizedImageUrl(release.coverArt, 400)}
+              src={release.coverArt}
               alt={`${release.title} by ${release.artistName}`}
               fill
-              unoptimized
               className="object-cover"
             />
           </div>

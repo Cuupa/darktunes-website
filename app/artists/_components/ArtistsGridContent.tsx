@@ -12,7 +12,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MagnifyingGlass } from '@phosphor-icons/react'
-import { getSquareThumbnail, getOptimizedImageUrl } from '@/lib/imageUtils'
 import type { Artist } from '@/types'
 
 interface ArtistsGridContentProps {
@@ -94,7 +93,7 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                     }}
                   >
                     <Image
-                      src={getSquareThumbnail(artist.imageUrl, 400)}
+                      src={artist.imageUrl}
                       alt={`${artist.name} – artist photo`}
                       fill
                       priority={index < 6}
@@ -103,7 +102,6 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                         objectPosition: `${artist.imagePositionX ?? 50}% ${artist.imagePositionY ?? 50}%`,
                       }}
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                      unoptimized
                     />
                   </div>
                 ) : (
@@ -120,12 +118,11 @@ export function ArtistsGridContent({ artists }: ArtistsGridContentProps) {
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
                   {artist.logoUrl ? (
                     <Image
-                      src={getOptimizedImageUrl(artist.logoUrl, 300)}
+                      src={artist.logoUrl}
                       alt={`${artist.name} – logo`}
                       width={200}
                       height={200}
                       className="max-w-full max-h-full object-contain"
-                      unoptimized
                     />
                   ) : (
                     <p className="text-white font-bold text-lg text-center leading-tight">{artist.name}</p>

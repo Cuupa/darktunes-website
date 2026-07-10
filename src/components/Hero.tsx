@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { ScrollReveal } from '@/components/animations/ScrollReveal'
 import { Badge } from '@/components/ui/badge'
 import { Play, ArrowDown } from '@phosphor-icons/react'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { useSmoothScrollToAnchor } from '@/hooks/useSmoothScrollToAnchor'
 import logoImage from '@/assets/images/logo_(1).png'
 import { useTranslations } from 'next-intl'
@@ -81,13 +80,13 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
    */
   let bgUrl: string | undefined
   if (heroItem.heroBgUrl) {
-    bgUrl = getOptimizedImageUrl(heroItem.heroBgUrl, 1200)
+    bgUrl = heroItem.heroBgUrl
   } else if (siteSettings.heroCustomBgUrl) {
-    bgUrl = getOptimizedImageUrl(siteSettings.heroCustomBgUrl, 1200)
+    bgUrl = siteSettings.heroCustomBgUrl
   } else if (itemIsRelease) {
-    bgUrl = getOptimizedImageUrl(heroItem.coverArt, 1200)
+    bgUrl = heroItem.coverArt
   } else if (heroItem.imageUrl) {
-    bgUrl = getOptimizedImageUrl(heroItem.imageUrl, 1200)
+    bgUrl = heroItem.imageUrl
   }
 
   // Title / subtitle / description
@@ -104,9 +103,9 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
     ? `/releases/${heroItem.id}`
     : `/news/${heroItem.slug}`
   const coverImageUrl = itemIsRelease
-    ? getOptimizedImageUrl(heroItem.coverArt, 800)
+    ? heroItem.coverArt
     : heroItem.imageUrl
-    ? getOptimizedImageUrl(heroItem.imageUrl, 800)
+    ? heroItem.imageUrl
     : undefined
 
   // ── Hero button resolution ──────────────────────────────────────────────
@@ -149,7 +148,6 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
             sizes="100vw"
             priority
             fetchPriority="high"
-            unoptimized
           />
         )}
         <div
@@ -254,7 +252,6 @@ export function Hero({ heroItem, siteSettings, artistSlug }: HeroProps) {
                   fill
                   className="object-cover"
                   sizes="50vw"
-                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
               </div>

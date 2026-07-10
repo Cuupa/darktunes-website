@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { DownloadSimple, FileArrowDown } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
 import { PressPhotoLightbox } from '@/components/press/PressPhotoLightbox'
 import type { PressAsset } from '@/types'
 import { getJournalistDownloadUrl } from '../../_actions/download'
@@ -113,11 +112,10 @@ export function PressKitList({ assets, zipDownloadEnabled = true }: PressKitList
                     aria-label={`View ${assetTitle(asset)}`}
                   >
                     <Image
-                      src={getOptimizedImageUrl(asset.publicUrl, 1000)}
+                      src={asset.publicUrl}
                       alt={asset.altText ?? `${assetTitle(asset)} – press asset`}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      unoptimized
                     />
                   </button>
                   <div className="flex items-center justify-between gap-3 p-4">
