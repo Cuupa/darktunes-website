@@ -1,17 +1,23 @@
 'use client'
 
 /**
- * LinkPopover — replaces window.prompt() for inserting/editing links in the editor.
- * Renders as a toolbar button that opens a Popover with URL and display-text inputs.
+ * LinkPopover — dialog for inserting/editing links in the TipTap editor.
+ * Toolbar button opens a modal with URL, display text, and new-tab options.
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { getMarkRange, type Editor } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Link as LinkIcon } from '@phosphor-icons/react'
 
 interface Props {
@@ -143,77 +149,100 @@ export function LinkPopover({ editor, disabled }: Props) {
     setOpen(false)
   }, [editor])
 
+  const handleOpen = useCallback(() => {
+    if (disabled) return
+    setOpen(true)
+  }, [disabled])
+
   const isActive = editor.isActive('link')
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant={isActive ? 'default' : 'ghost'}
-          size="icon"
-          className={`h-7 w-7 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
-          title="Insert / Edit Link"
-          aria-label="Insert / Edit Link"
-          aria-pressed={isActive}
-          disabled={disabled}
-        >
-          <span aria-hidden="true"><LinkIcon className="w-3.5 h-3.5" /></span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-3 space-y-3" align="start">
-        <div className="space-y-1.5">
-          <Label htmlFor="link-popover-text">Link text</Label>
-          <Input
-            id="link-popover-text"
-            value={linkText}
-            onChange={(e) => setLinkText(e.target.value)}
-            placeholder="HERE"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="link-popover-url">URL</Label>
-          <Input
-            id="link-popover-url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch id="link-popover-newtab" checked={newTab} onCheckedChange={setNewTab} />
-          <Label htmlFor="link-popover-newtab">Open in new tab</Label>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="link-popover-color">Link text color (optional)</Label>
-          <div className="flex items-center gap-2">
-            <input
-              id="link-popover-color"
-              type="color"
-              value={linkColor || '#ffffff'}
-              onChange={(e) => setLinkColor(e.target.value)}
-              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0.5"
-            />
-            {linkColor && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => setLinkColor('')} className="h-7 px-2 text-xs">
-                Clear
+    <>
+      <Button
+        type="button"
+        variant={isActive ? 'default' : 'ghost'}
+        size="icon"
+        className={`h-7 w-7 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+        title="Insert / Edit Link"
+        aria-label="Insert / Edit Link"
+        aria-pressed={isActive}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        disabled={disabled}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleOpen}
+      >
+        <span aria-hidden="true"><LinkIcon className="w-3.5 h-3.5" /></span>
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md" aria-labelledby="link-dialog-title">
+          <DialogHeader>
+            <DialogTitle id="link-dialog-title">Insert / Edit Link</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="link-popover-text">Link text</Label>
+              <Input
+                id="link-popover-text"
+                value={linkText}
+                onChange={(e) => setLinkText(e.target.value)}
+                placeholder="Display text"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="link-popover-url">URL</Label>
+              <Input
+                id="link-popover-url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://…"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleApply() }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="link-popover-newtab" checked={newTab} onCheckedChange={setNewTab} />
+              <Label htmlFor="link-popover-newtab">Open in new tab</Label>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="link-popover-color">Link text color (optional)</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="link-popover-color"
+                  type="color"
+                  value={linkColor || '#ffffff'}
+                  onChange={(e) => setLinkColor(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                />
+                {linkColor && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setLinkColor('')} className="h-7 px-2 text-xs">
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            {isActive && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive sm:mr-auto"
+                onClick={handleRemove}
+              >
+                Remove link
               </Button>
             )}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" size="sm" className="flex-1" onClick={handleApply}>
-            {url.trim() ? 'Apply' : 'Remove'}
-          </Button>
-          {isActive && (
-            <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={handleRemove}>
-              Remove link
+            <Button type="button" size="sm" onClick={handleApply}>
+              {url.trim() ? 'Apply' : 'Remove'}
             </Button>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

@@ -14,8 +14,9 @@ export const TIPTAP_EDITOR_CONTENT_CLASS =
   '[&_p]:mb-3 ' +
   '[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 ' +
   '[&_strong]:text-foreground [&_strong]:font-semibold ' +
-  '[&_ul]:list-disc [&_ul]:list-inside [&_ul]:pl-1 [&_ul]:my-2 [&_ul]:space-y-1 ' +
-  '[&_ol]:list-decimal [&_ol]:list-inside [&_ol]:pl-1 [&_ol]:my-2 [&_ol]:space-y-1 ' +
+  '[&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:space-y-1 ' +
+  '[&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1 ' +
+  '[&_li>p]:mb-0 ' +
   '[&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3 ' +
   '[&_hr]:my-4 [&_hr]:border-border'
 
@@ -30,8 +31,9 @@ export const RICH_TEXT_CONTENT_CLASS =
   '[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:opacity-80 ' +
   '[&_strong]:text-foreground [&_strong]:font-semibold ' +
   '[&_em]:italic ' +
-  '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-4 [&_ul]:space-y-1 ' +
-  '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-4 [&_ol]:space-y-1 ' +
+  '[&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-5 [&_ul]:my-4 [&_ul]:space-y-1 ' +
+  '[&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-5 [&_ol]:my-4 [&_ol]:space-y-1 ' +
+  '[&_li>p]:mb-0 ' +
   '[&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-4 ' +
   '[&_hr]:my-8 [&_hr]:border-border ' +
   '[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-sm'
