@@ -38,6 +38,7 @@ export function RichFaqContent({ content, className }: RichFaqContentProps) {
           '[&_strong]:text-foreground ' +
           '[&_ul]:list-disc [&_ul]:list-inside [&_ul]:pl-1 [&_ul]:my-2 [&_ul]:space-y-1 ' +
           '[&_ol]:list-decimal [&_ol]:list-inside [&_ol]:pl-1 [&_ol]:my-2 [&_ol]:space-y-1 ' +
+          '[&_li>p]:mb-0 [&_li>p]:inline ' +
           '[&_.tiptap-file-link]:inline-flex [&_.tiptap-file-link]:items-center [&_.tiptap-file-link]:gap-1 ' +
           '[&_.tiptap-file-link]:rounded-md [&_.tiptap-file-link]:border [&_.tiptap-file-link]:border-border ' +
           '[&_.tiptap-file-link]:px-2 [&_.tiptap-file-link]:py-1 [&_.tiptap-file-link]:text-sm'

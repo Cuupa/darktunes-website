@@ -28,6 +28,7 @@ describe('RichFaqContent', () => {
     expect(screen.getByText('First item')).toBeInTheDocument()
     expect(screen.getByText('Second item')).toBeInTheDocument()
     expect(container.firstChild).toHaveClass('[&_ul]:list-inside')
+    expect(container.firstChild).toHaveClass('[&_li>p]:inline')
     expect(container.querySelectorAll('li')).toHaveLength(2)
   })
 })
