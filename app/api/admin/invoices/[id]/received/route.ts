@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { getAdminInvoiceById, markInvoiceReceived } from '@/lib/api/artistInvoices'
 import { assertSettlementPeriodWritableById } from '@/lib/api/settlementPeriods'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
@@ -8,7 +8,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyAdmin(token)
 
   const id = req.nextUrl.pathname.split('/').at(-2)
   if (!id) throw new ApiError(400, 'Missing invoice id')

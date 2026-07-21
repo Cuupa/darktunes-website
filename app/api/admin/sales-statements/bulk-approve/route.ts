@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import {
   approveAndNotifySalesStatement,
   getSalesStatementById,
@@ -20,7 +20,7 @@ const bulkApproveSchema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyAdmin(token)
 
   const body: unknown = await req.json()
   const parsed = bulkApproveSchema.safeParse(body)

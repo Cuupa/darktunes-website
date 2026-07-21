@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { buildSettlementRegister } from '@/lib/api/settlementRegister'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -12,7 +12,7 @@ const querySchema = z.object({
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  await verifyAdminOrEditor(token)
+  await verifyAdmin(token)
 
   const parsed = querySchema.safeParse({
     periodStart: req.nextUrl.searchParams.get('periodStart'),

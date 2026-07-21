@@ -171,7 +171,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       const url = showRefreshSpinner
         ? '/api/health?mode=full&fresh=1'
         : '/api/health?mode=full'
-      const res = await fetch(url)
+      const res = await fetch(url, {
+        headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
+      })
       if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
       const data = (await parseAdminFetchJson(res)) as unknown as HealthResponse
       setHealth(data)
@@ -182,7 +184,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
       setLoading(false)
       if (showRefreshSpinner) setRefreshing(false)
     }
-  }, [])
+  }, [bearerToken])
 
   useEffect(() => {
     const pollIntervalMs = 120_000

@@ -40,6 +40,7 @@
 
 import React from 'react'
 import type { ThemeConfig } from '@/config/themeConfig'
+import { sanitizeThemeCss } from '@/lib/sanitizeThemeCss'
 
 // ── Flat-field legacy interface (kept for backward compatibility) ─────────────
 
@@ -354,8 +355,8 @@ export function ThemeStyleInjector(props: ThemeColors) {
     }
   }
 
-  // ── Custom CSS (raw injection from admin) ────────────────────────────────
-  const customCss = themeConfig?.effects?.customCss?.trim()
+  // ── Custom CSS (sanitized — never inject raw admin CSS into <style>) ─────
+  const customCss = sanitizeThemeCss(themeConfig?.effects?.customCss)
 
   if (!hasDeclarations && fontLinks.length === 0 && !customCss) return null
 

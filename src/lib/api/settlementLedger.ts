@@ -79,6 +79,32 @@ export async function appendLedgerEntry(
   return rowToEntry(data as LedgerRow)
 }
 
+/**
+ * True when a ledger row already exists for the given reference.
+ * Used for approve/payment idempotency and to skip payment posts after invoice_liability.
+ */
+export async function hasLedgerEntry(
+  db: DbClient,
+  referenceType: string,
+  referenceId: string,
+  entryType?: LedgerEntryType,
+): Promise<boolean> {
+  let query = db
+    .from('artist_settlement_ledger')
+    .select('id')
+    .eq('reference_type', referenceType)
+    .eq('reference_id', referenceId)
+    .limit(1)
+
+  if (entryType) {
+    query = query.eq('entry_type', entryType)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data?.length ?? 0) > 0
+}
+
 export async function getLedgerEntriesForArtist(
   db: DbClient,
   artistId: string,
@@ -219,6 +245,22 @@ export async function getUnappliedCarryForwards(
   return data ?? []
 }
 
+/** Net subtotal of invoice line items (cents). */
 export function invoiceTotalCents(lineItems: { qty: number; unit_price_cents: number }[]): number {
   return lineItems.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0)
+}
+
+/**
+ * Gross invoice total in cents (net + VAT).
+ * Matches PDF generation: tax = round(net * rate/100); §19 / 0% keeps net = gross.
+ */
+export function invoiceGrossCents(
+  lineItems: { qty: number; unit_price_cents: number }[],
+  taxRatePct: number,
+): number {
+  const net = invoiceTotalCents(lineItems)
+  const rate = Number.isFinite(taxRatePct) ? Math.max(0, taxRatePct) : 0
+  if (rate === 0) return net
+  const tax = Math.round(net * (rate / 100))
+  return net + tax
 }

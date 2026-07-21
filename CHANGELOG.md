@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Settlements — ledger double-booking**: statement-linked invoice payments no longer post a second negative ledger row when `invoice_liability` already exists; open balance returns to zero after full pay.
+- **Settlements — approve idempotency**: single statement approve only accepts `draft`; re-approve / retry cannot double-book `statement_payout`.
+- **Settlements — correction workflow**: creating a correction no longer supersedes the original or books ledger delta; supersede + delta happen on correction approve so artists keep seeing the live statement.
+- **Invoices — USt / gross totals**: payment caps and carry-forward unpaid amounts use gross (net + tax) matching the PDF.
+- **Portal invoices — locked periods**: creating a statement-linked invoice rejects locked/archived settlement periods (422).
+- **News — press exclusivity**: public news queries and RLS exclude `is_press_only`; press readers require published/scheduled + due `published_at`.
+- **News — unknown status**: mapper defaults unknown statuses to `draft` (was `published`).
+- **SOS UI**: “Sonstiges Digital” residual no longer double-counts Believe/Bandcamp.
+- **Auth — finance APIs**: sales-statements, settlements, invoices, and SOS admin routes require **admin** (editors blocked; matches UI).
+- **XSS — theme customCss**: admin CSS is sanitized before `<style>` injection (`sanitizeThemeCss`).
+- **Portal messages**: MessagesInbox uses shared `sanitizeHtml` on SSR (no raw HTML passthrough).
+- **Health**: `GET /api/health?mode=full` requires admin Bearer or `CRON_SECRET`; SystemHealthWidget sends the admin token.
+
 ### Performance
 - **Image optimization cleanup**: removed all `unoptimized` props and `wsrv.nl` helper wrappers (`getOptimizedImageUrl`, `getSquareThumbnail`) from every public-facing `<Image>` component (11 files). All images now flow through Next.js's built-in optimizer and Cloudflare CDN.
 - **`sizes` prop** added to every `fill` image that was missing it (PressReleaseDetailClient, ArtistEpkClient, PressReleasesClient, News.tsx, VideoGridBlock, ReleaseGridBlock) — prevents browsers from over-downloading near-viewport-width images.

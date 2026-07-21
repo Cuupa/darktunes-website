@@ -64,6 +64,12 @@ vi.mock('@/lib/api/settlementLedger', () => ({
   invoiceTotalCents: vi.fn((items: Array<{ qty: number; unit_price_cents: number }>) =>
     items.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0),
   ),
+  invoiceGrossCents: vi.fn(
+    (items: Array<{ qty: number; unit_price_cents: number }>, taxRatePct: number) => {
+      const net = items.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0)
+      return net + Math.round(net * (taxRatePct / 100))
+    },
+  ),
 }))
 
 function makeBuilder(data: unknown = null, error: unknown = null) {

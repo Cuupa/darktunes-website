@@ -3,7 +3,7 @@ import type { Database } from '@/types/database'
 import {
   computeCarryForwardOpeningBalance,
   getArtistOutstandingBalance,
-  invoiceTotalCents,
+  invoiceGrossCents,
   type CarryForwardBreakdown,
 } from '@/lib/api/settlementLedger'
 import { reconcileRegisterOpenBalance } from '@/lib/api/settlementReconciliation'
@@ -176,15 +176,16 @@ export async function computeCarryForwardBalances(
 
     const { data: invoices } = await db
       .from('artist_invoices')
-      .select('line_items, paid_amount_cents, outstanding_amount_cents, status')
+      .select('line_items, paid_amount_cents, outstanding_amount_cents, status, tax_rate_pct')
       .eq('artist_id', artistId)
       .eq('settlement_period_id', periodId)
 
     let unpaidInvoiceCents = 0
     let partialRemainder = 0
     for (const inv of invoices ?? []) {
-      const total = invoiceTotalCents(
+      const total = invoiceGrossCents(
         Array.isArray(inv.line_items) ? inv.line_items : [],
+        Number(inv.tax_rate_pct ?? 0),
       )
       const paid = Number(inv.paid_amount_cents ?? 0)
       if (inv.status === 'paid') continue

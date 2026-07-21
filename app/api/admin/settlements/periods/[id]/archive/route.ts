@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { archivePeriodWithCarryForward } from '@/lib/api/settlementRegister'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -12,7 +12,7 @@ const bodySchema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyAdmin(token)
 
   const id = req.nextUrl.pathname.split('/').at(-2)
   if (!id) throw new ApiError(400, 'Missing period id')

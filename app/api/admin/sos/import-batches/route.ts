@@ -16,7 +16,7 @@ import {
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAdminOrEditor() {
+async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -24,12 +24,12 @@ async function requireAdminOrEditor() {
   } = await supabase.auth.getUser()
   if (error || !user) throw new ApiError(401, 'Unauthorized')
   const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin', 'editor'].includes(role)) throw new ApiError(403, 'Forbidden')
+  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
   return { user, supabase }
 }
 
 export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAdminOrEditor()
+  await requireAdmin()
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batches = await listImportBatches(serviceSupabase, 100)
   return NextResponse.json({ batches })
@@ -38,7 +38,7 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 const MAX_REGISTRATION_BODY_BYTES = 16_384
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { user } = await requireAdminOrEditor()
+  const { user } = await requireAdmin()
 
   const rawBody = await req.text()
   if (rawBody.length > MAX_REGISTRATION_BODY_BYTES) {

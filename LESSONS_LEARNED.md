@@ -137,6 +137,22 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **`generateInvoicePdf` sync → async:** CJS `require()` was needed because the function was synchronous. Converting to `async` with `await import('jspdf')` / `await import('jspdf-autotable')` eliminates the `@typescript-eslint/no-require-imports` suppressions. Both callers (route handler + server action) are already async.
 
+### 2026-07-21 — Settlement ledger + press visibility + API/UI auth parity
+
+**Invoice liability and payment must not both reduce open balance:** Once `invoice_liability` zeros `statement_payout`, payment status lives on the invoice (`paid_amount_cents`); a second ledger `payment` row leaves permanent negative balance and corrupts carry-forward.
+
+**Approve gates belong in the DAL, not only in bulk routes:** Single-approve without `.eq('status','draft')` and without ledger idempotency doubles royalties on retry.
+
+**Correction drafts must not hide the original:** Supersede + ledger delta on create remove the only artist-visible statement until approve; move both to correction approve.
+
+**UI admin-only paths must match API auth:** Editors blocked from `/admin/statements` in the proxy still called `verifyAdminOrEditor` finance/SOS routes until APIs used `verifyAdmin` / admin-only role checks.
+
+**Public content filters need RLS + app:** `is_press_only` only in app is insufficient if anon RLS still returns press rows; keep both in sync.
+
+**Never inject raw admin CSS:** Theme `customCss` into `<style>` without stripping `</style` / script patterns is site-wide XSS when CSP allows `unsafe-inline`.
+
+**Local sanitize wrappers that no-op on SSR defeat the SSOT:** MessagesInbox returned raw HTML when `window` was undefined; always use `@/lib/sanitizeHtml`.
+
 ---
 
-*Last updated: 2026-07-06*
+*Last updated: 2026-07-21*

@@ -26,7 +26,7 @@ async function requireAccountingRole() {
   } = await supabase.auth.getUser()
   if (error || !user) throw new ApiError(401, 'Unauthorized')
   const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin', 'editor'].includes(role)) throw new ApiError(403, 'Forbidden')
+  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
   return { user, supabase }
 }
 

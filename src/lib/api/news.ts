@@ -22,7 +22,7 @@ export function rowToNewsPost(row: NewsRow): NewsPost {
   type NewsStatus = typeof validStatuses[number]
   const status: NewsStatus = (validStatuses as readonly string[]).includes(row.status)
     ? (row.status as NewsStatus)
-    : 'published'
+    : 'draft'
   return {
     id: row.id,
     title: stripEmojis(row.title),
@@ -124,6 +124,7 @@ export async function getPublicNewsPosts(db: DbClient): Promise<NewsPost[]> {
     .from('news_posts')
     .select('*')
     .in('status', ['published', 'scheduled'])
+    .eq('is_press_only', false)
     .lte('published_at', now)
     .order('published_at', { ascending: false })
     .limit(PUBLIC_QUERY_LIMITS.news)
@@ -145,6 +146,7 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
     .select('*')
     .eq('artist_id', artistId)
     .in('status', ['published', 'scheduled'])
+    .eq('is_press_only', false)
     .lte('published_at', now)
     .order('published_at', { ascending: false })
     .limit(PUBLIC_QUERY_LIMITS.newsByArtist)
@@ -169,6 +171,7 @@ export async function getPublicNewsPostsByArtistId(db: DbClient, artistId: strin
       .select('*')
       .in('id', extraIds)
       .in('status', ['published', 'scheduled'])
+      .eq('is_press_only', false)
       .lte('published_at', now)
       .order('published_at', { ascending: false })
 
@@ -192,6 +195,8 @@ export async function getPressOnlyNewsPosts(db: DbClient): Promise<NewsPost[]> {
     .from('news_posts')
     .select('*')
     .eq('is_press_only', true)
+    .in('status', ['published', 'scheduled'])
+    .lte('published_at', now)
     .or(`embargo_until.is.null,embargo_until.lte.${now}`)
     .order('published_at', { ascending: false })
     .limit(PUBLIC_QUERY_LIMITS.news)
@@ -206,6 +211,8 @@ export async function getPressReleaseBySlug(db: DbClient, slug: string): Promise
     .select('*')
     .eq('slug', slug)
     .eq('is_press_only', true)
+    .in('status', ['published', 'scheduled'])
+    .lte('published_at', now)
     .or(`embargo_until.is.null,embargo_until.lte.${now}`)
     .single()
   if (error) {
@@ -227,6 +234,7 @@ export async function getPublicNewsPostBySlug(db: DbClient, slug: string): Promi
     .select('*')
     .eq('slug', slug)
     .in('status', ['published', 'scheduled'])
+    .eq('is_press_only', false)
     .lte('published_at', now)
     .single()
   if (error) {

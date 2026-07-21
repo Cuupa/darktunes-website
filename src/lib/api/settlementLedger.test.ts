@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeCarryForwardOpeningBalance,
+  invoiceGrossCents,
   invoiceTotalCents,
   sumLedgerBalance,
   type CarryForwardBreakdown,
@@ -62,5 +63,10 @@ describe('settlementLedger helpers', () => {
         { qty: 2, unit_price_cents: 500 },
       ]),
     ).toBe(13500)
+  })
+
+  it('computes gross invoice total with VAT', () => {
+    expect(invoiceGrossCents([{ qty: 1, unit_price_cents: 10000 }], 19)).toBe(11900)
+    expect(invoiceGrossCents([{ qty: 1, unit_price_cents: 10000 }], 0)).toBe(10000)
   })
 })

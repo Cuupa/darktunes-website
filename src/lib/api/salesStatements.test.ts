@@ -26,6 +26,7 @@ vi.mock('@/lib/api/settlementLedger', () => ({
     amountEur: 100,
     createdAt: '2024-01-01T00:00:00Z',
   })),
+  hasLedgerEntry: vi.fn(async () => false),
 }))
 
 vi.mock('@/lib/api/settlementPeriods', () => ({
@@ -38,7 +39,7 @@ vi.mock('@/lib/api/settlementPeriods', () => ({
   })),
 }))
 
-import { appendLedgerEntry } from '@/lib/api/settlementLedger'
+import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 
 type DbClient = SupabaseClient<Database>
 type SalesStatementRow = Database['public']['Tables']['sales_statements']['Row']
@@ -246,6 +247,31 @@ describe('getSalesStatementById', () => {
   })
 })
 
+function makeApproveDb(statusRow: { status: string }, updateRow: SalesStatementRow | null, updateError: unknown = null) {
+  const selectSingle = vi.fn().mockResolvedValue({ data: statusRow, error: null })
+  const updateSingle = vi.fn().mockResolvedValue({ data: updateRow, error: updateError })
+  let fromCalls = 0
+  const db = {
+    from: vi.fn(() => {
+      fromCalls += 1
+      if (fromCalls === 1) {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: selectSingle,
+        }
+      }
+      return {
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: updateSingle,
+      }
+    }),
+  } as unknown as DbClient
+  return db
+}
+
 describe('approveSalesStatement', () => {
   it('updates status to label_approved and returns mapped domain object', async () => {
     const approvedRow: SalesStatementRow = {
@@ -254,7 +280,7 @@ describe('approveSalesStatement', () => {
       label_notes: 'Looks good.',
       label_approved_at: '2024-04-02T12:00:00Z',
     }
-    const db = makeMockDb(approvedRow)
+    const db = makeApproveDb({ status: 'draft' }, approvedRow)
     const result = await approveSalesStatement(db, 'stmt-uuid-1', 'Looks good.')
     expect(result.status).toBe('label_approved')
     expect(result.labelNotes).toBe('Looks good.')
@@ -268,14 +294,21 @@ describe('approveSalesStatement', () => {
       label_notes: null,
       label_approved_at: '2024-04-02T12:00:00Z',
     }
-    const db = makeMockDb(approvedRow)
+    const db = makeApproveDb({ status: 'draft' }, approvedRow)
     const result = await approveSalesStatement(db, 'stmt-uuid-1')
     expect(result.status).toBe('label_approved')
     expect(result.labelNotes).toBeUndefined()
   })
 
+  it('rejects non-draft statements', async () => {
+    const db = makeApproveDb({ status: 'label_approved' }, null)
+    await expect(approveSalesStatement(db, 'stmt-uuid-1')).rejects.toThrow(
+      'Cannot approve statement in status "label_approved"',
+    )
+  })
+
   it('throws on database error', async () => {
-    const db = makeMockDb(null, { message: 'update failed' })
+    const db = makeApproveDb({ status: 'draft' }, null, { message: 'update failed' })
     await expect(approveSalesStatement(db, 'stmt-uuid-1')).rejects.toThrow('update failed')
   })
 })
@@ -292,9 +325,20 @@ describe('approveAndNotifySalesStatement', () => {
       status: 'artist_notified',
     }
 
+    // fetch status → update approve → update notify
     const from = vi
       .fn()
-      .mockReturnValueOnce(makeBuilder(approvedRow))
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { status: 'draft' }, error: null }),
+      })
+      .mockReturnValueOnce({
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: approvedRow, error: null }),
+      })
       .mockReturnValueOnce(makeBuilder(notifiedRow))
 
     const db = { from } as unknown as DbClient
@@ -313,7 +357,7 @@ describe('approveAndNotifySalesStatement', () => {
       status: 'label_approved',
       label_approved_at: '2024-04-02T12:00:00Z',
     }
-    const db = makeMockDb(approvedRow)
+    const db = makeApproveDb({ status: 'draft' }, approvedRow)
     const notify = vi.fn().mockResolvedValue({ success: false, error: 'SMTP down' })
 
     const result = await approveAndNotifySalesStatement(db, 'stmt-uuid-1', notify)
@@ -351,7 +395,7 @@ describe('createCorrectionStatement', () => {
     ).rejects.toThrow('Cannot correct statement in status "draft"')
   })
 
-  it('creates a correction draft and supersedes the original', async () => {
+  it('creates a correction draft without superseding the original', async () => {
     const original: SalesStatementRow = {
       ...mockStatementRow,
       status: 'label_approved',
@@ -390,6 +434,7 @@ describe('createCorrectionStatement', () => {
     })
 
     const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    vi.mocked(appendLedgerEntry).mockClear()
     const result = await createCorrectionStatement(
       db,
       'stmt-uuid-1',
@@ -399,7 +444,8 @@ describe('createCorrectionStatement', () => {
 
     expect(result.id).toBe('stmt-correction')
     expect(result.amountEur).toBe(120)
-    expect(builder.update).toHaveBeenCalled()
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(appendLedgerEntry).not.toHaveBeenCalled()
   })
 })
 
@@ -430,24 +476,23 @@ function baseStatement(overrides: Partial<SalesStatement> = {}): SalesStatement 
 
 function makeLinkSettlementDb(originalSettlementPeriodId: string | null | 'skip-lookup') {
   const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
-  const updateBuilder = {
-    update: vi.fn().mockReturnValue({ eq: updateEq }),
-  }
   const selectSingle = vi.fn().mockResolvedValue({
-    data: { settlement_period_id: originalSettlementPeriodId },
+    data: {
+      amount_eur: 100,
+      settlement_period_id:
+        originalSettlementPeriodId === 'skip-lookup' ? null : originalSettlementPeriodId,
+      status: 'label_approved',
+    },
     error: null,
   })
-  const selectBuilder = {
-    select: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({ single: selectSingle }),
-    }),
-  }
-  let fromCalls = 0
+
   const db = {
-    from: vi.fn(() => {
-      fromCalls += 1
-      return fromCalls === 1 ? updateBuilder : selectBuilder
-    }),
+    from: vi.fn(() => ({
+      update: vi.fn().mockReturnValue({ eq: updateEq }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({ single: selectSingle }),
+      }),
+    })),
   } as unknown as DbClient
   return { db, updateEq, selectSingle }
 }
@@ -455,6 +500,7 @@ function makeLinkSettlementDb(originalSettlementPeriodId: string | null | 'skip-
 describe('linkApprovedStatementToSettlement', () => {
   it('books statement_payout for original documents', async () => {
     vi.mocked(appendLedgerEntry).mockClear()
+    vi.mocked(hasLedgerEntry).mockResolvedValue(false)
     const { db } = makeLinkSettlementDb('skip-lookup')
 
     await linkApprovedStatementToSettlement(db, baseStatement(), 'actor-1')
@@ -469,8 +515,19 @@ describe('linkApprovedStatementToSettlement', () => {
     )
   })
 
-  it('skips statement_payout when approving a correction on a settled original', async () => {
+  it('is idempotent when ledger entry already exists', async () => {
     vi.mocked(appendLedgerEntry).mockClear()
+    vi.mocked(hasLedgerEntry).mockResolvedValue(true)
+    const { db } = makeLinkSettlementDb('skip-lookup')
+
+    await linkApprovedStatementToSettlement(db, baseStatement(), 'actor-1')
+
+    expect(appendLedgerEntry).not.toHaveBeenCalled()
+  })
+
+  it('books correction delta when approving a correction on a settled original', async () => {
+    vi.mocked(appendLedgerEntry).mockClear()
+    vi.mocked(hasLedgerEntry).mockResolvedValue(false)
     const { db } = makeLinkSettlementDb('period-old')
 
     await linkApprovedStatementToSettlement(
@@ -484,11 +541,19 @@ describe('linkApprovedStatementToSettlement', () => {
       'actor-1',
     )
 
-    expect(appendLedgerEntry).not.toHaveBeenCalled()
+    expect(appendLedgerEntry).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        entryType: 'correction',
+        amountEur: 20,
+        referenceId: 'stmt-correction',
+      }),
+    )
   })
 
   it('books statement_payout for correction when original was never on the ledger', async () => {
     vi.mocked(appendLedgerEntry).mockClear()
+    vi.mocked(hasLedgerEntry).mockResolvedValue(false)
     const { db } = makeLinkSettlementDb(null)
 
     await linkApprovedStatementToSettlement(

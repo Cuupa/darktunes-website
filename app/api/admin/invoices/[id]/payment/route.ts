@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { getAdminInvoiceById, recordInvoicePayment } from '@/lib/api/artistInvoices'
 import { assertSettlementPeriodWritableById } from '@/lib/api/settlementPeriods'
-import { appendLedgerEntry } from '@/lib/api/settlementLedger'
+import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
 import {
   checkAndClaimIdempotencyKey,
@@ -24,7 +24,7 @@ const paymentSchema = z.object({
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyAdmin(token)
 
   const id = req.nextUrl.pathname.split('/').at(-2)
   if (!id) throw new ApiError(400, 'Missing invoice id')
@@ -70,18 +70,29 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       actorId: userId,
     })
 
-    const entryType = invoice.status === 'paid' ? 'payment' : 'partial_payment'
-    await appendLedgerEntry(supabase, {
-      artistId: invoice.artistId,
-      settlementPeriodId: invoice.settlementPeriodId ?? null,
-      entryType,
-      amountEur: -parsed.data.amountCents / 100,
-      currency: invoice.currency,
-      referenceType: 'artist_invoice',
-      referenceId: invoice.id,
-      description: `Payment ${parsed.data.paymentReference ?? invoice.invoiceNumber}`,
-      createdBy: userId,
-    })
+    // Statement-linked invoices already book invoice_liability (−amount) when created.
+    // A second payment ledger row would double-count and leave open balance negative.
+    // Free invoices without liability still post payment/partial_payment to the ledger.
+    const alreadyHasLiability = await hasLedgerEntry(
+      supabase,
+      'artist_invoice',
+      invoice.id,
+      'invoice_liability',
+    )
+    if (!alreadyHasLiability) {
+      const entryType = invoice.status === 'paid' ? 'payment' : 'partial_payment'
+      await appendLedgerEntry(supabase, {
+        artistId: invoice.artistId,
+        settlementPeriodId: invoice.settlementPeriodId ?? null,
+        entryType,
+        amountEur: -parsed.data.amountCents / 100,
+        currency: invoice.currency,
+        referenceType: 'artist_invoice',
+        referenceId: invoice.id,
+        description: `Payment ${parsed.data.paymentReference ?? invoice.invoiceNumber}`,
+        createdBy: userId,
+      })
+    }
 
     if (invoice.statementId && invoice.status === 'paid') {
       await updateSalesStatementStatus(supabase, invoice.statementId, 'paid')

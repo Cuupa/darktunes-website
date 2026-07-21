@@ -49,27 +49,27 @@ describe('settlementReconciliation', () => {
     expect(result.computedOpenBalanceEur).toBe(105.5)
   })
 
-  it('matches ledger sum to component snapshot', () => {
+  it('matches ledger sum to component snapshot (liability zeros payout; no payment double-book)', () => {
+    // Model: payout + liability cancel; cash remaining tracked on invoices, not payment ledger rows.
     const entries: LedgerEntry[] = [
       entry({ id: '1', entryType: 'carry_in', amountEur: 10 }),
       entry({ id: '2', entryType: 'statement_payout', amountEur: 100 }),
       entry({ id: '3', entryType: 'invoice_liability', amountEur: -100 }),
-      entry({ id: '4', entryType: 'payment', amountEur: -80 }),
-      entry({ id: '5', entryType: 'correction', amountEur: 5 }),
+      entry({ id: '4', entryType: 'correction', amountEur: 5 }),
     ]
 
     const snapshot = {
       statementPayoutEur: 100,
       invoiceLiabilityEur: -100,
-      paymentsEur: -80,
+      paymentsEur: 0,
       carryInEur: 10,
       carryOutEur: 0,
       correctionsEur: 5,
     }
 
-    expect(computeExpectedBalanceFromComponents(snapshot)).toBe(-65)
+    expect(computeExpectedBalanceFromComponents(snapshot)).toBe(15)
     const result = reconcileLedgerBalanceToComponents(entries, snapshot)
     expect(result.ok).toBe(true)
-    expect(result.ledgerBalanceEur).toBe(-65)
+    expect(result.ledgerBalanceEur).toBe(15)
   })
 })
