@@ -12,13 +12,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { syncSingleArtist } from '@/lib/sync/syncAll'
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
+import { revalidatePublicContent, RELEASE_SYNC_TAGS } from '@/lib/sync/revalidatePublicContent'
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const { serverEnv } = await import('@/lib/env.server')
@@ -67,9 +67,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     bandsintownApiKey: syncCredentials.bandsintownApiKey,
   })
 
-  revalidateTag('releases', 'max')
-  revalidateTag('artists', 'max')
-  revalidateTag('concerts', 'max')
+  revalidatePublicContent(RELEASE_SYNC_TAGS)
   return NextResponse.json(result)
 })
 

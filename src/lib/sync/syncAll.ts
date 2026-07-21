@@ -777,7 +777,8 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
  *   'spotify'  → only the Spotify block runs
  *   'discogs'  → only the Discogs block runs
  *   'full' / anything else → all configured APIs run
- *   'youtube'  → handled by a separate route; treated as 'full' here as a fallback
+ *   'youtube'  → NOT handled here (channel-level). Use POST /api/sync-youtube.
+ *                Legacy queue rows with job_type=youtube fall through to full.
  */
 export async function syncSingleArtist(
   artistId: string,

@@ -33,7 +33,13 @@ Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll
 
 **Scheduling (no Vercel Cron):** Supabase Cron → `supabase/functions/trigger-sync` → Next.js routes. Auth: `CRON_SECRET` Bearer. Typical schedules: `all` daily 03:00 UTC, `process-queue` every 5 min, `youtube` daily 06:00 UTC.
 
-**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube`, `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (50s budget). Odesli batches (`ODESLI_BATCH_SIZE`) reschedule on rate limit (15 min cooldown).
+**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube` (legacy; prefer channel route), `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (50s budget, `verifySyncTrigger`). Odesli batches (`ODESLI_BATCH_SIZE`) reschedule on rate limit (15 min cooldown).
+
+**YouTube videos** are **not** part of the artist queue. Channel sync: `POST /api/sync-youtube` (or `sync-api` with `apiSource: youtube`). Cron type `youtube` → that route.
+
+**Public cache after sync:** `revalidatePublicContent()` (`src/lib/sync/revalidatePublicContent.ts`) runs `revalidateTag` + `revalidatePath` for list routes (`/`, `/releases`, `/videos`, …). Queue executor revalidates once per batch end inside `waitUntil`. Admin hooks also call `POST /api/revalidate-content` after mutations and after queue drain.
+
+**Admin UX after full sync:** `useReleases.syncAllReleases` enqueues → kicks executor → polls `GET /api/sync/queue` (stats) for up to ~90s via `waitForSyncQueueIdle`, reloads the admin list, then busts public tags.
 
 **Release writes:** `syncReleaseFromExternalSource()` in `releases.ts` — cross-source merge before insert, plus same-source self-healing for exact `normTitle(title)` + year matches (for example Spotify `Cut` vs `Cut - Single`). `deduplicateReleases()` also performs an intra-Spotify dedup pass before DB writes so discogs metadata is preserved on the canonical entry. `upsertReleaseBySpotifyId` / `upsertReleaseByDiscogsId` require full UNIQUE constraints on `spotify_id` / `discogs_id` in `reset.sql`.
 

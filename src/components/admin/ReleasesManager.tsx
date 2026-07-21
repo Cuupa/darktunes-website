@@ -296,26 +296,33 @@ export function ReleasesManager() {
 
   const handleSync = async () => {
     try {
-      const result = await syncAllReleases()
-      if (!Array.isArray(result?.results)) {
-        toast.info(
-          'Sync jobs wurden eingereiht. Verarbeitung läuft im Hintergrund (alle 5 Minuten via Cron).',
+      const outcome = await syncAllReleases()
+      if (outcome.legacyResult && Array.isArray(outcome.legacyResult.results)) {
+        const totalSynced = outcome.legacyResult.results.reduce(
+          (sum, r) => sum + r.releasesUpserted + r.concertsUpserted,
+          0,
+        )
+        if (outcome.legacyResult.totalErrors === 0) {
+          toast.success(`Sync completed: ${totalSynced} item(s) updated across all APIs`)
+        } else {
+          setSyncResult(outcome.legacyResult)
+          toast.warning(
+            `Sync completed with ${outcome.legacyResult.totalErrors} error(s). ${totalSynced} item(s) synced. Click "View Errors" to see details.`,
+            { duration: 8000 },
+          )
+        }
+        return
+      }
+      if (outcome.drained) {
+        toast.success(
+          'Sync queue finished. Admin list reloaded and public cache revalidated.',
         )
         return
       }
-      const totalSynced = result.results.reduce(
-        (sum, r) => sum + r.releasesUpserted + r.concertsUpserted,
-        0,
+      toast.info(
+        `Sync still running in the background (${outcome.pending + outcome.running} job(s) left). List reloaded with current data; cron will finish the rest.`,
+        { duration: 8000 },
       )
-      if (result.totalErrors === 0) {
-        toast.success(`Sync completed: ${totalSynced} item(s) updated across all APIs`)
-      } else {
-        setSyncResult(result)
-        toast.warning(
-          `Sync completed with ${result.totalErrors} error(s). ${totalSynced} item(s) synced. Click "View Errors" to see details.`,
-          { duration: 8000 },
-        )
-      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     }

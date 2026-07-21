@@ -12,7 +12,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
@@ -21,6 +20,7 @@ import { fetchYouTubeChannelVideos, isYouTubeShort } from '@/lib/api/youtubeApi'
 import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { getYouTubeCredentials } from '@/lib/secrets/getExternalCredentials'
+import { revalidatePublicContent, VIDEO_SYNC_TAGS } from '@/lib/sync/revalidatePublicContent'
 
 // Route-segment config: allow up to 300 seconds on Vercel Pro (default is 10 s on Hobby).
 // Fetching all videos from a large channel can take longer than the default timeout.
@@ -122,7 +122,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     rate_limited: false,
   })
 
-  revalidateTag('videos', 'max')
+  revalidatePublicContent(VIDEO_SYNC_TAGS)
 
   await recordHealthHeartbeat(db, 'sync_youtube')
 

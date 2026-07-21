@@ -15,9 +15,12 @@ vi.mock('@/lib/api/videos', () => ({
   deleteVideo: vi.fn(),
 }))
 vi.mock('@/lib/editorActivityLogger', () => ({ logEditorActivity: vi.fn() }))
+vi.mock('@/lib/admin/revalidateContentCache', () => ({
+  revalidateContentCache: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('@/lib/supabase/client', () => ({
   createBrowserSupabaseClient: () => ({
-    auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) },
+    auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 't' } } }) },
   }),
 }))
 
