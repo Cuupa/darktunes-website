@@ -10,10 +10,21 @@
 ## Security
 - [ ] Verify unauthenticated users are blocked or redirected from protected routes (`/admin/*`, `/portal/*`, `/press/dashboard/*`, `/promo-pool/*`)
 - [ ] Validate protected API endpoints reject missing/invalid authentication
+- [ ] Confirm editor JWT cannot call finance APIs (`/api/admin/sales-statements/*`, `/api/admin/settlements/*`, `/api/admin/invoices/*`, `/api/admin/sos/*`) — expect 403
+- [ ] Confirm `GET /api/health?mode=full` without auth returns 401; admin System Health widget still loads with Bearer token
+- [ ] Confirm press-only news is absent from public `/news` and `/news/[slug]` but visible in press dashboard when published
+- [ ] Confirm theme custom CSS cannot inject `</style><script>` breakout (sanitized to empty)
 - [ ] Confirm `SUPABASE_SERVICE_ROLE_KEY` is never exposed in client HTML
-- [ ] Validate RLS is enabled for sensitive database tables
+- [ ] Validate RLS is enabled for sensitive database tables (apply `news_posts: public read` with `is_press_only = false` from `reset.sql`)
 - [ ] Review CSP and security headers in production deployment
 - [ ] Run vulnerability scan (`npm audit --production --audit-level=high`)
+
+## Settlements / invoices
+- [ ] Approve draft statement once → single `statement_payout`; second approve fails
+- [ ] Create correction → original still visible to artist; approve correction → original superseded, ledger delta only
+- [ ] Statement-linked invoice + full payment → open balance / carry-forward ~ 0 (no double negative)
+- [ ] Invoice with 19% USt: payment can record gross PDF total
+- [ ] Portal invoice against locked settlement period returns 422
 
 ## Corporate Identity
 - [ ] Validate only approved CI colors are hardcoded in components

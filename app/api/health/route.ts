@@ -8,7 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { withErrorHandler } from '@/lib/errors'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
+import { isValidCronSecret } from '@/lib/cronAuth'
+import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getCachedHealthSnapshot } from '@/lib/health/cachedHealthSnapshot'
 import { createHealthDbClient } from '@/lib/health/healthDbClient'
 import { buildHealthLivenessResponse } from '@/lib/health/healthLiveness'
@@ -28,6 +30,21 @@ function databaseHttpStatus(databaseStatus: string): number {
   return databaseStatus === 'offline' ? 503 : 200
 }
 
+async function assertFullHealthAuthorized(req: NextRequest): Promise<void> {
+  const authHeader = req.headers.get('authorization') ?? ''
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && isValidCronSecret(authHeader, cronSecret)) {
+    return
+  }
+
+  try {
+    const token = extractBearerToken(authHeader)
+    await verifyAdmin(token)
+  } catch {
+    throw new ApiError(401, 'Unauthorized')
+  }
+}
+
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const db = createHealthDbClient()
 
@@ -38,6 +55,8 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
       headers: { 'Cache-Control': 'no-store' },
     })
   }
+
+  await assertFullHealthAuthorized(req)
 
   const url = new URL(req.url)
   const fresh = url.searchParams.get('fresh') === '1'

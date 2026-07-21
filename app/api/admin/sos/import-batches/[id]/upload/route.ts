@@ -14,7 +14,7 @@ import { MAX_BRONZE_CSV_SERVER_BYTES } from '@/lib/sos/bronzeUploadLimits'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
 
-async function requireAdminOrEditor() {
+async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -22,7 +22,7 @@ async function requireAdminOrEditor() {
   } = await supabase.auth.getUser()
   if (error || !user) throw new ApiError(401, 'Unauthorized')
   const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin', 'editor'].includes(role)) throw new ApiError(403, 'Forbidden')
+  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
 }
 
 function extractBatchIdFromPath(pathname: string): string | null {
@@ -31,7 +31,7 @@ function extractBatchIdFromPath(pathname: string): string | null {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAdminOrEditor()
+  await requireAdmin()
   const id = extractBatchIdFromPath(new URL(req.url).pathname)
   if (!id) throw new ApiError(400, 'Invalid import batch upload path')
 

@@ -2925,12 +2925,14 @@ DROP POLICY IF EXISTS "news_posts: can_publish_news insert" ON public.news_posts
 DROP POLICY IF EXISTS "news_posts: can_edit_news update"    ON public.news_posts;
 
 -- Public: published/scheduled posts once publish time is reached (lazy publishing).
+-- Press-only posts are excluded from the anon path (journalists/staff still see all).
 -- Editors, journalists, and admins can read all posts (drafts, future scheduled, etc.).
 CREATE POLICY "news_posts: public read" ON public.news_posts
   FOR SELECT USING (
     (
       status IN ('published', 'scheduled')
       AND published_at <= NOW()
+      AND is_press_only = false
     )
     OR public.has_permission('can_edit_news')
     OR public.has_permission('can_publish_news')

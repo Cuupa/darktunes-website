@@ -2,8 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import DOMPurify from 'dompurify'
 import { toast } from 'sonner'
+import { sanitizeHtml } from '@/lib/sanitizeHtml'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { CaretDown, ChatCircleText, EnvelopeSimple } from '@phosphor-icons/react'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -29,11 +29,6 @@ interface ReplyDraft {
 }
 
 type MessageRow = Database['public']['Tables']['label_messages']['Row']
-
-function sanitizeHtml(html: string): string {
-  if (typeof window === 'undefined') return html
-  return DOMPurify.sanitize(html)
-}
 
 function rowToMessage(row: MessageRow): LabelMessage {
   return {

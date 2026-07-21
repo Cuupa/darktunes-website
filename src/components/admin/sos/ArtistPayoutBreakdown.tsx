@@ -1,6 +1,7 @@
 'use client'
 
 import type { ArtistRevenue } from '@/lib/sos/types'
+import { computeOtherDigitalRevenue } from '@/lib/sos/artistPayoutBreakdown'
 import {
   Sheet,
   SheetContent,
@@ -22,12 +23,11 @@ interface ArtistPayoutBreakdownProps {
 export function ArtistPayoutBreakdown({ revenue, open, onOpenChange }: ArtistPayoutBreakdownProps) {
   if (!revenue) return null
 
-  const digitalGross =
-    revenue.believeRevenue + revenue.bandcampRevenue + (revenue.totalRevenue - revenue.physicalReleasesRevenue - revenue.believeRevenue - revenue.bandcampRevenue - revenue.darkmerchRevenue)
+  const otherDigital = computeOtherDigitalRevenue(revenue)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" data-lenis-prevent>
         <SheetHeader>
           <SheetTitle>{revenue.artist}</SheetTitle>
           <SheetDescription>Aufschlüsselung: Umsatz → Gebühr → Split → Auszahlung</SheetDescription>
@@ -43,7 +43,7 @@ export function ArtistPayoutBreakdown({ revenue, open, onOpenChange }: ArtistPay
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Sonstiges Digital</dt>
-            <dd>{fmtEur(Math.max(0, digitalGross))}</dd>
+            <dd>{fmtEur(otherDigital)}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Physical Releases</dt>

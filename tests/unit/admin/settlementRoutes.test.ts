@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const verifyAdminOrEditorMock = vi.fn()
+const verifyAdminMock = vi.fn()
 const createServerSupabaseClientMock = vi.fn()
 const buildSettlementRegisterMock = vi.fn()
 const listSettlementPeriodsMock = vi.fn()
@@ -12,7 +12,7 @@ vi.mock('@/lib/adminAuth', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/adminAuth')>()
   return {
     ...actual,
-    verifyAdminOrEditor: verifyAdminOrEditorMock,
+    verifyAdmin: verifyAdminMock,
   }
 })
 
@@ -72,7 +72,7 @@ async function loadArchiveRoute() {
 
 describe('GET /api/admin/settlements/register', () => {
   beforeEach(() => {
-    verifyAdminOrEditorMock.mockResolvedValue('admin-user-1')
+    verifyAdminMock.mockResolvedValue('admin-user-1')
     createServerSupabaseClientMock.mockResolvedValue(MOCK_DB)
     buildSettlementRegisterMock.mockResolvedValue(SAMPLE_REGISTER)
   })
@@ -110,7 +110,7 @@ describe('GET /api/admin/settlements/register', () => {
 
 describe('GET /api/admin/settlements/periods', () => {
   beforeEach(() => {
-    verifyAdminOrEditorMock.mockResolvedValue('admin-user-1')
+    verifyAdminMock.mockResolvedValue('admin-user-1')
     createServerSupabaseClientMock.mockResolvedValue(MOCK_DB)
     listSettlementPeriodsMock.mockResolvedValue([{ id: 'period-1', status: 'open' }])
   })
@@ -135,7 +135,7 @@ describe('GET /api/admin/settlements/periods', () => {
 
 describe('POST /api/admin/settlements/periods/[id]/lock', () => {
   beforeEach(() => {
-    verifyAdminOrEditorMock.mockResolvedValue('admin-user-1')
+    verifyAdminMock.mockResolvedValue('admin-user-1')
     createServerSupabaseClientMock.mockResolvedValue(MOCK_DB)
     lockSettlementPeriodMock.mockResolvedValue({ id: 'period-1', status: 'locked' })
   })
@@ -163,7 +163,7 @@ describe('POST /api/admin/settlements/periods/[id]/lock', () => {
 
 describe('POST /api/admin/settlements/periods/[id]/archive', () => {
   beforeEach(() => {
-    verifyAdminOrEditorMock.mockResolvedValue('admin-user-1')
+    verifyAdminMock.mockResolvedValue('admin-user-1')
     createServerSupabaseClientMock.mockResolvedValue(MOCK_DB)
     archivePeriodWithCarryForwardMock.mockResolvedValue(undefined)
   })

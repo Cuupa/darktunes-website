@@ -11,7 +11,11 @@ import {
   updateInvoice,
 } from '@/lib/api/artistInvoices'
 import { appendLedgerEntry } from '@/lib/api/settlementLedger'
-import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
+import {
+  assertSettlementPeriodWritableById,
+  getOrCreateSettlementPeriod,
+  SettlementPeriodNotWritableError,
+} from '@/lib/api/settlementPeriods'
 import { getSalesStatementById, updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -143,6 +147,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       .eq('id', statement.id)
   }
 
+  if (settlementPeriodId) {
+    try {
+      await assertSettlementPeriodWritableById(supabase, settlementPeriodId)
+    } catch (err) {
+      if (err instanceof SettlementPeriodNotWritableError) {
+        throw new ApiError(422, err.message)
+      }
+      throw err
+    }
+  }
+
   const invoice = statement
     ? await createSosLinkedInvoice(supabase, {
         ...invoicePayload,
@@ -209,6 +224,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (statement && settlementPeriodId) {
+    // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
     const invoiceTotalEur = getLineItemSubtotal(input.line_items) / 100
     await appendLedgerEntry(supabase, {
       artistId: artist.id,

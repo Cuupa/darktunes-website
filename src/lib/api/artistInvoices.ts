@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { invoiceGrossCents } from '@/lib/api/settlementLedger'
 
 type DbClient = SupabaseClient<Database>
 type InvoiceRow = Database['public']['Tables']['artist_invoices']['Row']
@@ -328,10 +329,8 @@ export async function recordInvoicePayment(
     throw new Error(`Cannot record payment from status "${existing.status}"`)
   }
 
-  const totalCents = existing.lineItems.reduce(
-    (sum, item) => sum + item.qty * item.unit_price_cents,
-    0,
-  )
+  // Cap against gross total (net + VAT) so payments match PDF totals.
+  const totalCents = invoiceGrossCents(existing.lineItems, existing.taxRatePct)
   const newPaid = existing.paidAmountCents + input.amountCents
   if (newPaid > totalCents) throw new Error('Payment exceeds invoice total')
 

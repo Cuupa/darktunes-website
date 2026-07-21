@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
+import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
 import {
   deleteSalesStatementDraft,
@@ -13,7 +13,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
-  const userId = await verifyAdminOrEditor(token)
+  const userId = await verifyAdmin(token)
 
   const id = req.nextUrl.pathname.split('/').pop()
   if (!id) throw new ApiError(400, 'Missing statement id')

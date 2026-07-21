@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { appendLedgerEntry } from '@/lib/api/settlementLedger'
+import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
 import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
@@ -183,6 +183,18 @@ export async function approveSalesStatement(
   id: string,
   notes?: string,
 ): Promise<SalesStatement> {
+  const { data: existing, error: fetchError } = await db
+    .from('sales_statements')
+    .select('status')
+    .eq('id', id)
+    .single()
+
+  if (fetchError) throw new Error(fetchError.message)
+  if (!existing) throw new Error('Statement not found')
+  if (existing.status !== 'draft') {
+    throw new Error(`Cannot approve statement in status "${existing.status}"`)
+  }
+
   const { data: row, error } = await db
     .from('sales_statements')
     .update({
@@ -191,10 +203,12 @@ export async function approveSalesStatement(
       label_approved_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('status', 'draft')
     .select('*')
     .single()
 
   if (error) throw new Error(error.message)
+  if (!row) throw new Error('Cannot approve statement in status "draft" (concurrent update)')
   return rowToSalesStatement(row as SalesStatementRow)
 }
 
@@ -333,6 +347,11 @@ export async function linkApprovedStatementToSettlement(
 ): Promise<void> {
   if (statement.amountEur == null || !statement.periodStart || !statement.periodEnd) return
 
+  // Idempotent: re-approve / retry must not double-book.
+  if (await hasLedgerEntry(db, 'sales_statement', statement.id)) {
+    return
+  }
+
   const period = await getOrCreateSettlementPeriod(db, statement.periodStart, statement.periodEnd)
 
   await db
@@ -340,16 +359,47 @@ export async function linkApprovedStatementToSettlement(
     .update({ settlement_period_id: period.id })
     .eq('id', statement.id)
 
-  // Correction drafts already book the payout delta when created (if the original
-  // was on the settlement ledger). Approving must not add a second full payout.
+  // Correction approve: supersede original + book delta (not a full second payout).
   if (statement.documentType === 'correction' && statement.correctionOfId) {
     const { data: original, error } = await db
       .from('sales_statements')
-      .select('settlement_period_id')
+      .select('amount_eur, settlement_period_id, status')
       .eq('id', statement.correctionOfId)
       .single()
 
-    if (!error && original?.settlement_period_id) {
+    if (error) throw new Error(error.message)
+
+    if (original && original.status !== 'superseded') {
+      const { error: supersedeError } = await db
+        .from('sales_statements')
+        .update({
+          status: 'superseded',
+          superseded_by_id: statement.id,
+        })
+        .eq('id', statement.correctionOfId)
+
+      if (supersedeError) throw new Error(supersedeError.message)
+    }
+
+    const originalOnLedger =
+      original?.settlement_period_id != null ||
+      (await hasLedgerEntry(db, 'sales_statement', statement.correctionOfId))
+
+    if (originalOnLedger) {
+      const originalAmount = Number(original?.amount_eur ?? 0)
+      const delta = statement.amountEur - originalAmount
+      if (Math.abs(delta) >= 0.005) {
+        await appendLedgerEntry(db, {
+          artistId: statement.artistId,
+          settlementPeriodId: period.id,
+          entryType: 'correction',
+          amountEur: delta,
+          referenceType: 'sales_statement',
+          referenceId: statement.id,
+          description: `Statement correction ${statement.period}`,
+          createdBy: actorId,
+        })
+      }
       return
     }
   }
@@ -432,31 +482,9 @@ export async function createCorrectionStatement(
 
   if (insertError) throw new Error(insertError.message)
 
-  const { error: supersedeError } = await db
-    .from('sales_statements')
-    .update({
-      status: 'superseded',
-      superseded_by_id: correctionRow.id,
-    })
-    .eq('id', originalId)
-
-  if (supersedeError) throw new Error(supersedeError.message)
-
-  if (originalRow.settlement_period_id) {
-    const delta = input.amountEur - Number(originalRow.amount_eur ?? 0)
-    if (Math.abs(delta) >= 0.005) {
-      await appendLedgerEntry(db, {
-        artistId: originalRow.artist_id,
-        settlementPeriodId: originalRow.settlement_period_id,
-        entryType: 'correction',
-        amountEur: delta,
-        referenceType: 'sales_statement',
-        referenceId: correctionRow.id,
-        description: `Statement correction ${originalRow.period}`,
-        createdBy: actorId,
-      })
-    }
-  }
+  // Original stays visible until the correction is approved (see linkApprovedStatementToSettlement).
+  // actorId reserved for approve-time ledger attribution.
+  void actorId
 
   return rowToSalesStatement(correctionRow as SalesStatementRow)
 }
