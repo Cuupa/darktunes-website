@@ -1,35 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import {
   claimNextSyncJob,
   markSyncJobDone,
   markSyncJobFailed,
   rescheduleSyncJob,
+  type SyncJobType,
 } from '@/lib/api/syncQueue'
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
 import { syncOdesliBatch, syncSingleArtist } from '@/lib/sync/syncAll'
 import { RATE_LIMIT_JOB_COOLDOWN_MS, isRateLimitedSyncError } from '@/lib/sync/retryPolicy'
-import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
+import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
+import {
+  revalidatePublicContent,
+  RELEASE_SYNC_TAGS,
+  type PublicContentTag,
+} from '@/lib/sync/revalidatePublicContent'
 
 const TIME_BUDGET_MS = 50_000
 
 export const maxDuration = 60
 
+function tagsForJobType(jobType: SyncJobType): PublicContentTag[] {
+  // YouTube channel sync is a separate route; artist-scoped "youtube" jobs fall
+  // through to full artist sync (releases/concerts) as a legacy fallback.
+  if (jobType === 'odesli') return ['releases', 'artists']
+  return [...RELEASE_SYNC_TAGS]
+}
+
 async function processSyncJob(
   db: ReturnType<typeof createClient<Database>>,
-  job: Awaited<ReturnType<typeof claimNextSyncJob>>,
+  job: NonNullable<Awaited<ReturnType<typeof claimNextSyncJob>>>,
   uploadFn: ReturnType<typeof createSyncUploadFn>,
   syncCredentials: Awaited<ReturnType<typeof getSyncCredentials>>,
-): Promise<void> {
-  if (!job) return
-
+): Promise<PublicContentTag[]> {
   const deps = {
     db,
     fetch: globalThis.fetch,
@@ -59,14 +69,12 @@ async function processSyncJob(
       await markSyncJobDone(db, job.id)
     }
 
-    revalidateTag('releases', 'max')
-    revalidateTag('artists', 'max')
-    return
+    return tagsForJobType('odesli')
   }
 
   if (!job.artistId) {
     await markSyncJobFailed(db, job.id, 'Job has no artist_id', job.attemptCount)
-    return
+    return []
   }
 
   const result = await syncSingleArtist(job.artistId, job.jobType, deps)
@@ -81,9 +89,7 @@ async function processSyncJob(
     await markSyncJobDone(db, job.id)
   }
 
-  revalidateTag('releases', 'max')
-  revalidateTag('artists', 'max')
-  revalidateTag('concerts', 'max')
+  return tagsForJobType(job.jobType)
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
@@ -97,7 +103,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   if (!isCronAuthorized) {
     const token = extractBearerToken(authHeader)
-    await verifyAdmin(token)
+    await verifySyncTrigger(token)
   }
 
   const db = createClient<Database>(
@@ -118,22 +124,38 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
 
-  waitUntil((async () => {
-    const startTime = Date.now()
-    while (Date.now() - startTime < TIME_BUDGET_MS || force === '1') {
-      const job = await claimNextSyncJob(db)
-      if (!job) break
+  waitUntil(
+    (async () => {
+      const startTime = Date.now()
+      const tagsToRevalidate = new Set<PublicContentTag>()
+      let jobsProcessed = 0
 
-      try {
-        await processSyncJob(db, job, uploadFn, syncCredentials)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        await markSyncJobFailed(db, job.id, message, job.attemptCount, {
-          rateLimited: isRateLimitedSyncError(err),
-        })
+      while (Date.now() - startTime < TIME_BUDGET_MS || force === '1') {
+        const job = await claimNextSyncJob(db)
+        if (!job) break
+
+        try {
+          const tags = await processSyncJob(db, job, uploadFn, syncCredentials)
+          for (const tag of tags) tagsToRevalidate.add(tag)
+          jobsProcessed += 1
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          await markSyncJobFailed(db, job.id, message, job.attemptCount, {
+            rateLimited: isRateLimitedSyncError(err),
+          })
+          // Still bust caches — partial writes may have landed before the throw.
+          for (const tag of tagsForJobType(job.jobType)) tagsToRevalidate.add(tag)
+          jobsProcessed += 1
+        }
       }
-    }
-  })())
+
+      // Single end-of-batch revalidation is more reliable inside waitUntil than
+      // revalidateTag calls scattered mid-loop (and covers path-level ISR).
+      if (jobsProcessed > 0 && tagsToRevalidate.size > 0) {
+        revalidatePublicContent([...tagsToRevalidate])
+      }
+    })(),
+  )
 
   return NextResponse.json({ accepted: true })
 })

@@ -111,6 +111,16 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-07-21 — Sync queue accepted ≠ public/admin UI updated
+
+**Enqueue success is not data freshness:** `POST /api/sync` returns `{ accepted: true }` immediately via `waitUntil`. Admin hooks that `load()` in `finally` right after that response show the **pre-sync** DB snapshot. Poll queue stats (`GET /api/sync/queue`) and re-kick the executor until idle (or timeout), then reload + revalidate.
+
+**Videos are not on the artist queue:** Full/Spotify/Discogs/Odesli jobs never write `videos`. Channel sync is only `/api/sync-youtube` (or `sync-api` youtube). Do not expect release sync to refresh the videos page.
+
+**Public reads are Data Cache + ISR, not live Supabase:** `getCachedPublic*` uses `unstable_cache` (tags, up to 1h TTL). `revalidateTag` alone can leave list routes stale; pair with `revalidatePath` for `/`, `/releases`, `/videos`, etc. (`revalidatePublicContent`). Admin mutations must also call `/api/revalidate-content` (videos CRUD was missing this).
+
+**Do not alias GET to POST on queue routes:** `GET = POST` on `/api/sync/queue` made "read stats" enqueue jobs. Separate GET (stats) from POST (enqueue).
+
 ### 2026-06-25 — Settlements guided workflow + doc debloat
 
 **Guided wizard must be controlled, not self-contained:** `AccountingGuidedWizard` needs `activeStep` / `onActiveStepChange` from `AccountingPanel`. A Review-step CTA that called `setViewMode('guided')` without setting step to `settle` left operators on the wrong screen. Scroll targets (`#accounting-guided-settle-panel`) need explicit step state.

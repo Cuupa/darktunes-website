@@ -3,6 +3,7 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as videosApi from '@/lib/api/videos'
 import { logEditorActivity } from '@/lib/editorActivityLogger'
+import { revalidateContentCache } from '@/lib/admin/revalidateContentCache'
 import type { Video } from '@/types'
 import type { Database } from '@/types/database'
 
@@ -33,6 +34,18 @@ export function useVideos() {
     }
   }, [supabase])
 
+  const bustPublicVideos = useCallback(async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await revalidateContentCache(session.access_token, ['videos'])
+    } catch {
+      // non-critical
+    }
+  }, [supabase])
+
   const createVideo = async (data: VideoInsert): Promise<void> => {
     const created = await videosApi.createVideo(supabase, data)
     await logEditorActivity(supabase, {
@@ -43,6 +56,7 @@ export function useVideos() {
       changes: data,
     })
     await load()
+    void bustPublicVideos()
   }
 
   const updateVideo = async (id: string, data: VideoUpdate): Promise<void> => {
@@ -70,6 +84,7 @@ export function useVideos() {
         entityName: updated.title,
         changes: data,
       })
+      void bustPublicVideos()
     } catch (err) {
       // Rollback on error
       await load()
@@ -87,6 +102,7 @@ export function useVideos() {
       entityName: target?.title,
     })
     await load()
+    void bustPublicVideos()
   }
 
   const syncYouTube = async (): Promise<{ synced: number }> => {
@@ -107,6 +123,8 @@ export function useVideos() {
     }
     const result = (await res.json()) as { synced: number; message?: string }
     await load()
+    // Route already revalidates; belt-and-suspenders from the admin session.
+    await revalidateContentCache(session.access_token, ['videos'])
     return { synced: result.synced ?? 0 }
   }
 

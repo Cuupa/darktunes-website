@@ -336,9 +336,16 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         )
       } else if (api === 'spotify' || api === 'odesli') {
         const queued = data.queued as number | undefined
+        // Kick the queue executor immediately so jobs do not wait for the 5-minute cron.
+        if (typeof queued === 'number' && queued > 0) {
+          void fetch('/api/sync', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${bearerToken}` },
+          })
+        }
         toast.success(
           typeof queued === 'number' && queued > 0
-            ? `${getApiMeta(api).label} sync queued (${queued} job${queued === 1 ? '' : 's'}).`
+            ? `${getApiMeta(api).label} sync queued (${queued} job${queued === 1 ? '' : 's'}) — executor started; public cache refreshes as jobs finish.`
             : (typeof data.message === 'string'
                 ? data.message
                 : `${getApiMeta(api).label} sync already queued.`),

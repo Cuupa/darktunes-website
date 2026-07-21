@@ -17,7 +17,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { revalidateTag } from 'next/cache'
 import type { Database } from '@/types/database'
 import { withErrorHandler, ApiError, buildApiError } from '@/lib/errors'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
@@ -30,6 +29,11 @@ import {
   getSyncCredentials,
   getYouTubeCredentials,
 } from '@/lib/secrets/getExternalCredentials'
+import {
+  revalidatePublicContent,
+  RELEASE_SYNC_TAGS,
+  VIDEO_SYNC_TAGS,
+} from '@/lib/sync/revalidatePublicContent'
 
 // Odesli resolves every release — allow long runs on Vercel Pro.
 export const maxDuration = 300
@@ -127,7 +131,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       rate_limited: false,
     })
 
-    revalidateTag('videos', 'max')
+    revalidatePublicContent(VIDEO_SYNC_TAGS)
     return NextResponse.json({ synced: videos.length })
   }
 
@@ -210,8 +214,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     onlyApi: apiSource,
   })
 
-  revalidateTag('releases', 'max')
-  revalidateTag('artists', 'max')
-  revalidateTag('concerts', 'max')
+  revalidatePublicContent(RELEASE_SYNC_TAGS)
   return NextResponse.json(result)
 })

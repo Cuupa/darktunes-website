@@ -3,12 +3,23 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/env'
 import * as releasesApi from '@/lib/api/releases'
 import { logEditorActivity } from '@/lib/editorActivityLogger'
+import { revalidateContentCache } from '@/lib/admin/revalidateContentCache'
+import { waitForSyncQueueIdle } from '@/lib/sync/waitForSyncQueue'
 import type { Release } from '@/types'
 import type { Database } from '@/types/database'
 import type { SyncAllResult } from '@/lib/sync/syncAll'
 
 type ReleaseInsert = Database['public']['Tables']['releases']['Insert']
 type ReleaseUpdate = Database['public']['Tables']['releases']['Update']
+
+export type ReleaseSyncOutcome = {
+  /** True when the queue had no pending/running jobs when polling finished. */
+  drained: boolean
+  pending: number
+  running: number
+  /** Legacy direct-result payload when the executor still returns inline results. */
+  legacyResult: SyncAllResult | null
+}
 
 export function useReleases() {
   const [releases, setReleases] = useState<Release[]>([])
@@ -36,6 +47,18 @@ export function useReleases() {
     }
   }, [supabase])
 
+  const bustPublicCache = useCallback(async (tags: string[]) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await revalidateContentCache(session.access_token, tags)
+    } catch {
+      // non-critical
+    }
+  }, [supabase])
+
   const createRelease = async (data: ReleaseInsert): Promise<void> => {
     const created = await releasesApi.createRelease(supabase, data)
     await logEditorActivity(supabase, {
@@ -46,7 +69,7 @@ export function useReleases() {
       changes: data,
     })
     await load()
-    void revalidateContentCache(['releases'])
+    void bustPublicCache(['releases'])
   }
 
   const updateRelease = async (id: string, data: ReleaseUpdate): Promise<void> => {
@@ -59,7 +82,7 @@ export function useReleases() {
       changes: data,
     })
     await load()
-    void revalidateContentCache(['releases'])
+    void bustPublicCache(['releases'])
   }
 
   const deleteRelease = async (id: string): Promise<void> => {
@@ -72,11 +95,17 @@ export function useReleases() {
       entityName: target?.title,
     })
     await load()
-    void revalidateContentCache(['releases'])
+    void bustPublicCache(['releases'])
   }
 
-  const syncAllReleases = async (): Promise<SyncAllResult | null> => {
-    if (!isSupabaseConfigured) return null
+  /**
+   * Enqueue full artist sync jobs, kick the executor, poll until the queue is
+   * idle (or timeout), reload admin list, and bust the public content cache.
+   */
+  const syncAllReleases = async (): Promise<ReleaseSyncOutcome> => {
+    if (!isSupabaseConfigured) {
+      return { drained: true, pending: 0, running: 0, legacyResult: null }
+    }
     setIsSyncing(true)
     setSyncProgress(0)
     try {
@@ -84,11 +113,12 @@ export function useReleases() {
         data: { session },
       } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
+      const token = session.access_token
 
       const resQueue = await fetch('/api/sync/queue', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
       const queueText = await resQueue.text()
@@ -96,10 +126,11 @@ export function useReleases() {
         throw new Error(`Queue failed: ${queueText.slice(0, 200) || resQueue.status}`)
       }
 
+      // Initial executor kick (also done inside waitForSyncQueueIdle).
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
 
@@ -107,43 +138,45 @@ export function useReleases() {
       if (!res.ok) {
         throw new Error(`Sync failed: ${syncText.slice(0, 200) || res.status}`)
       }
-      let raw: Record<string, unknown> = {}
+
+      let legacyResult: SyncAllResult | null = null
       if (syncText.trim()) {
         try {
-          raw = JSON.parse(syncText) as Record<string, unknown>
+          const raw = JSON.parse(syncText) as Record<string, unknown>
+          // Async queue executor: { accepted: true }
+          if (!('accepted' in raw) && Array.isArray(raw.results)) {
+            legacyResult = raw as unknown as SyncAllResult
+          }
         } catch {
-          return null
+          // ignore parse errors
         }
       }
-      // Async queue executor: { accepted: true } — results arrive via background jobs.
-      if ('accepted' in raw || 'queued' in raw) return null
-      // Legacy direct-result format: { results, totalErrors, … }
-      if (!Array.isArray(raw.results)) return null
-      return raw as unknown as SyncAllResult
+
+      const waitResult = await waitForSyncQueueIdle({
+        accessToken: token,
+        timeoutMs: 90_000,
+        pollIntervalMs: 3_000,
+        onProgress: (active, stats) => {
+          const total = active + stats.done
+          if (total > 0) {
+            setSyncProgress(Math.min(99, Math.round((stats.done / total) * 100)))
+          }
+        },
+      })
+
+      setSyncProgress(100)
+      await load()
+      await revalidateContentCache(token, ['releases', 'artists', 'concerts'])
+
+      return {
+        drained: waitResult.drained,
+        pending: waitResult.stats.pending,
+        running: waitResult.stats.running,
+        legacyResult,
+      }
     } finally {
       setIsSyncing(false)
       setSyncProgress(0)
-      await load()
-    }
-  }
-
-  // Fire-and-forget ISR cache revalidation after mutations
-  const revalidateContentCache = async (tags: string[]): Promise<void> => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) return
-      void fetch('/api/revalidate-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ tags }),
-      })
-    } catch {
-      // Ignore revalidation errors — they are non-critical
     }
   }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Sync → frontend stale data**: queue executor now revalidates public tags **and** list paths (`revalidatePublicContent`) at batch end; YouTube/sync-api/artist routes share the same helper. Admin full release sync polls the queue (up to ~90s), reloads the list, and busts public cache instead of reloading immediately after `{ accepted: true }`. Video CRUD/sync also revalidates the `videos` tag. `GET /api/sync/queue` returns queue stats (no longer aliases POST enqueue). `/api/sync` accepts `verifySyncTrigger` (admin/editor), matching the queue route.
 - **Settlements — ledger double-booking**: statement-linked invoice payments no longer post a second negative ledger row when `invoice_liability` already exists; open balance returns to zero after full pay.
 - **Settlements — approve idempotency**: single statement approve only accepts `draft`; re-approve / retry cannot double-book `statement_payout`.
 - **Settlements — correction workflow**: creating a correction no longer supersedes the original or books ledger delta; supersede + delta happen on correction approve so artists keep seeing the live statement.
