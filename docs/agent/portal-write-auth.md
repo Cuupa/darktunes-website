@@ -81,16 +81,19 @@ Run against **production** (Supabase SQL editor or CI with service role read of 
 
 If Phase 1 fails → **apply** the relevant policy DDL from `reset.sql` (or a dedicated policy-only SQL file derived from it) to production, re-run verify. Do not flip app code first.
 
-### Phase 2 — Dual-path canary (optional but recommended)
+### Phase 2 — Dual-path canary (implemented)
 
-Add a temporary env flag, e.g. `PORTAL_WRITES_USE_USER_JWT=1` (default off):
+Env flag: `PORTAL_WRITES_USE_USER_JWT=1` (default **off** = service-role only).
+
+Helper: `src/lib/portal/portalWriteClient.ts` → `portalWriteWithCanary()`.
 
 1. Membership check (unchanged).
-2. Attempt write with **bearer** client.
-3. On RLS / permission failure: log structured error (`table`, `code`, `artist_id`, `user_id`), fall back to service role once, metric/increment “portal_rls_fallback”.
+2. If flag off → write with service role (current prod default).
+3. If flag on → try **user JWT**; on RLS/permission failure log `portal_rls_fallback` via `app_logs` and fall back once to service role.
 4. When fallback rate is ~0 for N days across primary + band-member accounts → Phase 3.
 
-Centralize this in one helper (see below) so routes do not fork logic ad hoc.
+**Wired routes (canary):** profile PUT, billing POST, EPK document PUT, fan-page document PUT, onboarding save/complete/skip (epks + artists).  
+**Always service-role:** gallery→press sync, welcome `label_messages`, editor notifications.
 
 ### Phase 3 — Flip default to user JWT
 
@@ -120,14 +123,9 @@ Regardless of JWT vs service role:
 4. **Errors:** map DB failures to `SERVER_ERROR` / `FORBIDDEN` without leaking internals; log server-side with table + Postgres code.
 5. **IoC:** pass `SupabaseClient` into DAL; routes choose client.
 
-## Suggested helper (Phase 2)
+## Helper
 
-```ts
-// src/lib/portal/portalWriteClient.ts (to add when implementing canary)
-// after membership:
-//   if (useUserJwt) try write(bearer); catch rls → log + write(service)
-//   else write(service)
-```
+`portalWriteWithCanary({ userDb, serviceDb, context, write })` in `src/lib/portal/portalWriteClient.ts`.
 
 Do not invent a second auth system — reuse `authenticatePortalBearer` + `resolvePortalArtist`.
 
@@ -150,8 +148,8 @@ This repo’s SSOT is **`supabase/reset.sql`** (no `supabase/migrations/`). Appl
 
 | Phase | Status |
 |-------|--------|
-| 0 Keep service-role fix shipped | Done in portal service-role PR |
+| 0 Keep service-role fix shipped | Done |
 | 1 Prod RLS verify | **Todo** — run `scripts/verify-portal-rls.sql` |
-| 2 Dual-path canary | Todo |
+| 2 Dual-path canary | **Done** (flag off by default; enable in staging/prod when ready) |
 | 3 Flip to user JWT by group | Todo |
 | 4 Remove fallback + harden artists columns | Todo |

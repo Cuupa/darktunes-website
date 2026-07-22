@@ -4,6 +4,7 @@ import { getBillingProfile, isBillingProfileComplete, upsertBillingProfile } fro
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const upsertBillingProfileSchema = z.object({
@@ -50,18 +51,30 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!artist) throw new ApiError(403, 'Forbidden')
 
   const serviceDb = await createServiceRoleSupabaseClient()
-  const profile = await upsertBillingProfile(serviceDb, artist.id, {
-    legalName: parsed.data.legal_name,
-    street: parsed.data.street,
-    postalCode: parsed.data.postal_code,
-    city: parsed.data.city,
-    country: parsed.data.country,
-    taxNumber: parsed.data.tax_number,
-    vatId: parsed.data.vat_id,
-    isSmallBusiness: parsed.data.is_small_business,
-    iban: parsed.data.iban,
-    bic: parsed.data.bic,
-    paypalEmail: parsed.data.paypal_email || undefined,
+  const { value: profile } = await portalWriteWithCanary({
+    userDb: supabase,
+    serviceDb,
+    context: {
+      route: 'POST /api/portal/billing-profile',
+      table: 'artist_billing_profiles',
+      operation: 'upsert',
+      artistId: artist.id,
+      userId: user.id,
+    },
+    write: (db) =>
+      upsertBillingProfile(db, artist.id, {
+        legalName: parsed.data.legal_name,
+        street: parsed.data.street,
+        postalCode: parsed.data.postal_code,
+        city: parsed.data.city,
+        country: parsed.data.country,
+        taxNumber: parsed.data.tax_number,
+        vatId: parsed.data.vat_id,
+        isSmallBusiness: parsed.data.is_small_business,
+        iban: parsed.data.iban,
+        bic: parsed.data.bic,
+        paypalEmail: parsed.data.paypal_email || undefined,
+      }),
   })
 
   return NextResponse.json({

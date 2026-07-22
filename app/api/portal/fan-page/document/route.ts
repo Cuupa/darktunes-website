@@ -16,6 +16,7 @@ import {
 } from '@/lib/api/artistProfiles'
 import { getFanPageDocumentState, saveFanPageDocument } from '@/lib/api/fanPageDocument'
 import { landingPageDocumentV1Schema } from '@/lib/fan-page/schema/documentV1'
+import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
 
 const putBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -53,7 +54,18 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const serviceDb = await createServiceRoleSupabaseClient()
-  const state = await saveFanPageDocument(serviceDb, artist.id, body.document)
+  const { value: state } = await portalWriteWithCanary({
+    userDb: supabase,
+    serviceDb,
+    context: {
+      route: 'PUT /api/portal/fan-page/document',
+      table: 'artist_landing_pages',
+      operation: 'upsert',
+      artistId: artist.id,
+      userId: user.id,
+    },
+    write: (db) => saveFanPageDocument(db, artist.id, body.document),
+  })
 
   return NextResponse.json(state)
 })

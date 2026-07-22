@@ -18,6 +18,7 @@ import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { syncPortalGalleryToPressKit } from '@/lib/api/portalGalleryPress'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
 import { z } from 'zod'
 import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
@@ -183,19 +184,30 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
   }
 
-  // Membership is already verified; use service-role for writes so portal
-  // members are not blocked by production RLS that only allowed artists.user_id.
+  // Membership verified. Default: service-role. With PORTAL_WRITES_USE_USER_JWT=1,
+  // try user JWT first and fall back on RLS (see portal-write-auth.md Phase 2).
   const serviceDb = await createServiceRoleSupabaseClient()
+  const writeCtxBase = {
+    route: 'PUT /api/portal/profile',
+    artistId: artist.id,
+    userId: user.id,
+  } as const
 
   let profile
   try {
-    profile = await upsertArtistProfile(serviceDb, profileData)
+    const epkResult = await portalWriteWithCanary({
+      userDb: supabase,
+      serviceDb,
+      context: { ...writeCtxBase, table: 'artist_epks', operation: 'upsert' },
+      write: (db) => upsertArtistProfile(db, profileData),
+    })
+    profile = epkResult.value
   } catch (upsertErr) {
     console.error('[portal/profile] artist_epks upsert failed:', upsertErr)
     throw buildApiError('SERVER_ERROR', 500)
   }
 
-  // Press-kit sync is best-effort — profile data must save even when asset sync fails.
+  // Press-kit sync is best-effort and always service-role (assets RLS).
   if (epk_gallery_photos !== undefined) {
     try {
       await syncPortalGalleryToPressKit(
@@ -226,13 +238,21 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
   if (image_url !== undefined) artistUpdate.image_url = normalizeUrl(image_url)
 
-  const { error: artistUpdateError } = await serviceDb
-    .from('artists')
-    .update(artistUpdate)
-    .eq('id', artist.id)
-
-  if (artistUpdateError) {
-    console.error('[portal/profile] artists update failed:', artistUpdateError)
+  try {
+    await portalWriteWithCanary({
+      userDb: supabase,
+      serviceDb,
+      context: { ...writeCtxBase, table: 'artists', operation: 'update' },
+      write: async (db) => {
+        const { error: artistUpdateError } = await db
+          .from('artists')
+          .update(artistUpdate)
+          .eq('id', artist.id)
+        if (artistUpdateError) throw new Error(artistUpdateError.message)
+      },
+    })
+  } catch (artistErr) {
+    console.error('[portal/profile] artists update failed:', artistErr)
     throw buildApiError('SERVER_ERROR', 500)
   }
 
