@@ -33,6 +33,7 @@ import { isRateLimitedSyncError, withApiRetry } from './retryPolicy'
 import { syncArtist } from './syncArtist'
 import type { SyncDeps } from './syncArtist'
 
+/** Releases (or artists) resolved per Odesli queue job invocation. */
 export const ODESLI_BATCH_SIZE = 40
 
 // ---------------------------------------------------------------------------
@@ -654,97 +655,108 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
   // 7. Odesli platform links for artists — uses each artist's latest
   // resolvable release URL as proxy (artist profile URLs are not supported).
+  // Batched like releases so free-tier rate limits do not thrash a single job.
   // Results are merged into the existing odesliResult (same api_source).
   if (!onlyApi || onlyApi === 'odesli') {
-    // Find the existing odesliResult from step 6, or create a fresh one when
-    // the caller used onlyApi='odesli' (step 6 already ran and pushed it).
     const existingOdesli = results.find((r) => r.api === 'odesli')
 
     if (!existingOdesli?.rateLimited) {
-    try {
-      // Odesli cannot resolve artist profile URLs — use each artist's latest release as proxy.
-      let releaseProxyQuery = db
-        .from('releases')
-        .select('artist_id, spotify_url, apple_music_url, release_date')
-        .or('spotify_url.not.is.null,apple_music_url.not.is.null')
-        .order('release_date', { ascending: false })
+      try {
+        // Odesli cannot resolve artist profile URLs — use each artist's latest release as proxy.
+        let releaseProxyQuery = db
+          .from('releases')
+          .select('artist_id, spotify_url, apple_music_url, release_date')
+          .or('spotify_url.not.is.null,apple_music_url.not.is.null')
+          .order('release_date', { ascending: false })
 
-      if (onlyArtistId) {
-        releaseProxyQuery = releaseProxyQuery.eq('artist_id', onlyArtistId)
-      }
+        if (onlyArtistId) {
+          releaseProxyQuery = releaseProxyQuery.eq('artist_id', onlyArtistId)
+        }
 
-      const { data: proxyReleaseRows, error: proxyErr } = await releaseProxyQuery
+        const { data: proxyReleaseRows, error: proxyErr } = await releaseProxyQuery
 
-      if (proxyErr) {
-        existingOdesli?.errors.push(`Odesli release proxy query failed: ${proxyErr.message}`)
-      }
+        if (proxyErr) {
+          existingOdesli?.errors.push(`Odesli release proxy query failed: ${proxyErr.message}`)
+        }
 
-      const releaseProxyByArtist = new Map<string, string>()
-      for (const row of proxyReleaseRows ?? []) {
-        if (!row.artist_id || releaseProxyByArtist.has(row.artist_id)) continue
-        const proxyUrl = pickOdesliMusicUrl(row.spotify_url, row.apple_music_url)
-        if (proxyUrl) releaseProxyByArtist.set(row.artist_id, proxyUrl)
-      }
+        const releaseProxyByArtist = new Map<string, string>()
+        for (const row of proxyReleaseRows ?? []) {
+          if (!row.artist_id || releaseProxyByArtist.has(row.artist_id)) continue
+          const proxyUrl = pickOdesliMusicUrl(row.spotify_url, row.apple_music_url)
+          if (proxyUrl) releaseProxyByArtist.set(row.artist_id, proxyUrl)
+        }
 
-      const proxyArtistIds = [...releaseProxyByArtist.keys()]
-      if (proxyArtistIds.length > 0) {
-      let artistsQuery = db
-        .from('artists')
-        .select('id')
-        .is('platform_links', null)
-        .in('id', proxyArtistIds)
+        const proxyArtistIds = [...releaseProxyByArtist.keys()]
+        if (proxyArtistIds.length > 0) {
+          let artistsQuery = db
+            .from('artists')
+            .select('id')
+            .is('platform_links', null)
+            .in('id', proxyArtistIds)
+            .order('id', { ascending: true })
+            .limit(odesliBatchLimit)
 
-      if (onlyArtistId) {
-        artistsQuery = artistsQuery.eq('id', onlyArtistId)
-      }
+          if (onlyArtistId) {
+            artistsQuery = artistsQuery.eq('id', onlyArtistId)
+          }
 
-      const { data: artistsWithoutPlatformLinks, error: batchErr } = await artistsQuery
+          const { data: artistsWithoutPlatformLinks, error: batchErr } = await artistsQuery
 
-      if (batchErr) {
-        existingOdesli?.errors.push(`Odesli artist batch query failed: ${batchErr.message}`)
-      }
+          if (batchErr) {
+            existingOdesli?.errors.push(`Odesli artist batch query failed: ${batchErr.message}`)
+          }
 
-      for (const artist of artistsWithoutPlatformLinks ?? []) {
-        const musicUrl = releaseProxyByArtist.get(artist.id)
-        if (!musicUrl) continue
+          const artistBatch = artistsWithoutPlatformLinks ?? []
 
-        if (existingOdesli) existingOdesli.artistsProcessed++
+          for (const artist of artistBatch) {
+            const musicUrl = releaseProxyByArtist.get(artist.id)
+            if (!musicUrl) continue
 
-        try {
-          const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
+            if (existingOdesli) existingOdesli.artistsProcessed++
 
-          if (Object.keys(odesli.platforms).length > 0) {
-            const { error: updateErr } = await db
-              .from('artists')
-              .update({ platform_links: odesli.platforms })
-              .eq('id', artist.id)
+            try {
+              const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
 
-            if (updateErr) {
-              existingOdesli?.errors.push(
-                `Odesli DB update for artist ${artist.id}: ${updateErr.message}`,
-              )
-            } else if (existingOdesli) {
-              existingOdesli.releasesUpserted++
+              if (Object.keys(odesli.platforms).length > 0) {
+                const { error: updateErr } = await db
+                  .from('artists')
+                  .update({ platform_links: odesli.platforms })
+                  .eq('id', artist.id)
+
+                if (updateErr) {
+                  existingOdesli?.errors.push(
+                    `Odesli DB update for artist ${artist.id}: ${updateErr.message}`,
+                  )
+                } else if (existingOdesli) {
+                  existingOdesli.releasesUpserted++
+                }
+              }
+            } catch (e) {
+              if (isRateLimitedSyncError(e)) {
+                if (existingOdesli) {
+                  existingOdesli.rateLimited = true
+                  existingOdesli.hasMoreWork = true
+                }
+                break
+              }
+              const odesliErr = String(e)
+              if (!isSkippableOdesliError(odesliErr)) {
+                existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
+              }
             }
           }
-        } catch (e) {
-          if (isRateLimitedSyncError(e)) {
-            if (existingOdesli) {
-              existingOdesli.rateLimited = true
-              existingOdesli.hasMoreWork = true
-            }
-            break
-          }
-          const odesliErr = String(e)
-          if (!isSkippableOdesliError(odesliErr)) {
-            existingOdesli?.errors.push(`Odesli resolve for artist ${artist.id}: ${odesliErr}`)
+
+          if (
+            existingOdesli &&
+            !existingOdesli.rateLimited &&
+            artistBatch.length >= odesliBatchLimit
+          ) {
+            existingOdesli.hasMoreWork = true
           }
         }
+      } catch (e) {
+        existingOdesli?.errors.push(`Odesli artist batch query failed: ${String(e)}`)
       }
-      }
-    } catch (e) {
-      existingOdesli?.errors.push(`Odesli artist batch query failed: ${String(e)}`)
-    }
     }
 
     // Write one combined sync_log for releases + artist platform links

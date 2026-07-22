@@ -126,7 +126,7 @@ export function useReleases() {
         throw new Error(`Queue failed: ${queueText.slice(0, 200) || resQueue.status}`)
       }
 
-      // Initial executor kick (also done inside waitForSyncQueueIdle).
+      // Initial executor kick (also done inside waitForSyncQueueIdle when running === 0).
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: {
@@ -152,19 +152,22 @@ export function useReleases() {
         }
       }
 
+      // Progress uses first poll's pending+running as the run baseline (not 24h done).
       const waitResult = await waitForSyncQueueIdle({
         accessToken: token,
-        timeoutMs: 90_000,
+        timeoutMs: 300_000,
         pollIntervalMs: 3_000,
-        onProgress: (active, stats) => {
-          const total = active + stats.done
-          if (total > 0) {
-            setSyncProgress(Math.min(99, Math.round((stats.done / total) * 100)))
+        onProgress: (_active, _stats, percent) => {
+          if (typeof percent === 'number') {
+            setSyncProgress(percent)
           }
         },
       })
 
-      setSyncProgress(100)
+      // Only show 100% when the queue actually drained — never fake completion.
+      if (waitResult.drained) {
+        setSyncProgress(100)
+      }
       await load()
       await revalidateContentCache(token, ['releases', 'artists', 'concerts'])
 

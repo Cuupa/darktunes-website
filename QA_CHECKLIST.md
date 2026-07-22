@@ -55,7 +55,7 @@
 - [ ] Validate schema parity with `supabase/reset.sql`
 - [ ] Validate artist/release/news sync jobs and cron triggers
 - [ ] Validate RLS and role permissions for new tables/features
-- [ ] Admin → Releases → "Sync All APIs": spinner stays until queue drains or ~90s; toast reflects drained vs still-running; list shows new rows without manual refresh
+- [ ] Admin → Releases → "Sync All APIs": progress climbs with backlog (not stuck at 100% mid-run); spinner stays until drain or ~5 min timeout; toast reflects drained vs still-running; cover art lands on CDN without `getaddrinfo EBUSY` spam in sync logs; Odesli job reschedules cleanly under rate limit
 - [ ] After release sync, public `/releases` and home release section show new visible non-promo releases (hard refresh OK; no need to wait full 1h TTL)
 - [ ] Admin → Videos → "Sync YouTube Channel": admin list updates; public `/videos` updates after revalidation
 - [ ] Full artist sync does **not** claim to update videos (YouTube is a separate action)

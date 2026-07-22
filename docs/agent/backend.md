@@ -25,7 +25,7 @@ Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verify
 
 ## Rate limiting
 
-External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPolicy.ts`. Base `HttpError` in `src/lib/rateLimiter.ts`. Odesli uses `resolveOdesliSmartLinkThrottled()` (~8 req/s).
+External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPolicy.ts`. Base `HttpError` in `src/lib/rateLimiter.ts`. Rate-limited (429) errors are **not** retried inside `withApiRetry` — the queue reschedules with cooldown. Transient DNS/network I/O uses `withTransientIoRetry()` (e.g. R2 `getaddrinfo EBUSY`). Odesli uses `resolveOdesliSmartLinkThrottled()` (~4 req/s).
 
 ## Sync service
 
@@ -33,13 +33,15 @@ Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll
 
 **Scheduling (no Vercel Cron):** Supabase Cron → `supabase/functions/trigger-sync` → Next.js routes. Auth: `CRON_SECRET` Bearer. Typical schedules: `all` daily 03:00 UTC, `process-queue` every 5 min, `youtube` daily 06:00 UTC.
 
-**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube` (legacy; prefer channel route), `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (50s budget, `verifySyncTrigger`). Odesli batches (`ODESLI_BATCH_SIZE`) reschedule on rate limit (15 min cooldown).
+**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube` (legacy; prefer channel route), `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (~280s budget, `maxDuration` 300, `verifySyncTrigger`). **Single-flight lease** (`site_settings.sync_executor_lease`) prevents overlapping `waitUntil` workers from admin poll kicks. Odesli batches (`ODESLI_BATCH_SIZE`) for releases **and** artist `platform_links`; reschedule on rate limit (15 min cooldown) or remaining work.
+
+**Cover art / R2:** `uploadUrlToR2` retries transient DNS errors and caps process-wide upload concurrency at 2. iTunes release processing concurrency is 2. iTunes lookup is capped at 200 collections (logged when truncated).
 
 **YouTube videos** are **not** part of the artist queue. Channel sync: `POST /api/sync-youtube` (or `sync-api` with `apiSource: youtube`). Cron type `youtube` → that route.
 
 **Public cache after sync:** `revalidatePublicContent()` (`src/lib/sync/revalidatePublicContent.ts`) runs `revalidateTag` + `revalidatePath` for list routes (`/`, `/releases`, `/videos`, …). Queue executor revalidates once per batch end inside `waitUntil`. Admin hooks also call `POST /api/revalidate-content` after mutations and after queue drain.
 
-**Admin UX after full sync:** `useReleases.syncAllReleases` enqueues → kicks executor → polls `GET /api/sync/queue` (stats) for up to ~90s via `waitForSyncQueueIdle`, reloads the admin list, then busts public tags.
+**Admin UX after full sync:** `useReleases.syncAllReleases` enqueues → kicks executor → polls `GET /api/sync/queue` for up to ~5 min via `waitForSyncQueueIdle` (only re-kicks when `running === 0`). Progress uses backlog drain (`pending+running` vs initial), never 24h `done` counts, and only reaches 100% when drained.
 
 **Release writes:** `syncReleaseFromExternalSource()` in `releases.ts` — cross-source merge before insert, plus same-source self-healing for exact `normTitle(title)` + year matches (for example Spotify `Cut` vs `Cut - Single`). `deduplicateReleases()` also performs an intra-Spotify dedup pass before DB writes so discogs metadata is preserved on the canonical entry. `upsertReleaseBySpotifyId` / `upsertReleaseByDiscogsId` require full UNIQUE constraints on `spotify_id` / `discogs_id` in `reset.sql`.
 

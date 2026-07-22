@@ -40,6 +40,11 @@ export const MAX_ATTEMPTS = 3
 /** Visibility timeout — running jobs past this are reset to pending. */
 export const LOCK_DURATION_MS = 10 * 60 * 1000
 
+/** site_settings key for the single-flight queue executor lease (ISO expiry). */
+export const SYNC_EXECUTOR_LEASE_KEY = 'sync_executor_lease'
+/** Default lease length; should cover one Vercel maxDuration budget. */
+export const EXECUTOR_LEASE_MS = 5 * 60 * 1000
+
 const ARTIST_SCOPED_JOB_TYPES: SyncJobType[] = ['full', 'spotify', 'discogs', 'youtube']
 
 /** Job types that block enqueueing the same artist for `jobType`. */
@@ -71,6 +76,74 @@ function rowToSyncJob(row: SyncQueueRow): SyncJob {
     errorMessage: row.error_message ?? null,
     attemptCount: row.attempt_count,
     createdAt: row.created_at,
+  }
+}
+
+/**
+ * Tries to acquire a single-flight lease so only one `/api/sync` waitUntil
+ * worker drains the queue at a time (avoids parallel R2/DNS storms).
+ * Returns true when this caller holds the lease.
+ */
+export async function tryAcquireSyncExecutorLease(
+  db: DbClient,
+  leaseMs = EXECUTOR_LEASE_MS,
+): Promise<boolean> {
+  const now = Date.now()
+  const { data: existing, error: readError } = await db
+    .from('site_settings')
+    .select('value')
+    .eq('key', SYNC_EXECUTOR_LEASE_KEY)
+    .maybeSingle()
+
+  if (readError) {
+    throw new Error(`Failed to read sync executor lease: ${readError.message}`)
+  }
+
+  if (existing?.value) {
+    const expiresAt = Date.parse(existing.value)
+    if (!Number.isNaN(expiresAt) && expiresAt > now) {
+      return false
+    }
+  }
+
+  const expires = new Date(now + leaseMs).toISOString()
+
+  if (existing) {
+    const { data, error } = await db
+      .from('site_settings')
+      .update({ value: expires })
+      .eq('key', SYNC_EXECUTOR_LEASE_KEY)
+      .eq('value', existing.value)
+      .select('key')
+
+    if (error) {
+      throw new Error(`Failed to acquire sync executor lease: ${error.message}`)
+    }
+    return (data?.length ?? 0) > 0
+  }
+
+  const { error: insertError } = await db.from('site_settings').insert({
+    key: SYNC_EXECUTOR_LEASE_KEY,
+    value: expires,
+  })
+
+  if (insertError) {
+    // Concurrent insert lost the race — another executor holds the lease.
+    if (insertError.code === '23505') return false
+    throw new Error(`Failed to create sync executor lease: ${insertError.message}`)
+  }
+
+  return true
+}
+
+/** Clears the executor lease so the next kick can start a new worker. */
+export async function releaseSyncExecutorLease(db: DbClient): Promise<void> {
+  const { error } = await db.from('site_settings').upsert(
+    { key: SYNC_EXECUTOR_LEASE_KEY, value: new Date(0).toISOString() },
+    { onConflict: 'key' },
+  )
+  if (error) {
+    throw new Error(`Failed to release sync executor lease: ${error.message}`)
   }
 }
 
