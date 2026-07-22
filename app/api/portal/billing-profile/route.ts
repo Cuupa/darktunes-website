@@ -4,6 +4,8 @@ import { getBillingProfile, isBillingProfileComplete, upsertBillingProfile } fro
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const upsertBillingProfileSchema = z.object({
   artist_id: z.string().uuid(),
@@ -26,7 +28,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const artist = await resolvePortalArtist(supabase, user.id, artistId)
   if (!artist) throw new ApiError(403, 'Forbidden')
 
-  const profile = await getBillingProfile(supabase, artist.id)
+  // Membership verified — service-role avoids RLS drift blocking band members.
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await getBillingProfile(serviceDb, artist.id)
 
   return NextResponse.json({
     profile,
@@ -35,7 +39,6 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body: unknown = await req.json()
   const parsed = upsertBillingProfileSchema.safeParse(body)
 
@@ -43,22 +46,29 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(400, parsed.error.issues.map((issue) => issue.message).join('; '))
   }
 
-  const artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
-  if (!artist) throw new ApiError(403, 'Forbidden')
-
-  const profile = await upsertBillingProfile(supabase, artist.id, {
-    legalName: parsed.data.legal_name,
-    street: parsed.data.street,
-    postalCode: parsed.data.postal_code,
-    city: parsed.data.city,
-    country: parsed.data.country,
-    taxNumber: parsed.data.tax_number,
-    vatId: parsed.data.vat_id,
-    isSmallBusiness: parsed.data.is_small_business,
-    iban: parsed.data.iban,
-    bic: parsed.data.bic,
-    paypalEmail: parsed.data.paypal_email || undefined,
-  })
+  const ctx = await withPortalMembership(req, parsed.data.artist_id)
+  const { value: profile } = await portalMemberWrite(
+    ctx,
+    {
+      route: 'POST /api/portal/billing-profile',
+      table: 'artist_billing_profiles',
+      operation: 'upsert',
+    },
+    (db) =>
+      upsertBillingProfile(db, ctx.artist.id, {
+        legalName: parsed.data.legal_name,
+        street: parsed.data.street,
+        postalCode: parsed.data.postal_code,
+        city: parsed.data.city,
+        country: parsed.data.country,
+        taxNumber: parsed.data.tax_number,
+        vatId: parsed.data.vat_id,
+        isSmallBusiness: parsed.data.is_small_business,
+        iban: parsed.data.iban,
+        bic: parsed.data.bic,
+        paypalEmail: parsed.data.paypal_email || undefined,
+      }),
+  )
 
   return NextResponse.json({
     profile,

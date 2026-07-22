@@ -9,12 +9,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const MAX_BYTES = 20 * 1024 * 1024 // 20 MB
 
@@ -37,10 +38,20 @@ function getExtension(filename: string): string {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const { supabase, user } = await authenticatePortalBearer(req)
 
-  const artist = await getArtistByUserId(supabase, user.id)
+  const formData = await req.formData()
+  const artistIdField = formData.get('artistId')
+  const artistId =
+    typeof artistIdField === 'string' && artistIdField.trim()
+      ? artistIdField.trim()
+      : new URL(req.url).searchParams.get('artistId')
+
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const formData = await req.formData()
   const file = formData.get('file')
   const label = formData.get('label')
   const category = formData.get('category')
@@ -83,7 +94,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  const doc = await createArtistDocument(supabase, {
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const doc = await createArtistDocument(serviceDb, {
     artistId: artist.id,
     label: label.slice(0, 255),
     category,

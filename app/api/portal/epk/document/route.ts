@@ -3,12 +3,16 @@
  *
  * GET  — load EPK canvas document (auto-migrates legacy presets on first access)
  * PUT  — save EPK canvas document
+ *
+ * Membership is verified with the bearer client; artist_epks reads/writes then
+ * use the service-role client so band members are not blocked by legacy RLS.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   getArtistProfileByArtistId,
   resolvePortalArtist,
@@ -17,6 +21,7 @@ import { ensureMigratedEpkDocument, saveEpkDocument } from '@/lib/api/epkDocumen
 import { epkDocumentV2Schema } from '@/lib/epk/schema/documentV2'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
 
 const putBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -36,11 +41,12 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const profile = await getArtistProfileByArtistId(supabase, artist.id)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await getArtistProfileByArtistId(serviceDb, artist.id)
   const siteSettings = await getCachedSiteSettings().catch(() => null)
 
   const state = await ensureMigratedEpkDocument(
-    supabase,
+    serviceDb,
     artist.id,
     profile ?? emptyArtistProfile(artist.id),
     artist,
@@ -51,25 +57,21 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body = putBodySchema.parse(await req.json())
+  const ctx = await withPortalMembership(req, body.artist_id)
 
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  const state = await saveEpkDocument(
-    supabase,
-    artist.id,
-    body.document,
-    user.id,
+  const { value: state } = await portalMemberWrite(
+    ctx,
     {
-      createVersion: body.create_version,
-      versionLabel: body.version_label,
+      route: 'PUT /api/portal/epk/document',
+      table: 'artist_epks',
+      operation: 'upsert',
     },
+    (db) =>
+      saveEpkDocument(db, ctx.artist.id, body.document, ctx.user.id, {
+        createVersion: body.create_version,
+        versionLabel: body.version_label,
+      }),
   )
 
   return NextResponse.json(state)

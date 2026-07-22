@@ -87,7 +87,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "dexie": "^4.4.4",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "embla-carousel-react": "^8.5.2",
     "exceljs": "^4.4.0",
     "fontkit": "^2.0.4",
@@ -102,7 +102,7 @@
     "lenis": "^1.3.23",
     "lucide-react": "^1.17.0",
     "marked": "^15.0.7",
-    "next": "^16.2.9",
+    "next": "^16.2.11",
     "next-intl": "^4.13.0",
     "papaparse": "^5.5.4",
     "pdf-lib": "^1.17.1",
@@ -115,7 +115,7 @@
     "react-resizable-panels": "^4.12.0",
     "recharts": "^3.9.0",
     "serwist": "^9.5.11",
-    "sharp": "^0.35.2",
+    "sharp": "^0.35.3",
     "sonner": "^2.0.1",
     "swiper": "^12.2.0",
     "tailwind-merge": "^3.0.2",
@@ -129,7 +129,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@lhci/cli": "^0.15.1",
-    "@next/bundle-analyzer": "^16.2.9",
+    "@next/bundle-analyzer": "^16.2.11",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.1.8",
     "@testing-library/jest-dom": "^6.9.1",
@@ -140,7 +140,7 @@
     "@vercel/node": "^5.7.15",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9.28.0",
-    "eslint-config-next": "^16.2.9",
+    "eslint-config-next": "^16.2.11",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.7.0",
@@ -170,7 +170,11 @@
     "tmp": "0.2.7",
     "@vercel/python-analysis": {
       "minimatch": "10.2.5"
-    }
+    },
+    "next": {
+      "sharp": "0.35.3"
+    },
+    "brace-expansion": "2.1.2"
   },
   "license": "UNLICENSED"
 }

@@ -51,7 +51,7 @@ function formatBytes(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function DocumentVault({ documents: initialDocuments, artistId: _artistId }: DocumentVaultProps) {
+export function DocumentVault({ documents: initialDocuments, artistId }: DocumentVaultProps) {
   const t = useTranslations('portal')
 
   const [documents, setDocuments] = useState<ArtistDocument[]>(initialDocuments)
@@ -91,9 +91,10 @@ export function DocumentVault({ documents: initialDocuments, artistId: _artistId
       form.append('file', file)
       form.append('label', uploadLabel.trim())
       form.append('category', uploadCategory)
+      form.append('artistId', artistId)
       if (uploadNotes.trim()) form.append('notes', uploadNotes.trim())
 
-      const res = await fetch('/api/portal/documents/upload', {
+      const res = await fetch(`/api/portal/documents/upload?artistId=${encodeURIComponent(artistId)}`, {
         method: 'POST',
         headers: {
           Authorization: ['Bearer', session.access_token].join(' '),
@@ -123,9 +124,12 @@ export function DocumentVault({ documents: initialDocuments, artistId: _artistId
       const session = await getSession()
       if (!session) { toast.error(t('profile_error')); return }
 
-      const res = await fetch(`/api/portal/documents/${docId}/download`, {
-        headers: { Authorization: ['Bearer', session.access_token].join(' ') },
-      })
+      const res = await fetch(
+        `/api/portal/documents/${docId}/download?artistId=${encodeURIComponent(artistId)}`,
+        {
+          headers: { Authorization: ['Bearer', session.access_token].join(' ') },
+        },
+      )
       if (!res.ok) throw new Error('Failed to get download URL')
       const { url } = await res.json() as { url: string }
       window.open(url, '_blank', 'noopener')
@@ -143,10 +147,13 @@ export function DocumentVault({ documents: initialDocuments, artistId: _artistId
       const session = await getSession()
       if (!session) { toast.error(t('profile_error')); return }
 
-      const res = await fetch(`/api/portal/documents/${docId}`, {
-        method: 'DELETE',
-        headers: { Authorization: ['Bearer', session.access_token].join(' ') },
-      })
+      const res = await fetch(
+        `/api/portal/documents/${docId}?artistId=${encodeURIComponent(artistId)}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: ['Bearer', session.access_token].join(' ') },
+        },
+      )
       if (!res.ok) throw new Error('Delete failed')
       setDocuments((prev) => prev.filter((d) => d.id !== docId))
       toast.success(t('documents_heading'))

@@ -2,31 +2,38 @@
  * app/api/portal/documents/[id]/download/route.ts
  *
  * GET — generate a short-lived (10 min) presigned download URL for a private document.
- * Verifies artist ownership before generating the URL.
+ * Verifies artist membership before generating the URL.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { getArtistByUserId } from '@/lib/api/artistProfiles'
+import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const EXPIRY_SECONDS = 600 // 10 minutes
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const { supabase, user } = await authenticatePortalBearer(req)
 
-  const artist = await getArtistByUserId(supabase, user.id)
+  const artistId = req.nextUrl.searchParams.get('artistId')
+  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const parts = req.nextUrl.pathname.split('/')
   const id = parts[parts.length - 2]
   if (!id) throw new ApiError(400, 'Missing document id')
 
-  const doc = await getArtistDocument(supabase, id, artist.id)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const doc = await getArtistDocument(serviceDb, id, artist.id)
   if (!doc) throw new ApiError(404, 'Document not found')
 
   const { serverEnv } = await import('@/lib/env.server')

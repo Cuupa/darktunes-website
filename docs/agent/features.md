@@ -10,6 +10,7 @@
 | Nav | `portal_feature_flags` gates modules; Settings always visible; onboarding when profile incomplete |
 | Presigned URLs | `src/lib/portal/presignedUrl.ts` — 5 min GET, 15 min PUT; wired in `statements/_actions/presignedUrl.ts` |
 | Bearer auth | Portal route handlers use `authenticatePortalBearer()` from `src/lib/portal/bearerAuth.ts` |
+| Writes | Membership first; many routes then use **service role** (pragmatic). Target: user JWT + RLS — see [portal-write-auth.md](portal-write-auth.md) |
 
 **Billing & invoices:** `artist_billing_profiles` at `/portal/billing`. `isBillingProfileComplete()` required before PDF generation. `InlineBillingProfileStep` gates: `/portal/invoices` (`InvoiceForm`, `FreeInvoiceGenerator`), `/portal/analytics` (Earnings), `/portal/statements` (quick invoice). SOS-linked flow: `/portal/invoices?statement={id}` → `artist_invoice_number` + `sales_statements.status = 'invoiced'`.
 

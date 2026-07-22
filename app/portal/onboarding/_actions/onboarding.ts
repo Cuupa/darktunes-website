@@ -9,10 +9,14 @@
  * completeOnboarding  — marks onboarding_completed = true (also persists final data)
  *                       and sends an automatic welcome message to the artist inbox.
  * skipOnboarding      — marks onboarding_completed = true without saving profile data.
+ *
+ * After membership is verified, writes use the service-role client so band members
+ * are not blocked by legacy RLS on artists / artist_epks / label_messages.
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
 import { getTranslations } from 'next-intl/server'
 
 // ---------------------------------------------------------------------------
@@ -37,7 +41,7 @@ async function getCurrentArtist(artistId?: string | null) {
   }
 
   if (!artist) throw new Error('No artist linked to this account')
-  return { supabase, artist }
+  return { supabase, artist, userId: user.id }
 }
 
 // ---------------------------------------------------------------------------
@@ -61,23 +65,48 @@ export async function saveOnboardingStep(
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist(artistId)
+    const { supabase, artist, userId } = await getCurrentArtist(artistId)
+    const serviceDb = await createServiceRoleSupabaseClient()
+    const ctx = {
+      route: 'onboarding/saveOnboardingStep',
+      artistId: artist.id,
+      userId,
+    }
 
     // Profile-specific fields only (bio)
     const { instagram_url, spotify_url, website_url, image_url, ...profileFields } = data
-    await upsertArtistProfile(supabase, {
-      artist_id: artist.id,
-      ...profileFields,
+    await portalWriteWithCanary({
+      userDb: supabase,
+      serviceDb,
+      context: { ...ctx, table: 'artist_epks', operation: 'upsert' },
+      write: (db) =>
+        upsertArtistProfile(db, {
+          artist_id: artist.id,
+          ...profileFields,
+        }),
     })
 
     // URL fields and image_url go to the artists table (single source of truth)
-    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null; image_url?: string | null } = {}
+    const artistUpdate: {
+      instagram_url?: string | null
+      spotify_url?: string | null
+      website_url?: string | null
+      image_url?: string | null
+    } = {}
     if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
     if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
     if (website_url !== undefined) artistUpdate.website_url = website_url
     if (image_url !== undefined) artistUpdate.image_url = image_url
     if (Object.keys(artistUpdate).length > 0) {
-      await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+      await portalWriteWithCanary({
+        userDb: supabase,
+        serviceDb,
+        context: { ...ctx, table: 'artists', operation: 'update' },
+        write: async (db) => {
+          const { error } = await db.from('artists').update(artistUpdate).eq('id', artist.id)
+          if (error) throw new Error(error.message)
+        },
+      })
     }
 
     return { ok: true }
@@ -101,33 +130,61 @@ export async function completeOnboarding(
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist(artistId)
+    const { supabase, artist, userId } = await getCurrentArtist(artistId)
+    const serviceDb = await createServiceRoleSupabaseClient()
+    const ctx = {
+      route: 'onboarding/completeOnboarding',
+      artistId: artist.id,
+      userId,
+    }
 
     const { instagram_url, spotify_url, website_url, ...profileFields } = data ?? {}
-    await upsertArtistProfile(supabase, {
-      artist_id: artist.id,
-      ...profileFields,
-      onboarding_completed: true,
+    await portalWriteWithCanary({
+      userDb: supabase,
+      serviceDb,
+      context: { ...ctx, table: 'artist_epks', operation: 'upsert' },
+      write: (db) =>
+        upsertArtistProfile(db, {
+          artist_id: artist.id,
+          ...profileFields,
+          onboarding_completed: true,
+        }),
     })
 
     // URL fields go to the artists table (single source of truth)
-    const artistUpdate: { instagram_url?: string | null; spotify_url?: string | null; website_url?: string | null } = {}
+    const artistUpdate: {
+      instagram_url?: string | null
+      spotify_url?: string | null
+      website_url?: string | null
+    } = {}
     if (instagram_url !== undefined) artistUpdate.instagram_url = instagram_url
     if (spotify_url !== undefined) artistUpdate.spotify_url = spotify_url
     if (website_url !== undefined) artistUpdate.website_url = website_url
     if (Object.keys(artistUpdate).length > 0) {
-      await supabase.from('artists').update(artistUpdate).eq('id', artist.id)
+      await portalWriteWithCanary({
+        userDb: supabase,
+        serviceDb,
+        context: { ...ctx, table: 'artists', operation: 'update' },
+        write: async (db) => {
+          const { error } = await db.from('artists').update(artistUpdate).eq('id', artist.id)
+          if (error) throw new Error(error.message)
+        },
+      })
     }
 
-    // Send an automatic welcome message to the artist's inbox
+    // Welcome message: artists only have SELECT on label_messages — always service role.
     const t = await getTranslations('portal')
-    await supabase.from('label_messages').insert({
+    const { error: msgError } = await serviceDb.from('label_messages').insert({
       artist_id: artist.id,
       subject: t('welcome_message_subject'),
       body: t('welcome_message_body'),
       body_html: t('welcome_message_body'),
       read: false,
     })
+    if (msgError) {
+      // Profile save succeeded — do not fail onboarding over a welcome-message glitch.
+      console.error('[completeOnboarding] welcome message insert failed:', msgError)
+    }
 
     return { ok: true }
   } catch (err) {
@@ -141,10 +198,23 @@ export async function completeOnboarding(
  */
 export async function skipOnboarding(artistId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { supabase, artist } = await getCurrentArtist(artistId)
-    await upsertArtistProfile(supabase, {
-      artist_id: artist.id,
-      onboarding_completed: true,
+    const { supabase, artist, userId } = await getCurrentArtist(artistId)
+    const serviceDb = await createServiceRoleSupabaseClient()
+    await portalWriteWithCanary({
+      userDb: supabase,
+      serviceDb,
+      context: {
+        route: 'onboarding/skipOnboarding',
+        table: 'artist_epks',
+        operation: 'upsert',
+        artistId: artist.id,
+        userId,
+      },
+      write: (db) =>
+        upsertArtistProfile(db, {
+          artist_id: artist.id,
+          onboarding_completed: true,
+        }),
     })
     return { ok: true }
   } catch (err) {

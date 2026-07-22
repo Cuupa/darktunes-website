@@ -68,11 +68,15 @@ export async function uploadRiderDocument(
   file: File,
   riderType: RiderType,
   token: string,
+  artistId?: string,
 ): Promise<string> {
   const body = new FormData()
   body.append('file', file)
 
-  const res = await fetch(`/api/portal/upload-rider?type=${encodeURIComponent(riderType)}`, {
+  const params = new URLSearchParams({ type: riderType })
+  if (artistId) params.set('artistId', artistId)
+
+  const res = await fetch(`/api/portal/upload-rider?${params.toString()}`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token },
     body,
