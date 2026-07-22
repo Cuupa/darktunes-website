@@ -22,7 +22,8 @@ import { mapWithConcurrency } from '@/lib/mapWithConcurrency'
 import { withApiRetry } from '@/lib/sync/retryPolicy'
 import { stripReleaseSuffix, type CrossSourceReleaseRow } from '@/lib/sync/deduplication'
 
-const RELEASE_SYNC_CONCURRENCY = 5
+/** Keep low: each release hits iTunes CDN + R2 (DNS-sensitive on Vercel). */
+const RELEASE_SYNC_CONCURRENCY = 2
 
 /** Serialises merge/upsert so parallel workers share one consistent in-memory release list. */
 let releaseSyncLock: Promise<void> = Promise.resolve()
@@ -224,8 +225,16 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
     .update({ last_synced_at: new Date().toISOString() })
     .eq('id', artistId)
 
+  const itunesTruncated = itunesReleases.length >= 200
+  if (itunesTruncated) {
+    errors.push(
+      `iTunes returned ${itunesReleases.length} collections (API limit 200) — catalog may be incomplete`,
+    )
+  }
+
   // 5. Write sync_log entry (skipped when syncAll writes an aggregate log)
   if (!skipSyncLog) {
+    const coverFailures = errors.filter((e) => e.includes('Cover art upload failed')).length
     const status: 'success' | 'partial' | 'error' =
       errors.length === 0 ? 'success' : releasesUpserted > 0 ? 'partial' : 'error'
 
@@ -241,6 +250,8 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
         source: 'itunes',
         releases_found: itunesReleases.length,
         releases_merged: releasesMerged,
+        cover_failures: coverFailures,
+        itunes_truncated: itunesTruncated,
         concurrency: RELEASE_SYNC_CONCURRENCY,
       },
     })

@@ -111,6 +111,14 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-07-22 — Sync cover storms, fake progress, Odesli thrash
+
+**Parallel queue executors storm R2 DNS:** Admin pollers that `POST /api/sync` every few seconds while a prior `waitUntil` is still alive multiply concurrent cover uploads → `getaddrinfo EBUSY` on R2. Fix with a single-flight executor lease + client kicks only when `running === 0`, lower release/R2 concurrency, and retry transient DNS.
+
+**Progress must use this run’s backlog:** `getSyncQueueStats().done` is last-24h global — not batch progress. Never set the UI to 100% unless the queue actually drained.
+
+**Do not retry 429 inside the request:** Rate limits belong to the queue cooldown (`RATE_LIMIT_JOB_COOLDOWN_MS`). Retrying Odesli 429s with exponential backoff burns the function budget and prolongs thrash. Batch artist `platform_links` like releases.
+
 ### 2026-07-21 — Sync queue accepted ≠ public/admin UI updated
 
 **Enqueue success is not data freshness:** `POST /api/sync` returns `{ accepted: true }` immediately via `waitUntil`. Admin hooks that `load()` in `finally` right after that response show the **pre-sync** DB snapshot. Poll queue stats (`GET /api/sync/queue`) and re-kick the executor until idle (or timeout), then reload + revalidate.

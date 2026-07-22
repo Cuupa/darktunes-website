@@ -13,12 +13,17 @@ export interface SyncQueueStats {
 
 export interface WaitForSyncQueueOptions {
   accessToken: string
-  /** Max time to wait for pending+running to reach 0. Default 90s. */
+  /** Max time to wait for pending+running to reach 0. Default 5 minutes. */
   timeoutMs?: number
   /** Delay between poll/execute kicks. Default 3s. */
   pollIntervalMs?: number
-  /** Called after each stats poll with active job count. */
-  onProgress?: (active: number, stats: SyncQueueStats) => void
+  /**
+   * Baseline active count when this wait started (pending+running at enqueue).
+   * When set, onProgress receives a 0–100 percent based on backlog drain.
+   */
+  initialActive?: number
+  /** Called after each stats poll with active job count and optional percent. */
+  onProgress?: (active: number, stats: SyncQueueStats, percent?: number) => void
   fetchImpl?: typeof fetch
 }
 
@@ -28,13 +33,24 @@ export interface WaitForSyncQueueResult {
   waitedMs: number
 }
 
-const DEFAULT_TIMEOUT_MS = 90_000
+const DEFAULT_TIMEOUT_MS = 300_000
 const DEFAULT_POLL_MS = 3_000
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
+}
+
+/** Progress percent from remaining backlog vs initial active count (capped at 99 until drained). */
+export function syncBacklogProgressPercent(
+  active: number,
+  initialActive: number,
+): number {
+  if (active <= 0) return 100
+  if (initialActive <= 0) return 0
+  const done = Math.max(0, initialActive - active)
+  return Math.min(99, Math.round((done / initialActive) * 100))
 }
 
 async function fetchQueueStats(
@@ -74,9 +90,10 @@ async function kickExecutor(
 }
 
 /**
- * Polls until the sync queue has no pending/running jobs, re-kicking the
- * background executor each cycle so large queues do not wait for the 5-minute
- * cron. Returns when drained or when timeoutMs elapses.
+ * Polls until the sync queue has no pending/running jobs.
+ * Re-kicks the executor only when nothing is running so overlapping waitUntil
+ * workers do not pile up (single-flight lease is the server-side guard).
+ * Returns when drained or when timeoutMs elapses.
  */
 export async function waitForSyncQueueIdle(
   options: WaitForSyncQueueOptions,
@@ -85,24 +102,32 @@ export async function waitForSyncQueueIdle(
     accessToken,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     pollIntervalMs = DEFAULT_POLL_MS,
+    initialActive: initialActiveOption,
     onProgress,
     fetchImpl = globalThis.fetch,
   } = options
 
   const started = Date.now()
   let stats = await fetchQueueStats(accessToken, fetchImpl)
-  onProgress?.(stats.pending + stats.running, stats)
+  let active = stats.pending + stats.running
+  const initialActive = initialActiveOption ?? active
+  onProgress?.(active, stats, syncBacklogProgressPercent(active, initialActive))
 
-  if (stats.pending + stats.running === 0) {
+  if (active === 0) {
     return { drained: true, stats, waitedMs: 0 }
   }
 
   while (Date.now() - started < timeoutMs) {
-    await kickExecutor(accessToken, fetchImpl)
+    // Only kick when idle of running jobs — avoids parallel executors under load.
+    // If running > 0, a worker is already draining; if pending > 0 and running === 0,
+    // the previous worker finished its budget and we need another kick.
+    if (stats.running === 0 && stats.pending > 0) {
+      await kickExecutor(accessToken, fetchImpl)
+    }
     await sleep(pollIntervalMs)
     stats = await fetchQueueStats(accessToken, fetchImpl)
-    const active = stats.pending + stats.running
-    onProgress?.(active, stats)
+    active = stats.pending + stats.running
+    onProgress?.(active, stats, syncBacklogProgressPercent(active, initialActive))
     if (active === 0) {
       return { drained: true, stats, waitedMs: Date.now() - started }
     }

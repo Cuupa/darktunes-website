@@ -10,6 +10,9 @@ import {
   countStuckSyncJobs,
   conflictingArtistJobTypes,
   getSyncQueueStats,
+  tryAcquireSyncExecutorLease,
+  releaseSyncExecutorLease,
+  SYNC_EXECUTOR_LEASE_KEY,
   MAX_ATTEMPTS,
 } from './syncQueue'
 
@@ -21,6 +24,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
@@ -29,6 +33,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue(result),
     gte: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
@@ -46,6 +51,37 @@ function makeSequentialMockDb(calls: Array<{ data: unknown; error?: unknown }>):
     }),
   } as unknown as DbClient
 }
+
+describe('tryAcquireSyncExecutorLease', () => {
+  it('acquires when no lease row exists', async () => {
+    const db = makeSequentialMockDb([{ data: null }, { data: null }])
+    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(true)
+    expect(db.from).toHaveBeenCalledWith('site_settings')
+  })
+
+  it('returns false when lease is still valid', async () => {
+    const future = new Date(Date.now() + 60_000).toISOString()
+    const db = makeSequentialMockDb([{ data: { value: future } }])
+    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(false)
+  })
+
+  it('acquires when lease is expired via optimistic update', async () => {
+    const past = new Date(Date.now() - 60_000).toISOString()
+    const db = makeSequentialMockDb([
+      { data: { value: past } },
+      { data: [{ key: SYNC_EXECUTOR_LEASE_KEY }] },
+    ])
+    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(true)
+  })
+})
+
+describe('releaseSyncExecutorLease', () => {
+  it('upserts expired lease value', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await expect(releaseSyncExecutorLease(db)).resolves.toBeUndefined()
+    expect(db.from).toHaveBeenCalledWith('site_settings')
+  })
+})
 
 describe('countStuckSyncJobs', () => {
   it('returns the number of stuck running jobs', async () => {

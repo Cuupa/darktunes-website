@@ -15,6 +15,46 @@ import {
   HeadObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3'
+import { withTransientIoRetry } from '@/lib/sync/retryPolicy'
+
+/** Process-wide cap so multi-artist executor loops do not storm R2 DNS. */
+const R2_UPLOAD_CONCURRENCY = 2
+let r2UploadPermits = R2_UPLOAD_CONCURRENCY
+const r2UploadWaiters: Array<() => void> = []
+
+async function acquireR2UploadSlot(): Promise<void> {
+  if (r2UploadPermits > 0) {
+    r2UploadPermits -= 1
+    return
+  }
+  await new Promise<void>((resolve) => {
+    r2UploadWaiters.push(resolve)
+  })
+}
+
+function releaseR2UploadSlot(): void {
+  const next = r2UploadWaiters.shift()
+  if (next) {
+    next()
+  } else {
+    r2UploadPermits += 1
+  }
+}
+
+async function withR2UploadSlot<T>(fn: () => Promise<T>): Promise<T> {
+  await acquireR2UploadSlot()
+  try {
+    return await fn()
+  } finally {
+    releaseR2UploadSlot()
+  }
+}
+
+/** Test helper — resets in-process upload concurrency state. */
+export function resetR2UploadConcurrencyForTests(): void {
+  r2UploadPermits = R2_UPLOAD_CONCURRENCY
+  r2UploadWaiters.length = 0
+}
 
 /**
  * Creates a pre-configured S3Client pointed at the Cloudflare R2 endpoint.
@@ -74,34 +114,38 @@ export async function uploadUrlToR2(
   keyPrefix: string,
   fetchFn: typeof fetch = globalThis.fetch,
 ): Promise<string> {
-  const resp = await fetchFn(imageUrl)
-  if (!resp.ok) {
-    throw new Error(`Failed to download image (${resp.status}): ${imageUrl}`)
-  }
+  return withR2UploadSlot(() =>
+    withTransientIoRetry(async () => {
+      const resp = await fetchFn(imageUrl)
+      if (!resp.ok) {
+        throw new Error(`Failed to download image (${resp.status}): ${imageUrl}`)
+      }
 
-  const contentType = resp.headers.get('content-type') ?? 'image/jpeg'
-  const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg'
-  const buffer = Buffer.from(await resp.arrayBuffer())
-  const hash = createHash('sha256').update(buffer).digest('hex')
-  const key = `${keyPrefix}/${hash}.${ext}`
-  const publicUrl = buildR2PublicUrl(r2PublicUrl, key)
+      const contentType = resp.headers.get('content-type') ?? 'image/jpeg'
+      const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg'
+      const buffer = Buffer.from(await resp.arrayBuffer())
+      const hash = createHash('sha256').update(buffer).digest('hex')
+      const key = `${keyPrefix}/${hash}.${ext}`
+      const publicUrl = buildR2PublicUrl(r2PublicUrl, key)
 
-  if (await objectExistsInR2(s3, bucket, key)) {
-    return publicUrl
-  }
+      if (await objectExistsInR2(s3, bucket, key)) {
+        return publicUrl
+      }
 
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ContentLength: buffer.length,
-      CacheControl: 'public, max-age=31536000, immutable',
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+          ContentLength: buffer.length,
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      )
+
+      return publicUrl
     }),
   )
-
-  return publicUrl
 }
 
 /**

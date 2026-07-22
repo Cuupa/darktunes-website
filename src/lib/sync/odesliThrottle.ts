@@ -5,7 +5,8 @@
 import { resolveOdesliSmartLink } from './odesliApi'
 import { withApiRetry } from './retryPolicy'
 
-const MIN_INTERVAL_MS = 120
+/** ~4 req/s — headroom under Odesli free tier (~10 req/s). */
+const MIN_INTERVAL_MS = 250
 
 let lastCallAt = 0
 let chain: Promise<void> = Promise.resolve()

@@ -5,7 +5,9 @@ import {
   claimNextSyncJob,
   markSyncJobDone,
   markSyncJobFailed,
+  releaseSyncExecutorLease,
   rescheduleSyncJob,
+  tryAcquireSyncExecutorLease,
   type SyncJobType,
 } from '@/lib/api/syncQueue'
 import { createSyncUploadFn } from '@/lib/r2Utils'
@@ -23,9 +25,10 @@ import {
   type PublicContentTag,
 } from '@/lib/sync/revalidatePublicContent'
 
-const TIME_BUDGET_MS = 50_000
+/** Leave headroom under Vercel maxDuration (300s) for revalidation + lease release. */
+const TIME_BUDGET_MS = 280_000
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 function tagsForJobType(jobType: SyncJobType): PublicContentTag[] {
   // YouTube channel sync is a separate route; artist-scoped "youtube" jobs fall
@@ -116,6 +119,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   void recordHealthHeartbeat(db, 'sync_execute')
 
+  // Single-flight: overlapping admin poll kicks must not spawn parallel workers.
+  // force=1 still requires a lease (avoids DNS storms) but retries once after a short wait is not needed.
+  const acquired = await tryAcquireSyncExecutorLease(db, TIME_BUDGET_MS + 20_000)
+  if (!acquired) {
+    return NextResponse.json({ accepted: true, alreadyRunning: true })
+  }
+
   const uploadFn = createSyncUploadFn(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
     serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
@@ -130,34 +140,42 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       const tagsToRevalidate = new Set<PublicContentTag>()
       let jobsProcessed = 0
 
-      while (Date.now() - startTime < TIME_BUDGET_MS || force === '1') {
-        const job = await claimNextSyncJob(db)
-        if (!job) break
+      try {
+        while (Date.now() - startTime < TIME_BUDGET_MS || force === '1') {
+          const job = await claimNextSyncJob(db)
+          if (!job) break
 
-        try {
-          const tags = await processSyncJob(db, job, uploadFn, syncCredentials)
-          for (const tag of tags) tagsToRevalidate.add(tag)
-          jobsProcessed += 1
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          await markSyncJobFailed(db, job.id, message, job.attemptCount, {
-            rateLimited: isRateLimitedSyncError(err),
-          })
-          // Still bust caches — partial writes may have landed before the throw.
-          for (const tag of tagsForJobType(job.jobType)) tagsToRevalidate.add(tag)
-          jobsProcessed += 1
+          try {
+            const tags = await processSyncJob(db, job, uploadFn, syncCredentials)
+            for (const tag of tags) tagsToRevalidate.add(tag)
+            jobsProcessed += 1
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            await markSyncJobFailed(db, job.id, message, job.attemptCount, {
+              rateLimited: isRateLimitedSyncError(err),
+            })
+            // Still bust caches — partial writes may have landed before the throw.
+            for (const tag of tagsForJobType(job.jobType)) tagsToRevalidate.add(tag)
+            jobsProcessed += 1
+          }
         }
-      }
 
-      // Single end-of-batch revalidation is more reliable inside waitUntil than
-      // revalidateTag calls scattered mid-loop (and covers path-level ISR).
-      if (jobsProcessed > 0 && tagsToRevalidate.size > 0) {
-        revalidatePublicContent([...tagsToRevalidate])
+        // Single end-of-batch revalidation is more reliable inside waitUntil than
+        // revalidateTag calls scattered mid-loop (and covers path-level ISR).
+        if (jobsProcessed > 0 && tagsToRevalidate.size > 0) {
+          revalidatePublicContent([...tagsToRevalidate])
+        }
+      } finally {
+        try {
+          await releaseSyncExecutorLease(db)
+        } catch (leaseErr) {
+          console.error('[sync] failed to release executor lease:', leaseErr)
+        }
       }
     })(),
   )
 
-  return NextResponse.json({ accepted: true })
+  return NextResponse.json({ accepted: true, alreadyRunning: false })
 })
 
 export const GET = POST
