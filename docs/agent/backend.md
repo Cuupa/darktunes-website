@@ -137,6 +137,16 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 
 `scripts/vercel-install.sh` — `npm ci` + env validation. Required: `NEXT_PUBLIC_SUPABASE_*`, R2 vars, `API_CREDENTIALS_ENCRYPTION_KEY`. Integrations in Admin API Keys. See `DEPLOYMENT.md`.
 
+## Portal write auth (service role vs user JWT)
+
+**Target:** Bearer → membership (`resolvePortalArtist`) → write with **user JWT** so RLS is a second gate.
+
+**Current (pragmatic):** After membership, many portal routes write with **service role** so band members / production RLS drift do not 500 (profile hometown bug). This bypasses RLS; keep field allowlists and membership checks mandatory.
+
+**Service role forever:** `label_messages` welcome insert (artists SELECT-only), `editor_notifications` to staff, cron/admin jobs.
+
+**Migrate back:** verify prod policies with `scripts/verify-portal-rls.sql` → optional dual-path canary → flip tables by risk. Full plan: [portal-write-auth.md](portal-write-auth.md).
+
 ## Error logging
 
 Non-fatal errors → `app_logs` (service role). Visible in Admin System tab.
