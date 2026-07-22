@@ -88,7 +88,7 @@ export interface SyncAllResult {
  * Returns a consolidated result — never throws.
  */
 const EXISTING_RELEASES_SELECT =
-  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode' as const
+  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode, sync_policy' as const
 
 function mapExistingReleaseRow(row: {
   id: string
@@ -99,6 +99,7 @@ function mapExistingReleaseRow(row: {
   discogs_id: string | null
   isrc: string | null
   barcode: string | null
+  sync_policy?: 'auto' | 'manual_until_street' | 'locked' | null
 }): CrossSourceReleaseRow {
   return {
     id: row.id,
@@ -109,6 +110,7 @@ function mapExistingReleaseRow(row: {
     discogs_id: row.discogs_id,
     isrc: row.isrc,
     barcode: row.barcode,
+    sync_policy: row.sync_policy ?? 'auto',
   }
 }
 

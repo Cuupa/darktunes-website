@@ -827,3 +827,84 @@ describe('pruneOrphanedDuplicates', () => {
     expect(deletedIds).not.toContain('rel-featured')
   })
 })
+
+describe('isReleaseSyncProtected', () => {
+  it('protects locked rows always', async () => {
+    const { isReleaseSyncProtected } = await import('./deduplication')
+    expect(
+      isReleaseSyncProtected(
+        { release_date: '2020-01-01', sync_policy: 'locked' },
+        new Date('2026-07-22T12:00:00Z'),
+      ),
+    ).toBe(true)
+  })
+
+  it('protects manual_until_street when street date is in the future', async () => {
+    const { isReleaseSyncProtected } = await import('./deduplication')
+    expect(
+      isReleaseSyncProtected(
+        { release_date: '2099-12-01', sync_policy: 'manual_until_street' },
+        new Date('2026-07-22T12:00:00Z'),
+      ),
+    ).toBe(true)
+  })
+
+  it('allows merge on street date and after', async () => {
+    const { isReleaseSyncProtected } = await import('./deduplication')
+    expect(
+      isReleaseSyncProtected(
+        { release_date: '2026-07-22', sync_policy: 'manual_until_street' },
+        new Date('2026-07-22T12:00:00Z'),
+      ),
+    ).toBe(false)
+    expect(
+      isReleaseSyncProtected(
+        { release_date: '2020-01-01', sync_policy: 'manual_until_street' },
+        new Date('2026-07-22T12:00:00Z'),
+      ),
+    ).toBe(false)
+  })
+
+  it('auto is never protected by policy alone', async () => {
+    const { isReleaseSyncProtected } = await import('./deduplication')
+    expect(
+      isReleaseSyncProtected(
+        { release_date: '2099-01-01', sync_policy: 'auto' },
+        new Date('2026-07-22T12:00:00Z'),
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('findCrossSourceMergeTarget sync protection', () => {
+  const protectedManual: CrossSourceReleaseRow = {
+    id: 'manual-1',
+    title: 'Upcoming Single',
+    release_date: '2099-06-01',
+    spotify_id: null,
+    itunes_id: null,
+    discogs_id: null,
+    isrc: null,
+    barcode: null,
+    sync_policy: 'manual_until_street',
+  }
+
+  it('does not merge iTunes onto a protected future manual row', () => {
+    const target = findCrossSourceMergeTarget(
+      [protectedManual],
+      { title: 'Upcoming Single', releaseDate: '2099-06-01' },
+      'itunes',
+    )
+    expect(target).toBeNull()
+  })
+
+  it('merges after policy is auto', () => {
+    const open: CrossSourceReleaseRow = { ...protectedManual, sync_policy: 'auto' }
+    const target = findCrossSourceMergeTarget(
+      [open],
+      { title: 'Upcoming Single', releaseDate: '2099-06-01' },
+      'itunes',
+    )
+    expect(target?.id).toBe('manual-1')
+  })
+})

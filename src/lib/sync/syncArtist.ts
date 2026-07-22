@@ -178,7 +178,7 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
 
   const { data: existingReleaseRows } = await db
     .from('releases')
-    .select('id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode')
+    .select('id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode, sync_policy')
     .eq('artist_id', artistId)
 
   const existingReleases: CrossSourceReleaseRow[] = (existingReleaseRows ?? []).map((row) => ({
@@ -190,6 +190,7 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
     discogs_id: row.discogs_id,
     isrc: row.isrc,
     barcode: row.barcode,
+    sync_policy: row.sync_policy ?? 'auto',
   }))
 
   // 2. Fetch iTunes releases with exponential backoff

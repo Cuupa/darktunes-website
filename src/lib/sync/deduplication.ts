@@ -72,6 +72,8 @@ export interface MergedRelease {
 // Helpers
 // ---------------------------------------------------------------------------
 
+export type ReleaseSyncPolicy = 'auto' | 'manual_until_street' | 'locked'
+
 export interface CrossSourceReleaseRow {
   id: string
   title: string
@@ -81,6 +83,29 @@ export interface CrossSourceReleaseRow {
   discogs_id?: string | null
   isrc?: string | null
   barcode?: string | null
+  /** When omitted, treated as auto (legacy rows). */
+  sync_policy?: ReleaseSyncPolicy | null
+}
+
+/**
+ * True when external sync must not fuzzy-merge onto this row.
+ * - locked: never
+ * - manual_until_street: until calendar release_date (inclusive of today = open)
+ * - auto: never protected by policy alone
+ */
+export function isReleaseSyncProtected(
+  row: Pick<CrossSourceReleaseRow, 'release_date' | 'sync_policy'>,
+  now: Date = new Date(),
+): boolean {
+  const policy = row.sync_policy ?? 'auto'
+  if (policy === 'locked') return true
+  if (policy !== 'manual_until_street') return false
+
+  // Compare date-only in UTC to avoid timezone flip near midnight
+  const street = row.release_date.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(street)) return true
+  const today = now.toISOString().slice(0, 10)
+  return street > today
 }
 
 export type ExternalReleaseSource = 'itunes' | 'spotify' | 'discogs'
@@ -104,6 +129,7 @@ export function registerSyncedRelease(
     discogs_id?: string | null
     isrc?: string | null
     barcode?: string | null
+    sync_policy?: ReleaseSyncPolicy | null
   },
   merged: boolean,
 ): void {
@@ -115,6 +141,7 @@ export function registerSyncedRelease(
     if (row.discogs_id) target.discogs_id = row.discogs_id
     if (row.isrc) target.isrc = row.isrc
     if (row.barcode) target.barcode = row.barcode
+    if (row.sync_policy) target.sync_policy = row.sync_policy
     target.title = row.title
     target.release_date = row.release_date
     return
@@ -132,6 +159,7 @@ export function registerSyncedRelease(
     discogs_id: row.discogs_id ?? null,
     isrc: row.isrc ?? null,
     barcode: row.barcode ?? null,
+    sync_policy: row.sync_policy ?? 'auto',
   })
 }
 
@@ -326,6 +354,7 @@ export function findCrossSourceMergeTarget(
   const incomingBarcode = normalizeBarcode(incoming.barcode)
 
   for (const row of existingReleases) {
+    if (isReleaseSyncProtected(row)) continue
     if (source === 'itunes' && row.itunes_id) continue
     if (source === 'spotify' && row.spotify_id) continue
     if (source === 'discogs' && row.discogs_id) continue
