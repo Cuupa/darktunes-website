@@ -43,12 +43,12 @@ interface PlaylistItemsPage {
 
 /**
  * Derives the uploads-playlist ID for a channel.
- * YouTube's convention: replace the leading "UC" with "UU".
+ * YouTube's convention: replace the leading "UC" with "UULF".
  * e.g. "UCLFuCYsYBaq3j0gM4wWo82LkQ" → "UULFuCYsYBaq3j0gM4wWo82LkQ"
  */
 function uploadsPlaylistId(channelId: string): string {
   if (channelId.startsWith('UC')) {
-    return 'UU' + channelId.slice(2)
+    return 'UULF' + channelId.slice(2)
   }
   return channelId
 }
