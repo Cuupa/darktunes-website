@@ -114,6 +114,14 @@ export interface Release {
   platformLinks?: Record<string, string>
   popularity?: number
   isVisible: boolean
+  /**
+   * How external sync may update this row:
+   * - auto: normal merge
+   * - manual_until_street: no fuzzy merge before release_date
+   * - locked: never fuzzy-merge
+   * Defaults to auto when omitted (legacy fixtures / partial objects).
+   */
+  syncPolicy?: 'auto' | 'manual_until_street' | 'locked'
   /** When true, this release is only visible in the journalist Promo Pool and never shown on the public homepage. */
   isPromo: boolean
   /** Optional promo/teaser text shown in the Hero section when this release is featured. */
@@ -898,6 +906,8 @@ export interface ReleaseSubmission {
   formData: Record<string, unknown> | null
   adminReply: string | null
   adminReplyAt: string | null
+  /** Catalog release created from this submission (draft), if any */
+  releaseId?: string | null
   createdAt: string
   updatedAt: string
 }

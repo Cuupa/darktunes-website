@@ -82,6 +82,7 @@ const mockReleaseRow: ReleaseRow = {
   bandcamp_url: null,
   smartlink_url: null,
   guest_artists: null,
+  sync_policy: 'auto' as const,
 }
 
 describe('getReleases', () => {

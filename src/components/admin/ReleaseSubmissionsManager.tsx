@@ -98,6 +98,42 @@ export function ReleaseSubmissionsManager() {
     }
   }
 
+  const createDraftRelease = async () => {
+    if (!selected) return
+    setSaving(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/release-submissions/' + selected.id, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'create_draft_release' }),
+      })
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(errBody.error ?? 'Failed')
+      }
+      const data = (await res.json()) as {
+        submission: ReleaseSubmission
+        release: { id: string; title: string }
+        created: boolean
+      }
+      toast.success(
+        data.created
+          ? `Draft release created (hidden): ${data.release.title}`
+          : `Draft already linked: ${data.release.title}`,
+      )
+      setSelected(data.submission)
+      await fetchSubmissions()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create draft release')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const saveStatus = async () => {
     if (!selected) return
     setSaving(true)
@@ -263,9 +299,28 @@ export function ReleaseSubmissionsManager() {
                 placeholder="Optional message to artist…"
               />
             </div>
-            <Button onClick={() => void saveStatus()} disabled={saving}>
-              {saving ? t('saving') : t('field_save')}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => void saveStatus()} disabled={saving}>
+                {saving ? t('saving') : t('field_save')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void createDraftRelease()}
+                disabled={saving}
+              >
+                {selected.releaseId ? 'Open linked draft' : 'Create draft release'}
+              </Button>
+              {selected.releaseId && (
+                <span className="text-xs text-muted-foreground font-mono">
+                  release_id: {selected.releaseId}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Draft release is created as <strong>hidden</strong> with sync protection until street date.
+              Edit it under Admin → Releases, then make visible when ready.
+            </p>
           </CardContent>
         </Card>
       ) : (

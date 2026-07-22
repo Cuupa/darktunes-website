@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withErrorHandler } from '@/lib/errors'
+import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
-import { updateReleaseSubmissionStatus } from '@/lib/api/releaseSubmissions'
+import {
+  createDraftReleaseFromSubmission,
+  updateReleaseSubmissionStatus,
+} from '@/lib/api/releaseSubmissions'
 import { getTracksBySubmissionId } from '@/lib/api/releaseSubmissionTracks'
 
 function extractId(req: NextRequest): string {
@@ -14,6 +17,10 @@ function extractId(req: NextRequest): string {
 const patchSchema = z.object({
   status: z.enum(['received', 'reviewed', 'accepted', 'rejected']),
   adminReply: z.string().optional(),
+})
+
+const postSchema = z.object({
+  action: z.literal('create_draft_release'),
 })
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -57,5 +64,31 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   }
 
   return NextResponse.json(submission)
+})
+
+/**
+ * POST — create a hidden catalog draft release from this submission.
+ * Body: { action: 'create_draft_release' }
+ * Idempotent when release_id is already set.
+ */
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const token = extractBearerToken(req.headers.get('authorization'))
+  await verifyAdminOrEditor(token)
+  const supabase = await createServiceRoleSupabaseClient()
+
+  const id = extractId(req)
+  const body = postSchema.parse(await req.json())
+  if (body.action !== 'create_draft_release') {
+    throw new ApiError(400, 'Unsupported action')
+  }
+
+  try {
+    const result = await createDraftReleaseFromSubmission(supabase, id)
+    return NextResponse.json(result, { status: result.created ? 201 : 200 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to create draft release'
+    if (msg === 'Submission not found') throw new ApiError(404, msg)
+    throw new ApiError(500, msg)
+  }
 })
 

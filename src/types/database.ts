@@ -1711,6 +1711,7 @@ export interface Database {
           hero_secondary_btn_action: string | null
           hero_secondary_btn_href: string | null
           guest_artists: string | null
+          sync_policy: 'auto' | 'manual_until_street' | 'locked'
           created_at: string
           updated_at: string
         }
@@ -1750,6 +1751,7 @@ export interface Database {
           hero_secondary_btn_action?: string | null
           hero_secondary_btn_href?: string | null
           guest_artists?: string | null
+          sync_policy?: 'auto' | 'manual_until_street' | 'locked'
           created_at?: string
           updated_at?: string
         }
@@ -1789,6 +1791,7 @@ export interface Database {
           hero_secondary_btn_action?: string | null
           hero_secondary_btn_href?: string | null
           guest_artists?: string | null
+          sync_policy?: 'auto' | 'manual_until_street' | 'locked'
           created_at?: string
           updated_at?: string
         }
@@ -3791,6 +3794,7 @@ export interface Database {
           form_data: Record<string, unknown> | null
           admin_reply: string | null
           admin_reply_at: string | null
+          release_id: string | null
           created_at: string
           updated_at: string
         }
@@ -3815,6 +3819,7 @@ export interface Database {
           form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
+          release_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -3839,6 +3844,7 @@ export interface Database {
           form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
+          release_id?: string | null
           created_at?: string
           updated_at?: string
         }

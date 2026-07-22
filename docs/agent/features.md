@@ -97,9 +97,13 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 Artists pick release type, enter track count for multi-track types, and see only fields marked visible/required for that type.
 
+**Draft catalog release:** Admin POST `/api/admin/release-submissions/[id]` `{ action: 'create_draft_release' }` → hidden `releases` row + `release_submissions.release_id` link + `sync_policy=manual_until_street`. Accept status alone does **not** create a catalog row.
+
+**Sync protection:** `releases.sync_policy` — `auto` | `manual_until_street` | `locked`. Fuzzy iTunes/Spotify/Discogs merge skips protected rows until street date (or forever if locked).
+
 ## Video submission
 
-`/portal/releases/videos/new` → `videos` row `is_visible=false`. Admin: `/admin/video-submissions`. APIs: `POST /api/portal/submit-video`, `PATCH /api/admin/video-submissions/[id]`.
+`/portal/releases/videos/new` → `video_submissions` row only (not a `videos` catalog entry until a future promote feature). Admin: `/admin/video-submissions`. APIs: `POST /api/portal/submit-video`, `PATCH /api/admin/video-submissions/[id]`.
 
 ## Portal access gate
 

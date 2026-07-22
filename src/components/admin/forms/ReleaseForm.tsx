@@ -42,6 +42,8 @@ export interface ReleaseFormData {
   featuredUntilLocal: string
   isVisible: boolean
   isPromo: boolean
+  /** auto | manual_until_street | locked — protects pre-release rows from sync overwrite */
+  syncPolicy: 'auto' | 'manual_until_street' | 'locked'
   promoText: string
   heroBgUrl: string
   heroPrimaryBtnLabel: string
@@ -76,6 +78,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   const featured = watch('featured')
   const isVisible = watch('isVisible')
   const isPromo = watch('isPromo')
+  const syncPolicy = watch('syncPolicy')
   const type = watch('type')
   const heroPrimaryBtnAction = watch('heroPrimaryBtnAction')
   const heroSecondaryBtnAction = watch('heroSecondaryBtnAction')
@@ -240,6 +243,31 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
           <Label htmlFor="smartlinkUrl">Smartlink URL</Label>
           <Input id="smartlinkUrl" {...register('smartlinkUrl')} disabled={isLoading} placeholder="https://linktr.ee/…" />
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="syncPolicy">Sync protection</Label>
+        <Select
+          value={syncPolicy}
+          onValueChange={(v) =>
+            setValue('syncPolicy', v as ReleaseFormData['syncPolicy'])
+          }
+          disabled={isLoading}
+        >
+          <SelectTrigger id="syncPolicy">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto (normal sync merge)</SelectItem>
+            <SelectItem value="manual_until_street">
+              Protect until street date (no fuzzy iTunes merge)
+            </SelectItem>
+            <SelectItem value="locked">Locked (never fuzzy-merge)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Use protect/locked for pre-releases entered by hand so sync cannot overwrite them before release day.
+        </p>
       </div>
 
       <div className="flex items-center gap-6">

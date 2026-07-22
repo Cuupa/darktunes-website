@@ -70,6 +70,7 @@ export function rowToRelease(row: ReleaseRow): Release {
         }
       : undefined,
     guestArtists: row.guest_artists ? stripEmojis(row.guest_artists) : undefined,
+    syncPolicy: row.sync_policy ?? 'auto',
   }
 }
 
@@ -341,7 +342,7 @@ function pickSyncWritableFields(data: ReleaseInsert): ReleaseUpdate {
 }
 
 const CROSS_SOURCE_RELEASE_SELECT =
-  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode'
+  'id, title, release_date, spotify_id, itunes_id, discogs_id, isrc, barcode, sync_policy'
 
 function rowToCrossSourceRelease(row: {
   id: string
@@ -352,6 +353,7 @@ function rowToCrossSourceRelease(row: {
   discogs_id: string | null
   isrc: string | null
   barcode: string | null
+  sync_policy?: 'auto' | 'manual_until_street' | 'locked' | null
 }): CrossSourceReleaseRow {
   return {
     id: row.id,
@@ -362,6 +364,7 @@ function rowToCrossSourceRelease(row: {
     discogs_id: row.discogs_id,
     isrc: row.isrc,
     barcode: row.barcode,
+    sync_policy: row.sync_policy ?? 'auto',
   }
 }
 
@@ -487,6 +490,7 @@ function releaseRowFromInsert(
     discogs_id: sanitized.discogs_id ?? release.discogsId ?? null,
     isrc: sanitized.isrc ?? release.isrc ?? null,
     barcode: sanitized.barcode ?? release.barcode ?? null,
+    sync_policy: sanitized.sync_policy ?? release.syncPolicy ?? 'auto',
   }
 }
 

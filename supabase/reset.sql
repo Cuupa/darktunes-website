@@ -829,6 +829,23 @@ ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS featured_until            T
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS featured_removed_reason   TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS bandcamp_url             TEXT;
 ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS smartlink_url            TEXT;
+-- Sync protection: auto | manual_until_street | locked
+ALTER TABLE public.releases ADD COLUMN IF NOT EXISTS sync_policy TEXT NOT NULL DEFAULT 'auto';
+DO $$ BEGIN
+  ALTER TABLE public.releases
+    ADD CONSTRAINT releases_sync_policy_check
+    CHECK (sync_policy IN ('auto', 'manual_until_street', 'locked'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+COMMENT ON COLUMN public.releases.sync_policy IS
+  'auto: normal sync merge; manual_until_street: no fuzzy merge before release_date; locked: never fuzzy-merge.';
+-- Pre-existing manual placeholders (no external IDs) default to street-date protection
+UPDATE public.releases
+SET sync_policy = 'manual_until_street'
+WHERE sync_policy = 'auto'
+  AND spotify_id IS NULL
+  AND itunes_id IS NULL
+  AND discogs_id IS NULL;
 -- Upgrade FK from SET NULL → CASCADE (idempotent via drop+add)
 ALTER TABLE public.releases DROP CONSTRAINT IF EXISTS releases_artist_id_fkey;
 ALTER TABLE public.releases ADD CONSTRAINT releases_artist_id_fkey
@@ -4540,13 +4557,18 @@ CREATE TABLE IF NOT EXISTS public.release_submissions (
   form_data           JSONB,
   admin_reply         TEXT,
   admin_reply_at      TIMESTAMPTZ,
+  -- Linked catalog release when label creates a draft from this submission
+  release_id          UUID                      REFERENCES public.releases (id) ON DELETE SET NULL,
   created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS release_id UUID REFERENCES public.releases (id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_release_submissions_artist_id ON public.release_submissions (artist_id);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_status    ON public.release_submissions (status);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_created   ON public.release_submissions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_release_submissions_release_id ON public.release_submissions (release_id);
 
 DROP TRIGGER IF EXISTS trg_release_submissions_updated_at ON public.release_submissions;
 CREATE TRIGGER trg_release_submissions_updated_at
