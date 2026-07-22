@@ -6,7 +6,9 @@
  * Security:
  *   - Bearer token verified via Supabase Auth
  *   - artist_id in body validated against the authenticated user's linked artist
- *   - Supabase RLS provides a second layer of enforcement at the DB level
+ *   - After membership is verified, artist_epks + artists writes use the
+ *     service-role client so band members are not blocked by legacy RLS that
+ *     only allowed `artists.user_id` (same pattern as the artists update path).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -21,6 +23,7 @@ import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
 
 type ArtistUpdate = Database['public']['Tables']['artists']['Update']
+type ArtistEpkInsert = Database['public']['Tables']['artist_epks']['Insert']
 type NullableUrl = string | null | undefined
 
 /** Hash a plaintext password using scrypt. Returns `salt:hash` hex string. */
@@ -30,65 +33,81 @@ function hashPassword(plain: string): string {
   return `${salt}:${hash}`
 }
 
+/**
+ * Accept absolute URLs, empty/null, or legacy non-URL storage paths (relative
+ * R2 keys, protocol-relative CDN paths). Strict `.url()` alone rejected real
+ * roster data and blocked otherwise-valid profile saves with 400.
+ */
+const optionalMediaUrl = z.union([
+  z.string().url(),
+  z.literal(''),
+  z.null(),
+  z.string().max(2000),
+]).optional()
+
+const optionalLinkUrl = z.union([z.string().url(), z.literal(''), z.null()]).optional()
+
 const profileBodySchema = z.object({
   artist_id: z.string().uuid(),
-  bio: z.string().max(2000).nullable().optional(),
+  // artists.bio can be long HTML from the label CMS; portal form only re-sends it.
+  bio: z.string().max(50000).nullable().optional(),
   bio_short: z.string().max(6000).nullable().optional(),
   bio_medium: z.string().max(12000).nullable().optional(),
   bio_long: z.string().max(30000).nullable().optional(),
-  image_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  image_url: optionalMediaUrl,
   genres: z.array(z.string()).optional(),
   // Social/streaming URLs — stored in the artists table (single source of truth).
   // Accepted here so the form submits a single payload; written to artists only.
-  website_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  instagram_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  youtube_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  bandcamp_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  spotify_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  apple_music_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  tiktok_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  facebook_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  website_url: optionalLinkUrl,
+  instagram_url: optionalLinkUrl,
+  youtube_url: optionalLinkUrl,
+  bandcamp_url: optionalLinkUrl,
+  spotify_url: optionalLinkUrl,
+  apple_music_url: optionalLinkUrl,
+  tiktok_url: optionalLinkUrl,
+  facebook_url: optionalLinkUrl,
   press_quote: z.string().max(1000).nullable().optional(),
   founding_year: z.number().int().min(1900).max(2100).nullable().optional(),
   hometown: z.string().max(200).nullable().optional(),
   booking_contact: z.string().max(500).nullable().optional(),
   press_contact: z.string().max(500).nullable().optional(),
-  soundcloud_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  soundcloud_url: optionalLinkUrl,
   custom_links: z.array(
     z.object({
       label: z.string(),
       url: z.union([z.string().url(), z.literal(''), z.null()]),
     }),
   ).nullable().optional(),
-  rider_stage_plot_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  rider_technical_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
-  rider_hospitality_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  rider_stage_plot_url: optionalMediaUrl,
+  rider_technical_url: optionalMediaUrl,
+  rider_hospitality_url: optionalMediaUrl,
   // EPK customisation
   epk_theme: z.string().max(50).optional(),
   epk_layout: z.enum(['classic', 'magazine', 'minimal', 'full-bleed']).optional(),
   epk_orientation: z.enum(['portrait', 'landscape']).optional(),
-  epk_bg_image_url: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  epk_bg_image_url: optionalMediaUrl,
   epk_bg_opacity: z.number().int().min(0).max(100).optional(),
   epk_sections_order: z.array(z.string()).optional(),
   epk_sections_hidden: z.array(z.string()).optional(),
-  // EPK password protection — client sends plaintext prefixed with __plain__
+  // EPK password protection — client sends plaintext; hashed before persist
   epk_password_raw: z.string().max(200).nullable().optional(),
   epk_password_sections: z.array(z.string()).optional(),
   // EPK gallery + custom theme
-  epk_gallery_photos: z.array(z.union([z.string().url(), z.literal(''), z.null()])).optional(),
+  epk_gallery_photos: z.array(z.union([z.string().url(), z.literal(''), z.null(), z.string().max(2000)])).optional(),
   epk_custom_theme_tokens: z.record(z.string(), z.string()).nullable().optional(),
 })
 
 const normalizeUrl = (v: NullableUrl): string | null => (v === '' ? null : v ?? null)
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  // 1. Authenticate (Bearer JWT + RLS-aware Supabase client)
+  // 1. Authenticate (Bearer JWT + RLS-aware Supabase client for membership checks)
   const { supabase, user } = await authenticatePortalBearer(req)
 
   // 2. Validate body
   const body: unknown = await req.json()
   const parsed = profileBodySchema.safeParse(body)
   if (!parsed.success) {
+    console.error('[portal/profile] validation failed:', parsed.error.flatten())
     throw buildApiError('VALIDATION_ERROR', 400)
   }
 
@@ -130,13 +149,14 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     genres,
     founding_year,
     hometown,
+    epk_password_raw,
     ...profileFields
   } = d
 
   let epkPasswordHash: string | null | undefined = undefined
-  if (profileFields.epk_password_raw !== undefined) {
+  if (epk_password_raw !== undefined) {
     // null means "clear the password", a string means "set new password"
-    epkPasswordHash = profileFields.epk_password_raw ? hashPassword(profileFields.epk_password_raw) : null
+    epkPasswordHash = epk_password_raw ? hashPassword(epk_password_raw) : null
   }
 
   const normalizedCustomLinks = custom_links == null
@@ -149,22 +169,31 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     ?.map((url) => normalizeUrl(url))
     .filter((url): url is string => url !== null)
 
-  const profileData = {
+  // Never forward epk_password_raw (not a DB column). Pin artist_id to the
+  // membership-resolved row so clients cannot spoof another artist_id post-check.
+  const profileData: ArtistEpkInsert = {
     ...profileFields,
+    artist_id: artist.id,
     ...(rider_stage_plot_url !== undefined ? { rider_stage_plot_url: normalizeUrl(rider_stage_plot_url) } : {}),
     ...(rider_technical_url !== undefined ? { rider_technical_url: normalizeUrl(rider_technical_url) } : {}),
     ...(rider_hospitality_url !== undefined ? { rider_hospitality_url: normalizeUrl(rider_hospitality_url) } : {}),
     ...(epk_bg_image_url !== undefined ? { epk_bg_image_url: normalizeUrl(epk_bg_image_url) } : {}),
     ...(custom_links !== undefined ? { custom_links: normalizedCustomLinks } : {}),
     ...(epk_gallery_photos !== undefined ? { epk_gallery_photos: normalizedGalleryPhotos } : {}),
-    // Remove the raw password field; replace with hashed version
-    epk_password_raw: undefined,
     ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
   }
 
-  const profile = await upsertArtistProfile(supabase, profileData)
-
+  // Membership is already verified; use service-role for writes so portal
+  // members are not blocked by production RLS that only allowed artists.user_id.
   const serviceDb = await createServiceRoleSupabaseClient()
+
+  let profile
+  try {
+    profile = await upsertArtistProfile(serviceDb, profileData)
+  } catch (upsertErr) {
+    console.error('[portal/profile] artist_epks upsert failed:', upsertErr)
+    throw buildApiError('SERVER_ERROR', 500)
+  }
 
   // Press-kit sync is best-effort — profile data must save even when asset sync fails.
   if (epk_gallery_photos !== undefined) {
@@ -197,10 +226,6 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
   if (image_url !== undefined) artistUpdate.image_url = normalizeUrl(image_url)
 
-  // Shared artist fields (bio, genres, URLs, image) live on `artists`. Membership
-  // is already verified above; use the service-role client so band members who
-  // are not `artists.user_id` can still persist portal edits when production
-  // RLS predates the artist_members-based update policy.
   const { error: artistUpdateError } = await serviceDb
     .from('artists')
     .update(artistUpdate)

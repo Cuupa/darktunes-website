@@ -3,12 +3,16 @@
  *
  * GET  — load EPK canvas document (auto-migrates legacy presets on first access)
  * PUT  — save EPK canvas document
+ *
+ * Membership is verified with the bearer client; artist_epks reads/writes then
+ * use the service-role client so band members are not blocked by legacy RLS.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   getArtistProfileByArtistId,
   resolvePortalArtist,
@@ -36,11 +40,12 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const profile = await getArtistProfileByArtistId(supabase, artist.id)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await getArtistProfileByArtistId(serviceDb, artist.id)
   const siteSettings = await getCachedSiteSettings().catch(() => null)
 
   const state = await ensureMigratedEpkDocument(
-    supabase,
+    serviceDb,
     artist.id,
     profile ?? emptyArtistProfile(artist.id),
     artist,
@@ -61,8 +66,9 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
+  const serviceDb = await createServiceRoleSupabaseClient()
   const state = await saveEpkDocument(
-    supabase,
+    serviceDb,
     artist.id,
     body.document,
     user.id,

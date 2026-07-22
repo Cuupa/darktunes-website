@@ -4,6 +4,8 @@
  * GET    — list share links for an artist
  * POST   — create a new share link
  * DELETE — revoke a share link (?id=&artist_id=)
+ *
+ * Membership is verified with the bearer client; share-link CRUD uses service-role.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -16,6 +18,7 @@ import {
   revokeEpkShareLink,
 } from '@/lib/api/epkShareLinks'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const createSchema = z.object({
   artist_id: z.string().uuid(),
@@ -41,23 +44,24 @@ async function resolveArtistForUser(
     throw err
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
-  return { supabase, user, artist }
+  const serviceDb = await createServiceRoleSupabaseClient()
+  return { serviceDb, user, artist }
 }
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!artistId) throw new ApiError(400, 'artist_id is required')
 
-  const { supabase, artist } = await resolveArtistForUser(req, artistId)
-  const links = await listEpkShareLinks(supabase, artist.id)
+  const { serviceDb, artist } = await resolveArtistForUser(req, artistId)
+  const links = await listEpkShareLinks(serviceDb, artist.id)
   return NextResponse.json({ links })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = createSchema.parse(await req.json())
-  const { supabase, user, artist } = await resolveArtistForUser(req, body.artist_id)
+  const { serviceDb, user, artist } = await resolveArtistForUser(req, body.artist_id)
 
-  const link = await createEpkShareLink(supabase, {
+  const link = await createEpkShareLink(serviceDb, {
     artistId: artist.id,
     createdBy: user.id,
     label: body.label,
@@ -73,7 +77,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!linkId || !artistId) throw new ApiError(400, 'id and artist_id are required')
 
-  const { supabase, artist } = await resolveArtistForUser(req, artistId)
-  await revokeEpkShareLink(supabase, artist.id, linkId)
+  const { serviceDb, artist } = await resolveArtistForUser(req, artistId)
+  await revokeEpkShareLink(serviceDb, artist.id, linkId)
   return NextResponse.json({ success: true })
 })

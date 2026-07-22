@@ -2,6 +2,8 @@
  * app/api/portal/epk/versions/[id]/restore/route.ts
  *
  * POST — restore an EPK document from a version snapshot
+ *
+ * Membership is verified with the bearer client; restore writes use service-role.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,6 +12,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { restoreEpkVersion } from '@/lib/api/epkDocument'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const bodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -32,7 +35,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   try {
-    const state = await restoreEpkVersion(supabase, artist.id, versionId, user.id)
+    const serviceDb = await createServiceRoleSupabaseClient()
+    const state = await restoreEpkVersion(serviceDb, artist.id, versionId, user.id)
     return NextResponse.json(state)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Restore failed'

@@ -44,7 +44,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(403, 'Direct publish not allowed for this artist')
   }
 
-  const result = await publishFanPage(supabase, {
+  // Membership verified — publish state writes use service-role so band members
+  // are not blocked by legacy RLS on artist_landing_pages.
+  const serviceRole = await createServiceRoleSupabaseClient()
+  const result = await publishFanPage(serviceRole, {
     artistId: artist.id,
     mode: body.mode,
     landingPublishTrusted: artist.landingPublishTrusted ?? false,
@@ -52,7 +55,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   })
 
   if (body.mode === 'submit_review') {
-    const serviceRole = await createServiceRoleSupabaseClient()
     const { data: recipients } = await serviceRole
       .from('users')
       .select('id')

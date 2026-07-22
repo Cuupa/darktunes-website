@@ -4,6 +4,7 @@ import { getBillingProfile, isBillingProfileComplete, upsertBillingProfile } fro
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const upsertBillingProfileSchema = z.object({
   artist_id: z.string().uuid(),
@@ -26,7 +27,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const artist = await resolvePortalArtist(supabase, user.id, artistId)
   if (!artist) throw new ApiError(403, 'Forbidden')
 
-  const profile = await getBillingProfile(supabase, artist.id)
+  // Membership verified — service-role avoids RLS drift blocking band members.
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await getBillingProfile(serviceDb, artist.id)
 
   return NextResponse.json({
     profile,
@@ -46,7 +49,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
   if (!artist) throw new ApiError(403, 'Forbidden')
 
-  const profile = await upsertBillingProfile(supabase, artist.id, {
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await upsertBillingProfile(serviceDb, artist.id, {
     legalName: parsed.data.legal_name,
     street: parsed.data.street,
     postalCode: parsed.data.postal_code,

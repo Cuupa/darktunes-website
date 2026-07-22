@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   buildEpkFontPublicUrl,
   createEpkFont,
@@ -58,8 +59,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
+  const serviceDb = await createServiceRoleSupabaseClient()
   const { serverEnv } = await import('@/lib/env.server')
-  const fonts = await listEpkFonts(supabase, artist.id)
+  const fonts = await listEpkFonts(serviceDb, artist.id)
 
   return NextResponse.json({
     fonts: fonts.map((font) => ({
@@ -130,7 +132,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ? label.trim()
       : familyFromFilename(file.name)
 
-  const record = await createEpkFont(supabase, {
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const record = await createEpkFont(serviceDb, {
     artist_id: artist.id,
     name: familyName,
     r2_key: r2Key,
@@ -162,7 +165,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
   const body = deleteSchema.parse(await req.json())
-  const removed = await deleteEpkFont(supabase, body.id, artist.id)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const removed = await deleteEpkFont(serviceDb, body.id, artist.id)
   if (!removed) throw new ApiError(404, 'Font not found')
 
   if (removed.artistId) {

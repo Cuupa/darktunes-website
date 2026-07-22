@@ -1,11 +1,15 @@
 /**
  * GET/PUT — Fan Page document load/save
+ *
+ * Membership is verified with the bearer client; document reads/writes use
+ * service-role so band members are not blocked by legacy RLS.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   getArtistProfileByArtistId,
   resolvePortalArtist,
@@ -30,8 +34,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const profile = await getArtistProfileByArtistId(supabase, artist.id)
-  const state = await getFanPageDocumentState(supabase, artist.id, artist, profile, templateId)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const profile = await getArtistProfileByArtistId(serviceDb, artist.id)
+  const state = await getFanPageDocumentState(serviceDb, artist.id, artist, profile, templateId)
 
   return NextResponse.json(state)
 })
@@ -47,7 +52,8 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
 
-  const state = await saveFanPageDocument(supabase, artist.id, body.document)
+  const serviceDb = await createServiceRoleSupabaseClient()
+  const state = await saveFanPageDocument(serviceDb, artist.id, body.document)
 
   return NextResponse.json(state)
 })

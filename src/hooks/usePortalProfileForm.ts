@@ -37,7 +37,9 @@ export const PORTAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024
 const optionalUrl = z.string().url('Must be a valid URL').optional().or(z.literal(''))
 
 export const profileSchema = z.object({
-  bio: z.string().max(2000).optional(),
+  // Not edited in the portal UI — only re-sent to preserve artists.bio.
+  // Label CMS bios can be long HTML; keep in sync with the API max.
+  bio: z.string().max(50000).optional(),
   bio_short: z.string().max(6000).optional(),
   bio_medium: z.string().max(12000).optional(),
   bio_long: z.string().max(30000).optional(),
@@ -181,7 +183,7 @@ export function usePortalProfileForm({
       const supabase = createBrowserSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { toast.error(t('profile_rider_upload_error')); return }
-      const url = await uploadRiderDocument(file, riderType, session.access_token)
+      const url = await uploadRiderDocument(file, riderType, session.access_token, artistId)
       setRiderUrls((prev) => ({ ...prev, [riderType]: url }))
       toast.success(t('profile_rider_uploaded'))
     } catch {
@@ -283,11 +285,16 @@ export function usePortalProfileForm({
         ? parseInt(values.founding_year, 10)
         : null
 
+      // Prefer a real photo URL; empty string must become null (?? only catches null/undefined).
+      const imageUrl = photoUrl && photoUrl.trim() ? photoUrl.trim() : null
+
       await saveArtistProfile(
         {
           artist_id: artistId,
-          image_url: photoUrl ?? null,
-          bio: values.bio ?? null,
+          image_url: imageUrl,
+          // Only re-send label bio when present — omit when empty so we never
+          // wipe artists.bio with null/'' from an unused form field.
+          ...(values.bio?.trim() ? { bio: values.bio } : {}),
           bio_short: values.bio_short ?? null,
           bio_medium: values.bio_medium ?? null,
           bio_long: values.bio_long ?? null,
@@ -296,7 +303,7 @@ export function usePortalProfileForm({
             : [],
           press_quote: values.press_quote ?? null,
           founding_year: foundingYearNum && !isNaN(foundingYearNum) ? foundingYearNum : null,
-          hometown: values.hometown || null,
+          hometown: values.hometown?.trim() ? values.hometown.trim() : null,
           booking_contact: values.booking_contact || null,
           press_contact: values.press_contact || null,
           website_url: values.website_url || null,
