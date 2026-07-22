@@ -21,7 +21,7 @@ import { ensureMigratedEpkDocument, saveEpkDocument } from '@/lib/api/epkDocumen
 import { epkDocumentV2Schema } from '@/lib/epk/schema/documentV2'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
-import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
 
 const putBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -57,33 +57,22 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body = putBodySchema.parse(await req.json())
+  const ctx = await withPortalMembership(req, body.artist_id)
 
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const { value: state } = await portalWriteWithCanary({
-    userDb: supabase,
-    serviceDb,
-    context: {
+  const { value: state } = await portalMemberWrite(
+    ctx,
+    {
       route: 'PUT /api/portal/epk/document',
       table: 'artist_epks',
       operation: 'upsert',
-      artistId: artist.id,
-      userId: user.id,
     },
-    write: (db) =>
-      saveEpkDocument(db, artist.id, body.document, user.id, {
+    (db) =>
+      saveEpkDocument(db, ctx.artist.id, body.document, ctx.user.id, {
         createVersion: body.create_version,
         versionLabel: body.version_label,
       }),
-  })
+  )
 
   return NextResponse.json(state)
 })

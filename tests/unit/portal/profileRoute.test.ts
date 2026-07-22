@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const createServiceRoleSupabaseClientMock = vi.fn()
 const resolvePortalArtistMock = vi.fn()
 const upsertArtistProfileMock = vi.fn()
+const getArtistProfileByArtistIdMock = vi.fn()
 const syncPortalGalleryToPressKitMock = vi.fn()
 const revalidatePathMock = vi.fn()
 const authenticatePortalBearerMock = vi.fn()
@@ -19,6 +20,7 @@ vi.mock('@/lib/portal/bearerAuth', () => ({
 vi.mock('@/lib/api/artistProfiles', () => ({
   resolvePortalArtist: resolvePortalArtistMock,
   upsertArtistProfile: upsertArtistProfileMock,
+  getArtistProfileByArtistId: getArtistProfileByArtistIdMock,
 }))
 
 vi.mock('@/lib/api/portalGalleryPress', () => ({
@@ -54,6 +56,7 @@ describe('PUT /api/portal/profile', () => {
 
     resolvePortalArtistMock.mockResolvedValue({ id: artistId, slug: 'artist-slug' })
     upsertArtistProfileMock.mockResolvedValue({ id: 'profile-1' })
+    getArtistProfileByArtistIdMock.mockResolvedValue({ id: 'profile-existing' })
     syncPortalGalleryToPressKitMock.mockResolvedValue(undefined)
   })
 
@@ -99,7 +102,6 @@ describe('PUT /api/portal/profile', () => {
 
     const serviceClient = await createServiceRoleSupabaseClientMock.mock.results[0]?.value
 
-    // EPK upsert must use service-role (not the bearer/RLS client)
     expect(upsertArtistProfileMock).toHaveBeenCalledWith(
       serviceClient,
       expect.objectContaining({
@@ -112,7 +114,6 @@ describe('PUT /api/portal/profile', () => {
         epk_gallery_photos: ['https://images.example.com/gallery.jpg'],
       }),
     )
-    // Never forward the raw password field to PostgREST
     const upsertPayload = upsertArtistProfileMock.mock.calls[0]?.[1] as Record<string, unknown>
     expect(upsertPayload).not.toHaveProperty('epk_password_raw')
 
@@ -144,7 +145,7 @@ describe('PUT /api/portal/profile', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/artists')
   })
 
-  it('persists hometown on artists via service-role after membership check', async () => {
+  it('persists hometown without artist_epks upsert when only roster fields change', async () => {
     const { PUT } = await loadRoute()
     const request = new NextRequest('http://localhost/api/portal/profile', {
       method: 'PUT',
@@ -162,12 +163,11 @@ describe('PUT /api/portal/profile', () => {
     const response = await PUT(request)
     expect(response.status).toBe(200)
 
-    const serviceClient = await createServiceRoleSupabaseClientMock.mock.results[0]?.value
-    expect(upsertArtistProfileMock).toHaveBeenCalledWith(
-      serviceClient,
-      expect.objectContaining({ artist_id: artistId }),
-    )
+    // Partial roster-only patch must not upsert EPK
+    expect(upsertArtistProfileMock).not.toHaveBeenCalled()
+    expect(getArtistProfileByArtistIdMock).toHaveBeenCalled()
 
+    const serviceClient = await createServiceRoleSupabaseClientMock.mock.results[0]?.value
     const updateBuilder = serviceClient.from.mock.results[0]?.value
     expect(updateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -195,6 +195,7 @@ describe('PUT /api/portal/profile', () => {
     const response = await PUT(request)
     expect(response.status).toBe(200)
 
+    expect(upsertArtistProfileMock).not.toHaveBeenCalled()
     const serviceClient = await createServiceRoleSupabaseClientMock.mock.results[0]?.value
     const updateBuilder = serviceClient.from.mock.results[0]?.value
     expect(updateBuilder.update).toHaveBeenCalledWith(
@@ -238,7 +239,7 @@ describe('PUT /api/portal/profile', () => {
       },
       body: JSON.stringify({
         artist_id: artistId,
-        hometown: 'Leipzig',
+        press_quote: 'Great band',
       }),
     })
 

@@ -145,7 +145,9 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 
 **Service role forever:** `label_messages` welcome insert (artists SELECT-only), `editor_notifications` to staff, cron/admin jobs.
 
-**Migrate back:** verify prod policies with `scripts/verify-portal-rls.sql` → dual-path canary (`PORTAL_WRITES_USE_USER_JWT=1` + `portalWriteWithCanary`) → flip tables by risk. Full plan: [portal-write-auth.md](portal-write-auth.md).
+**Helpers:** `withPortalMembership` + `portalMemberWrite` (`src/lib/portal/withPortalMembership.ts`). Profile PUT accepts **partial** payloads (dirty fields only).
+
+**Migrate back:** verify prod policies with `scripts/verify-portal-rls.sql` → dual-path canary (`PORTAL_WRITES_USE_USER_JWT=1`) → flip tables by risk. Full plan: [portal-write-auth.md](portal-write-auth.md).
 
 ## Error logging
 

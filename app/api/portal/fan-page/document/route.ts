@@ -16,7 +16,7 @@ import {
 } from '@/lib/api/artistProfiles'
 import { getFanPageDocumentState, saveFanPageDocument } from '@/lib/api/fanPageDocument'
 import { landingPageDocumentV1Schema } from '@/lib/fan-page/schema/documentV1'
-import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
 
 const putBodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -43,29 +43,18 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body = putBodySchema.parse(await req.json())
+  const ctx = await withPortalMembership(req, body.artist_id)
 
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const { value: state } = await portalWriteWithCanary({
-    userDb: supabase,
-    serviceDb,
-    context: {
+  const { value: state } = await portalMemberWrite(
+    ctx,
+    {
       route: 'PUT /api/portal/fan-page/document',
       table: 'artist_landing_pages',
       operation: 'upsert',
-      artistId: artist.id,
-      userId: user.id,
     },
-    write: (db) => saveFanPageDocument(db, artist.id, body.document),
-  })
+    (db) => saveFanPageDocument(db, ctx.artist.id, body.document),
+  )
 
   return NextResponse.json(state)
 })

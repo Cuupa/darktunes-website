@@ -4,7 +4,7 @@ import { getBillingProfile, isBillingProfileComplete, upsertBillingProfile } fro
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const upsertBillingProfileSchema = z.object({
@@ -39,7 +39,6 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body: unknown = await req.json()
   const parsed = upsertBillingProfileSchema.safeParse(body)
 
@@ -47,22 +46,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(400, parsed.error.issues.map((issue) => issue.message).join('; '))
   }
 
-  const artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
-  if (!artist) throw new ApiError(403, 'Forbidden')
-
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const { value: profile } = await portalWriteWithCanary({
-    userDb: supabase,
-    serviceDb,
-    context: {
+  const ctx = await withPortalMembership(req, parsed.data.artist_id)
+  const { value: profile } = await portalMemberWrite(
+    ctx,
+    {
       route: 'POST /api/portal/billing-profile',
       table: 'artist_billing_profiles',
       operation: 'upsert',
-      artistId: artist.id,
-      userId: user.id,
     },
-    write: (db) =>
-      upsertBillingProfile(db, artist.id, {
+    (db) =>
+      upsertBillingProfile(db, ctx.artist.id, {
         legalName: parsed.data.legal_name,
         street: parsed.data.street,
         postalCode: parsed.data.postal_code,
@@ -75,7 +68,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         bic: parsed.data.bic,
         paypalEmail: parsed.data.paypal_email || undefined,
       }),
-  })
+  )
 
   return NextResponse.json({
     profile,

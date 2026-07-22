@@ -117,11 +117,12 @@ Remove service-role fallback only when dual-path metrics and QA are green.
 
 Regardless of JWT vs service role:
 
-1. **Auth:** `authenticatePortalBearer` / server session + `getUser`.
-2. **AuthZ:** `resolvePortalArtist(userId, artistId)` — membership required.
+1. **Auth + AuthZ:** prefer `withPortalMembership(req, artistId)` for mutation routes (Bearer + membership + `userDb`/`serviceDb`).
+2. **Writes:** `portalMemberWrite(ctx, meta, write)` for dual-path canary.
 3. **Field allowlist:** only portal-safe columns on `artists` (bio, hometown, genres, socials, image, …). Never pass raw body through to `artists`.
-4. **Errors:** map DB failures to `SERVER_ERROR` / `FORBIDDEN` without leaking internals; log server-side with table + Postgres code.
-5. **IoC:** pass `SupabaseClient` into DAL; routes choose client.
+4. **Partial profile PUT:** client sends only dirty fields; server skips `artist_epks` upsert when only roster fields change.
+5. **Errors:** map DB failures to `SERVER_ERROR` / `FORBIDDEN` without leaking internals; log server-side with table + Postgres code.
+6. **IoC:** pass `SupabaseClient` into DAL; routes choose client via membership helper.
 
 ## Helper
 

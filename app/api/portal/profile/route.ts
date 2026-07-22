@@ -1,24 +1,23 @@
 /**
  * app/api/portal/profile/route.ts
  *
- * PUT /api/portal/profile — upsert the artist's EPK profile.
+ * PUT /api/portal/profile — partial or full upsert of the artist's EPK profile
+ * and shared artists-table fields.
  *
  * Security:
- *   - Bearer token verified via Supabase Auth
- *   - artist_id in body validated against the authenticated user's linked artist
- *   - After membership is verified, artist_epks + artists writes use the
- *     service-role client so band members are not blocked by legacy RLS that
- *     only allowed `artists.user_id` (same pattern as the artists update path).
+ *   - withPortalMembership (Bearer + artist_members)
+ *   - Field allowlists only (no raw body passthrough)
+ *   - portalMemberWrite canary (service-role default; optional user JWT)
+ *
+ * Partial payloads: omit keys that should not change. artist_id is required.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { withErrorHandler, buildApiError } from '@/lib/errors'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { resolvePortalArtist, upsertArtistProfile } from '@/lib/api/artistProfiles'
+import { getArtistProfileByArtistId, upsertArtistProfile } from '@/lib/api/artistProfiles'
 import { syncPortalGalleryToPressKit } from '@/lib/api/portalGalleryPress'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { portalWriteWithCanary } from '@/lib/portal/portalWriteClient'
+import { portalMemberWrite, withPortalMembership } from '@/lib/portal/withPortalMembership'
 import { z } from 'zod'
 import { scryptSync, randomBytes } from 'crypto'
 import type { Database } from '@/types/database'
@@ -100,11 +99,10 @@ const profileBodySchema = z.object({
 
 const normalizeUrl = (v: NullableUrl): string | null => (v === '' ? null : v ?? null)
 
-export const PUT = withErrorHandler(async (req: NextRequest) => {
-  // 1. Authenticate (Bearer JWT + RLS-aware Supabase client for membership checks)
-  const { supabase, user } = await authenticatePortalBearer(req)
+const ROUTE = 'PUT /api/portal/profile'
 
-  // 2. Validate body
+export const PUT = withErrorHandler(async (req: NextRequest) => {
+  // 1. Validate body first (cheap) then membership
   const body: unknown = await req.json()
   const parsed = profileBodySchema.safeParse(body)
   if (!parsed.success) {
@@ -112,20 +110,11 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     throw buildApiError('VALIDATION_ERROR', 400)
   }
 
-  // 3. Confirm the artist_id in the body belongs to the authenticated user
-  let artist
-  try {
-    artist = await resolvePortalArtist(supabase, user.id, parsed.data.artist_id)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw buildApiError('FORBIDDEN', 403)
-    throw err
-  }
-  if (!artist) throw buildApiError('FORBIDDEN', 403)
+  // 2. Auth + membership (pins artist; spoofed artist_id rejected)
+  const ctx = await withPortalMembership(req, parsed.data.artist_id)
+  const { artist, user, serviceDb } = ctx
 
-  // 4. Build upsert payload — resolve password before inserting.
-  // Social/streaming URLs (website_url, instagram_url, etc.) are stored in
-  // the artists table only (Track 2 consolidation); exclude them here.
+  // 3. Split artists-table fields vs artist_epks fields
   const d = parsed.data
   const {
     website_url,
@@ -144,19 +133,17 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     epk_bg_image_url,
     custom_links,
     epk_gallery_photos,
-    // bio, genres, founding_year, and hometown are stored on artists (single source of truth);
-    // extract them here so they are NOT passed to upsertArtistProfile.
     bio,
     genres,
     founding_year,
     hometown,
     epk_password_raw,
+    artist_id: _artistId,
     ...profileFields
   } = d
 
   let epkPasswordHash: string | null | undefined = undefined
   if (epk_password_raw !== undefined) {
-    // null means "clear the password", a string means "set new password"
     epkPasswordHash = epk_password_raw ? hashPassword(epk_password_raw) : null
   }
 
@@ -170,8 +157,6 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     ?.map((url) => normalizeUrl(url))
     .filter((url): url is string => url !== null)
 
-  // Never forward epk_password_raw (not a DB column). Pin artist_id to the
-  // membership-resolved row so clients cannot spoof another artist_id post-check.
   const profileData: ArtistEpkInsert = {
     ...profileFields,
     artist_id: artist.id,
@@ -184,30 +169,29 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     ...(epkPasswordHash !== undefined ? { epk_password_hash: epkPasswordHash } : {}),
   }
 
-  // Membership verified. Default: service-role. With PORTAL_WRITES_USE_USER_JWT=1,
-  // try user JWT first and fall back on RLS (see portal-write-auth.md Phase 2).
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const writeCtxBase = {
-    route: 'PUT /api/portal/profile',
-    artistId: artist.id,
-    userId: user.id,
-  } as const
+  // Partial update: only touch artist_epks when EPK-side keys were sent
+  const epkPatchKeys = Object.keys(profileData).filter((k) => k !== 'artist_id')
+  const hasEpkPatch = epkPatchKeys.length > 0
 
-  let profile
-  try {
-    const epkResult = await portalWriteWithCanary({
-      userDb: supabase,
-      serviceDb,
-      context: { ...writeCtxBase, table: 'artist_epks', operation: 'upsert' },
-      write: (db) => upsertArtistProfile(db, profileData),
-    })
-    profile = epkResult.value
-  } catch (upsertErr) {
-    console.error('[portal/profile] artist_epks upsert failed:', upsertErr)
-    throw buildApiError('SERVER_ERROR', 500)
+  let profile = null
+  if (hasEpkPatch) {
+    try {
+      const epkResult = await portalMemberWrite(
+        ctx,
+        { route: ROUTE, table: 'artist_epks', operation: 'upsert' },
+        (db) => upsertArtistProfile(db, profileData),
+      )
+      profile = epkResult.value
+    } catch (upsertErr) {
+      console.error('[portal/profile] artist_epks upsert failed:', upsertErr)
+      throw buildApiError('SERVER_ERROR', 500)
+    }
+  } else {
+    // Hometown-only (etc.): return current EPK row without a no-op upsert
+    profile = await getArtistProfileByArtistId(serviceDb, artist.id)
   }
 
-  // Press-kit sync is best-effort and always service-role (assets RLS).
+  // Press-kit sync only when gallery was part of this request
   if (epk_gallery_photos !== undefined) {
     try {
       await syncPortalGalleryToPressKit(
@@ -221,8 +205,8 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  // 5. Sync shared fields back to the artists table (single source of truth)
-  const artistUpdate: ArtistUpdate = { updated_at: new Date().toISOString() }
+  // 4. Shared artists fields — only keys present in the payload
+  const artistUpdate: ArtistUpdate = {}
   if (bio !== undefined) artistUpdate.bio = bio ?? ''
   if (genres !== undefined) artistUpdate.genres = genres
   if (founding_year !== undefined) artistUpdate.founding_year = founding_year
@@ -238,25 +222,27 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   if (soundcloud_url !== undefined) artistUpdate.soundcloud_url = normalizeUrl(soundcloud_url)
   if (image_url !== undefined) artistUpdate.image_url = normalizeUrl(image_url)
 
-  try {
-    await portalWriteWithCanary({
-      userDb: supabase,
-      serviceDb,
-      context: { ...writeCtxBase, table: 'artists', operation: 'update' },
-      write: async (db) => {
-        const { error: artistUpdateError } = await db
-          .from('artists')
-          .update(artistUpdate)
-          .eq('id', artist.id)
-        if (artistUpdateError) throw new Error(artistUpdateError.message)
-      },
-    })
-  } catch (artistErr) {
-    console.error('[portal/profile] artists update failed:', artistErr)
-    throw buildApiError('SERVER_ERROR', 500)
+  const hasArtistPatch = Object.keys(artistUpdate).length > 0
+  if (hasArtistPatch) {
+    artistUpdate.updated_at = new Date().toISOString()
+    try {
+      await portalMemberWrite(
+        ctx,
+        { route: ROUTE, table: 'artists', operation: 'update' },
+        async (db) => {
+          const { error: artistUpdateError } = await db
+            .from('artists')
+            .update(artistUpdate)
+            .eq('id', artist.id)
+          if (artistUpdateError) throw new Error(artistUpdateError.message)
+        },
+      )
+    } catch (artistErr) {
+      console.error('[portal/profile] artists update failed:', artistErr)
+      throw buildApiError('SERVER_ERROR', 500)
+    }
   }
 
-  // 6. Invalidate public-facing artist pages so changes are reflected immediately
   if (artist.slug) {
     revalidatePath(`/artists/${artist.slug}`)
     revalidatePath(`/press/artists/${artist.slug}`)

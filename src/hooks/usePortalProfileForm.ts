@@ -91,6 +91,7 @@ export function usePortalProfileForm({
   const t = useTranslations('portal')
   const tErrors = useTranslations('errors')
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(artist?.imageUrl)
+  const [photoDirty, setPhotoDirty] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const isUploading = uploadProgress !== null && uploadProgress < 100
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -101,10 +102,12 @@ export function usePortalProfileForm({
     technical: initialProfile?.riderTechnicalUrl,
     hospitality: initialProfile?.riderHospitalityUrl,
   })
+  const [ridersDirty, setRidersDirty] = useState(false)
   const [riderUploading, setRiderUploading] = useState<RiderType | null>(null)
 
   // Gallery photos (managed separately from the main form)
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>(initialProfile?.epkGalleryPhotos ?? [])
+  const [galleryDirty, setGalleryDirty] = useState(false)
   const [galleryUploading, setGalleryUploading] = useState(false)
 
   const form = useForm<ProfileFormValues>({
@@ -160,6 +163,7 @@ export function usePortalProfileForm({
 
       const url = await uploadArtistPhoto(artistId, file, session.access_token, setUploadProgress)
       setPhotoUrl(url)
+      setPhotoDirty(true)
       toast.success(t('profile_photoUploaded'))
     } catch {
       toast.error(t('profile_photoError'))
@@ -185,6 +189,7 @@ export function usePortalProfileForm({
       if (!session) { toast.error(t('profile_rider_upload_error')); return }
       const url = await uploadRiderDocument(file, riderType, session.access_token, artistId)
       setRiderUrls((prev) => ({ ...prev, [riderType]: url }))
+      setRidersDirty(true)
       toast.success(t('profile_rider_uploaded'))
     } catch {
       toast.error(t('profile_rider_upload_error'))
@@ -195,6 +200,7 @@ export function usePortalProfileForm({
 
   const handleRiderDelete = async (riderType: RiderType) => {
     setRiderUrls((prev) => ({ ...prev, [riderType]: undefined }))
+    setRidersDirty(true)
     toast.success(t('profile_rider_deleted'))
   }
 
@@ -246,6 +252,7 @@ export function usePortalProfileForm({
         nextPhotos = [...prev, url]
         return nextPhotos
       })
+      setGalleryDirty(true)
       const saved = await persistGalleryPhotos(nextPhotos)
       if (saved) {
         toast.success(t('profile_photoUploaded'))
@@ -261,6 +268,7 @@ export function usePortalProfileForm({
   const handleGalleryRemove = async (url: string) => {
     const nextPhotos = galleryPhotos.filter((u) => u !== url)
     setGalleryPhotos(nextPhotos)
+    setGalleryDirty(true)
     const saved = await persistGalleryPhotos(nextPhotos)
     if (saved) {
       toast.success(t('profile_saved'))
@@ -268,7 +276,7 @@ export function usePortalProfileForm({
   }
 
   // -------------------------------------------------------------------------
-  // Form submission (includes rider URLs + gallery photos)
+  // Form submission — partial payload (only dirty fields + dirty extras)
   // -------------------------------------------------------------------------
 
   const onSubmit = async (values: ProfileFormValues) => {
@@ -281,49 +289,72 @@ export function usePortalProfileForm({
         return
       }
 
-      const foundingYearNum = values.founding_year
-        ? parseInt(values.founding_year, 10)
-        : null
+      const dirty = form.formState.dirtyFields
+      const hasFormDirty = Object.keys(dirty).length > 0
+      const hasExtraDirty = photoDirty || galleryDirty || ridersDirty
 
-      // Prefer a real photo URL; empty string must become null (?? only catches null/undefined).
-      const imageUrl = photoUrl && photoUrl.trim() ? photoUrl.trim() : null
+      if (!hasFormDirty && !hasExtraDirty) {
+        toast.message(t('profile_saved'))
+        return
+      }
 
-      await saveArtistProfile(
-        {
-          artist_id: artistId,
-          image_url: imageUrl,
-          // Only re-send label bio when present — omit when empty so we never
-          // wipe artists.bio with null/'' from an unused form field.
-          ...(values.bio?.trim() ? { bio: values.bio } : {}),
-          bio_short: values.bio_short ?? null,
-          bio_medium: values.bio_medium ?? null,
-          bio_long: values.bio_long ?? null,
-          genres: values.genres
-            ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
-            : [],
-          press_quote: values.press_quote ?? null,
-          founding_year: foundingYearNum && !isNaN(foundingYearNum) ? foundingYearNum : null,
-          hometown: values.hometown?.trim() ? values.hometown.trim() : null,
-          booking_contact: values.booking_contact || null,
-          press_contact: values.press_contact || null,
-          website_url: values.website_url || null,
-          instagram_url: values.instagram_url || null,
-          youtube_url: values.youtube_url || null,
-          bandcamp_url: values.bandcamp_url || null,
-          spotify_url: values.spotify_url || null,
-          apple_music_url: values.apple_music_url || null,
-          tiktok_url: values.tiktok_url || null,
-          facebook_url: values.facebook_url || null,
-          soundcloud_url: values.soundcloud_url || null,
-          custom_links: (values.custom_links ?? []).filter((l) => l.label && l.url) as Array<{ label: string; url: string }> | null,
-          rider_stage_plot_url: riderUrls.stage_plot ?? null,
-          rider_technical_url: riderUrls.technical ?? null,
-          rider_hospitality_url: riderUrls.hospitality ?? null,
-          epk_gallery_photos: galleryPhotos,
-        },
-        session.access_token,
-      )
+      type SavePayload = Parameters<typeof saveArtistProfile>[0]
+      const payload: SavePayload = { artist_id: artistId }
 
+      if (dirty.bio && values.bio?.trim()) payload.bio = values.bio
+      if (dirty.bio_short) payload.bio_short = values.bio_short ?? null
+      if (dirty.bio_medium) payload.bio_medium = values.bio_medium ?? null
+      if (dirty.bio_long) payload.bio_long = values.bio_long ?? null
+      if (dirty.genres) {
+        payload.genres = values.genres
+          ? values.genres.split(',').map((g) => g.trim()).filter(Boolean)
+          : []
+      }
+      if (dirty.press_quote) payload.press_quote = values.press_quote ?? null
+      if (dirty.founding_year) {
+        const foundingYearNum = values.founding_year
+          ? parseInt(values.founding_year, 10)
+          : null
+        payload.founding_year =
+          foundingYearNum && !isNaN(foundingYearNum) ? foundingYearNum : null
+      }
+      if (dirty.hometown) {
+        payload.hometown = values.hometown?.trim() ? values.hometown.trim() : null
+      }
+      if (dirty.booking_contact) payload.booking_contact = values.booking_contact || null
+      if (dirty.press_contact) payload.press_contact = values.press_contact || null
+      if (dirty.website_url) payload.website_url = values.website_url || null
+      if (dirty.instagram_url) payload.instagram_url = values.instagram_url || null
+      if (dirty.youtube_url) payload.youtube_url = values.youtube_url || null
+      if (dirty.bandcamp_url) payload.bandcamp_url = values.bandcamp_url || null
+      if (dirty.spotify_url) payload.spotify_url = values.spotify_url || null
+      if (dirty.apple_music_url) payload.apple_music_url = values.apple_music_url || null
+      if (dirty.tiktok_url) payload.tiktok_url = values.tiktok_url || null
+      if (dirty.facebook_url) payload.facebook_url = values.facebook_url || null
+      if (dirty.soundcloud_url) payload.soundcloud_url = values.soundcloud_url || null
+      if (dirty.custom_links) {
+        payload.custom_links = (values.custom_links ?? [])
+          .filter((l) => l.label && l.url) as Array<{ label: string; url: string }>
+      }
+
+      if (photoDirty) {
+        payload.image_url = photoUrl && photoUrl.trim() ? photoUrl.trim() : null
+      }
+      if (galleryDirty) {
+        payload.epk_gallery_photos = galleryPhotos
+      }
+      if (ridersDirty) {
+        payload.rider_stage_plot_url = riderUrls.stage_plot ?? null
+        payload.rider_technical_url = riderUrls.technical ?? null
+        payload.rider_hospitality_url = riderUrls.hospitality ?? null
+      }
+
+      await saveArtistProfile(payload, session.access_token)
+
+      form.reset(values)
+      setPhotoDirty(false)
+      setGalleryDirty(false)
+      setRidersDirty(false)
       toast.success(t('profile_saved'))
     } catch (err) {
       if (err instanceof PortalProfileSaveError) {
