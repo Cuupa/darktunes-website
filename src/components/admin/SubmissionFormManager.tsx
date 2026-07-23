@@ -76,6 +76,8 @@ const COPY = {
   fieldLabel: 'Label',
   fieldType: 'Type',
   fieldScope: 'Scope',
+  fieldGroup: 'Wizard group',
+  fieldGroupHint: 'Controls which step artists see this field on (metadata, distribution, rights, track, or custom).',
   scopeRelease: 'Release',
   scopeTrack: 'Track',
   status: 'Status',
@@ -127,6 +129,14 @@ async function parseApiError(res: Response): Promise<string> {
   }
 }
 
+const FIELD_GROUP_PRESETS = [
+  'metadata',
+  'distribution',
+  'rights',
+  'track',
+  'other',
+] as const
+
 interface SortableFieldRowProps {
   field: SubmissionFormField
   formType: 'release' | 'video'
@@ -136,6 +146,7 @@ interface SortableFieldRowProps {
   onLabelBlur: (field: SubmissionFormField, locale: string, value: string) => void
   onVisibleChange: (field: SubmissionFormField, visible: boolean) => void
   onRequiredChange: (field: SubmissionFormField, required: boolean) => void
+  onGroupChange: (field: SubmissionFormField, group: string | null) => void
   onDelete: (id: string) => void
 }
 
@@ -148,6 +159,7 @@ function SortableFieldRow({
   onLabelBlur,
   onVisibleChange,
   onRequiredChange,
+  onGroupChange,
   onDelete,
 }: SortableFieldRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -198,6 +210,29 @@ function SortableFieldRow({
         </TableCell>
       )}
       <TableCell>
+        <select
+          className="flex h-8 w-full min-w-[7rem] rounded-md border border-input bg-background px-2 text-xs"
+          value={field.fieldGroup ?? ''}
+          aria-label={`Wizard group for ${field.fieldKey}`}
+          onChange={(e) => {
+            const next = e.target.value.trim() || null
+            if (next === (field.fieldGroup ?? null)) return
+            onGroupChange(field, next)
+          }}
+        >
+          <option value="">—</option>
+          {FIELD_GROUP_PRESETS.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+          {field.fieldGroup &&
+            !(FIELD_GROUP_PRESETS as readonly string[]).includes(field.fieldGroup) && (
+              <option value={field.fieldGroup}>{field.fieldGroup}</option>
+            )}
+        </select>
+      </TableCell>
+      <TableCell>
         <SubmissionFieldToggles
           visible={field.isVisible}
           required={field.isRequired}
@@ -243,6 +278,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
   const [newField, setNewField] = useState<Partial<SubmissionFormField>>({
     fieldType: 'text',
     fieldScope: 'release',
+    fieldGroup: 'metadata',
     fieldLabels: { ...EMPTY_LABELS },
     isRequired: false,
     isVisible: true,
@@ -562,6 +598,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                   <TableHead className="bg-card">{COPY.fieldLabel}</TableHead>
                   <TableHead className="bg-card">{COPY.fieldType}</TableHead>
                   {formType === 'release' && <TableHead className="bg-card">{COPY.fieldScope}</TableHead>}
+                  <TableHead className="bg-card" title={COPY.fieldGroupHint}>{COPY.fieldGroup}</TableHead>
                   <TableHead className="bg-card">{COPY.status}</TableHead>
                   <TableHead className="bg-card">{COPY.actions}</TableHead>
                 </TableRow>
@@ -584,6 +621,7 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                         updateField(f, { isVisible: visible, ...(!visible ? { isRequired: false } : {}) })
                       }
                       onRequiredChange={(f, required) => updateField(f, { isRequired: required })}
+                      onGroupChange={(f, group) => updateField(f, { fieldGroup: group })}
                       onDelete={(id) => setDeleteTarget(id)}
                     />
                   ))}
@@ -635,6 +673,27 @@ export function SubmissionFormManager({ variant = 'page' }: SubmissionFormManage
                   </select>
                 </div>
               )}
+              <div className="space-y-1">
+                <Label className="text-xs">{COPY.fieldGroup}</Label>
+                <select
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                  value={newField.fieldGroup ?? 'metadata'}
+                  onChange={(e) =>
+                    setNewField((p) => ({
+                      ...p,
+                      fieldGroup: e.target.value || null,
+                    }))
+                  }
+                  aria-label={COPY.fieldGroup}
+                >
+                  {FIELD_GROUP_PRESETS.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground">{COPY.fieldGroupHint}</p>
+              </div>
               {routing.locales.map((loc) => (
                 <div key={loc} className="space-y-1">
                   <Label className="text-xs">{COPY.fieldLabel} ({loc.toUpperCase()})</Label>

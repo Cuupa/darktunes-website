@@ -85,17 +85,20 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 ## Release submission form
 
-`/portal/releases/new` — schema-driven form from `submission_form_schema` + per-type rules.
+`/portal/releases/new` — **guided wizard** over schema-driven fields from `submission_form_schema` + per-type rules.
 
 | Piece | Location |
 |-------|----------|
-| Field schema | `submission_form_schema` (`field_scope`: `release` \| `track`; optional `type_rules` JSONB per release type) |
+| Field schema | `submission_form_schema` (`field_scope`: `release` \| `track`; `field_group` drives wizard steps; optional `type_rules` JSONB per release type) |
 | Track count rules | `submission_release_type_rules` (`fixed_1` for single; `user_specified` + min/max for album/ep/compilation) |
-| Rule resolution | `src/lib/submissions/fieldTypeRules.ts` — shared by portal UI + `POST /api/portal/submit-release` |
-| Admin UI | `SubmissionFormManager` — tabs: Fields, Track rules, Rules per type |
+| Wizard steps | `src/lib/submissions/wizardSteps.ts` — type → groups (`metadata` / `distribution` / `rights` / custom) → tracks → review |
+| Cover art check | `POST /api/portal/cover-art-check` + `verifyCoverArtUrl` (server-side, Drive-aware); re-checked on `POST /api/portal/submit-release` |
+| Draft autosave | IndexedDB via `useLocalKV` key `release-submission-draft:{artistId}` |
+| Rule resolution | `src/lib/submissions/fieldTypeRules.ts` — shared by portal UI + submit route |
+| Admin UI | `SubmissionFormManager` — Fields (incl. wizard group), Track rules, Rules per type |
 | Admin APIs | `PUT /api/admin/submission-form-schema`, `PUT /api/admin/submission-release-type-rules` |
 
-Artists pick release type, enter track count for multi-track types, and see only fields marked visible/required for that type.
+Artists are guided step-by-step; only fields visible/required for the selected type appear. Admins assign **wizard group** per field so custom fields land on the right step without code changes.
 
 **Draft catalog release:** Admin POST `/api/admin/release-submissions/[id]` `{ action: 'create_draft_release' }` → hidden `releases` row + `release_submissions.release_id` link + `sync_policy=manual_until_street`. Accept status alone does **not** create a catalog row.
 

@@ -1,13 +1,19 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
 import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -19,8 +25,25 @@ import {
 } from '@/lib/submissions/fieldTypeRules'
 import { RELEASE_STANDARD_FIELD_TO_BODY_KEY } from '@/lib/submissions/releaseFieldMapping'
 import { filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
+import {
+  applyFieldToAllTracks,
+  buildReleaseWizardSteps,
+  copyTrackValues,
+  countCompleteTracks,
+  humanizeGroupKey,
+  isTrackRowComplete,
+  prefillTrackFromRelease,
+  validateStepFields,
+  type WizardStep,
+} from '@/lib/submissions/wizardSteps'
+import { getFieldLabel } from '@/lib/submissions/fieldLabels'
+import { useLocalKV } from '@/hooks/useLocalKV'
 import type { SubmissionReleaseType } from '@/lib/submissions/fieldTypes'
 import type { Artist, SubmissionFormField, SubmissionReleaseTypeRule } from '@/types'
+import {
+  SubmissionWizardShell,
+  defaultStepLabel,
+} from './SubmissionWizardShell'
 
 interface ReleaseSubmissionFormProps {
   artist: Artist | null
@@ -33,6 +56,14 @@ interface TrackRow {
   values: Record<string, string>
 }
 
+interface DraftState {
+  values: Record<string, string>
+  tracks: TrackRow[]
+  trackCount: number
+  stepId: string
+  coverArtVerified: boolean
+}
+
 function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, string> {
   const values: Record<string, string> = {}
   for (const f of trackFields) {
@@ -41,22 +72,69 @@ function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, st
   return values
 }
 
-function buildTrackRows(count: number, trackFields: SubmissionFormField[], existing: TrackRow[]): TrackRow[] {
+function buildTrackRows(
+  count: number,
+  trackFields: SubmissionFormField[],
+  existing: TrackRow[],
+  releaseValues: Record<string, string>,
+): TrackRow[] {
   const rows: TrackRow[] = []
   for (let i = 0; i < count; i += 1) {
     const prev = existing[i]
+    const base = prev?.values ?? emptyTrackValues(trackFields)
+    const filled = prev ? base : prefillTrackFromRelease(base, releaseValues, trackFields)
+    // Ensure all current track field keys exist
+    for (const f of trackFields) {
+      if (filled[f.fieldKey] === undefined) {
+        filled[f.fieldKey] = f.fieldType === 'boolean' ? 'false' : ''
+      }
+    }
     rows.push({
       id: prev?.id ?? `track-${i + 1}`,
-      values: prev?.values ?? emptyTrackValues(trackFields),
+      values: filled,
     })
   }
   return rows
 }
 
+function buildInitialValues(
+  formSchema: SubmissionFormField[],
+  artist: Artist | null,
+): Record<string, string> {
+  const init: Record<string, string> = { type: 'single' }
+  if (artist?.name) init.artist_name = artist.name
+  if (artist?.genres?.[0]) init.genre = artist.genres[0]
+  if (artist?.spotifyUrl) init.spotify_url = artist.spotifyUrl
+  if (artist?.appleMusicUrl) init.apple_music_url = artist.appleMusicUrl
+  if (artist?.youtubeUrl) init.youtube_url = artist.youtubeUrl
+  for (const f of formSchema) {
+    if (init[f.fieldKey] === undefined) {
+      init[f.fieldKey] = f.fieldType === 'boolean' ? 'false' : ''
+    }
+  }
+  return init
+}
+
+const COPYABLE_TRACK_KEYS = [
+  'composer',
+  'author',
+  'track_genre',
+  'track_language',
+  'gema_track',
+  'explicit',
+  'live',
+  'cover_version',
+  'instrumental',
+]
+
 export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: ReleaseSubmissionFormProps) {
   const t = useTranslations('portal')
   const locale = useLocale()
   const router = useRouter()
+  const draftKey = `release-submission-draft:${artist?.id ?? 'anon'}`
+  const [draft, setDraft, clearDraft, draftLoaded] = useLocalKV<DraftState>(draftKey)
+  const restoredRef = useRef(false)
+  const headingFocusRef = useRef(false)
 
   const releaseFields = useMemo(
     () => formSchema.filter((f) => f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
@@ -67,21 +145,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [formSchema],
   )
 
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = { type: 'single' }
-    if (artist?.name) init.artist_name = artist.name
-    if (artist?.genres?.[0]) init.genre = artist.genres[0]
-    if (artist?.spotifyUrl) init.spotify_url = artist.spotifyUrl
-    if (artist?.appleMusicUrl) init.apple_music_url = artist.appleMusicUrl
-    if (artist?.youtubeUrl) init.youtube_url = artist.youtubeUrl
-    if (artist?.name) init.title = artist.name
-    for (const f of formSchema) {
-      if (init[f.fieldKey] === undefined) {
-        init[f.fieldKey] = f.fieldType === 'boolean' ? 'false' : ''
-      }
-    }
-    return init
-  })
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    buildInitialValues(formSchema, artist),
+  )
 
   const releaseType = (values.type || 'single') as SubmissionReleaseType
   const activeTypeRule = getTypeRuleForRelease(typeRules, releaseType)
@@ -98,11 +164,72 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   )
 
   const [tracks, setTracks] = useState<TrackRow[]>(() =>
-    buildTrackRows(1, filterFieldsForType(allTrackFields, 'single', { type: 'single' }), []),
+    buildTrackRows(
+      1,
+      filterFieldsForType(allTrackFields, 'single', { type: 'single' }),
+      [],
+      {},
+    ),
   )
   const [coverArtVerified, setCoverArtVerified] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [maxReachableIndex, setMaxReachableIndex] = useState(0)
+  const [showDraftBanner, setShowDraftBanner] = useState(false)
+
+  const wizardSteps = useMemo(
+    () => buildReleaseWizardSteps(visibleReleaseFields, visibleTrackFields),
+    [visibleReleaseFields, visibleTrackFields],
+  )
+
+  // Restore draft once IndexedDB loads
+  useEffect(() => {
+    if (!draftLoaded || restoredRef.current || !draft) return
+    restoredRef.current = true
+    if (draft.values && Object.keys(draft.values).length > 0) {
+      setValues((prev) => ({ ...prev, ...draft.values }))
+      if (draft.tracks?.length) setTracks(draft.tracks)
+      if (typeof draft.trackCount === 'number') setTrackCount(draft.trackCount)
+      if (draft.coverArtVerified) setCoverArtVerified(true)
+      setShowDraftBanner(true)
+    }
+  }, [draftLoaded, draft])
+
+  // Restore step after steps rebuild from restored type
+  useEffect(() => {
+    if (!draft?.stepId || !showDraftBanner) return
+    const idx = wizardSteps.findIndex((s) => s.id === draft.stepId)
+    if (idx >= 0) {
+      setActiveIndex(idx)
+      setMaxReachableIndex((m) => Math.max(m, idx))
+    }
+  }, [wizardSteps, draft?.stepId, showDraftBanner])
+
+  // Persist draft
+  useEffect(() => {
+    if (!draftLoaded || !artist?.id) return
+    const handle = setTimeout(() => {
+      setDraft({
+        values,
+        tracks,
+        trackCount,
+        stepId: wizardSteps[activeIndex]?.id ?? 'type',
+        coverArtVerified,
+      })
+    }, 400)
+    return () => clearTimeout(handle)
+  }, [
+    values,
+    tracks,
+    trackCount,
+    activeIndex,
+    coverArtVerified,
+    wizardSteps,
+    draftLoaded,
+    artist?.id,
+    setDraft,
+  ])
 
   useEffect(() => {
     const rule = getTypeRuleForRelease(typeRules, releaseType)
@@ -112,8 +239,26 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
 
   useEffect(() => {
     const count = userSpecifiedTracks ? trackCount : 1
-    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev))
-  }, [trackCount, userSpecifiedTracks, visibleTrackFields])
+    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev, values))
+  }, [trackCount, userSpecifiedTracks, visibleTrackFields, values])
+
+  // Keep active index in range when steps change (e.g. type switch)
+  useEffect(() => {
+    if (activeIndex >= wizardSteps.length) {
+      setActiveIndex(Math.max(0, wizardSteps.length - 1))
+    }
+    setMaxReachableIndex((m) => Math.min(m, Math.max(wizardSteps.length - 1, 0)))
+  }, [wizardSteps.length, activeIndex])
+
+  useEffect(() => {
+    if (!headingFocusRef.current) {
+      headingFocusRef.current = true
+      return
+    }
+    document.getElementById('submission-step-heading')?.focus()
+  }, [activeIndex])
+
+  const activeStep: WizardStep | undefined = wizardSteps[activeIndex]
 
   const setFieldValue = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -140,6 +285,57 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     })
   }
 
+  const validateCurrentStep = (): boolean => {
+    if (!activeStep) return true
+    const errors: Record<string, string> = {}
+
+    if (activeStep.kind === 'type' || activeStep.kind === 'group') {
+      Object.assign(
+        errors,
+        validateStepFields(
+          activeStep.fields,
+          values,
+          validateFieldValue,
+          t('releases_submit_required'),
+        ),
+      )
+      if (activeStep.kind === 'type' && userSpecifiedTracks) {
+        const trackCountError = validateTrackCount(activeTypeRule, trackCount, tracks.length)
+        if (trackCountError) errors.track_count = trackCountError
+      }
+      // Cover verification on distribution step when cover field is present
+      if (activeStep.fields.some((f) => f.fieldKey === 'cover_art_url')) {
+        if ((values.cover_art_url ?? '').trim() && !coverArtVerified) {
+          errors.cover_art_url = t('releases_submit_cover_check_required')
+        }
+      }
+    }
+
+    if (activeStep.kind === 'tracks') {
+      const trackCountError = validateTrackCount(
+        activeTypeRule,
+        userSpecifiedTracks ? trackCount : 1,
+        tracks.length,
+      )
+      if (trackCountError) errors.track_count = trackCountError
+      for (const track of tracks) {
+        for (const field of visibleTrackFields) {
+          const raw = track.values[field.fieldKey] ?? ''
+          const errKey = `${track.id}:${field.fieldKey}`
+          if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
+            errors[errKey] = t('releases_submit_required')
+          } else if (raw.trim()) {
+            const err = validateFieldValue(field.fieldType, raw)
+            if (err) errors[errKey] = err
+          }
+        }
+      }
+    }
+
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const validateBeforeSubmit = (): boolean => {
     const errors: Record<string, string> = {}
 
@@ -154,9 +350,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     }
 
     const trackCountError = validateTrackCount(activeTypeRule, userSpecifiedTracks ? trackCount : 1, tracks.length)
-    if (trackCountError) {
-      errors.track_count = trackCountError
-    }
+    if (trackCountError) errors.track_count = trackCountError
 
     for (const track of tracks) {
       for (const field of visibleTrackFields) {
@@ -171,13 +365,29 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       }
     }
 
+    if (!coverArtVerified) {
+      errors.cover_art_url = t('releases_submit_cover_check_required')
+    }
+
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const goNext = () => {
+    if (!validateCurrentStep()) {
+      toast.error(t('releases_submit_validation_error'))
+      return
+    }
+    const next = Math.min(activeIndex + 1, wizardSteps.length - 1)
+    setActiveIndex(next)
+    setMaxReachableIndex((m) => Math.max(m, next))
+  }
 
+  const goBack = () => {
+    setActiveIndex((i) => Math.max(0, i - 1))
+  }
+
+  const submit = async () => {
     if (!coverArtVerified) {
       toast.error(t('releases_submit_cover_check_required'))
       return
@@ -190,14 +400,16 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     setSubmitting(true)
     try {
       const supabase = createBrowserSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!session) {
         toast.error(t('releases_submit_error'))
         return
       }
 
       const standardBody: Record<string, unknown> = {
-        coverArtVerified,
+        coverArtVerified: true,
       }
       const formData: Record<string, unknown> = {}
 
@@ -235,11 +447,12 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string }
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
         toast.error(err.error ?? t('releases_submit_error'))
         return
       }
 
+      clearDraft()
       toast.success(t('releases_submit_success'))
       router.push('/portal/releases/submissions')
       router.refresh()
@@ -250,112 +463,397 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     }
   }
 
+  const resolveStepTitle = (step: WizardStep): string => {
+    if (step.kind === 'group' && step.groupKey && step.titleKey === 'submission_wizard_step_custom') {
+      return t('submission_wizard_step_custom', { group: humanizeGroupKey(step.groupKey) })
+    }
+    return t(step.titleKey as Parameters<typeof t>[0])
+  }
+
+  const resolveStepDescription = (step: WizardStep): string => {
+    if (step.kind === 'group' && step.groupKey && step.descriptionKey === 'submission_wizard_step_custom_desc') {
+      return t('submission_wizard_step_custom_desc', { group: humanizeGroupKey(step.groupKey) })
+    }
+    return t(step.descriptionKey as Parameters<typeof t>[0])
+  }
+
+  const renderReleaseFields = (fields: SubmissionFormField[]) =>
+    fields.map((field) => (
+      <div key={field.id}>
+        {field.fieldKey === 'cover_art_url' ? (
+          <div className="space-y-2">
+            <SchemaDrivenField
+              field={field}
+              locale={locale}
+              value={values[field.fieldKey] ?? ''}
+              onChange={(v) => setFieldValue(field.fieldKey, v)}
+              error={fieldErrors[field.fieldKey]}
+            />
+            <CoverArtAnalyzer
+              url={values.cover_art_url ?? ''}
+              onVerified={handleCoverArtVerified}
+            />
+          </div>
+        ) : (
+          <SchemaDrivenField
+            field={field}
+            locale={locale}
+            value={values[field.fieldKey] ?? ''}
+            onChange={(v) => setFieldValue(field.fieldKey, v)}
+            error={fieldErrors[field.fieldKey]}
+          />
+        )}
+      </div>
+    ))
+
+  const tracksComplete = countCompleteTracks(tracks, visibleTrackFields)
+
+  const reviewIssues = useMemo(() => {
+    const issues: Array<{ label: string; stepId: string }> = []
+    for (const field of visibleReleaseFields) {
+      const raw = values[field.fieldKey] ?? ''
+      if (field.isRequired && field.fieldType !== 'boolean' && !raw.trim()) {
+        const step =
+          wizardSteps.find(
+            (s) =>
+              (s.kind === 'type' || s.kind === 'group') &&
+              s.fields.some((f) => f.fieldKey === field.fieldKey),
+          ) ?? wizardSteps.find((s) => s.kind === 'review')
+        issues.push({
+          label: getFieldLabel(field, locale),
+          stepId: step?.id ?? 'review',
+        })
+      }
+    }
+    if (!coverArtVerified) {
+      const dist = wizardSteps.find((s) => s.fields.some((f) => f.fieldKey === 'cover_art_url'))
+      issues.push({
+        label: t('releases_submit_cover_check_heading'),
+        stepId: dist?.id ?? 'review',
+      })
+    }
+    if (visibleTrackFields.some((f) => f.isRequired)) {
+      const incomplete = tracks.length - tracksComplete
+      if (incomplete > 0) {
+        issues.push({
+          label: t('submission_wizard_review_tracks_incomplete', {
+            n: String(incomplete),
+          }),
+          stepId: 'tracks',
+        })
+      }
+    }
+    return issues
+  }, [
+    visibleReleaseFields,
+    values,
+    coverArtVerified,
+    visibleTrackFields,
+    tracks,
+    tracksComplete,
+    wizardSteps,
+    locale,
+    t,
+  ])
+
+  const discardDraft = () => {
+    clearDraft()
+    setShowDraftBanner(false)
+    setValues(buildInitialValues(formSchema, artist))
+    setTracks(
+      buildTrackRows(1, filterFieldsForType(allTrackFields, 'single', { type: 'single' }), [], {}),
+    )
+    setCoverArtVerified(false)
+    setActiveIndex(0)
+    setMaxReachableIndex(0)
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{t('releases_submit_heading')}</h1>
-      <p className="text-sm text-muted-foreground">{t('releases_submit_pending_notice')}</p>
+      <div>
+        <h1 className="text-3xl font-bold">{t('releases_submit_heading')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('releases_submit_pending_notice')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('submission_wizard_intro')}</p>
+      </div>
 
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle>{t('releases_submit_heading')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={(e) => void submit(e)}>
-            {visibleReleaseFields.map((field) => (
-              <div key={field.id}>
-                {field.fieldKey === 'cover_art_url' ? (
-                  <div className="space-y-2">
-                    <SchemaDrivenField
-                      field={field}
-                      locale={locale}
-                      value={values[field.fieldKey] ?? ''}
-                      onChange={(v) => setFieldValue(field.fieldKey, v)}
-                      error={fieldErrors[field.fieldKey]}
-                    />
-                    <CoverArtAnalyzer
-                      url={values.cover_art_url ?? ''}
-                      onVerified={handleCoverArtVerified}
-                    />
-                  </div>
-                ) : (
-                  <SchemaDrivenField
-                    field={field}
-                    locale={locale}
-                    value={values[field.fieldKey] ?? ''}
-                    onChange={(v) => setFieldValue(field.fieldKey, v)}
-                    error={fieldErrors[field.fieldKey]}
+      {showDraftBanner && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-4 py-3 text-sm"
+          role="status"
+        >
+          <span>{t('submission_wizard_draft_restored')}</span>
+          <Button type="button" variant="outline" size="sm" onClick={discardDraft}>
+            {t('submission_wizard_draft_discard')}
+          </Button>
+        </div>
+      )}
+
+      {activeStep && (
+        <SubmissionWizardShell
+          steps={wizardSteps}
+          activeIndex={activeIndex}
+          onStepChange={setActiveIndex}
+          maxReachableIndex={maxReachableIndex}
+          stepTitle={resolveStepTitle(activeStep)}
+          stepDescription={resolveStepDescription(activeStep)}
+          onBack={goBack}
+          onNext={activeStep.kind === 'review' ? () => void submit() : goNext}
+          nextLabel={
+            activeStep.kind === 'review'
+              ? submitting
+                ? t('releases_submit_saving')
+                : t('releases_submit_save')
+              : t('submission_wizard_next')
+          }
+          backLabel={t('submission_wizard_back')}
+          nextDisabled={
+            activeStep.kind === 'review'
+              ? submitting || !coverArtVerified || reviewIssues.length > 0
+              : false
+          }
+          hideNext={false}
+          getStepLabel={(step) => defaultStepLabel(step, (key, values) => t(key as Parameters<typeof t>[0], values))}
+          footerExtra={
+            activeStep.kind === 'review' ? (
+              <span className="text-xs text-muted-foreground">
+                {coverArtVerified
+                  ? t('releases_submit_cover_check_ok')
+                  : t('releases_submit_cover_check_required')}
+              </span>
+            ) : null
+          }
+        >
+          {(activeStep.kind === 'type' || activeStep.kind === 'group') && (
+            <div className="space-y-4">
+              {renderReleaseFields(activeStep.fields)}
+              {activeStep.kind === 'type' && userSpecifiedTracks && (
+                <div className="space-y-2 border-t border-border pt-4">
+                  <Label htmlFor="track-count">{t('releases_submit_track_count')}</Label>
+                  <Input
+                    id="track-count"
+                    type="number"
+                    min={activeTypeRule?.minTracks ?? 2}
+                    max={activeTypeRule?.maxTracks ?? 99}
+                    value={trackCount}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      if (!Number.isNaN(next)) setTrackCount(next)
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev }
+                        delete copy.track_count
+                        return copy
+                      })
+                    }}
+                    aria-invalid={!!fieldErrors.track_count}
+                    aria-describedby={fieldErrors.track_count ? 'track-count-error' : undefined}
                   />
-                )}
-              </div>
-            ))}
-
-            {userSpecifiedTracks && visibleTrackFields.length > 0 && (
-              <div className="space-y-2 border-t border-border pt-4">
-                <Label htmlFor="track-count">{t('releases_submit_track_count')}</Label>
-                <Input
-                  id="track-count"
-                  type="number"
-                  min={activeTypeRule?.minTracks ?? 2}
-                  max={activeTypeRule?.maxTracks ?? 99}
-                  value={trackCount}
-                  onChange={(e) => {
-                    const next = Number(e.target.value)
-                    if (!Number.isNaN(next)) setTrackCount(next)
-                    setFieldErrors((prev) => {
-                      const copy = { ...prev }
-                      delete copy.track_count
-                      return copy
-                    })
-                  }}
-                  aria-invalid={!!fieldErrors.track_count}
-                  aria-describedby={fieldErrors.track_count ? 'track-count-error' : undefined}
-                />
-                {fieldErrors.track_count && (
-                  <p id="track-count-error" className="text-sm text-destructive" role="alert">
-                    {fieldErrors.track_count}
+                  {fieldErrors.track_count && (
+                    <p id="track-count-error" className="text-sm text-destructive" role="alert">
+                      {fieldErrors.track_count}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {t('releases_submit_track_count_hint', {
+                      min: activeTypeRule?.minTracks ?? 2,
+                      max: activeTypeRule?.maxTracks ?? 99,
+                    })}
                   </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {t('releases_submit_track_count_hint', {
-                    min: activeTypeRule?.minTracks ?? 2,
-                    max: activeTypeRule?.maxTracks ?? 99,
+                </div>
+              )}
+              {activeStep.kind === 'type' && activeTypeRule && (
+                <p className="text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2">
+                  {userSpecifiedTracks
+                    ? t('submission_wizard_type_hint_multi', {
+                        min: String(activeTypeRule.minTracks),
+                        max: String(activeTypeRule.maxTracks),
+                      })
+                    : t('submission_wizard_type_hint_single')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeStep.kind === 'tracks' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {t('submission_wizard_tracks_progress', {
+                    done: String(tracksComplete),
+                    total: String(tracks.length),
                   })}
                 </p>
+                <Badge variant="secondary">
+                  {tracksComplete}/{tracks.length}
+                </Badge>
               </div>
-            )}
 
-            {visibleTrackFields.length > 0 && (
-              <div className="space-y-4 border-t border-border pt-4">
-                <h2 className="text-lg font-semibold">{t('releases_submit_tracks_heading')}</h2>
-                {tracks.map((track, index) => (
-                  <div key={track.id} className="rounded-md border border-border p-4 space-y-3">
-                    <p className="text-sm font-medium">{t('releases_submit_track_label', { n: index + 1 })}</p>
-                    {visibleTrackFields.map((field) => (
-                      <SchemaDrivenField
-                        key={`${track.id}-${field.id}`}
-                        field={field}
-                        locale={locale}
-                        value={track.values[field.fieldKey] ?? ''}
-                        onChange={(v) => setTrackValue(track.id, field.fieldKey, v)}
-                        idPrefix={track.id}
-                        error={fieldErrors[`${track.id}:${field.fieldKey}`]}
-                      />
-                    ))}
+              <Accordion type="multiple" defaultValue={tracks[0] ? [tracks[0].id] : []} className="space-y-2">
+                {tracks.map((track, index) => {
+                  const complete = isTrackRowComplete(track.values, visibleTrackFields)
+                  return (
+                    <AccordionItem
+                      key={track.id}
+                      value={track.id}
+                      className="rounded-md border border-border px-3"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <span className="flex items-center gap-2 text-sm font-medium">
+                          {t('releases_submit_track_label', { n: index + 1 })}
+                          {track.values.song_title ? (
+                            <span className="font-normal text-muted-foreground truncate max-w-[12rem]">
+                              — {track.values.song_title}
+                            </span>
+                          ) : null}
+                          <Badge variant={complete ? 'default' : 'outline'} className="text-[10px]">
+                            {complete
+                              ? t('submission_wizard_track_complete')
+                              : t('submission_wizard_track_incomplete')}
+                          </Badge>
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-4">
+                        {index > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const prev = tracks[index - 1]
+                              if (!prev) return
+                              setTracks((rows) =>
+                                rows.map((tr) =>
+                                  tr.id === track.id
+                                    ? {
+                                        ...tr,
+                                        values: copyTrackValues(
+                                          prev.values,
+                                          tr.values,
+                                          COPYABLE_TRACK_KEYS.filter((k) =>
+                                            visibleTrackFields.some((f) => f.fieldKey === k),
+                                          ),
+                                        ),
+                                      }
+                                    : tr,
+                                ),
+                              )
+                              toast.success(t('submission_wizard_copy_prev_done'))
+                            }}
+                          >
+                            {t('submission_wizard_copy_prev')}
+                          </Button>
+                        )}
+                        {visibleTrackFields.map((field) => (
+                          <div key={`${track.id}-${field.id}`} className="space-y-1">
+                            <SchemaDrivenField
+                              field={field}
+                              locale={locale}
+                              value={track.values[field.fieldKey] ?? ''}
+                              onChange={(v) => setTrackValue(track.id, field.fieldKey, v)}
+                              idPrefix={track.id}
+                              error={fieldErrors[`${track.id}:${field.fieldKey}`]}
+                            />
+                            {field.fieldType !== 'boolean' && (
+                              <button
+                                type="button"
+                                className="text-xs text-primary hover:underline"
+                                onClick={() => {
+                                  setTracks((rows) =>
+                                    applyFieldToAllTracks(
+                                      rows,
+                                      field.fieldKey,
+                                      track.values[field.fieldKey] ?? '',
+                                    ),
+                                  )
+                                  toast.success(t('submission_wizard_apply_all_done'))
+                                }}
+                              >
+                                {t('submission_wizard_apply_all')}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                })}
+              </Accordion>
+            </div>
+          )}
+
+          {activeStep.kind === 'review' && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-border p-4 space-y-2">
+                <h3 className="text-sm font-semibold">{t('submission_wizard_review_summary')}</h3>
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  {visibleReleaseFields
+                    .filter((f) => f.fieldKey !== 'type' || true)
+                    .slice(0, 12)
+                    .map((field) => {
+                      const raw = values[field.fieldKey] ?? ''
+                      if (!raw.trim() && field.fieldType !== 'boolean') return null
+                      return (
+                        <div key={field.id}>
+                          <dt className="text-muted-foreground text-xs">
+                            {getFieldLabel(field, locale)}
+                          </dt>
+                          <dd className="font-medium break-all">
+                            {field.fieldType === 'boolean'
+                              ? raw === 'true'
+                                ? 'Yes'
+                                : 'No'
+                              : raw}
+                          </dd>
+                        </div>
+                      )
+                    })}
+                  <div>
+                    <dt className="text-muted-foreground text-xs">{t('releases_submit_tracks_heading')}</dt>
+                    <dd className="font-medium">
+                      {tracksComplete}/{tracks.length} {t('submission_wizard_track_complete').toLowerCase()}
+                    </dd>
                   </div>
-                ))}
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {t('releases_submit_cover_check_heading')}
+                    </dt>
+                    <dd className="font-medium">
+                      {coverArtVerified
+                        ? t('submission_wizard_review_cover_ok')
+                        : t('submission_wizard_review_cover_missing')}
+                    </dd>
+                  </div>
+                </dl>
               </div>
-            )}
 
-            <Button
-              type="submit"
-              disabled={submitting || !coverArtVerified}
-              title={!coverArtVerified ? t('releases_submit_cover_check_required') : undefined}
-            >
-              {submitting ? t('releases_submit_saving') : t('releases_submit_save')}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              {reviewIssues.length > 0 ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-2" role="alert">
+                  <p className="text-sm font-medium text-destructive">
+                    {t('submission_wizard_review_issues')}
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
+                    {reviewIssues.map((issue) => (
+                      <li key={`${issue.stepId}-${issue.label}`}>
+                        <button
+                          type="button"
+                          className="text-primary hover:underline"
+                          onClick={() => {
+                            const idx = wizardSteps.findIndex((s) => s.id === issue.stepId)
+                            if (idx >= 0) setActiveIndex(idx)
+                          }}
+                        >
+                          {issue.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('submission_wizard_review_ready')}</p>
+              )}
+            </div>
+          )}
+        </SubmissionWizardShell>
+      )}
     </div>
   )
 }

@@ -42,13 +42,16 @@ interface PlaylistItemsPage {
 }
 
 /**
- * Derives the uploads-playlist ID for a channel.
- * YouTube's convention: replace the leading "UC" with "UULF".
+ * Derives the channel "uploads" playlist ID.
+ * YouTube convention: replace the leading "UC" with "UU" (all uploads).
  * e.g. "UCLFuCYsYBaq3j0gM4wWo82LkQ" → "UULFuCYsYBaq3j0gM4wWo82LkQ"
+ *
+ * Other prefixes (not used here): UULF long-form only, UUSH Shorts, UULV live.
+ * Shorts filtering is handled separately via duration / is_short, not playlist choice.
  */
 function uploadsPlaylistId(channelId: string): string {
   if (channelId.startsWith('UC')) {
-    return 'UULF' + channelId.slice(2)
+    return 'UU' + channelId.slice(2)
   }
   return channelId
 }

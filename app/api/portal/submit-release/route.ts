@@ -14,6 +14,7 @@ import { buildTrackInsert, filterArtistTrackFields } from '@/lib/submissions/tra
 import { coerceReleaseDate } from '@/lib/submissions/submissionSchemaValidation'
 import { filterFieldsForType } from '@/lib/submissions/fieldTypeRules'
 import { validateReleaseSubmissionByType } from '@/lib/submissions/submissionTypeValidation'
+import { verifyCoverArtUrl } from '@/lib/submissions/coverArtCheck'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
 
 const trackInputSchema = z.object({
@@ -79,6 +80,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     formData,
   })
 
+  // Re-verify cover art server-side — never trust client coverArtVerified alone
+  const { serverEnv } = await import('@/lib/env.server')
+  const coverCheck = await verifyCoverArtUrl(body.coverArtUrl, {
+    r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
+  })
+  if (!coverCheck.verified) {
+    throw new ApiError(
+      400,
+      coverCheck.message ??
+        `Cover art verification failed (${coverCheck.status}). Expected JPEG 3000×3000.`,
+    )
+  }
+
   const releaseType = body.type ?? 'single'
   const trackFields = filterArtistTrackFields(
     filterFieldsForType(
@@ -93,7 +107,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     title: body.title,
     audio_download_url: body.audioDownloadUrl,
     cover_art_url: body.coverArtUrl,
-    cover_art_verified: body.coverArtVerified ?? false,
+    cover_art_verified: true,
     release_date: coerceReleaseDate(body.releaseDate),
     type: body.type ?? null,
     genre: body.genre ?? null,
